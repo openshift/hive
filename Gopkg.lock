@@ -269,6 +269,14 @@
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:e3bb58bcd5cf318d91ccdb290fd8e0e78d16add716b1ccf861fed19c1551fde0"
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "3e01752db0189b9157070a0e1668a620f9a85da2"
+  version = "v1.0.6"
+
+[[projects]]
   digest = "1:b7bf9fd95d38ebe6726a63b7d0320611f7c920c64e2c8313eba0cec51926bf55"
   name = "github.com/spf13/afero"
   packages = [
@@ -754,6 +762,7 @@
     "github.com/emicklei/go-restful",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/sirupsen/logrus",
     "golang.org/x/net/context",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",

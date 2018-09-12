@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"testing"

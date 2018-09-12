@@ -18,7 +18,7 @@ package clusterdeployment
 
 import (
 	"context"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 
 	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"

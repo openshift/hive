@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/controller"

@@ -39,7 +39,7 @@ gometalinter.v2 --disable-all \
     --enable=errcheck \
     --enable=varcheck \
     --enable=goconst \
-    --enable=gosec \
+    --enable=gas \
     --enable=unparam \
     --enable=ineffassign \
     --enable=nakedret \

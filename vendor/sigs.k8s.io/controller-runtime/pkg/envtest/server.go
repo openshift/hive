@@ -22,7 +22,6 @@ import (
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/testing_frameworks/integration"
 )
 
@@ -71,59 +70,38 @@ type Environment struct {
 
 	// CRDDirectoryPaths is a list of paths containing CRD yaml or json configs.
 	CRDDirectoryPaths []string
-
-	// UseExisting indicates that this environments should use an
-	// existing kubeconfig, instead of trying to stand up a new control plane.
-	// This is useful in cases that need aggregated API servers and the like.
-	UseExistingCluster bool
 }
 
 // Stop stops a running server
 func (te *Environment) Stop() error {
-	if te.UseExistingCluster {
-		return nil
-	}
 	return te.ControlPlane.Stop()
 }
 
 // Start starts a local Kubernetes server and updates te.ApiserverPort with the port it is listening on
 func (te *Environment) Start() (*rest.Config, error) {
-	if te.UseExistingCluster {
-		if te.Config == nil {
-			// we want to allow people to pass in their own config, so
-			// only load a config if it hasn't already been set.
-
-			var err error
-			te.Config, err = config.GetConfig()
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		te.ControlPlane = integration.ControlPlane{}
-		te.ControlPlane.APIServer = &integration.APIServer{Args: defaultKubeAPIServerFlags}
-		if os.Getenv(envKubeAPIServerBin) == "" {
-			te.ControlPlane.APIServer.Path = defaultAssetPath("kube-apiserver")
-		}
-		if os.Getenv(envEtcdBin) == "" {
-			te.ControlPlane.Etcd = &integration.Etcd{Path: defaultAssetPath("etcd")}
-		}
-		if os.Getenv(envKubectlBin) == "" {
-			// we can't just set the path manually (it's behind a function), so set the environment variable instead
-			if err := os.Setenv(envKubectlBin, defaultAssetPath("kubectl")); err != nil {
-				return nil, err
-			}
-		}
-
-		// Start the control plane - retry if it fails
-		if err := te.ControlPlane.Start(); err != nil {
+	te.ControlPlane = integration.ControlPlane{}
+	te.ControlPlane.APIServer = &integration.APIServer{Args: defaultKubeAPIServerFlags}
+	if os.Getenv(envKubeAPIServerBin) == "" {
+		te.ControlPlane.APIServer.Path = defaultAssetPath("kube-apiserver")
+	}
+	if os.Getenv(envEtcdBin) == "" {
+		te.ControlPlane.Etcd = &integration.Etcd{Path: defaultAssetPath("etcd")}
+	}
+	if os.Getenv(envKubectlBin) == "" {
+		// we can't just set the path manually (it's behind a function), so set the environment variable instead
+		if err := os.Setenv(envKubectlBin, defaultAssetPath("kubectl")); err != nil {
 			return nil, err
 		}
+	}
 
-		// Create the *rest.Config for creating new clients
-		te.Config = &rest.Config{
-			Host: te.ControlPlane.APIURL().Host,
-		}
+	// Start the control plane - retry if it fails
+	if err := te.ControlPlane.Start(); err != nil {
+		return nil, err
+	}
+
+	// Create the *rest.Config for creating new clients
+	te.Config = &rest.Config{
+		Host: te.ControlPlane.APIURL().Host,
 	}
 
 	_, err := InstallCRDs(te.Config, CRDInstallOptions{

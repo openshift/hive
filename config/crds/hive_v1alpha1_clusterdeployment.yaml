@@ -21,6 +21,98 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            baseDomain:
+              type: string
+            clusterID:
+              type: string
+            machines:
+              items:
+                properties:
+                  name:
+                    type: string
+                  platform:
+                    properties:
+                      aws:
+                        properties:
+                          iamRoleName:
+                            type: string
+                          rootVolume:
+                            properties:
+                              iops:
+                                format: int64
+                                type: integer
+                              size:
+                                format: int64
+                                type: integer
+                              type:
+                                type: string
+                            required:
+                            - iops
+                            - size
+                            - type
+                            type: object
+                          type:
+                            type: string
+                        required:
+                        - type
+                        - iamRoleName
+                        - rootVolume
+                        type: object
+                    type: object
+                  replicas:
+                    format: int64
+                    type: integer
+                required:
+                - name
+                - replicas
+                - platform
+                type: object
+              type: array
+            networking:
+              properties:
+                podCIDR:
+                  type: string
+                serviceCIDR:
+                  type: string
+                type:
+                  type: string
+              required:
+              - type
+              - serviceCIDR
+              - podCIDR
+              type: object
+            platform:
+              properties:
+                aws:
+                  properties:
+                    credentialsSecret:
+                      type: object
+                    region:
+                      type: string
+                    sshSecret:
+                      type: object
+                    vpcCIDRBlock:
+                      type: string
+                    vpcID:
+                      type: string
+                  required:
+                  - region
+                  - vpcID
+                  - vpcCIDRBlock
+                  - sshSecret
+                  - credentialsSecret
+                  type: object
+              type: object
+            pullSecret:
+              type: string
+          required:
+          - clusterID
+          - baseDomain
+          - networking
+          - machines
+          - platform
+          - pullSecret
           type: object
         status:
           type: object
@@ -30,4 +122,3 @@ status:
     kind: ""
     plural: ""
   conditions: null
-  storedVersions: null

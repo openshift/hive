@@ -27,7 +27,14 @@ import (
 
 func TestStorageClusterDeployment(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
-	created := &ClusterDeployment{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	created := &ClusterDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		Spec: ClusterDeploymentSpec{
+			Config: InstallConfig{
+				Machines: []MachinePool{},
+			},
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create

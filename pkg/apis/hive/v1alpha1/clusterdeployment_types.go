@@ -17,16 +17,28 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// Important: Run "make" to regenerate code after modifying this file
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Config InstallConfig `json:"config"`
+}
+
+// MyAWSPlatform stores all the global configuration that
+// all machinesets use.
+type MyAWSPlatform struct {
+	// SSHSecret refers to a secret that contains the ssh private key to access
+	// EC2 instances in this cluster.
+	SSHSecret corev1.LocalObjectReference `json:"sshSecret"`
+
+	// CredentialsSecret refers to a secret that contains the AWS account access
+	// credentials.
+	CredentialsSecret corev1.LocalObjectReference `json:"credentialsSecret"`
 }
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment

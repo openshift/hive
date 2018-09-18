@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: cluster-deployment-template
+
+parameters:
+- name: CLUSTER_NAME
+  displayName: Cluster Name
+  description: The name to give to the Cluster created. If using real AWS, then this name should include your username so that resources created in AWS can be identified as yours.
+  required: true
+- name: ADMIN_EMAIL
+  displayName: Admin Email
+  description: Your email address.
+  required: true
+- name: ADMIN_PASSWORD
+  displayName: Admin Password
+  description: Your password to login to the new cluster.
+  required: true
+- name: SSH_KEY
+  displayName: SSH Key
+  description: Your public SSH key to reach instances.
+  required: true
+- name: BASE_DOMAIN
+  displayName: Base DNS Domain
+  description: Base DNS domain for your cluster. Will be combined with cluster name when creating entries.
+  default: new-installer.openshift.com
+
+objects:
+- apiVersion: hive.openshift.io/v1alpha1
+  kind: ClusterDeployment
+  metadata:
+    labels:
+      controller-tools.k8s.io: "1.0"
+    name: ${CLUSTER_NAME}
+  spec:
+    config:
+      admin:
+        email: ${ADMIN_EMAIL}
+        password: ${ADMIN_PASSWORD}
+        sshKey: ${SSH_KEY}
+      clusterID: ${CLUSTER_NAME} # TODO: what kind of ID is this
+      baseDomain: ${BASE_DOMAIN}
+      networking:
+        type: openshift-sdn
+        serviceCIDR: "172.30.0.0/16"
+        podCIDR: "10.128.0.0/14"
+      platform:
+        aws:
+          region: us-east-1
+          vpcID: should-not-be-required # TODO
+          vpcCIDRBlock: 10.0.0.0/16
+      pullSecret: does-not-exist # TODO
+      machines:
+      - name: master
+        replicas: 3
+        platform:
+          aws:
+            type: m4-large
+            iamRoleName: TBD # TODO
+            rootVolume:
+              iops: 100 # TODO
+              size: 32
+              type: gp2
+      - name: worker
+        replicas: 3
+        platform:
+          aws:
+            type: m4-large
+            iamRoleName: TBD # TODO
+            rootVolume:
+              iops: 100 # TODO
+              size: 32
+              type: gp2
+

@@ -18,16 +18,19 @@ package clusterdeployment
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
-	"reflect"
+	"time"
 
-	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	log "github.com/sirupsen/logrus"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+
+	kbatch "k8s.io/api/batch/v1"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,14 +40,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
+const (
+	installerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+)
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-// USER ACTION REQUIRED: update cmd/manager/main.go to call this hive.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
 }
@@ -63,16 +64,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1alpha1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by ClusterDeployment - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+	// Watch for jobs created by a ClusterDeployment:
+	err = c.Watch(&source.Kind{Type: &kbatch.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1alpha1.ClusterDeployment{},
+		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
 		return err
@@ -91,15 +91,16 @@ type ReconcileClusterDeployment struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
+//
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
+//
+// TODO: RBAC for jobs instead of deployments here:
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the ClusterDeployment instance
-	instance := &hivev1alpha1.ClusterDeployment{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	cd := &hivev1.ClusterDeployment{}
+	err := r.Get(context.TODO(), request.NamespacedName, cd)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -109,58 +110,211 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	cdLog := log.WithFields(log.Fields{
+		"clusterDeployment": cd.Name,
+		"namespace":         cd.Namespace,
+	})
+	cdLog.Info("reconciling cluster deployment")
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
+	job := generateInstallerJob("mytestjob", cd, installerImage, kapi.PullIfNotPresent, nil)
+	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+		cdLog.Errorf("error setting controller reference", err)
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
+	cdLog = cdLog.WithField("job", job.Name)
+
+	// Check if the Job already exists for this ClusterDeployment:
+	found := &kbatch.Job{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Create(context.TODO(), deploy)
+		cdLog.Infof("creating job")
+		err = r.Create(context.TODO(), job)
 		if err != nil {
+			cdLog.Errorf("error creating job: %v", err)
 			return reconcile.Result{}, err
 		}
 	} else if err != nil {
+		cdLog.Errorf("error getting job: %v", err)
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
 	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			return reconcile.Result{}, err
+	// TODO: I don't think we can update the job spec once created?
+	/*
+		if !reflect.DeepEqual(job.Spec, found.Spec) {
+			found.Spec = job.Spec
+			cdLog.Infof("updating job")
+			err = r.Update(context.TODO(), found)
+			if err != nil {
+				cdLog.Errorf("error updating job: %v", err)
+				return reconcile.Result{}, err
+			}
+		} else {
+			cdLog.Debugf("job found and already up to date")
 		}
-	}
+	*/
+	cdLog.Debugf("reconcile complete")
 	return reconcile.Result{}, nil
+}
+
+func generateInstallerJob(
+	name string,
+	cd *hivev1.ClusterDeployment,
+	installerImage string,
+	installerImagePullPolicy kapi.PullPolicy,
+	serviceAccount *kapi.ServiceAccount) *kbatch.Job {
+
+	cdLog := log.WithFields(log.Fields{
+		"clusterDeployment": cd.Name,
+		"namespace":         cd.Namespace,
+	})
+
+	cdLog.Debug("generating installer job")
+
+	/*
+		cfgMap := r.generateInventoryConfigMap(name, inventory, vars, cdLog)
+
+		env := []kapi.EnvVar{
+			{
+				Name:  "INVENTORY_DIR",
+				Value: "/ansible/inventory",
+			},
+			{
+				Name:  "ANSIBLE_HOST_KEY_CHECKING",
+				Value: "False",
+			},
+			{
+				Name:  "OPTS",
+				Value: "-vvv --private-key=/ansible/ssh/privatekey.pem",
+			},
+		}
+
+		if len(hardware.AccountSecret.Name) > 0 {
+			env = append(env, []kapi.EnvVar{
+				{
+					Name: "AWS_ACCESS_KEY_ID",
+					ValueFrom: &kapi.EnvVarSource{
+						SecretKeyRef: &kapi.SecretKeySelector{
+							LocalObjectReference: hardware.AccountSecret,
+							Key:                  "awsAccessKeyId",
+						},
+					},
+				},
+				{
+					Name: "AWS_SECRET_ACCESS_KEY",
+					ValueFrom: &kapi.EnvVarSource{
+						SecretKeyRef: &kapi.SecretKeySelector{
+							LocalObjectReference: hardware.AccountSecret,
+							Key:                  "awsSecretAccessKey",
+						},
+					},
+				},
+			}...)
+		}
+
+		volumes := make([]kapi.Volume, 0, 3)
+		volumeMounts := make([]kapi.VolumeMount, 0, 3)
+
+		// Mounts for inventory and vars files
+		volumeMounts = append(volumeMounts, kapi.VolumeMount{
+			Name:      "inventory",
+			MountPath: "/ansible/inventory/",
+		})
+		volumes = append(volumes, kapi.Volume{
+			Name: "inventory",
+			VolumeSource: kapi.VolumeSource{
+				ConfigMap: &kapi.ConfigMapVolumeSource{
+					LocalObjectReference: kapi.LocalObjectReference{
+						Name: cfgMap.Name,
+					},
+				},
+			},
+		})
+
+		if len(hardware.SSHSecret.Name) > 0 {
+			volumeMounts = append(volumeMounts, kapi.VolumeMount{
+				Name:      "sshkey",
+				MountPath: "/ansible/ssh/",
+			})
+			// sshKeyFileMode is used to set the file permissions for the private SSH key
+			sshKeyFileMode := int32(0600)
+			volumes = append(volumes, kapi.Volume{
+				Name: "sshkey",
+				VolumeSource: kapi.VolumeSource{
+					Secret: &kapi.SecretVolumeSource{
+						SecretName: hardware.SSHSecret.Name,
+						Items: []kapi.KeyToPath{
+							{
+								Key:  "ssh-privatekey",
+								Path: "privatekey.pem",
+								Mode: &sshKeyFileMode,
+							},
+							{
+								Key:  "ssh-publickey",
+								Path: "publickey.pub",
+								Mode: &sshKeyFileMode,
+							},
+						},
+					},
+				},
+			})
+		}
+		if len(hardware.SSLSecret.Name) > 0 {
+			volumeMounts = append(volumeMounts, kapi.VolumeMount{
+				Name:      "sslkey",
+				MountPath: "/ansible/ssl/",
+			})
+			volumes = append(volumes, kapi.Volume{
+				Name: "sslkey",
+				VolumeSource: kapi.VolumeSource{
+					Secret: &kapi.SecretVolumeSource{
+						SecretName: hardware.SSLSecret.Name,
+					},
+				},
+			})
+		}
+	*/
+
+	containers := []kapi.Container{
+		{
+			Name:            "installer",
+			Image:           installerImage,
+			ImagePullPolicy: installerImagePullPolicy,
+			//Env:             envForPlaybook,
+			//VolumeMounts:    volumeMounts,
+		},
+	}
+
+	podSpec := kapi.PodSpec{
+		DNSPolicy:     kapi.DNSClusterFirst,
+		RestartPolicy: kapi.RestartPolicyOnFailure,
+		Containers:    containers,
+		//		Volumes:       volumes,
+	}
+
+	if serviceAccount != nil {
+		podSpec.ServiceAccountName = serviceAccount.Name
+	}
+
+	completions := int32(1)
+	deadline := int64((24 * time.Hour).Seconds())
+	backoffLimit := int32(123456) // effectively limitless
+
+	job := &kbatch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: cd.Namespace,
+		},
+		Spec: kbatch.JobSpec{
+			Completions:           &completions,
+			ActiveDeadlineSeconds: &deadline,
+			BackoffLimit:          &backoffLimit,
+			Template: kapi.PodTemplateSpec{
+				Spec: podSpec,
+			},
+		},
+	}
+
+	return job
 }

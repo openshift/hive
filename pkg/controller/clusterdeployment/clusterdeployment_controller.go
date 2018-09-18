@@ -18,6 +18,8 @@ package clusterdeployment
 
 import (
 	"context"
+	"fmt"
+	"gopkg.in/yaml.v2"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -116,17 +118,42 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	})
 	cdLog.Info("reconciling cluster deployment")
 
-	job := generateInstallerJob("mytestjob", cd, installerImage, kapi.PullIfNotPresent, nil)
+	job, cfgMap, err := generateInstallerJob("mytestjob", cd, installerImage, kapi.PullIfNotPresent, nil, r.scheme)
+	if err != nil {
+		cdLog.Errorf("error generating install job", err)
+		return reconcile.Result{}, err
+	}
+
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
-		cdLog.Errorf("error setting controller reference", err)
+		cdLog.Errorf("error setting controller reference on job", err)
+		return reconcile.Result{}, err
+	}
+
+	if err := controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
+		cdLog.Errorf("error setting controller reference on config map", err)
 		return reconcile.Result{}, err
 	}
 
 	cdLog = cdLog.WithField("job", job.Name)
 
+	// Check if the ConfigMap already exists for this ClusterDeployment:
+	existingCfgMap := &kapi.ConfigMap{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.Infof("creating config map")
+		err = r.Create(context.TODO(), cfgMap)
+		if err != nil {
+			cdLog.Errorf("error creating config map: %v", err)
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
+		cdLog.Errorf("error getting config map: %v", err)
+		return reconcile.Result{}, err
+	}
+
 	// Check if the Job already exists for this ClusterDeployment:
-	found := &kbatch.Job{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, found)
+	existingJob := &kbatch.Job{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		cdLog.Infof("creating job")
 		err = r.Create(context.TODO(), job)
@@ -163,7 +190,9 @@ func generateInstallerJob(
 	cd *hivev1.ClusterDeployment,
 	installerImage string,
 	installerImagePullPolicy kapi.PullPolicy,
-	serviceAccount *kapi.ServiceAccount) *kbatch.Job {
+
+	serviceAccount *kapi.ServiceAccount,
+	scheme *runtime.Scheme) (*kbatch.Job, *kapi.ConfigMap, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -172,6 +201,22 @@ func generateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 
+	d, err := yaml.Marshal(cd.Spec.Config)
+	if err != nil {
+		return nil, nil, err
+	}
+	installConfig := string(d)
+	cdLog.Infof("Generated installConfig: \n\n\n%s\n\n\n", installConfig)
+
+	cfgMap := &kapi.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-installconfig", name),
+			Namespace: cd.Namespace,
+		},
+		Data: map[string]string{
+			"installconfig.yaml": installConfig,
+		},
+	}
 	/*
 		cfgMap := r.generateInventoryConfigMap(name, inventory, vars, cdLog)
 
@@ -212,26 +257,27 @@ func generateInstallerJob(
 				},
 			}...)
 		}
+	*/
 
-		volumes := make([]kapi.Volume, 0, 3)
-		volumeMounts := make([]kapi.VolumeMount, 0, 3)
+	volumes := make([]kapi.Volume, 0, 1)
+	volumeMounts := make([]kapi.VolumeMount, 0, 1)
 
-		// Mounts for inventory and vars files
-		volumeMounts = append(volumeMounts, kapi.VolumeMount{
-			Name:      "inventory",
-			MountPath: "/ansible/inventory/",
-		})
-		volumes = append(volumes, kapi.Volume{
-			Name: "inventory",
-			VolumeSource: kapi.VolumeSource{
-				ConfigMap: &kapi.ConfigMapVolumeSource{
-					LocalObjectReference: kapi.LocalObjectReference{
-						Name: cfgMap.Name,
-					},
+	volumeMounts = append(volumeMounts, kapi.VolumeMount{
+		Name:      "installconfig",
+		MountPath: "/home/user/installerinput",
+	})
+	volumes = append(volumes, kapi.Volume{
+		Name: "installconfig",
+		VolumeSource: kapi.VolumeSource{
+			ConfigMap: &kapi.ConfigMapVolumeSource{
+				LocalObjectReference: kapi.LocalObjectReference{
+					Name: cfgMap.Name,
 				},
 			},
-		})
+		},
+	})
 
+	/*
 		if len(hardware.SSHSecret.Name) > 0 {
 			volumeMounts = append(volumeMounts, kapi.VolumeMount{
 				Name:      "sshkey",
@@ -282,7 +328,9 @@ func generateInstallerJob(
 			Image:           installerImage,
 			ImagePullPolicy: installerImagePullPolicy,
 			//Env:             envForPlaybook,
-			//VolumeMounts:    volumeMounts,
+			VolumeMounts: volumeMounts,
+			Command:      []string{"cat", "/home/user/installerinput/installconfig.yaml"},
+			//Command:      []string{"/home/user/installer/tectonic", "init", "--config", "/home/user/installerinput/installconfig.yaml"},
 		},
 	}
 
@@ -290,7 +338,7 @@ func generateInstallerJob(
 		DNSPolicy:     kapi.DNSClusterFirst,
 		RestartPolicy: kapi.RestartPolicyOnFailure,
 		Containers:    containers,
-		//		Volumes:       volumes,
+		Volumes:       volumes,
 	}
 
 	if serviceAccount != nil {
@@ -316,5 +364,5 @@ func generateInstallerJob(
 		},
 	}
 
-	return job
+	return job, cfgMap, nil
 }

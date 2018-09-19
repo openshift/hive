@@ -2,11 +2,16 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 
-all: test manager
+all: test build
 
 # Run tests
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
+
+# Builds all of hive's binaries (including utils).
+.PHONY: build
+build: manager
+
 
 # Build manager binary
 manager: generate fmt vet

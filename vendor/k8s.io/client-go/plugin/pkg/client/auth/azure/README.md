@@ -7,7 +7,7 @@ This plugin provides an integration with Azure Active Directory device flow. If 
 
 1. Create an Azure Active Directory *Web App / API* application for `apiserver` following these [instructions](https://docs.microsoft.com/en-us/azure/active-directory/active-directory-app-registration)
 
-2. Create a second Azure Active Directory native application for `kubectl`
+2. Create a second Azure Active Directory native application for `kubectl` 
 
 3. On `kubectl` application's configuration page in Azure portal grant permissions to `apiserver` application by clicking on *Required Permissions*, click the *Add* button and search for the apiserver application created in step 1. Select "Access apiserver" under the *DELEGATED PERMISSIONS*. Once added click the *Grant Permissions* button to apply the changes
 
@@ -22,7 +22,7 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    * Replace the `APISERVER_APPLICATION_ID` with the application ID of `apiserver` application
    * Replace `TENANT_ID` with your tenant ID.
 
-5. Configure the `kubectl` to use the `azure` authentication provider
+5. Configure the `kubectl` to use the `azure` authentication provider 
 
    ```
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \
@@ -35,7 +35,7 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    * Supported environments: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
    * Replace `USER_NAME` and `TENANT_ID` with your user name and tenant ID
    * Replace `APPLICATION_ID` with the application ID of your`kubectl` application ID
-   * Replace `APISERVER_APPLICATION_ID` with the application ID of your `apiserver` application ID
+   * Replace `APISERVER_APPLICATION_ID` with the application ID of your `apiserver` application ID 
 
  6. The access token is acquired when first `kubectl` command is executed
 

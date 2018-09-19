@@ -1,4 +1,5 @@
 required = [
+    "github.com/aws/aws-sdk-go",
     "github.com/emicklei/go-restful",
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers

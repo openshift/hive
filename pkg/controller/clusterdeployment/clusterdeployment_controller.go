@@ -217,47 +217,30 @@ func generateInstallerJob(
 			"installconfig.yaml": installConfig,
 		},
 	}
-	/*
-		cfgMap := r.generateInventoryConfigMap(name, inventory, vars, cdLog)
 
-		env := []kapi.EnvVar{
+	env := []kapi.EnvVar{}
+	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
+		env = append(env, []kapi.EnvVar{
 			{
-				Name:  "INVENTORY_DIR",
-				Value: "/ansible/inventory",
-			},
-			{
-				Name:  "ANSIBLE_HOST_KEY_CHECKING",
-				Value: "False",
-			},
-			{
-				Name:  "OPTS",
-				Value: "-vvv --private-key=/ansible/ssh/privatekey.pem",
-			},
-		}
-
-		if len(hardware.AccountSecret.Name) > 0 {
-			env = append(env, []kapi.EnvVar{
-				{
-					Name: "AWS_ACCESS_KEY_ID",
-					ValueFrom: &kapi.EnvVarSource{
-						SecretKeyRef: &kapi.SecretKeySelector{
-							LocalObjectReference: hardware.AccountSecret,
-							Key:                  "awsAccessKeyId",
-						},
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &kapi.EnvVarSource{
+					SecretKeyRef: &kapi.SecretKeySelector{
+						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+						Key:                  "awsAccessKeyId",
 					},
 				},
-				{
-					Name: "AWS_SECRET_ACCESS_KEY",
-					ValueFrom: &kapi.EnvVarSource{
-						SecretKeyRef: &kapi.SecretKeySelector{
-							LocalObjectReference: hardware.AccountSecret,
-							Key:                  "awsSecretAccessKey",
-						},
+			},
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &kapi.EnvVarSource{
+					SecretKeyRef: &kapi.SecretKeySelector{
+						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+						Key:                  "awsSecretAccessKey",
 					},
 				},
-			}...)
-		}
-	*/
+			},
+		}...)
+	}
 
 	volumes := make([]kapi.Volume, 0, 1)
 	volumeMounts := make([]kapi.VolumeMount, 0, 1)
@@ -327,9 +310,9 @@ func generateInstallerJob(
 			Name:            "installer",
 			Image:           installerImage,
 			ImagePullPolicy: installerImagePullPolicy,
-			//Env:             envForPlaybook,
-			VolumeMounts: volumeMounts,
-			Command:      []string{"cat", "/home/user/installerinput/installconfig.yaml"},
+			Env:             env,
+			VolumeMounts:    volumeMounts,
+			Command:         []string{"cat", "/home/user/installerinput/installconfig.yaml"},
 			//Command:      []string{"/home/user/installer/tectonic", "init", "--config", "/home/user/installerinput/installconfig.yaml"},
 		},
 	}

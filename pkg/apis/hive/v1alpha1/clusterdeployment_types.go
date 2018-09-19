@@ -26,19 +26,24 @@ import (
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
-	Config InstallConfig `json:"config"`
+	Config          InstallConfig   `json:"config"`
+	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
 }
 
-// MyAWSPlatform stores all the global configuration that
-// all machinesets use.
-type MyAWSPlatform struct {
-	// SSHSecret refers to a secret that contains the ssh private key to access
-	// EC2 instances in this cluster.
-	SSHSecret corev1.LocalObjectReference `json:"sshSecret"`
+type PlatformSecrets struct {
+	// +optional
+	AWS *AWSPlatformSecrets `json:"aws,omitempty"`
+}
 
-	// CredentialsSecret refers to a secret that contains the AWS account access
+// AWSPlatformSecrets contains secrets for clusters on the AWS platform.
+type AWSPlatformSecrets struct {
+	// SSH refers to a secret that contains the ssh private key to access
+	// EC2 instances in this cluster.
+	//SSH corev1.LocalObjectReference `json:"ssh"`
+
+	// Credentials refers to a secret that contains the AWS account access
 	// credentials.
-	CredentialsSecret corev1.LocalObjectReference `json:"credentialsSecret"`
+	Credentials corev1.LocalObjectReference `json:"credentials"`
 }
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment

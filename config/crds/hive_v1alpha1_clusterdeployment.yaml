@@ -159,8 +159,19 @@ spec:
               - platform
               - pullSecret
               type: object
+            platformSecrets:
+              properties:
+                aws:
+                  properties:
+                    credentials:
+                      type: object
+                  required:
+                  - credentials
+                  type: object
+              type: object
           required:
           - config
+          - platformSecrets
           type: object
         status:
           type: object

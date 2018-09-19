@@ -19,7 +19,7 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 	"time"
 
 	log "github.com/sirupsen/logrus"

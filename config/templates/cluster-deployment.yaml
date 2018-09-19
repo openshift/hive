@@ -24,8 +24,23 @@ parameters:
   displayName: Base DNS Domain
   description: Base DNS domain for your cluster. Will be combined with cluster name when creating entries.
   default: new-installer.openshift.com
+- name: AWS_ACCESS_KEY_ID
+  required: true
+  description: Base64 encoded AWS access key ID that can be used to provision cluster resources.
+- name: AWS_SECRET_ACCESS_KEY
+  required: true
+  description: Base64 encoded AWS secret access key that can be used to provision cluster resources.
 
 objects:
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ${CLUSTER_NAME}-aws-creds
+  type: Opaque
+  data:
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+
 - apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment
   metadata:
@@ -33,6 +48,10 @@ objects:
       controller-tools.k8s.io: "1.0"
     name: ${CLUSTER_NAME}
   spec:
+    platformSecrets:
+      aws:
+        credentials:
+          name: "${CLUSTER_NAME}-aws-creds"
     config:
       admin:
         email: ${ADMIN_EMAIL}

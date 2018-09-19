@@ -7,5 +7,7 @@ API driven OpenShift cluster provisioning and management
 
 # Create a Cluster Deployment
 
-  `$ oc process -f config/templates/cluster-deployment.yaml CLUSTER_NAME=$USER ADMIN_EMAIL="dgoodwin@redhat.com" ADMIN_PASSWORD="letmein" SSH_KEY="$(cat ~/libra.pem)" | oc apply -f -`
+Assuming AWS credentials set in the standard environment variables, and our usual SSH key:
+
+  `$ oc process -f config/templates/cluster-deployment.yaml CLUSTER_NAME=$USER ADMIN_EMAIL="dgoodwin@redhat.com" ADMIN_PASSWORD="letmein" SSH_KEY="$(cat ~/libra.pem)" AWS_ACCESS_KEY_ID="$(echo $AWS_ACCESS_KEY_ID | base64)" AWS_SECRET_ACCESS_KEY="$(echo $AWS_SECRET_ACCESS_KEY | base64)" | oc apply -f -`
 

@@ -10,12 +10,16 @@ test: generate fmt vet manifests
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: manager
+build: manager hiveutil
 
 
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager github.com/openshift/hive/cmd/manager
+
+# Build hiveutil binary
+hiveutil: fmt vet
+	go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
@@ -36,11 +40,11 @@ manifests:
 
 # Run go fmt against code
 fmt:
-	go fmt ./pkg/... ./cmd/...
+	go fmt ./pkg/... ./cmd/... ./contrib/...
 
 # Run go vet against code
 vet:
-	go vet ./pkg/... ./cmd/...
+	go vet ./pkg/... ./cmd/... ./contrib/...
 
 # Generate code
 generate:

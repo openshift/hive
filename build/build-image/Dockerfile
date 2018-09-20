@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM openshift/origin-release:golang-GO_VERSION
+FROM openshift/origin-release:golang-1.10
 
 # Install the golint, use this to check our source for niceness
 RUN go get -u github.com/golang/lint/golint
@@ -26,11 +26,5 @@ RUN export version=1.0.1 && \
     cd /tmp && \
     curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_amd64.tar.gz && \
     tar -zxvf /tmp/kubebuilder_${version}_linux_amd64.tar.gz && \
-    mv kubebuilder_${version}_linux_amd64 /usr/local/kubebuilder
-
-
-# Create the full dir tree that we'll mount our src into when we run the image
-RUN mkdir -p /go/src/github.com/openshift/hive
-
-# Default to our src dir
-WORKDIR /go/src/github.com/openshift/hive
+    mv kubebuilder_${version}_linux_amd64 /usr/local/kubebuilder && \
+    rm /tmp/kubebuilder_${version}_linux_amd64.tar.gz

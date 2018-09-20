@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This image is meant to be used only for CI as a base for
-# verification tests and unit tests.
-# It combines the builder image (images/builder-image) and the
-# hive source.
+FROM BASEIMAGE
 
-FROM    builder-base
-RUN     mkdir -p /go/src/github.com/openshift/hive && \
-        cd /go/src/github.com/openshift/hive
-WORKDIR /go/src/github.com/openshift/hive
-COPY    . .
-RUN     chmod -R og+w /go
+COPY manager opt/services/
+COPY hiveutil /usr/bin
+
+ENTRYPOINT ["/opt/services/manager"]

@@ -21,12 +21,15 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"golang.org/x/net/context"
-	appsv1 "k8s.io/api/apps/v1"
+
+	kbatch "k8s.io/api/batch/v1"
+	kapi "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -35,13 +38,26 @@ import (
 var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-var depKey = types.NamespacedName{Name: "foo-deployment", Namespace: "default"}
+
+var cfgMapKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
+var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 
 const timeout = time.Second * 5
 
-func TestReconcile(t *testing.T) {
+func testClusterDeployment() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		Spec: hivev1.ClusterDeploymentSpec{
+			Config: hivev1.InstallConfig{
+				Machines: []hivev1.MachinePool{},
+			},
+		},
+	}
+}
+
+func TestReconcileNewClusterDeployment(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	instance := &hivev1alpha1.ClusterDeployment{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	instance := testClusterDeployment()
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
@@ -58,24 +74,31 @@ func TestReconcile(t *testing.T) {
 	// The instance object may not be a valid object because it might be missing some required fields.
 	// Please modify the instance object by adding required fields and then remove the following if statement.
 	if apierrors.IsInvalid(err) {
-		t.Logf("failed to create object, got an invalid object error: %v", err)
+		t.Errorf("failed to create object, got an invalid object error: %v", err)
+		t.Fail()
 		return
 	}
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
-	deploy := &appsv1.Deployment{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+	cfgMap := &kapi.ConfigMap{}
+	g.Eventually(func() error { return c.Get(context.TODO(), cfgMapKey, cfgMap) }, timeout).
 		Should(gomega.Succeed())
 
-	// Delete the Deployment and expect Reconcile to be called for Deployment deletion
-	g.Expect(c.Delete(context.TODO(), deploy)).NotTo(gomega.HaveOccurred())
+	job := &kbatch.Job{}
+	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
+		Should(gomega.Succeed())
+
+	// Delete the Job and expect Reconcile to be called for Job deletion
+	g.Expect(c.Delete(context.TODO(), job)).NotTo(gomega.HaveOccurred())
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
 		Should(gomega.Succeed())
 
-	// Manually delete Deployment since GC isn't enabled in the test control plane
-	g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
+	// Manually delete Job since GC isn't enabled in the test control plane
+	g.Expect(c.Delete(context.TODO(), job)).To(gomega.Succeed())
 
 }
+
+// TODO: how to mimic objects already existing?

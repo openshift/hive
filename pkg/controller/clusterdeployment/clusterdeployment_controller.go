@@ -120,7 +120,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog.Info("reconciling cluster deployment")
 	origCD := cd.DeepCopy()
 
-	job, cfgMap, err := generateInstallerJob("mytestjob", cd, installerImage, kapi.PullIfNotPresent, nil, r.scheme)
+	job, cfgMap, err := generateInstallerJob(fmt.Sprintf("%s-install", cd.Name), cd, installerImage, kapi.PullIfNotPresent, nil, r.scheme)
 	if err != nil {
 		cdLog.Errorf("error generating install job", err)
 		return reconcile.Result{}, err
@@ -142,7 +142,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	existingCfgMap := &kapi.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.Infof("creating config map")
+		cdLog.WithField("configMap", cfgMap.Name).Infof("creating config map")
 		err = r.Create(context.TODO(), cfgMap)
 		if err != nil {
 			cdLog.Errorf("error creating config map: %v", err)
@@ -208,11 +208,10 @@ func generateInstallerJob(
 		return nil, nil, err
 	}
 	installConfig := string(d)
-	cdLog.Infof("Generated installConfig: \n\n\n%s\n\n\n", installConfig)
 
 	cfgMap := &kapi.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-installconfig", name),
+			Name:      name,
 			Namespace: cd.Namespace,
 		},
 		Data: map[string]string{

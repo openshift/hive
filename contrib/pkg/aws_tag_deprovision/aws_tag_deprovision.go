@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -55,14 +56,15 @@ type awsObjectWithTags struct {
 // deleteFunc type is the interface a function needs to implement to be called as a goroutine.
 // The (bool, error) return type mimics wait.ExponentialBackoff where the bool indicates successful
 // completion, and the error is for unrecoverable errors.
-type deleteFunc func(awsClient *session.Session, filters awsFilter, logger log.FieldLogger) (bool, error)
+type deleteFunc func(awsClient *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error)
 
 // ClusterUninstaller holds the various options for the cluster we want to delete
 type ClusterUninstaller struct {
-	Filters  awsFilter // filter(s) we will be searching for
-	Logger   log.FieldLogger
-	LogLevel string
-	Region   string
+	Filters     awsFilter // filter(s) we will be searching for
+	Logger      log.FieldLogger
+	LogLevel    string
+	Region      string
+	ClusterName string
 }
 
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
@@ -89,6 +91,7 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&opt.LogLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
+	flags.StringVar(&opt.ClusterName, "cluster-name", "", "Name that cluster was installed with")
 	return cmd
 }
 
@@ -123,6 +126,9 @@ func (o *ClusterUninstaller) validate() error {
 	if len(o.Filters) == 0 {
 		return fmt.Errorf("you must specify at least one tag filter")
 	}
+	if len(o.ClusterName) == 0 {
+		return fmt.Errorf("you must specify cluster-name")
+	}
 	return nil
 }
 
@@ -133,6 +139,7 @@ func populateDeleteFuncs(funcs map[string]deleteFunc) {
 	funcs["deleteEIPs"] = deleteEIPs
 	funcs["deleteNATGateways"] = deleteNATGateways
 	funcs["deleteInstances"] = deleteInstances
+	funcs["deleteIAMresources"] = deleteIAMresources
 	funcs["deleteSecurityGroups"] = deleteSecurityGroups
 	funcs["deleteInternetGateways"] = deleteInternetGateways
 	funcs["deleteSubnets"] = deleteSubnets
@@ -153,7 +160,7 @@ func (o *ClusterUninstaller) Run() error {
 
 	// launch goroutines
 	for name, function := range deleteFuncs {
-		go deleteRunner(name, function, awsSession, o.Filters, o.Logger, returnChannel)
+		go deleteRunner(name, function, awsSession, o.Filters, o.ClusterName, o.Logger, returnChannel)
 	}
 
 	// wait for them to finish
@@ -167,7 +174,7 @@ func (o *ClusterUninstaller) Run() error {
 	return nil
 }
 
-func deleteRunner(deleteFuncName string, dFunction deleteFunc, awsSession *session.Session, filters awsFilter, logger log.FieldLogger, channel chan string) {
+func deleteRunner(deleteFuncName string, dFunction deleteFunc, awsSession *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger, channel chan string) {
 	backoffSettings := wait.Backoff{
 		Duration: time.Second * 10,
 		Factor:   1.3,
@@ -175,7 +182,7 @@ func deleteRunner(deleteFuncName string, dFunction deleteFunc, awsSession *sessi
 	}
 
 	err := wait.ExponentialBackoff(backoffSettings, func() (bool, error) {
-		return dFunction(awsSession, filters, logger)
+		return dFunction(awsSession, filters, clusterName, logger)
 	})
 
 	if err != nil {
@@ -251,25 +258,6 @@ func tagsToMap(tags interface{}) (map[string]string, error) {
 	return x, nil
 }
 
-// getInstanceProfileIDFromARN will return the InstanceProfileId given the instance
-// profile's ARN
-func getInstanceProfileIDFromARN(ipARN *string, iamClient *iam.IAM) (*string, error) {
-
-	results, err := iamClient.ListInstanceProfiles(&iam.ListInstanceProfilesInput{})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ip := range results.InstanceProfiles {
-		if *ip.Arn == *ipARN {
-			return ip.InstanceProfileId, nil
-		}
-	}
-
-	// if we didn't find it, that means it may already have been deleted
-	return nil, nil
-}
-
 // lbToAWSObjects will create awsObjectWithTags given a list of load balancers
 func lbToAWSObjects(lbList []*elb.LoadBalancerDescription, elbClient *elb.ELB) ([]awsObjectWithTags, error) {
 	lbObjects := []awsObjectWithTags{}
@@ -300,7 +288,7 @@ func lbToAWSObjects(lbList []*elb.LoadBalancerDescription, elbClient *elb.ELB) (
 }
 
 // deleteLBs finds all load balancers matching 'filters' and attempts to delete them
-func deleteLBs(awsSession *session.Session, filters awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteLBs(awsSession *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debug("Deleting load balancers")
 	defer logger.Debugf("Exiting deleting load balancers")
 	elbClient := elb.New(awsSession)
@@ -406,7 +394,7 @@ func deleteRouteTablesWithVPC(vpc *ec2.Vpc, ec2Client *ec2.EC2, logger log.Field
 }
 
 // deleteVPCs will delete any VPCs that match the provided filters/tags
-func deleteVPCs(awsSession *session.Session, filters awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteVPCs(awsSession *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debug("Deleting VPCs")
 	defer logger.Debug("Exiting deleting VPCs")
 	ec2Client := getEC2Client(awsSession)
@@ -456,7 +444,7 @@ func getEC2Client(awsSession *session.Session) *ec2.EC2 {
 }
 
 // deleteNATGateways will attempt to delete all NAT Gateways that match the provided filters
-func deleteNATGateways(awsSession *session.Session, filters awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteNATGateways(awsSession *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 
 	logger.Debugf("Deleting NAT Gateways")
 	defer logger.Debugf("Exiting deleting NAT Gateways")
@@ -534,7 +522,7 @@ func deleteNetworkIface(iface *string, ec2Client *ec2.EC2, logger log.FieldLogge
 }
 
 // deleteEIPs will attempt to delete any elastic IPs matching the provided filters
-func deleteEIPs(awsSession *session.Session, filters awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteEIPs(awsSession *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debug("Deleting EIPs")
 	defer logger.Debug("Exiting deleting EIPs")
 	ec2Client := getEC2Client(awsSession)
@@ -607,7 +595,6 @@ func deletePoliciesFromRole(role *string, iamClient *iam.IAM) error {
 
 // deleteRolesFromInstanceProfile will attempt to delete any roles associated with a given instance profile
 func deleteRolesFromInstanceProfile(ip *iam.InstanceProfile, iamClient *iam.IAM, logger log.FieldLogger) error {
-
 	for _, role := range ip.Roles {
 		logger.Debugf("deleting role %v from instance profile %v", *role.RoleName, *ip.InstanceProfileName)
 
@@ -637,8 +624,6 @@ func deleteRolesFromInstanceProfile(ip *iam.InstanceProfile, iamClient *iam.IAM,
 		// need to loop because this is the only time we'll have the name of the role
 		// now that it has been detached from the instance profile
 		for {
-			// delete policies from role first
-
 			_, err = iamClient.DeleteRole(&iam.DeleteRoleInput{
 				RoleName: role.RoleName,
 			})
@@ -696,9 +681,91 @@ func deleteInstanceProfile(instanceProfileID *string, iamClient *iam.IAM, logger
 	return nil
 }
 
+// tryDeleteRoleProfileByName attempts to delete roles and profiles with given name ($CLUSTER_NAME-bootstrap|master|worker-role|profile)
+func tryDeleteRoleProfileByName(roleName string, profileName string, session *session.Session, logger log.FieldLogger) error {
+	logger.Debugf("deleting role: %s", roleName)
+	describeRoleInput := iam.GetRoleInput{}
+	describeRoleInput.RoleName = &roleName
+	iamClient := iam.New(session)
+	if _, err := iamClient.GetRole(&describeRoleInput); err != nil && err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+		return err
+	}
+
+	// empty the role
+	logger.Debugf("deleting policies from role: %s", roleName)
+	if err := deletePoliciesFromRole(&roleName, iamClient); err != nil && err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+		logger.Debugf("error deleting policies from role: %v", err)
+		return err
+	}
+	describeProfileInput := iam.GetInstanceProfileInput{}
+	describeProfileInput.InstanceProfileName = &profileName
+	if _, err := iamClient.GetInstanceProfile(&describeProfileInput); err != nil && err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+		return err
+	}
+
+	// detach role from profile
+	logger.Debugf("detaching role from profile: %s", profileName)
+	_, err := iamClient.RemoveRoleFromInstanceProfile(&iam.RemoveRoleFromInstanceProfileInput{
+		InstanceProfileName: &profileName,
+		RoleName:            &roleName,
+	})
+	if err != nil && err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+		logger.Debugf("error removing role from instance profile: %v", err)
+		return err
+	}
+	if err == nil {
+		logger.Infof("Removed role %v from instance profile %v", roleName, profileName)
+	}
+	// delete profile
+	logger.Debugf("deleting instance profile: %v", profileName)
+	_, err = iamClient.DeleteInstanceProfile(&iam.DeleteInstanceProfileInput{
+		InstanceProfileName: &profileName,
+	})
+	if err != nil && err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+		logger.Debugf("error deleting instance profile %s: %v", profileName, err)
+		return err
+	}
+	if err == nil {
+		logger.Infof("deleted profile %s", profileName)
+	}
+	// now we can delete role
+	logger.Debugf("deleted policies from role %s", roleName)
+	deleteRoleInput := iam.DeleteRoleInput{}
+	deleteRoleInput.RoleName = &roleName
+	if _, err := iamClient.DeleteRole(&deleteRoleInput); err != nil && err.(awserr.Error).Code() != iam.ErrCodeNoSuchEntityException {
+		logger.Debugf("error deleting role %s: %v", roleName, err)
+		return err
+	}
+	if err == nil {
+		logger.Infof("deleted role %s", roleName)
+	}
+	return nil
+}
+
+// deleteIAMresources will delete any IAM resources created by the installer that are not associated with a running instance
+// Currently openshift/installer creates 3 roles per cluster, 1 for master|worker|bootstrap and identified by the
+// cluster name used to install the cluster.
+func deleteIAMresources(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
+	logger.Debugf("Deleting IAM resources")
+	defer logger.Debugf("Exiting deleting IAM resources")
+	installer_type := []string{"master", "worker", "bootstrap"}
+	for _, t := range installer_type {
+		// Naming of IAM resources expected from https://github.com/openshift/installer as follows:
+		// $CLUSTER_NAME-master-role     $CLUSTER_NAME-worker-role    $CLUSTER_NAME-bootstrap-role
+		// $CLUSTER_NAME-master-profile  $CLUSTER_NAME-worker-profile $CLUSTER_NAME-bootstrap-profile
+		roleName := fmt.Sprintf("%s-%s-role", clusterName, t)
+		instanceProfileName := fmt.Sprintf("%s-%s-profile", clusterName, t)
+		if err := tryDeleteRoleProfileByName(roleName, instanceProfileName, session, logger); err != nil {
+			logger.Debugf("error deleting instance profile %s: %v", instanceProfileName, err)
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // deleteInstances will find any running instances that match the given filter and terminate them
 // and any instance profiles attached to the instance(s)
-func deleteInstances(session *session.Session, filter awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteInstances(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting instances")
 	defer logger.Debugf("Exiting deleting instances")
 
@@ -784,7 +851,7 @@ func deleteSecurityGroupRules(sg *ec2.SecurityGroup, ec2Client *ec2.EC2, logger 
 }
 
 // deleteSecurityGroups will attempt to delete all security groups matching the given filter
-func deleteSecurityGroups(session *session.Session, filter awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteSecurityGroups(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting security groups")
 	defer logger.Debugf("Exiting deleting security groups")
 
@@ -843,7 +910,7 @@ func detachInternetGateways(gw *ec2.InternetGateway, ec2Client *ec2.EC2, logger 
 }
 
 // deleteInternetGateways will attemp to delete any Internet Gateways matching the given filter
-func deleteInternetGateways(session *session.Session, filter awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteInternetGateways(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting internet gateways")
 	defer logger.Debugf("Exiting deleting internet gateways")
 
@@ -934,7 +1001,7 @@ func deleteRoutesFromTable(rt *ec2.RouteTable, ec2Client *ec2.EC2, logger log.Fi
 }
 
 // deleteSubnets will attempt to delete all Subnets matching the given filter
-func deleteSubnets(session *session.Session, filter awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteSubnets(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debug("Deleting subnets")
 	defer logger.Debug("Exiting deleting subnets")
 
@@ -980,7 +1047,7 @@ func bucketsToAWSObjects(buckets []*s3.Bucket, s3Client *s3.S3, logger log.Field
 			Bucket: bucket.Name,
 		})
 		if err != nil {
-			logger.Errorf("error getting tags for bucket %s: %v, skipping...", bucket.Name, err)
+			logger.Debugf("error getting tags for bucket %s: %v, skipping...", bucket.Name, err)
 			continue
 		}
 
@@ -1034,7 +1101,7 @@ func filterObjects(awsObjects []awsObjectWithTags, filters awsFilter) []awsObjec
 }
 
 // deleteS3Buckets will attempt to delete (and empty) any S3 bucket matching the provided filter
-func deleteS3Buckets(session *session.Session, filter awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteS3Buckets(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting S3 buckets")
 	defer logger.Debugf("Exiting deleting buckets")
 
@@ -1258,7 +1325,7 @@ func emptyAndDeleteRoute53Zone(zoneID string, r53Client *route53.Route53, logger
 
 // deleteRoute53 will attempt to delete any route53 zone matching the given filter.
 // it will also attempt to delete any entries in the shared/public route53 zone
-func deleteRoute53(session *session.Session, filters awsFilter, logger log.FieldLogger) (bool, error) {
+func deleteRoute53(session *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting Route53 zones")
 	defer logger.Debugf("Exiting deleting Route53 zones")
 

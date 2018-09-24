@@ -1,0 +1,3 @@
+rules:
+- importName: hivev1
+  importPath: github.com/openshift/hive/pkg/apis/hive/v1alpha1

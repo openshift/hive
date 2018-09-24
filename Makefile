@@ -1,3 +1,9 @@
+BINDIR = bin
+SRC_DIRS = pkg contrib
+GOFILES = $(shell find $(SRC_DIRS) -name '*.go')
+VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
+
+
 
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
@@ -45,6 +51,14 @@ fmt:
 # Run go vet against code
 vet:
 	go vet ./pkg/... ./cmd/... ./contrib/...
+
+# Check import naming
+verify-imports:
+	@echo "Verifying import naming"
+	$(foreach file,$(GOFILES), \
+		$(shell $(BINDIR)/hiveutil verify-imports -c $(VERIFY_IMPORTS_CONFIG) $(file))\
+	)
+
 
 # Generate code
 generate:

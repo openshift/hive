@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/aws_tag_deprovision"
+	"github.com/openshift/hive/contrib/pkg/verification"
 )
 
 func main() {
@@ -49,6 +50,7 @@ func NewCOUtilityCommand() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(aws_tag_deprovision.NewDeprovisionAWSWithTagsCommand())
+	cmd.AddCommand(verification.NewVerifyImportsCommand())
 
 	return cmd
 }

@@ -48,8 +48,9 @@ type AWSPlatformSecrets struct {
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment
 type ClusterDeploymentStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+
+	// Installed is true if the installer job has successfully completed for this cluster.
+	Installed bool `json:"installed"`
 }
 
 // +genclient

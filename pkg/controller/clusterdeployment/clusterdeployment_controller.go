@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ghodss/yaml"
+	"reflect"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -117,8 +118,9 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		"namespace":         cd.Namespace,
 	})
 	cdLog.Info("reconciling cluster deployment")
+	origCD := cd.DeepCopy()
 
-	job, cfgMap, err := generateInstallerJob("mytestjob", cd, installerImage, kapi.PullIfNotPresent, nil, r.scheme)
+	job, cfgMap, err := generateInstallerJob(fmt.Sprintf("%s-install", cd.Name), cd, installerImage, kapi.PullIfNotPresent, nil, r.scheme)
 	if err != nil {
 		cdLog.Errorf("error generating install job", err)
 		return reconcile.Result{}, err
@@ -140,7 +142,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	existingCfgMap := &kapi.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.Infof("creating config map")
+		cdLog.WithField("configMap", cfgMap.Name).Infof("creating config map")
 		err = r.Create(context.TODO(), cfgMap)
 		if err != nil {
 			cdLog.Errorf("error creating config map: %v", err)
@@ -164,23 +166,23 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	} else if err != nil {
 		cdLog.Errorf("error getting job: %v", err)
 		return reconcile.Result{}, err
+	} else {
+		// Job exists, check it's status:
+		cd.Status.Installed = isSuccessful(existingJob)
 	}
 
-	// Update the found object and write the result back if there are any changes
-	// TODO: I don't think we can update the job spec once created?
-	/*
-		if !reflect.DeepEqual(job.Spec, found.Spec) {
-			found.Spec = job.Spec
-			cdLog.Infof("updating job")
-			err = r.Update(context.TODO(), found)
-			if err != nil {
-				cdLog.Errorf("error updating job: %v", err)
-				return reconcile.Result{}, err
-			}
-		} else {
-			cdLog.Debugf("job found and already up to date")
+	// Update cluster deployment status if changed:
+	if !reflect.DeepEqual(cd.Status, origCD.Status) {
+		cdLog.Infof("status has changed, updating cluster deployment")
+		err = r.Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.Errorf("error updating cluster deployment: %v", err)
+			return reconcile.Result{}, err
 		}
-	*/
+	} else {
+		cdLog.Infof("cluster deployment status unchanged")
+	}
+
 	cdLog.Debugf("reconcile complete")
 	return reconcile.Result{}, nil
 }
@@ -206,11 +208,10 @@ func generateInstallerJob(
 		return nil, nil, err
 	}
 	installConfig := string(d)
-	cdLog.Infof("Generated installConfig: \n\n\n%s\n\n\n", installConfig)
 
 	cfgMap := &kapi.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-installconfig", name),
+			Name:      name,
 			Namespace: cd.Namespace,
 		},
 		Data: map[string]string{
@@ -348,4 +349,23 @@ func generateInstallerJob(
 	}
 
 	return job, cfgMap, nil
+}
+
+// getJobConditionStatus gets the status of the condition in the job. If the
+// condition is not found in the job, then returns False.
+func getJobConditionStatus(job *kbatch.Job, conditionType kbatch.JobConditionType) kapi.ConditionStatus {
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == conditionType {
+			return condition.Status
+		}
+	}
+	return kapi.ConditionFalse
+}
+
+func isSuccessful(job *kbatch.Job) bool {
+	return getJobConditionStatus(job, kbatch.JobComplete) == kapi.ConditionTrue
+}
+
+func isFailed(job *kbatch.Job) bool {
+	return getJobConditionStatus(job, kbatch.JobFailed) == kapi.ConditionTrue
 }

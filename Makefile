@@ -31,7 +31,7 @@ hiveutil:
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
 run: generate fmt vet
-	go run ./cmd/manager/main.go
+	go run ./cmd/manager/main.go --log-level=debug
 
 # Install CRDs into a cluster
 .PHONY: install

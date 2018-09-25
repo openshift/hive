@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -44,7 +45,8 @@ import (
 )
 
 const (
-	installerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+	installerImage   = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+	uninstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer" // TODO
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -120,7 +122,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog.Info("reconciling cluster deployment")
 	origCD := cd.DeepCopy()
 
-	job, cfgMap, err := generateInstallerJob(fmt.Sprintf("%s-install", cd.Name), cd, installerImage, kapi.PullIfNotPresent, nil, r.scheme)
+	job, cfgMap, err := generateInstallerJob(fmt.Sprintf("%s-install", cd.Name), cd, installerImage, kapi.PullIfNotPresent, false, nil, r.scheme)
 	if err != nil {
 		cdLog.Errorf("error generating install job", err)
 		return reconcile.Result{}, err
@@ -134,6 +136,18 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	if err := controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
 		cdLog.Errorf("error setting controller reference on config map", err)
 		return reconcile.Result{}, err
+	}
+
+	if cd.DeletionTimestamp != nil {
+		if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+			return reconcile.Result{}, nil
+		}
+		return r.syncDeletedClusterDeployment(cd, cdLog)
+	}
+
+	if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+		cdLog.Debugf("adding clusterdeployment finalizer")
+		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
 	cdLog = cdLog.WithField("job", job.Name)
@@ -168,7 +182,9 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	} else {
 		// Job exists, check it's status:
+		cdLog.Infof("conditions: %s", existingJob.Status.Conditions)
 		cd.Status.Installed = isSuccessful(existingJob)
+		cdLog.Infof("successful: %s", cd.Status.Installed)
 	}
 
 	// Update cluster deployment status if changed:
@@ -187,12 +203,64 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	return reconcile.Result{}, nil
 }
 
+func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+	// Generate an uninstall job:
+	uninstall := true
+	uninstallJob, _, err := generateInstallerJob(fmt.Sprintf("%s-uninstall", cd.Name), cd, installerImage,
+		kapi.PullIfNotPresent, uninstall, nil, r.scheme)
+	if err != nil {
+		cdLog.Errorf("error generating uninstall job", err)
+		return reconcile.Result{}, err
+	}
+
+	if err := controllerutil.SetControllerReference(cd, uninstallJob, r.scheme); err != nil {
+		cdLog.Errorf("error setting controller reference on job", err)
+		return reconcile.Result{}, err
+	}
+
+	// Check if uninstall job already exists:
+	existingJob := &kbatch.Job{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.Infof("creating uninstall job")
+		err = r.Create(context.TODO(), uninstallJob)
+		if err != nil {
+			cdLog.Errorf("error creating uninstall job: %v", err)
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
+		cdLog.Errorf("error getting uninstall job: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	// Uninstall job exists, check it's status and if successful, remove the finalizer:
+	if isSuccessful(existingJob) {
+		cdLog.Infof("uninstall job successful, removing finalizer")
+		return reconcile.Result{}, r.removeClusterDeploymentFinalizer(cd)
+	}
+
+	cdLog.Infof("uninstall job not yet successful")
+	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
+	cd = cd.DeepCopy()
+	AddFinalizer(cd, hivev1.FinalizerDeprovision)
+	return r.Update(context.TODO(), cd)
+}
+
+func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
+	cd = cd.DeepCopy()
+	DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
+	return r.Update(context.TODO(), cd)
+}
+
 func generateInstallerJob(
 	name string,
 	cd *hivev1.ClusterDeployment,
 	installerImage string,
 	installerImagePullPolicy kapi.PullPolicy,
-
+	uninstall bool,
 	serviceAccount *kapi.ServiceAccount,
 	scheme *runtime.Scheme) (*kbatch.Job, *kapi.ConfigMap, error) {
 
@@ -208,16 +276,6 @@ func generateInstallerJob(
 		return nil, nil, err
 	}
 	installConfig := string(d)
-
-	cfgMap := &kapi.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: cd.Namespace,
-		},
-		Data: map[string]string{
-			"installconfig.yaml": installConfig,
-		},
-	}
 
 	env := []kapi.EnvVar{}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
@@ -243,68 +301,38 @@ func generateInstallerJob(
 		}...)
 	}
 
+	// Will be unused for uninstall jobs:
+	var cfgMap *kapi.ConfigMap
 	volumes := make([]kapi.Volume, 0, 1)
 	volumeMounts := make([]kapi.VolumeMount, 0, 1)
 
-	volumeMounts = append(volumeMounts, kapi.VolumeMount{
-		Name:      "installconfig",
-		MountPath: "/home/user/installerinput",
-	})
-	volumes = append(volumes, kapi.Volume{
-		Name: "installconfig",
-		VolumeSource: kapi.VolumeSource{
-			ConfigMap: &kapi.ConfigMapVolumeSource{
-				LocalObjectReference: kapi.LocalObjectReference{
-					Name: cfgMap.Name,
+	if !uninstall {
+		cfgMap = &kapi.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: cd.Namespace,
+			},
+			Data: map[string]string{
+				"installconfig.yaml": installConfig,
+			},
+		}
+
+		volumeMounts = append(volumeMounts, kapi.VolumeMount{
+			Name:      "installconfig",
+			MountPath: "/home/user/installerinput",
+		})
+		volumes = append(volumes, kapi.Volume{
+			Name: "installconfig",
+			VolumeSource: kapi.VolumeSource{
+				ConfigMap: &kapi.ConfigMapVolumeSource{
+					LocalObjectReference: kapi.LocalObjectReference{
+						Name: cfgMap.Name,
+					},
 				},
 			},
-		},
-	})
+		})
 
-	/*
-		if len(hardware.SSHSecret.Name) > 0 {
-			volumeMounts = append(volumeMounts, kapi.VolumeMount{
-				Name:      "sshkey",
-				MountPath: "/ansible/ssh/",
-			})
-			// sshKeyFileMode is used to set the file permissions for the private SSH key
-			sshKeyFileMode := int32(0600)
-			volumes = append(volumes, kapi.Volume{
-				Name: "sshkey",
-				VolumeSource: kapi.VolumeSource{
-					Secret: &kapi.SecretVolumeSource{
-						SecretName: hardware.SSHSecret.Name,
-						Items: []kapi.KeyToPath{
-							{
-								Key:  "ssh-privatekey",
-								Path: "privatekey.pem",
-								Mode: &sshKeyFileMode,
-							},
-							{
-								Key:  "ssh-publickey",
-								Path: "publickey.pub",
-								Mode: &sshKeyFileMode,
-							},
-						},
-					},
-				},
-			})
-		}
-		if len(hardware.SSLSecret.Name) > 0 {
-			volumeMounts = append(volumeMounts, kapi.VolumeMount{
-				Name:      "sslkey",
-				MountPath: "/ansible/ssl/",
-			})
-			volumes = append(volumes, kapi.Volume{
-				Name: "sslkey",
-				VolumeSource: kapi.VolumeSource{
-					Secret: &kapi.SecretVolumeSource{
-						SecretName: hardware.SSLSecret.Name,
-					},
-				},
-			})
-		}
-	*/
+	}
 
 	containers := []kapi.Container{
 		{
@@ -316,6 +344,10 @@ func generateInstallerJob(
 			Command:         []string{"cat", "/home/user/installerinput/installconfig.yaml"},
 			//Command:      []string{"/home/user/installer/tectonic", "init", "--config", "/home/user/installerinput/installconfig.yaml"},
 		},
+	}
+
+	if uninstall {
+		containers[0].Command = []string{"echo", "this would have been an uninstall"}
 	}
 
 	podSpec := kapi.PodSpec{
@@ -368,4 +400,28 @@ func isSuccessful(job *kbatch.Job) bool {
 
 func isFailed(job *kbatch.Job) bool {
 	return getJobConditionStatus(job, kbatch.JobFailed) == kapi.ConditionTrue
+}
+
+// HasFinalizer returns true if the given object has the given finalizer
+func HasFinalizer(object metav1.Object, finalizer string) bool {
+	for _, f := range object.GetFinalizers() {
+		if f == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// AddFinalizer adds a finalizer to the given object
+func AddFinalizer(object metav1.Object, finalizer string) {
+	finalizers := sets.NewString(object.GetFinalizers()...)
+	finalizers.Insert(finalizer)
+	object.SetFinalizers(finalizers.List())
+}
+
+// DeleteFinalizer removes a finalizer from the given object
+func DeleteFinalizer(object metav1.Object, finalizer string) {
+	finalizers := sets.NewString(object.GetFinalizers()...)
+	finalizers.Delete(finalizer)
+	object.SetFinalizers(finalizers.List())
 }

@@ -24,6 +24,10 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 // Important: Run "make" to regenerate code after modifying this file
 
+const (
+	FinalizerDeprovision string = "hive.openshift.io/deprovision"
+)
+
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
 	Config          InstallConfig   `json:"config"`

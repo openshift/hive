@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -973,7 +972,7 @@ func deleteSubnets(session *session.Session, filter awsFilter, logger log.FieldL
 }
 
 // bucketsToAWSObjects will convert a list of S3 Buckets to awsObjectsWithTags (for easier filtering)
-func bucketsToAWSObjects(buckets []*s3.Bucket, s3Client *s3.S3) ([]awsObjectWithTags, error) {
+func bucketsToAWSObjects(buckets []*s3.Bucket, s3Client *s3.S3, logger log.FieldLogger) ([]awsObjectWithTags, error) {
 	bucketObjects := []awsObjectWithTags{}
 
 	for _, bucket := range buckets {
@@ -981,18 +980,8 @@ func bucketsToAWSObjects(buckets []*s3.Bucket, s3Client *s3.S3) ([]awsObjectWith
 			Bucket: bucket.Name,
 		})
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				switch aerr.Code() {
-				case "NoSuchTagSet":
-					// it is okay for a bucket to have no tags, just ignore it
-					// since we can't filter on a tagless bucket
-					continue
-				default:
-					return bucketObjects, err
-				}
-			} else {
-				return bucketObjects, err
-			}
+			logger.Errorf("error getting tags for bucket %s: %v, skipping...", bucket.Name, err)
+			continue
 		}
 
 		tagsAsMap, err := tagsToMap(tags.TagSet)
@@ -1060,7 +1049,7 @@ func deleteS3Buckets(session *session.Session, filter awsFilter, logger log.Fiel
 			return false, nil
 		}
 
-		awsObjects, err := bucketsToAWSObjects(results.Buckets, s3Client)
+		awsObjects, err := bucketsToAWSObjects(results.Buckets, s3Client, logger)
 		if err != nil {
 			return false, fmt.Errorf("error converting buckets to internal objects: %v", err)
 		}

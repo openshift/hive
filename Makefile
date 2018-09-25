@@ -3,6 +3,12 @@ SRC_DIRS = pkg contrib
 GOFILES = $(shell find $(SRC_DIRS) -name '*.go')
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
+USE_BUILDAH ?= 1
+ifeq ($(USE_BUILDAH), 1)
+	BUILD_CMD = buildah build-using-dockerfile
+else
+	BUILD_CMD = docker build
+endif
 
 
 # Image URL to use all building/pushing image targets
@@ -65,10 +71,15 @@ generate:
 	go generate ./pkg/... ./cmd/...
 
 # Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
+docker-build:
+	# Put the '.' at the end so it works with both docker and buildah
+	$(BUILD_CMD) -t ${IMG} .
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+
+	# If we built using buildah, then push it to the local docker-daemon
+	# (so docker/'oc cluster up' can see/use it)
+	$(if ifeq ($(USE_BUILDAH),1), buildah push ${IMG} docker-daemon:${IMG})
 
 # Push the docker image
 docker-push:

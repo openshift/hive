@@ -61,11 +61,11 @@ vet:
 
 # Run verification tests
 .PHONY: verify
-verify: generate hiveutil verify-imports verify-gofmt verify-lint verify-go-vet
+verify: verify-imports verify-gofmt verify-lint verify-go-vet
 
 # Check import naming
 .PHONY: verify-imports
-verify-imports:
+verify-imports: hiveutil
 	@echo "Verifying import naming"
 	@sh -c \
 	  'for file in $(GOFILES) ; do \
@@ -91,7 +91,7 @@ verify-gofmt:
 	@rm .out
 
 .PHONY: verify-go-vet
-verify-go-vet:
+verify-go-vet: generate
 	@echo Verifying go vet
 	@go vet ./cmd/... ./contrib/... $(go list ./pkg/... | grep -v _generated)
 

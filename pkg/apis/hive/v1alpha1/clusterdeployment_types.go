@@ -25,6 +25,8 @@ import (
 // Important: Run "make" to regenerate code after modifying this file
 
 const (
+	// FinalizerDeprovision is used on ClusterDeployments to ensure we run a successful deprovision
+	// job before cleaning up the API object.
 	FinalizerDeprovision string = "hive.openshift.io/deprovision"
 )
 

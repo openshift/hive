@@ -64,7 +64,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 func TestReconcileNewClusterDeployment(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	instance := testClusterDeployment()
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
@@ -76,6 +75,7 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
 	defer close(StartTestManager(mgr, g))
 
+	instance := testClusterDeployment()
 	// Create the ClusterDeployment object and expect the Reconcile and Deployment to be created
 	err = c.Create(context.TODO(), instance)
 	// The instance object may not be a valid object because it might be missing some required fields.
@@ -97,21 +97,16 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
 		Should(gomega.Succeed())
 
-	/*
-		// Fake that the install job was successful:
-		job.Status.Conditions = []kbatch.JobCondition{
-			{
-				Type:   kbatch.JobComplete,
-				Status: kapi.ConditionTrue,
-			},
-		}
-		fmt.Println("updating job")
-		g.Expect(c.Update(context.TODO(), job)).NotTo(gomega.HaveOccurred())
-		fmt.Println("updated job")
-		fmt.Println(reflect.TypeOf(c))
+	// Fake that the install job was successful:
+	job.Status.Conditions = []kbatch.JobCondition{
+		{
+			Type:   kbatch.JobComplete,
+			Status: kapi.ConditionTrue,
+		},
+	}
+	g.Expect(c.Status().Update(context.TODO(), job)).NotTo(gomega.HaveOccurred())
 
-		g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	*/
+	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
 	// Test that our cluster deployment is updated as we would expect:
 	g.Eventually(func() error {
@@ -121,11 +116,9 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 			return err
 		}
 		// All of these conditions should eventually be true:
-		/*
-			if !updatedCD.Status.Installed {
-				return fmt.Errorf("cluster deployment status not marked installed")
-			}
-		*/
+		if !updatedCD.Status.Installed {
+			return fmt.Errorf("cluster deployment status not marked installed")
+		}
 		if !HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
 			return fmt.Errorf("cluster deployment does not have expected finalizer")
 		}
@@ -140,7 +133,6 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 
 	// Manually delete Job since GC isn't enabled in the test control plane
 	g.Expect(c.Delete(context.TODO(), job)).To(gomega.Succeed())
-
 }
 
 // TODO: how to mimic objects already existing?

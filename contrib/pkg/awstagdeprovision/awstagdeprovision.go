@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_tag_deprovision
+package awstagdeprovision
 
 import (
 	"fmt"
@@ -427,9 +427,9 @@ func deleteVPCs(awsSession *session.Session, filters awsFilter, clusterName stri
 			if err != nil {
 				logger.Debugf("error deleting VPC %v: %v", *vpc.VpcId, err)
 				return false, nil
-			} else {
-				logger.WithField("id", *vpc.VpcId).Info("Deleted VPC")
 			}
+
+			logger.WithField("id", *vpc.VpcId).Info("Deleted VPC")
 		}
 
 		return false, nil
@@ -513,9 +513,9 @@ func deleteNetworkIface(iface *string, ec2Client *ec2.EC2, logger log.FieldLogge
 		if err != nil {
 			logger.Debugf("error deleting network iface: %v", err)
 			return err
-		} else {
-			logger.WithField("id", *i.NetworkInterfaceId).Info("Deleted network interface")
 		}
+
+		logger.WithField("id", *i.NetworkInterfaceId).Info("Deleted network interface")
 	}
 
 	return nil
@@ -604,9 +604,9 @@ func deleteRolesFromInstanceProfile(ip *iam.InstanceProfile, iamClient *iam.IAM,
 		if err != nil {
 			logger.Debugf("error deleting policies from role: %v", err)
 			return err
-		} else {
-			logger.Infof("Deleted all policies from role: %v", *role.RoleName)
 		}
+
+		logger.Infof("Deleted all policies from role: %v", *role.RoleName)
 
 		// detach role from instance profile
 		_, err = iamClient.RemoveRoleFromInstanceProfile(&iam.RemoveRoleFromInstanceProfileInput{
@@ -616,9 +616,9 @@ func deleteRolesFromInstanceProfile(ip *iam.InstanceProfile, iamClient *iam.IAM,
 		if err != nil {
 			logger.Debugf("error removing role from instance profile: %v", err)
 			return err
-		} else {
-			logger.Infof("Removed role %v from instance profile %v", *role.RoleName, *ip.InstanceProfileName)
 		}
+
+		logger.Infof("Removed role %v from instance profile %v", *role.RoleName, *ip.InstanceProfileName)
 
 		// now delete the role
 		// need to loop because this is the only time we'll have the name of the role
@@ -748,8 +748,8 @@ func tryDeleteRoleProfileByName(roleName string, profileName string, session *se
 func deleteIAMresources(session *session.Session, filter awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting IAM resources")
 	defer logger.Debugf("Exiting deleting IAM resources")
-	installer_type := []string{"master", "worker", "bootstrap"}
-	for _, t := range installer_type {
+	installerType := []string{"master", "worker", "bootstrap"}
+	for _, t := range installerType {
 		// Naming of IAM resources expected from https://github.com/openshift/installer as follows:
 		// $CLUSTER_NAME-master-role     $CLUSTER_NAME-worker-role    $CLUSTER_NAME-bootstrap-role
 		// $CLUSTER_NAME-master-profile  $CLUSTER_NAME-worker-profile $CLUSTER_NAME-bootstrap-profile
@@ -993,9 +993,9 @@ func deleteRoutesFromTable(rt *ec2.RouteTable, ec2Client *ec2.EC2, logger log.Fi
 		if err != nil {
 			logger.Debugf("error deleting route from route table: %v", err)
 			return err
-		} else {
-			logger.Infof("Deleted route %v from route table %v", *route.DestinationCidrBlock, *rt.RouteTableId)
 		}
+
+		logger.Infof("Deleted route %v from route table %v", *route.DestinationCidrBlock, *rt.RouteTableId)
 	}
 	return nil
 }
@@ -1232,9 +1232,9 @@ func deleteEntriesFromSharedR53Zone(zoneID string, sharedZoneID string, r53Clien
 				})
 				if err != nil {
 					return err
-				} else {
-					logger.Infof("Deleted record %v from r53 zone %v", *sharedEntry.Name, sharedZoneID)
 				}
+
+				logger.Infof("Deleted record %v from r53 zone %v", *sharedEntry.Name, sharedZoneID)
 			}
 		}
 	}
@@ -1305,9 +1305,8 @@ func emptyAndDeleteRoute53Zone(zoneID string, r53Client *route53.Route53, logger
 		})
 		if err != nil {
 			return err
-		} else {
-			logger.Infof("Deleted record %v from r53 zone %v", *entry.Name, zoneID)
 		}
+		logger.Infof("Deleted record %v from r53 zone %v", *entry.Name, zoneID)
 	}
 
 	// now delete zone
@@ -1316,9 +1315,9 @@ func emptyAndDeleteRoute53Zone(zoneID string, r53Client *route53.Route53, logger
 	})
 	if err != nil {
 		return err
-	} else {
-		logger.WithField("id", zoneID).Info("Deleted route53 zone")
 	}
+
+	logger.WithField("id", zoneID).Info("Deleted route53 zone")
 
 	return nil
 }

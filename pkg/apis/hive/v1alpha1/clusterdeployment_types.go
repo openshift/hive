@@ -30,6 +30,7 @@ type ClusterDeploymentSpec struct {
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
 }
 
+// PlatformSecrets defines the secrets to be used by various clouds.
 type PlatformSecrets struct {
 	// +optional
 	AWS *AWSPlatformSecrets `json:"aws,omitempty"`

@@ -23,7 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/hive/contrib/pkg/aws_tag_deprovision"
+	"github.com/openshift/hive/contrib/pkg/awstagdeprovision"
 	"github.com/openshift/hive/contrib/pkg/verification"
 )
 
@@ -31,7 +31,7 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.DebugLevel)
 
-	cmd := NewCOUtilityCommand()
+	cmd := newCOUtilityCommand()
 
 	err := cmd.Execute()
 	if err != nil {
@@ -40,7 +40,7 @@ func main() {
 	}
 }
 
-func NewCOUtilityCommand() *cobra.Command {
+func newCOUtilityCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hiveutil SUB-COMMAND",
 		Short: "Utilities for hive",
@@ -49,7 +49,7 @@ func NewCOUtilityCommand() *cobra.Command {
 			cmd.Usage()
 		},
 	}
-	cmd.AddCommand(aws_tag_deprovision.NewDeprovisionAWSWithTagsCommand())
+	cmd.AddCommand(awstagdeprovision.NewDeprovisionAWSWithTagsCommand())
 	cmd.AddCommand(verification.NewVerifyImportsCommand())
 
 	return cmd

@@ -17,11 +17,14 @@ limitations under the License.
 package clusterdeployment
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+
+	"github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	kbatch "k8s.io/api/batch/v1"
@@ -43,6 +46,10 @@ var cfgMapKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 
 const timeout = time.Second * 5
+
+func init() {
+	log.SetLevel(log.DebugLevel)
+}
 
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
@@ -89,6 +96,41 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	job := &kbatch.Job{}
 	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
 		Should(gomega.Succeed())
+
+	/*
+		// Fake that the install job was successful:
+		job.Status.Conditions = []kbatch.JobCondition{
+			{
+				Type:   kbatch.JobComplete,
+				Status: kapi.ConditionTrue,
+			},
+		}
+		fmt.Println("updating job")
+		g.Expect(c.Update(context.TODO(), job)).NotTo(gomega.HaveOccurred())
+		fmt.Println("updated job")
+		fmt.Println(reflect.TypeOf(c))
+
+		g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+	*/
+
+	// Test that our cluster deployment is updated as we would expect:
+	g.Eventually(func() error {
+		updatedCD := &hivev1.ClusterDeployment{}
+		err := c.Get(context.TODO(), expectedRequest.NamespacedName, updatedCD)
+		if err != nil {
+			return err
+		}
+		// All of these conditions should eventually be true:
+		/*
+			if !updatedCD.Status.Installed {
+				return fmt.Errorf("cluster deployment status not marked installed")
+			}
+		*/
+		if !HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
+			return fmt.Errorf("cluster deployment does not have expected finalizer")
+		}
+		return nil
+	}, timeout).Should(gomega.Succeed())
 
 	// Delete the Job and expect Reconcile to be called for Job deletion
 	g.Expect(c.Delete(context.TODO(), job)).NotTo(gomega.HaveOccurred())

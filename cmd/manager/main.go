@@ -18,6 +18,7 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/controller"
@@ -27,33 +28,68 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
+const (
+	defaultLogLevel = "info"
+)
+
+type ControllerManagerOptions struct {
+	LogLevel string
+}
+
+func NewRootCommand() *cobra.Command {
+	opts := &ControllerManagerOptions{}
+	cmd := &cobra.Command{
+		Use:   "manager",
+		Short: "OpenShift Hive controller manager.",
+		Run: func(cmd *cobra.Command, args []string) {
+			// Set log level
+			level, err := log.ParseLevel(opts.LogLevel)
+			if err != nil {
+				log.WithError(err).Fatal("Cannot parse log level")
+			}
+			log.SetLevel(level)
+			log.Debug("debug logging enabled")
+
+			// Get a config to talk to the apiserver
+			cfg, err := config.GetConfig()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// Create a new Cmd to provide shared dependencies and start components
+			mgr, err := manager.New(cfg, manager.Options{})
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			log.Printf("Registering Components.")
+
+			// Setup Scheme for all resources
+			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			// Setup all Controllers
+			if err := controller.AddToManager(mgr); err != nil {
+				log.Fatal(err)
+			}
+
+			log.Printf("Starting the Cmd.")
+
+			// Start the Cmd
+			log.Fatal(mgr.Start(signals.SetupSignalHandler()))
+		},
+	}
+
+	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
+
+	return cmd
+}
+
 func main() {
-	// Get a config to talk to the apiserver
-	cfg, err := config.GetConfig()
+	cmd := NewRootCommand()
+	err := cmd.Execute()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Create a new Cmd to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, manager.Options{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("Registering Components.")
-
-	// Setup Scheme for all resources
-	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Fatal(err)
-	}
-
-	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("Starting the Cmd.")
-
-	// Start the Cmd
-	log.Fatal(mgr.Start(signals.SetupSignalHandler()))
 }

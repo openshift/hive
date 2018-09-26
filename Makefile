@@ -61,7 +61,7 @@ vet:
 
 # Run verification tests
 .PHONY: verify
-verify: hiveutil verify-imports verify-gofmt verify-lint verify-go-vet
+verify: generate hiveutil verify-imports verify-gofmt verify-lint verify-go-vet
 
 # Check import naming
 .PHONY: verify-imports

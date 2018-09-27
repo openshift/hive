@@ -23,7 +23,11 @@ parameters:
 - name: BASE_DOMAIN
   displayName: Base DNS Domain
   description: Base DNS domain for your cluster. Will be combined with cluster name when creating entries.
-  default: new-installer.openshift.com
+  value: new-installer.openshift.com
+- name: PULL_SECRET
+  displayName: Pull Secret for OpenShift Images
+  description: Pull Secret for OpenShift Images
+  required: true
 - name: AWS_ACCESS_KEY_ID
   required: true
   description: Base64 encoded AWS access key ID that can be used to provision cluster resources.
@@ -37,7 +41,7 @@ objects:
   metadata:
     name: ${CLUSTER_NAME}-aws-creds
   type: Opaque
-  data:
+  stringData:
     awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
     awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
 
@@ -68,7 +72,7 @@ objects:
           region: us-east-1
           vpcID: should-not-be-required # TODO
           vpcCIDRBlock: 10.0.0.0/16
-      pullSecret: does-not-exist # TODO
+      pullSecret: "${PULL_SECRET}"
       machines:
       - name: master
         replicas: 3

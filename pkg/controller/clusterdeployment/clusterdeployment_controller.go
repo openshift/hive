@@ -120,7 +120,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		"namespace":         cd.Namespace,
 	})
 	cdLog.Info("reconciling cluster deployment")
-	origCD := cd.DeepCopy()
+	origCD := cd
+	cd = cd.DeepCopy()
 
 	job, cfgMap, err := generateInstallerJob(fmt.Sprintf("%s-install", cd.Name), cd, installerImage, kapi.PullIfNotPresent, false, nil, r.scheme)
 	if err != nil {

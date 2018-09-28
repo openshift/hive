@@ -147,6 +147,12 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	cdLog = cdLog.WithField("job", job.Name)
 
+	// If the ClusterDeployment is already installed, we should stop
+	// any further processing.
+	if cd.Status.Installed {
+		return reconcile.Result{}, nil
+	}
+
 	// Check if the Job already exists for this ClusterDeployment:
 	existingJob := &kbatch.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)

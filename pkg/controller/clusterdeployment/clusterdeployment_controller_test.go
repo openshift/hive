@@ -42,7 +42,6 @@ var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
 
-var cfgMapKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 
 const timeout = time.Second * 5
@@ -88,10 +87,6 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-
-	cfgMap := &kapi.ConfigMap{}
-	g.Eventually(func() error { return c.Get(context.TODO(), cfgMapKey, cfgMap) }, timeout).
-		Should(gomega.Succeed())
 
 	job := &kbatch.Job{}
 	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).

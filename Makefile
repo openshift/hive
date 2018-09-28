@@ -52,7 +52,7 @@ manifests:
 # Run go fmt against code
 .PHONY: fmt
 fmt:
-	go fmt ./pkg/... ./cmd/... ./contrib/...
+	gofmt -w -s $(SRC_DIRS)
 
 # Run go vet against code
 .PHONY: vet
@@ -86,7 +86,7 @@ verify-gofmt:
 	@echo Verifying gofmt
 	@gofmt -l -s $(SRC_DIRS)>.out 2>&1 || true
 	@[ ! -s .out ] || \
-	  (echo && echo "*** Please 'gofmt -s -d' on the following:" && \
+	  (echo && echo "*** Please run 'make fmt' in order to fix the following:" && \
 	  cat .out && echo && rm .out && false)
 	@rm .out
 

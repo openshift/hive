@@ -262,6 +262,10 @@ func tagsToMap(tags interface{}) (map[string]string, error) {
 func lbToAWSObjects(lbList []*elb.LoadBalancerDescription, elbClient *elb.ELB) ([]awsObjectWithTags, error) {
 	lbObjects := []awsObjectWithTags{}
 
+	if len(lbList) == 0 {
+		return lbObjects, nil
+	}
+
 	describeTagsInput := elb.DescribeTagsInput{}
 	// populate the list of LBs we want tags for
 	for _, lb := range lbList {

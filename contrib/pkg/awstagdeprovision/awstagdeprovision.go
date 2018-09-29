@@ -307,9 +307,18 @@ func deleteLBs(awsSession *session.Session, filters awsFilter, clusterName strin
 			return false, nil
 		}
 
-		lbObjects, err := lbToAWSObjects(results.LoadBalancerDescriptions, elbClient)
-		if err != nil {
-			return false, nil
+		lbObjects := []awsObjectWithTags{}
+		for i := 0; i < len(results.LoadBalancerDescriptions); i += 20 {
+			j := i + 20
+			if j > len(results.LoadBalancerDescriptions) {
+				j = len(results.LoadBalancerDescriptions)
+			}
+			new, err := lbToAWSObjects(results.LoadBalancerDescriptions[i:j], elbClient)
+			if err != nil {
+				logger.Errorf("error converting load balancers to internal AWS objects: %v", err)
+				return false, nil
+			}
+			lbObjects = append(lbObjects, new...)
 		}
 
 		filteredResults := filterObjects(lbObjects, filters)

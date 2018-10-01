@@ -34,5 +34,15 @@ API driven OpenShift cluster provisioning and management
      | oc apply -f -
   ```
 * Delete your ClusterDeployment:
-  * `$ oc delete clusterdeployment $USER`
 
+  * [ Temporary Workaround ] 
+    * Determine your tectonicClusterID by going to AWS and inspecting the tags on a machine instance
+    * Annotate your ClusterDeployment with the tectonicClusterID:
+      ```bash
+      $ oc annotate clusterdeployment $USER tectonicClusterID=[clusterIDFromAWS]
+      ```
+
+  * Delete the clusterdeployment:
+    ```bash
+    $ oc delete clusterdeployment $USER
+    ```

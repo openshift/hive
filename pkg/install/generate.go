@@ -17,14 +17,16 @@ limitations under the License.
 package install
 
 import (
+	"bytes"
+	"fmt"
+	"text/template"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	kbatch "k8s.io/api/batch/v1"
-	kapi "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
@@ -32,13 +34,9 @@ import (
 // GenerateInstallerJob creates a job to install an OpenShift cluster
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
-	name string,
 	cd *hivev1.ClusterDeployment,
 	installerImage string,
-	installerImagePullPolicy kapi.PullPolicy,
-	uninstall bool,
-	serviceAccount *kapi.ServiceAccount,
-	scheme *runtime.Scheme) *kbatch.Job {
+	installerImagePullPolicy corev1.PullPolicy) *batchv1.Job {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -47,13 +45,56 @@ func GenerateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 
-	env := []kapi.EnvVar{}
+	env := []corev1.EnvVar{
+		{
+			Name:  "OPENSHIFT_INSTALL_BASE_DOMAIN",
+			Value: cd.Spec.Config.BaseDomain,
+		},
+		{
+			Name:  "OPENSHIFT_INSTALL_CLUSTER_NAME",
+			Value: cd.Name,
+		},
+		{
+			Name:  "OPENSHIFT_INSTALL_EMAIL_ADDRESS",
+			Value: cd.Spec.Config.Admin.Email,
+		},
+		{
+			Name: "OPENSHIFT_INSTALL_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: cd.Spec.Config.Admin.Password,
+					Key:                  "password",
+				},
+			},
+		},
+		{
+			Name: "OPENSHIFT_INSTALL_PULL_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: cd.Spec.Config.PullSecret,
+					Key:                  ".dockercfg",
+				},
+			},
+		},
+	}
+	if cd.Spec.Config.AWS != nil {
+		env = append(env, []corev1.EnvVar{
+			{
+				Name:  "OPENSHIFT_INSTALL_AWS_REGION",
+				Value: cd.Spec.Config.AWS.Region,
+			},
+			{
+				Name:  "OPENSHIFT_INSTALL_PLATFORM",
+				Value: "aws",
+			},
+		}...)
+	}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
-		env = append(env, []kapi.EnvVar{
+		env = append(env, []corev1.EnvVar{
 			{
 				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &kapi.EnvVarSource{
-					SecretKeyRef: &kapi.SecretKeySelector{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
 						Key:                  "awsAccessKeyId",
 					},
@@ -61,129 +102,221 @@ func GenerateInstallerJob(
 			},
 			{
 				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &kapi.EnvVarSource{
-					SecretKeyRef: &kapi.SecretKeySelector{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
 						Key:                  "awsSecretAccessKey",
 					},
 				},
 			},
-			{
-				Name:  "OPENSHIFT_INSTALL_BASE_DOMAIN",
-				Value: cd.Spec.Config.BaseDomain,
-			},
-			{
-				Name:  "OPENSHIFT_INSTALL_CLUSTER_NAME",
-				Value: cd.Name,
-			},
-			{
-				Name:  "OPENSHIFT_INSTALL_EMAIL_ADDRESS",
-				Value: cd.Spec.Config.Admin.Email,
-			},
-			{
-				Name: "OPENSHIFT_INSTALL_PASSWORD",
-				ValueFrom: &kapi.EnvVarSource{
-					SecretKeyRef: &kapi.SecretKeySelector{
-						LocalObjectReference: cd.Spec.Config.Admin.Password,
-						Key:                  "password",
-					},
-				},
-			},
-			{
-				Name:  "OPENSHIFT_INSTALL_PLATFORM",
-				Value: "aws",
-			},
-			{
-				Name: "OPENSHIFT_INSTALL_PULL_SECRET",
-				ValueFrom: &kapi.EnvVarSource{
-					SecretKeyRef: &kapi.SecretKeySelector{
-						LocalObjectReference: cd.Spec.Config.PullSecret,
-						Key:                  ".dockercfg",
-					},
-				},
-			},
-			{
-				Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
-				ValueFrom: &kapi.EnvVarSource{
-					SecretKeyRef: &kapi.SecretKeySelector{
-						LocalObjectReference: *cd.Spec.Config.Admin.SSHKey,
-						Key:                  "ssh-publickey",
-					},
-				},
-			},
-			{
-				Name:  "OPENSHIFT_INSTALL_AWS_REGION",
-				Value: cd.Spec.Config.AWS.Region,
-			},
 		}...)
 	}
 
-	volumes := []kapi.Volume{
+	if cd.Spec.Config.Admin.SSHKey != nil {
+		env = append(env, corev1.EnvVar{
+			Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: *cd.Spec.Config.Admin.SSHKey,
+					Key:                  "ssh-publickey",
+				},
+			},
+		})
+	}
+
+	volumes := []corev1.Volume{
 		{
 			Name: "install",
-			VolumeSource: kapi.VolumeSource{
-				EmptyDir: &kapi.EmptyDirVolumeSource{},
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 	}
 
-	volumeMounts := []kapi.VolumeMount{
+	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "install",
 			MountPath: "/output",
 		},
 	}
 
-	command := []string{}
-	if uninstall {
-		command = []string{"echo", "this would have been an uninstall"}
-	}
-	args := []string{}
-	if !uninstall {
-		args = []string{"cluster"}
-	}
+	args := []string{"cluster"}
 
-	containers := []kapi.Container{
+	containers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
 			ImagePullPolicy: installerImagePullPolicy,
 			Env:             env,
-			Command:         command,
 			Args:            args,
 			VolumeMounts:    volumeMounts,
 		},
 	}
 
-	podSpec := kapi.PodSpec{
-		DNSPolicy:     kapi.DNSClusterFirst,
-		RestartPolicy: kapi.RestartPolicyOnFailure,
+	podSpec := corev1.PodSpec{
+		DNSPolicy:     corev1.DNSClusterFirst,
+		RestartPolicy: corev1.RestartPolicyOnFailure,
 		Containers:    containers,
 		Volumes:       volumes,
-	}
-
-	if serviceAccount != nil {
-		podSpec.ServiceAccountName = serviceAccount.Name
 	}
 
 	completions := int32(1)
 	deadline := int64((24 * time.Hour).Seconds())
 	backoffLimit := int32(123456) // effectively limitless
 
-	job := &kbatch.Job{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      fmt.Sprintf("install-%s", cd.Name),
 			Namespace: cd.Namespace,
 		},
-		Spec: kbatch.JobSpec{
+		Spec: batchv1.JobSpec{
 			Completions:           &completions,
 			ActiveDeadlineSeconds: &deadline,
 			BackoffLimit:          &backoffLimit,
-			Template: kapi.PodTemplateSpec{
+			Template: corev1.PodTemplateSpec{
 				Spec: podSpec,
 			},
 		},
 	}
 
 	return job
+}
+
+const metadataTemplate = `{
+	"clusterName": "{{ .Name }}",
+	"aws": {
+		"region": "{{ .Region }}",
+		"identifier": {
+			"tectonicClusterID": "{{ .ClusterID }}"
+		}
+	}
+}`
+
+type metadataParams struct {
+	Name      string
+	Region    string
+	ClusterID string
+}
+
+// GenerateUninstallerJob creates a job to uninstall an OpenShift cluster
+// given a ClusterDeployment and an installer image.
+func GenerateUninstallerJob(
+	cd *hivev1.ClusterDeployment,
+	installerImage string,
+	installerImagePullPolicy corev1.PullPolicy) (*batchv1.Job, *corev1.ConfigMap, error) {
+
+	if cd.Spec.Config.AWS == nil {
+		return nil, nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
+	}
+
+	// TODO: Remove when using real Status.ClusterID
+	if cd.Annotations == nil || cd.Annotations["tectonicClusterID"] == "" {
+		return nil, nil, fmt.Errorf("tectonicClusterID annotation not present in ClusterDeployment")
+	}
+
+	t, err := template.New("metadata").Parse(metadataTemplate)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	params := metadataParams{
+		Name:   cd.Name,
+		Region: cd.Spec.Config.AWS.Region,
+		// TODO: Obtain this from the cluster status when available
+		ClusterID: cd.Annotations["tectonicClusterID"],
+	}
+	buf := &bytes.Buffer{}
+	err = t.Execute(buf, params)
+	if err != nil {
+		return nil, nil, err
+	}
+	metadata := buf.String()
+
+	cm := &corev1.ConfigMap{}
+	cmName := fmt.Sprintf("%s-uninstall-config", cd.Name)
+	cm.Name = cmName
+	cm.Namespace = cd.Namespace
+	cm.Data = map[string]string{"metadata.json": metadata}
+
+	env := []corev1.EnvVar{}
+	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
+		env = append(env, []corev1.EnvVar{
+			{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+						Key:                  "awsAccessKeyId",
+					},
+				},
+			},
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+						Key:                  "awsSecretAccessKey",
+					},
+				},
+			},
+		}...)
+	}
+
+	volumes := []corev1.Volume{
+		{
+			Name: "metadata",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cmName,
+					},
+				},
+			},
+		},
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "metadata",
+			MountPath: "/cluster/metadata",
+		},
+	}
+
+	args := []string{"destroy-cluster", "--dir", "/cluster/metadata"}
+
+	containers := []corev1.Container{
+		{
+			Name:            "installer",
+			Image:           installerImage,
+			ImagePullPolicy: installerImagePullPolicy,
+			Env:             env,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
+		},
+	}
+
+	podSpec := corev1.PodSpec{
+		DNSPolicy:     corev1.DNSClusterFirst,
+		RestartPolicy: corev1.RestartPolicyOnFailure,
+		Containers:    containers,
+		Volumes:       volumes,
+	}
+
+	completions := int32(1)
+	deadline := int64((24 * time.Hour).Seconds())
+	backoffLimit := int32(123456) // effectively limitless
+
+	job := &batchv1.Job{}
+	job.Name = fmt.Sprintf("%s-uninstall", cd.Name)
+	job.Namespace = cd.Namespace
+	job.Spec = batchv1.JobSpec{
+		Completions:           &completions,
+		ActiveDeadlineSeconds: &deadline,
+		BackoffLimit:          &backoffLimit,
+		Template: corev1.PodTemplateSpec{
+			Spec: podSpec,
+		},
+	}
+
+	return job, cm, nil
 }

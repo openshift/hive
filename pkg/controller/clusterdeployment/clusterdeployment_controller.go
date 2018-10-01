@@ -18,7 +18,6 @@ package clusterdeployment
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -121,7 +120,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	origCD := cd
 	cd = cd.DeepCopy()
 
-	job := install.GenerateInstallerJob(fmt.Sprintf("%s-install", cd.Name), cd, installerImage, kapi.PullIfNotPresent, false, nil, r.scheme)
+	job := install.GenerateInstallerJob(cd, installerImage, kapi.PullIfNotPresent)
 	if err != nil {
 		cdLog.Errorf("error generating install job", err)
 		return reconcile.Result{}, err
@@ -190,13 +189,15 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	// Generate an uninstall job:
-	uninstall := true
-	uninstallJob := install.GenerateInstallerJob(fmt.Sprintf("%s-uninstall", cd.Name), cd, installerImage,
-		kapi.PullIfNotPresent, uninstall, nil, r.scheme)
-
-	err := controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
+	uninstallJob, cm, err := install.GenerateUninstallerJob(cd, installerImage, kapi.PullIfNotPresent)
 	if err != nil {
-		cdLog.Errorf("error setting controller reference on job", err)
+		cdLog.Errorf("error generating uninstaller job: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	err = controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
+	if err != nil {
+		cdLog.Errorf("error setting controller reference on job: %v", err)
 		return reconcile.Result{}, err
 	}
 
@@ -204,12 +205,18 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	existingJob := &kbatch.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.Infof("creating uninstall job")
+		cdLog.Infof("creating configmap for uninstall job")
+		err = r.Create(context.TODO(), cm)
+		if err != nil {
+			cdLog.Errorf("error creating configmap for uninstall job: %v", err)
+			return reconcile.Result{}, err
+		}
 		err = r.Create(context.TODO(), uninstallJob)
 		if err != nil {
 			cdLog.Errorf("error creating uninstall job: %v", err)
 			return reconcile.Result{}, err
 		}
+		return reconcile.Result{}, nil
 	} else if err != nil {
 		cdLog.Errorf("error getting uninstall job: %v", err)
 		return reconcile.Result{}, err

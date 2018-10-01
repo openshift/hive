@@ -1,6 +1,13 @@
 # OpenShift Hive
 API driven OpenShift cluster provisioning and management
 
+## Deploying Locally
+
+* Ensure that you have access to an OpenShift cluster and have administrator access
+
+* Build and provision CRDs, roles, and controller:
+   * `$ make provision`
+
 ## Development Workflow
 
 * Create the ClusterDeployment CRD:

@@ -98,8 +98,7 @@ type ReconcileClusterDeployment struct {
 //
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 //
-// TODO: RBAC for jobs instead of deployments here:
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the ClusterDeployment instance

@@ -81,20 +81,35 @@ func GenerateInstallerJob(
 				Value: cd.Spec.Config.Admin.Email,
 			},
 			{
-				Name:  "OPENSHIFT_INSTALL_PASSWORD",
-				Value: cd.Spec.Config.Admin.Password,
+				Name: "OPENSHIFT_INSTALL_PASSWORD",
+				ValueFrom: &kapi.EnvVarSource{
+					SecretKeyRef: &kapi.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Config.Admin.Password,
+						Key:                  "password",
+					},
+				},
 			},
 			{
 				Name:  "OPENSHIFT_INSTALL_PLATFORM",
 				Value: "aws",
 			},
 			{
-				Name:  "OPENSHIFT_INSTALL_PULL_SECRET",
-				Value: cd.Spec.Config.PullSecret,
+				Name: "OPENSHIFT_INSTALL_PULL_SECRET",
+				ValueFrom: &kapi.EnvVarSource{
+					SecretKeyRef: &kapi.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Config.PullSecret,
+						Key:                  ".dockercfg",
+					},
+				},
 			},
 			{
-				Name:  "OPENSHIFT_INSTALL_SSH_PUB_KEY",
-				Value: cd.Spec.Config.Admin.SSHKey,
+				Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
+				ValueFrom: &kapi.EnvVarSource{
+					SecretKeyRef: &kapi.SecretKeySelector{
+						LocalObjectReference: *cd.Spec.Config.Admin.SSHKey,
+						Key:                  "ssh-publickey",
+					},
+				},
 			},
 			{
 				Name:  "OPENSHIFT_INSTALL_AWS_REGION",

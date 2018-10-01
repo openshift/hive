@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	"net"
 )
 
@@ -25,18 +27,18 @@ type InstallConfig struct {
 	// perform the installation.
 	Platform `json:"platform"`
 
-	// PullSecret is the secret to use when pulling images.
-	PullSecret string `json:"pullSecret"`
+	// PullSecret is the reference to the secret to use when pulling images.
+	PullSecret corev1.LocalObjectReference `json:"pullSecret"`
 }
 
 // Admin is the configuration for the admin user.
 type Admin struct {
 	// Email is the email address of the admin user.
 	Email string `json:"email"`
-	// Password is the password of the admin user.
-	Password string `json:"password"`
-	// SSHKey to use for the access to compute instances.
-	SSHKey string `json:"sshKey,omitempty"`
+	// Password is a reference to the secret that contains the password of the admin user.
+	Password corev1.LocalObjectReference `json:"password"`
+	// SSHKey is a reference to the secret that contains a public key to use for access to compute instances.
+	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
 }
 
 // Platform is the configuration for the specific platform upon which to perform

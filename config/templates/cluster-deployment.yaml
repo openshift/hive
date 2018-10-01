@@ -45,6 +45,30 @@ objects:
     awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
     awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
 
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ${CLUSTER_NAME}-pull-secret
+  type: kubernetes.io/dockercfg
+  stringData:
+    ".dockercfg": "${PULL_SECRET}"
+
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ${CLUSTER_NAME}-ssh-key
+  type: Opaque
+  stringData:
+    ssh-publickey: "${SSH_KEY}"
+
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: ${CLUSTER_NAME}-admin-creds
+  type: Opaque
+  stringData:
+    password: ${ADMIKN_PASSWORD}
+
 - apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment
   metadata:
@@ -59,8 +83,10 @@ objects:
     config:
       admin:
         email: ${ADMIN_EMAIL}
-        password: ${ADMIN_PASSWORD}
-        sshKey: ${SSH_KEY}
+        password:
+          name: "${CLUSTER_NAME}-admin-creds"
+        sshKey:
+          name: "${CLUSTER_NAME}-ssh-key"
       clusterID: ${CLUSTER_NAME} # TODO: what kind of ID is this
       baseDomain: ${BASE_DOMAIN}
       networking:
@@ -72,7 +98,8 @@ objects:
           region: us-east-1
           vpcID: should-not-be-required # TODO
           vpcCIDRBlock: 10.0.0.0/16
-      pullSecret: "${PULL_SECRET}"
+      pullSecret:
+        name: "${CLUSTER_NAME}-pull-secret"
       machines:
       - name: master
         replicas: 3

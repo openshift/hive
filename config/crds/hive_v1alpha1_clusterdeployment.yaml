@@ -29,9 +29,9 @@ spec:
                     email:
                       type: string
                     password:
-                      type: string
+                      type: object
                     sshKey:
-                      type: string
+                      type: object
                   required:
                   - email
                   - password
@@ -149,7 +149,7 @@ spec:
                       type: object
                   type: object
                 pullSecret:
-                  type: string
+                  type: object
               required:
               - clusterID
               - admin

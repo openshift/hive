@@ -6,7 +6,7 @@ VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= hive-controller:latest
 
 all: fmt vet test build
 
@@ -40,7 +40,7 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests
+deploy: manifests docker-build
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 
@@ -102,10 +102,14 @@ generate:
 
 # Build the docker image
 .PHONY: docker-build
-docker-build: test
-	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+docker-build: manager hiveutil
+	$(eval build_path := ./build/hive)
+	$(eval tmp_build_path := "$(build_path)/tmp")
+	mkdir -p $(tmp_build_path)
+	cp $(build_path)/Dockerfile $(tmp_build_path)
+	cp ./bin/* $(tmp_build_path)
+	docker build -t ${IMG} $(tmp_build_path)
+	rm -rf $(tmp_build_path)
 
 # Push the docker image
 .PHONY: docker-push

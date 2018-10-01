@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+FROM centos:7
 
-COPY manager opt/services/
+COPY manager /opt/services/
 COPY hiveutil /usr/bin
 
 ENTRYPOINT ["/opt/services/manager"]

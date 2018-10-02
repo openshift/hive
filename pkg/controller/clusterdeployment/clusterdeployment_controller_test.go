@@ -28,7 +28,7 @@ import (
 	"golang.org/x/net/context"
 
 	kbatch "k8s.io/api/batch/v1"
-	kapi "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,7 +42,7 @@ var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
 
-var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
+var jobKey = types.NamespacedName{Name: "install-foo", Namespace: "default"}
 
 const timeout = time.Second * 5
 
@@ -55,7 +55,31 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
 		Spec: hivev1.ClusterDeploymentSpec{
 			Config: hivev1.InstallConfig{
+				Admin: hivev1.Admin{
+					Email: "user@example.com",
+					Password: corev1.LocalObjectReference{
+						Name: "admin-password",
+					},
+					SSHKey: &corev1.LocalObjectReference{
+						Name: "ssh-key",
+					},
+				},
 				Machines: []hivev1.MachinePool{},
+				PullSecret: corev1.LocalObjectReference{
+					Name: "pull-secret",
+				},
+				Platform: hivev1.Platform{
+					AWS: &hivev1.AWSPlatform{
+						Region: "us-east-1",
+					},
+				},
+			},
+			PlatformSecrets: hivev1.PlatformSecrets{
+				AWS: &hivev1.AWSPlatformSecrets{
+					Credentials: corev1.LocalObjectReference{
+						Name: "aws-credentials",
+					},
+				},
 			},
 		},
 	}
@@ -96,7 +120,7 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	job.Status.Conditions = []kbatch.JobCondition{
 		{
 			Type:   kbatch.JobComplete,
-			Status: kapi.ConditionTrue,
+			Status: corev1.ConditionTrue,
 		},
 	}
 	g.Expect(c.Status().Update(context.TODO(), job)).NotTo(gomega.HaveOccurred())

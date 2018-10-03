@@ -42,9 +42,13 @@ var c client.Client
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
 
-var jobKey = types.NamespacedName{Name: "install-foo", Namespace: "default"}
+var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 
-const timeout = time.Second * 5
+const (
+	timeout             = time.Second * 10
+	fakeClusterUUID     = "fe953108-f64c-4166-bb8e-20da7665ba00"
+	fakeClusterMetadata = `{"clusterName":"foo","aws":{"region":"us-east-1","identifier":{"tectonicClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}`
+)
 
 func init() {
 	log.SetLevel(log.DebugLevel)
@@ -116,14 +120,8 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
 		Should(gomega.Succeed())
 
-	// Fake that the install job was successful:
-	job.Status.Conditions = []kbatch.JobCondition{
-		{
-			Type:   kbatch.JobComplete,
-			Status: corev1.ConditionTrue,
-		},
-	}
-	g.Expect(c.Status().Update(context.TODO(), job)).NotTo(gomega.HaveOccurred())
+	err = fakeInstallJobSuccess(c, instance, job)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
@@ -137,6 +135,9 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 		// All of these conditions should eventually be true:
 		if !updatedCD.Status.Installed {
 			return fmt.Errorf("cluster deployment status not marked installed")
+		}
+		if updatedCD.Status.ClusterUUID != fakeClusterUUID {
+			return fmt.Errorf("cluster deployment status does not have cluster UUID")
 		}
 		if !HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
 			return fmt.Errorf("cluster deployment does not have expected finalizer")
@@ -155,3 +156,30 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 }
 
 // TODO: how to mimic objects already existing?
+
+func fakeInstallJobSuccess(c client.Client, cd *hivev1.ClusterDeployment, job *kbatch.Job) error {
+
+	// Create a fake cluster metadata configmap:
+	metadataCfgMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-metadata", cd.Name),
+			Namespace: cd.Namespace,
+		},
+		Data: map[string]string{
+			"metadata.json": fakeClusterMetadata,
+		},
+	}
+	err := c.Create(context.TODO(), metadataCfgMap)
+	if err != nil {
+		return err
+	}
+
+	// Fake that the install job was successful:
+	job.Status.Conditions = []kbatch.JobCondition{
+		{
+			Type:   kbatch.JobComplete,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	return c.Status().Update(context.TODO(), job)
+}

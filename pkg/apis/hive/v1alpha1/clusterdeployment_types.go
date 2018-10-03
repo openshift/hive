@@ -58,6 +58,9 @@ type ClusterDeploymentStatus struct {
 
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`
+
+	// ClusterUUID is a unique identifier generated for this cluster.
+	ClusterUUID string `json:"clusterUUID"`
 }
 
 // +genclient

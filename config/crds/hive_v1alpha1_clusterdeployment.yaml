@@ -175,10 +175,13 @@ spec:
           type: object
         status:
           properties:
+            clusterUUID:
+              type: string
             installed:
               type: boolean
           required:
           - installed
+          - clusterUUID
           type: object
   version: v1alpha1
 status:

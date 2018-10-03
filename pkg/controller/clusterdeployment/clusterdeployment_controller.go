@@ -18,12 +18,15 @@ package clusterdeployment
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
 	kbatch "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +48,13 @@ import (
 const (
 	installerImage   = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 	uninstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer" // TODO
+	hiveImage        = "hive-controller"
+
+	// serviceAccountName will be a service account that can run the installer and then
+	// upload artifacts to the cluster's namespace.
+	serviceAccountName = "cluster-installer"
+	roleName           = "cluster-installer"
+	roleBindingName    = "cluster-installer"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -117,17 +127,11 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		"namespace":         cd.Namespace,
 	})
 	cdLog.Info("reconciling cluster deployment")
-	origCD := cd
 	cd = cd.DeepCopy()
 
-	job := install.GenerateInstallerJob(cd, installerImage, kapi.PullIfNotPresent)
+	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
-		cdLog.Errorf("error generating install job", err)
-		return reconcile.Result{}, err
-	}
-
-	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
-		cdLog.Errorf("error setting controller reference on job", err)
+		cdLog.WithError(err).Error("error setting up service account and role")
 		return reconcile.Result{}, err
 	}
 
@@ -143,53 +147,106 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
-	cdLog = cdLog.WithField("job", job.Name)
+	job := install.GenerateInstallerJob(cd, serviceAccountName, installerImage,
+		hiveImage, kapi.PullIfNotPresent)
 
-	// If the ClusterDeployment is already installed, we should stop
-	// any further processing.
-	if cd.Status.Installed {
-		return reconcile.Result{}, nil
+	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+		cdLog.Errorf("error setting controller reference on job", err)
+		return reconcile.Result{}, err
 	}
+	cdLog = cdLog.WithField("job", job.Name)
 
 	// Check if the Job already exists for this ClusterDeployment:
 	existingJob := &kbatch.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.Infof("creating job")
-		err = r.Create(context.TODO(), job)
-		if err != nil {
-			cdLog.Errorf("error creating job: %v", err)
-			return reconcile.Result{}, err
+		// If the ClusterDeployment is already installed, we do not need to create a new job:
+		if cd.Status.Installed {
+			cdLog.Debug("cluster is already installed, no job needed")
+		} else {
+			cdLog.Infof("creating install job")
+			err = r.Create(context.TODO(), job)
+			if err != nil {
+				cdLog.Errorf("error creating job: %v", err)
+				return reconcile.Result{}, err
+			}
 		}
 	} else if err != nil {
 		cdLog.Errorf("error getting job: %v", err)
 		return reconcile.Result{}, err
 	} else {
-		// Job exists, check it's status:
-		cdLog.Infof("conditions: %s", existingJob.Status.Conditions)
-		cd.Status.Installed = isSuccessful(existingJob)
-		cdLog.Infof("successful: %s", cd.Status.Installed)
+		cdLog.Infof("cluster job exists, successful: %v", cd.Status.Installed)
 	}
 
-	// Update cluster deployment status if changed:
-	if !reflect.DeepEqual(cd.Status, origCD.Status) {
-		cdLog.Infof("status has changed, updating cluster deployment")
-		err = r.Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.Errorf("error updating cluster deployment: %v", err)
-			return reconcile.Result{}, err
-		}
-	} else {
-		cdLog.Infof("cluster deployment status unchanged")
+	err = r.updateClusterDeploymentStatus(cd, existingJob, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Errorf("error updating cluster deployment status")
+		return reconcile.Result{}, err
 	}
 
 	cdLog.Debugf("reconcile complete")
 	return reconcile.Result{}, nil
 }
 
+func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *kbatch.Job, cdLog log.FieldLogger) error {
+	cdLog.Debug("updating cluster deployment status")
+	origCD := cd
+	cd = cd.DeepCopy()
+	if job != nil {
+		// Job exists, check it's status:
+		cd.Status.Installed = isSuccessful(job)
+	}
+
+	if cd.Status.Installed {
+		if cd.Status.ClusterUUID == "" {
+			metadataCfgMap := &kapi.ConfigMap{}
+			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
+			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
+			if err != nil {
+				// This would be pretty strange for a cluster that is installed:
+				cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
+				return err
+			}
+
+			// Dynamically parse the JSON to get the UUID we need:
+			var objMap map[string]interface{}
+			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &objMap); err != nil {
+				cdLog.WithError(err).Error("error reading json from metadata")
+				return err
+			}
+			aws, ok := objMap["aws"].(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
+			}
+			identifier, ok := aws["identifier"].(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
+			}
+			cd.Status.ClusterUUID, ok = identifier["tectonicClusterID"].(string)
+			if !ok {
+				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
+			}
+		}
+	}
+
+	// Update cluster deployment status if changed:
+	if !reflect.DeepEqual(cd.Status, origCD.Status) {
+		cdLog.Infof("status has changed, updating cluster deployment")
+		err := r.Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.Errorf("error updating cluster deployment: %v", err)
+			return err
+		}
+	} else {
+		cdLog.Infof("cluster deployment status unchanged")
+	}
+
+	return nil
+}
+
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	// Generate an uninstall job:
-	uninstallJob, cm, err := install.GenerateUninstallerJob(cd, installerImage, kapi.PullIfNotPresent)
+	uninstallJob, err := install.GenerateUninstallerJob(cd, installerImage, kapi.PullIfNotPresent)
 	if err != nil {
 		cdLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err
@@ -205,12 +262,6 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	existingJob := &kbatch.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.Infof("creating configmap for uninstall job")
-		err = r.Create(context.TODO(), cm)
-		if err != nil {
-			cdLog.Errorf("error creating configmap for uninstall job: %v", err)
-			return reconcile.Result{}, err
-		}
 		err = r.Create(context.TODO(), uninstallJob)
 		if err != nil {
 			cdLog.Errorf("error creating uninstall job: %v", err)
@@ -242,6 +293,100 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	cd = cd.DeepCopy()
 	DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cd)
+}
+
+// setupClusterInstallServiceAccount ensures a service account exists which can upload
+// the required artifacts after running the installer in a pod. (metadata, admin kubeconfig)
+func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace string, cdLog log.FieldLogger) (*kapi.ServiceAccount, error) {
+	// create new serviceaccount if it doesn't already exist
+	currentSA := &kapi.ServiceAccount{}
+	err := r.Client.Get(context.Background(), client.ObjectKey{Name: serviceAccountName, Namespace: namespace}, currentSA)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("error checking for existing serviceaccount")
+	}
+
+	if errors.IsNotFound(err) {
+		currentSA = &kapi.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceAccountName,
+				Namespace: namespace,
+			},
+		}
+		err = r.Client.Create(context.Background(), currentSA)
+
+		if err != nil {
+			return nil, fmt.Errorf("error creating serviceaccount: %v", err)
+		}
+		cdLog.WithField("name", serviceAccountName).Info("created service account")
+	} else {
+		cdLog.WithField("name", serviceAccountName).Debug("service account already exists")
+	}
+
+	expectedRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"secrets", "configmaps"},
+				Verbs:     []string{"create", "delete", "get", "list", "update"},
+			},
+		},
+	}
+	currentRole := &rbacv1.Role{}
+	err = r.Client.Get(context.Background(), client.ObjectKey{Name: roleName, Namespace: namespace}, currentRole)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("error checking for existing role: %v", err)
+	}
+	if errors.IsNotFound(err) {
+		err = r.Client.Create(context.Background(), expectedRole)
+		if err != nil {
+			return nil, fmt.Errorf("error creating role: %v", err)
+		}
+		cdLog.WithField("name", roleName).Info("created role")
+	} else {
+		cdLog.WithField("name", roleName).Debug("role already exists")
+	}
+
+	// create rolebinding for the serviceaccount
+	currentRB := &rbacv1.RoleBinding{}
+	err = r.Client.Get(context.Background(), client.ObjectKey{Name: roleBindingName, Namespace: namespace}, currentRB)
+
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("error checking for existing rolebinding: %v", err)
+	}
+
+	if errors.IsNotFound(err) {
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleBindingName,
+				Namespace: namespace,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      currentSA.Name,
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Name: roleName,
+				Kind: "Role",
+			},
+		}
+
+		err = r.Client.Create(context.Background(), rb)
+		if err != nil {
+			return nil, fmt.Errorf("error creating rolebinding: %v", err)
+		}
+		cdLog.WithField("name", roleBindingName).Info("created rolebinding")
+	} else {
+		cdLog.WithField("name", roleBindingName).Debug("rolebinding already exists")
+	}
+
+	return currentSA, nil
 }
 
 // getJobConditionStatus gets the status of the condition in the job. If the

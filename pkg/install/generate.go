@@ -17,9 +17,7 @@ limitations under the License.
 package install
 
 import (
-	"bytes"
 	"fmt"
-	"text/template"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -35,8 +33,10 @@ import (
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
+	serviceAccountName string,
 	installerImage string,
-	installerImagePullPolicy corev1.PullPolicy) *batchv1.Job {
+	hiveImage string,
+	imagePullPolicy corev1.PullPolicy) *batchv1.Job {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -140,24 +140,35 @@ func GenerateInstallerJob(
 		},
 	}
 
-	args := []string{"cluster"}
-
+	// This container just needs to copy the required install binaries to the shared emptyDir volume,
+	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			ImagePullPolicy: imagePullPolicy,
 			Env:             env,
-			Args:            args,
+			Command:         []string{"/bin/sh", "-c"},
+			Args:            []string{"cp -v /bin/openshift-install /output && cp -v /bin/terraform /output && ls -la /output"},
+			VolumeMounts:    volumeMounts,
+		},
+		{
+			Name:            "hive",
+			Image:           hiveImage,
+			ImagePullPolicy: imagePullPolicy,
+			Env:             env,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args:            []string{"install-manager", "--work-dir", "/output", "--log-level", "debug", cd.Namespace, cd.Name},
 			VolumeMounts:    volumeMounts,
 		},
 	}
 
 	podSpec := corev1.PodSpec{
-		DNSPolicy:     corev1.DNSClusterFirst,
-		RestartPolicy: corev1.RestartPolicyOnFailure,
-		Containers:    containers,
-		Volumes:       volumes,
+		DNSPolicy:          corev1.DNSClusterFirst,
+		RestartPolicy:      corev1.RestartPolicyOnFailure,
+		Containers:         containers,
+		Volumes:            volumes,
+		ServiceAccountName: serviceAccountName,
 	}
 
 	completions := int32(1)
@@ -166,7 +177,7 @@ func GenerateInstallerJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("install-%s", cd.Name),
+			Name:      fmt.Sprintf("%s-install", cd.Name),
 			Namespace: cd.Namespace,
 		},
 		Spec: batchv1.JobSpec{
@@ -182,61 +193,16 @@ func GenerateInstallerJob(
 	return job
 }
 
-const metadataTemplate = `{
-	"clusterName": "{{ .Name }}",
-	"aws": {
-		"region": "{{ .Region }}",
-		"identifier": {
-			"tectonicClusterID": "{{ .ClusterID }}"
-		}
-	}
-}`
-
-type metadataParams struct {
-	Name      string
-	Region    string
-	ClusterID string
-}
-
 // GenerateUninstallerJob creates a job to uninstall an OpenShift cluster
 // given a ClusterDeployment and an installer image.
 func GenerateUninstallerJob(
 	cd *hivev1.ClusterDeployment,
 	installerImage string,
-	installerImagePullPolicy corev1.PullPolicy) (*batchv1.Job, *corev1.ConfigMap, error) {
+	imagePullPolicy corev1.PullPolicy) (*batchv1.Job, error) {
 
 	if cd.Spec.Config.AWS == nil {
-		return nil, nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
+		return nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
 	}
-
-	// TODO: Remove when using real Status.ClusterID
-	if cd.Annotations == nil || cd.Annotations["tectonicClusterID"] == "" {
-		return nil, nil, fmt.Errorf("tectonicClusterID annotation not present in ClusterDeployment")
-	}
-
-	t, err := template.New("metadata").Parse(metadataTemplate)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	params := metadataParams{
-		Name:   cd.Name,
-		Region: cd.Spec.Config.AWS.Region,
-		// TODO: Obtain this from the cluster status when available
-		ClusterID: cd.Annotations["tectonicClusterID"],
-	}
-	buf := &bytes.Buffer{}
-	err = t.Execute(buf, params)
-	if err != nil {
-		return nil, nil, err
-	}
-	metadata := buf.String()
-
-	cm := &corev1.ConfigMap{}
-	cmName := fmt.Sprintf("%s-uninstall-config", cd.Name)
-	cm.Name = cmName
-	cm.Namespace = cd.Namespace
-	cm.Data = map[string]string{"metadata.json": metadata}
 
 	env := []corev1.EnvVar{}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
@@ -268,7 +234,9 @@ func GenerateUninstallerJob(
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: cmName,
+						// TODO: This matches what is done in the hiveutil install-manager command.
+						// We should explicitly link the two.
+						Name: fmt.Sprintf("%s-metadata", cd.Name),
 					},
 				},
 			},
@@ -282,13 +250,13 @@ func GenerateUninstallerJob(
 		},
 	}
 
-	args := []string{"destroy-cluster", "--dir", "/cluster/metadata"}
+	args := []string{"destroy-cluster", "--dir", "/cluster/metadata", "--log-level", "debug"}
 
 	containers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			ImagePullPolicy: imagePullPolicy,
 			Env:             env,
 			Args:            args,
 			VolumeMounts:    volumeMounts,
@@ -318,5 +286,5 @@ func GenerateUninstallerJob(
 		},
 	}
 
-	return job, cm, nil
+	return job, nil
 }

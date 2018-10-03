@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/awstagdeprovision"
+	"github.com/openshift/hive/contrib/pkg/installmanager"
 	"github.com/openshift/hive/contrib/pkg/verification"
 )
 
@@ -51,6 +52,7 @@ func newCOUtilityCommand() *cobra.Command {
 	}
 	cmd.AddCommand(awstagdeprovision.NewDeprovisionAWSWithTagsCommand())
 	cmd.AddCommand(verification.NewVerifyImportsCommand())
+	cmd.AddCommand(installmanager.NewInstallManagerCommand())
 
 	return cmd
 }

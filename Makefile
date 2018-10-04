@@ -15,6 +15,9 @@ all: fmt vet test build
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
+test-integration: generate
+	go test ./test/integration/... -coverprofile cover.out
+
 # Builds all of hive's binaries (including utils).
 .PHONY: build
 build: manager hiveutil

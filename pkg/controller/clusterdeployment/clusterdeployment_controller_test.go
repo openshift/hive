@@ -17,46 +17,195 @@ limitations under the License.
 package clusterdeployment
 
 import (
-	"fmt"
+	"context"
+	"reflect"
 	"testing"
-	"time"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-
-	"github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
-	kbatch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openshift/hive/pkg/apis"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
-var c client.Client
-
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-
-var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
-
 const (
-	timeout             = time.Second * 10
-	fakeClusterUUID     = "fe953108-f64c-4166-bb8e-20da7665ba00"
-	fakeClusterMetadata = `{"clusterName":"foo","aws":{"region":"us-east-1","identifier":{"tectonicClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}`
+	testName         = "foo"
+	installJobName   = "foo-install"
+	uninstallJobName = "foo-uninstall"
+	testNamespace    = "default"
+	metadataName     = "foo-metadata"
 )
 
 func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+func TestClusterDeploymentReconcile(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	// Utility function to get the test CD from the fake client
+	getCD := func(c client.Client) *hivev1.ClusterDeployment {
+		cd := &hivev1.ClusterDeployment{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, cd)
+		if err == nil {
+			return cd
+		}
+		return nil
+	}
+	getJob := func(c client.Client, name string) *batchv1.Job {
+		job := &batchv1.Job{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: testNamespace}, job)
+		if err == nil {
+			return job
+		}
+		return nil
+	}
+	getInstallJob := func(c client.Client) *batchv1.Job {
+		return getJob(c, installJobName)
+	}
+	getUninstallJob := func(c client.Client) *batchv1.Job {
+		return getJob(c, uninstallJobName)
+	}
+
+	tests := []struct {
+		name      string
+		existing  []runtime.Object
+		expectErr bool
+		validate  func(client.Client)
+	}{
+		{
+			name: "Add finalizer",
+			existing: []runtime.Object{
+				testClusterDeploymentWithoutFinalizer(),
+			},
+			validate: func(c client.Client) {
+				cd := getCD(c)
+				if cd == nil || !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+					t.Errorf("did not get expected clusterdeployment finalizer")
+				}
+			},
+		},
+		{
+			name: "Create install job",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+			},
+			validate: func(c client.Client) {
+				job := getInstallJob(c)
+				if job == nil {
+					t.Errorf("did not find expected install job")
+				}
+			},
+		},
+		{
+			name: "No-op: Running install job",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testInstallJob(),
+			},
+			validate: func(c client.Client) {
+				cd := getCD(c)
+				if cd == nil || !reflect.DeepEqual(cd, testClusterDeployment()) {
+					t.Errorf("got unexpected change in clusterdeployment")
+				}
+				job := getInstallJob(c)
+				if job == nil || !reflect.DeepEqual(job, testInstallJob()) {
+					t.Errorf("got unexpected change in install job")
+				}
+			},
+		},
+		{
+			name: "Completed install job",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testCompletedInstallJob(),
+				testMetadataConfigMap(),
+			},
+			validate: func(c client.Client) {
+				cd := getCD(c)
+				if cd == nil || !cd.Status.Installed {
+					t.Errorf("did not get a clusterdeployment with a status of Installed")
+					return
+				}
+				if cd.Status.ClusterUUID != "testFooClusterUUID" {
+					t.Errorf("did not get expected ClusterUUID in status")
+				}
+			},
+		},
+		{
+			name: "Run uninstall",
+			existing: []runtime.Object{
+				testDeletedClusterDeployment(),
+			},
+			validate: func(c client.Client) {
+				uninstallJob := getUninstallJob(c)
+				if uninstallJob == nil {
+					t.Errorf("did not find expected uninstall job")
+				}
+			},
+		},
+		{
+			name: "No-op deleted cluster without finalizer",
+			existing: []runtime.Object{
+				testDeletedClusterDeploymentWithoutFinalizer(),
+			},
+			validate: func(c client.Client) {
+				uninstallJob := getUninstallJob(c)
+				if uninstallJob != nil {
+					t.Errorf("got unexpected uninstall job")
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existing...)
+			rcd := &ReconcileClusterDeployment{
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+			}
+
+			_, err := rcd.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      testName,
+					Namespace: testNamespace,
+				},
+			})
+
+			if test.validate != nil {
+				test.validate(fakeClient)
+			}
+
+			if err != nil && !test.expectErr {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if err == nil && test.expectErr {
+				t.Errorf("Expected error but got none")
+			}
+		})
+	}
+}
+
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{hivev1.FinalizerDeprovision},
+			UID:        types.UID("1234"),
+		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			Config: hivev1.InstallConfig{
 				Admin: hivev1.Admin{
@@ -89,97 +238,61 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	}
 }
 
-func TestReconcileNewClusterDeployment(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-
-	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
-	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = mgr.GetClient()
-
-	recFn, requests := SetupTestReconcile(newReconciler(mgr))
-	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
-	defer close(StartTestManager(mgr, g))
-
-	instance := testClusterDeployment()
-	// Create the ClusterDeployment object and expect the Reconcile and Deployment to be created
-	err = c.Create(context.TODO(), instance)
-	// The instance object may not be a valid object because it might be missing some required fields.
-	// Please modify the instance object by adding required fields and then remove the following if statement.
-	if apierrors.IsInvalid(err) {
-		t.Errorf("failed to create object, got an invalid object error: %v", err)
-		t.Fail()
-		return
-	}
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	defer c.Delete(context.TODO(), instance)
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-
-	job := &kbatch.Job{}
-	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
-		Should(gomega.Succeed())
-
-	err = fakeInstallJobSuccess(c, instance, job)
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-
-	// Test that our cluster deployment is updated as we would expect:
-	g.Eventually(func() error {
-		updatedCD := &hivev1.ClusterDeployment{}
-		err := c.Get(context.TODO(), expectedRequest.NamespacedName, updatedCD)
-		if err != nil {
-			return err
-		}
-		// All of these conditions should eventually be true:
-		if !updatedCD.Status.Installed {
-			return fmt.Errorf("cluster deployment status not marked installed")
-		}
-		if updatedCD.Status.ClusterUUID != fakeClusterUUID {
-			return fmt.Errorf("cluster deployment status does not have cluster UUID")
-		}
-		if !HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
-			return fmt.Errorf("cluster deployment does not have expected finalizer")
-		}
-		return nil
-	}, timeout).Should(gomega.Succeed())
-
-	// Delete the Job and expect Reconcile to be called for Job deletion
-	g.Expect(c.Delete(context.TODO(), job)).NotTo(gomega.HaveOccurred())
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), jobKey, job) }, timeout).
-		Should(gomega.Succeed())
-
-	// Manually delete Job since GC isn't enabled in the test control plane
-	g.Expect(c.Delete(context.TODO(), job)).To(gomega.Succeed())
+func testClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Finalizers = []string{}
+	return cd
 }
 
-// TODO: how to mimic objects already existing?
+func testDeletedClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	now := metav1.Now()
+	cd.DeletionTimestamp = &now
+	return cd
+}
 
-func fakeInstallJobSuccess(c client.Client, cd *hivev1.ClusterDeployment, job *kbatch.Job) error {
+func testDeletedClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	now := metav1.Now()
+	cd.DeletionTimestamp = &now
+	cd.Finalizers = []string{}
+	return cd
+}
 
-	// Create a fake cluster metadata configmap:
-	metadataCfgMap := &corev1.ConfigMap{
+func testInstallJob() *batchv1.Job {
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-metadata", cd.Name),
-			Namespace: cd.Namespace,
+			Name:      installJobName,
+			Namespace: testNamespace,
 		},
-		Data: map[string]string{
-			"metadata.json": fakeClusterMetadata,
-		},
+		Spec: batchv1.JobSpec{},
 	}
-	err := c.Create(context.TODO(), metadataCfgMap)
-	if err != nil {
-		return err
-	}
+	controllerutil.SetControllerReference(testClusterDeployment(), job, scheme.Scheme)
+	return job
+}
 
-	// Fake that the install job was successful:
-	job.Status.Conditions = []kbatch.JobCondition{
+func testCompletedInstallJob() *batchv1.Job {
+	job := testInstallJob()
+	job.Status.Conditions = []batchv1.JobCondition{
 		{
-			Type:   kbatch.JobComplete,
+			Type:   batchv1.JobComplete,
 			Status: corev1.ConditionTrue,
 		},
 	}
-	return c.Status().Update(context.TODO(), job)
+	return job
+}
+
+func testMetadataConfigMap() *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{}
+	cm.Name = metadataName
+	cm.Namespace = testNamespace
+	metadataJSON := `{
+		"aws": {
+			"identifier": {
+				"tectonicClusterID": "testFooClusterUUID"
+			}
+		}
+	}`
+	cm.Data = map[string]string{"metadata.json": metadataJSON}
+	return cm
 }

@@ -17,6 +17,33 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  - secrets
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - hive.openshift.io
   resources:
   - clusterdeployments
@@ -28,3 +55,9 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments/finalizers
+  verbs:
+  - update

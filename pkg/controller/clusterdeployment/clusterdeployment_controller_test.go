@@ -18,13 +18,14 @@ package clusterdeployment
 
 import (
 	"context"
-	"reflect"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -116,11 +117,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client) {
 				cd := getCD(c)
-				if cd == nil || !reflect.DeepEqual(cd, testClusterDeployment()) {
+				if cd == nil || !apiequality.Semantic.DeepEqual(cd, testClusterDeployment()) {
 					t.Errorf("got unexpected change in clusterdeployment")
 				}
 				job := getInstallJob(c)
-				if job == nil || !reflect.DeepEqual(job, testInstallJob()) {
+				if job == nil || !apiequality.Semantic.DeepEqual(job, testInstallJob()) {
 					t.Errorf("got unexpected change in install job")
 				}
 			},
@@ -167,6 +168,18 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "Delete expired cluster deployment",
+			existing: []runtime.Object{
+				testExpiredClusterDeployment(),
+			},
+			validate: func(c client.Client) {
+				cd := getCD(c)
+				if cd != nil {
+					t.Errorf("got unexpected cluster deployment (expected deleted)")
+				}
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -201,10 +214,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       testName,
-			Namespace:  testNamespace,
-			Finalizers: []string{hivev1.FinalizerDeprovision},
-			UID:        types.UID("1234"),
+			Name:        testName,
+			Namespace:   testNamespace,
+			Finalizers:  []string{hivev1.FinalizerDeprovision},
+			UID:         types.UID("1234"),
+			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			Config: hivev1.InstallConfig{
@@ -256,6 +270,13 @@ func testDeletedClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
 	now := metav1.Now()
 	cd.DeletionTimestamp = &now
 	cd.Finalizers = []string{}
+	return cd
+}
+
+func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(-60 * time.Minute)}
+	cd.Annotations[deleteAfterAnnotation] = "5m"
 	return cd
 }
 

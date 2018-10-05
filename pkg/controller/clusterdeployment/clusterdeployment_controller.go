@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -55,6 +56,9 @@ const (
 	serviceAccountName = "cluster-installer"
 	roleName           = "cluster-installer"
 	roleBindingName    = "cluster-installer"
+
+	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
+	deleteAfterAnnotation = "hive.openshift.io/delete-after"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -143,6 +147,30 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			return reconcile.Result{}, nil
 		}
 		return r.syncDeletedClusterDeployment(cd, cdLog)
+	}
+
+	// Check for the delete-after annotation, and if the cluster has expired, delete it
+	deleteAfter, ok := cd.Annotations[deleteAfterAnnotation]
+	if ok {
+		cdLog.Debugf("found delete after annotation: %s", deleteAfter)
+		dur, err := time.ParseDuration(deleteAfter)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("error parsing %s as a duration: %v", deleteAfterAnnotation, err)
+		}
+		if !cd.CreationTimestamp.IsZero() {
+			expiry := cd.CreationTimestamp.Add(dur)
+			cdLog.Debugf("cluster expires at: %s", expiry)
+			if time.Now().After(expiry) {
+				cdLog.WithField("expiry", expiry).Info("cluster has expired, issuing delete")
+				r.Delete(context.TODO(), cd)
+				return reconcile.Result{}, nil
+			}
+		}
+
+		// TODO: Enqueue cluster for deletion rather than wait for full resync
+		// enqueueDur := expiry.Sub(time.Now()) + 60*time.Second
+		// cdLog.Debugf("cluster will re-sync due to expiry time in: %v", enqueueDur)
+		// r.enqueueAfter(cd, enqueueDur)
 	}
 
 	if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {

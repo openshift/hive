@@ -61,3 +61,15 @@ rules:
   - clusterdeployments/finalizers
   verbs:
   - update
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - dnszones
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

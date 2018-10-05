@@ -67,7 +67,7 @@ objects:
     name: ${CLUSTER_NAME}-admin-creds
   type: Opaque
   stringData:
-    password: ${ADMIKN_PASSWORD}
+    password: ${ADMIN_PASSWORD}
 
 - apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment

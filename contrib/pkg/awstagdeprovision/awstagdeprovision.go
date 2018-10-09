@@ -135,7 +135,6 @@ func (o *ClusterUninstaller) validate() error {
 // populateDeleteFuncs is the list of functions that will be launched as goroutines
 func populateDeleteFuncs(funcs map[string]deleteFunc) {
 	funcs["deleteVPCs"] = deleteVPCs
-	funcs["deleteLBs"] = deleteLBs
 	funcs["deleteEIPs"] = deleteEIPs
 	funcs["deleteNATGateways"] = deleteNATGateways
 	funcs["deleteInstances"] = deleteInstances
@@ -258,91 +257,53 @@ func tagsToMap(tags interface{}) (map[string]string, error) {
 	return x, nil
 }
 
-// lbToAWSObjects will create awsObjectWithTags given a list of load balancers
-func lbToAWSObjects(lbList []*elb.LoadBalancerDescription, elbClient *elb.ELB) ([]awsObjectWithTags, error) {
-	lbObjects := []awsObjectWithTags{}
+// filterLBsByVPC will find all the load balancers in the provided list that are under the provided VPC
+func filterLBsByVPC(lbs []*elb.LoadBalancerDescription, vpc *ec2.Vpc, logger log.FieldLogger) []*elb.LoadBalancerDescription {
+	filteredLBs := []*elb.LoadBalancerDescription{}
 
-	if len(lbList) == 0 {
-		return lbObjects, nil
-	}
-
-	describeTagsInput := elb.DescribeTagsInput{}
-	// populate the list of LBs we want tags for
-	for _, lb := range lbList {
-		describeTagsInput.LoadBalancerNames = append(describeTagsInput.LoadBalancerNames, lb.LoadBalancerName)
-	}
-
-	lbTagResults, err := elbClient.DescribeTags(&describeTagsInput)
-	if err != nil {
-		return lbObjects, fmt.Errorf("Error fetching tags for load balancers: %v", err)
-	}
-
-	for _, lb := range lbTagResults.TagDescriptions {
-		tagsAsMap, err := tagsToMap(lb)
-		if err != nil {
-			return lbObjects, err
+	for _, lb := range lbs {
+		if *lb.VPCId == *vpc.VpcId {
+			filteredLBs = append(filteredLBs, lb)
 		}
-		lbObjects = append(lbObjects, awsObjectWithTags{
-			Name: *lb.LoadBalancerName,
-			Tags: tagsAsMap,
-		})
-
 	}
-	return lbObjects, nil
+
+	return filteredLBs
 }
 
-// deleteLBs finds all load balancers matching 'filters' and attempts to delete them
-func deleteLBs(awsSession *session.Session, filters awsFilter, clusterName string, logger log.FieldLogger) (bool, error) {
-	logger.Debug("Deleting load balancers")
+// deleteLBs finds all load balancers under the provided VPC and attempts to delete them
+// returns bool representing whether it has completed its work (ie no LBs left to delete)
+func deleteLBs(vpc *ec2.Vpc, awsSession *session.Session, logger log.FieldLogger) bool {
+	logger.Debugf("Deleting load balancers")
 	defer logger.Debugf("Exiting deleting load balancers")
 	elbClient := elb.New(awsSession)
 
-	// No support for filters so we'll have to filter locally
 	describeLoadBalancersInput := elb.DescribeLoadBalancersInput{}
-
-	for {
-		results, err := elbClient.DescribeLoadBalancers(&describeLoadBalancersInput)
-		if err != nil {
-			logger.Errorf("Error listing load balancers: %v", err)
-			return false, nil
-		}
-
-		lbObjects := []awsObjectWithTags{}
-		for i := 0; i < len(results.LoadBalancerDescriptions); i += 20 {
-			j := i + 20
-			if j > len(results.LoadBalancerDescriptions) {
-				j = len(results.LoadBalancerDescriptions)
-			}
-			new, err := lbToAWSObjects(results.LoadBalancerDescriptions[i:j], elbClient)
-			if err != nil {
-				logger.Errorf("error converting load balancers to internal AWS objects: %v", err)
-				return false, nil
-			}
-			lbObjects = append(lbObjects, new...)
-		}
-
-		filteredResults := filterObjects(lbObjects, filters)
-		logger.Debugf("from %d total load balancers, %d match filters", len(lbObjects), len(filteredResults))
-		if len(filteredResults) == 0 {
-			// no items left to delete
-			break
-		}
-
-		// now delete
-		for _, lb := range filteredResults {
-			logger.Debugf("Deleting load balancer: %v", lb.Name)
-			_, err := elbClient.DeleteLoadBalancer(&elb.DeleteLoadBalancerInput{
-				LoadBalancerName: aws.String(lb.Name),
-			})
-			if err != nil {
-				logger.Debugf("Error deleting load balancer %v: %v", lb.Name, err)
-			} else {
-				logger.WithField("name", lb.Name).Info("Deleted load balancer")
-			}
-		}
-		return false, nil
+	results, err := elbClient.DescribeLoadBalancers(&describeLoadBalancersInput)
+	if err != nil {
+		logger.Errorf("Error listing load balancers: %v", err)
+		return false
 	}
-	return true, nil
+
+	filteredLBs := filterLBsByVPC(results.LoadBalancerDescriptions, vpc, logger)
+	logger.Debugf("from %d total load balancers, %d scheduled for deletion", len(results.LoadBalancerDescriptions), len(filteredLBs))
+
+	if len(filteredLBs) == 0 {
+		// no items left to delete
+		return true
+	}
+
+	for _, lb := range filteredLBs {
+		logger.Debugf("Deleting load balancer: %v", *lb.LoadBalancerName)
+		_, err := elbClient.DeleteLoadBalancer(&elb.DeleteLoadBalancerInput{
+			LoadBalancerName: lb.LoadBalancerName,
+		})
+		if err != nil {
+			logger.Debugf("Error deleting load balancer %v: %v", *lb.LoadBalancerName, err)
+		} else {
+			logger.WithField("name", *lb.LoadBalancerName).Info("Deleted load balancer")
+		}
+	}
+	return false
 }
 
 // rtHasMainAssociation will check whether a given route table has an association marked 'Main'
@@ -426,7 +387,14 @@ func deleteVPCs(awsSession *session.Session, filters awsFilter, clusterName stri
 		}
 
 		for _, vpc := range results.Vpcs {
-			// first delete route tables associated with the VPC (not all of them are tagged)
+			// first delete any Load Balancers under this VPC (not all of them are tagged)
+			complete := deleteLBs(vpc, awsSession, logger)
+			if !complete {
+				logger.Debugf("not finished deleting load balancers, will need to retry")
+				return false, nil
+			}
+
+			// next delete route tables associated with the VPC (not all of them are tagged)
 			err := deleteRouteTablesWithVPC(vpc, ec2Client, logger)
 			if err != nil {
 				logger.Debugf("error deleting route tables: %v", err)

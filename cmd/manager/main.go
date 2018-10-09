@@ -41,12 +41,12 @@ const (
 	defaultLogLevel = "info"
 )
 
-type ControllerManagerOptions struct {
+type controllerManagerOptions struct {
 	LogLevel string
 }
 
-func NewRootCommand() *cobra.Command {
-	opts := &ControllerManagerOptions{}
+func newRootCommand() *cobra.Command {
+	opts := &controllerManagerOptions{}
 	cmd := &cobra.Command{
 		Use:   "manager",
 		Short: "OpenShift Hive controller manager.",
@@ -118,7 +118,7 @@ func (writer glogWriter) Write(data []byte) (n int, err error) {
 
 func main() {
 	defer glog.Flush()
-	cmd := NewRootCommand()
+	cmd := newRootCommand()
 	err := cmd.Execute()
 	if err != nil {
 		log.Fatal(err)

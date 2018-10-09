@@ -2,6 +2,7 @@ package installmanager
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,10 +14,19 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/hive/pkg/apis"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -29,12 +39,14 @@ const (
 // InstallManager coordinates executing the openshift-install binary, modifying
 // generated assets, and uploading artifacts to the kube API after completion.
 type InstallManager struct {
-	log         log.FieldLogger
-	LogLevel    string
-	WorkDir     string
-	ClusterName string
-	Namespace   string
-	KubeClient  clientset.Interface
+	log           log.FieldLogger
+	LogLevel      string
+	WorkDir       string
+	ClusterName   string
+	Namespace     string
+	KubeClient    clientset.Interface
+	DynamicClient client.Client
+	Scheme        *runtime.Scheme
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -61,6 +73,7 @@ func NewInstallManagerCommand() *cobra.Command {
 				log.WithError(err).Error("invalid command options")
 				return
 			}
+
 			if err := opts.Run(); err != nil {
 				log.WithError(err).Error("runtime error")
 			}
@@ -109,8 +122,10 @@ func (m *InstallManager) Validate() error {
 
 // Run is the entrypoint to start the install process
 func (m *InstallManager) Run() error {
-	if err := m.getKubeClient(); err != nil {
-		m.log.WithError(err).Fatal("error creating kube client")
+	var err error
+	m.KubeClient, m.DynamicClient, err = getClients()
+	if err != nil {
+		m.log.WithError(err).Fatal("error creating kube clients")
 	}
 
 	m.waitForInstallerBinaries()
@@ -137,23 +152,6 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(installErr).Fatal("failed due to install error")
 	}
 
-	return nil
-}
-
-func (m *InstallManager) getKubeClient() error {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-	cfg, err := kubeconfig.ClientConfig()
-	if err != nil {
-		m.log.WithError(err).Error("cannot obtain client config")
-		return err
-	}
-	m.KubeClient, err = clientset.NewForConfig(cfg)
-	if err != nil {
-		m.log.WithError(err).Error("cannot create kubernetes client from client config")
-		return err
-	}
-	m.log.Debug("created kube client")
 	return nil
 }
 
@@ -239,6 +237,18 @@ func (m *InstallManager) uploadClusterMetadata() error {
 			"metadata.json": string(metadataBytes),
 		},
 	}
+
+	cd := &hivev1.ClusterDeployment{}
+	err = m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterName}, cd)
+	if err != nil {
+		m.log.WithError(err).Error("error getting cluster deployment")
+		return err
+	}
+	if err := controllerutil.SetControllerReference(cd, metadataCfgMap, scheme.Scheme); err != nil {
+		m.log.WithError(err).Error("error setting controller reference on configmap")
+		return err
+	}
+
 	_, err = m.KubeClient.CoreV1().ConfigMaps(m.Namespace).Create(metadataCfgMap)
 	if err != nil {
 		// TODO: what should happen if the configmap already exists?
@@ -273,6 +283,17 @@ func (m *InstallManager) uploadAdminKubeconfig() error {
 			"kubeconfig": kubeconfigBytes,
 		},
 	}
+
+	cd := &hivev1.ClusterDeployment{}
+	err = m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterName}, cd)
+	if err != nil {
+		m.log.WithError(err).Error("error getting cluster deployment")
+		return err
+	}
+	if err := controllerutil.SetControllerReference(cd, kubeconfigSecret, scheme.Scheme); err != nil {
+		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
+		return err
+	}
 	_, err = m.KubeClient.CoreV1().Secrets(m.Namespace).Create(kubeconfigSecret)
 	if err != nil {
 		// TODO: what should happen if it already exists?
@@ -282,4 +303,25 @@ func (m *InstallManager) uploadAdminKubeconfig() error {
 	m.log.WithField("secretName", kubeconfigSecret.Name).Info("uploaded admin kubeconfig secret")
 
 	return nil
+}
+
+func getClients() (*clientset.Clientset, client.Client, error) {
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+	cfg, err := kubeconfig.ClientConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	kubeClient, err := clientset.NewForConfig(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	apis.AddToScheme(scheme.Scheme)
+	dynamicClient, err := client.New(cfg, client.Options{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return kubeClient, dynamicClient, nil
 }

@@ -46,5 +46,6 @@ Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig sec
 
 ```bash
 kubectl get secret ${USER}-admin-kubeconfig -o json | jq ".data.kubeconfig" -r | base64 -d > ${USER}.kubeconfig
-kubectl --kubeconfig ${USER}.kubeconfig get nodes
+export KUBECONFIG=${USER}.kubeconfig
+kubectl get nodes
 ```

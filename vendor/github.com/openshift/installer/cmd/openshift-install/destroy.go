@@ -26,14 +26,6 @@ func newDestroyCmd() *cobra.Command {
 	return cmd
 }
 
-func newLegacyDestroyClusterCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "destroy-cluster",
-		Short: "DEPRECATED: Use 'destroy cluster' instead.",
-		RunE:  runDestroyCmd,
-	}
-}
-
 func newDestroyClusterCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "cluster",
@@ -43,13 +35,18 @@ func newDestroyClusterCmd() *cobra.Command {
 }
 
 func runDestroyCmd(cmd *cobra.Command, args []string) error {
+	cleanup, err := setupFileHook(rootOpts.dir)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup logging hook")
+	}
+	defer cleanup()
+
 	destroyer, err := destroy.New(logrus.StandardLogger(), rootOpts.dir)
 	if err != nil {
 		return errors.Wrap(err, "Failed while preparing to destroy cluster")
 	}
 	if err := destroyer.Run(); err != nil {
 		return errors.Wrap(err, "Failed to destroy cluster")
-
 	}
 
 	store, err := asset.NewStore(rootOpts.dir)

@@ -30,6 +30,7 @@ func (m *Templates) Dependencies() []asset.Asset {
 		&bootkube.CVOOverrides{},
 		&bootkube.LegacyCVOOverrides{},
 		&bootkube.EtcdServiceEndpointsKubeSystem{},
+		&bootkube.HostEtcdServiceEndpointsKubeSystem{},
 		&bootkube.KubeSystemConfigmapEtcdServingCA{},
 		&bootkube.KubeSystemConfigmapRootCA{},
 		&bootkube.KubeSystemSecretEtcdClient{},
@@ -38,6 +39,7 @@ func (m *Templates) Dependencies() []asset.Asset {
 		&bootkube.OpenshiftClusterAPINamespace{},
 		&bootkube.OpenshiftServiceCertSignerNamespace{},
 		&bootkube.EtcdServiceKubeSystem{},
+		&bootkube.HostEtcdServiceKubeSystem{},
 		&tectonic.BindingDiscovery{},
 		&tectonic.CloudCredsSecret{},
 		&tectonic.RoleCloudCredsSecretReader{},
@@ -53,6 +55,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 	cVOOverrides := &bootkube.CVOOverrides{}
 	legacyCVOOverrides := &bootkube.LegacyCVOOverrides{}
 	etcdServiceEndpointsKubeSystem := &bootkube.EtcdServiceEndpointsKubeSystem{}
+	hostEtcdServiceEndpointsKubeSystem := &bootkube.HostEtcdServiceEndpointsKubeSystem{}
 	kubeSystemConfigmapEtcdServingCA := &bootkube.KubeSystemConfigmapEtcdServingCA{}
 	kubeSystemConfigmapRootCA := &bootkube.KubeSystemConfigmapRootCA{}
 	kubeSystemSecretEtcdClient := &bootkube.KubeSystemSecretEtcdClient{}
@@ -61,6 +64,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 	openshiftClusterAPINamespace := &bootkube.OpenshiftClusterAPINamespace{}
 	openshiftServiceCertSignerNamespace := &bootkube.OpenshiftServiceCertSignerNamespace{}
 	etcdServiceKubeSystem := &bootkube.EtcdServiceKubeSystem{}
+	hostEtcdServiceKubeSystem := &bootkube.HostEtcdServiceKubeSystem{}
 
 	bindingDiscovery := &tectonic.BindingDiscovery{}
 	cloudCredsSecret := &tectonic.CloudCredsSecret{}
@@ -74,6 +78,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 		cVOOverrides,
 		legacyCVOOverrides,
 		etcdServiceEndpointsKubeSystem,
+		hostEtcdServiceEndpointsKubeSystem,
 		kubeSystemConfigmapEtcdServingCA,
 		kubeSystemConfigmapRootCA,
 		kubeSystemSecretEtcdClient,
@@ -82,6 +87,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 		openshiftClusterAPINamespace,
 		openshiftServiceCertSignerNamespace,
 		etcdServiceKubeSystem,
+		hostEtcdServiceKubeSystem,
 		bindingDiscovery,
 		cloudCredsSecret,
 		roleCloudCredsSecretReader)
@@ -94,6 +100,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 	m.FileList = append(m.FileList, cVOOverrides.Files()...)
 	m.FileList = append(m.FileList, legacyCVOOverrides.Files()...)
 	m.FileList = append(m.FileList, etcdServiceEndpointsKubeSystem.Files()...)
+	m.FileList = append(m.FileList, hostEtcdServiceEndpointsKubeSystem.Files()...)
 	m.FileList = append(m.FileList, kubeSystemConfigmapEtcdServingCA.Files()...)
 	m.FileList = append(m.FileList, kubeSystemConfigmapRootCA.Files()...)
 	m.FileList = append(m.FileList, kubeSystemSecretEtcdClient.Files()...)
@@ -102,6 +109,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 	m.FileList = append(m.FileList, openshiftClusterAPINamespace.Files()...)
 	m.FileList = append(m.FileList, openshiftServiceCertSignerNamespace.Files()...)
 	m.FileList = append(m.FileList, etcdServiceKubeSystem.Files()...)
+	m.FileList = append(m.FileList, hostEtcdServiceKubeSystem.Files()...)
 
 	m.FileList = append(m.FileList, bindingDiscovery.Files()...)
 	m.FileList = append(m.FileList, cloudCredsSecret.Files()...)

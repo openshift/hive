@@ -35,8 +35,9 @@ func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
 	serviceAccountName string,
 	installerImage string,
+	installerImagePullPolicy corev1.PullPolicy,
 	hiveImage string,
-	imagePullPolicy corev1.PullPolicy) *batchv1.Job {
+	hiveImagePullPolicy corev1.PullPolicy) *batchv1.Job {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -146,7 +147,7 @@ func GenerateInstallerJob(
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: imagePullPolicy,
+			ImagePullPolicy: installerImagePullPolicy,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			Args:            []string{"cp -v /bin/openshift-install /output && cp -v /bin/terraform /output && ls -la /output"},
@@ -155,7 +156,7 @@ func GenerateInstallerJob(
 		{
 			Name:            "hive",
 			Image:           hiveImage,
-			ImagePullPolicy: imagePullPolicy,
+			ImagePullPolicy: hiveImagePullPolicy,
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args:            []string{"install-manager", "--work-dir", "/output", "--log-level", "debug", cd.Namespace, cd.Name},

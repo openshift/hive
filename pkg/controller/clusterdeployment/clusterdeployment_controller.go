@@ -49,7 +49,7 @@ import (
 const (
 	installerImage   = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 	uninstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer" // TODO
-	hiveImage        = "hive-controller"
+	hiveImage        = "hive-controller:latest"
 
 	// serviceAccountName will be a service account that can run the installer and then
 	// upload artifacts to the cluster's namespace.
@@ -115,7 +115,7 @@ type ReconcileClusterDeployment struct {
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments/finalizers,verbs=update
+// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments/finalizers,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
@@ -178,7 +178,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
-	job := install.GenerateInstallerJob(cd, serviceAccountName, installerImage,
+	job := install.GenerateInstallerJob(cd, serviceAccountName, installerImage, kapi.PullAlways,
 		hiveImage, kapi.PullIfNotPresent)
 
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
@@ -277,7 +277,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	// Generate an uninstall job:
-	uninstallJob, err := install.GenerateUninstallerJob(cd, installerImage, kapi.PullIfNotPresent)
+	uninstallJob, err := install.GenerateUninstallerJob(cd, installerImage, kapi.PullAlways)
 	if err != nil {
 		cdLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

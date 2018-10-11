@@ -21,6 +21,10 @@ resources:
 - ../rbac/rbac_role_binding.yaml
 - ../rbac/rbac_role.yaml
 - ../manager/manager.yaml
+- ../crds/hive_v1alpha1_clusterdeployment.yaml
+- ../crds/hive_v1alpha1_dnszone.yaml
 
 patches:
 - manager_image_patch.yaml
+- clusterdeployment_crd_status_patch.yaml
+- dnszone_crd_status_patch.yaml

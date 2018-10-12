@@ -15,7 +15,7 @@
 FROM openshift/origin-release:golang-1.10
 
 # Install the golint, use this to check our source for niceness
-RUN go get -u github.com/golang/lint/golint
+RUN go get -u golang.org/x/lint/golint
 
 # Install gomock and mockgen for the mocks used in unit tests
 RUN go get -u github.com/golang/mock/gomock

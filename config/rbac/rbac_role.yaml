@@ -60,7 +60,13 @@ rules:
   resources:
   - clusterdeployments/finalizers
   verbs:
+  - get
+  - list
+  - watch
+  - create
   - update
+  - patch
+  - delete
 - apiGroups:
   - hive.openshift.io
   resources:

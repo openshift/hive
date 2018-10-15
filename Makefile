@@ -2,6 +2,7 @@ BINDIR = bin
 SRC_DIRS = pkg contrib
 GOFILES = $(shell find $(SRC_DIRS) -name '*.go')
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
+DOCKER_CMD ?= docker
 
 
 
@@ -111,10 +112,10 @@ docker-build: manager hiveutil
 	mkdir -p $(tmp_build_path)
 	cp $(build_path)/Dockerfile $(tmp_build_path)
 	cp ./bin/* $(tmp_build_path)
-	docker build -t ${IMG} $(tmp_build_path)
+	$(DOCKER_CMD) build -t ${IMG} $(tmp_build_path)
 	rm -rf $(tmp_build_path)
 
 # Push the docker image
 .PHONY: docker-push
 docker-push:
-	docker push ${IMG}
+	$(DOCKER_CMD) push ${IMG}

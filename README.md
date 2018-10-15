@@ -1,19 +1,22 @@
 # OpenShift Hive
 API driven OpenShift cluster provisioning and management
 
-## Deploying Locally
+## Deploying In-Cluster
 
-* Ensure that you have access to an OpenShift cluster and have administrator access
+* Ensure that you have access to an OpenShift cluster and have administrator permissions. This could be oc cluster up, minishift, or an actual cluster you can oc login to.
+* Build and deploy to Minishift:
+  * `$ hack/minishift-deploy.sh`
+* Build deploy to current kubectl context:
+   * `$ make deploy`
 
-* Build and provision CRDs, roles, and controller:
-   * `$ make provision`
-
-## Development Workflow
+## Running from Source
 
 * Create the ClusterDeployment CRD:
   * `$ kubectl apply -f config/crds/hive_v1alpha1_clusterdeployment.yaml --validate=false`
 * Run the Hive controllers from source:
   * `$ make run`
+
+## Using Hive
 * Create a ClusterDeployment:
   * Place the OpenShift images pull secret in a known location like `$HOME/config.json`
   * Assuming AWS credentials set in the standard environment variables, and our usual SSH key.

@@ -74,6 +74,8 @@ objects:
   metadata:
     labels:
       controller-tools.k8s.io: "1.0"
+    annotations:
+      hive.openshift.io/delete-after: "8h"
     name: ${CLUSTER_NAME}
   spec:
     platformSecrets:

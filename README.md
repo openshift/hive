@@ -37,3 +37,15 @@ API driven OpenShift cluster provisioning and management
   ```bash
   $ oc delete clusterdeployment $USER
   ```
+
+## Tips
+
+### Using the Admin Kubeconfig
+
+Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:
+
+```bash
+kubectl get secret ${USER}-admin-kubeconfig -o json | jq ".data.kubeconfig" -r | base64 -d > ${USER}.kubeconfig
+export KUBECONFIG=${USER}.kubeconfig
+kubectl get nodes
+```

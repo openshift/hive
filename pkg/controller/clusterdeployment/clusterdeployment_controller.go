@@ -364,6 +364,11 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 				Resources: []string{"secrets", "configmaps"},
 				Verbs:     []string{"create", "delete", "get", "list", "update"},
 			},
+			{
+				APIGroups: []string{"hive.openshift.io"},
+				Resources: []string{"clusterdeployments", "clusterdeployments/finalizers"},
+				Verbs:     []string{"create", "delete", "get", "list", "update"},
+			},
 		},
 	}
 	currentRole := &rbacv1.Role{}

@@ -28,7 +28,7 @@ manager: generate
 	go build -o bin/manager github.com/openshift/hive/cmd/manager
 
 # Build hiveutil binary
-hiveutil:
+hiveutil: generate
 	go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
 
 # Run against the configured Kubernetes cluster in ~/.kube/config

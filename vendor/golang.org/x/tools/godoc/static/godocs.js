@@ -149,8 +149,16 @@ function setupDropdownPlayground() {
     button.removeClass('active');
     div.hide();
   });
-  button.show();
   $('#menu').css('min-width', '+=60');
+
+  // Hide inline playground if we click somewhere on the page.
+  // This is needed in mobile devices, where the "Play" button
+  // is not clickable once the playground opens up.
+  $("#page").click(function() {
+    if (button.hasClass('active')) {
+      button.click();
+    }
+  });
 }
 
 function setupInlinePlayground() {

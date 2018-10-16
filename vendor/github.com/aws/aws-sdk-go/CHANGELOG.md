@@ -1,3 +1,189 @@
+Release v1.15.55 (2018-10-15)
+===
+
+### Service Client Updates
+* `service/lambda`: Updates service API and documentation
+  * Documentation updates for lambda
+* `service/rds`: Updates service API and documentation
+  * This release adds a new parameter to specify the DB instance or cluster parameter group for restore from DB snapshot and restore to point int time operations. For more information, see Amazon RDS Documentation.
+* `service/servicecatalog`: Updates service API, documentation, and paginators
+  * AWS Service Catalog enables you to reduce administrative maintenance and end-user training while adhering to compliance and security measures. With service actions, you as the administrator can enable end users to perform operational tasks, troubleshoot issues, run approved commands, or request permissions within Service Catalog. Service actions are defined using AWS Systems Manager documents, where you have access to pre-defined actions that implement AWS best practices, such asEC2 stop and reboot, as well as the ability to define custom actions.
+
+Release v1.15.54 (2018-10-12)
+===
+
+### Service Client Updates
+* `service/cloudtrail`: Updates service API and documentation
+  * The LookupEvents API now supports two new attribute keys: ReadOnly and AccessKeyId
+
+### SDK Enhancements
+* `aws/session`: Add support for credential source(#2201)
+  * Allows for shared config file to contain `credential_source` with any of the given values `EcsContainer`, `Environment` or `Ec2InstanceMetadata`
+
+Release v1.15.53 (2018-10-11)
+===
+
+### Service Client Updates
+* `service/athena`: Updates service API and documentation
+  * 1. GetQueryExecution API changes to return statementType of a submitted Athena query.  2. GetQueryResults API changes to return the number of rows added to a table when a CTAS query is executed.
+* `service/directconnect`: Updates service API and documentation
+  * This release adds support for Jumbo Frames over AWS Direct Connect. You can now set MTU value when creating new virtual interfaces. This release also includes a new API to modify MTU value of existing virtual interfaces.
+* `service/ec2`: Updates service API
+  * You can now launch the smaller-sized G3 instance called g3s.xlarge. G3s.xlarge provides 4 vCPU, 30.5 GB RAM and a NVIDIA Tesla M60 GPU. It is ideal for remote workstations, engineering and architectural applications, and 3D visualizations and rendering for visual effects.
+* `service/mediaconvert`: Updates service paginators
+  * Added Paginators for all the MediaConvert list operations
+* `service/transcribe`: Updates service API and documentation
+
+Release v1.15.52 (2018-10-10)
+===
+
+### Service Client Updates
+* `service/comprehend`: Updates service API
+* `service/es`: Updates service API and documentation
+  * Amazon Elasticsearch Service now supports customer-scheduled service software updates. When new service software becomes available, you can request an update to your domain and benefit from new features more quickly. If you take no action, we update the service software automatically after a certain time frame.
+* `service/transcribe`: Updates service API and documentation
+
+Release v1.15.51 (2018-10-09)
+===
+
+### Service Client Updates
+* `service/ssm`: Updates service API and documentation
+  * Adds StartDate, EndDate, and ScheduleTimezone to CreateMaintenanceWindow and UpdateMaintenanceWindow; Adds NextExecutionTime to GetMaintenanceWindow and DescribeMaintenanceWindows; Adds CancelMaintenanceWindowExecution, DescribeMaintenanceWindowSchedule and DescribeMaintenanceWindowsForTarget APIs.
+
+Release v1.15.50 (2018-10-08)
+===
+
+### Service Client Updates
+* `service/iot`: Updates service API and documentation
+  * We are releasing job execution timeout functionalities to customers. Customer now can set job execution timeout on the job level when creating a job.
+* `service/iot-jobs-data`: Updates service API and documentation
+
+Release v1.15.49 (2018-10-05)
+===
+
+### Service Client Updates
+* `service/ds`: Updates service API and documentation
+  * SDK changes to create a new type of trust for active directory
+
+Release v1.15.48 (2018-10-04)
+===
+
+### Service Client Updates
+* `service/apigateway`: Updates service API and documentation
+  * Adding support for multi-value parameters in TestInvokeMethod and TestInvokeAuthorizer.
+* `service/codebuild`: Updates service API and documentation
+  * Add resolved source version field in build output
+* `service/ssm`: Updates service API and documentation
+  * Adds RejectedPatchesAction to baseline to enable stricted validation of the rejected Patches List ; Add InstalledRejected and InstallOverrideList to compliance reporting
+* `service/storagegateway`: Updates service API and documentation
+  * AWS Storage Gateway now enables you to specify folders and subfolders when you update your file gateway's view of your S3 objects using the Refresh Cache API.
+
+Release v1.15.47 (2018-10-02)
+===
+
+### Service Client Updates
+* `service/sagemaker`: Updates service waiters
+  * Waiter for SageMaker Batch Transform Jobs.
+* `service/secretsmanager`: Updates service documentation
+  * Documentation updates for secretsmanager
+
+### SDK Enhancements
+* `aws/config`: fix typo in Config struct documentation (#2169)
+  * fix typo in Config struct documentation in aws-sdk-go/aws/config.go
+* `internal/csm`: Add region to api call metrics (#2175)
+* `private/model/api`: Use modeled service signing version in code generation (#2162)
+  * Updates the SDK's code generate to make use of the model's service signature version when generating the client for the service. This allows the SDK to generate a client using the correct signature version, e.g v4 vs s3v4 without the need for additional customizations.
+
+### SDK Bugs
+* `service/cloudfront/sign`: Do not Escape HTML when encode the cloudfront sign policy (#2164)
+  * Fixes the signer escaping HTML elements `<`, `>`, and `&` in the signature policy incorrectly. Allows use of multiple query parameters in the URL to be signed.
+  * Fixes #2163
+Release v1.15.46 (2018-10-01)
+===
+
+### Service Client Updates
+* `service/guardduty`: Updates service API and documentation
+  * Support optional FindingPublishingFrequency parameter in CreateDetector and UpdateDetector operations, and ClientToken on Create* operations
+* `service/rekognition`: Updates service documentation
+  * Documentation updates for Amazon Rekognition
+
+Release v1.15.45 (2018-09-28)
+===
+
+### Service Client Updates
+* `service/codestar`: Updates service API and documentation
+  * This release enables tagging CodeStar Projects at creation. The CreateProject API now includes optional tags parameter.
+* `service/ec2`: Updates service API
+  * You can now use EC2 High Memory instances with 6 TiB memory (u-6tb1.metal), 9 TiB memory (u-9tb1.metal), and 12 TiB memory (u-12tb1.metal), which are ideal for running large in-memory databases, including production deployments of SAP HANA. These instances offer 448 logical processors, where each logical processor is a hyperthread on 224 cores. These instance deliver high networking throughput and lower latency with up to 25 Gbps of aggregate network bandwidth using Elastic Network Adapter (ENA)-based Enhanced Networking. These instances are EBS-Optimized by default, and support encrypted and unencrypted EBS volumes. This instance is only available in host-tenancy. You will need an EC2 Dedicated Host for this instance type to launch an instance.
+
+Release v1.15.44 (2018-09-27)
+===
+
+### Service Client Updates
+* `service/apigateway`: Updates service documentation
+  * Adding support for OpenAPI 3.0 import and export.
+* `service/codecommit`: Updates service API and documentation
+  * This release adds API support for getting the contents of a file, getting the contents of a folder, and for deleting a file in an AWS CodeCommit repository.
+* `service/mq`: Updates service API and documentation
+  * Amazon MQ supports ActiveMQ 5.15.6, in addition to 5.15.0. Automatic minor version upgrades can be toggled. Updated the documentation.
+
+Release v1.15.43 (2018-09-26)
+===
+
+### Service Client Updates
+* `aws/endpoints`: Updated Regions and Endpoints metadata.
+* `service/glue`: Updates service API and documentation
+  * AWS Glue now supports data encryption at rest for ETL jobs and development endpoints. With encryption enabled, when you run ETL jobs, or development endpoints, Glue will use AWS KMS keys to write encrypted data at rest. You can also encrypt the metadata stored in the Glue Data Catalog using keys that you manage with AWS KMS. Additionally, you can use AWS KMS keys to encrypt the logs generated by crawlers and ETL jobs as well as encrypt ETL job bookmarks. Encryption settings for Glue crawlers, ETL jobs, and development endpoints can be configured using the security configurations in Glue. Glue Data Catalog encryption can be enabled via the settings for the Glue Data Catalog.
+* `service/opsworkscm`: Updates service API and documentation
+  * This release introduces a new API called ExportServerEngineAttribute to Opsworks-CM. You can use this API call to export engine specific attributes like the UserData script used for unattended bootstrapping of new nodes that connect to the server.
+* `service/rds`: Updates service API and documentation
+  * This release includes Deletion Protection for RDS databases.
+* `service/sqs`: Updates service API and documentation
+  * Documentation updates for Amazon SQS.
+
+### SDK Enhancements
+* `private/protocol/restjson/restjson`: Use json.Decoder to decrease memory allocation (#2141)
+  * Update RESTJSON protocol unmarshaler to use json.Decoder instead of ioutil.ReadAll to reduce allocations.
+* `private/protocol/jsonrpc/jsonrpc`: Use json.Decoder to decrease memory allocation (#2142)
+  * Update JSONPRC protocol unmarshaler to use json.Decoder instead of ioutil.ReadAll to reduce allocations.
+
+Release v1.15.42 (2018-09-25)
+===
+
+### Service Client Updates
+* `service/cloudfront`: Updates service documentation
+  * Documentation updates for cloudfront
+* `service/ds`: Updates service API and documentation
+  * API changes related to launch of cross account for Directory Service.
+* `service/ec2`: Updates service API and documentation
+  * Add pagination support for ec2.describe-route-tables API.
+
+Release v1.15.41 (2018-09-24)
+===
+
+### Service Client Updates
+* `service/connect`: Updates service API, documentation, and paginators
+* `service/rds`: Updates service API and documentation
+  * Adds DB engine version requirements for option group option settings, and specifies if an option setting requires a value.
+
+Release v1.15.40 (2018-09-21)
+===
+
+### Service Client Updates
+* `service/mediaconvert`: Updates service API and documentation
+  * To offer lower prices for predictable, non-urgent workloads, we propose the concept of Reserved Transcode pricing. Reserved Transcode pricing Reserved Transcoding pricing would offer the customer access to a fixed parallel processing capacity for a fixed monthly rate. This capacity would be stated in terms of number of Reserved Transcode Slots (RTSs). One RTS would be able to process one job at a time for a fixed monthly fee.
+
+Release v1.15.39 (2018-09-20)
+===
+
+### Service Client Updates
+* `service/ds`: Updates service API and documentation
+  * Added CreateLogSubscription, DeleteLogSubscription, and ListLogSubscriptions APIs for Microsoft AD. Customers can now opt in to have Windows security event logs from the domain controllers forwarded to a log group in their account.
+* `service/ec2`: Updates service API
+  * You can now launch f1.4xlarge, a new instance size within the existing f1 family which provides two Xilinx Virtex Field Programmable Arrays (FPGAs) for acceleration. FPGA acceleration provide additional performance and time sensitivity for specialized accelerated workloads such as clinical genomics and real-time video processing. F1.4xlarge instances are available in the US East (N. Virginia), US West (Oregon), GovCloud (US), and EU West (Dublin) AWS Regions.
+* `service/rds`: Updates service API and documentation
+  * This launch enables RDS start-db-cluster and stop-db-cluster. Stopping and starting Amazon Aurora clusters helps you manage costs for development and test environments. You can temporarily stop all the DB instances in your cluster, instead of setting up and tearing down all the DB instances each time that you use the cluster.
+
 Release v1.15.38 (2018-09-19)
 ===
 

@@ -176,13 +176,37 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
-	job := install.GenerateInstallerJob(cd, serviceAccountName)
+	job, cfgMap, err := install.GenerateInstallerJob(cd, serviceAccountName)
+	if err != nil {
+		cdLog.WithError(err).Error("error generating install job")
+		return reconcile.Result{}, err
+	}
 
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.Errorf("error setting controller reference on job", err)
 		return reconcile.Result{}, err
 	}
+	if err := controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
+		cdLog.Errorf("error setting controller reference on config map", err)
+		return reconcile.Result{}, err
+	}
+
 	cdLog = cdLog.WithField("job", job.Name)
+
+	// Check if the ConfigMap already exists for this ClusterDeployment:
+	existingCfgMap := &kapi.ConfigMap{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.WithField("configMap", cfgMap.Name).Infof("creating config map")
+		err = r.Create(context.TODO(), cfgMap)
+		if err != nil {
+			cdLog.Errorf("error creating config map: %v", err)
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
+		cdLog.Errorf("error getting config map: %v", err)
+		return reconcile.Result{}, err
+	}
 
 	// Check if the Job already exists for this ClusterDeployment:
 	existingJob := &kbatch.Job{}

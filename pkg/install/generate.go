@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -40,7 +41,7 @@ const (
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
-	serviceAccountName string) *batchv1.Job {
+	serviceAccountName string) (*batchv1.Job, *corev1.ConfigMap, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -48,6 +49,22 @@ func GenerateInstallerJob(
 	})
 
 	cdLog.Debug("generating installer job")
+
+	d, err := yaml.Marshal(cd.Spec.Config)
+	if err != nil {
+		return nil, nil, err
+	}
+	installConfig := string(d)
+
+	cfgMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-installconfig", cd.Name),
+			Namespace: cd.Namespace,
+		},
+		Data: map[string]string{
+			"installconfig.yaml": installConfig,
+		},
+	}
 
 	env := []corev1.EnvVar{
 		{
@@ -135,12 +152,26 @@ func GenerateInstallerJob(
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name: "installconfig",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cfgMap.Name,
+					},
+				},
+			},
+		},
 	}
 
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "install",
 			MountPath: "/output",
+		},
+		{
+			Name:      "installconfig",
+			MountPath: "/output/config",
 		},
 	}
 
@@ -214,7 +245,7 @@ func GenerateInstallerJob(
 		},
 	}
 
-	return job
+	return job, cfgMap, nil
 }
 
 // GenerateUninstallerJob creates a job to uninstall an OpenShift cluster

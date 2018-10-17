@@ -41,7 +41,10 @@ const (
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
-	serviceAccountName string) (*batchv1.Job, *corev1.ConfigMap, error) {
+	serviceAccountName string,
+	adminPassword string,
+	sshKey string,
+	pullSecret string) (*batchv1.Job, *corev1.ConfigMap, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -50,7 +53,12 @@ func GenerateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 
-	d, err := yaml.Marshal(cd.Spec.Config)
+	ic, err := generateInstallConfig(&cd.Spec, adminPassword, sshKey, pullSecret)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	d, err := yaml.Marshal(ic)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -75,10 +75,37 @@ spec:
                             type: object
                           libvirt:
                             properties:
-                              qcowImagePath:
+                              image:
+                                type: string
+                              imagePool:
+                                type: string
+                              imageVolume:
                                 type: string
                             required:
-                            - qcowImagePath
+                            - image
+                            type: object
+                          openstack:
+                            properties:
+                              rootVolume:
+                                properties:
+                                  iops:
+                                    format: int64
+                                    type: integer
+                                  size:
+                                    format: int64
+                                    type: integer
+                                  type:
+                                    type: string
+                                required:
+                                - iops
+                                - size
+                                - type
+                                type: object
+                              type:
+                                type: string
+                            required:
+                            - type
+                            - rootVolume
                             type: object
                         type: object
                       replicas:
@@ -107,9 +134,35 @@ spec:
                   properties:
                     aws:
                       properties:
+                        defaultMachinePlatform:
+                          properties:
+                            iamRoleName:
+                              type: string
+                            rootVolume:
+                              properties:
+                                iops:
+                                  format: int64
+                                  type: integer
+                                size:
+                                  format: int64
+                                  type: integer
+                                type:
+                                  type: string
+                              required:
+                              - iops
+                              - size
+                              - type
+                              type: object
+                            type:
+                              type: string
+                          required:
+                          - type
+                          - iamRoleName
+                          - rootVolume
+                          type: object
                         region:
                           type: string
-                        tags:
+                        userTags:
                           type: object
                         vpcCIDRBlock:
                           type: string
@@ -124,6 +177,17 @@ spec:
                       properties:
                         URI:
                           type: string
+                        defaultMachinePlatform:
+                          properties:
+                            image:
+                              type: string
+                            imagePool:
+                              type: string
+                            imageVolume:
+                              type: string
+                          required:
+                          - image
+                          type: object
                         masterIPs:
                           items:
                             format: byte

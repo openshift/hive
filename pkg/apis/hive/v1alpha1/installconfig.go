@@ -73,8 +73,13 @@ type AWSPlatform struct {
 	// Region specifies the AWS region where the cluster will be created.
 	Region string `json:"region"`
 
-	// UserTags specifies additional tags for AWS resources created by the cluster.
-	UserTags map[string]string `json:"tags,omitempty"`
+	// UserTags specifies additional tags for AWS resources created for the cluster.
+	UserTags map[string]string `json:"userTags,omitempty"`
+
+	// DefaultMachinePlatform is the default configuration used when
+	// installing on AWS for machine pools which do not define their own
+	// platform configuration.
+	DefaultMachinePlatform *AWSMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
 
 	// VPCID specifies the vpc to associate with the cluster.
 	// If empty, new vpc will be created.
@@ -89,8 +94,15 @@ type AWSPlatform struct {
 // LibvirtPlatform stores all the global configuration that
 // all machinesets use.
 type LibvirtPlatform struct {
-	// URI
+	// URI is the identifier for the libvirtd connection.  It must be
+	// reachable from both the host (where the installer is run) and the
+	// cluster (where the cluster-API controller pod will be running).
 	URI string `json:"URI"`
+
+	// DefaultMachinePlatform is the default configuration used when
+	// installing on AWS for machine pools which do not define their own
+	// platform configuration.
+	DefaultMachinePlatform *LibvirtMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
 
 	// Network
 	Network LibvirtNetwork `json:"network"`

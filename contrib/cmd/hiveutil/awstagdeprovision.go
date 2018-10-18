@@ -32,8 +32,9 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	opt := &awstagdeprovision.ClusterUninstaller{}
 	opt.Filters = awstagdeprovision.AWSFilter{}
 	cmd := &cobra.Command{
-		Use:   "aws-tag-deprovision key=value",
-		Short: "Deprovision AWS assets (as created by openshift-installer) with a given tag",
+		Use:   "aws-tag-deprovision KEY=VALUE ...",
+		Short: "Deprovision AWS assets (as created by openshift-installer) with the given tag(s)",
+		Long:  "Deprovision AWS assets (as created by openshift-installer) with the given tag(s).  A resource matches the filter if all of the key/value pairs are in its tags.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := completeAWSUninstaller(opt, args); err != nil {
 				log.WithError(err).Error("Cannot complete command")

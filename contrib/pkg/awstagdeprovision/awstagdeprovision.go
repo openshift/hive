@@ -19,7 +19,6 @@ package awstagdeprovision
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -36,7 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -69,61 +67,6 @@ type ClusterUninstaller struct {
 	ClusterName string
 }
 
-// NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
-func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
-	opt := &ClusterUninstaller{}
-	opt.Filters = AWSFilter{}
-	cmd := &cobra.Command{
-		Use:   "aws-tag-deprovision key=value",
-		Short: "Deprovision AWS assets (as created by openshift-installer) with a given tag",
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := opt.complete(args); err != nil {
-				log.WithError(err).Error("Cannot complete command")
-				return
-			}
-			if err := opt.validate(); err != nil {
-				log.WithError(err).Error("Invalid command options")
-				return
-			}
-			if err := opt.Run(); err != nil {
-				log.WithError(err).Error("Runtime error")
-			}
-		},
-	}
-	flags := cmd.Flags()
-	flags.StringVar(&opt.LogLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
-	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
-	flags.StringVar(&opt.ClusterName, "cluster-name", "", "Name that cluster was installed with")
-	return cmd
-}
-
-func (o *ClusterUninstaller) complete(args []string) error {
-	for _, arg := range args {
-		err := parseFilter(o.Filters, arg)
-		if err != nil {
-			return fmt.Errorf("cannot parse filter %s: %v", arg, err)
-		}
-	}
-
-	// Set log level
-	level, err := log.ParseLevel(o.LogLevel)
-	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
-		return err
-	}
-
-	o.Logger = log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
-
-	return nil
-}
-
 func (o *ClusterUninstaller) validate() error {
 	if len(o.Filters) == 0 {
 		return fmt.Errorf("you must specify at least one tag filter")
@@ -150,6 +93,10 @@ func populateDeleteFuncs(funcs map[string]deleteFunc) {
 
 // Run is the entrypoint to start the uninstall process
 func (o *ClusterUninstaller) Run() error {
+	err := o.validate()
+	if err != nil {
+		return err
+	}
 	deleteFuncs := map[string]deleteFunc{}
 	populateDeleteFuncs(deleteFuncs)
 	returnChannel := make(chan string)
@@ -206,17 +153,6 @@ func getAWSSession(region string) (*session.Session, error) {
 	}
 
 	return s, nil
-}
-
-func parseFilter(filterMap AWSFilter, str string) error {
-	parts := strings.SplitN(str, "=", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("incorrectly formatted filter")
-	}
-
-	filterMap[parts[0]] = parts[1]
-
-	return nil
 }
 
 func createEC2Filters(filters AWSFilter) []*ec2.Filter {

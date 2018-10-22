@@ -1,8 +1,8 @@
 apiVersion: apps.openshift.io/v1
 kind: DeploymentConfig
 metadata:
-  name: controller-manager
-  namespace: system
+  name: hive-controller-manager
+  namespace: openshift-hive
 spec:
   template:
     spec:

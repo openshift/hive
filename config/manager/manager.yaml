@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: system
+  name: openshift-hive
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: controller-manager-service
-  namespace: system
+  name: hive-controller-manager-service
+  namespace: openshift-hive
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -23,8 +23,8 @@ spec:
 apiVersion: apps.openshift.io/v1
 kind: DeploymentConfig
 metadata:
-  name: controller-manager
-  namespace: system
+  name: hive-controller-manager
+  namespace: openshift-hive
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"

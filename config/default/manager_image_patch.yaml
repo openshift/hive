@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
 metadata:
   name: controller-manager
   namespace: system

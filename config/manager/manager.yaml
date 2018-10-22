@@ -20,8 +20,8 @@ spec:
   ports:
   - port: 443
 ---
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
 metadata:
   name: controller-manager
   namespace: system
@@ -30,10 +30,22 @@ metadata:
     controller-tools.k8s.io: "1.0"
 spec:
   selector:
-    matchLabels:
-      control-plane: controller-manager
-      controller-tools.k8s.io: "1.0"
-  serviceName: controller-manager-service
+    control-plane: controller-manager
+    controller-tools.k8s.io: "1.0"
+  replicas: 1
+  revisionHistoryLimit: 4
+  strategy:
+    type: Rolling
+  triggers:
+    - type: "ConfigChange"
+    #- type: "ImageChange"
+      #imageChangeParams:
+        #automatic: true
+        #containerNames:
+          #- "manager"
+        #from:
+          #kind: "ImageStreamTag"
+          #name: "cluster-operator:latest"
   template:
     metadata:
       labels:

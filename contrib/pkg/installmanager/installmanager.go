@@ -19,9 +19,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -44,44 +42,48 @@ type InstallManager struct {
 	WorkDir       string
 	ClusterName   string
 	Namespace     string
-	KubeClient    clientset.Interface
 	DynamicClient client.Client
-	Scheme        *runtime.Scheme
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
 func NewInstallManagerCommand() *cobra.Command {
-	opts := &InstallManager{}
+	im := &InstallManager{}
 	cmd := &cobra.Command{
 		Use:   "install-manager NAMESPACE CLUSTER_NAME",
 		Short: "Executes and oversees the openshift-installer.",
 		Long:  "The Hive Install Manager runs the phases of the openshift-installer, edits generated assets before completing install, and monitors for artifacts that need to be uploaded back to Hive.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := opts.Complete(args); err != nil {
+			if err := im.Complete(args); err != nil {
 				log.WithError(err).Error("cannot complete command")
 				return
 			}
 
 			if len(args) != 2 {
 				cmd.Help()
-				opts.log.Fatal("invalid command arguments")
+				im.log.Fatal("invalid command arguments")
 			}
 			// Parse the namespace/name for our cluster deployment:
-			opts.Namespace, opts.ClusterName = args[0], args[1]
+			im.Namespace, im.ClusterName = args[0], args[1]
 
-			if err := opts.Validate(); err != nil {
+			if err := im.Validate(); err != nil {
 				log.WithError(err).Error("invalid command options")
 				return
 			}
 
-			if err := opts.Run(); err != nil {
+			var err error
+			im.DynamicClient, err = getClient()
+			if err != nil {
+				im.log.WithError(err).Fatal("error creating kube clients")
+			}
+
+			if err := im.Run(); err != nil {
 				log.WithError(err).Error("runtime error")
 			}
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opts.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
-	flags.StringVar(&opts.WorkDir, "work-dir", "/output", "directory to use for all input and output")
+	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	return cmd
 }
 
@@ -122,12 +124,6 @@ func (m *InstallManager) Validate() error {
 
 // Run is the entrypoint to start the install process
 func (m *InstallManager) Run() error {
-	var err error
-	m.KubeClient, m.DynamicClient, err = getClients()
-	if err != nil {
-		m.log.WithError(err).Fatal("error creating kube clients")
-	}
-
 	m.waitForInstallerBinaries()
 
 	installErr := m.runInstaller()
@@ -249,7 +245,7 @@ func (m *InstallManager) uploadClusterMetadata() error {
 		return err
 	}
 
-	_, err = m.KubeClient.CoreV1().ConfigMaps(m.Namespace).Create(metadataCfgMap)
+	err = m.DynamicClient.Create(context.Background(), metadataCfgMap)
 	if err != nil {
 		// TODO: what should happen if the configmap already exists?
 		m.log.WithError(err).Error("error creating metadata configmap")
@@ -294,7 +290,8 @@ func (m *InstallManager) uploadAdminKubeconfig() error {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return err
 	}
-	_, err = m.KubeClient.CoreV1().Secrets(m.Namespace).Create(kubeconfigSecret)
+
+	err = m.DynamicClient.Create(context.Background(), kubeconfigSecret)
 	if err != nil {
 		// TODO: what should happen if it already exists?
 		m.log.WithError(err).Error("error creating admin kubeconfig secret")
@@ -305,23 +302,19 @@ func (m *InstallManager) uploadAdminKubeconfig() error {
 	return nil
 }
 
-func getClients() (*clientset.Clientset, client.Client, error) {
+func getClient() (client.Client, error) {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
 	cfg, err := kubeconfig.ClientConfig()
 	if err != nil {
-		return nil, nil, err
-	}
-	kubeClient, err := clientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	apis.AddToScheme(scheme.Scheme)
 	dynamicClient, err := client.New(cfg, client.Options{})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return kubeClient, dynamicClient, nil
+	return dynamicClient, nil
 }

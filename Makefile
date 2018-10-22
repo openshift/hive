@@ -14,7 +14,7 @@ all: fmt vet test build
 # Run tests
 .PHONY: test
 test: generate fmt vet manifests
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
 test-integration: generate
 	go test ./test/integration/... -coverprofile cover.out

@@ -22,5 +22,3 @@ resources:
 - ../rbac/rbac_role.yaml
 - ../manager/manager.yaml
 
-patches:
-- manager_image_patch.yaml

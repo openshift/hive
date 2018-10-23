@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: system
+  name: openshift-hive
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: controller-manager-service
-  namespace: system
+  name: hive-controller-manager-service
+  namespace: openshift-hive
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -20,20 +20,32 @@ spec:
   ports:
   - port: 443
 ---
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
 metadata:
-  name: controller-manager
-  namespace: system
+  name: hive-controller-manager
+  namespace: openshift-hive
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 spec:
   selector:
-    matchLabels:
-      control-plane: controller-manager
-      controller-tools.k8s.io: "1.0"
-  serviceName: controller-manager-service
+    control-plane: controller-manager
+    controller-tools.k8s.io: "1.0"
+  replicas: 1
+  revisionHistoryLimit: 4
+  strategy:
+    type: Rolling
+  triggers:
+    - type: "ConfigChange"
+    #- type: "ImageChange"
+      #imageChangeParams:
+        #automatic: true
+        #containerNames:
+          #- "manager"
+        #from:
+          #kind: "ImageStreamTag"
+          #name: "cluster-operator:latest"
   template:
     metadata:
       labels:
@@ -41,7 +53,11 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
+      # By default we are assuming a development setup with the image pushed to
+      # the local registry. Pull policy should be Never in this case, it will be
+      # modified in overrides for actual environments.
       - image: hive-controller:latest
+        imagePullPolicy: Never
         name: manager
         resources:
           limits:
@@ -50,4 +66,8 @@ spec:
           requests:
             cpu: 100m
             memory: 20Mi
+        command:
+          - /opt/services/manager
+          - --log-level
+          - debug
       terminationGracePeriodSeconds: 10

@@ -1,0 +1,13 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  name: hive-controller-manager
+  namespace: openshift-hive
+spec:
+  template:
+    spec:
+      containers:
+      # Run from a defined image published to quay as necessary for SD's needs:
+      - image: quay.io/dgoodwin/hive:latest
+        name: manager
+        imagePullPolicy: Always

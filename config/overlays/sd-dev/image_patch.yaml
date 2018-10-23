@@ -10,4 +10,4 @@ spec:
       # Run from a defined image published to quay as necessary for SD's needs:
       - image: quay.io/dgoodwin/hive:latest
         name: manager
-        imagePullPolicy: Never
+        imagePullPolicy: Always

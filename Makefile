@@ -48,6 +48,12 @@ deploy: manifests docker-build
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 
+# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+.PHONY: deploy-sd-dev
+deploy-sd-dev: manifests
+	kubectl apply -f config/crds
+	kustomize build config/overlays/sd-dev | kubectl apply -f -
+
 # Generate manifests e.g. CRD, RBAC etc.
 .PHONY: manifests
 manifests:

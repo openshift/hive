@@ -149,6 +149,9 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
 
+	// requeueAfter will be used to determine if cluster should be requeued after
+	// reconcile has completed
+	var requeueAfter time.Duration
 	// Check for the delete-after annotation, and if the cluster has expired, delete it
 	deleteAfter, ok := cd.Annotations[deleteAfterAnnotation]
 	if ok {
@@ -165,12 +168,11 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 				r.Delete(context.TODO(), cd)
 				return reconcile.Result{}, nil
 			}
-		}
 
-		// TODO: Enqueue cluster for deletion rather than wait for full resync
-		// enqueueDur := expiry.Sub(time.Now()) + 60*time.Second
-		// cdLog.Debugf("cluster will re-sync due to expiry time in: %v", enqueueDur)
-		// r.enqueueAfter(cd, enqueueDur)
+			// We have an expiry time but we're not expired yet. Set requeueAfter for just after expiry time
+			// so that we requeue cluster for deletion once reconcile has completed
+			requeueAfter = expiry.Sub(time.Now()) + 60*time.Second
+		}
 	}
 
 	if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
@@ -216,6 +218,11 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	cdLog.Debugf("reconcile complete")
+	// Check for requeueAfter duration
+	if requeueAfter != 0 {
+		cdLog.Debugf("cluster will re-sync due to expiry time in: %v", requeueAfter)
+		return reconcile.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+	}
 	return reconcile.Result{}, nil
 }
 

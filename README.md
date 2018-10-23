@@ -6,8 +6,10 @@ API driven OpenShift cluster provisioning and management
 * Ensure that you have access to an OpenShift cluster and have administrator permissions. This could be oc cluster up, minishift, or an actual cluster you can oc login to.
 * Build and deploy to Minishift:
   * `$ hack/minishift-deploy.sh`
-* Build and deploy to current kubectl context:
+* Build and deploy to current kubectl context using local container image:
    * `$ make deploy`
+* Build and deploy to current kubectl context using remote container image:
+   * `$ make deploy-sd-dev`
 
 ## Running from Source
 

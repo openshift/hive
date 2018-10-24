@@ -30,11 +30,10 @@ import (
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
 func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	opt := &awstagdeprovision.ClusterUninstaller{}
-	opt.Filters = awstagdeprovision.AWSFilter{}
 	cmd := &cobra.Command{
 		Use:   "aws-tag-deprovision KEY=VALUE ...",
 		Short: "Deprovision AWS assets (as created by openshift-installer) with the given tag(s)",
-		Long:  "Deprovision AWS assets (as created by openshift-installer) with the given tag(s).  A resource matches the filter if all of the key/value pairs are in its tags.",
+		Long:  "Deprovision AWS assets (as created by openshift-installer) with the given tag(s).  A resource matches the filter if any of the key/value pairs are in its tags.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := completeAWSUninstaller(opt, args); err != nil {
 				log.WithError(err).Error("Cannot complete command")
@@ -54,10 +53,12 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 
 func completeAWSUninstaller(o *awstagdeprovision.ClusterUninstaller, args []string) error {
 	for _, arg := range args {
-		err := parseFilter(o.Filters, arg)
+		filter := awstagdeprovision.AWSFilter{}
+		err := parseFilter(filter, arg)
 		if err != nil {
 			return fmt.Errorf("cannot parse filter %s: %v", arg, err)
 		}
+		o.Filters = append(o.Filters, filter)
 	}
 
 	// Set log level

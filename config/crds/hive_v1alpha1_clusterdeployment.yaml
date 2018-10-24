@@ -159,6 +159,22 @@ spec:
               - platform
               - pullSecret
               type: object
+            images:
+              properties:
+                hiveImage:
+                  type: string
+                hiveImagePullPolicy:
+                  type: string
+                installerImage:
+                  type: string
+                installerImagePullPolicy:
+                  type: string
+              required:
+              - installerImage
+              - installerImagePullPolicy
+              - hiveImage
+              - hiveImagePullPolicy
+              type: object
             platformSecrets:
               properties:
                 aws:
@@ -172,6 +188,7 @@ spec:
           required:
           - config
           - platformSecrets
+          - images
           type: object
         status:
           properties:

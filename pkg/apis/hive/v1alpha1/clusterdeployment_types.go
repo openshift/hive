@@ -34,6 +34,20 @@ const (
 type ClusterDeploymentSpec struct {
 	Config          InstallConfig   `json:"config"`
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
+	// +optional
+	Images ProvisionImages `json:"images"`
+}
+
+// ProvisionImages allows overriding the default images used to provision a cluster.
+type ProvisionImages struct {
+	// InstallerImage is the image containing the openshift-install and terraform binaries that will be used to install.
+	InstallerImage string `json:"installerImage"`
+	// InstallerImagePullPolicy is the pull policy for the installer image.
+	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy"`
+	// HiveImage is the image used in the sidecar container to manage execution of openshift-install.
+	HiveImage string `json:"hiveImage"`
+	// HiveImagePullPolicy is the pull policy for the installer image.
+	HiveImagePullPolicy corev1.PullPolicy `json:"hiveImagePullPolicy"`
 }
 
 // PlatformSecrets defines the secrets to be used by various clouds.

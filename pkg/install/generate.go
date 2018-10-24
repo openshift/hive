@@ -29,15 +29,18 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
+const (
+	defaultInstallerImage           = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+	defaultInstallerImagePullPolicy = corev1.PullAlways
+	defaultHiveImage                = "hive-controller:latest"
+	defaultHiveImagePullPolicy      = corev1.PullNever
+)
+
 // GenerateInstallerJob creates a job to install an OpenShift cluster
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
-	serviceAccountName string,
-	installerImage string,
-	installerImagePullPolicy corev1.PullPolicy,
-	hiveImage string,
-	hiveImagePullPolicy corev1.PullPolicy) *batchv1.Job {
+	serviceAccountName string) *batchv1.Job {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -141,6 +144,26 @@ func GenerateInstallerJob(
 		},
 	}
 
+	installerImage := defaultInstallerImage
+	if cd.Spec.Images.InstallerImage != "" {
+		installerImage = cd.Spec.Images.InstallerImage
+	}
+
+	installerImagePullPolicy := defaultInstallerImagePullPolicy
+	if cd.Spec.Images.InstallerImagePullPolicy != "" {
+		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
+	}
+
+	hiveImage := defaultHiveImage
+	if cd.Spec.Images.HiveImage != "" {
+		hiveImage = cd.Spec.Images.HiveImage
+	}
+
+	hiveImagePullPolicy := defaultHiveImagePullPolicy
+	if cd.Spec.Images.HiveImagePullPolicy != "" {
+		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
+	}
+
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
@@ -197,9 +220,7 @@ func GenerateInstallerJob(
 // GenerateUninstallerJob creates a job to uninstall an OpenShift cluster
 // given a ClusterDeployment and an installer image.
 func GenerateUninstallerJob(
-	cd *hivev1.ClusterDeployment,
-	installerImage string,
-	imagePullPolicy corev1.PullPolicy) (*batchv1.Job, error) {
+	cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
 
 	if cd.Spec.Config.AWS == nil {
 		return nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
@@ -253,11 +274,21 @@ func GenerateUninstallerJob(
 
 	args := []string{"destroy-cluster", "--dir", "/cluster/metadata", "--log-level", "debug"}
 
+	installerImage := defaultInstallerImage
+	if cd.Spec.Images.InstallerImage != "" {
+		installerImage = cd.Spec.Images.InstallerImage
+	}
+
+	installerImagePullPolicy := defaultInstallerImagePullPolicy
+	if cd.Spec.Images.InstallerImagePullPolicy != "" {
+		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
+	}
+
 	containers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: imagePullPolicy,
+			ImagePullPolicy: installerImagePullPolicy,
 			Env:             env,
 			Args:            args,
 			VolumeMounts:    volumeMounts,

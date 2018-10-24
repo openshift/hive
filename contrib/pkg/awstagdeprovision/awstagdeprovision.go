@@ -966,7 +966,7 @@ func bucketsToAWSObjects(buckets []*s3.Bucket, s3Client *s3.S3, logger log.Field
 			Bucket: bucket.Name,
 		})
 		if err != nil {
-			logger.Debugf("error getting tags for bucket %s: %v, skipping...", bucket.Name, err)
+			logger.Debugf("error getting tags for bucket %s: %v, skipping...", *bucket.Name, err)
 			continue
 		}
 

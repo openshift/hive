@@ -82,6 +82,11 @@ objects:
       aws:
         credentials:
           name: "${CLUSTER_NAME}-aws-creds"
+    images:
+      hiveImage: "hive-controller:latest"
+      hiveImagePullPolicy: Never
+      installerImage: "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+      installerImagePullPolicy: Always
     config:
       admin:
         email: ${ADMIN_EMAIL}

@@ -47,10 +47,6 @@ import (
 )
 
 const (
-	installerImage   = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-	uninstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer" // TODO
-	hiveImage        = "hive-controller:latest"
-
 	// serviceAccountName will be a service account that can run the installer and then
 	// upload artifacts to the cluster's namespace.
 	serviceAccountName = "cluster-installer"
@@ -180,8 +176,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
-	job := install.GenerateInstallerJob(cd, serviceAccountName, installerImage, kapi.PullAlways,
-		hiveImage, kapi.PullIfNotPresent)
+	job := install.GenerateInstallerJob(cd, serviceAccountName)
 
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.Errorf("error setting controller reference on job", err)
@@ -284,7 +279,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	// Generate an uninstall job:
-	uninstallJob, err := install.GenerateUninstallerJob(cd, installerImage, kapi.PullAlways)
+	uninstallJob, err := install.GenerateUninstallerJob(cd)
 	if err != nil {
 		cdLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

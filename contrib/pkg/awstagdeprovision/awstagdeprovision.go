@@ -721,17 +721,9 @@ func deleteInstances(session *session.Session, filter AWSFilter, clusterName str
 		Values: []*string{aws.String("running")},
 	})
 
-	for {
-		results, err := ec2Client.DescribeInstances(&describeInstancesInput)
-		if err != nil {
-			logger.Debugf("error listing instances: %v", err)
-			return false, nil
-		}
-
-		if len(results.Reservations) == 0 {
-			break
-		}
-
+	found := false
+	err := ec2Client.DescribeInstancesPages(&describeInstancesInput, func(results *ec2.DescribeInstancesOutput, lastPage bool) bool {
+		found = found || len(results.Reservations) > 0
 		for _, reservation := range results.Reservations {
 			for _, instance := range reservation.Instances {
 				// first delete any instance profiles (they are not tagged)
@@ -745,7 +737,7 @@ func deleteInstances(session *session.Session, filter AWSFilter, clusterName str
 
 				// now delete the instance
 				logger.Debugf("deleting instance: %v", *instance.InstanceId)
-				_, err = ec2Client.TerminateInstances(&ec2.TerminateInstancesInput{
+				_, err := ec2Client.TerminateInstances(&ec2.TerminateInstancesInput{
 					InstanceIds: []*string{instance.InstanceId},
 				})
 				if err != nil {
@@ -757,10 +749,13 @@ func deleteInstances(session *session.Session, filter AWSFilter, clusterName str
 			}
 		}
 
-		return false, nil
+		return lastPage
+	})
+	if err != nil {
+		logger.Debugf("error describing instances: %v", err)
 	}
 
-	return true, nil
+	return found, nil
 }
 
 // deleteSecurityGroupRules will attempt to delete all the rules defined in the given security group

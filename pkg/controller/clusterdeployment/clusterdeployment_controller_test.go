@@ -41,11 +41,14 @@ import (
 )
 
 const (
-	testName         = "foo"
-	installJobName   = "foo-install"
-	uninstallJobName = "foo-uninstall"
-	testNamespace    = "default"
-	metadataName     = "foo-metadata"
+	testName            = "foo"
+	installJobName      = "foo-install"
+	uninstallJobName    = "foo-uninstall"
+	testNamespace       = "default"
+	metadataName        = "foo-metadata"
+	adminPasswordSecret = "admin-password"
+	sshKeySecret        = "ssh-key"
+	pullSecretSecret    = "pull-secret"
 )
 
 func init() {
@@ -89,6 +92,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Add finalizer",
 			existing: []runtime.Object{
 				testClusterDeploymentWithoutFinalizer(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				cd := getCD(c)
@@ -101,6 +107,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Create install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				job := getInstallJob(c)
@@ -114,6 +123,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testInstallJob(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				cd := getCD(c)
@@ -132,6 +144,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testClusterDeployment(),
 				testCompletedInstallJob(),
 				testMetadataConfigMap(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				cd := getCD(c)
@@ -148,6 +163,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Run uninstall",
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				uninstallJob := getUninstallJob(c)
@@ -160,6 +178,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "No-op deleted cluster without finalizer",
 			existing: []runtime.Object{
 				testDeletedClusterDeploymentWithoutFinalizer(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				uninstallJob := getUninstallJob(c)
@@ -172,6 +193,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Delete expired cluster deployment",
 			existing: []runtime.Object{
 				testExpiredClusterDeployment(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client) {
 				cd := getCD(c)
@@ -225,20 +249,23 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				Admin: hivev1.Admin{
 					Email: "user@example.com",
 					Password: corev1.LocalObjectReference{
-						Name: "admin-password",
+						Name: adminPasswordSecret,
 					},
 					SSHKey: &corev1.LocalObjectReference{
-						Name: "ssh-key",
+						Name: sshKeySecret,
 					},
 				},
 				Machines: []hivev1.MachinePool{},
 				PullSecret: corev1.LocalObjectReference{
-					Name: "pull-secret",
+					Name: pullSecretSecret,
 				},
 				Platform: hivev1.Platform{
 					AWS: &hivev1.AWSPlatform{
 						Region: "us-east-1",
 					},
+				},
+				Networking: hivev1.Networking{
+					Type: hivev1.NetworkTypeOpenshiftSDN,
 				},
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
@@ -316,4 +343,17 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 	}`
 	cm.Data = map[string]string{"metadata.json": metadataJSON}
 	return cm
+}
+
+func testSecret(name, key, value string) *corev1.Secret {
+	s := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			key: []byte(value),
+		},
+	}
+	return s
 }

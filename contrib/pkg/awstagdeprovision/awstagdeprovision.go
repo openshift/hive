@@ -105,6 +105,7 @@ func populateDeleteFuncs(funcs map[string]deleteFunc) {
 	funcs["deleteSubnets"] = deleteSubnets
 	funcs["deleteS3Buckets"] = deleteS3Buckets
 	funcs["deleteRoute53"] = deleteRoute53
+	funcs["deletePVs"] = deletePVs
 }
 
 // Run is the entrypoint to start the uninstall process
@@ -1314,4 +1315,40 @@ func deleteRoute53(session *session.Session, filters AWSFilter, clusterName stri
 	}
 	// all done deleting r53 entries/zones
 	return true, nil
+}
+
+// deletePVs will find PVs based on provided filters and delete them
+func deletePVs(session *session.Session, filters AWSFilter, clusterName string, logger log.FieldLogger) (bool, error) {
+
+	logger.Debugf("Deleting PVs (%s)", filters)
+	defer logger.Debugf("Exiting deleting PVs (%s)", filters)
+
+	ec2Client := getEC2Client(session)
+	describeVolumesInput := ec2.DescribeVolumesInput{}
+	describeVolumesInput.Filters = createEC2Filters(filters)
+
+	results, err := ec2Client.DescribeVolumes(&describeVolumesInput)
+	if err != nil {
+		logger.Debugf("error listing volumes: %v", err)
+		return false, nil
+	}
+
+	if len(results.Volumes) == 0 {
+		// nothing to delete, we must be done
+		return true, nil
+	}
+
+	for _, vol := range results.Volumes {
+		logger.Debugf("deleting volume: %v", *vol.VolumeId)
+		_, err := ec2Client.DeleteVolume(&ec2.DeleteVolumeInput{
+			VolumeId: vol.VolumeId,
+		})
+		if err != nil {
+			logger.Debugf("error deleting volume: %v", err)
+		} else {
+			logger.WithField("id", *vol.VolumeId).Info("Deleted Volume")
+		}
+	}
+
+	return false, nil
 }

@@ -180,6 +180,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
+	cdLog.Debug("loading admin secret")
 	adminPassword, err := r.loadSecretData(cd.Spec.Config.Admin.Password.Name,
 		cd.Namespace, adminCredsSecretPasswordKey)
 	if err != nil {
@@ -187,6 +188,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	cdLog.Debug("loading SSH key secret")
 	sshKey, err := r.loadSecretData(cd.Spec.Config.Admin.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
@@ -194,6 +196,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	cdLog.Debug("loading pull secret secret")
 	pullSecret, err := r.loadSecretData(cd.Spec.Config.PullSecret.Name, cd.Namespace, pullSecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load pull secret from secret")
@@ -222,6 +225,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	cdLog = cdLog.WithField("job", job.Name)
 
+	cdLog.Debug("checking if install-config.yml config map exists")
 	// Check if the ConfigMap already exists for this ClusterDeployment:
 	existingCfgMap := &kapi.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)

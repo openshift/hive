@@ -114,12 +114,12 @@ objects:
       baseDomain: ${BASE_DOMAIN}
       networking:
         type: openshift-sdn
-        serviceCIDR: "172.30.0.0/16"
-        podCIDR: "10.128.0.0/14"
+        serviceCIDR: "10.3.0.0/16"
+        podCIDR: "10.2.0.0/16"
       platform:
         aws:
           region: us-east-1
-          vpcID: should-not-be-required # TODO
+          vpcID: ""
           vpcCIDRBlock: 10.0.0.0/16
       pullSecret:
         name: "${CLUSTER_NAME}-pull-secret"
@@ -128,20 +128,20 @@ objects:
         replicas: 3
         platform:
           aws:
-            type: m4-large
-            iamRoleName: TBD # TODO
+            type: m4.large
+            iamRoleName: ""
             rootVolume:
               iops: 100 # TODO
-              size: 32
+              size: 22
               type: gp2
       - name: worker
         replicas: 3
         platform:
           aws:
-            type: m4-large
-            iamRoleName: TBD # TODO
+            type: m4.large
+            iamRoleName: ""
             rootVolume:
               iops: 100 # TODO
-              size: 32
+              size: 22
               type: gp2
 

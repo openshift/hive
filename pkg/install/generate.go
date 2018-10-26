@@ -70,7 +70,8 @@ func GenerateInstallerJob(
 			Namespace: cd.Namespace,
 		},
 		Data: map[string]string{
-			"installconfig.yaml": installConfig,
+			// Filename should match installer default:
+			"install-config.yml": installConfig,
 		},
 	}
 
@@ -179,7 +180,7 @@ func GenerateInstallerJob(
 		},
 		{
 			Name:      "installconfig",
-			MountPath: "/output/config",
+			MountPath: "/installconfig",
 		},
 	}
 
@@ -221,8 +222,18 @@ func GenerateInstallerJob(
 			ImagePullPolicy: hiveImagePullPolicy,
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args:            []string{"install-manager", "--work-dir", "/output", "--log-level", "debug", cd.Namespace, cd.Name},
-			VolumeMounts:    volumeMounts,
+			Args: []string{
+				"install-manager",
+				"--work-dir",
+				"/output",
+				"--log-level",
+				"debug",
+				"--install-config",
+				"/installconfig/install-config.yml",
+				cd.Namespace,
+				cd.Name,
+			},
+			VolumeMounts: volumeMounts,
 		},
 	}
 
@@ -311,7 +322,7 @@ func GenerateUninstallerJob(
 		},
 	}
 
-	args := []string{"destroy-cluster", "--dir", "/cluster/metadata", "--log-level", "debug"}
+	args := []string{"destroy", "cluster", "--dir", "/cluster/metadata", "--log-level", "debug"}
 
 	installerImage := defaultInstallerImage
 	if cd.Spec.Images.InstallerImage != "" {

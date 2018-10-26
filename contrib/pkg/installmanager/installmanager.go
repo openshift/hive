@@ -40,6 +40,7 @@ type InstallManager struct {
 	log           log.FieldLogger
 	LogLevel      string
 	WorkDir       string
+	InstallConfig string
 	ClusterName   string
 	Namespace     string
 	DynamicClient client.Client
@@ -84,6 +85,8 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
+	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
+	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yml", "location of install-config.yml to copy into work-dir")
 	return cmd
 }
 
@@ -125,6 +128,14 @@ func (m *InstallManager) Validate() error {
 // Run is the entrypoint to start the install process
 func (m *InstallManager) Run() error {
 	m.waitForInstallerBinaries()
+
+	dstInstallConfig := filepath.Join(m.WorkDir, "install-config.yml")
+	m.log.Debugf("copying %s to %s", m.InstallConfig, dstInstallConfig)
+	err := m.copyFile(m.InstallConfig, dstInstallConfig)
+	if err != nil {
+		m.log.WithError(err).Fatalf("error copying install config from %s to %s",
+			m.InstallConfig, dstInstallConfig)
+	}
 
 	installErr := m.runInstaller()
 	if installErr != nil {
@@ -175,7 +186,7 @@ func (m *InstallManager) waitForInstallerBinaries() {
 
 func (m *InstallManager) runInstaller() error {
 	m.log.Info("running openshift-install")
-	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), []string{"cluster", "--dir", m.WorkDir, "--log-level", "debug"}...)
+	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), []string{"create", "cluster", "--dir", m.WorkDir, "--log-level", "debug"}...)
 
 	// Copy all stdout/stderr output from the child process:
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -300,6 +311,26 @@ func (m *InstallManager) uploadAdminKubeconfig() error {
 	m.log.WithField("secretName", kubeconfigSecret.Name).Info("uploaded admin kubeconfig secret")
 
 	return nil
+}
+
+func (m *InstallManager) copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }
 
 func getClient() (client.Client, error) {

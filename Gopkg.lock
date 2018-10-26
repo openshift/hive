@@ -50,6 +50,7 @@
     "service/ec2/ec2iface",
     "service/elb",
     "service/elb/elbiface",
+    "service/elbv2",
     "service/iam",
     "service/iam/iamiface",
     "service/route53",
@@ -374,14 +375,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a2eb49d7aac212c4c773b2e1f7a6e2098fbf20d8a62b4a68af980567418f478f"
+  digest = "1:7d5000a492a42046700e3ddc4f61d3fa81815aa8b4e50af5247b061c2deb137f"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/ipnet",
     "pkg/types",
   ]
   pruneopts = "T"
-  revision = "840428443f7879ee0437ba2b30a9e4bd1048c587"
+  revision = "39523ae9bde306dcb36114c5e308e8283ce5b429"
 
 [[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
@@ -951,6 +952,7 @@
     "github.com/aws/aws-sdk-go/service/ec2/ec2iface",
     "github.com/aws/aws-sdk-go/service/elb",
     "github.com/aws/aws-sdk-go/service/elb/elbiface",
+    "github.com/aws/aws-sdk-go/service/elbv2",
     "github.com/aws/aws-sdk-go/service/iam",
     "github.com/aws/aws-sdk-go/service/iam/iamiface",
     "github.com/aws/aws-sdk-go/service/route53",
@@ -963,7 +965,9 @@
     "github.com/golang/mock/gomock",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/installer/pkg/ipnet",
     "github.com/openshift/installer/pkg/types",
+    "github.com/pborman/uuid",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/stretchr/testify/assert",
@@ -982,7 +986,6 @@
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/wait",
-    "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",

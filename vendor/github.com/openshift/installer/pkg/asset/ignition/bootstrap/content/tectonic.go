@@ -7,13 +7,11 @@ const (
 Description=Bootstrap a Tectonic cluster
 Wants=bootkube.service
 After=bootkube.service
+ConditionPathExists=!/opt/tectonic/.tectonic.done
 
 [Service]
 WorkingDirectory=/opt/tectonic/tectonic
-
-ExecStart=/opt/tectonic/tectonic.sh /opt/tectonic/auth/kubeconfig
-# Workaround for https://github.com/opencontainers/runc/pull/1807
-ExecStartPost=/usr/bin/touch /opt/tectonic/.tectonic.done
+ExecStart=/usr/local/bin/tectonic.sh /opt/tectonic/auth/kubeconfig
 
 Restart=on-failure
 RestartSec=5s
@@ -90,6 +88,9 @@ done
 
 # Wait for Tectonic pods
 wait_for_pods tectonic-system
+
+# Workaround for https://github.com/opencontainers/runc/pull/1807
+touch /opt/tectonic/.tectonic.done
 
 echo "Tectonic installation is done"
 `

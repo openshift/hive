@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"os"
+
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/asset/ignition/bootstrap"
 	"github.com/openshift/installer/pkg/asset/ignition/machine"
@@ -10,15 +12,15 @@ import (
 )
 
 const (
-	tfvarsFilename  = "terraform.tfvars"
+	// TfVarsFileName is the filename for Terraform variables.
+	TfVarsFileName  = "terraform.tfvars"
 	tfvarsAssetName = "Terraform Variables"
 )
 
 // TerraformVariables depends on InstallConfig and
 // Ignition to generate the terrafor.tfvars.
 type TerraformVariables struct {
-	Platform string
-	File     *asset.File
+	File *asset.File
 }
 
 var _ asset.WritableAsset = (*TerraformVariables)(nil)
@@ -46,24 +48,17 @@ func (t *TerraformVariables) Generate(parents asset.Parents) error {
 	worker := &machine.Worker{}
 	parents.Get(installConfig, bootstrap, master, worker)
 
-	t.Platform = installConfig.Config.Platform.Name()
-
 	bootstrapIgn := string(bootstrap.Files()[0].Data)
 
-	masterFiles := master.Files()
-	masterIgns := make([]string, len(masterFiles))
-	for i, f := range masterFiles {
-		masterIgns[i] = string(f.Data)
-	}
-
+	masterIgn := string(master.Files()[0].Data)
 	workerIgn := string(worker.Files()[0].Data)
 
-	data, err := tfvars.TFVars(installConfig.Config, bootstrapIgn, masterIgns, workerIgn)
+	data, err := tfvars.TFVars(installConfig.Config, bootstrapIgn, masterIgn, workerIgn)
 	if err != nil {
 		return errors.Wrap(err, "failed to get Tfvars")
 	}
 	t.File = &asset.File{
-		Filename: tfvarsFilename,
+		Filename: TfVarsFileName,
 		Data:     data,
 	}
 
@@ -76,4 +71,18 @@ func (t *TerraformVariables) Files() []*asset.File {
 		return []*asset.File{t.File}
 	}
 	return []*asset.File{}
+}
+
+// Load reads the terraform.tfvars from disk.
+func (t *TerraformVariables) Load(f asset.FileFetcher) (found bool, err error) {
+	file, err := f.FetchByName(TfVarsFileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	t.File = file
+	return true, nil
 }

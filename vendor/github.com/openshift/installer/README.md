@@ -10,7 +10,7 @@
 
 First, install all [build dependencies](docs/dev/dependencies.md).
 
-After cloning this repository, the installer binary will need to be built by running the following:
+Clone this repository to `src/github.com/openshift/installer` in your [GOPATH](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable). Then build the `openshift-install` binary with:
 
 ```sh
 hack/build.sh
@@ -19,7 +19,7 @@ hack/build.sh
 This will create `bin/openshift-install`. This binary can then be invoked to create an OpenShift cluster, like so:
 
 ```sh
-bin/openshift-install cluster
+bin/openshift-install create cluster
 ```
 
 The installer requires the terraform binary either alongside openshift-install or in `$PATH`.
@@ -41,8 +41,8 @@ Log in using the admin credentials you configured when creating the cluster.
 
 #### Kubeconfig
 
-You can also use the admin kubeconfig which `openshift-install cluster` placed under `--dir` (which defaults to `.`) in `auth/kubeconfig`.
-If you launched the cluster with `openshift-install --dir "${DIR}" cluster`, you can use:
+You can also use the admin kubeconfig which `openshift-install create cluster` placed under `--dir` (which defaults to `.`) in `auth/kubeconfig`.
+If you launched the cluster with `openshift-install --dir "${DIR}" create cluster`, you can use:
 
 ```sh
 export KUBECONFIG="${DIR}/auth/kubeconfig"
@@ -53,5 +53,9 @@ export KUBECONFIG="${DIR}/auth/kubeconfig"
 Destroy the cluster and release associated resources with:
 
 ```sh
-openshift-install destroy-cluster
+openshift-install destroy cluster
 ```
+
+Note that you almost certainly also want to clean up the installer state files too, including `auth/`, `terraform.tfstate`, etc.
+The best thing to do is always pass the `--dir` argument to `install` and `destroy`.
+And if you want to reinstall from scratch, `rm -rf` the asset directory beforehand.

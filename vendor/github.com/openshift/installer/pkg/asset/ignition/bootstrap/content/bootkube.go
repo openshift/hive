@@ -12,13 +12,11 @@ const (
 Description=Bootstrap a Kubernetes cluster
 Wants=kubelet.service
 After=kubelet.service
+ConditionPathExists=!/opt/tectonic/.bootkube.done
 
 [Service]
 WorkingDirectory=/opt/tectonic
-
-ExecStart=/opt/tectonic/bootkube.sh
-# Workaround for https://github.com/opencontainers/runc/pull/1807
-ExecStartPost=/usr/bin/touch /opt/tectonic/.bootkube.done
+ExecStart=/usr/local/bin/bootkube.sh
 
 Restart=on-failure
 RestartSec=5s
@@ -31,7 +29,7 @@ var (
 	BootkubeShFileTemplate = template.Must(template.New("bootkube.sh").Parse(`#!/usr/bin/env bash
 set -e
 
-mkdir --parents /etc/kubernetes/manifests/
+mkdir --parents /etc/kubernetes/{manifests,bootstrap-configs,bootstrap-manifests}
 
 MACHINE_CONFIG_OPERATOR_IMAGE=$(podman run --rm {{.ReleaseImage}} image machine-config-operator)
 MACHINE_CONFIG_CONTROLLER_IMAGE=$(podman run --rm {{.ReleaseImage}} image machine-config-controller)
@@ -41,6 +39,11 @@ MACHINE_CONFIG_DAEMON_IMAGE=$(podman run --rm {{.ReleaseImage}} image machine-co
 KUBE_APISERVER_OPERATOR_IMAGE=$(podman run --rm {{.ReleaseImage}} image cluster-kube-apiserver-operator)
 KUBE_CONTROLLER_MANAGER_OPERATOR_IMAGE=$(podman run --rm {{.ReleaseImage}} image cluster-kube-controller-manager-operator)
 KUBE_SCHEDULER_OPERATOR_IMAGE=$(podman run --rm {{.ReleaseImage}} image cluster-kube-scheduler-operator)
+
+OPENSHIFT_HYPERSHIFT_IMAGE=$(podman run --rm {{.ReleaseImage}} image hypershift)
+OPENSHIFT_HYPERKUBE_IMAGE=$(podman run --rm {{.ReleaseImage}} image hyperkube)
+
+mkdir --parents ./{bootstrap-manifests,manifests}
 
 if [ ! -d cvo-bootstrap ]
 then
@@ -54,24 +57,8 @@ then
 			--output-dir=/assets/cvo-bootstrap \
 			--release-image="{{.ReleaseImage}}"
 
-	cp --recursive cvo-bootstrap/manifests .
-fi
-
-if [ ! -d kco-bootstrap ]
-then
-	echo "Rendering Kubernetes core manifests..."
-
-	# shellcheck disable=SC2154
-	podman run \
-		--volume "$PWD:/assets:z" \
-		--volume /etc/kubernetes:/etc/kubernetes:z \
-		"{{.KubeCoreRenderImage}}" \
-		--config=/assets/kco-config.yaml \
-		--output=/assets/kco-bootstrap
-
-	cp --recursive kco-bootstrap/bootstrap-configs /etc/kubernetes/bootstrap-configs
-	cp --recursive kco-bootstrap/bootstrap-manifests .
-	cp --recursive kco-bootstrap/manifests .
+	cp cvo-bootstrap/bootstrap/* bootstrap-manifests/
+	cp cvo-bootstrap/manifests/* manifests/
 fi
 
 if [ ! -d kube-apiserver-bootstrap ]
@@ -84,14 +71,16 @@ then
 		"${KUBE_APISERVER_OPERATOR_IMAGE}" \
 		/usr/bin/cluster-kube-apiserver-operator render \
 		--manifest-etcd-serving-ca=etcd-client-ca.crt \
+		--manifest-etcd-server-urls={{.EtcdCluster}} \
+		--manifest-image=${OPENSHIFT_HYPERSHIFT_IMAGE} \
 		--asset-input-dir=/assets/tls \
 		--asset-output-dir=/assets/kube-apiserver-bootstrap \
-		--config-output-file=/assets/kube-apiserver-bootstrap/config
+		--config-output-file=/assets/kube-apiserver-bootstrap/config \
+		--config-override-files=/assets/bootkube-config-overrides/kube-apiserver-config-overrides.yaml
 
-	# TODO: copy the bootstrap manifests to replace kube-core-operator
-	cp --recursive kube-apiserver-bootstrap/manifests/00_openshift-kube-apiserver-ns.yaml manifests/00_openshift-kube-apiserver-ns.yaml
-	cp --recursive kube-apiserver-bootstrap/manifests/secret-* manifests/
-	cp --recursive kube-apiserver-bootstrap/manifests/configmap-* manifests/
+	cp kube-apiserver-bootstrap/config /etc/kubernetes/bootstrap-configs/kube-apiserver-config.yaml
+	cp kube-apiserver-bootstrap/bootstrap-manifests/* bootstrap-manifests/
+	cp kube-apiserver-bootstrap/manifests/* manifests/
 fi
 
 if [ ! -d kube-controller-manager-bootstrap ]
@@ -103,13 +92,16 @@ then
 		--volume "$PWD:/assets:z" \
 		"${KUBE_CONTROLLER_MANAGER_OPERATOR_IMAGE}" \
 		/usr/bin/cluster-kube-controller-manager-operator render \
+		--manifest-image=${OPENSHIFT_HYPERKUBE_IMAGE} \
 		--asset-input-dir=/assets/tls \
 		--asset-output-dir=/assets/kube-controller-manager-bootstrap \
-		--config-output-file=/assets/kube-controller-manager-bootstrap/config
+		--config-output-file=/assets/kube-controller-manager-bootstrap/config \
+		--config-override-files=/assets/bootkube-config-overrides/kube-controller-manager-config-overrides.yaml \
+		--disable-phase-2
 
-	# TODO: copy the bootstrap manifests to replace kube-core-operator
-	cp --recursive kube-controller-manager-bootstrap/manifests/00_openshift-kube-controller-manager-ns.yaml manifests/00_openshift-kube-controller-manager-ns.yaml
-	cp --recursive kube-controller-manager-bootstrap/manifests/configmap-* manifests/
+	cp kube-controller-manager-bootstrap/config /etc/kubernetes/bootstrap-configs/kube-controller-manager-config.yaml
+	cp kube-controller-manager-bootstrap/bootstrap-manifests/* bootstrap-manifests/
+	cp kube-controller-manager-bootstrap/manifests/* manifests/
 fi
 
 if [ ! -d kube-scheduler-bootstrap ]
@@ -121,14 +113,20 @@ then
 		--volume "$PWD:/assets:z" \
 		"${KUBE_SCHEDULER_OPERATOR_IMAGE}" \
 		/usr/bin/cluster-kube-scheduler-operator render \
+		--manifest-image=${OPENSHIFT_HYPERKUBE_IMAGE} \
 		--asset-input-dir=/assets/tls \
 		--asset-output-dir=/assets/kube-scheduler-bootstrap \
 		--config-output-file=/assets/kube-scheduler-bootstrap/config
 
-	# TODO: copy the bootstrap manifests to replace kube-core-operator
-	cp --recursive kube-scheduler-bootstrap/manifests/00_openshift-kube-scheduler-ns.yaml manifests/00_openshift-kube-scheduler-ns.yaml
-	cp --recursive kube-scheduler-bootstrap/manifests/configmap-* manifests/
+	cp kube-scheduler-bootstrap/config /etc/kubernetes/bootstrap-configs/kube-scheduler-config.yaml
+	cp kube-scheduler-bootstrap/bootstrap-manifests/* bootstrap-manifests/
+	cp kube-scheduler-bootstrap/manifests/* manifests/
 fi
+
+# TODO: Remove this when kube-proxy and kube-dns are properly rendered by corresponding operators.
+echo "Installing temporary bootstrap manifests..."
+cp kube-proxy-operator-bootstrap/* manifests/
+cp kube-dns-operator-bootstrap/* manifests/
 
 if [ ! -d mco-bootstrap ]
 then
@@ -152,8 +150,8 @@ then
 	# 1. read the controller config rendered by MachineConfigOperator
 	# 2. read the default MachineConfigPools rendered by MachineConfigOperator
 	# 3. read any additional MachineConfigs that are needed for the default MachineConfigPools.
-	mkdir --parents /etc/mcc/bootstrap/
-	cp --recursive mco-bootstrap/manifests /etc/mcc/bootstrap/manifests
+	mkdir --parents /etc/mcc/bootstrap/manifests /etc/kubernetes/manifests/
+	cp mco-bootstrap/manifests/* /etc/mcc/bootstrap/manifests/
 	cp mco-bootstrap/machineconfigoperator-bootstrap-pod.yaml /etc/kubernetes/manifests/
 
 	# /etc/ssl/mcs/tls.{crt, key} are locations for MachineConfigServer's tls assets.
@@ -192,7 +190,6 @@ podman run \
 echo "Waiting for etcd cluster..."
 
 # Wait for the etcd cluster to come up.
-set +e
 # shellcheck disable=SC2154,SC2086
 until podman run \
 		--rm \
@@ -212,7 +209,6 @@ do
 	echo "etcdctl failed. Retrying in 5 seconds..."
 	sleep 5
 done
-set -e
 
 echo "etcd cluster up. Killing etcd certificate signer..."
 
@@ -229,6 +225,36 @@ podman run \
 	--network=host \
 	--entrypoint=/bootkube \
 	"{{.BootkubeImage}}" \
-	start --asset-dir=/assets
+	start --asset-dir=/assets --required-pods openshift-kube-apiserver/openshift-kube-apiserver,kube-system/kube-scheduler,openshift-kube-controller-manager/openshift-kube-controller-manager,openshift-cluster-version/cluster-version-operator
+
+# Workaround for https://github.com/opencontainers/runc/pull/1807
+touch /opt/tectonic/.bootkube.done
+`))
+)
+
+var (
+	// BootkubeConfigOverrides contains the configuration override files passed to the render commands of the components.
+	// These are supposed to be customized by the installer where the config differs from the operator render default.
+	BootkubeConfigOverrides = []*template.Template{
+		KubeApiserverConfigOverridesTemplate,
+		KubeControllerManagerConfigOverridesTemplate,
+	}
+)
+
+var (
+	// KubeApiserverConfigOverridesTemplate are overrides that the installer passes to the default config of the
+	// kube-apiserver rendered by the cluster-kube-apiserver-operator.
+	KubeApiserverConfigOverridesTemplate = template.Must(template.New("kube-apiserver-config-overrides.yaml").Parse(`
+apiVersion: kubecontrolplane.config.openshift.io/v1
+kind: KubeAPIServerConfig
+kubeletClientInfo:
+  ca: "" # kubelet uses self-signed serving certs. TODO: fix kubelet pki
+`))
+
+	// KubeControllerManagerConfigOverridesTemplate are overrides that the installer passes to the default config of the
+	// kube-controller-manager rendered by the cluster-kube-controller-manager-operator.
+	KubeControllerManagerConfigOverridesTemplate = template.Must(template.New("kube-controller-manager-config-overrides.yaml").Parse(`
+apiVersion: kubecontrolplane.config.openshift.io/v1
+kind: KubeControllerManagerConfig
 `))
 )

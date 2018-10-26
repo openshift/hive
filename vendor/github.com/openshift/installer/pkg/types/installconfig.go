@@ -7,6 +7,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// PlatformNameAWS is name for AWS platform.
+	PlatformNameAWS string = "aws"
+	// PlatformNameOpenstack is name for Openstack platform.
+	PlatformNameOpenstack string = "openstack"
+	// PlatformNameLibvirt is name for Libvirt platform.
+	PlatformNameLibvirt string = "libvirt"
+)
+
 // InstallConfig is the configuration for an OpenShift install.
 type InstallConfig struct {
 	// +optional
@@ -79,13 +88,13 @@ func (p *Platform) Name() string {
 		return ""
 	}
 	if p.AWS != nil {
-		return "aws"
+		return PlatformNameAWS
 	}
 	if p.Libvirt != nil {
-		return "libvirt"
+		return PlatformNameLibvirt
 	}
 	if p.OpenStack != nil {
-		return "openstack"
+		return PlatformNameOpenstack
 	}
 	return ""
 }
@@ -137,10 +146,10 @@ type OpenStackPlatform struct {
 	// Region specifies the OpenStack region where the cluster will be created.
 	Region string `json:"region"`
 
-	// VPCID specifies the vpc to associate with the cluster.
-	// If empty, new vpc will be created.
-	// +optional
-	VPCID string `json:"vpcID"`
+	// DefaultMachinePlatform is the default configuration used when
+	// installing on OpenStack for machine pools which do not define their own
+	// platform configuration.
+	DefaultMachinePlatform *OpenStackMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
 
 	// NetworkCIDRBlock
 	// +optional

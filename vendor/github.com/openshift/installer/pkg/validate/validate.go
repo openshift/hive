@@ -12,28 +12,6 @@ import (
 	"unicode/utf8"
 )
 
-const (
-	maxS3BucketNameLength = 63
-)
-
-// S3Bucket does some basic validation to ensure that the S3 bucket
-// matches the S3 bucket naming rules. Not all rules are checked
-// because Tectonic controls the generation of S3 bucket names, creating
-// buckets of the form: <cluster-name>.<domain-name>
-// If domain-name contains a trailing dot, it's removed from the bucket name.
-func S3Bucket(name string) error {
-	if len(name) < 3 {
-		return fmt.Errorf("the S3 bucket name %q is too short; S3 bucket names must contain at least three characters", name)
-	}
-	if len(name) > maxS3BucketNameLength {
-		return fmt.Errorf("the S3 bucket name %q is too long; S3 bucket names must be less than 63 characters", name)
-	}
-	if !regexp.MustCompile("^[a-z0-9][a-z0-9-.]{1,61}[a-z0-9]$").MatchString(name) {
-		return fmt.Errorf("invalid characters in S3 bucket name: %q", name)
-	}
-	return nil
-}
-
 // DomainName checks if the given string is a valid domain name and returns an error if not.
 func DomainName(v string) error {
 	if err := nonEmpty(v); err != nil {
@@ -253,4 +231,34 @@ func lastIP(cidr *net.IPNet) net.IP {
 		last = append(last, cidr.IP[i]|^cidr.Mask[i])
 	}
 	return last
+}
+
+// SSHPublicKey checks if the given string is a valid OpenSSH public key
+// and returns an error if not.
+func SSHPublicKey(v string) error {
+	trimmed := strings.TrimSpace(v)
+
+	// Don't let users hang themselves
+	if isMatch(`-BEGIN [\w-]+ PRIVATE KEY-`, trimmed) {
+		return errors.New("invalid SSH public key (appears to be a private key)")
+	}
+
+	if strings.Contains(trimmed, "\n") {
+		return errors.New("invalid SSH public key (should not contain any newline characters)")
+	}
+
+	invalidError := errors.New("invalid SSH public key")
+
+	keyParts := regexp.MustCompile(`\s+`).Split(trimmed, -1)
+	if len(keyParts) < 2 {
+		return invalidError
+	}
+
+	keyType := keyParts[0]
+	keyBase64 := keyParts[1]
+	if !isMatch(`^[\w-]+$`, keyType) || !isMatch(`^[A-Za-z0-9+\/]+={0,2}$`, keyBase64) {
+		return invalidError
+	}
+
+	return nil
 }

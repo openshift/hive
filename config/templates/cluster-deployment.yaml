@@ -34,6 +34,22 @@ parameters:
 - name: AWS_SECRET_ACCESS_KEY
   required: true
   description: Base64 encoded AWS secret access key that can be used to provision cluster resources.
+- name: HIVE_IMAGE
+  displayName: Hive image URL
+  description: Hive image URL
+  value: "hive-controller:latest"
+- name: HIVE_IMAGE_PULL_POLICY
+  displayName: Hive image pull policy
+  description: Hive image pull policy
+  value: Never
+- name: INSTALLER_IMAGE
+  displayName: OpenShift Installer image URL
+  description: OpenShift Installer image URL
+  value: "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+- name: INSTALLER_IMAGE_PULL_POLICY
+  displayName: OpenShift Installer image pull policy
+  description: OpenShift Installer image pull policy
+  value: Always
 
 objects:
 - apiVersion: v1
@@ -83,10 +99,10 @@ objects:
         credentials:
           name: "${CLUSTER_NAME}-aws-creds"
     images:
-      hiveImage: "hive-controller:latest"
-      hiveImagePullPolicy: Never
-      installerImage: "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-      installerImagePullPolicy: Always
+      hiveImage: "${HIVE_IMAGE}"
+      hiveImagePullPolicy: "${HIVE_IMAGE_PULL_POLICY}"
+      installerImage: "${INSTALLER_IMAGE}"
+      installerImagePullPolicy: "${INSTALLER_IMAGE_PULL_POLICY}"
     config:
       admin:
         email: ${ADMIN_EMAIL}

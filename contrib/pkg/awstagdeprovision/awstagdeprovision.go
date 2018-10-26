@@ -233,8 +233,8 @@ func filterLBsByVPC(lbs []*elb.LoadBalancerDescription, vpc *ec2.Vpc, logger log
 // deleteLBs finds all load balancers under the provided VPC and attempts to delete them
 // returns bool representing whether it has completed its work (ie no LBs left to delete)
 func deleteLBs(vpc *ec2.Vpc, awsSession *session.Session, logger log.FieldLogger) bool {
-	logger.Debugf("Deleting load balancers (%s)", vpc.VpcId)
-	defer logger.Debugf("Exiting deleting load balancers (%s)", vpc.VpcId)
+	logger.Debugf("Deleting load balancers (%s)", *vpc.VpcId)
+	defer logger.Debugf("Exiting deleting load balancers (%s)", *vpc.VpcId)
 	elbClient := elb.New(awsSession)
 
 	describeLoadBalancersInput := elb.DescribeLoadBalancersInput{}

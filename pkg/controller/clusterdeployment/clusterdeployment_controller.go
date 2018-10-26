@@ -18,11 +18,11 @@ package clusterdeployment
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 
 	kbatch "k8s.io/api/batch/v1"
@@ -135,6 +135,10 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	})
 	cdLog.Info("reconciling cluster deployment")
 	cd = cd.DeepCopy()
+
+	if cd.Status.ClusterUUID == "" {
+		return reconcile.Result{}, r.setClusterUUID(cd, cdLog)
+	}
 
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
@@ -300,38 +304,6 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		cd.Status.Installed = isSuccessful(job)
 	}
 
-	if cd.Status.Installed {
-		if cd.Status.ClusterUUID == "" {
-			metadataCfgMap := &kapi.ConfigMap{}
-			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
-			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
-			if err != nil {
-				// This would be pretty strange for a cluster that is installed:
-				cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
-				return err
-			}
-
-			// Dynamically parse the JSON to get the UUID we need:
-			var objMap map[string]interface{}
-			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &objMap); err != nil {
-				cdLog.WithError(err).Error("error reading json from metadata")
-				return err
-			}
-			aws, ok := objMap["aws"].(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
-			}
-			identifier, ok := aws["identifier"].(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
-			}
-			cd.Status.ClusterUUID, ok = identifier["tectonicClusterID"].(string)
-			if !ok {
-				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
-			}
-		}
-	}
-
 	// Update cluster deployment status if changed:
 	if !reflect.DeepEqual(cd.Status, origCD.Status) {
 		cdLog.Infof("status has changed, updating cluster deployment")
@@ -347,6 +319,25 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	return nil
 }
 
+// setClusterUUID sets the
+func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cdLog.Debug("setting cluster UUID")
+	cd = cd.DeepCopy()
+
+	if cd.Status.ClusterUUID != "" {
+		return fmt.Errorf("cluster UUID already set")
+	}
+
+	cd.Status.ClusterUUID = uuid.New()
+	cdLog.WithField("clusterUUID", cd.Status.ClusterUUID).Info("generated new cluster UUID")
+	err := r.Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.Errorf("error updating cluster deployment: %v", err)
+		return err
+	}
+
+	return nil
+}
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	// Generate an uninstall job:
 	uninstallJob, err := install.GenerateUninstallerJob(cd)

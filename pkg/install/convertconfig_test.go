@@ -51,54 +51,33 @@ const (
 	ec2VolType      = "sometype"
 )
 
-func buildValidClusterDeploymentSpec() *hivev1.ClusterDeploymentSpec {
+func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 	replicas := int64(3)
-	return &hivev1.ClusterDeploymentSpec{
-		Config: hivev1.InstallConfig{
-			ClusterID:  testClusterID,
-			BaseDomain: "test.example.com",
-			Admin: hivev1.Admin{
-				Email: "user@example.com",
-				Password: corev1.LocalObjectReference{
-					Name: "admin-password",
-				},
-				SSHKey: &corev1.LocalObjectReference{
-					Name: "ssh-key",
-				},
-			},
-			PullSecret: corev1.LocalObjectReference{
-				Name: "pull-secret",
-			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1.AWSPlatform{
-					Region: awsRegion,
-					UserTags: map[string]string{
-						"foo": "bar",
+	return &hivev1.ClusterDeployment{
+		Spec: hivev1.ClusterDeploymentSpec{
+			Config: hivev1.InstallConfig{
+				BaseDomain: "test.example.com",
+				Admin: hivev1.Admin{
+					Email: "user@example.com",
+					Password: corev1.LocalObjectReference{
+						Name: "admin-password",
 					},
-					VPCID:        vpcID,
-					VPCCIDRBlock: vpcCIDRBlock,
-					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
-						InstanceType: awsInstanceType,
-						IAMRoleName:  iamRoleName,
-						EC2RootVolume: hivev1.EC2RootVolume{
-							IOPS: ec2VolIOPS,
-							Size: ec2VolSize,
-							Type: ec2VolType,
+					SSHKey: &corev1.LocalObjectReference{
+						Name: "ssh-key",
+					},
+				},
+				PullSecret: corev1.LocalObjectReference{
+					Name: "pull-secret",
+				},
+				Platform: hivev1.Platform{
+					AWS: &hivev1.AWSPlatform{
+						Region: awsRegion,
+						UserTags: map[string]string{
+							"foo": "bar",
 						},
-					},
-				},
-			},
-			Networking: hivev1.Networking{
-				Type:        hivev1.NetworkTypeOpenshiftSDN,
-				ServiceCIDR: "172.30.0.0/16",
-				PodCIDR:     "10.128.0.0/14",
-			},
-			Machines: []hivev1.MachinePool{
-				{
-					Name:     "masters",
-					Replicas: &replicas,
-					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
+						VPCID:        vpcID,
+						VPCCIDRBlock: vpcCIDRBlock,
+						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
 							InstanceType: awsInstanceType,
 							IAMRoleName:  iamRoleName,
 							EC2RootVolume: hivev1.EC2RootVolume{
@@ -109,27 +88,52 @@ func buildValidClusterDeploymentSpec() *hivev1.ClusterDeploymentSpec {
 						},
 					},
 				},
-				{
-					Name:     "workers",
-					Replicas: &replicas,
-					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
-							InstanceType: awsInstanceType,
-							IAMRoleName:  iamRoleName,
-							EC2RootVolume: hivev1.EC2RootVolume{
-								IOPS: ec2VolIOPS,
-								Size: ec2VolSize,
-								Type: ec2VolType,
+				Networking: hivev1.Networking{
+					Type:        hivev1.NetworkTypeOpenshiftSDN,
+					ServiceCIDR: "172.30.0.0/16",
+					PodCIDR:     "10.128.0.0/14",
+				},
+				Machines: []hivev1.MachinePool{
+					{
+						Name:     "masters",
+						Replicas: &replicas,
+						Platform: hivev1.MachinePoolPlatform{
+							AWS: &hivev1.AWSMachinePoolPlatform{
+								InstanceType: awsInstanceType,
+								IAMRoleName:  iamRoleName,
+								EC2RootVolume: hivev1.EC2RootVolume{
+									IOPS: ec2VolIOPS,
+									Size: ec2VolSize,
+									Type: ec2VolType,
+								},
+							},
+						},
+					},
+					{
+						Name:     "workers",
+						Replicas: &replicas,
+						Platform: hivev1.MachinePoolPlatform{
+							AWS: &hivev1.AWSMachinePoolPlatform{
+								InstanceType: awsInstanceType,
+								IAMRoleName:  iamRoleName,
+								EC2RootVolume: hivev1.EC2RootVolume{
+									IOPS: ec2VolIOPS,
+									Size: ec2VolSize,
+									Type: ec2VolType,
+								},
 							},
 						},
 					},
 				},
 			},
 		},
+		Status: hivev1.ClusterDeploymentStatus{
+			ClusterUUID: testClusterID,
+		},
 	}
 }
 
-// buildBaseExpectedInstallConfig should match the above buildValidClusterDeploymentSpec exactly.
+// buildBaseExpectedInstallConfig should match the above buildValidClusterDeployment exactly.
 func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 	replicas := int64(3)
 	return &installtypes.InstallConfig{
@@ -142,7 +146,8 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		},
 		PullSecret: pullSecret,
 		Networking: installtypes.Networking{
-			Type: installtypes.NetworkTypeOpenshiftSDN,
+			// TODO: Hardcoded to match installer for now.
+			Type: "flannel",
 			ServiceCIDR: ipnet.IPNet{
 				IPNet: parseCIDR("172.30.0.0/16"),
 			},
@@ -207,19 +212,19 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 func TestConvert(t *testing.T) {
 	tests := []struct {
 		name                  string
-		cdSpec                *hivev1.ClusterDeploymentSpec
+		cd                    *hivev1.ClusterDeployment
 		expectedInstallConfig *installtypes.InstallConfig
 	}{
 		{
-			name:                  "full copy",
-			cdSpec:                buildValidClusterDeploymentSpec(),
+			name: "full copy",
+			cd:   buildValidClusterDeployment(),
 			expectedInstallConfig: buildBaseExpectedInstallConfig(),
 		},
 		{
 			name: "no default machine pool",
-			cdSpec: func() *hivev1.ClusterDeploymentSpec {
-				cd := buildValidClusterDeploymentSpec()
-				cd.Config.Platform.AWS.DefaultMachinePlatform = nil
+			cd: func() *hivev1.ClusterDeployment {
+				cd := buildValidClusterDeployment()
+				cd.Spec.Config.Platform.AWS.DefaultMachinePlatform = nil
 				return cd
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
@@ -230,9 +235,9 @@ func TestConvert(t *testing.T) {
 		},
 		{
 			name: "no platform",
-			cdSpec: func() *hivev1.ClusterDeploymentSpec {
-				cd := buildValidClusterDeploymentSpec()
-				cd.Config.Platform.AWS = nil
+			cd: func() *hivev1.ClusterDeployment {
+				cd := buildValidClusterDeployment()
+				cd.Spec.Config.Platform.AWS = nil
 				return cd
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
@@ -243,10 +248,10 @@ func TestConvert(t *testing.T) {
 		},
 		{
 			name: "no networking CIDRs",
-			cdSpec: func() *hivev1.ClusterDeploymentSpec {
-				cd := buildValidClusterDeploymentSpec()
-				cd.Config.Networking.PodCIDR = ""
-				cd.Config.Networking.ServiceCIDR = ""
+			cd: func() *hivev1.ClusterDeployment {
+				cd := buildValidClusterDeployment()
+				cd.Spec.Config.Networking.PodCIDR = ""
+				cd.Spec.Config.Networking.ServiceCIDR = ""
 				return cd
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
@@ -259,7 +264,7 @@ func TestConvert(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ic, err := generateInstallConfig(test.cdSpec, adminPassword, adminSSHKey, pullSecret)
+			ic, err := generateInstallConfig(test.cd, adminPassword, adminSSHKey, pullSecret)
 			if assert.NoError(t, err) {
 				assert.Equal(t, test.expectedInstallConfig, ic)
 			}

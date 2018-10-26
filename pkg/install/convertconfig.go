@@ -33,7 +33,7 @@ import (
 // as ClusterDeployment is used as a CRD API.
 //
 // It is assumed the caller will lookup the admin password and ssh key from their respective secrets.
-func generateInstallConfig(spec *hivev1.ClusterDeploymentSpec, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
+func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
 	/*
 		networkType, err := convertNetworkingType(spec.Config.Networking.Type)
 		if err != nil {
@@ -41,6 +41,7 @@ func generateInstallConfig(spec *hivev1.ClusterDeploymentSpec, adminPassword, ss
 		}
 	*/
 
+	spec := cd.Spec
 	platform := types.Platform{}
 	if spec.Config.Platform.AWS != nil {
 		aws := spec.Config.Platform.AWS
@@ -87,8 +88,7 @@ func generateInstallConfig(spec *hivev1.ClusterDeploymentSpec, adminPassword, ss
 		ObjectMeta: metav1.ObjectMeta{
 			Name: spec.Config.ClusterID,
 		},
-		// TODO ???
-		ClusterID: "a9dfbd60-1b52-498b-9703-932c1eea347a",
+		ClusterID: cd.Status.ClusterUUID,
 		Admin: types.Admin{
 			Email:    spec.Config.Admin.Email,
 			Password: adminPassword,

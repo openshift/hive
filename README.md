@@ -1,6 +1,11 @@
 # OpenShift Hive
 API driven OpenShift cluster provisioning and management
 
+## Prerequisites
+
+ * Install mockgen:
+   * `$ go get github.com/golang/mock/gomock; go install github.com/golang/mock/mockgen`
+
 ## Deploying In-Cluster
 
 * Ensure that you have access to an OpenShift cluster and have administrator permissions. This could be oc cluster up, minishift, or an actual cluster you can oc login to.

@@ -704,7 +704,7 @@ func deleteIAMresources(session *session.Session, filter AWSFilter, clusterName 
 	return true, nil
 }
 
-// deleteInstances will find any running instances that match the given filter and terminate them
+// deleteInstances will find any running/pending instances that match the given filter and terminate them
 // and any instance profiles attached to the instance(s)
 func deleteInstances(session *session.Session, filter AWSFilter, clusterName string, logger log.FieldLogger) (bool, error) {
 	logger.Debugf("Deleting instances (%s)", filter)
@@ -716,15 +716,15 @@ func deleteInstances(session *session.Session, filter AWSFilter, clusterName str
 	describeInstancesInput := ec2.DescribeInstancesInput{}
 	describeInstancesInput.Filters = createEC2Filters(filter)
 
-	// only fetch instances in 'running' state since they take a while to really get cleaned up
+	// only fetch instances in 'running|pending' state since 'terminated' ones take a while to really get cleaned up
 	describeInstancesInput.Filters = append(describeInstancesInput.Filters, &ec2.Filter{
 		Name:   aws.String("instance-state-name"),
-		Values: []*string{aws.String("running")},
+		Values: []*string{aws.String("running"), aws.String("pending")},
 	})
 
-	found := false
+	instancesFound := false
 	err := ec2Client.DescribeInstancesPages(&describeInstancesInput, func(results *ec2.DescribeInstancesOutput, lastPage bool) bool {
-		found = found || len(results.Reservations) > 0
+		instancesFound = instancesFound || len(results.Reservations) > 0
 		for _, reservation := range results.Reservations {
 			for _, instance := range reservation.Instances {
 				// first delete any instance profiles (they are not tagged)
@@ -754,9 +754,10 @@ func deleteInstances(session *session.Session, filter AWSFilter, clusterName str
 	})
 	if err != nil {
 		logger.Debugf("error describing instances: %v", err)
+		return false, nil
 	}
 
-	return found, nil
+	return !instancesFound, nil
 }
 
 // deleteSecurityGroupRules will attempt to delete all the rules defined in the given security group

@@ -251,7 +251,7 @@ func GenerateInstallerJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-install", cd.Name),
+			Name:      GetInstallJobName(cd),
 			Namespace: cd.Namespace,
 		},
 		Spec: batchv1.JobSpec{
@@ -265,6 +265,11 @@ func GenerateInstallerJob(
 	}
 
 	return job, cfgMap, nil
+}
+
+// GetInstallJobName returns the expected name of the install job for a cluster deployment.
+func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
+	return fmt.Sprintf("%s-install", cd.Name)
 }
 
 // GenerateUninstallerJob creates a job to uninstall an OpenShift cluster

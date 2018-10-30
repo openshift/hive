@@ -25,7 +25,7 @@ import (
 	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 
-	kbatch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -87,7 +87,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for jobs created by a ClusterDeployment:
-	err = c.Watch(&source.Kind{Type: &kbatch.Job{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
@@ -246,7 +246,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	// Check if the Job already exists for this ClusterDeployment:
-	existingJob := &kbatch.Job{}
+	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		// If the ClusterDeployment is already installed, we do not need to create a new job:
@@ -295,7 +295,7 @@ func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataK
 	return string(retStr), nil
 }
 
-func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *kbatch.Job, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {
 	cdLog.Debug("updating cluster deployment status")
 	origCD := cd
 	cd = cd.DeepCopy()
@@ -339,6 +339,29 @@ func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment
 	return nil
 }
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+
+	// Delete the install job in case it's still running:
+	installJob := &batchv1.Job{}
+	err := r.Get(context.Background(),
+		types.NamespacedName{
+			Name:      install.GetInstallJobName(cd),
+			Namespace: cd.Namespace,
+		},
+		installJob)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.Debugf("install job no longer exists, nothing to cleanup")
+	} else if err != nil {
+		cdLog.WithError(err).Errorf("error getting existing install job for deleted cluster deployment")
+		return reconcile.Result{}, err
+	} else {
+		err = r.Delete(context.Background(), installJob,
+			client.PropagationPolicy(metav1.DeletePropagationForeground))
+		if err != nil {
+			cdLog.WithError(err).Errorf("error deleting existing install job for deleted cluster deployment")
+			return reconcile.Result{}, err
+		}
+	}
+
 	// Generate an uninstall job:
 	uninstallJob, err := install.GenerateUninstallerJob(cd)
 	if err != nil {
@@ -353,7 +376,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Check if uninstall job already exists:
-	existingJob := &kbatch.Job{}
+	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), uninstallJob)
@@ -490,7 +513,7 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 
 // getJobConditionStatus gets the status of the condition in the job. If the
 // condition is not found in the job, then returns False.
-func getJobConditionStatus(job *kbatch.Job, conditionType kbatch.JobConditionType) kapi.ConditionStatus {
+func getJobConditionStatus(job *batchv1.Job, conditionType batchv1.JobConditionType) kapi.ConditionStatus {
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == conditionType {
 			return condition.Status
@@ -499,12 +522,12 @@ func getJobConditionStatus(job *kbatch.Job, conditionType kbatch.JobConditionTyp
 	return kapi.ConditionFalse
 }
 
-func isSuccessful(job *kbatch.Job) bool {
-	return getJobConditionStatus(job, kbatch.JobComplete) == kapi.ConditionTrue
+func isSuccessful(job *batchv1.Job) bool {
+	return getJobConditionStatus(job, batchv1.JobComplete) == kapi.ConditionTrue
 }
 
-func isFailed(job *kbatch.Job) bool {
-	return getJobConditionStatus(job, kbatch.JobFailed) == kapi.ConditionTrue
+func isFailed(job *batchv1.Job) bool {
+	return getJobConditionStatus(job, batchv1.JobFailed) == kapi.ConditionTrue
 }
 
 // HasFinalizer returns true if the given object has the given finalizer

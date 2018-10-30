@@ -305,48 +305,32 @@ func GenerateUninstallerJob(
 		}...)
 	}
 
-	volumes := []corev1.Volume{
-		{
-			Name: "metadata",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						// TODO: This matches what is done in the hiveutil install-manager command.
-						// We should explicitly link the two.
-						Name: fmt.Sprintf("%s-metadata", cd.Name),
-					},
-				},
-			},
-		},
+	hiveImage := defaultHiveImage
+	if cd.Spec.Images.HiveImage != "" {
+		hiveImage = cd.Spec.Images.HiveImage
 	}
 
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "metadata",
-			MountPath: "/cluster/metadata",
-		},
-	}
-
-	args := []string{"destroy", "cluster", "--dir", "/cluster/metadata", "--log-level", "debug"}
-
-	installerImage := defaultInstallerImage
-	if cd.Spec.Images.InstallerImage != "" {
-		installerImage = cd.Spec.Images.InstallerImage
-	}
-
-	installerImagePullPolicy := defaultInstallerImagePullPolicy
-	if cd.Spec.Images.InstallerImagePullPolicy != "" {
-		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
+	hiveImagePullPolicy := defaultHiveImagePullPolicy
+	if cd.Spec.Images.HiveImagePullPolicy != "" {
+		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
 	}
 
 	containers := []corev1.Container{
 		{
-			Name:            "installer",
-			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			Name:            "deprovision",
+			Image:           hiveImage,
+			ImagePullPolicy: hiveImagePullPolicy,
 			Env:             env,
-			Args:            args,
-			VolumeMounts:    volumeMounts,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"aws-tag-deprovision",
+				"--loglevel",
+				"debug",
+				"--cluster-name",
+				cd.Name,
+				fmt.Sprintf("tectonicClusterID=%s", cd.Status.ClusterUUID),
+				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Name),
+			},
 		},
 	}
 
@@ -354,7 +338,6 @@ func GenerateUninstallerJob(
 		DNSPolicy:     corev1.DNSClusterFirst,
 		RestartPolicy: corev1.RestartPolicyOnFailure,
 		Containers:    containers,
-		Volumes:       volumes,
 	}
 
 	completions := int32(1)

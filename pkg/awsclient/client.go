@@ -50,6 +50,7 @@ const (
 // Client is a wrapper object for actual AWS SDK clients to allow for easier testing.
 type Client interface {
 	//EC2
+	DescribeAvailabilityZones(*ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error)
 	DescribeImages(*ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error)
 	DescribeVpcs(*ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
 	DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
@@ -92,6 +93,10 @@ type awsClient struct {
 	iamClient     iamiface.IAMAPI
 	route53Client route53iface.Route53API
 	s3Client      s3iface.S3API
+}
+
+func (c *awsClient) DescribeAvailabilityZones(input *ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error) {
+	return c.ec2Client.DescribeAvailabilityZones(input)
 }
 
 func (c *awsClient) DescribeImages(input *ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error) {

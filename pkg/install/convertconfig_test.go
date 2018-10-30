@@ -268,7 +268,7 @@ func TestConvert(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ic, err := generateInstallConfig(test.cd, adminPassword, adminSSHKey, pullSecret)
+			ic, err := GenerateInstallConfig(test.cd, adminPassword, adminSSHKey, pullSecret)
 			if assert.NoError(t, err) {
 				assert.Equal(t, test.expectedInstallConfig, ic)
 			}

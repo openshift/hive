@@ -42,6 +42,7 @@ import (
 const (
 	testClusterName = "test-cluster"
 	testNamespace   = "test-namespace"
+	testUUID        = "fake-cluster-UUID"
 
 	installerBinary     = "openshift-install"
 	terraformBinary     = "terraform"
@@ -86,6 +87,7 @@ func TestInstallManager(t *testing.T) {
 			im := InstallManager{
 				LogLevel:      "debug",
 				WorkDir:       tempDir,
+				InstallConfig: filepath.Join(tempDir, "tempinstallconfig.yml"),
 				ClusterName:   testClusterName,
 				Namespace:     testNamespace,
 				DynamicClient: fakeClient,
@@ -99,6 +101,11 @@ func TestInstallManager(t *testing.T) {
 			}
 			// File contents don't matter for terraform, it won't be called because we're faking the install binary:
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, terraformBinary), "")) {
+				t.Fail()
+			}
+
+			// Install config also doesn't get used, we just need a file we can copy:
+			if !assert.NoError(t, writeFakeInstallConfig(im.InstallConfig)) {
 				t.Fail()
 			}
 
@@ -141,6 +148,13 @@ func writeFakeBinary(fileName string, contents string) error {
 	return err
 }
 
+func writeFakeInstallConfig(fileName string) error {
+	// nothing needs to read this so for now just an empty file
+	data := []byte("fakefile")
+	err := ioutil.WriteFile(fileName, data, 0755)
+	return err
+}
+
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -178,6 +192,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			ClusterUUID: testUUID,
 		},
 	}
 }

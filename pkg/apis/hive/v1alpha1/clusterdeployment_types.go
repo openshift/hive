@@ -32,8 +32,18 @@ const (
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
-	Config          InstallConfig   `json:"config"`
+
+	// ClusterUUID is a unique identifier for this cluster. Will be generated if none is provided.
+	// TODO: omitempty for now so we don't have to specify when creating.
+	ClusterUUID string `json:"clusterUUID,omitempty"`
+
+	// Config contains the desired configuration for the cluster.
+	Config InstallConfig `json:"config"`
+
+	// PlatformSecrets contains credentials and secrets for the cluster infrastructure.
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
+
+	// Images allows overriding the default images used to provision and manage the cluster.
 	// +optional
 	Images ProvisionImages `json:"images"`
 }
@@ -72,9 +82,6 @@ type ClusterDeploymentStatus struct {
 
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`
-
-	// ClusterUUID is a unique identifier generated for this cluster.
-	ClusterUUID string `json:"clusterUUID"`
 }
 
 // +genclient

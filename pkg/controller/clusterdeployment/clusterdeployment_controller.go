@@ -136,7 +136,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog.Info("reconciling cluster deployment")
 	cd = cd.DeepCopy()
 
-	if cd.Status.ClusterUUID == "" {
+	if cd.Spec.ClusterUUID == "" {
 		return reconcile.Result{}, r.setClusterUUID(cd, cdLog)
 	}
 
@@ -324,12 +324,12 @@ func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment
 	cdLog.Debug("setting cluster UUID")
 	cd = cd.DeepCopy()
 
-	if cd.Status.ClusterUUID != "" {
+	if cd.Spec.ClusterUUID != "" {
 		return fmt.Errorf("cluster UUID already set")
 	}
 
-	cd.Status.ClusterUUID = uuid.New()
-	cdLog.WithField("clusterUUID", cd.Status.ClusterUUID).Info("generated new cluster UUID")
+	cd.Spec.ClusterUUID = uuid.New()
+	cdLog.WithField("clusterUUID", cd.Spec.ClusterUUID).Info("generated new cluster UUID")
 	err := r.Update(context.TODO(), cd)
 	if err != nil {
 		cdLog.WithError(err).Errorf("error updating cluster deployment")

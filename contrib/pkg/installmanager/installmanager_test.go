@@ -164,6 +164,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
 				Admin: hivev1.Admin{
 					Email: "user@example.com",
@@ -191,9 +192,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterUUID: testUUID,
 		},
 	}
 }

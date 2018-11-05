@@ -88,7 +88,7 @@ func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: spec.Config.ClusterID,
 		},
-		ClusterID: cd.Status.ClusterUUID,
+		ClusterID: cd.Spec.ClusterUUID,
 		Admin: types.Admin{
 			Email:    spec.Config.Admin.Email,
 			Password: adminPassword,

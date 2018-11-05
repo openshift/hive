@@ -55,6 +55,7 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 	replicas := int64(3)
 	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterUUID: testClusterID,
 			Config: hivev1.InstallConfig{
 				BaseDomain: "test.example.com",
 				Admin: hivev1.Admin{
@@ -126,9 +127,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterUUID: testClusterID,
 		},
 	}
 }

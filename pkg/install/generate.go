@@ -328,7 +328,7 @@ func GenerateUninstallerJob(
 				"debug",
 				"--cluster-name",
 				cd.Name,
-				fmt.Sprintf("tectonicClusterID=%s", cd.Status.ClusterUUID),
+				fmt.Sprintf("tectonicClusterID=%s", cd.Spec.ClusterUUID),
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Name),
 			},
 		},

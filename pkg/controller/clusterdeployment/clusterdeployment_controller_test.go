@@ -38,6 +38,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/install"
 )
 
 const (
@@ -131,8 +132,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if cd == nil || !apiequality.Semantic.DeepEqual(cd, testClusterDeployment()) {
-					t.Logf("%v", cd)
-					t.Logf("%v", testClusterDeployment())
 					t.Errorf("got unexpected change in clusterdeployment")
 				}
 				job := getInstallJob(c)
@@ -160,17 +159,31 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Run uninstall",
+			name: "Delete cluster deployment",
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),
 				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job, _, _ := install.GenerateInstallerJob(
+						testExpiredClusterDeployment(),
+						"fakeserviceaccount",
+						"password",
+						"sshkey",
+						"pullsecret")
+					return job
+				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				uninstallJob := getUninstallJob(c)
 				if uninstallJob == nil {
 					t.Errorf("did not find expected uninstall job")
+				}
+
+				instJob := getInstallJob(c)
+				if instJob != nil {
+					t.Errorf("got unexpected install job (expected delete)")
 				}
 			},
 		},

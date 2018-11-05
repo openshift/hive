@@ -88,3 +88,15 @@ kubectl get secret ${USER}-admin-kubeconfig -o json | jq ".data.kubeconfig" -r |
 export KUBECONFIG=${USER}.kubeconfig
 kubectl get nodes
 ```
+
+### Troubleshooting Deprovision
+
+After deleting your cluster deployment you will see an uninstall job created. If for any reason this job gets stuck you can:
+
+ 1. Delete the uninstall job, it will be recreated and tried again.
+ 1. Manually delete the uninstall finalizer allowing the cluster deployment to be deleted, but note that this may leave artifacts in your AWS account.
+    * `kubectl edit clusterdeployments.hive.openshift.io YOURCLUSTER`
+ 1. You can manually run the uninstall code with hiveutil to delete AWS resources based on their tags.
+    * Get your cluster UUID from the clusterdeployment.Spec.ClusterUUID.
+    * `make hiveutil`
+    * `bin/hiveutil aws-tag-deprovision --loglevel=debug --cluster-name CLUSTER_NAME tectonicClusterID=CLUSTER_UUID kubernetes.io/cluster/CLUSTER_NAME=owned`

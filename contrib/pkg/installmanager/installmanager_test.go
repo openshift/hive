@@ -151,8 +151,7 @@ func writeFakeBinary(fileName string, contents string) error {
 func writeFakeInstallConfig(fileName string) error {
 	// nothing needs to read this so for now just an empty file
 	data := []byte("fakefile")
-	err := ioutil.WriteFile(fileName, data, 0755)
-	return err
+	return ioutil.WriteFile(fileName, data, 0755)
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

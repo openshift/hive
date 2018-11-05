@@ -332,7 +332,7 @@ func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment
 	cdLog.WithField("clusterUUID", cd.Status.ClusterUUID).Info("generated new cluster UUID")
 	err := r.Update(context.TODO(), cd)
 	if err != nil {
-		cdLog.Errorf("error updating cluster deployment: %v", err)
+		cdLog.WithError(err).Errorf("error updating cluster deployment")
 		return err
 	}
 
@@ -349,7 +349,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		},
 		installJob)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.Debugf("install job no longer exists, nothing to cleanup")
+		cdLog.Debug("install job no longer exists, nothing to cleanup")
 	} else if err != nil {
 		cdLog.WithError(err).Errorf("error getting existing install job for deleted cluster deployment")
 		return reconcile.Result{}, err
@@ -360,6 +360,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			cdLog.WithError(err).Errorf("error deleting existing install job for deleted cluster deployment")
 			return reconcile.Result{}, err
 		}
+		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
 	}
 
 	// Generate an uninstall job:

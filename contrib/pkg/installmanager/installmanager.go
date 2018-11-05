@@ -330,7 +330,7 @@ func (m *InstallManager) copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return out.Close()
+	return out.Sync()
 }
 
 func getClient() (client.Client, error) {

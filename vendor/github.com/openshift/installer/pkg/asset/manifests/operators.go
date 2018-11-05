@@ -12,9 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/openshift/installer/pkg/asset"
-	"github.com/openshift/installer/pkg/asset/ignition/machine"
 	"github.com/openshift/installer/pkg/asset/installconfig"
-	"github.com/openshift/installer/pkg/asset/kubeconfig"
 	"github.com/openshift/installer/pkg/asset/manifests/content/bootkube"
 	"github.com/openshift/installer/pkg/asset/tls"
 )
@@ -23,14 +21,17 @@ const (
 	manifestDir = "manifests"
 )
 
+var (
+	kubeSysConfigPath = filepath.Join(manifestDir, "cluster-config.yaml")
+
+	_ asset.WritableAsset = (*Manifests)(nil)
+)
+
 // Manifests generates the dependent operator config.yaml files
 type Manifests struct {
-	KubeSysConfig  *configurationObject
-	TectonicConfig *configurationObject
-	FileList       []*asset.File
+	KubeSysConfig *configurationObject
+	FileList      []*asset.File
 }
-
-var _ asset.WritableAsset = (*Manifests)(nil)
 
 type genericData map[string]string
 
@@ -44,68 +45,37 @@ func (m *Manifests) Name() string {
 func (m *Manifests) Dependencies() []asset.Asset {
 	return []asset.Asset{
 		&installconfig.InstallConfig{},
-		&KubeCoreOperator{},
 		&networkOperator{},
-		&kubeAddonOperator{},
-		&machineAPIOperator{},
-		&Tectonic{},
 		&tls.RootCA{},
-		&tls.EtcdCA{},
 		&tls.IngressCertKey{},
 		&tls.KubeCA{},
-		&tls.AggregatorCA{},
 		&tls.ServiceServingCA{},
-		&tls.ClusterAPIServerCertKey{},
 		&tls.EtcdClientCertKey{},
-		&tls.APIServerCertKey{},
-		&tls.OpenshiftAPIServerCertKey{},
-		&tls.APIServerProxyCertKey{},
 		&tls.MCSCertKey{},
 		&tls.KubeletCertKey{},
-		&tls.ServiceAccountKeyPair{},
-		&kubeconfig.Admin{},
-		&machine.Worker{},
 	}
 }
 
 // Generate generates the respective operator config.yml files
 func (m *Manifests) Generate(dependencies asset.Parents) error {
-	kco := &KubeCoreOperator{}
 	no := &networkOperator{}
-	addon := &kubeAddonOperator{}
-	mao := &machineAPIOperator{}
 	installConfig := &installconfig.InstallConfig{}
-	dependencies.Get(kco, no, addon, mao, installConfig)
+	dependencies.Get(no, installConfig)
 
-	// kco+no+mao go to kube-system config map
+	// no+mao go to kube-system config map
 	m.KubeSysConfig = configMap("kube-system", "cluster-config-v1", genericData{
-		"kco-config":     string(kco.Files()[0].Data),
 		"network-config": string(no.Files()[0].Data),
 		"install-config": string(installConfig.Files()[0].Data),
-		"mao-config":     string(mao.Files()[0].Data),
 	})
 	kubeSysConfigData, err := yaml.Marshal(m.KubeSysConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to create kube-system/cluster-config-v1 configmap")
 	}
 
-	// addon goes to openshift system
-	m.TectonicConfig = configMap("tectonic-system", "cluster-config-v1", genericData{
-		"addon-config": string(addon.Files()[0].Data),
-	})
-	tectonicConfigData, err := yaml.Marshal(m.TectonicConfig)
-	if err != nil {
-		return errors.Wrap(err, "failed to create tectonic-system/cluster-config-v1 configmap")
-	}
-
 	m.FileList = []*asset.File{
 		{
-			Filename: filepath.Join(manifestDir, "cluster-config.yaml"),
+			Filename: kubeSysConfigPath,
 			Data:     kubeSysConfigData,
-		},
-		{
-			Filename: filepath.Join("tectonic", "00_cluster-config.yaml"),
-			Data:     tectonicConfigData,
 		},
 	}
 	m.FileList = append(m.FileList, m.generateBootKubeManifests(dependencies)...)
@@ -120,36 +90,18 @@ func (m *Manifests) Files() []*asset.File {
 
 func (m *Manifests) generateBootKubeManifests(dependencies asset.Parents) []*asset.File {
 	installConfig := &installconfig.InstallConfig{}
-	aggregatorCA := &tls.AggregatorCA{}
-	apiServerCertKey := &tls.APIServerCertKey{}
-	apiServerProxyCertKey := &tls.APIServerProxyCertKey{}
-	clusterAPIServerCertKey := &tls.ClusterAPIServerCertKey{}
-	etcdCA := &tls.EtcdCA{}
-	etcdClientCertKey := &tls.EtcdClientCertKey{}
 	kubeCA := &tls.KubeCA{}
 	mcsCertKey := &tls.MCSCertKey{}
-	openshiftAPIServerCertKey := &tls.OpenshiftAPIServerCertKey{}
-	adminKubeconfig := &kubeconfig.Admin{}
+	etcdClientCertKey := &tls.EtcdClientCertKey{}
 	rootCA := &tls.RootCA{}
-	serviceAccountKeyPair := &tls.ServiceAccountKeyPair{}
 	serviceServingCA := &tls.ServiceServingCA{}
-	workerIgnition := &machine.Worker{}
 	dependencies.Get(
 		installConfig,
-		aggregatorCA,
-		apiServerCertKey,
-		apiServerProxyCertKey,
-		clusterAPIServerCertKey,
-		etcdCA,
 		etcdClientCertKey,
 		kubeCA,
 		mcsCertKey,
-		openshiftAPIServerCertKey,
-		adminKubeconfig,
 		rootCA,
-		serviceAccountKeyPair,
 		serviceServingCA,
-		workerIgnition,
 	)
 
 	etcdEndpointHostnames := make([]string, installConfig.Config.MasterCount())
@@ -158,55 +110,35 @@ func (m *Manifests) generateBootKubeManifests(dependencies asset.Parents) []*ass
 	}
 
 	templateData := &bootkubeTemplateData{
-		AggregatorCaCert:                base64.StdEncoding.EncodeToString(aggregatorCA.Cert()),
-		AggregatorCaKey:                 base64.StdEncoding.EncodeToString(aggregatorCA.Key()),
-		ApiserverCert:                   base64.StdEncoding.EncodeToString(apiServerCertKey.Cert()),
-		ApiserverKey:                    base64.StdEncoding.EncodeToString(apiServerCertKey.Key()),
-		ApiserverProxyCert:              base64.StdEncoding.EncodeToString(apiServerProxyCertKey.Cert()),
-		ApiserverProxyKey:               base64.StdEncoding.EncodeToString(apiServerProxyCertKey.Key()),
 		Base64encodeCloudProviderConfig: "", // FIXME
-		ClusterapiCaCert:                base64.StdEncoding.EncodeToString(clusterAPIServerCertKey.Cert()),
-		ClusterapiCaKey:                 base64.StdEncoding.EncodeToString(clusterAPIServerCertKey.Key()),
-		EtcdCaCert:                      base64.StdEncoding.EncodeToString(etcdCA.Cert()),
 		EtcdClientCert:                  base64.StdEncoding.EncodeToString(etcdClientCertKey.Cert()),
 		EtcdClientKey:                   base64.StdEncoding.EncodeToString(etcdClientCertKey.Key()),
 		KubeCaCert:                      base64.StdEncoding.EncodeToString(kubeCA.Cert()),
 		KubeCaKey:                       base64.StdEncoding.EncodeToString(kubeCA.Key()),
 		McsTLSCert:                      base64.StdEncoding.EncodeToString(mcsCertKey.Cert()),
 		McsTLSKey:                       base64.StdEncoding.EncodeToString(mcsCertKey.Key()),
-		OidcCaCert:                      base64.StdEncoding.EncodeToString(kubeCA.Cert()),
-		OpenshiftApiserverCert:          base64.StdEncoding.EncodeToString(openshiftAPIServerCertKey.Cert()),
-		OpenshiftApiserverKey:           base64.StdEncoding.EncodeToString(openshiftAPIServerCertKey.Key()),
-		OpenshiftLoopbackKubeconfig:     base64.StdEncoding.EncodeToString(adminKubeconfig.Files()[0].Data),
 		PullSecret:                      base64.StdEncoding.EncodeToString([]byte(installConfig.Config.PullSecret)),
 		RootCaCert:                      base64.StdEncoding.EncodeToString(rootCA.Cert()),
-		ServiceaccountKey:               base64.StdEncoding.EncodeToString(serviceAccountKeyPair.Private()),
-		ServiceaccountPub:               base64.StdEncoding.EncodeToString(serviceAccountKeyPair.Public()),
 		ServiceServingCaCert:            base64.StdEncoding.EncodeToString(serviceServingCA.Cert()),
 		ServiceServingCaKey:             base64.StdEncoding.EncodeToString(serviceServingCA.Key()),
 		TectonicNetworkOperatorImage:    "quay.io/coreos/tectonic-network-operator-dev:375423a332f2c12b79438fc6a6da6e448e28ec0f",
-		WorkerIgnConfig:                 base64.StdEncoding.EncodeToString(workerIgnition.Files()[0].Data),
 		CVOClusterID:                    installConfig.Config.ClusterID,
 		EtcdEndpointHostnames:           etcdEndpointHostnames,
 		EtcdEndpointDNSSuffix:           installConfig.Config.BaseDomain,
 	}
 
 	assetData := map[string][]byte{
-		"cluster-apiserver-certs.yaml":          applyTemplateData(bootkube.ClusterApiserverCerts, templateData),
-		"ign-config.yaml":                       applyTemplateData(bootkube.IgnConfig, templateData),
-		"kube-apiserver-secret.yaml":            applyTemplateData(bootkube.KubeApiserverSecret, templateData),
 		"kube-cloud-config.yaml":                applyTemplateData(bootkube.KubeCloudConfig, templateData),
-		"kube-controller-manager-secret.yaml":   applyTemplateData(bootkube.KubeControllerManagerSecret, templateData),
 		"machine-config-server-tls-secret.yaml": applyTemplateData(bootkube.MachineConfigServerTLSSecret, templateData),
-		"openshift-apiserver-secret.yaml":       applyTemplateData(bootkube.OpenshiftApiserverSecret, templateData),
 		"openshift-service-signer-secret.yaml":  applyTemplateData(bootkube.OpenshiftServiceCertSignerSecret, templateData),
 		"pull.json":                             applyTemplateData(bootkube.Pull, templateData),
 		"tectonic-network-operator.yaml":        applyTemplateData(bootkube.TectonicNetworkOperator, templateData),
 		"cvo-overrides.yaml":                    applyTemplateData(bootkube.CVOOverrides, templateData),
+		"legacy-cvo-overrides.yaml":             applyTemplateData(bootkube.LegacyCVOOverrides, templateData),
 		"etcd-service-endpoints.yaml":           applyTemplateData(bootkube.EtcdServiceEndpointsKubeSystem, templateData),
+		"kube-system-secret-etcd-client.yaml":   applyTemplateData(bootkube.KubeSystemSecretEtcdClient, templateData),
 
 		"01-tectonic-namespace.yaml":                 []byte(bootkube.TectonicNamespace),
-		"02-ingress-namespace.yaml":                  []byte(bootkube.IngressNamespace),
 		"03-openshift-web-console-namespace.yaml":    []byte(bootkube.OpenshiftWebConsoleNamespace),
 		"04-openshift-machine-config-operator.yaml":  []byte(bootkube.OpenshiftMachineConfigOperator),
 		"05-openshift-cluster-api-namespace.yaml":    []byte(bootkube.OpenshiftClusterAPINamespace),
@@ -233,4 +165,35 @@ func applyTemplateData(template *template.Template, templateData interface{}) []
 		panic(err)
 	}
 	return buf.Bytes()
+}
+
+// Load returns the manifests asset from disk.
+func (m *Manifests) Load(f asset.FileFetcher) (bool, error) {
+	fileList, err := f.FetchByPattern(filepath.Join(manifestDir, "*"))
+	if err != nil {
+		return false, err
+	}
+	if len(fileList) == 0 {
+		return false, nil
+	}
+
+	kubeSysConfig := &configurationObject{}
+	var found bool
+	for _, file := range fileList {
+		if file.Filename == kubeSysConfigPath {
+			if err := yaml.Unmarshal(file.Data, kubeSysConfig); err != nil {
+				return false, errors.Wrapf(err, "failed to unmarshal cluster-config.yaml")
+			}
+			found = true
+		}
+	}
+
+	if !found {
+		return false, nil
+
+	}
+
+	m.FileList, m.KubeSysConfig = fileList, kubeSysConfig
+
+	return true, nil
 }

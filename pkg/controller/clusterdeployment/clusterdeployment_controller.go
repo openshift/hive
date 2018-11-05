@@ -18,14 +18,14 @@ package clusterdeployment
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 
-	kbatch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -87,7 +87,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for jobs created by a ClusterDeployment:
-	err = c.Watch(&source.Kind{Type: &kbatch.Job{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
@@ -136,6 +136,10 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog.Info("reconciling cluster deployment")
 	cd = cd.DeepCopy()
 
+	if cd.Spec.ClusterUUID == "" {
+		return reconcile.Result{}, r.setClusterUUID(cd, cdLog)
+	}
+
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("error setting up service account and role")
@@ -180,6 +184,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
+	cdLog.Debug("loading admin secret")
 	adminPassword, err := r.loadSecretData(cd.Spec.Config.Admin.Password.Name,
 		cd.Namespace, adminCredsSecretPasswordKey)
 	if err != nil {
@@ -187,6 +192,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	cdLog.Debug("loading SSH key secret")
 	sshKey, err := r.loadSecretData(cd.Spec.Config.Admin.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
@@ -194,6 +200,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	cdLog.Debug("loading pull secret secret")
 	pullSecret, err := r.loadSecretData(cd.Spec.Config.PullSecret.Name, cd.Namespace, pullSecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load pull secret from secret")
@@ -222,6 +229,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	cdLog = cdLog.WithField("job", job.Name)
 
+	cdLog.Debug("checking if install-config.yml config map exists")
 	// Check if the ConfigMap already exists for this ClusterDeployment:
 	existingCfgMap := &kapi.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
@@ -238,7 +246,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	// Check if the Job already exists for this ClusterDeployment:
-	existingJob := &kbatch.Job{}
+	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		// If the ClusterDeployment is already installed, we do not need to create a new job:
@@ -287,45 +295,13 @@ func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataK
 	return string(retStr), nil
 }
 
-func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *kbatch.Job, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {
 	cdLog.Debug("updating cluster deployment status")
 	origCD := cd
 	cd = cd.DeepCopy()
 	if job != nil {
 		// Job exists, check it's status:
 		cd.Status.Installed = isSuccessful(job)
-	}
-
-	if cd.Status.Installed {
-		if cd.Status.ClusterUUID == "" {
-			metadataCfgMap := &kapi.ConfigMap{}
-			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
-			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
-			if err != nil {
-				// This would be pretty strange for a cluster that is installed:
-				cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
-				return err
-			}
-
-			// Dynamically parse the JSON to get the UUID we need:
-			var objMap map[string]interface{}
-			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &objMap); err != nil {
-				cdLog.WithError(err).Error("error reading json from metadata")
-				return err
-			}
-			aws, ok := objMap["aws"].(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
-			}
-			identifier, ok := aws["identifier"].(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
-			}
-			cd.Status.ClusterUUID, ok = identifier["tectonicClusterID"].(string)
-			if !ok {
-				return fmt.Errorf("cluster metadata did not contain aws.identifier.tectonicClusterID")
-			}
-		}
 	}
 
 	// Update cluster deployment status if changed:
@@ -343,7 +319,50 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	return nil
 }
 
+// setClusterUUID sets the
+func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cdLog.Debug("setting cluster UUID")
+	cd = cd.DeepCopy()
+
+	if cd.Spec.ClusterUUID != "" {
+		return fmt.Errorf("cluster UUID already set")
+	}
+
+	cd.Spec.ClusterUUID = uuid.New()
+	cdLog.WithField("clusterUUID", cd.Spec.ClusterUUID).Info("generated new cluster UUID")
+	err := r.Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Errorf("error updating cluster deployment")
+		return err
+	}
+
+	return nil
+}
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+
+	// Delete the install job in case it's still running:
+	installJob := &batchv1.Job{}
+	err := r.Get(context.Background(),
+		types.NamespacedName{
+			Name:      install.GetInstallJobName(cd),
+			Namespace: cd.Namespace,
+		},
+		installJob)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.Debug("install job no longer exists, nothing to cleanup")
+	} else if err != nil {
+		cdLog.WithError(err).Errorf("error getting existing install job for deleted cluster deployment")
+		return reconcile.Result{}, err
+	} else {
+		err = r.Delete(context.Background(), installJob,
+			client.PropagationPolicy(metav1.DeletePropagationForeground))
+		if err != nil {
+			cdLog.WithError(err).Errorf("error deleting existing install job for deleted cluster deployment")
+			return reconcile.Result{}, err
+		}
+		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
+	}
+
 	// Generate an uninstall job:
 	uninstallJob, err := install.GenerateUninstallerJob(cd)
 	if err != nil {
@@ -358,7 +377,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Check if uninstall job already exists:
-	existingJob := &kbatch.Job{}
+	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		err = r.Create(context.TODO(), uninstallJob)
@@ -495,7 +514,7 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 
 // getJobConditionStatus gets the status of the condition in the job. If the
 // condition is not found in the job, then returns False.
-func getJobConditionStatus(job *kbatch.Job, conditionType kbatch.JobConditionType) kapi.ConditionStatus {
+func getJobConditionStatus(job *batchv1.Job, conditionType batchv1.JobConditionType) kapi.ConditionStatus {
 	for _, condition := range job.Status.Conditions {
 		if condition.Type == conditionType {
 			return condition.Status
@@ -504,12 +523,12 @@ func getJobConditionStatus(job *kbatch.Job, conditionType kbatch.JobConditionTyp
 	return kapi.ConditionFalse
 }
 
-func isSuccessful(job *kbatch.Job) bool {
-	return getJobConditionStatus(job, kbatch.JobComplete) == kapi.ConditionTrue
+func isSuccessful(job *batchv1.Job) bool {
+	return getJobConditionStatus(job, batchv1.JobComplete) == kapi.ConditionTrue
 }
 
-func isFailed(job *kbatch.Job) bool {
-	return getJobConditionStatus(job, kbatch.JobFailed) == kapi.ConditionTrue
+func isFailed(job *batchv1.Job) bool {
+	return getJobConditionStatus(job, batchv1.JobFailed) == kapi.ConditionTrue
 }
 
 // HasFinalizer returns true if the given object has the given finalizer

@@ -22,6 +22,8 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
 )
@@ -31,12 +33,15 @@ import (
 // as ClusterDeployment is used as a CRD API.
 //
 // It is assumed the caller will lookup the admin password and ssh key from their respective secrets.
-func generateInstallConfig(spec *hivev1.ClusterDeploymentSpec, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
-	networkType, err := convertNetworkingType(spec.Config.Networking.Type)
-	if err != nil {
-		return nil, err
-	}
+func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
+	/*
+		networkType, err := convertNetworkingType(spec.Config.Networking.Type)
+		if err != nil {
+			return nil, err
+		}
+	*/
 
+	spec := cd.Spec
 	platform := types.Platform{}
 	if spec.Config.Platform.AWS != nil {
 		aws := spec.Config.Platform.AWS
@@ -80,7 +85,10 @@ func generateInstallConfig(spec *hivev1.ClusterDeploymentSpec, adminPassword, ss
 	}
 
 	ic := &types.InstallConfig{
-		ClusterID: spec.Config.ClusterID,
+		ObjectMeta: metav1.ObjectMeta{
+			Name: spec.Config.ClusterID,
+		},
+		ClusterID: cd.Spec.ClusterUUID,
 		Admin: types.Admin{
 			Email:    spec.Config.Admin.Email,
 			Password: adminPassword,
@@ -88,7 +96,8 @@ func generateInstallConfig(spec *hivev1.ClusterDeploymentSpec, adminPassword, ss
 		},
 		BaseDomain: spec.Config.BaseDomain,
 		Networking: types.Networking{
-			Type: networkType,
+			// TODO: installer currently only works with flannel, flagged for TODO on their end here: https://github.com/openshift/installer/blob/master/pkg/asset/installconfig/installconfig.go#L82
+			Type: "flannel",
 			ServiceCIDR: ipnet.IPNet{
 				IPNet: parseCIDR(spec.Config.Networking.ServiceCIDR),
 			},

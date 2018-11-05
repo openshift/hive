@@ -8,24 +8,9 @@ variable "associate_public_ip_address" {
   description = "If set to true, public-facing ingress resources are created."
 }
 
-variable "bucket" {
-  type        = "string"
-  description = "The S3 bucket name for bootstrap ignition file."
-}
-
 variable "cluster_name" {
   type        = "string"
   description = "The name of the cluster."
-}
-
-variable "elbs" {
-  type        = "list"
-  default     = []
-  description = "Elastic load balancer IDs to attach to the bootstrap node."
-}
-
-variable "elbs_length" {
-  description = "The length of the 'elbs' variable, to work around https://github.com/hashicorp/terraform/issues/12570."
 }
 
 variable "iam_role" {
@@ -54,6 +39,16 @@ variable "tags" {
   type        = "map"
   default     = {}
   description = "AWS tags to be applied to created resources."
+}
+
+variable "target_group_arns" {
+  type        = "list"
+  default     = []
+  description = "The list of target group ARNs for the load balancer."
+}
+
+variable "target_group_arns_length" {
+  description = "The length of the 'target_group_arns' variable, to work around https://github.com/hashicorp/terraform/issues/12570."
 }
 
 variable "volume_iops" {

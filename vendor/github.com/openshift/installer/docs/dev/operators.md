@@ -56,7 +56,7 @@ Creating a new asset in the installer source is only for exceptional cases where
 Such operators need to be directly integrated in the installer's [`manifests` package](../../pkg/asset/manifests). Within this, there are two ways to get the manifests/config files integrated:
 
  - A new asset for the operator
-Create a new operator asset, and render the Dependencies, Name, Load and Generate functions. The Dependencies might contain InstallConfig as an example. In the Generate function, create the config files as asset contents. For the config/manifest’s actual structure, one can choose to vendor the operator’s github pkg, or, if the configuration structures are fairly simple then just copy the definitions directly and avoid the hassle of vendoring. Finally, return the entire list of configs and manifests in the Generate function.
+Create a new operator asset, and render the Dependencies, Name, Load and Generate functions. The Dependencies might contain InstallConfig as an example. In the Generate function, create the config files as asset contents. For the config/manifest’s actual structure, one can choose to vendor the operator’s github pkg, or, if the configuration structures are fairly simple then just copy the definitions directly and avoid the hassle of vendoring. Finally, return the entire list of configs and manifests in the Generate function. 
 
  - Template files
 In the pkg/asset/manifests/content/tectonic directory, place the templates golang variables. Then modify pkg/asset/manifests/tectonic.go to expand the template. Expand templateData in template.go for filling up the template variables.

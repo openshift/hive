@@ -25,9 +25,8 @@ resource "libvirt_volume" "master" {
 }
 
 resource "libvirt_ignition" "master" {
-  count   = "${var.tectonic_master_count}"
-  name    = "master-${count.index}.ign"
-  content = "${var.ignition_masters[count.index]}"
+  name    = "master.ign"
+  content = "${var.ignition_master}"
 }
 
 resource "libvirt_ignition" "worker" {
@@ -49,6 +48,10 @@ resource "libvirt_network" "tectonic_net" {
 
   dns = [{
     local_only = true
+
+    srvs = ["${flatten(list(
+      data.libvirt_network_dns_srv_template.etcd_cluster.*.rendered,
+    ))}"]
 
     hosts = ["${flatten(list(
       data.libvirt_network_dns_host_template.bootstrap.*.rendered,
@@ -87,22 +90,15 @@ resource "libvirt_domain" "master" {
   }
 }
 
-locals {
-  "hostnames" = [
-    "${var.tectonic_cluster_name}-api",
-  ]
-}
-
 data "libvirt_network_dns_host_template" "bootstrap" {
-  count    = "${length(local.hostnames)}"
   ip       = "${var.tectonic_libvirt_bootstrap_ip}"
-  hostname = "${local.hostnames[count.index]}"
+  hostname = "${var.tectonic_cluster_name}-api"
 }
 
 data "libvirt_network_dns_host_template" "masters" {
-  count    = "${var.tectonic_master_count * length(local.hostnames)}"
-  ip       = "${var.tectonic_libvirt_master_ips[count.index / length(local.hostnames)]}"
-  hostname = "${local.hostnames[count.index % length(local.hostnames)]}"
+  count    = "${var.tectonic_master_count}"
+  ip       = "${var.tectonic_libvirt_master_ips[count.index]}"
+  hostname = "${var.tectonic_cluster_name}-api"
 }
 
 data "libvirt_network_dns_host_template" "etcds" {
@@ -115,4 +111,14 @@ data "libvirt_network_dns_host_template" "workers" {
   count    = "${var.tectonic_worker_count}"
   ip       = "${var.tectonic_libvirt_worker_ips[count.index]}"
   hostname = "${var.tectonic_cluster_name}"
+}
+
+data "libvirt_network_dns_srv_template" "etcd_cluster" {
+  count    = "${var.tectonic_master_count}"
+  service  = "etcd-server-ssl"
+  protocol = "tcp"
+  domain   = "${var.tectonic_cluster_name}.${var.tectonic_base_domain}"
+  port     = 2380
+  weight   = 10
+  target   = "${var.tectonic_cluster_name}-etcd-${count.index}.${var.tectonic_base_domain}"
 }

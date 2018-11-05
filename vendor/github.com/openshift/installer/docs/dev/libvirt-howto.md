@@ -7,24 +7,28 @@ It's expected that you will create and destroy clusters often in the course of d
 
 Before you begin, install the [build dependencies](dependencies.md).
 
-### Install and Enable Libvirt
-On Fedora:
+### Enable KVM
 
-```sh
-sudo dnf install libvirt-daemon
+Make sure you have KVM enabled by checking for the device:
+
+```console
+$ ls -l /dev/kvm 
+crw-rw-rw-+ 1 root kvm 10, 232 Oct 31 09:22 /dev/kvm
 ```
 
-or on CentOS / RHEL:
+If it is missing, try some of the ideas [here][kvm-install].
+
+### Install and Enable Libvirt
+On Fedora, CentOS/RHEL:
 
 ```sh
-sudo yum install libvirt-daemon
+sudo yum install libvirt libvirt-devel
 ```
 
 Then start libvirtd:
 
 ```sh
-sudo systemctl start libvirtd
-sudo systemctl enable libvirtd
+sudo systemctl enable --now libvirtd
 ```
 
 ### Pick names
@@ -50,6 +54,38 @@ polkit.addRule(function(action, subject) {
   }
 });
 EOF
+```
+
+### Enable IP Forwarding
+
+Libvirt creates a bridged connection to the host machine, but in order for the
+network bridge to work IP forwarding needs to be enabled. The following command
+will tell you if forwarding is enabled:
+
+```sh
+sysctl net.ipv4.ip_forward
+```
+
+If the command output is:
+
+```sh
+net.ipv4.ip_forward = 0
+```
+
+then forwarding is disabled and proceed with the rest of this section. If IP
+forwarding is enabled then skip the rest of this section.
+
+To enable IP forwarding for the current boot:
+
+```sh
+sysctl net.ipv4.ip_forward=1
+```
+
+or to persist the setting across reboots (recommended):
+
+```sh
+echo "net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/99-ipforward.conf
+sudo sysctl -p /etc/sysctl.d/99-ipforward.conf
 ```
 
 ### Configure libvirt to accept TCP connections
@@ -184,7 +220,7 @@ EOF
 ## Build and run the installer
 
 With [libvirt configured](#install-and-enable-libvirt), you can proceed with [the usual quick-start](../../README.md#quick-start).
-Set `TAGS` when building if you need `destroy-cluster` support for libvirt; this is not enabled by default because it requires [cgo][]:
+Set `TAGS` when building if you need `destroy cluster` support for libvirt; this is not enabled by default because it requires [cgo][]:
 
 ```sh
 TAGS=libvirt_destroy hack/build.sh
@@ -205,7 +241,7 @@ export OPENSHIFT_INSTALL_LIBVIRT_URI=qemu+tcp://192.168.122.1/system
 If you compiled with `libvirt_destroy`, you can use:
 
 ```sh
-openshift-install destroy-cluster
+openshift-install destroy cluster
 ```
 
 If you did not compile with `libvirt_destroy`, you can use [`virsh-cleanup.sh`](../../scripts/maintenance/virsh-cleanup.sh), but note it will currently destroy *all* libvirt resources.
@@ -238,9 +274,11 @@ Using the domain names above will only work if you [set up the DNS overlay](#set
 Alternatively, if you didn't set up DNS on the host, you can use:
 
 ```sh
-virsh domifaddr master0  # to get the master IP
+virsh -c "${OPENSHIFT_INSTALL_LIBVIRT_URI}" domifaddr master0  # to get the master IP
 ssh core@$MASTER_IP
 ```
+
+Here `OPENSHIFT_INSTALL_LIBVIRT_URI` is the libvirt connection URI which you [passed to the installer](#build-and-run-the-installer).
 
 ### Inspect the cluster with kubectl
 
@@ -252,10 +290,10 @@ kubectl get -n tectonic-system pods
 ```
 
 Alternatively, you can run `kubectl` from the bootstrap or master nodes.
-[SSH in](#ssh-access), and run:
+Use `scp` or similar to transfer your local `${DIR}/auth/kubeconfig`, then [SSH in](#ssh-access) and run:
 
 ```sh
-export KUBECONFIG=/var/opt/tectonic/auth/kubeconfig
+export KUBECONFIG=/where/you/put/your/kubeconfig
 kubectl get --all-namespaces pods
 ```
 
@@ -335,3 +373,4 @@ If your issue is not reported, please do.
 [issues_libvirt]: https://github.com/openshift/installer/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+libvirt
 [libvirt_selinux_issues]: https://github.com/dmacvicar/terraform-provider-libvirt/issues/142#issuecomment-409040151
 [tfprovider_libvirt_race]: https://github.com/dmacvicar/terraform-provider-libvirt/issues/402#issuecomment-419500064
+[kvm-install]: http://www.linux-kvm.org/page/FAQ#Preparing_to_use_KVM

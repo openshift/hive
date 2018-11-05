@@ -2,7 +2,7 @@ package kubeconfig
 
 import (
 	"fmt"
-	"path/filepath"
+	"os"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -24,7 +24,7 @@ func (k *kubeconfig) generate(
 	clientCertKey tls.CertKeyInterface,
 	installConfig *types.InstallConfig,
 	userName string,
-	filename string,
+	kubeconfigPath string,
 ) error {
 	k.Config = &clientcmd.Config{
 		Clusters: []clientcmd.NamedCluster{
@@ -63,7 +63,7 @@ func (k *kubeconfig) generate(
 	}
 
 	k.File = &asset.File{
-		Filename: filepath.Join("auth", filename),
+		Filename: kubeconfigPath,
 		Data:     data,
 	}
 
@@ -76,4 +76,23 @@ func (k *kubeconfig) Files() []*asset.File {
 		return []*asset.File{k.File}
 	}
 	return []*asset.File{}
+}
+
+// load returns the kubeconfig from disk.
+func (k *kubeconfig) load(f asset.FileFetcher, name string) (found bool, err error) {
+	file, err := f.FetchByName(name)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	config := &clientcmd.Config{}
+	if err := yaml.Unmarshal(file.Data, config); err != nil {
+		return false, errors.Wrapf(err, "failed to unmarshal")
+	}
+
+	k.File, k.Config = file, config
+	return true, nil
 }

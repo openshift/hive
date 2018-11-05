@@ -53,7 +53,7 @@ func GenerateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 
-	ic, err := generateInstallConfig(&cd.Spec, adminPassword, sshKey, pullSecret)
+	ic, err := generateInstallConfig(cd, adminPassword, sshKey, pullSecret)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -70,7 +70,8 @@ func GenerateInstallerJob(
 			Namespace: cd.Namespace,
 		},
 		Data: map[string]string{
-			"installconfig.yaml": installConfig,
+			// Filename should match installer default:
+			"install-config.yml": installConfig,
 		},
 	}
 
@@ -179,7 +180,7 @@ func GenerateInstallerJob(
 		},
 		{
 			Name:      "installconfig",
-			MountPath: "/output/config",
+			MountPath: "/installconfig",
 		},
 	}
 
@@ -221,8 +222,18 @@ func GenerateInstallerJob(
 			ImagePullPolicy: hiveImagePullPolicy,
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args:            []string{"install-manager", "--work-dir", "/output", "--log-level", "debug", cd.Namespace, cd.Name},
-			VolumeMounts:    volumeMounts,
+			Args: []string{
+				"install-manager",
+				"--work-dir",
+				"/output",
+				"--log-level",
+				"debug",
+				"--install-config",
+				"/installconfig/install-config.yml",
+				cd.Namespace,
+				cd.Name,
+			},
+			VolumeMounts: volumeMounts,
 		},
 	}
 
@@ -240,7 +251,7 @@ func GenerateInstallerJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-install", cd.Name),
+			Name:      GetInstallJobName(cd),
 			Namespace: cd.Namespace,
 		},
 		Spec: batchv1.JobSpec{
@@ -254,6 +265,11 @@ func GenerateInstallerJob(
 	}
 
 	return job, cfgMap, nil
+}
+
+// GetInstallJobName returns the expected name of the install job for a cluster deployment.
+func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
+	return fmt.Sprintf("%s-install", cd.Name)
 }
 
 // GenerateUninstallerJob creates a job to uninstall an OpenShift cluster
@@ -289,48 +305,32 @@ func GenerateUninstallerJob(
 		}...)
 	}
 
-	volumes := []corev1.Volume{
-		{
-			Name: "metadata",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						// TODO: This matches what is done in the hiveutil install-manager command.
-						// We should explicitly link the two.
-						Name: fmt.Sprintf("%s-metadata", cd.Name),
-					},
-				},
-			},
-		},
+	hiveImage := defaultHiveImage
+	if cd.Spec.Images.HiveImage != "" {
+		hiveImage = cd.Spec.Images.HiveImage
 	}
 
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "metadata",
-			MountPath: "/cluster/metadata",
-		},
-	}
-
-	args := []string{"destroy-cluster", "--dir", "/cluster/metadata", "--log-level", "debug"}
-
-	installerImage := defaultInstallerImage
-	if cd.Spec.Images.InstallerImage != "" {
-		installerImage = cd.Spec.Images.InstallerImage
-	}
-
-	installerImagePullPolicy := defaultInstallerImagePullPolicy
-	if cd.Spec.Images.InstallerImagePullPolicy != "" {
-		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
+	hiveImagePullPolicy := defaultHiveImagePullPolicy
+	if cd.Spec.Images.HiveImagePullPolicy != "" {
+		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
 	}
 
 	containers := []corev1.Container{
 		{
-			Name:            "installer",
-			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			Name:            "deprovision",
+			Image:           hiveImage,
+			ImagePullPolicy: hiveImagePullPolicy,
 			Env:             env,
-			Args:            args,
-			VolumeMounts:    volumeMounts,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"aws-tag-deprovision",
+				"--loglevel",
+				"debug",
+				"--cluster-name",
+				cd.Name,
+				fmt.Sprintf("tectonicClusterID=%s", cd.Spec.ClusterUUID),
+				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Name),
+			},
 		},
 	}
 
@@ -338,7 +338,6 @@ func GenerateUninstallerJob(
 		DNSPolicy:     corev1.DNSClusterFirst,
 		RestartPolicy: corev1.RestartPolicyOnFailure,
 		Containers:    containers,
-		Volumes:       volumes,
 	}
 
 	completions := int32(1)

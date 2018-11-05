@@ -38,6 +38,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/install"
 )
 
 const (
@@ -49,6 +50,7 @@ const (
 	adminPasswordSecret = "admin-password"
 	sshKeySecret        = "ssh-key"
 	pullSecretSecret    = "pull-secret"
+	testUUID            = "fakeUUID"
 )
 
 func init() {
@@ -86,7 +88,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		name      string
 		existing  []runtime.Object
 		expectErr bool
-		validate  func(client.Client)
+		validate  func(client.Client, *testing.T)
 	}{
 		{
 			name: "Add finalizer",
@@ -96,7 +98,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if cd == nil || !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 					t.Errorf("did not get expected clusterdeployment finalizer")
@@ -111,7 +113,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				job := getInstallJob(c)
 				if job == nil {
 					t.Errorf("did not find expected install job")
@@ -119,7 +121,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "No-op: Running install job",
+			name: "No-op Running install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testInstallJob(),
@@ -127,7 +129,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if cd == nil || !apiequality.Semantic.DeepEqual(cd, testClusterDeployment()) {
 					t.Errorf("got unexpected change in clusterdeployment")
@@ -148,29 +150,40 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if cd == nil || !cd.Status.Installed {
 					t.Errorf("did not get a clusterdeployment with a status of Installed")
 					return
 				}
-				if cd.Status.ClusterUUID != "testFooClusterUUID" {
-					t.Errorf("did not get expected ClusterUUID in status")
-				}
 			},
 		},
 		{
-			name: "Run uninstall",
+			name: "Delete cluster deployment",
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),
 				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job, _, _ := install.GenerateInstallerJob(
+						testExpiredClusterDeployment(),
+						"fakeserviceaccount",
+						"password",
+						"sshkey",
+						"pullsecret")
+					return job
+				}(),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				uninstallJob := getUninstallJob(c)
 				if uninstallJob == nil {
 					t.Errorf("did not find expected uninstall job")
+				}
+
+				instJob := getInstallJob(c)
+				if instJob != nil {
+					t.Errorf("got unexpected install job (expected delete)")
 				}
 			},
 		},
@@ -182,7 +195,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				uninstallJob := getUninstallJob(c)
 				if uninstallJob != nil {
 					t.Errorf("got unexpected uninstall job")
@@ -197,7 +210,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
-			validate: func(c client.Client) {
+			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if cd != nil {
 					t.Errorf("got unexpected cluster deployment (expected deleted)")
@@ -222,7 +235,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			})
 
 			if test.validate != nil {
-				test.validate(fakeClient)
+				test.validate(fakeClient, t)
 			}
 
 			if err != nil && !test.expectErr {
@@ -245,6 +258,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
 				Admin: hivev1.Admin{
 					Email: "user@example.com",

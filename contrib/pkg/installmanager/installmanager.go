@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/openshift/hive/contrib/pkg/awstagdeprovision"
 )
 
 const (
@@ -32,18 +35,23 @@ const (
 	// relative to our WorkDir.
 	metadataRelativePath        = "metadata.json"
 	adminKubeConfigRelativePath = "auth/kubeconfig"
+	uuidKey                     = "tectonicClusterID"
+	kubernetesKeyPrefix         = "kubernetes.io/cluster/"
 )
 
 // InstallManager coordinates executing the openshift-install binary, modifying
 // generated assets, and uploading artifacts to the kube API after completion.
 type InstallManager struct {
-	log           log.FieldLogger
-	LogLevel      string
-	WorkDir       string
-	InstallConfig string
-	ClusterName   string
-	Namespace     string
-	DynamicClient client.Client
+	log                   log.FieldLogger
+	LogLevel              string
+	WorkDir               string
+	InstallConfig         string
+	ClusterUUID           string
+	Region                string
+	ClusterName           string
+	Namespace             string
+	DynamicClient         client.Client
+	SkipPreInstallCleanup bool
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -85,6 +93,8 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
+	flags.StringVar(&im.ClusterUUID, "cluster-uuid", "", "UUID to tag cloud resources with")
+	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
 	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yml", "location of install-config.yml to copy into work-dir")
 	return cmd
@@ -122,6 +132,9 @@ func (m *InstallManager) Complete(args []string) error {
 
 // Validate ensures the given options and arguments are valid.
 func (m *InstallManager) Validate() error {
+	if m.ClusterUUID == "" {
+		m.log.Fatalf("cluster-uuid parameter must be provided")
+	}
 	return nil
 }
 
@@ -184,7 +197,55 @@ func (m *InstallManager) waitForInstallerBinaries() {
 	m.log.Infof("all install binaries found, ready to proceed with install")
 }
 
+// cleanupBeforeInstall allows recovering from an installation error and allows retries
+func (m *InstallManager) cleanupBeforeInstall() error {
+	// first cleanup any remnant cache files from a previous installation attempt
+	deleteFiles := []string{
+		"auth",
+		"metadata.json",
+		"terraform.tfstate",
+		"terraform.tfvars",
+		".openshift_install_state.json",
+	}
+	for _, f := range deleteFiles {
+		if _, err := os.Stat(path.Join([]string{m.WorkDir, f}...)); os.IsNotExist(err) {
+			// skipping non-existent file
+			continue
+		}
+
+		if err := os.RemoveAll(path.Join([]string{m.WorkDir, f}...)); err != nil {
+			m.log.WithError(err).Error("error while cleaning up terraform remnants")
+			return err
+		}
+	}
+
+	// now run the uninstaller to clean up any cloud resources previously created
+	filters := []awstagdeprovision.AWSFilter{
+		{uuidKey: m.ClusterUUID},
+		{kubernetesKeyPrefix + m.ClusterName: "owned"},
+	}
+	uninstaller := &awstagdeprovision.ClusterUninstaller{
+		Filters:     filters,
+		Region:      m.Region,
+		ClusterName: m.ClusterName,
+		Logger:      m.log,
+	}
+
+	err := uninstaller.Run()
+
+	return err
+}
+
 func (m *InstallManager) runInstaller() error {
+
+	if !m.SkipPreInstallCleanup {
+		err := m.cleanupBeforeInstall()
+		if err != nil {
+			m.log.WithError(err).Error("error while trying to preemptively clean up")
+			return err
+		}
+	}
+
 	m.log.Info("running openshift-install")
 	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), []string{"create", "cluster", "--dir", m.WorkDir, "--log-level", "debug"}...)
 

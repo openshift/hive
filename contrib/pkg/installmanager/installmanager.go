@@ -42,15 +42,16 @@ const (
 // InstallManager coordinates executing the openshift-install binary, modifying
 // generated assets, and uploading artifacts to the kube API after completion.
 type InstallManager struct {
-	log           log.FieldLogger
-	LogLevel      string
-	WorkDir       string
-	InstallConfig string
-	ClusterUUID   string
-	Region        string
-	ClusterName   string
-	Namespace     string
-	DynamicClient client.Client
+	log                   log.FieldLogger
+	LogLevel              string
+	WorkDir               string
+	InstallConfig         string
+	ClusterUUID           string
+	Region                string
+	ClusterName           string
+	Namespace             string
+	DynamicClient         client.Client
+	SkipPreInstallCleanup bool
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -237,10 +238,12 @@ func (m *InstallManager) cleanupBeforeInstall() error {
 
 func (m *InstallManager) runInstaller() error {
 
-	err := m.cleanupBeforeInstall()
-	if err != nil {
-		m.log.WithError(err).Error("error while trying to preemptively clean up")
-		return err
+	if !m.SkipPreInstallCleanup {
+		err := m.cleanupBeforeInstall()
+		if err != nil {
+			m.log.WithError(err).Error("error while trying to preemptively clean up")
+			return err
+		}
 	}
 
 	m.log.Info("running openshift-install")
@@ -253,7 +256,7 @@ func (m *InstallManager) runInstaller() error {
 	childStderr, _ := cmd.StderrPipe()
 	stdout := io.MultiWriter(os.Stdout, &stdoutBuf)
 	stderr := io.MultiWriter(os.Stderr, &stderrBuf)
-	err = cmd.Start()
+	err := cmd.Start()
 	if err != nil {
 		log.WithError(err).Fatal("command start failed")
 	}

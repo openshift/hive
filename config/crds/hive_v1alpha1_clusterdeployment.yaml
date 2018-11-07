@@ -51,6 +51,8 @@ spec:
                         properties:
                           aws:
                             properties:
+                              amiID:
+                                type: string
                               iamRoleName:
                                 type: string
                               rootVolume:
@@ -70,6 +72,10 @@ spec:
                                 type: object
                               type:
                                 type: string
+                              zones:
+                                items:
+                                  type: string
+                                type: array
                             required:
                             - type
                             - iamRoleName
@@ -138,6 +144,8 @@ spec:
                       properties:
                         defaultMachinePlatform:
                           properties:
+                            amiID:
+                              type: string
                             iamRoleName:
                               type: string
                             rootVolume:
@@ -157,6 +165,10 @@ spec:
                               type: object
                             type:
                               type: string
+                            zones:
+                              items:
+                                type: string
+                              type: array
                           required:
                           - type
                           - iamRoleName

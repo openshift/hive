@@ -69,7 +69,7 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterDeployment{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileClusterDeployment{Client: mgr.GetClient(), scheme: mgr.GetScheme(), amiLookupFunc: lookupAMI}
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -103,7 +103,8 @@ var _ reconcile.Reconciler = &ReconcileClusterDeployment{}
 // ReconcileClusterDeployment reconciles a ClusterDeployment object
 type ReconcileClusterDeployment struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme        *runtime.Scheme
+	amiLookupFunc func(cd *hivev1.ClusterDeployment) (string, error)
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -182,6 +183,21 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment finalizer")
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
+	}
+
+	// Ensure we have an AMI set, if not lookup the latest:
+	if cd.Spec.Config.Platform.AWS != nil && !isDefaultAMISet(cd) {
+		cdLog.Debugf("looking up a default AMI for cluster")
+		if cd.Spec.Config.Platform.AWS.DefaultMachinePlatform == nil {
+			cd.Spec.Config.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
+		}
+		ami, err := r.amiLookupFunc(cd)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		cd.Spec.Config.AWS.DefaultMachinePlatform.AMIID = ami
+		cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
 	cdLog.Debug("loading admin secret")

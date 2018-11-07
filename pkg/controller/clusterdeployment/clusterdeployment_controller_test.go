@@ -51,6 +51,7 @@ const (
 	sshKeySecret        = "ssh-key"
 	pullSecretSecret    = "pull-secret"
 	testUUID            = "fakeUUID"
+	testAMI             = "ami-totallyfake"
 )
 
 func init() {
@@ -117,6 +118,21 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				job := getInstallJob(c)
 				if job == nil {
 					t.Errorf("did not find expected install job")
+				}
+			},
+		},
+		{
+			name: "Lookup default AMI",
+			existing: []runtime.Object{
+				testNoDefaultAMIClusterDeployment(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if cd == nil || cd.Spec.Config.Platform.AWS.DefaultMachinePlatform.AMIID != testAMI {
+					t.Errorf("did not get expected default AMI")
 				}
 			},
 		},
@@ -225,6 +241,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
+				amiLookupFunc: func(cd *hivev1.ClusterDeployment) (string, error) {
+					return testAMI, nil
+				},
 			}
 
 			_, err := rcd.Reconcile(reconcile.Request{
@@ -276,6 +295,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				Platform: hivev1.Platform{
 					AWS: &hivev1.AWSPlatform{
 						Region: "us-east-1",
+						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
+							AMIID: testAMI,
+						},
 					},
 				},
 				Networking: hivev1.Networking{
@@ -318,6 +340,12 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(-60 * time.Minute)}
 	cd.Annotations[deleteAfterAnnotation] = "5m"
+	return cd
+}
+
+func testNoDefaultAMIClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Spec.Config.Platform.AWS.DefaultMachinePlatform.AMIID = ""
 	return cd
 }
 

@@ -29,6 +29,12 @@ type MachinePoolPlatform struct {
 // AWSMachinePoolPlatform stores the configuration for a machine pool
 // installed on AWS.
 type AWSMachinePoolPlatform struct {
+	// Zones is list of availability zones that can be used.
+	Zones []string `json:"zones,omitempty"`
+
+	// AMIID defines the AMI that should be used.
+	AMIID string `json:"amiID,omitempty"`
+
 	// InstanceType defines the ec2 instance type.
 	// eg. m4-large
 	InstanceType string `json:"type"`

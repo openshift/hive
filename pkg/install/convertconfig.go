@@ -60,6 +60,8 @@ func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, 
 					Size: aws.DefaultMachinePlatform.EC2RootVolume.Size,
 					Type: aws.DefaultMachinePlatform.EC2RootVolume.Type,
 				},
+				AMIID: aws.DefaultMachinePlatform.AMIID,
+				Zones: aws.DefaultMachinePlatform.Zones,
 			}
 		}
 	}
@@ -79,6 +81,8 @@ func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, 
 					Size: mp.Platform.AWS.EC2RootVolume.Size,
 					Type: mp.Platform.AWS.EC2RootVolume.Type,
 				},
+				AMIID: mp.Platform.AWS.AMIID,
+				Zones: mp.Platform.AWS.Zones,
 			}
 		}
 		machinePools = append(machinePools, newMP)

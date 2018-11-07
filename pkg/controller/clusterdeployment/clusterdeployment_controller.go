@@ -19,6 +19,8 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"path"
 	"reflect"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -320,10 +324,46 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		cd.Status.Installed = isSuccessful(job)
 	}
 
+	// TODO: this is a temporary hack for deployment to clusters with pre-existing cluster deployments
+	// which would not have had the admin kubeconfig secret name set. We know what the name would have
+	// been. This code can be deleted in the near term once this rolls out.
+	if cd.Status.Installed && cd.Status.AdminKubeconfigSecret.Name == "" {
+		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", cd.Name)}
+	}
+
+	if cd.Status.AdminKubeconfigSecret.Name != "" {
+		adminKubeconfigSecret := &corev1.Secret{}
+		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
+		if err != nil {
+			return err
+		}
+
+		// Parse the admin kubeconfig for the server URL:
+		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
+		if err != nil {
+			return err
+		}
+		cluster, ok := config.Clusters[cd.Name]
+		if !ok {
+			return fmt.Errorf("error parsing admin kubeconfig secret data")
+		}
+
+		// We should be able to assume only one cluster in here:
+		server := cluster.Server
+		cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
+		u, err := url.Parse(server)
+		if err != nil {
+			return err
+		}
+		cd.Status.APIURL = server
+		u.Path = path.Join(u.Path, "console")
+		cd.Status.WebConsoleURL = u.String()
+	}
+
 	// Update cluster deployment status if changed:
 	if !reflect.DeepEqual(cd.Status, origCD.Status) {
 		cdLog.Infof("status has changed, updating cluster deployment")
-		err := r.Update(context.TODO(), cd)
+		err := r.Status().Update(context.TODO(), cd)
 		if err != nil {
 			cdLog.Errorf("error updating cluster deployment: %v", err)
 			return err
@@ -469,7 +509,7 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 			},
 			{
 				APIGroups: []string{"hive.openshift.io"},
-				Resources: []string{"clusterdeployments", "clusterdeployments/finalizers"},
+				Resources: []string{"clusterdeployments", "clusterdeployments/finalizers", "clusterdeployments/status"},
 				Verbs:     []string{"create", "delete", "get", "list", "update"},
 			},
 		},

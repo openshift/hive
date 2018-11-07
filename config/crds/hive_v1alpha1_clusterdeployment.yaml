@@ -11,6 +11,8 @@ spec:
     kind: ClusterDeployment
     plural: clusterdeployments
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -270,10 +272,19 @@ spec:
           type: object
         status:
           properties:
+            adminKubeconfigSecret:
+              type: object
+            apiURL:
+              type: string
             installed:
               type: boolean
+            webConsoleURL:
+              type: string
           required:
           - installed
+          - adminKubeconfigSecret
+          - apiURL
+          - webConsoleURL
           type: object
   version: v1alpha1
 status:

@@ -155,17 +155,24 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(installErr).Error("error running openshift-install")
 	}
 
-	// TODO: if we successfully installed, but fail after this point, that would be
-	// pretty bad.
+	cd, err := m.loadClusterDeployment()
+	if err != nil {
+		m.log.WithError(err).Fatal("error looking up cluster deployment")
+	}
 
 	// Try to upload any artifacts that exist regardless if the install errored or not.
 	// We may need to cleanup.
-	if err := m.uploadClusterMetadata(); err != nil {
+	if err := m.uploadClusterMetadata(cd); err != nil {
 		m.log.WithError(err).Fatal("error uploading cluster metadata.json")
 	}
 
-	if err := m.uploadAdminKubeconfig(); err != nil {
+	adminKubeconfigSecret, err := m.uploadAdminKubeconfig(cd)
+	if err != nil {
 		m.log.WithError(err).Fatal("error uploading admin kubeconfig")
+	}
+
+	if err := m.updateClusterDeploymentStatus(cd, adminKubeconfigSecret.Name); err != nil {
+		m.log.WithError(err).Fatal("error updating cluster deployment status")
 	}
 
 	if installErr != nil {
@@ -282,7 +289,7 @@ func (m *InstallManager) runInstaller() error {
 	return err
 }
 
-func (m *InstallManager) uploadClusterMetadata() error {
+func (m *InstallManager) uploadClusterMetadata(cd *hivev1.ClusterDeployment) error {
 	m.log.Infoln("uploading cluster metadata")
 	fullMetadataPath := filepath.Join(m.WorkDir, metadataRelativePath)
 	if _, err := os.Stat(fullMetadataPath); os.IsNotExist(err) {
@@ -306,12 +313,6 @@ func (m *InstallManager) uploadClusterMetadata() error {
 		},
 	}
 
-	cd := &hivev1.ClusterDeployment{}
-	err = m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterName}, cd)
-	if err != nil {
-		m.log.WithError(err).Error("error getting cluster deployment")
-		return err
-	}
 	if err := controllerutil.SetControllerReference(cd, metadataCfgMap, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on configmap")
 		return err
@@ -328,18 +329,28 @@ func (m *InstallManager) uploadClusterMetadata() error {
 	return nil
 }
 
-func (m *InstallManager) uploadAdminKubeconfig() error {
+func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, error) {
+	cd := &hivev1.ClusterDeployment{}
+	err := m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterName}, cd)
+	if err != nil {
+		m.log.WithError(err).Error("error getting cluster deployment")
+		return nil, err
+	}
+	return cd, nil
+}
+
+func (m *InstallManager) uploadAdminKubeconfig(cd *hivev1.ClusterDeployment) (*corev1.Secret, error) {
 	m.log.Infoln("uploading admin kubeconfig")
 	fullPath := filepath.Join(m.WorkDir, adminKubeConfigRelativePath)
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		m.log.WithField("path", fullPath).Error("admin kubeconfig file does not exist")
-		return err
+		return nil, err
 	}
 
 	kubeconfigBytes, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin kubeconfig file")
-		return err
+		return nil, err
 	}
 
 	kubeconfigSecret := &corev1.Secret{
@@ -352,26 +363,27 @@ func (m *InstallManager) uploadAdminKubeconfig() error {
 		},
 	}
 
-	cd := &hivev1.ClusterDeployment{}
-	err = m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterName}, cd)
-	if err != nil {
-		m.log.WithError(err).Error("error getting cluster deployment")
-		return err
-	}
 	if err := controllerutil.SetControllerReference(cd, kubeconfigSecret, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
-		return err
+		return nil, err
 	}
 
 	err = m.DynamicClient.Create(context.Background(), kubeconfigSecret)
 	if err != nil {
 		// TODO: what should happen if it already exists?
 		m.log.WithError(err).Error("error creating admin kubeconfig secret")
-		return err
+		return nil, err
 	}
 	m.log.WithField("secretName", kubeconfigSecret.Name).Info("uploaded admin kubeconfig secret")
 
-	return nil
+	return kubeconfigSecret, nil
+}
+
+func (m *InstallManager) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName string) error {
+	// Update the cluster deployment status with a reference to the admin kubeconfig secret:
+	m.log.Info("updating cluster deployment status")
+	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
+	return m.DynamicClient.Status().Update(context.Background(), cd)
 }
 
 func (m *InstallManager) copyFile(src, dst string) error {

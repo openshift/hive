@@ -38,6 +38,7 @@ const (
 	testName        = "foo"
 	testNamespace   = "default"
 	testClusterID   = "foo"
+	testAMI         = "ami-totallyfake"
 	adminPassword   = "adminpassword"
 	adminSSHKey     = "adminSSH"
 	pullSecret      = "pullSecret"
@@ -107,6 +108,8 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 									Size: ec2VolSize,
 									Type: ec2VolType,
 								},
+								AMIID: testAMI,
+								Zones: []string{"us-east-1a", "us-east-1b"},
 							},
 						},
 					},
@@ -185,6 +188,8 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 							Size: ec2VolSize,
 							Type: ec2VolType,
 						},
+						AMIID: testAMI,
+						Zones: []string{"us-east-1a", "us-east-1b"},
 					},
 				},
 			},

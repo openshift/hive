@@ -139,6 +139,19 @@ func TestInstallManager(t *testing.T) {
 			}
 			_, ok = adminKubeconfig.Data["kubeconfig"]
 			assert.True(t, ok)
+
+			// Ensure we set a status reference to the admin kubeconfig secret:
+			cd := &hivev1.ClusterDeployment{}
+			err = fakeClient.Get(context.Background(),
+				types.NamespacedName{
+					Namespace: testNamespace,
+					Name:      testClusterName,
+				},
+				cd)
+			if !assert.NoError(t, err) {
+				t.Fail()
+			}
+			assert.Equal(t, adminKubeconfig.Name, cd.Status.AdminKubeconfigSecret.Name)
 		})
 	}
 }

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,16 +43,23 @@ import (
 )
 
 const (
-	testName            = "foo"
-	installJobName      = "foo-install"
-	uninstallJobName    = "foo-uninstall"
-	testNamespace       = "default"
-	metadataName        = "foo-metadata"
-	adminPasswordSecret = "admin-password"
-	sshKeySecret        = "ssh-key"
-	pullSecretSecret    = "pull-secret"
-	testUUID            = "fakeUUID"
-	testAMI             = "ami-totallyfake"
+	testName              = "foo"
+	installJobName        = "foo-install"
+	uninstallJobName      = "foo-uninstall"
+	testNamespace         = "default"
+	metadataName          = "foo-metadata"
+	adminPasswordSecret   = "admin-password"
+	sshKeySecret          = "ssh-key"
+	pullSecretSecret      = "pull-secret"
+	testUUID              = "fakeUUID"
+	testAMI               = "ami-totallyfake"
+	adminKubeconfigSecret = "foo-admin-kubeconfig"
+	adminKubeconfig       = `clusters:
+- cluster:
+    certificate-authority-data: JUNK
+    server: https://foo-api.clusters.example.com:6443
+  name: foo
+`
 )
 
 func init() {
@@ -157,12 +165,34 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Parse server URL from admin kubeconfig",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testInstallJob(),
+				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.Equal(t, cd.Status.APIURL, "https://foo-api.clusters.example.com:6443")
+				assert.Equal(t, cd.Status.WebConsoleURL, "https://foo-api.clusters.example.com:6443/console")
+			},
+		},
+		{
 			name: "Completed install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testCompletedInstallJob(),
 				testMetadataConfigMap(),
 				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},

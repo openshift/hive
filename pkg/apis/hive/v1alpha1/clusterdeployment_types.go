@@ -82,6 +82,15 @@ type ClusterDeploymentStatus struct {
 
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`
+
+	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
+	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret"`
+
+	// APIURL is the URL where the cluster's API can be accessed.
+	APIURL string `json:"apiURL"`
+
+	// WebConsoleURL is the URL for the cluster's web console UI.
+	WebConsoleURL string `json:"webConsoleURL"`
 }
 
 // +genclient
@@ -89,6 +98,7 @@ type ClusterDeploymentStatus struct {
 
 // ClusterDeployment is the Schema for the clusterdeployments API
 // +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type ClusterDeployment struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

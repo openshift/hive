@@ -47,17 +47,7 @@ rules:
   - hive.openshift.io
   resources:
   - clusterdeployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
+  - clusterdeployments/status
   - clusterdeployments/finalizers
   verbs:
   - get

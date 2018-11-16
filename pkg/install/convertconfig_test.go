@@ -23,6 +23,7 @@ import (
 
 	"github.com/openshift/installer/pkg/ipnet"
 	installtypes "github.com/openshift/installer/pkg/types"
+	installawstypes "github.com/openshift/installer/pkg/types/aws"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -148,26 +149,26 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		PullSecret: pullSecret,
 		Networking: installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
-			Type: "flannel",
+			Type: "OpenshiftSDN",
 			ServiceCIDR: ipnet.IPNet{
 				IPNet: parseCIDR("172.30.0.0/16"),
 			},
-			PodCIDR: ipnet.IPNet{
+			PodCIDR: &ipnet.IPNet{
 				IPNet: parseCIDR("10.128.0.0/14"),
 			},
 		},
 		Platform: installtypes.Platform{
-			AWS: &installtypes.AWSPlatform{
+			AWS: &installawstypes.Platform{
 				Region: awsRegion,
 				UserTags: map[string]string{
 					"foo": "bar",
 				},
 				VPCID:        vpcID,
 				VPCCIDRBlock: vpcCIDRBlock,
-				DefaultMachinePlatform: &installtypes.AWSMachinePoolPlatform{
+				DefaultMachinePlatform: &installawstypes.MachinePool{
 					InstanceType: awsInstanceType,
 					IAMRoleName:  iamRoleName,
-					EC2RootVolume: installtypes.EC2RootVolume{
+					EC2RootVolume: installawstypes.EC2RootVolume{
 						IOPS: ec2VolIOPS,
 						Size: ec2VolSize,
 						Type: ec2VolType,
@@ -180,10 +181,10 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				Name:     "masters",
 				Replicas: &replicas,
 				Platform: installtypes.MachinePoolPlatform{
-					AWS: &installtypes.AWSMachinePoolPlatform{
+					AWS: &installawstypes.MachinePool{
 						InstanceType: awsInstanceType,
 						IAMRoleName:  iamRoleName,
-						EC2RootVolume: installtypes.EC2RootVolume{
+						EC2RootVolume: installawstypes.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
 							Type: ec2VolType,
@@ -197,10 +198,10 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				Name:     "workers",
 				Replicas: &replicas,
 				Platform: installtypes.MachinePoolPlatform{
-					AWS: &installtypes.AWSMachinePoolPlatform{
+					AWS: &installawstypes.MachinePool{
 						InstanceType: awsInstanceType,
 						IAMRoleName:  iamRoleName,
-						EC2RootVolume: installtypes.EC2RootVolume{
+						EC2RootVolume: installawstypes.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
 							Type: ec2VolType,
@@ -259,7 +260,7 @@ func TestConvert(t *testing.T) {
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
 				ic := buildBaseExpectedInstallConfig()
-				ic.Networking.PodCIDR = ipnet.IPNet{}
+				ic.Networking.PodCIDR = &ipnet.IPNet{}
 				ic.Networking.ServiceCIDR = ipnet.IPNet{}
 				return ic
 			}(),

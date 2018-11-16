@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: {{.Namespace}}
+  name: {{fname "podname"}}
+spec:
+  containers:
+  - image: "busybox"
+foo: {{getOr . "Empty" "fallback"}}
+bar: {{getOr . "Namespace" "error"}}

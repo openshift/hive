@@ -14,14 +14,15 @@ import (
 	clusterapi "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/types/aws"
 )
 
 // Machines returns a list of machines for a machinepool.
 func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDataSecret string) ([]clusterapi.Machine, error) {
-	if configPlatform := config.Platform.Name(); configPlatform != types.PlatformNameAWS {
+	if configPlatform := config.Platform.Name(); configPlatform != aws.Name {
 		return nil, fmt.Errorf("non-AWS configuration: %q", configPlatform)
 	}
-	if poolPlatform := pool.Platform.Name(); poolPlatform != types.PlatformNameAWS {
+	if poolPlatform := pool.Platform.Name(); poolPlatform != aws.Name {
 		return nil, fmt.Errorf("non-AWS machine-pool: %q", poolPlatform)
 	}
 	clustername := config.ObjectMeta.Name
@@ -33,15 +34,10 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 	if pool.Replicas != nil {
 		total = *pool.Replicas
 	}
-	numOfAZs := int64(len(azs))
 	var machines []clusterapi.Machine
-	for idx := range azs {
-		replicas := int32(total / numOfAZs)
-		if int64(idx) < total%numOfAZs {
-			replicas++
-		}
-
-		provider, err := provider(config.ClusterID, clustername, platform, mpool, idx, role, userDataSecret)
+	for idx := int64(0); idx < total; idx++ {
+		azIndex := int(idx) % len(azs)
+		provider, err := provider(config.ClusterID, clustername, platform, mpool, azIndex, role, userDataSecret)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create provider")
 		}
@@ -73,7 +69,7 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 	return machines, nil
 }
 
-func provider(clusterID, clusterName string, platform *types.AWSPlatform, mpool *types.AWSMachinePoolPlatform, azIdx int, role, userDataSecret string) (*awsprovider.AWSMachineProviderConfig, error) {
+func provider(clusterID, clusterName string, platform *aws.Platform, mpool *aws.MachinePool, azIdx int, role, userDataSecret string) (*awsprovider.AWSMachineProviderConfig, error) {
 	az := mpool.Zones[azIdx]
 	tags, err := tagsFromUserTags(clusterID, clusterName, platform.UserTags)
 	if err != nil {

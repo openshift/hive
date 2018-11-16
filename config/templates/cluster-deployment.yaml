@@ -113,7 +113,7 @@ objects:
       clusterID: ${CLUSTER_NAME} # TODO: what kind of ID is this
       baseDomain: ${BASE_DOMAIN}
       networking:
-        type: openshift-sdn
+        type: OpenshiftSDN
         serviceCIDR: "10.3.0.0/16"
         podCIDR: "10.2.0.0/16"
       platform:

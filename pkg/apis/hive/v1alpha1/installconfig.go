@@ -62,9 +62,9 @@ type NetworkType string
 
 const (
 	// NetworkTypeOpenshiftSDN is used to install with SDN.
-	NetworkTypeOpenshiftSDN NetworkType = "openshift-sdn"
+	NetworkTypeOpenshiftSDN NetworkType = "OpenshiftSDN"
 	// NetworkTypeOpenshiftOVN is used to install with OVN.
-	NetworkTypeOpenshiftOVN NetworkType = "openshift-ovn"
+	NetworkTypeOpenshiftOVN NetworkType = "OVNKubernetes"
 )
 
 // AWSPlatform stores all the global configuration that

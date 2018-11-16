@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	"github.com/openshift/installer/pkg/asset/kubeconfig"
 	"github.com/openshift/installer/pkg/asset/manifests"
+	"github.com/openshift/installer/pkg/asset/templates"
 	destroybootstrap "github.com/openshift/installer/pkg/destroy/bootstrap"
 )
 
@@ -59,6 +60,16 @@ var (
 		assets: []asset.WritableAsset{&manifests.Manifests{}, &manifests.Tectonic{}},
 	}
 
+	manifestTemplatesTarget = target{
+		name: "Manifest templates",
+		command: &cobra.Command{
+			Use:   "manifest-templates",
+			Short: "Generates the unrendered Kubernetes manifest templates",
+			Long:  "",
+		},
+		assets: []asset.WritableAsset{&templates.Templates{}},
+	}
+
 	ignitionConfigsTarget = target{
 		name: "Ignition Configs",
 		command: &cobra.Command{
@@ -78,13 +89,17 @@ var (
 			// FIXME: add longer descriptions for our commands with examples for better UX.
 			// Long:  "",
 			PostRunE: func(_ *cobra.Command, _ []string) error {
-				return destroyBootstrap(context.Background(), rootOpts.dir)
+				err := destroyBootstrap(context.Background(), rootOpts.dir)
+				if err != nil {
+					return err
+				}
+				return logComplete(rootOpts.dir)
 			},
 		},
 		assets: []asset.WritableAsset{&cluster.TerraformVariables{}, &kubeconfig.Admin{}, &cluster.Cluster{}},
 	}
 
-	targets = []target{installConfigTarget, manifestsTarget, ignitionConfigsTarget, clusterTarget}
+	targets = []target{installConfigTarget, manifestTemplatesTarget, manifestsTarget, ignitionConfigsTarget, clusterTarget}
 )
 
 // Deprecated: Use 'create' subcommands instead.
@@ -185,10 +200,21 @@ func destroyBootstrap(ctx context.Context, directory string) (err error) {
 		eventContext,
 		"",
 		func(sinceResourceVersion string) (watch.Interface, error) {
-			return events.Watch(metav1.ListOptions{
-				Watch:           true,
-				ResourceVersion: sinceResourceVersion,
-			})
+			for {
+				watcher, err := events.Watch(metav1.ListOptions{
+					ResourceVersion: sinceResourceVersion,
+				})
+				if err == nil {
+					return watcher, nil
+				}
+				select {
+				case <-eventContext.Done():
+					return watcher, err
+				default:
+					logrus.Warningf("Failed to connect events watcher: %s", err)
+					time.Sleep(2 * time.Second)
+				}
+			}
 		},
 		func(watchEvent watch.Event) (bool, error) {
 			event, ok := watchEvent.Object.(*corev1.Event)
@@ -210,9 +236,22 @@ func destroyBootstrap(ctx context.Context, directory string) (err error) {
 		},
 	)
 	if err != nil {
-		return errors.Wrap(err, "waiting for bootstrap-complete")
+		logrus.Error(errors.Wrap(err, "waiting for bootstrap-complete"))
+		return nil
 	}
 
 	logrus.Info("Destroying the bootstrap resources...")
 	return destroybootstrap.Destroy(rootOpts.dir)
+}
+
+// logComplete prints info upon completion
+func logComplete(directory string) error {
+	absDir, err := filepath.Abs(directory)
+	if err != nil {
+		return err
+	}
+	kubeconfig := filepath.Join(absDir, "auth", "kubeconfig")
+	logrus.Infof("Install complete! Run 'export KUBECONFIG=%s' to manage your cluster.", kubeconfig)
+	logrus.Info("After exporting your kubeconfig, run 'oc -h' for a list of OpenShift client commands.")
+	return nil
 }

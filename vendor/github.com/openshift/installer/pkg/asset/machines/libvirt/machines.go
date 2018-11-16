@@ -10,15 +10,16 @@ import (
 	clusterapi "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/types/libvirt"
 )
 
 // Machines returns a list of machines for a machinepool.
 func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDataSecret string) ([]clusterapi.Machine, error) {
-	if configPlatform := config.Platform.Name(); configPlatform != types.PlatformNameLibvirt {
+	if configPlatform := config.Platform.Name(); configPlatform != libvirt.Name {
 		return nil, fmt.Errorf("non-Libvirt configuration: %q", configPlatform)
 	}
 	// FIXME: empty is a valid case for Libvirt as we don't use it.
-	if poolPlatform := pool.Platform.Name(); poolPlatform != "" && poolPlatform != types.PlatformNameLibvirt {
+	if poolPlatform := pool.Platform.Name(); poolPlatform != "" && poolPlatform != libvirt.Name {
 		return nil, fmt.Errorf("non-Libvirt machine-pool: %q", poolPlatform)
 	}
 	clustername := config.ObjectMeta.Name
@@ -30,7 +31,7 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 	if pool.Replicas != nil {
 		total = *pool.Replicas
 	}
-	provider := provider(platform, pool.Name)
+	provider := provider(clustername, platform, pool.Name)
 	var machines []clusterapi.Machine
 	for idx := int64(0); idx < total; idx++ {
 		machine := clusterapi.Machine{
@@ -40,7 +41,7 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "openshift-cluster-api",
-				Name:      fmt.Sprintf("%s%d", pool.Name, idx),
+				Name:      fmt.Sprintf("%s-%s-%d", clustername, pool.Name, idx),
 				Labels: map[string]string{
 					"sigs.k8s.io/cluster-api-cluster":      clustername,
 					"sigs.k8s.io/cluster-api-machine-role": role,
@@ -60,7 +61,7 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 	return machines, nil
 }
 
-func provider(platform *types.LibvirtPlatform, name string) *libvirtprovider.LibvirtMachineProviderConfig {
+func provider(clusterName string, platform *libvirt.Platform, name string) *libvirtprovider.LibvirtMachineProviderConfig {
 	return &libvirtprovider.LibvirtMachineProviderConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "libvirtproviderconfig.k8s.io/v1alpha1",
@@ -68,12 +69,12 @@ func provider(platform *types.LibvirtPlatform, name string) *libvirtprovider.Lib
 		},
 		DomainMemory: 2048,
 		DomainVcpu:   2,
-		IgnKey:       fmt.Sprintf("/var/lib/libvirt/images/%s.ign", name),
+		IgnKey:       fmt.Sprintf("/var/lib/libvirt/images/%s-%s.ign", clusterName, name),
 		Volume: &libvirtprovider.Volume{
 			PoolName:     "default",
-			BaseVolumeID: "/var/lib/libvirt/images/coreos_base",
+			BaseVolumeID: fmt.Sprintf("/var/lib/libvirt/images/%s-base", clusterName),
 		},
-		NetworkInterfaceName:    platform.Network.Name,
+		NetworkInterfaceName:    clusterName,
 		NetworkInterfaceAddress: platform.Network.IPRange,
 		Autostart:               false,
 		URI:                     platform.URI,

@@ -130,7 +130,7 @@ Finally, if you have a firewall, you may have to allow connections to the
 libvirt daemon from the IP range used by your cluster nodes.
 
 The following examples use the default cluster IP range of `192.168.126.0/24` (which is currently not configurable) and a libvirt `default` subnet of `192.168.124.0/24`, which might be different in your configuration.
-If you're uncertain about the libvirt *default* subnet you should be able to see its address using the command `ip -4 a show dev virbr0` or by inspecting `virsh --connect qemu:///system net-dumpxml default.
+If you're uncertain about the libvirt *default* subnet you should be able to see its address using the command `ip -4 a show dev virbr0` or by inspecting `virsh --connect qemu:///system net-dumpxml default`.
 Ensure the cluster IP range does not overlap your `virbr0` IP address.
 
 #### iptables
@@ -274,7 +274,7 @@ Using the domain names above will only work if you [set up the DNS overlay](#set
 Alternatively, if you didn't set up DNS on the host, you can use:
 
 ```sh
-virsh -c "${OPENSHIFT_INSTALL_LIBVIRT_URI}" domifaddr master0  # to get the master IP
+virsh -c "${OPENSHIFT_INSTALL_LIBVIRT_URI}" domifaddr "${OPENSHIFT_INSTALL_CLUSTER_NAME}-master-0"  # to get the master IP
 ssh core@$MASTER_IP
 ```
 
@@ -286,7 +286,7 @@ You'll need a `kubectl` binary on your path and [the kubeconfig from your `clust
 
 ```sh
 export KUBECONFIG="${DIR}/auth/kubeconfig"
-kubectl get -n tectonic-system pods
+kubectl get --all-namespaces pods
 ```
 
 Alternatively, you can run `kubectl` from the bootstrap or master nodes.

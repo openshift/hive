@@ -18,10 +18,6 @@ ignored = ["github.com/openshift/installer/tests*"]
   version = "0.26.0"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/coreos/tectonic-config"
-
-[[constraint]]
   name = "github.com/libvirt/libvirt-go"
   version = "4.7.0"
 
@@ -75,3 +71,11 @@ ignored = ["github.com/openshift/installer/tests*"]
 [[constraint]]
   name = "k8s.io/utils"
   revision = "4c3feeb576b06ef8fea769809bd3db5e5e78dc23"
+
+[[constraint]]
+  name = "github.com/openshift/cluster-network-operator"
+  revision = "fb8b55a1072436a51b153de9acf5bf5525efcf83"
+
+[[constraint]]
+  name = "github.com/gophercloud/utils"
+  revision = "34f5991525d116b3832e0d9409492274f1c06bda"

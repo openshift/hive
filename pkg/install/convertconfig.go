@@ -26,6 +26,9 @@ import (
 
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
+	installeraws "github.com/openshift/installer/pkg/types/aws"
+
+	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 )
 
 // generateInstallConfig builds an InstallConfig for the installer from our ClusterDeploymentSpec.
@@ -34,28 +37,27 @@ import (
 //
 // It is assumed the caller will lookup the admin password and ssh key from their respective secrets.
 func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
-	/*
-		networkType, err := convertNetworkingType(spec.Config.Networking.Type)
-		if err != nil {
-			return nil, err
-		}
-	*/
-
 	spec := cd.Spec
+
+	networkType, err := convertNetworkingType(spec.Config.Networking.Type)
+	if err != nil {
+		return nil, err
+	}
+
 	platform := types.Platform{}
 	if spec.Config.Platform.AWS != nil {
 		aws := spec.Config.Platform.AWS
-		platform.AWS = &types.AWSPlatform{
+		platform.AWS = &installeraws.Platform{
 			Region:       aws.Region,
 			UserTags:     aws.UserTags,
 			VPCID:        aws.VPCID,
 			VPCCIDRBlock: aws.VPCCIDRBlock,
 		}
 		if aws.DefaultMachinePlatform != nil {
-			platform.AWS.DefaultMachinePlatform = &types.AWSMachinePoolPlatform{
+			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
 				InstanceType: aws.DefaultMachinePlatform.InstanceType,
 				IAMRoleName:  aws.DefaultMachinePlatform.IAMRoleName,
-				EC2RootVolume: types.EC2RootVolume{
+				EC2RootVolume: installeraws.EC2RootVolume{
 					IOPS: aws.DefaultMachinePlatform.EC2RootVolume.IOPS,
 					Size: aws.DefaultMachinePlatform.EC2RootVolume.Size,
 					Type: aws.DefaultMachinePlatform.EC2RootVolume.Type,
@@ -73,10 +75,10 @@ func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, 
 			Replicas: mp.Replicas,
 		}
 		if mp.Platform.AWS != nil {
-			newMP.Platform.AWS = &types.AWSMachinePoolPlatform{
+			newMP.Platform.AWS = &installeraws.MachinePool{
 				InstanceType: mp.Platform.AWS.InstanceType,
 				IAMRoleName:  mp.Platform.AWS.IAMRoleName,
-				EC2RootVolume: types.EC2RootVolume{
+				EC2RootVolume: installeraws.EC2RootVolume{
 					IOPS: mp.Platform.AWS.EC2RootVolume.IOPS,
 					Size: mp.Platform.AWS.EC2RootVolume.Size,
 					Type: mp.Platform.AWS.EC2RootVolume.Type,
@@ -100,12 +102,11 @@ func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, 
 		},
 		BaseDomain: spec.Config.BaseDomain,
 		Networking: types.Networking{
-			// TODO: installer currently only works with flannel, flagged for TODO on their end here: https://github.com/openshift/installer/blob/master/pkg/asset/installconfig/installconfig.go#L82
-			Type: "flannel",
+			Type: networkType,
 			ServiceCIDR: ipnet.IPNet{
 				IPNet: parseCIDR(spec.Config.Networking.ServiceCIDR),
 			},
-			PodCIDR: ipnet.IPNet{
+			PodCIDR: &ipnet.IPNet{
 				IPNet: parseCIDR(spec.Config.Networking.PodCIDR),
 			},
 		},
@@ -124,12 +125,12 @@ func parseCIDR(s string) net.IPNet {
 	return *cidr
 }
 
-func convertNetworkingType(hnt hivev1.NetworkType) (types.NetworkType, error) {
+func convertNetworkingType(hnt hivev1.NetworkType) (netopv1.NetworkType, error) {
 	switch hnt {
 	case hivev1.NetworkTypeOpenshiftOVN:
-		return types.NetworkTypeOpenshiftOVN, nil
+		return netopv1.NetworkTypeOVNKubernetes, nil
 	case hivev1.NetworkTypeOpenshiftSDN:
-		return types.NetworkTypeOpenshiftSDN, nil
+		return netopv1.NetworkTypeOpenshiftSDN, nil
 	default:
 		return "", fmt.Errorf("unknown NetworkType: %s", hnt)
 	}

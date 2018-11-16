@@ -115,17 +115,6 @@
   version = "v0.26.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:3f74b3c0cc3e70631a87355e7265fcf84d0d65f4b75dc6eb9d55e942a5ca0a05"
-  name = "github.com/coreos/tectonic-config"
-  packages = [
-    "config/kube-addon",
-    "config/tectonic-network",
-  ]
-  pruneopts = "NUT"
-  revision = "0d649ebfd3552dfa5c6cc2cf053e17ba924b7024"
-
-[[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -209,6 +198,38 @@
   pruneopts = "NUT"
   revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
   version = "v0.2.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:ad26de5429bd2d4dec5ba169e758795db2f6b054a3fd15dee10b029a5f371992"
+  name = "github.com/gophercloud/gophercloud"
+  packages = [
+    ".",
+    "openstack",
+    "openstack/compute/v2/flavors",
+    "openstack/compute/v2/images",
+    "openstack/compute/v2/servers",
+    "openstack/identity/v2/tenants",
+    "openstack/identity/v2/tokens",
+    "openstack/identity/v3/tokens",
+    "openstack/networking/v2/extensions/layer3/routers",
+    "openstack/networking/v2/extensions/security/groups",
+    "openstack/networking/v2/extensions/security/rules",
+    "openstack/networking/v2/networks",
+    "openstack/networking/v2/ports",
+    "openstack/networking/v2/subnets",
+    "openstack/utils",
+    "pagination",
+  ]
+  pruneopts = "NUT"
+  revision = "3a7818a07cfc862267a0b03635075a444c92dcda"
+
+[[projects]]
+  digest = "1:df12b635fdefd90b1d139a70c45716896552051589b004021c745dcbaf0dad96"
+  name = "github.com/gophercloud/utils"
+  packages = ["openstack/clientconfig"]
+  pruneopts = "NUT"
+  revision = "34f5991525d116b3832e0d9409492274f1c06bda"
 
 [[projects]]
   branch = "master"
@@ -334,6 +355,13 @@
   packages = ["pkg/apis/libvirtproviderconfig/v1alpha1"]
   pruneopts = "NUT"
   revision = "437b1012ea0bf4c6a1189e42ff3755933689eeb4"
+
+[[projects]]
+  digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
+  name = "github.com/openshift/cluster-network-operator"
+  packages = ["pkg/apis/networkoperator/v1"]
+  pruneopts = "NUT"
+  revision = "fb8b55a1072436a51b153de9acf5bf5525efcf83"
 
 [[projects]]
   digest = "1:14f70ac5f181ccb012cddc7c72ac28709497155340b2fad822bd15d9a8722d93"
@@ -607,7 +635,7 @@
   revision = "7c111c89a854dfd8ba47d0bfdbe352bc85951011"
 
 [[projects]]
-  digest = "1:6f470287ef14e234c58e3ad27ff96a850bdc8283cae42e242f2ba5ce67e6b475"
+  digest = "1:db1a4cd5c12f340d0779da16d2d5ae2419b1a470d010fc988e5e345b8c7f494c"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/errors",
@@ -641,7 +669,6 @@
     "pkg/util/json",
     "pkg/util/naming",
     "pkg/util/net",
-    "pkg/util/rand",
     "pkg/util/runtime",
     "pkg/util/sets",
     "pkg/util/validation",
@@ -770,13 +797,19 @@
     "github.com/aws/aws-sdk-go/service/ec2",
     "github.com/coreos/ignition/config/util",
     "github.com/coreos/ignition/config/v2_2/types",
-    "github.com/coreos/tectonic-config/config/kube-addon",
-    "github.com/coreos/tectonic-config/config/tectonic-network",
     "github.com/ghodss/yaml",
+    "github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
+    "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets",
+    "github.com/gophercloud/utils/openstack/clientconfig",
     "github.com/gregjones/httpcache",
     "github.com/gregjones/httpcache/diskcache",
     "github.com/libvirt/libvirt-go",
     "github.com/openshift/cluster-api-provider-libvirt/pkg/apis/libvirtproviderconfig/v1alpha1",
+    "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/hive/contrib/pkg/awstagdeprovision",
     "github.com/pborman/uuid",
     "github.com/pkg/errors",
@@ -791,7 +824,6 @@
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/runtime",
-    "k8s.io/apimachinery/pkg/util/rand",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/watch",

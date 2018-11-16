@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busybox1
+  namespace: ns
+spec:
+  containers:
+  - image: busybox
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: crb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  name: cr
+subjects:
+  - kind: ServiceAccount
+    name: sa
+    namespace: ns
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm
+  namespace: ns
+data:
+  key: val

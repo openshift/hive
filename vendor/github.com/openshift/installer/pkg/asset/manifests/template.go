@@ -18,6 +18,7 @@ type cloudCredsSecretData struct {
 
 type bootkubeTemplateData struct {
 	Base64encodeCloudProviderConfig string
+	EtcdCaCert                      string
 	EtcdClientCert                  string
 	EtcdClientKey                   string
 	KubeCaCert                      string
@@ -28,7 +29,6 @@ type bootkubeTemplateData struct {
 	RootCaCert                      string
 	ServiceServingCaCert            string
 	ServiceServingCaKey             string
-	TectonicNetworkOperatorImage    string
 	WorkerIgnConfig                 string
 	CVOClusterID                    string
 	EtcdEndpointHostnames           []string
@@ -36,7 +36,5 @@ type bootkubeTemplateData struct {
 }
 
 type tectonicTemplateData struct {
-	KubeAddonOperatorImage string
-	PullSecret             string
-	CloudCreds             cloudCredsSecretData
+	CloudCreds cloudCredsSecretData
 }

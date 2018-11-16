@@ -1,0 +1,72 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: openshift-sdn
+  name: sdn-controller-config
+data:
+  controller-config.yaml: |-
+{{.NetworkControllerConfig | indent 4}}
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sdn-controller
+  namespace: openshift-sdn
+  annotations:
+    kubernetes.io/description: |
+      This deployment runs the openshift SDN networking controller.
+  labels:
+    app: sdn-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sdn-controller
+  template:
+    metadata:
+      labels:
+        app: sdn-controller
+    spec:
+      containers:
+      - name: sdn-controller
+        image: {{.HypershiftImage}}
+        command: ["hypershift", "openshift-network-controller"]
+        args:
+        - "--config=/config/controller-config.yaml"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 50Mi
+          requests:
+            cpu: 20m
+            memory: 50Mi
+        volumeMounts:
+        - mountPath: /config
+          name: config
+          readOnly: true
+        env:
+        - name: KUBERNETES_SERVICE_PORT # allows the controller to communicate with apiserver directly on same host.
+          value: "6443"
+        - name: KUBERNETES_SERVICE_HOST # allows the controller to communicate with apiserver directly on same host.
+          value: "127.0.0.1"
+      hostNetwork: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      restartPolicy: Always
+      serviceAccountName: sdn-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoSchedule"
+      volumes:
+      - configMap:
+          name: sdn-controller-config
+        name: config

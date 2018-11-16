@@ -11,6 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/openshift/installer/pkg/asset"
+	"github.com/openshift/installer/pkg/asset/cluster/aws"
+	"github.com/openshift/installer/pkg/asset/cluster/libvirt"
+	"github.com/openshift/installer/pkg/asset/cluster/openstack"
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	"github.com/openshift/installer/pkg/asset/kubeconfig"
 	"github.com/openshift/installer/pkg/terraform"
@@ -87,28 +90,11 @@ func (c *Cluster) Generate(parents asset.Parents) (err error) {
 
 	switch {
 	case installConfig.Config.Platform.AWS != nil:
-		metadata.ClusterPlatformMetadata.AWS = &types.ClusterAWSPlatformMetadata{
-			Region: installConfig.Config.Platform.AWS.Region,
-			Identifier: []map[string]string{
-				{
-					"tectonicClusterID": installConfig.Config.ClusterID,
-				},
-				{
-					fmt.Sprintf("kubernetes.io/cluster/%s", installConfig.Config.ObjectMeta.Name): "owned",
-				},
-			},
-		}
+		metadata.ClusterPlatformMetadata.AWS = aws.Metadata(installConfig.Config)
 	case installConfig.Config.Platform.OpenStack != nil:
-		metadata.ClusterPlatformMetadata.OpenStack = &types.ClusterOpenStackPlatformMetadata{
-			Region: installConfig.Config.Platform.OpenStack.Region,
-			Identifier: map[string]string{
-				"tectonicClusterID": installConfig.Config.ClusterID,
-			},
-		}
+		metadata.ClusterPlatformMetadata.OpenStack = openstack.Metadata(installConfig.Config)
 	case installConfig.Config.Platform.Libvirt != nil:
-		metadata.ClusterPlatformMetadata.Libvirt = &types.ClusterLibvirtPlatformMetadata{
-			URI: installConfig.Config.Platform.Libvirt.URI,
-		}
+		metadata.ClusterPlatformMetadata.Libvirt = libvirt.Metadata(installConfig.Config)
 	default:
 		return fmt.Errorf("no known platform")
 	}
@@ -153,7 +139,7 @@ func (c *Cluster) Load(f asset.FileFetcher) (found bool, err error) {
 		return false, err
 	}
 
-	return true, fmt.Errorf("%q already exisits.  There may already be a running cluster", terraform.StateFileName)
+	return true, fmt.Errorf("%q already exists.  There may already be a running cluster", terraform.StateFileName)
 }
 
 // LoadMetadata loads the cluster metadata from an asset directory.

@@ -1,0 +1,1 @@
+Testing that documentation files are ignored.

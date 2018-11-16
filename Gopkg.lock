@@ -374,15 +374,26 @@
   version = "v1.4.2"
 
 [[projects]]
+  digest = "1:ccf387b1000d4864aaf832aae3524898c320263620f7e3162ded978fe2ea3ba4"
+  name = "github.com/openshift/cluster-network-operator"
+  packages = ["pkg/apis/networkoperator/v1"]
+  pruneopts = "T"
+  revision = "fb8b55a1072436a51b153de9acf5bf5525efcf83"
+
+[[projects]]
   branch = "master"
-  digest = "1:7d5000a492a42046700e3ddc4f61d3fa81815aa8b4e50af5247b061c2deb137f"
+  digest = "1:b5556252785f49933353e1d907718db5e302d77f533d7e2bd46bb907c352103c"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/ipnet",
+    "pkg/rhcos",
     "pkg/types",
+    "pkg/types/aws",
+    "pkg/types/libvirt",
+    "pkg/types/openstack",
   ]
   pruneopts = "T"
-  revision = "39523ae9bde306dcb36114c5e308e8283ce5b429"
+  revision = "5a740603a7129579d58c26f4b532dd8844f40f61"
 
 [[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
@@ -966,6 +977,7 @@
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/installer/pkg/ipnet",
+    "github.com/openshift/installer/pkg/rhcos",
     "github.com/openshift/installer/pkg/types",
     "github.com/pborman/uuid",
     "github.com/sirupsen/logrus",

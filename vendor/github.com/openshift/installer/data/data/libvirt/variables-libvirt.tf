@@ -1,11 +1,11 @@
+variable "bootstrap_dns" {
+  default     = true
+  description = "Whether to include DNS entries for the bootstrap node or not."
+}
+
 variable "tectonic_libvirt_uri" {
   type        = "string"
   description = "libvirt connection URI"
-}
-
-variable "tectonic_libvirt_network_name" {
-  type        = "string"
-  description = "Name of the libvirt network to create"
 }
 
 variable "tectonic_libvirt_network_if" {

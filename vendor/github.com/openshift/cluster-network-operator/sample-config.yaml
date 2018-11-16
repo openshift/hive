@@ -1,0 +1,13 @@
+apiVersion: "networkoperator.openshift.io/v1"
+kind: "NetworkConfig"
+metadata:
+  name: "default"
+spec:
+  serviceNetwork: "172.30.0.0/16"
+  clusterNetworks:
+    - cidr: "10.128.0.0/14"
+      hostSubnetLength: 9
+  defaultNetwork:
+    type: OpenshiftSDN
+    openshiftSDNConfig:
+      mode: Networkpolicy

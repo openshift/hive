@@ -4,11 +4,11 @@ import (
 	"net"
 	"os"
 
-	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
@@ -19,8 +19,9 @@ const (
 )
 
 var (
-	defaultServiceCIDR = parseCIDR("10.3.0.0/16")
-	defaultPodCIDR     = parseCIDR("10.2.0.0/16")
+	defaultServiceCIDR      = parseCIDR("10.3.0.0/16")
+	defaultClusterCIDR      = "10.2.0.0/16"
+	defaultHostSubnetLength = 9 // equivalent to a /23 per node
 )
 
 // InstallConfig generates the install-config.yml file.
@@ -79,15 +80,16 @@ func (a *InstallConfig) Generate(parents asset.Parents) error {
 		},
 		BaseDomain: baseDomain.BaseDomain,
 		Networking: types.Networking{
-			// TODO(yifan): Flannel is the temporal default network type for now,
-			// Need to update it to the new types.
-			Type: "flannel",
+			Type: "OpenshiftSDN",
 
 			ServiceCIDR: ipnet.IPNet{
 				IPNet: defaultServiceCIDR,
 			},
-			PodCIDR: ipnet.IPNet{
-				IPNet: defaultPodCIDR,
+			ClusterNetworks: []netopv1.ClusterNetwork{
+				{
+					CIDR:             defaultClusterCIDR,
+					HostSubnetLength: uint32(defaultHostSubnetLength),
+				},
 			},
 		},
 		PullSecret: pullSecret.PullSecret,
@@ -98,11 +100,10 @@ func (a *InstallConfig) Generate(parents asset.Parents) error {
 	switch {
 	case platform.AWS != nil:
 		a.Config.AWS = platform.AWS
-	case platform.Openstack != nil:
-		a.Config.OpenStack = platform.Openstack
+	case platform.OpenStack != nil:
+		a.Config.OpenStack = platform.OpenStack
 	case platform.Libvirt != nil:
 		a.Config.Libvirt = platform.Libvirt
-		a.Config.Libvirt.Network.Name = clusterName.ClusterName
 		numberOfMasters = 1
 		numberOfWorkers = 1
 	default:
@@ -143,17 +144,6 @@ func (a *InstallConfig) Files() []*asset.File {
 		return []*asset.File{a.File}
 	}
 	return []*asset.File{}
-}
-
-// ClusterDNSIP returns the string representation of the DNS server's IP
-// address.
-func ClusterDNSIP(installConfig *types.InstallConfig) (string, error) {
-	ip, err := cidr.Host(&installConfig.ServiceCIDR.IPNet, 10)
-	if err != nil {
-		return "", err
-	}
-
-	return ip.String(), nil
 }
 
 func parseCIDR(s string) net.IPNet {

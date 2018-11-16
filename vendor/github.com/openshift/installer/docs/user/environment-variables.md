@@ -5,7 +5,8 @@ The installer accepts a number of environment variable that allow the interactiv
 ## General
 
 * `OPENSHIFT_INSTALL_BASE_DOMAIN`:
-    The base domain of the cluster. All DNS records will be sub-domains of this base.
+    The base domain of the cluster.
+    All DNS records will be sub-domains of this base and will also include the cluster name.
 
     For AWS, this must be a previously-existing public Route 53 zone.  You can check for any already in your account with:
 
@@ -16,6 +17,9 @@ The installer accepts a number of environment variable that allow the interactiv
 * `OPENSHIFT_INSTALL_CLUSTER_NAME`:
      The name of the cluster.
      This will be used when generating sub-domains.
+
+     For libvirt, choose a name that is unique enough to be used as a prefix during cluster deletion.
+     For example, if you use `demo` as your cluster name, `openshift-install destroy cluster` may destroy all domains, networks, pools, and volumes that begin with `demo`.
 * `OPENSHIFT_INSTALL_EMAIL_ADDRESS`:
      The email address of the cluster administrator.
      This will be used to log in to the console.
@@ -47,5 +51,7 @@ The installer accepts a number of environment variable that allow the interactiv
     This must be accessible from the running cluster.
 * `OPENSHIFT_INSTALL_LIBVIRT_IMAGE`:
     The URI for the OS image.
-    For example it might be url like `http://aos-ostree.rhev-ci-vms.eng.rdu2.redhat.com/rhcos/images/cloud/latest/rhcos-qemu.qcow2.gz` or
-    a local file like `file:///tmp/openshift-install-853528428`.
+    For example it might be a URI like `https://example.com/rhcos-qemu.qcow2` or a local file like `file:///tmp/redhat-coreos-maipo-47.78-qemu.qcow2`.
+
+    **Warning**: you should only set this if you're testing RHCOS releases.
+    Most users should allow the installer to choose the OS image.

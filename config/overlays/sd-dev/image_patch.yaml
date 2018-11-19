@@ -8,6 +8,6 @@ spec:
     spec:
       containers:
       # Run from a defined image published to quay as necessary for SD's needs:
-      - image: quay.io/twiest/hive-controller:20181106
+      - image: quay.io/twiest/hive-controller:20181119
         name: manager
         imagePullPolicy: Always

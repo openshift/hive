@@ -13,6 +13,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > export INSTALLER_GOPATH=/path/to/openshift/installer/gopath
   > export INSTALLER_SRC=${INSTALLER_GOPATH}/src/github.com/openshift/installer
   > export INSTALLER_IMAGE_TAG=quay.io/twiest/installer:${RELEASE_VER}
+  > export AUTHFILE=~/.docker/config
   ```
 
 - Get the latest installer code
@@ -31,7 +32,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
 
 - Push the build installer image to quay
   ```shell
-  > BUILDAH_ISOLATION=chroot sudo buildah push --authfile $HOME/.docker/config.json ${INSTALLER_IMAGE_TAG} docker://${INSTALLER_IMAGE_TAG}
+  > BUILDAH_ISOLATION=chroot sudo buildah push --authfile ${AUTHFILE} ${INSTALLER_IMAGE_TAG} docker://${INSTALLER_IMAGE_TAG}
   ```
 
 ## Build the hive-controller Image
@@ -40,6 +41,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > export HIVE_GOPATH=/path/to/openshift/installer/gopath
   > export HIVE_SRC=${HIVE_GOPATH}/src/github.com/openshift/hive
   > export HIVE_IMAGE_TAG=quay.io/twiest/hive-controller:${RELEASE_VER}
+  > export AUTHFILE=~/.docker/config
   ```
 
 - Get the latest installer code
@@ -53,13 +55,12 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
 - Build the installer container
   ```shell
   > cd "${HIVE_SRC}"
-  > GOPATH="${HIVE_GOPATH}" make docker-build
-  > docker tag hive-controller "${HIVE_IMAGE_TAG}"
+  > IMG="${HIVE_IMAGE_TAG}" make buildah-build
   ```
 
 - Push the build installer image to quay
   ```shell
-  > docker push "${HIVE_IMAGE_TAG}"
+  > BUILDAH_ISOLATION=chroot sudo buildah push --authfile ${AUTHFILE} ${HIVE_IMAGE_TAG} docker://${HIVE_IMAGE_TAG}
   ```
 
 ## Change the OpenShift Hive SD Deploy to point to the new images

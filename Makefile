@@ -125,3 +125,14 @@ docker-build: manager hiveutil
 .PHONY: docker-push
 docker-push:
 	$(DOCKER_CMD) push ${IMG}
+
+# Build the image with buildah
+.PHONY: buildah-build
+buildah-build: manager hiveutil
+	$(eval build_path := ./build/hive)
+	$(eval tmp_build_path := "$(build_path)/tmp")
+	mkdir -p $(tmp_build_path)
+	cp $(build_path)/Dockerfile $(tmp_build_path)
+	cp ./bin/* $(tmp_build_path)
+	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} $(tmp_build_path)
+	rm -rf $(tmp_build_path)

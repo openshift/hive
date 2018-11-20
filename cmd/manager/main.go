@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -82,6 +84,7 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
+	flag.CommandLine.Parse([]string{})
 
 	return cmd
 }

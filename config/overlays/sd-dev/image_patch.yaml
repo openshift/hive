@@ -11,3 +11,14 @@ spec:
       - image: quay.io/twiest/hive-controller:20181119
         name: manager
         imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        command:
+          - /opt/services/manager
+          - --log-level
+          - debug

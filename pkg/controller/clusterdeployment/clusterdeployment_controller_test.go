@@ -43,22 +43,23 @@ import (
 )
 
 const (
-	testName              = "foo"
-	installJobName        = "foo-install"
-	uninstallJobName      = "foo-uninstall"
+	testName              = "foo-lqmsh"
+	testClusterID         = "bar"
+	installJobName        = "foo-lqmsh-install"
+	uninstallJobName      = "foo-lqmsh-uninstall"
 	testNamespace         = "default"
-	metadataName          = "foo-metadata"
+	metadataName          = "foo-lqmsh-metadata"
 	adminPasswordSecret   = "admin-password"
 	sshKeySecret          = "ssh-key"
 	pullSecretSecret      = "pull-secret"
 	testUUID              = "fakeUUID"
 	testAMI               = "ami-totallyfake"
-	adminKubeconfigSecret = "foo-admin-kubeconfig"
+	adminKubeconfigSecret = "foo-lqmsh-admin-kubeconfig"
 	adminKubeconfig       = `clusters:
 - cluster:
     certificate-authority-data: JUNK
-    server: https://foo-api.clusters.example.com:6443
-  name: foo
+    server: https://bar-api.clusters.example.com:6443
+  name: bar
 `
 )
 
@@ -181,8 +182,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				assert.Equal(t, cd.Status.APIURL, "https://foo-api.clusters.example.com:6443")
-				assert.Equal(t, cd.Status.WebConsoleURL, "https://foo-api.clusters.example.com:6443/console")
+				assert.Equal(t, cd.Status.APIURL, "https://bar-api.clusters.example.com:6443")
+				assert.Equal(t, cd.Status.WebConsoleURL, "https://bar-api.clusters.example.com:6443/console")
 			},
 		},
 		{
@@ -309,6 +310,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
+				ClusterID: testClusterID,
 				Admin: hivev1.Admin{
 					Email: "user@example.com",
 					Password: corev1.LocalObjectReference{

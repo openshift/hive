@@ -342,7 +342,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		if err != nil {
 			return err
 		}
-		cluster, ok := config.Clusters[cd.Name]
+		cluster, ok := config.Clusters[cd.Spec.Config.ClusterID]
 		if !ok {
 			return fmt.Errorf("error parsing admin kubeconfig secret data")
 		}

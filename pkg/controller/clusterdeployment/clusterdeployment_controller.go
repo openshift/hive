@@ -196,6 +196,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		}
 		ami, err := r.amiLookupFunc(cd)
 		if err != nil {
+			cdLog.WithError(err).Error("error looking up default AMI for cluster")
 			return reconcile.Result{}, err
 		}
 		cd.Spec.Config.AWS.DefaultMachinePlatform.AMIID = ami

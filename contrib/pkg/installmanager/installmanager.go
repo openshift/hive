@@ -19,7 +19,9 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -33,25 +35,31 @@ import (
 const (
 	// metadataRelativePath is the location of the installers cluster metadata file
 	// relative to our WorkDir.
-	metadataRelativePath        = "metadata.json"
-	adminKubeConfigRelativePath = "auth/kubeconfig"
-	uuidKey                     = "tectonicClusterID"
-	kubernetesKeyPrefix         = "kubernetes.io/cluster/"
+	metadataRelativePath                = "metadata.json"
+	adminKubeConfigRelativePath         = "auth/kubeconfig"
+	uuidKey                             = "tectonicClusterID"
+	kubernetesKeyPrefix                 = "kubernetes.io/cluster/"
+	metadataConfigmapStringTemplate     = "%s-metadata"
+	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"
+	sleepBetweenRetries                 = time.Second * 5
 )
 
 // InstallManager coordinates executing the openshift-install binary, modifying
 // generated assets, and uploading artifacts to the kube API after completion.
 type InstallManager struct {
-	log                   log.FieldLogger
-	LogLevel              string
-	WorkDir               string
-	InstallConfig         string
-	ClusterUUID           string
-	Region                string
-	ClusterName           string
-	Namespace             string
-	DynamicClient         client.Client
-	SkipPreInstallCleanup bool
+	log                           log.FieldLogger
+	LogLevel                      string
+	WorkDir                       string
+	InstallConfig                 string
+	ClusterUUID                   string
+	Region                        string
+	ClusterName                   string
+	Namespace                     string
+	DynamicClient                 client.Client
+	runUninstaller                func(clusterName, region, uuid string, logger log.FieldLogger) error
+	uploadClusterMetadata         func(*hivev1.ClusterDeployment, *InstallManager) error
+	updateClusterDeploymentStatus func(*hivev1.ClusterDeployment, string, *InstallManager) error
+	uploadAdminKubeconfig         func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -102,6 +110,12 @@ func NewInstallManagerCommand() *cobra.Command {
 
 // Complete sets remaining fields on the InstallManager based on command options and arguments.
 func (m *InstallManager) Complete(args []string) error {
+	// Connect up structure's function pointers
+	m.uploadClusterMetadata = uploadClusterMetadata
+	m.updateClusterDeploymentStatus = updateClusterDeploymentStatus
+	m.uploadAdminKubeconfig = uploadAdminKubeconfig
+	m.runUninstaller = runUninstaller
+
 	// Set log level
 	level, err := log.ParseLevel(m.LogLevel)
 	if err != nil {
@@ -162,17 +176,22 @@ func (m *InstallManager) Run() error {
 
 	// Try to upload any artifacts that exist regardless if the install errored or not.
 	// We may need to cleanup.
-	if err := m.uploadClusterMetadata(cd); err != nil {
-		m.log.WithError(err).Fatal("error uploading cluster metadata.json")
+	if err := m.uploadClusterMetadata(cd, m); err != nil {
+		// non-fatal. log and continue.
+		m.log.WithError(err).Warning("error uploading cluster metadata.json")
 	}
 
-	adminKubeconfigSecret, err := m.uploadAdminKubeconfig(cd)
+	adminKubeconfigSecret, err := m.uploadAdminKubeconfig(cd, m)
 	if err != nil {
-		m.log.WithError(err).Fatal("error uploading admin kubeconfig")
+		// fatal. without admin kubeconfig we have no cluster
+		m.log.WithError(err).Error("error uploading admin kubeconfig")
+		return fmt.Errorf("error trying to save admin kubeconfig: %v", err)
 	}
 
-	if err := m.updateClusterDeploymentStatus(cd, adminKubeconfigSecret.Name); err != nil {
-		m.log.WithError(err).Fatal("error updating cluster deployment status")
+	if err := m.updateClusterDeploymentStatus(cd, adminKubeconfigSecret.Name, m); err != nil {
+		// non-fatal. log and continue.
+		// will fix up any updates to the clusterdeployment in the periodic controller
+		m.log.WithError(err).Warning("error updating cluster deployment status")
 	}
 
 	if installErr != nil {
@@ -206,7 +225,27 @@ func (m *InstallManager) waitForInstallerBinaries() {
 
 // cleanupBeforeInstall allows recovering from an installation error and allows retries
 func (m *InstallManager) cleanupBeforeInstall() error {
-	// first cleanup any remnant cache files from a previous installation attempt
+	if err := m.cleanupMetadataConfigmap(); err != nil {
+		return err
+	}
+
+	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
+		return err
+	}
+
+	if err := m.cleanupTerraformFiles(); err != nil {
+		return err
+	}
+
+	if err := m.runUninstaller(m.ClusterName, m.Region, m.ClusterUUID, m.log); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *InstallManager) cleanupTerraformFiles() error {
+	// cleanup any remnant cache files from a previous installation attempt
 	deleteFiles := []string{
 		"auth",
 		"metadata.json",
@@ -226,31 +265,31 @@ func (m *InstallManager) cleanupBeforeInstall() error {
 		}
 	}
 
-	// now run the uninstaller to clean up any cloud resources previously created
+	return nil
+}
+
+func runUninstaller(clusterName, region, uuid string, logger log.FieldLogger) error {
+	// run the uninstaller to clean up any cloud resources previously created
 	filters := []awstagdeprovision.AWSFilter{
-		{uuidKey: m.ClusterUUID},
-		{kubernetesKeyPrefix + m.ClusterName: "owned"},
+		{uuidKey: uuid},
+		{kubernetesKeyPrefix + clusterName: "owned"},
 	}
 	uninstaller := &awstagdeprovision.ClusterUninstaller{
 		Filters:     filters,
-		Region:      m.Region,
-		ClusterName: m.ClusterName,
-		Logger:      m.log,
+		Region:      region,
+		ClusterName: clusterName,
+		Logger:      logger,
 	}
 
 	err := uninstaller.Run()
-
 	return err
 }
 
 func (m *InstallManager) runInstaller() error {
 
-	if !m.SkipPreInstallCleanup {
-		err := m.cleanupBeforeInstall()
-		if err != nil {
-			m.log.WithError(err).Error("error while trying to preemptively clean up")
-			return err
-		}
+	if err := m.cleanupBeforeInstall(); err != nil {
+		m.log.WithError(err).Error("error while trying to preemptively clean up")
+		return err
 	}
 
 	m.log.Info("running openshift-install")
@@ -289,7 +328,7 @@ func (m *InstallManager) runInstaller() error {
 	return err
 }
 
-func (m *InstallManager) uploadClusterMetadata(cd *hivev1.ClusterDeployment) error {
+func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 	m.log.Infoln("uploading cluster metadata")
 	fullMetadataPath := filepath.Join(m.WorkDir, metadataRelativePath)
 	if _, err := os.Stat(fullMetadataPath); os.IsNotExist(err) {
@@ -305,7 +344,7 @@ func (m *InstallManager) uploadClusterMetadata(cd *hivev1.ClusterDeployment) err
 
 	metadataCfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-metadata", m.ClusterName),
+			Name:      fmt.Sprintf(metadataConfigmapStringTemplate, m.ClusterName),
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
@@ -339,9 +378,10 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 	return cd, nil
 }
 
-func (m *InstallManager) uploadAdminKubeconfig(cd *hivev1.ClusterDeployment) (*corev1.Secret, error) {
+func uploadAdminKubeconfig(cd *hivev1.ClusterDeployment, m *InstallManager) (*corev1.Secret, error) {
 	m.log.Infoln("uploading admin kubeconfig")
 	fullPath := filepath.Join(m.WorkDir, adminKubeConfigRelativePath)
+
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		m.log.WithField("path", fullPath).Error("admin kubeconfig file does not exist")
 		return nil, err
@@ -355,7 +395,7 @@ func (m *InstallManager) uploadAdminKubeconfig(cd *hivev1.ClusterDeployment) (*c
 
 	kubeconfigSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-admin-kubeconfig", m.ClusterName),
+			Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterName),
 			Namespace: m.Namespace,
 		},
 		Data: map[string][]byte{
@@ -368,18 +408,29 @@ func (m *InstallManager) uploadAdminKubeconfig(cd *hivev1.ClusterDeployment) (*c
 		return nil, err
 	}
 
-	err = m.DynamicClient.Create(context.Background(), kubeconfigSecret)
-	if err != nil {
-		// TODO: what should happen if it already exists?
-		m.log.WithError(err).Error("error creating admin kubeconfig secret")
+	secretUploaded := false
+	// try 10 times to save the admin kubeconfig with some sleeps between attempts
+	for i := 1; i < 11; i++ {
+		err = m.DynamicClient.Create(context.Background(), kubeconfigSecret)
+		if err != nil {
+			m.log.WithError(err).Warningf("error creating admmin kubeconfig secret (attempt %d)", i)
+			time.Sleep(sleepBetweenRetries)
+			continue
+		}
+		m.log.WithField("secretName", kubeconfigSecret.Name).Info("uploaded admin kubeconfig secret")
+		secretUploaded = true
+		break
+	}
+
+	if !secretUploaded {
+		m.log.WithError(err).Error("failed to save admin kubeconfig secret")
 		return nil, err
 	}
-	m.log.WithField("secretName", kubeconfigSecret.Name).Info("uploaded admin kubeconfig secret")
 
 	return kubeconfigSecret, nil
 }
 
-func (m *InstallManager) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName string) error {
+func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName string, m *InstallManager) error {
 	// Update the cluster deployment status with a reference to the admin kubeconfig secret:
 	m.log.Info("updating cluster deployment status")
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
@@ -404,6 +455,71 @@ func (m *InstallManager) copyFile(src, dst string) error {
 		return err
 	}
 	return out.Sync()
+}
+
+func (m *InstallManager) cleanupMetadataConfigmap() error {
+	// find/delete any previous metadata configmap
+	namespacedName := types.NamespacedName{
+		Name:      fmt.Sprintf(metadataConfigmapStringTemplate, m.ClusterName),
+		Namespace: m.Namespace,
+	}
+	emptyCfgMap := &corev1.ConfigMap{}
+	populatedCfgMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
+		},
+	}
+	err := m.deleteAnyExistingObject(namespacedName, populatedCfgMap, emptyCfgMap)
+	if err != nil {
+		m.log.WithError(err).Error("failed to fetch/delete any pre-existing metadata configmap")
+		return err
+	}
+
+	return nil
+}
+
+func (m *InstallManager) cleanupAdminKubeconfigSecret() error {
+	// find/delete any previous admin kubeconfig secret
+	namespacedName := types.NamespacedName{
+		Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterName),
+		Namespace: m.Namespace,
+	}
+	emptySecret := &corev1.Secret{}
+	populatedSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
+		},
+	}
+	err := m.deleteAnyExistingObject(namespacedName, populatedSecret, emptySecret)
+	if err != nil {
+		m.log.WithError(err).Error("failed to fetch/delete any pre-existing kubeconfig secret")
+		return err
+	}
+
+	return nil
+}
+
+// deleteAnyExistingObject will look for any object that exists that matches the passed in 'obj' and will delete it if it exists
+func (m *InstallManager) deleteAnyExistingObject(namespacedName types.NamespacedName, obj runtime.Object, emptyObj runtime.Object) error {
+
+	err := m.DynamicClient.Get(context.Background(), namespacedName, emptyObj)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	} else if errors.IsNotFound(err) {
+		// object doesn't exist so ignore
+	} else {
+		// found existing object so delete it
+		m.log.Infof("deleting existing object: %v/%v", namespacedName.Namespace, namespacedName.Name)
+		err = m.DynamicClient.Delete(context.Background(), obj)
+		if err != nil {
+			m.log.WithError(err).Errorf("error deleting object: %v/%v", namespacedName.Namespace, namespacedName.Name)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func getClient() (client.Client, error) {

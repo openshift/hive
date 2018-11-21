@@ -63,14 +63,35 @@ func init() {
 func TestInstallManager(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
-		name     string
-		existing []runtime.Object
+		name                 string
+		existing             []runtime.Object
+		failedMetadataSave   bool
+		failedKubeconfigSave bool
+		failedStatusUpdate   bool
 	}{
 		{
 			name:     "successful install",
 			existing: []runtime.Object{testClusterDeployment()},
 		},
-		// TODO: simulate some error conditions here
+		{
+			name:     "pre-existing secret and configmap",
+			existing: []runtime.Object{testClusterDeployment(), testPreexistingConfigMap(), testPreexistingSecret()},
+		},
+		{
+			name:               "failed metadata upload", // a non-fatal error
+			existing:           []runtime.Object{testClusterDeployment()},
+			failedMetadataSave: true,
+		},
+		{
+			name:               "failed cluster status update", // a non-fatal error
+			existing:           []runtime.Object{testClusterDeployment()},
+			failedStatusUpdate: true,
+		},
+		{
+			name:                 "failed admin kubeconfig save", // fatal error
+			existing:             []runtime.Object{testClusterDeployment()},
+			failedKubeconfigSave: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -85,13 +106,12 @@ func TestInstallManager(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 
 			im := InstallManager{
-				LogLevel:              "debug",
-				WorkDir:               tempDir,
-				InstallConfig:         filepath.Join(tempDir, "tempinstallconfig.yml"),
-				ClusterName:           testClusterName,
-				Namespace:             testNamespace,
-				DynamicClient:         fakeClient,
-				SkipPreInstallCleanup: true,
+				LogLevel:      "debug",
+				WorkDir:       tempDir,
+				InstallConfig: filepath.Join(tempDir, "tempinstallconfig.yml"),
+				ClusterName:   testClusterName,
+				Namespace:     testNamespace,
+				DynamicClient: fakeClient,
 			}
 			testLog.Debugf("%v", im)
 			im.Complete([]string{})
@@ -110,48 +130,82 @@ func TestInstallManager(t *testing.T) {
 				t.Fail()
 			}
 
-			im.Run()
-
-			// Ensure we uploaded cluster metadata:
-			metadata := &corev1.ConfigMap{}
-			err = fakeClient.Get(context.Background(),
-				types.NamespacedName{
-					Namespace: testNamespace,
-					Name:      fmt.Sprintf("%s-metadata", testClusterName),
-				},
-				metadata)
-			if !assert.NoError(t, err) {
-				t.Fail()
+			if test.failedMetadataSave {
+				im.uploadClusterMetadata = func(*hivev1.ClusterDeployment, *InstallManager) error {
+					return fmt.Errorf("failed to save metadata")
+				}
 			}
-			_, ok := metadata.Data["metadata.json"]
-			assert.True(t, ok)
 
-			// Ensure we uploaded admin kubeconfig secret:
-			adminKubeconfig := &corev1.Secret{}
-			err = fakeClient.Get(context.Background(),
-				types.NamespacedName{
-					Namespace: testNamespace,
-					Name:      fmt.Sprintf("%s-admin-kubeconfig", testClusterName),
-				},
-				adminKubeconfig)
-			if !assert.NoError(t, err) {
-				t.Fail()
+			if test.failedStatusUpdate {
+				im.updateClusterDeploymentStatus = func(*hivev1.ClusterDeployment, string, *InstallManager) error {
+					return fmt.Errorf("failed to update clusterdeployment status")
+				}
 			}
-			_, ok = adminKubeconfig.Data["kubeconfig"]
-			assert.True(t, ok)
 
-			// Ensure we set a status reference to the admin kubeconfig secret:
-			cd := &hivev1.ClusterDeployment{}
-			err = fakeClient.Get(context.Background(),
-				types.NamespacedName{
-					Namespace: testNamespace,
-					Name:      testClusterName,
-				},
-				cd)
-			if !assert.NoError(t, err) {
-				t.Fail()
+			if test.failedKubeconfigSave {
+				im.uploadAdminKubeconfig = func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error) {
+					return nil, fmt.Errorf("failed to save admin kubeconfig")
+				}
 			}
-			assert.Equal(t, adminKubeconfig.Name, cd.Status.AdminKubeconfigSecret.Name)
+
+			// We don't want to run the uninstaller, so stub it out
+			im.runUninstaller = alwaysSucceedUninstall
+
+			err = im.Run()
+
+			if test.failedKubeconfigSave {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if !test.failedMetadataSave {
+				// Ensure we uploaded cluster metadata:
+				metadata := &corev1.ConfigMap{}
+				err = fakeClient.Get(context.Background(),
+					types.NamespacedName{
+						Namespace: testNamespace,
+						Name:      fmt.Sprintf("%s-metadata", testClusterName),
+					},
+					metadata)
+				if !assert.NoError(t, err) {
+					t.Fail()
+				}
+				_, ok := metadata.Data["metadata.json"]
+				assert.True(t, ok)
+			}
+
+			if !test.failedKubeconfigSave {
+				// Ensure we uploaded admin kubeconfig secret:
+				adminKubeconfig := &corev1.Secret{}
+				err = fakeClient.Get(context.Background(),
+					types.NamespacedName{
+						Namespace: testNamespace,
+						Name:      fmt.Sprintf("%s-admin-kubeconfig", testClusterName),
+					},
+					adminKubeconfig)
+				if !assert.NoError(t, err) {
+					t.Fail()
+				}
+				_, ok := adminKubeconfig.Data["kubeconfig"]
+				assert.True(t, ok)
+
+				if !test.failedStatusUpdate {
+					// Ensure we set a status reference to the admin kubeconfig secret:
+					cd := &hivev1.ClusterDeployment{}
+					err = fakeClient.Get(context.Background(),
+						types.NamespacedName{
+							Namespace: testNamespace,
+							Name:      testClusterName,
+						},
+						cd)
+					if !assert.NoError(t, err) {
+						t.Fail()
+					}
+					assert.Equal(t, adminKubeconfig.Name, cd.Status.AdminKubeconfigSecret.Name)
+				}
+			}
+
 		})
 	}
 }
@@ -207,5 +261,30 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				},
 			},
 		},
+	}
+}
+
+func alwaysSucceedUninstall(string, string, string, log.FieldLogger) error {
+	log.Debugf("running always successful uninstall")
+	return nil
+}
+
+func testPreexistingSecret() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testClusterName + "-admin-kubeconfig",
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{}, // empty test data
+	}
+}
+
+func testPreexistingConfigMap() *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testClusterName + "-metadata",
+			Namespace: testNamespace,
+		},
+		Data: map[string]string{}, // empty test data
 	}
 }

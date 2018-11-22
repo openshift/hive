@@ -18,8 +18,9 @@ API driven OpenShift cluster provisioning and management
 
 ## Running from Source
 
-* Create the ClusterDeployment CRD:
+* Create the ClusterDeployment and DNSZone CRDs:
   * `$ kubectl apply -f config/crds/hive_v1alpha1_clusterdeployment.yaml`
+  * `$ kubectl apply -f config/crds/hive_v1alpha1_dnszone.yaml`
 * Run the Hive controllers from source:
   * `$ make run`
 

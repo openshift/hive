@@ -205,6 +205,28 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Completed with install job manually deleted",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testMetadataConfigMap(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.True(t, cd.Status.Installed)
+				job := getInstallJob(c)
+				assert.Nil(t, job)
+			},
+		},
+		{
 			name: "Delete cluster deployment",
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),

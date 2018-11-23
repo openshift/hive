@@ -154,11 +154,23 @@ func (m *InstallManager) Validate() error {
 
 // Run is the entrypoint to start the install process
 func (m *InstallManager) Run() error {
+	cd, err := m.loadClusterDeployment()
+	if err != nil {
+		m.log.WithError(err).Fatal("error looking up cluster deployment")
+	}
+	if cd.Status.Installed {
+		// This should not be possible but just in-case we can somehow
+		// run the install job for a cluster already installed, exit early,
+		// and don't delete *anything*.
+		m.log.Warn("cluster is already installed, exiting")
+		os.Exit(0)
+	}
+
 	m.waitForInstallerBinaries()
 
 	dstInstallConfig := filepath.Join(m.WorkDir, "install-config.yml")
 	m.log.Debugf("copying %s to %s", m.InstallConfig, dstInstallConfig)
-	err := m.copyFile(m.InstallConfig, dstInstallConfig)
+	err = m.copyFile(m.InstallConfig, dstInstallConfig)
 	if err != nil {
 		m.log.WithError(err).Fatalf("error copying install config from %s to %s",
 			m.InstallConfig, dstInstallConfig)
@@ -167,11 +179,6 @@ func (m *InstallManager) Run() error {
 	installErr := m.runInstaller()
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install")
-	}
-
-	cd, err := m.loadClusterDeployment()
-	if err != nil {
-		m.log.WithError(err).Fatal("error looking up cluster deployment")
 	}
 
 	// Try to upload any artifacts that exist regardless if the install errored or not.

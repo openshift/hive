@@ -237,12 +237,12 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
-		cdLog.Errorf("error setting controller reference on job", err)
+	if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+		cdLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err
 	}
-	if err := controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
-		cdLog.Errorf("error setting controller reference on config map", err)
+	if err = controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
+		cdLog.WithError(err).Error("error setting controller reference on config map")
 		return reconcile.Result{}, err
 	}
 

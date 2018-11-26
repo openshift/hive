@@ -318,19 +318,20 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	cdLog.Debug("updating cluster deployment status")
 	origCD := cd
 	cd = cd.DeepCopy()
-	if job != nil {
+	if job != nil && job.Name != "" && job.Namespace != "" {
 		// Job exists, check it's status:
 		cd.Status.Installed = isSuccessful(job)
 	}
 
-	// TODO: this is a temporary hack for deployment to clusters with pre-existing cluster deployments
-	// which would not have had the admin kubeconfig secret name set. We know what the name would have
-	// been. This code can be deleted in the near term once this rolls out.
+	// The install manager sets this secret name, but we don't consider it a critical failure and
+	// will attempt to heal it here, as the value is predictable.
 	if cd.Status.Installed && cd.Status.AdminKubeconfigSecret.Name == "" {
 		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", cd.Name)}
 	}
 
-	if cd.Status.AdminKubeconfigSecret.Name != "" {
+	if cd.Status.AdminKubeconfigSecret.Name != "" &&
+		(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+
 		adminKubeconfigSecret := &corev1.Secret{}
 		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
 		if err != nil {
@@ -362,6 +363,8 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	// Update cluster deployment status if changed:
 	if !reflect.DeepEqual(cd.Status, origCD.Status) {
 		cdLog.Infof("status has changed, updating cluster deployment")
+		cdLog.Debugf("orig: %v", origCD)
+		cdLog.Debugf("new : %v", cd.Status)
 		err := r.Status().Update(context.TODO(), cd)
 		if err != nil {
 			cdLog.Errorf("error updating cluster deployment: %v", err)

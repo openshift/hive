@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -48,6 +47,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
 
@@ -76,7 +76,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
 		logger: log.WithField("controller", controllerName),
-		remoteClusterAPIClientBuilder: buildRemoteClusterAPIClient,
+		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 		awsClientBuilder:              awsclient.NewClient,
 	}
 }
@@ -327,26 +327,6 @@ func workerPool(pools []installtypes.MachinePool) installtypes.MachinePool {
 		}
 	}
 	return installtypes.MachinePool{}
-}
-
-func buildRemoteClusterAPIClient(secretData string) (client.Client, error) {
-	config, err := clientcmd.Load([]byte(secretData))
-	if err != nil {
-		return nil, err
-	}
-	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
-	cfg, err := kubeConfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	scheme, err := capiv1.SchemeBuilder.Build()
-	if err != nil {
-		return nil, err
-	}
-	return client.New(cfg, client.Options{
-		Scheme: scheme,
-	})
 }
 
 func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installtypes.InstallConfig, error) {

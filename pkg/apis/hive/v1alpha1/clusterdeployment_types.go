@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -85,6 +86,9 @@ type ClusterDeploymentStatus struct {
 
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret"`
+
+	// ClusterVersionStatus will hold a copy of the remote cluster's ClusterVersion.Status
+	ClusterVersionStatus openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus"`
 
 	// APIURL is the URL where the cluster's API can be accessed.
 	APIURL string `json:"apiURL"`

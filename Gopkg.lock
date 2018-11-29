@@ -1476,6 +1476,7 @@
     "github.com/golang/mock/gomock",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/api/config/v1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/machines/aws",

@@ -265,6 +265,62 @@ spec:
               type: object
             apiURL:
               type: string
+            clusterVersionStatus:
+              properties:
+                availableUpdates:
+                  items:
+                    properties:
+                      payload:
+                        type: string
+                      version:
+                        type: string
+                    required:
+                    - version
+                    - payload
+                    type: object
+                  type: array
+                conditions:
+                  items:
+                    properties:
+                      lastTransitionTime:
+                        format: date-time
+                        type: string
+                      message:
+                        type: string
+                      reason:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                    required:
+                    - type
+                    - status
+                    - lastTransitionTime
+                    type: object
+                  type: array
+                current:
+                  properties:
+                    payload:
+                      type: string
+                    version:
+                      type: string
+                  required:
+                  - version
+                  - payload
+                  type: object
+                generation:
+                  format: int64
+                  type: integer
+                versionHash:
+                  type: string
+              required:
+              - current
+              - generation
+              - versionHash
+              - conditions
+              - availableUpdates
+              type: object
             installed:
               type: boolean
             webConsoleURL:
@@ -272,6 +328,7 @@ spec:
           required:
           - installed
           - adminKubeconfigSecret
+          - clusterVersionStatus
           - apiURL
           - webConsoleURL
           type: object

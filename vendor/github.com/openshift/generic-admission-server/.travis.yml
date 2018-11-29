@@ -1,0 +1,12 @@
+language: go
+
+go:
+  - "1.10"
+
+script:
+  - make build
+
+notifications:
+  irc: "chat.freenode.net#openshift-dev"
+
+sudo: false

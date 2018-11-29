@@ -3,9 +3,12 @@ required = [
     "github.com/emicklei/go-restful",
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers
+    "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/stretchr/testify/assert",
     "golang.org/x/net/context",
     "github.com/openshift/installer/pkg/types",
+    "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+    "k8s.io/apiserver/pkg/util/logs",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
@@ -16,8 +19,7 @@ required = [
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/testing_frameworks/integration", # for integration testing
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
-    ]
+]
 
 [prune]
   go-tests = true
@@ -58,3 +60,11 @@ version="v1.4.7"
 [[constraint]]
   branch = "master"
   name = "github.com/openshift/installer"
+
+[[constraint]]
+  name = "github.com/openshift/generic-admission-server"
+  version = "v.1.11.0"
+
+[[constraint]]
+  name = "k8s.io/apiserver"
+  version="kubernetes-1.11.2"

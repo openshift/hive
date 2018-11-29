@@ -33,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+
+	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 )
 
 const (

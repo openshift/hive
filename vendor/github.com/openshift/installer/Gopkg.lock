@@ -201,7 +201,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ad26de5429bd2d4dec5ba169e758795db2f6b054a3fd15dee10b029a5f371992"
+  digest = "1:56c12cdd01d62ed0836da8d8756f7331b3544dd0dd023f1ab1db69c204776a1c"
   name = "github.com/gophercloud/gophercloud"
   packages = [
     ".",
@@ -218,6 +218,9 @@
     "openstack/networking/v2/networks",
     "openstack/networking/v2/ports",
     "openstack/networking/v2/subnets",
+    "openstack/objectstorage/v1/accounts",
+    "openstack/objectstorage/v1/containers",
+    "openstack/objectstorage/v1/objects",
     "openstack/utils",
     "pagination",
   ]
@@ -771,11 +774,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:14833e88e9193430014238507ee22eb650952caa5b70611babab520380cfcbc8"
+  digest = "1:70e659b4cad21aaf34189b548b3c050783713330972b54fe30959f2b43b0ef78"
   name = "sigs.k8s.io/cluster-api-provider-aws"
   packages = ["pkg/apis/awsproviderconfig/v1alpha1"]
   pruneopts = "NUT"
-  revision = "24d07d04fe7fa31597bf75f45d4cd41d0e4b2b94"
+  revision = "e6986093d1fbac2084c50b04fe2f78125ffca582"
   source = "https://github.com/openshift/cluster-api-provider-aws.git"
 
 [[projects]]
@@ -804,6 +807,8 @@
     "github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/ports",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets",
+    "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers",
+    "github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects",
     "github.com/gophercloud/utils/openstack/clientconfig",
     "github.com/gregjones/httpcache",
     "github.com/gregjones/httpcache/diskcache",

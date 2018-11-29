@@ -41,8 +41,8 @@ import (
 )
 
 const (
-	awsCredsSecretIDKey     = "awsAccessKeyId"
-	awsCredsSecretAccessKey = "awsSecretAccessKey"
+	awsCredsSecretIDKey     = "aws_access_key_id"
+	awsCredsSecretAccessKey = "aws_secret_access_key"
 )
 
 //go:generate mockgen -source=./client.go -destination=./mock/client_generated.go -package=mock

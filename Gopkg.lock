@@ -374,6 +374,18 @@
   version = "v1.4.2"
 
 [[projects]]
+  branch = "master"
+  digest = "1:41d6eff91126b8c3a65bf379e370a0b2cf8df4f846386ca6a7a6782617173ac6"
+  name = "github.com/openshift/api"
+  packages = [
+    "config/v1",
+    "operator/v1",
+    "operator/v1alpha1",
+  ]
+  pruneopts = "T"
+  revision = "e7dc90658844828191986cb07f3e44eeeba0b03a"
+
+[[projects]]
   digest = "1:ccf387b1000d4864aaf832aae3524898c320263620f7e3162ded978fe2ea3ba4"
   name = "github.com/openshift/cluster-network-operator"
   packages = ["pkg/apis/networkoperator/v1"]
@@ -385,6 +397,7 @@
   digest = "1:b5556252785f49933353e1d907718db5e302d77f533d7e2bd46bb907c352103c"
   name = "github.com/openshift/installer"
   packages = [
+    "pkg/asset/machines/aws",
     "pkg/ipnet",
     "pkg/rhcos",
     "pkg/types",
@@ -394,6 +407,17 @@
   ]
   pruneopts = "T"
   revision = "5a740603a7129579d58c26f4b532dd8844f40f61"
+
+[[projects]]
+  branch = "master"
+  digest = "1:42c813e0b3094ec07014a7b15b8068395a54c0fdcb4d05682c44b4095e8daf8d"
+  name = "github.com/openshift/library-go"
+  packages = [
+    "pkg/operator/resource/resourcemerge",
+    "pkg/operator/v1alpha1helpers",
+  ]
+  pruneopts = "T"
+  revision = "08e93f1ee0f48016a6d3d8979630b457cb530553"
 
 [[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
@@ -732,6 +756,7 @@
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
+    "pkg/apis/meta/v1/validation",
     "pkg/apis/meta/v1beta1",
     "pkg/conversion",
     "pkg/conversion/queryparams",
@@ -885,6 +910,33 @@
   revision = "9dfdf9be683f61f82cda12362c44c784e0778b56"
 
 [[projects]]
+  digest = "1:76292b66aeae151b7c47ba7c1eff253aaa89ac641367c96c7ce25d424544c71c"
+  name = "k8s.io/utils"
+  packages = ["pointer"]
+  pruneopts = "T"
+  revision = "4c3feeb576b06ef8fea769809bd3db5e5e78dc23"
+
+[[projects]]
+  branch = "master"
+  digest = "1:e99adef47e9f7029c5fa2f0ba03e78a32194cf24ada000a6b8753d6f8cde02cc"
+  name = "sigs.k8s.io/cluster-api"
+  packages = [
+    "pkg/apis/cluster/common",
+    "pkg/apis/cluster/v1alpha1",
+  ]
+  pruneopts = "T"
+  revision = "0734939e05aeb64ab198e3feeee8b4e90ee5cbb2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:8aba6e080bb9d16bf635e5ccedb836c693fc96d5b2c811183644993ae6a90d6d"
+  name = "sigs.k8s.io/cluster-api-provider-aws"
+  packages = ["pkg/apis/awsproviderconfig/v1alpha1"]
+  pruneopts = "T"
+  revision = "e6986093d1fbac2084c50b04fe2f78125ffca582"
+  source = "https://github.com/openshift/cluster-api-provider-aws.git"
+
+[[projects]]
   digest = "1:4c3be496e0e0977b54e265fea184b57e9928fed12a1a14687c04b5d42e044abc"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
@@ -976,9 +1028,13 @@
     "github.com/golang/mock/gomock",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
+    "github.com/openshift/installer/pkg/asset/machines/aws",
     "github.com/openshift/installer/pkg/ipnet",
     "github.com/openshift/installer/pkg/rhcos",
     "github.com/openshift/installer/pkg/types",
+    "github.com/openshift/installer/pkg/types/aws",
+    "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
     "github.com/pborman/uuid",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
@@ -1003,6 +1059,7 @@
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/client/fake",

@@ -31,12 +31,12 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 )
 
-// generateInstallConfig builds an InstallConfig for the installer from our ClusterDeploymentSpec.
+// GenerateInstallConfig builds an InstallConfig for the installer from our ClusterDeploymentSpec.
 // The two types are extremely similar, but have different goals and in some cases deviation was required
 // as ClusterDeployment is used as a CRD API.
 //
 // It is assumed the caller will lookup the admin password and ssh key from their respective secrets.
-func generateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
+func GenerateInstallConfig(cd *hivev1.ClusterDeployment, adminPassword, sshKey, pullSecret string) (*types.InstallConfig, error) {
 	spec := cd.Spec
 
 	networkType, err := convertNetworkingType(spec.Config.Networking.Type)

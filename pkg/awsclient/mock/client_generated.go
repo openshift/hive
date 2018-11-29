@@ -38,6 +38,19 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+// DescribeAvailabilityZones mocks base method
+func (m *MockClient) DescribeAvailabilityZones(arg0 *ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error) {
+	ret := m.ctrl.Call(m, "DescribeAvailabilityZones", arg0)
+	ret0, _ := ret[0].(*ec2.DescribeAvailabilityZonesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeAvailabilityZones indicates an expected call of DescribeAvailabilityZones
+func (mr *MockClientMockRecorder) DescribeAvailabilityZones(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeAvailabilityZones", reflect.TypeOf((*MockClient)(nil).DescribeAvailabilityZones), arg0)
+}
+
 // DescribeImages mocks base method
 func (m *MockClient) DescribeImages(arg0 *ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error) {
 	ret := m.ctrl.Call(m, "DescribeImages", arg0)

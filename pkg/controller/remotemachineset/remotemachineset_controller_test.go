@@ -18,6 +18,7 @@ package remotemachineset
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -363,7 +364,8 @@ func testClusterDeployment(machinePools []hivev1.MachinePool) *hivev1.ClusterDep
 			},
 		},
 		Status: hivev1.ClusterDeploymentStatus{
-			Installed: true,
+			Installed:             true,
+			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
 		},
 	}
 }

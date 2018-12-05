@@ -293,7 +293,7 @@ func GenerateUninstallerJob(
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-						Key:                  "awsAccessKeyId",
+						Key:                  "aws_access_key_id",
 					},
 				},
 			},
@@ -302,7 +302,7 @@ func GenerateUninstallerJob(
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-						Key:                  "awsSecretAccessKey",
+						Key:                  "aws_secret_access_key",
 					},
 				},
 			},

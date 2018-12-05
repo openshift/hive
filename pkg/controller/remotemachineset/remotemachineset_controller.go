@@ -143,7 +143,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
-	secretName := cd.Spec.Config.ClusterID + "-admin-kubeconfig"
+	secretName := cd.Status.AdminKubeconfigSecret.Name
 	secretData, err := r.loadSecretData(secretName, cd.Namespace, adminKubeConfigKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load admin kubeconfig")

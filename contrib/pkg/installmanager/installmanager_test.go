@@ -50,7 +50,7 @@ const (
 echo "Fake Installer"
 echo $@
 WORKDIR=%s
-echo '{"clusterName":"test-cluster","aws":{"region":"us-east-1","identifier":{"tectonicClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}' > $WORKDIR/metadata.json
+echo '{"clusterName":"test-cluster","aws":{"region":"us-east-1","identifier":{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}' > $WORKDIR/metadata.json
 mkdir -p $WORKDIR/auth/
 echo "fakekubeconfig" > $WORKDIR/auth/kubeconfig
 `

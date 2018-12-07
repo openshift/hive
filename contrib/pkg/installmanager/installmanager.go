@@ -37,7 +37,7 @@ const (
 	// relative to our WorkDir.
 	metadataRelativePath                = "metadata.json"
 	adminKubeConfigRelativePath         = "auth/kubeconfig"
-	uuidKey                             = "tectonicClusterID"
+	uuidKey                             = "openshiftClusterID"
 	kubernetesKeyPrefix                 = "kubernetes.io/cluster/"
 	metadataConfigmapStringTemplate     = "%s-metadata"
 	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"

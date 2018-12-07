@@ -48,7 +48,7 @@ var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
 const (
 	timeout             = time.Second * 10
 	fakeClusterUUID     = "fe953108-f64c-4166-bb8e-20da7665ba00"
-	fakeClusterMetadata = `{"clusterName":"foo","aws":{"region":"us-east-1","identifier":{"tectonicClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}`
+	fakeClusterMetadata = `{"clusterName":"foo","aws":{"region":"us-east-1","identifier":{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}`
 )
 
 func init() {

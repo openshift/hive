@@ -433,7 +433,7 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 	metadataJSON := `{
 		"aws": {
 			"identifier": {
-				"tectonicClusterID": "testFooClusterUUID"
+				"openshiftClusterID": "testFooClusterUUID"
 			}
 		}
 	}`

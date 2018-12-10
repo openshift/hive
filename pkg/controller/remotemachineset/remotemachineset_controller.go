@@ -356,16 +356,8 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 	})
 	cd = cd.DeepCopy()
 
-	cdLog.Debug("loading admin secret")
-	adminPassword, err := r.loadSecretData(cd.Spec.Config.Admin.Password.Name,
-		cd.Namespace, adminCredsSecretPasswordKey)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to load admin password from secret")
-		return nil, err
-	}
-
 	cdLog.Debug("loading SSH key secret")
-	sshKey, err := r.loadSecretData(cd.Spec.Config.Admin.SSHKey.Name,
+	sshKey, err := r.loadSecretData(cd.Spec.Config.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -379,7 +371,7 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 		return nil, err
 	}
 
-	ic, err := install.GenerateInstallConfig(cd, adminPassword, sshKey, pullSecret)
+	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to generate install config")
 		return nil, err

@@ -42,7 +42,6 @@ const (
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
 	serviceAccountName string,
-	adminPassword string,
 	sshKey string,
 	pullSecret string) (*batchv1.Job, *corev1.ConfigMap, error) {
 
@@ -53,7 +52,7 @@ func GenerateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 
-	ic, err := GenerateInstallConfig(cd, adminPassword, sshKey, pullSecret)
+	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,19 +82,6 @@ func GenerateInstallerJob(
 		{
 			Name:  "OPENSHIFT_INSTALL_CLUSTER_NAME",
 			Value: cd.Name,
-		},
-		{
-			Name:  "OPENSHIFT_INSTALL_EMAIL_ADDRESS",
-			Value: cd.Spec.Config.Admin.Email,
-		},
-		{
-			Name: "OPENSHIFT_INSTALL_PASSWORD",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: cd.Spec.Config.Admin.Password,
-					Key:                  "password",
-				},
-			},
 		},
 		{
 			Name: "OPENSHIFT_INSTALL_PULL_SECRET",
@@ -142,12 +128,12 @@ func GenerateInstallerJob(
 		}...)
 	}
 
-	if cd.Spec.Config.Admin.SSHKey != nil {
+	if cd.Spec.Config.SSHKey != nil {
 		env = append(env, corev1.EnvVar{
 			Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: *cd.Spec.Config.Admin.SSHKey,
+					LocalObjectReference: *cd.Spec.Config.SSHKey,
 					Key:                  "ssh-publickey",
 				},
 			},

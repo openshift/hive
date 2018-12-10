@@ -60,14 +60,8 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 			ClusterUUID: testClusterID,
 			Config: hivev1.InstallConfig{
 				BaseDomain: "test.example.com",
-				Admin: hivev1.Admin{
-					Email: "user@example.com",
-					Password: corev1.LocalObjectReference{
-						Name: "admin-password",
-					},
-					SSHKey: &corev1.LocalObjectReference{
-						Name: "ssh-key",
-					},
+				SSHKey: &corev1.LocalObjectReference{
+					Name: "ssh-key",
 				},
 				PullSecret: corev1.LocalObjectReference{
 					Name: "pull-secret",
@@ -141,11 +135,7 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 	return &installtypes.InstallConfig{
 		ClusterID:  testClusterID,
 		BaseDomain: "test.example.com",
-		Admin: installtypes.Admin{
-			Email:    "user@example.com",
-			Password: adminPassword,
-			SSHKey:   adminSSHKey,
-		},
+		SSHKey:     adminSSHKey,
 		PullSecret: pullSecret,
 		Networking: installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
@@ -268,7 +258,7 @@ func TestConvert(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ic, err := GenerateInstallConfig(test.cd, adminPassword, adminSSHKey, pullSecret)
+			ic, err := GenerateInstallConfig(test.cd, adminSSHKey, pullSecret)
 			if assert.NoError(t, err) {
 				assert.Equal(t, test.expectedInstallConfig, ic)
 			}

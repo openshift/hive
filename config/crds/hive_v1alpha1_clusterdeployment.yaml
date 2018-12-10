@@ -28,18 +28,6 @@ spec:
               type: string
             config:
               properties:
-                admin:
-                  properties:
-                    email:
-                      type: string
-                    password:
-                      type: object
-                    sshKey:
-                      type: object
-                  required:
-                  - email
-                  - password
-                  type: object
                 baseDomain:
                   type: string
                 clusterID:
@@ -230,9 +218,10 @@ spec:
                   type: object
                 pullSecret:
                   type: object
+                sshKey:
+                  type: object
               required:
               - clusterID
-              - admin
               - baseDomain
               - networking
               - machines

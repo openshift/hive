@@ -238,7 +238,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"fakeserviceaccount",
-						"password",
 						"sshkey",
 						"pullsecret")
 					return job
@@ -333,14 +332,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
 				ClusterID: testClusterID,
-				Admin: hivev1.Admin{
-					Email: "user@example.com",
-					Password: corev1.LocalObjectReference{
-						Name: adminPasswordSecret,
-					},
-					SSHKey: &corev1.LocalObjectReference{
-						Name: sshKeySecret,
-					},
+				SSHKey: &corev1.LocalObjectReference{
+					Name: sshKeySecret,
 				},
 				Machines: []hivev1.MachinePool{},
 				PullSecret: corev1.LocalObjectReference{

@@ -204,16 +204,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
-	cdLog.Debug("loading admin secret")
-	adminPassword, err := r.loadSecretData(cd.Spec.Config.Admin.Password.Name,
-		cd.Namespace, adminCredsSecretPasswordKey)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to load admin password from secret")
-		return reconcile.Result{}, err
-	}
-
 	cdLog.Debug("loading SSH key secret")
-	sshKey, err := r.loadSecretData(cd.Spec.Config.Admin.SSHKey.Name,
+	sshKey, err := r.loadSecretData(cd.Spec.Config.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -230,7 +222,6 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	job, cfgMap, err := install.GenerateInstallerJob(
 		cd,
 		serviceAccountName,
-		adminPassword,
 		sshKey,
 		pullSecret)
 	if err != nil {

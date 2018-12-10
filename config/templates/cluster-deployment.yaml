@@ -8,14 +8,6 @@ parameters:
   displayName: Cluster Name
   description: The name to give to the Cluster created. If using real AWS, then this name should include your username so that resources created in AWS can be identified as yours.
   required: true
-- name: ADMIN_EMAIL
-  displayName: Admin Email
-  description: Your email address.
-  required: true
-- name: ADMIN_PASSWORD
-  displayName: Admin Password
-  description: Your password to login to the new cluster.
-  required: true
 - name: SSH_KEY
   displayName: SSH Key
   description: Your public SSH key to reach instances.
@@ -77,14 +69,6 @@ objects:
   stringData:
     ssh-publickey: "${SSH_KEY}"
 
-- apiVersion: v1
-  kind: Secret
-  metadata:
-    name: ${CLUSTER_NAME}-admin-creds
-  type: Opaque
-  stringData:
-    password: ${ADMIN_PASSWORD}
-
 - apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment
   metadata:
@@ -104,12 +88,8 @@ objects:
       installerImage: "${INSTALLER_IMAGE}"
       installerImagePullPolicy: "${INSTALLER_IMAGE_PULL_POLICY}"
     config:
-      admin:
-        email: ${ADMIN_EMAIL}
-        password:
-          name: "${CLUSTER_NAME}-admin-creds"
-        sshKey:
-          name: "${CLUSTER_NAME}-ssh-key"
+      sshKey:
+        name: "${CLUSTER_NAME}-ssh-key"
       clusterID: ${CLUSTER_NAME} # TODO: what kind of ID is this
       baseDomain: ${BASE_DOMAIN}
       networking:

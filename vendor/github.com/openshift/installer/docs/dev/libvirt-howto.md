@@ -22,7 +22,7 @@ If it is missing, try some of the ideas [here][kvm-install].
 On Fedora, CentOS/RHEL:
 
 ```sh
-sudo yum install libvirt libvirt-devel
+sudo yum install libvirt libvirt-devel libvirt-daemon-kvm qemu-kvm
 ```
 
 Then start libvirtd:
@@ -40,9 +40,6 @@ In this example, we'll set the base domain to `tt.testing` and the cluster name 
 git clone https://github.com/openshift/installer.git
 cd installer
 ```
-
-### Get a pull secret
-Go to https://account.coreos.com/ and obtain a *pull secret*.
 
 ### Make sure you have permissions for `qemu:///system`
 You may want to grant yourself permissions to use libvirt as a non-root user. You could allow all users in the wheel group by doing the following:
@@ -197,7 +194,7 @@ This step is optional, but useful for being able to resolve cluster-internal hos
     For this example:
 
     ```sh
-    echo server=/tt.testing/192.168.126.1 | sudo tee /etc/NetworkManager/dnsmasq.d/tectonic.conf
+    echo server=/tt.testing/192.168.126.1 | sudo tee /etc/NetworkManager/dnsmasq.d/openshift.conf
     ```
 3. `systemctl restart NetworkManager`
 
@@ -226,13 +223,12 @@ Set `TAGS` when building if you need `destroy cluster` support for libvirt; this
 TAGS=libvirt_destroy hack/build.sh
 ```
 
-To avoid being prompted repeatedly, you can set [environment variables](../user/environment-variables.md) to reflect your libvirt choices.  For example, selecting libvirt, setting [our earlier name choices](#pick-names), [our pull secret](#get-a-pull-secret), and telling both the installer and the machine-API operator to contact `libvirtd` at [the usual libvirt IP](#firewall), you can use:
+To avoid being prompted repeatedly, you can set [environment variables](../user/environment-variables.md) to reflect your libvirt choices.  For example, selecting libvirt, setting [our earlier name choices](#pick-names), and telling both the installer and the machine-API operator to contact `libvirtd` at [the usual libvirt IP](#firewall), you can use:
 
 ```sh
 export OPENSHIFT_INSTALL_PLATFORM=libvirt
 export OPENSHIFT_INSTALL_BASE_DOMAIN=tt.testing
 export OPENSHIFT_INSTALL_CLUSTER_NAME=test1
-export OPENSHIFT_INSTALL_PULL_SECRET_PATH=path/to/your/pull-secret.json
 export OPENSHIFT_INSTALL_LIBVIRT_URI=qemu+tcp://192.168.122.1/system
 ```
 
@@ -265,7 +261,7 @@ The bootstrap node, e.g. `test1-bootstrap.tt.testing`, runs the bootstrap proces
 
 ```sh
 ssh core@$OPENSHIFT_INSTALL_CLUSTER_NAME-bootstrap.$OPENSHIFT_INSTALL_BASE_DOMAIN
-sudo journalctl -f -u bootkube -u tectonic
+sudo journalctl -f -u bootkube -u openshift
 ```
 
 You'll have to wait for etcd to reach quorum before this makes any progress.
@@ -339,7 +335,7 @@ Error: Error applying plan:
 Depending on your libvirt version you might encounter [a race condition][bugzilla_libvirt_race] leading to an error similar to:
 
 ```
-* libvirt_domain.master.0: Error creating libvirt domain: virError(Code=43, Domain=19, Message='Network not found: no network with matching name 'tectonic'')
+* libvirt_domain.master.0: Error creating libvirt domain: virError(Code=43, Domain=19, Message='Network not found: no network with matching name 'test1'')
 ```
 This is also being [tracked on the libvirt-terraform-provider][tfprovider_libvirt_race] but is likely not fixable on the client side, which is why you should upgrade libvirt to >=4.5 or a patched version, depending on your environment.
 

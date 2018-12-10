@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	rootDir              = "/opt/tectonic"
+	rootDir              = "/opt/openshift"
 	defaultReleaseImage  = "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
 	bootstrapIgnFilename = "bootstrap.ign"
 )
@@ -37,10 +37,10 @@ const (
 // bootstrapTemplateData is the data to use to replace values in bootstrap
 // template files.
 type bootstrapTemplateData struct {
-	BootkubeImage         string
 	EtcdCertSignerImage   string
 	EtcdCluster           string
 	EtcdctlImage          string
+	PullSecret            string
 	ReleaseImage          string
 	AdminKubeConfigBase64 string
 }
@@ -72,7 +72,7 @@ func (a *Bootstrap) Dependencies() []asset.Asset {
 		&kubeconfig.Admin{},
 		&kubeconfig.Kubelet{},
 		&manifests.Manifests{},
-		&manifests.Tectonic{},
+		&manifests.Openshift{},
 	}
 }
 
@@ -105,7 +105,7 @@ func (a *Bootstrap) Generate(dependencies asset.Parents) error {
 
 	a.Config.Passwd.Users = append(
 		a.Config.Passwd.Users,
-		igntypes.PasswdUser{Name: "core", SSHAuthorizedKeys: []igntypes.SSHAuthorizedKey{igntypes.SSHAuthorizedKey(installConfig.Config.Admin.SSHKey)}},
+		igntypes.PasswdUser{Name: "core", SSHAuthorizedKeys: []igntypes.SSHAuthorizedKey{igntypes.SSHAuthorizedKey(installConfig.Config.SSHKey)}},
 	)
 
 	data, err := json.Marshal(a.Config)
@@ -149,7 +149,7 @@ func (a *Bootstrap) getTemplateData(installConfig *types.InstallConfig, adminKub
 	return &bootstrapTemplateData{
 		EtcdCertSignerImage:   "quay.io/coreos/kube-etcd-signer-server:678cc8e6841e2121ebfdb6e2db568fce290b67d6",
 		EtcdctlImage:          "quay.io/coreos/etcd:v3.2.14",
-		BootkubeImage:         "quay.io/coreos/bootkube:v0.14.0",
+		PullSecret:            installConfig.PullSecret,
 		ReleaseImage:          releaseImage,
 		EtcdCluster:           strings.Join(etcdEndpoints, ","),
 		AdminKubeConfigBase64: base64.StdEncoding.EncodeToString(adminKubeConfig),
@@ -281,8 +281,8 @@ func (a *Bootstrap) addParentFiles(dependencies asset.Parents) {
 	adminKubeconfig := &kubeconfig.Admin{}
 	kubeletKubeconfig := &kubeconfig.Kubelet{}
 	mfsts := &manifests.Manifests{}
-	tectonic := &manifests.Tectonic{}
-	dependencies.Get(adminKubeconfig, kubeletKubeconfig, mfsts, tectonic)
+	openshiftManifests := &manifests.Openshift{}
+	dependencies.Get(adminKubeconfig, kubeletKubeconfig, mfsts, openshiftManifests)
 
 	a.Config.Storage.Files = append(
 		a.Config.Storage.Files,
@@ -299,7 +299,7 @@ func (a *Bootstrap) addParentFiles(dependencies asset.Parents) {
 	)
 	a.Config.Storage.Files = append(
 		a.Config.Storage.Files,
-		ignition.FilesFromAsset(rootDir, 0644, tectonic)...,
+		ignition.FilesFromAsset(rootDir, 0644, openshiftManifests)...,
 	)
 
 	for _, asset := range []asset.WritableAsset{

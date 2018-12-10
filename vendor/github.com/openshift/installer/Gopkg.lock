@@ -201,17 +201,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:56c12cdd01d62ed0836da8d8756f7331b3544dd0dd023f1ab1db69c204776a1c"
+  digest = "1:5ecf13c53905c3385d0db93a56f904801728e8a9b7dc229242fe5462931347c0"
   name = "github.com/gophercloud/gophercloud"
   packages = [
     ".",
+    "internal",
     "openstack",
     "openstack/compute/v2/flavors",
     "openstack/compute/v2/images",
     "openstack/compute/v2/servers",
     "openstack/identity/v2/tenants",
     "openstack/identity/v2/tokens",
+    "openstack/identity/v3/regions",
     "openstack/identity/v3/tokens",
+    "openstack/imageservice/v2/images",
     "openstack/networking/v2/extensions/layer3/routers",
     "openstack/networking/v2/extensions/security/groups",
     "openstack/networking/v2/extensions/security/rules",
@@ -353,11 +356,33 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b5875601953e2887f2fb469fde65c530bf33ae7439f10a67793ee8491305506c"
+  digest = "1:8d0349ca7980bc787c8c595434618a5abc98076d07a50ca38c9a80685e70f80e"
+  name = "github.com/openshift/api"
+  packages = [
+    "config/v1",
+    "route/v1",
+  ]
+  pruneopts = "NUT"
+  revision = "6a375c5bd37e0a30bf3da96935273fa41f957a0d"
+
+[[projects]]
+  digest = "1:6b1540f37963c713da08d8463791201d8469e8c755ed66a0b54ee424b15ea401"
+  name = "github.com/openshift/client-go"
+  packages = [
+    "route/clientset/versioned",
+    "route/clientset/versioned/scheme",
+    "route/clientset/versioned/typed/route/v1",
+  ]
+  pruneopts = "NUT"
+  revision = "1fa528d3be060e4c7178eb69e76d37cf7e699e3c"
+
+[[projects]]
+  branch = "master"
+  digest = "1:2a801f8e2e0d98ee3221f6e82522e8965240dd98cb97cdacf9410c651af8bf7e"
   name = "github.com/openshift/cluster-api-provider-libvirt"
   packages = ["pkg/apis/libvirtproviderconfig/v1alpha1"]
   pruneopts = "NUT"
-  revision = "437b1012ea0bf4c6a1189e42ff3755933689eeb4"
+  revision = "223f16433e235d5b4fce8f332abc6abcd50acaf4"
 
 [[projects]]
   digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
@@ -367,11 +392,11 @@
   revision = "fb8b55a1072436a51b153de9acf5bf5525efcf83"
 
 [[projects]]
-  digest = "1:14f70ac5f181ccb012cddc7c72ac28709497155340b2fad822bd15d9a8722d93"
+  digest = "1:c2edaeee2250d3886f1e2223a8c6698498ecdc467a72949888f89dc1dde89045"
   name = "github.com/openshift/hive"
   packages = ["contrib/pkg/awstagdeprovision"]
   pruneopts = "NUT"
-  revision = "8c7844d9b61c35f53bab561f5ce4d879fef86ec6"
+  revision = "2349f175d3e4fc6542dec79add881a59f2d7b1b8"
 
 [[projects]]
   digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
@@ -479,9 +504,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
+  digest = "1:001a4e7a40e50ff2ef32e2556bca50c4f77daa457db3ac6afc8bea9bb2122cfb"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "bcrypt",
+    "blowfish",
+    "ssh/terminal",
+  ]
   pruneopts = "NUT"
   revision = "4d3f4d9ffa16a13f451c3b2999e9c49e9750bf06"
 
@@ -802,6 +831,8 @@
     "github.com/coreos/ignition/config/v2_2/types",
     "github.com/ghodss/yaml",
     "github.com/gophercloud/gophercloud/openstack/compute/v2/servers",
+    "github.com/gophercloud/gophercloud/openstack/identity/v3/regions",
+    "github.com/gophercloud/gophercloud/openstack/imageservice/v2/images",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups",
     "github.com/gophercloud/gophercloud/openstack/networking/v2/networks",
@@ -813,6 +844,8 @@
     "github.com/gregjones/httpcache",
     "github.com/gregjones/httpcache/diskcache",
     "github.com/libvirt/libvirt-go",
+    "github.com/openshift/api/config/v1",
+    "github.com/openshift/client-go/route/clientset/versioned",
     "github.com/openshift/cluster-api-provider-libvirt/pkg/apis/libvirtproviderconfig/v1alpha1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/hive/contrib/pkg/awstagdeprovision",
@@ -823,6 +856,8 @@
     "github.com/spf13/cobra",
     "github.com/stretchr/testify/assert",
     "github.com/vincent-petithory/dataurl",
+    "golang.org/x/crypto/bcrypt",
+    "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/sys/unix",
     "gopkg.in/AlecAivazis/survey.v1",
     "k8s.io/api/core/v1",
@@ -833,6 +868,7 @@
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/kubernetes",
+    "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/tools/clientcmd/api/v1",
     "k8s.io/client-go/tools/watch",

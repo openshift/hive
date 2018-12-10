@@ -15,15 +15,13 @@ import (
 )
 
 type config struct {
-	ClusterID  string `json:"tectonic_cluster_id,omitempty"`
-	Name       string `json:"tectonic_cluster_name,omitempty"`
-	BaseDomain string `json:"tectonic_base_domain,omitempty"`
-	Masters    int    `json:"tectonic_master_count,omitempty"`
-	Workers    int    `json:"tectonic_worker_count,omitempty"`
+	ClusterID  string `json:"cluster_id,omitempty"`
+	Name       string `json:"cluster_name,omitempty"`
+	BaseDomain string `json:"base_domain,omitempty"`
+	Masters    int    `json:"master_count,omitempty"`
 
 	IgnitionBootstrap string `json:"ignition_bootstrap,omitempty"`
 	IgnitionMaster    string `json:"ignition_master,omitempty"`
-	IgnitionWorker    string `json:"ignition_worker,omitempty"`
 
 	aws.AWS             `json:",inline"`
 	libvirt.Libvirt     `json:",inline"`
@@ -32,27 +30,26 @@ type config struct {
 
 // TFVars converts the InstallConfig and Ignition content to
 // terraform.tfvar JSON.
-func TFVars(cfg *types.InstallConfig, bootstrapIgn, masterIgn, workerIgn string) ([]byte, error) {
+func TFVars(cfg *types.InstallConfig, bootstrapIgn, masterIgn string) ([]byte, error) {
 	config := &config{
 		ClusterID:  cfg.ClusterID,
 		Name:       cfg.ObjectMeta.Name,
 		BaseDomain: cfg.BaseDomain,
 
 		IgnitionMaster:    masterIgn,
-		IgnitionWorker:    workerIgn,
 		IgnitionBootstrap: bootstrapIgn,
 	}
 
 	for _, m := range cfg.Machines {
-		var replicas int
-		if m.Replicas == nil {
-			replicas = 1
-		} else {
-			replicas = int(*m.Replicas)
-		}
-
 		switch m.Name {
 		case "master":
+			var replicas int
+			if m.Replicas == nil {
+				replicas = 1
+			} else {
+				replicas = int(*m.Replicas)
+			}
+
 			config.Masters += replicas
 			if m.Platform.AWS != nil {
 				config.AWS.Master = aws.Master{
@@ -66,16 +63,9 @@ func TFVars(cfg *types.InstallConfig, bootstrapIgn, masterIgn, workerIgn string)
 				}
 			}
 		case "worker":
-			config.Workers += replicas
 			if m.Platform.AWS != nil {
 				config.AWS.Worker = aws.Worker{
-					EC2Type:     m.Platform.AWS.InstanceType,
 					IAMRoleName: m.Platform.AWS.IAMRoleName,
-					WorkerRootVolume: aws.WorkerRootVolume{
-						IOPS: m.Platform.AWS.EC2RootVolume.IOPS,
-						Size: m.Platform.AWS.EC2RootVolume.Size,
-						Type: m.Platform.AWS.EC2RootVolume.Type,
-					},
 				}
 			}
 		default:
@@ -115,7 +105,7 @@ func TFVars(cfg *types.InstallConfig, bootstrapIgn, masterIgn, workerIgn string)
 			Image:     cfg.Platform.Libvirt.DefaultMachinePlatform.Image,
 			MasterIPs: masterIPs,
 		}
-		if err := config.Libvirt.TFVars(config.Masters, config.Workers); err != nil {
+		if err := config.Libvirt.TFVars(config.Masters); err != nil {
 			return nil, errors.Wrap(err, "failed to insert libvirt variables")
 		}
 		if err := config.Libvirt.UseCachedImage(); err != nil {

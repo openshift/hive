@@ -286,12 +286,12 @@
   revision = "6f2cf27854a4a29e3811b0371547be335d411b8b"
 
 [[projects]]
-  digest = "1:db4ee29dee022c4cd49908553e35dd1c1c01ac56273bdf0c66a18bfba2eead30"
+  digest = "1:7912bb30698616cf0c41e5ef6a29a447c9a3e76bfcacbc21420ed3cdf616fd94"
   name = "github.com/golang/mock"
   packages = ["gomock"]
   pruneopts = "T"
-  revision = "c34cdb4725f4c3844d095133c6e40e448b86589b"
-  version = "v1.1.1"
+  revision = "51421b967af1f557f93a59e0057aaf15ca02e29c"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:a2ecb56e5053d942aafc86738915fb94c9131bac848c543b8b6764365fd69080"
@@ -561,7 +561,8 @@
   version = "v.1.11.0"
 
 [[projects]]
-  digest = "1:b9ca50be1fb60778185621b4e4d88898ad3b7f7088a6445e2ae375b4fd3fe888"
+  branch = "master"
+  digest = "1:7c835855e7a7659dc525b9efd4de9c69b89242fffc5bd05e767544dd887dec52"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/machines/aws",
@@ -573,8 +574,7 @@
     "pkg/types/openstack",
   ]
   pruneopts = "T"
-  revision = "c620a9bbe00e21c77a9b2047af5ae01c2c95acc5"
-  version = "v0.4.0"
+  revision = "485b1bec14c39e954c70b1a83cee706ef3d5edde"
 
 [[projects]]
   branch = "master"
@@ -1472,18 +1472,22 @@
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/emicklei/go-restful",
     "github.com/ghodss/yaml",
+    "github.com/golang/glog",
     "github.com/golang/mock/gomock",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
+    "github.com/openshift/installer/pkg/asset/machines/aws",
     "github.com/openshift/installer/pkg/ipnet",
     "github.com/openshift/installer/pkg/rhcos",
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",
+    "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
     "github.com/pborman/uuid",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
+    "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
     "golang.org/x/net/context",
     "gopkg.in/yaml.v2",

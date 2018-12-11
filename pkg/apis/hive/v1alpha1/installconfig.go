@@ -11,8 +11,8 @@ type InstallConfig struct {
 	// ClusterID is the ID of the cluster.
 	ClusterID string `json:"clusterID"`
 
-	// Admin is the configuration for the admin user.
-	Admin Admin `json:"admin"`
+	// SSHKey is the reference to the secret that contains a public key to use for access to compute instances.
+	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
 
 	// BaseDomain is the base domain to which the cluster should belong.
 	BaseDomain string `json:"baseDomain"`
@@ -29,16 +29,6 @@ type InstallConfig struct {
 
 	// PullSecret is the reference to the secret to use when pulling images.
 	PullSecret corev1.LocalObjectReference `json:"pullSecret"`
-}
-
-// Admin is the configuration for the admin user.
-type Admin struct {
-	// Email is the email address of the admin user.
-	Email string `json:"email"`
-	// Password is a reference to the secret that contains the password of the admin user.
-	Password corev1.LocalObjectReference `json:"password"`
-	// SSHKey is a reference to the secret that contains a public key to use for access to compute instances.
-	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
 }
 
 // Platform is the configuration for the specific platform upon which to perform

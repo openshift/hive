@@ -20,20 +20,14 @@ The installer accepts a number of environment variable that allow the interactiv
 
      For libvirt, choose a name that is unique enough to be used as a prefix during cluster deletion.
      For example, if you use `demo` as your cluster name, `openshift-install destroy cluster` may destroy all domains, networks, pools, and volumes that begin with `demo`.
-* `OPENSHIFT_INSTALL_EMAIL_ADDRESS`:
-     The email address of the cluster administrator.
-     This will be used to log in to the console.
-* `OPENSHIFT_INSTALL_PASSWORD`:
-     The password of the cluster administrator.
-     This will be used to log in to the console.
 * `OPENSHIFT_INSTALL_PLATFORM`:
      The platform onto which the cluster will be installed.
      Valid values are `aws` and `libvirt`.
 * `OPENSHIFT_INSTALL_PULL_SECRET`:
      The container registry pull secret for this cluster (e.g. `{"auths": {...}}`).
-     You can generate these secrets with the `podman login` command.
+     You can get this secret from [try.openshift.com](https://try.openshift.com).
 * `OPENSHIFT_INSTALL_PULL_SECRET_PATH`:
-     As an alternative to `OPENSHIFT_INSTALL_SSH_PUB_KEY`, you can configure this variable with a path containing your pull secret.
+     As an alternative to `OPENSHIFT_INSTALL_PULL_SECRET`, you can configure this variable with a path containing your pull secret.
 * `OPENSHIFT_INSTALL_SSH_PUB_KEY`:
      The SSH public key used to access all nodes within the cluster (e.g. `ssh-rsa AAAA...`).
      This is optional.
@@ -43,7 +37,7 @@ The installer accepts a number of environment variable that allow the interactiv
 ## Platform-Specific
 
 * `AWS_PROFILE`:
-     The AWS profile that corresponds to value in `${HOME}/.aws/credentials`.  If not provided, the default is "default".
+    The AWS profile that corresponds to value in `${HOME}/.aws/credentials`.  If not provided, the default is "default".
 * `OPENSHIFT_INSTALL_AWS_REGION`:
     The AWS region to be used for installation.
 * `OPENSHIFT_INSTALL_LIBVIRT_URI`:

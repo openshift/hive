@@ -329,14 +329,8 @@ func testClusterDeployment(machinePools []hivev1.MachinePool) *hivev1.ClusterDep
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
-				Admin: hivev1.Admin{
-					Email: "user@example.com",
-					Password: corev1.LocalObjectReference{
-						Name: adminPasswordSecret,
-					},
-					SSHKey: &corev1.LocalObjectReference{
-						Name: sshKeySecret,
-					},
+				SSHKey: &corev1.LocalObjectReference{
+					Name: sshKeySecret,
 				},
 				ClusterID: testName,
 				Machines:  machinePools,

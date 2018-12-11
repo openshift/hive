@@ -4,7 +4,7 @@ package templates
 import (
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/asset/templates/content/bootkube"
-	"github.com/openshift/installer/pkg/asset/templates/content/tectonic"
+	"github.com/openshift/installer/pkg/asset/templates/content/openshift"
 )
 
 var _ asset.WritableAsset = (*Templates)(nil)
@@ -28,21 +28,19 @@ func (m *Templates) Dependencies() []asset.Asset {
 		&bootkube.OpenshiftServiceCertSignerSecret{},
 		&bootkube.Pull{},
 		&bootkube.CVOOverrides{},
-		&bootkube.LegacyCVOOverrides{},
-		&bootkube.EtcdServiceEndpointsKubeSystem{},
 		&bootkube.HostEtcdServiceEndpointsKubeSystem{},
 		&bootkube.KubeSystemConfigmapEtcdServingCA{},
 		&bootkube.KubeSystemConfigmapRootCA{},
 		&bootkube.KubeSystemSecretEtcdClient{},
-		&bootkube.OpenshiftWebConsoleNamespace{},
 		&bootkube.OpenshiftMachineConfigOperator{},
 		&bootkube.OpenshiftClusterAPINamespace{},
 		&bootkube.OpenshiftServiceCertSignerNamespace{},
 		&bootkube.EtcdServiceKubeSystem{},
 		&bootkube.HostEtcdServiceKubeSystem{},
-		&tectonic.BindingDiscovery{},
-		&tectonic.CloudCredsSecret{},
-		&tectonic.RoleCloudCredsSecretReader{},
+		&openshift.BindingDiscovery{},
+		&openshift.CloudCredsSecret{},
+		&openshift.KubeadminPasswordSecret{},
+		&openshift.RoleCloudCredsSecretReader{},
 	}
 }
 
@@ -53,22 +51,20 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 	openshiftServiceCertSignerSecret := &bootkube.OpenshiftServiceCertSignerSecret{}
 	pull := &bootkube.Pull{}
 	cVOOverrides := &bootkube.CVOOverrides{}
-	legacyCVOOverrides := &bootkube.LegacyCVOOverrides{}
-	etcdServiceEndpointsKubeSystem := &bootkube.EtcdServiceEndpointsKubeSystem{}
 	hostEtcdServiceEndpointsKubeSystem := &bootkube.HostEtcdServiceEndpointsKubeSystem{}
 	kubeSystemConfigmapEtcdServingCA := &bootkube.KubeSystemConfigmapEtcdServingCA{}
 	kubeSystemConfigmapRootCA := &bootkube.KubeSystemConfigmapRootCA{}
 	kubeSystemSecretEtcdClient := &bootkube.KubeSystemSecretEtcdClient{}
-	openshiftWebConsoleNamespace := &bootkube.OpenshiftWebConsoleNamespace{}
 	openshiftMachineConfigOperator := &bootkube.OpenshiftMachineConfigOperator{}
 	openshiftClusterAPINamespace := &bootkube.OpenshiftClusterAPINamespace{}
 	openshiftServiceCertSignerNamespace := &bootkube.OpenshiftServiceCertSignerNamespace{}
 	etcdServiceKubeSystem := &bootkube.EtcdServiceKubeSystem{}
 	hostEtcdServiceKubeSystem := &bootkube.HostEtcdServiceKubeSystem{}
 
-	bindingDiscovery := &tectonic.BindingDiscovery{}
-	cloudCredsSecret := &tectonic.CloudCredsSecret{}
-	roleCloudCredsSecretReader := &tectonic.RoleCloudCredsSecretReader{}
+	bindingDiscovery := &openshift.BindingDiscovery{}
+	cloudCredsSecret := &openshift.CloudCredsSecret{}
+	kubeadminPasswordSecret := &openshift.KubeadminPasswordSecret{}
+	roleCloudCredsSecretReader := &openshift.RoleCloudCredsSecretReader{}
 
 	dependencies.Get(
 		kubeCloudConfig,
@@ -76,13 +72,10 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 		openshiftServiceCertSignerSecret,
 		pull,
 		cVOOverrides,
-		legacyCVOOverrides,
-		etcdServiceEndpointsKubeSystem,
 		hostEtcdServiceEndpointsKubeSystem,
 		kubeSystemConfigmapEtcdServingCA,
 		kubeSystemConfigmapRootCA,
 		kubeSystemSecretEtcdClient,
-		openshiftWebConsoleNamespace,
 		openshiftMachineConfigOperator,
 		openshiftClusterAPINamespace,
 		openshiftServiceCertSignerNamespace,
@@ -90,6 +83,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 		hostEtcdServiceKubeSystem,
 		bindingDiscovery,
 		cloudCredsSecret,
+		kubeadminPasswordSecret,
 		roleCloudCredsSecretReader)
 
 	m.FileList = []*asset.File{}
@@ -98,13 +92,10 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 	m.FileList = append(m.FileList, openshiftServiceCertSignerSecret.Files()...)
 	m.FileList = append(m.FileList, pull.Files()...)
 	m.FileList = append(m.FileList, cVOOverrides.Files()...)
-	m.FileList = append(m.FileList, legacyCVOOverrides.Files()...)
-	m.FileList = append(m.FileList, etcdServiceEndpointsKubeSystem.Files()...)
 	m.FileList = append(m.FileList, hostEtcdServiceEndpointsKubeSystem.Files()...)
 	m.FileList = append(m.FileList, kubeSystemConfigmapEtcdServingCA.Files()...)
 	m.FileList = append(m.FileList, kubeSystemConfigmapRootCA.Files()...)
 	m.FileList = append(m.FileList, kubeSystemSecretEtcdClient.Files()...)
-	m.FileList = append(m.FileList, openshiftWebConsoleNamespace.Files()...)
 	m.FileList = append(m.FileList, openshiftMachineConfigOperator.Files()...)
 	m.FileList = append(m.FileList, openshiftClusterAPINamespace.Files()...)
 	m.FileList = append(m.FileList, openshiftServiceCertSignerNamespace.Files()...)
@@ -113,6 +104,7 @@ func (m *Templates) Generate(dependencies asset.Parents) error {
 
 	m.FileList = append(m.FileList, bindingDiscovery.Files()...)
 	m.FileList = append(m.FileList, cloudCredsSecret.Files()...)
+	m.FileList = append(m.FileList, kubeadminPasswordSecret.Files()...)
 	m.FileList = append(m.FileList, roleCloudCredsSecretReader.Files()...)
 
 	return nil

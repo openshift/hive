@@ -199,7 +199,7 @@ func GenerateInstallerJob(
 			ImagePullPolicy: installerImagePullPolicy,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
-			Args:            []string{"cp -v /bin/openshift-install /output && cp -v /bin/terraform /output && ls -la /output"},
+			Args:            []string{"cp -v /bin/openshift-install /output && ls -la /output"},
 			VolumeMounts:    volumeMounts,
 		},
 		{

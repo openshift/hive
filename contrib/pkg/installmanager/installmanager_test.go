@@ -45,7 +45,6 @@ const (
 	testUUID        = "fake-cluster-UUID"
 
 	installerBinary     = "openshift-install"
-	terraformBinary     = "terraform"
 	fakeInstallerBinary = `#!/bin/sh
 echo "Fake Installer"
 echo $@
@@ -118,10 +117,6 @@ func TestInstallManager(t *testing.T) {
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
 				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
-				t.Fail()
-			}
-			// File contents don't matter for terraform, it won't be called because we're faking the install binary:
-			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, terraformBinary), "")) {
 				t.Fail()
 			}
 

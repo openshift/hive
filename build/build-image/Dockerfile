@@ -24,8 +24,8 @@ RUN go get -u github.com/golang/mock/mockgen
 # Basic Debug Tools
 RUN yum -y install strace tcping && yum clean all
 
-# Install kubebuilder 1.0.1    TODO: ask cewong if there's a way to cache this. It takes a long time to d/l
-RUN export version=1.0.1 && \
+# Install kubebuilder 1.0.5    TODO: ask cewong if there's a way to cache this. It takes a long time to d/l
+RUN export version=1.0.5 && \
     cd /tmp && \
     curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_amd64.tar.gz && \
     tar -zxvf /tmp/kubebuilder_${version}_linux_amd64.tar.gz && \

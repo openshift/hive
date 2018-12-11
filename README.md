@@ -100,4 +100,4 @@ After deleting your cluster deployment you will see an uninstall job created. If
  1. You can manually run the uninstall code with hiveutil to delete AWS resources based on their tags.
     * Get your cluster UUID from the clusterdeployment.Spec.ClusterUUID.
     * `make hiveutil`
-    * `bin/hiveutil aws-tag-deprovision --loglevel=debug --cluster-name CLUSTER_NAME tectonicClusterID=CLUSTER_UUID kubernetes.io/cluster/CLUSTER_NAME=owned`
+    * `bin/hiveutil aws-tag-deprovision --loglevel=debug --cluster-name CLUSTER_NAME openshiftClusterID=CLUSTER_UUID kubernetes.io/cluster/CLUSTER_NAME=owned`

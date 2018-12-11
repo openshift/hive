@@ -263,6 +263,8 @@ spec:
           properties:
             adminKubeconfigSecret:
               type: object
+            adminPasswordSecret:
+              type: object
             apiURL:
               type: string
             clusterVersionStatus:
@@ -328,6 +330,7 @@ spec:
           required:
           - installed
           - adminKubeconfigSecret
+          - adminPasswordSecret
           - clusterVersionStatus
           - apiURL
           - webConsoleURL

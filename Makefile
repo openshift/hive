@@ -21,7 +21,7 @@ test-integration: generate
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: manager hiveutil
+build: manager hiveutil hiveadmission
 
 
 # Build manager binary
@@ -31,6 +31,10 @@ manager: generate
 # Build hiveutil binary
 hiveutil: generate
 	go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
+
+# Build hiveadmission binary
+hiveadmission:
+	go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
@@ -44,15 +48,23 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests docker-build
+deploy: manifests docker-build deploy-hiveadmission
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
-deploy-sd-dev: manifests
+deploy-sd-dev: manifests deploy-hiveadmission
 	kubectl apply -f config/crds
 	kustomize build config/overlays/sd-dev | kubectl apply -f -
+
+.PHONY: deploy-hiveadmission
+deploy-hiveadmission:
+	$(eval kube_service_account := $(shell oc get secret -n kube-system | awk "/kubernetes.io\/service-account-token/ { line=\$$1 } END{print line}"))
+	$(eval service_ca := $(shell oc get secret -n openshift-service-cert-signer "service-serving-cert-signer-signing-key" -o json | jq -r '.data."tls.crt"'))
+	$(eval kube_ca := $(shell oc get secret -n kube-system "$(kube_service_account)" -o json | jq -r '.data."ca.crt"'))
+	@oc process -f config/templates/hiveadmission.yaml SERVICE_CA="$(service_ca)" KUBE_CA="$(kube_ca)" | oc apply -n openshift-hive -f -
+	@oc apply -f config/rbac/hiveadmission_rbac_role.yaml -f config/rbac/hiveadmission_rbac_role_binding.yaml
 
 # Generate manifests e.g. CRD, RBAC etc.
 .PHONY: manifests
@@ -112,7 +124,7 @@ generate:
 
 # Build the docker image
 .PHONY: docker-build
-docker-build: manager hiveutil
+docker-build: manager hiveutil hiveadmission
 	$(eval build_path := ./build/hive)
 	$(eval tmp_build_path := "$(build_path)/tmp")
 	mkdir -p $(tmp_build_path)
@@ -128,7 +140,7 @@ docker-push:
 
 # Build the image with buildah
 .PHONY: buildah-build
-buildah-build: manager hiveutil
+buildah-build: manager hiveutil hiveadmission
 	$(eval build_path := ./build/hive)
 	$(eval tmp_build_path := "$(build_path)/tmp")
 	mkdir -p $(tmp_build_path)

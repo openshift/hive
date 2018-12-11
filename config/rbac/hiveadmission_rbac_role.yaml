@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: List
+items:
+# to let the admission server read the dnszone objects
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+    name: system:openshift:hive:hiveadmission:dnszones
+  rules:
+  - apiGroups:
+    - admission.hive.openshift.io
+    resources:
+    - dnszones
+    verbs:
+    - get
+    - list
+    - watch
+
+
+# this should be a default for an aggregated apiserver
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: system:openshift:hive:hiveadmission:webhooks
+  rules:
+  - apiGroups:
+    - admissionregistration.k8s.io
+    resources:
+    - validatingwebhookconfigurations
+    - mutatingwebhookconfigurations
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+    - list
+    - watch

@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: List
+items:
+# to delegate authentication and authorization
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: auth-delegator-openshift-hiveadmission
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:auth-delegator
+  subjects:
+  - kind: ServiceAccount
+    namespace: openshift-hive
+    name: hiveadmission
+
+
+# to let the admission server read the namespace reservations
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: hiveadmission-openshift-hive-hiveadmission
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:openshift:hive:hiveadmission:dnszones
+  subjects:
+  - kind: ServiceAccount
+    namespace: openshift-hive
+    name: hiveadmission
+
+# to read the config for terminating authentication
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    namespace: kube-system
+    name: extension-server-authentication-reader-openshift-hiveadmission
+  roleRef:
+    kind: Role
+    apiGroup: rbac.authorization.k8s.io
+    name: extension-apiserver-authentication-reader
+  subjects:
+  - kind: ServiceAccount
+    namespace: openshift-hive
+    name: hiveadmission
+
+
+# this should be a default for an aggregated apiserver
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: aggregated-apiserver-openshift-hiveadmission
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:openshift:hive:hiveadmission:webhooks
+  subjects:
+  - kind: ServiceAccount
+    namespace: openshift-hive
+    name: hiveadmission

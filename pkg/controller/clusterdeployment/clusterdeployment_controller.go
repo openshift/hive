@@ -46,7 +46,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
 
@@ -63,6 +65,9 @@ const (
 	adminCredsSecretPasswordKey = "password"
 	pullSecretKey               = ".dockercfg"
 	adminSSHKeySecretKey        = "ssh-publickey"
+	adminKubeconfigKey          = "kubeconfig"
+	clusterVersionObjectName    = "version"
+	clusterVersionUnknown       = "undef"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -73,7 +78,12 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterDeployment{Client: mgr.GetClient(), scheme: mgr.GetScheme(), amiLookupFunc: lookupAMI}
+	return &ReconcileClusterDeployment{
+		Client:                        mgr.GetClient(),
+		scheme:                        mgr.GetScheme(),
+		amiLookupFunc:                 lookupAMI,
+		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
+	}
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -109,6 +119,10 @@ type ReconcileClusterDeployment struct {
 	client.Client
 	scheme        *runtime.Scheme
 	amiLookupFunc func(cd *hivev1.ClusterDeployment) (string, error)
+
+	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
+	// remote cluster's cluster-api
+	remoteClusterAPIClientBuilder func(string) (client.Client, error)
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -350,6 +364,34 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		cd.Status.APIURL = server
 		u.Path = path.Join(u.Path, "console")
 		cd.Status.WebConsoleURL = u.String()
+	}
+
+	// Update remote cluster's version into our status
+	if cd.Status.AdminKubeconfigSecret.Name != "" {
+		kubeconfig, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
+		if err != nil {
+			cdLog.WithError(err).Error("error loading remote cluster's kubeconfig")
+			return err
+		}
+
+		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(kubeconfig)
+		if err != nil {
+			cdLog.WithError(err).Error("error building remote cluster-api client connection")
+			return err
+		}
+
+		remoteClusterVersion := &openshiftapiv1.ClusterVersion{}
+		err = remoteClusterAPIClient.Get(context.Background(),
+			types.NamespacedName{Name: clusterVersionObjectName},
+			remoteClusterVersion)
+		if err != nil {
+			cdLog.WithError(err).Error("error fetching remote clusterversion object")
+			return err
+		}
+
+		cdLog.Debugf("remote cluster version status: %+v", remoteClusterVersion.Status)
+		fixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
+		remoteClusterVersion.Status.DeepCopyInto(&cd.Status.ClusterVersionStatus)
 	}
 
 	// Update cluster deployment status if changed:
@@ -603,4 +645,19 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	finalizers := sets.NewString(object.GetFinalizers()...)
 	finalizers.Delete(finalizer)
 	object.SetFinalizers(finalizers.List())
+}
+
+func fixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.ClusterVersionStatus) {
+
+	// Fetching clusterVersion object can results in nil clusterVersion.Status.AvailableUpdates
+	// and clusterVersion.Status.Conditions.
+	// Place an empty list if needed to satisfy the object validation.
+
+	if clusterVersionStatus.AvailableUpdates == nil {
+		clusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
+	}
+
+	if clusterVersionStatus.Conditions == nil {
+		clusterVersionStatus.Conditions = []openshiftapiv1.ClusterOperatorStatusCondition{}
+	}
 }

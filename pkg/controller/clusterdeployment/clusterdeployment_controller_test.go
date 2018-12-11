@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/install"
@@ -61,6 +62,8 @@ const (
     server: https://bar-api.clusters.example.com:6443
   name: bar
 `
+	testRemoteClusterCurrentVersion = "4.0.0"
+	remoteClusterVersionObjectName  = "version"
 )
 
 func init() {
@@ -69,6 +72,7 @@ func init() {
 
 func TestClusterDeploymentReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
+	openshiftapiv1.Install(scheme.Scheme)
 
 	// Utility function to get the test CD from the fake client
 	getCD := func(c client.Client) *hivev1.ClusterDeployment {
@@ -79,6 +83,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		}
 		return nil
 	}
+
 	getJob := func(c client.Client, name string) *batchv1.Job {
 		job := &batchv1.Job{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: testNamespace}, job)
@@ -182,8 +187,27 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				assert.Equal(t, cd.Status.APIURL, "https://bar-api.clusters.example.com:6443")
-				assert.Equal(t, cd.Status.WebConsoleURL, "https://bar-api.clusters.example.com:6443/console")
+				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
+				assert.Equal(t, "https://bar-api.clusters.example.com:6443/console", cd.Status.WebConsoleURL)
+			},
+		},
+		{
+			name: "Fetch remote cluster version status into clusterdeployment status",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testInstallJob(),
+				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.Equal(t, "4.0.0", cd.Status.ClusterVersionStatus.Current.Version)
 			},
 		},
 		{
@@ -296,6 +320,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				amiLookupFunc: func(cd *hivev1.ClusterDeployment) (string, error) {
 					return testAMI, nil
 				},
+				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
 			_, err := rcd.Reconcile(reconcile.Request{
@@ -445,4 +470,29 @@ func testSecret(name, key, value string) *corev1.Secret {
 		},
 	}
 	return s
+}
+
+func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error) {
+	remoteClusterVersion := &openshiftapiv1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: remoteClusterVersionObjectName,
+		},
+	}
+	remoteClusterVersion.Status = testRemoteClusterVersionStatus()
+
+	remoteClient := fake.NewFakeClient(remoteClusterVersion)
+
+	return remoteClient, nil
+}
+
+func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
+	status := openshiftapiv1.ClusterVersionStatus{
+		Current: openshiftapiv1.Update{
+			Version: testRemoteClusterCurrentVersion,
+			Payload: "TESTPAYLOAD",
+		},
+		Generation:  123456789,
+		VersionHash: "TESTVERSIONHASH",
+	}
+	return status
 }

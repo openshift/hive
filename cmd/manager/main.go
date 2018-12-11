@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 )
 
 const (
@@ -75,6 +76,10 @@ func NewRootCommand() *cobra.Command {
 
 			// Setup Scheme for all resources
 			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := openshiftapiv1.Install(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

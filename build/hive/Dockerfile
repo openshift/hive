@@ -15,6 +15,7 @@
 FROM centos:7
 
 COPY manager /opt/services/
+COPY hiveadmission /usr/bin
 COPY hiveutil /usr/bin
 
 ENTRYPOINT ["/opt/services/manager"]

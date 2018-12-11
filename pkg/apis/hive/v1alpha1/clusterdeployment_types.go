@@ -50,7 +50,7 @@ type ClusterDeploymentSpec struct {
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
 type ProvisionImages struct {
-	// InstallerImage is the image containing the openshift-install and terraform binaries that will be used to install.
+	// InstallerImage is the image containing the openshift-install binary that will be used to install.
 	InstallerImage string `json:"installerImage"`
 	// InstallerImagePullPolicy is the pull policy for the installer image.
 	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy"`

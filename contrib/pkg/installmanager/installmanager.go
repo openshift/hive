@@ -211,7 +211,6 @@ func (m *InstallManager) Run() error {
 func (m *InstallManager) waitForInstallerBinaries() {
 	waitForFiles := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
-		filepath.Join(m.WorkDir, "terraform"),
 	}
 	m.log.Infof("waiting for install binaries to be available: %v", waitForFiles)
 

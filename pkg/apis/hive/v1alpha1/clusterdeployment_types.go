@@ -59,6 +59,10 @@ type ProvisionImages struct {
 	HiveImage string `json:"hiveImage"`
 	// HiveImagePullPolicy is the pull policy for the installer image.
 	HiveImagePullPolicy corev1.PullPolicy `json:"hiveImagePullPolicy"`
+
+	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
+	// is the primary and best way to specify what specific version of OpenShift you wish to install.
+	ReleaseImage string `json:"releaseImage"`
 }
 
 // PlatformSecrets defines the secrets to be used by various clouds.

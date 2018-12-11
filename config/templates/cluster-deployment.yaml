@@ -42,6 +42,11 @@ parameters:
   displayName: OpenShift Installer image pull policy
   description: OpenShift Installer image pull policy
   value: Always
+- name: OPENSHIFT_RELEASE_IMAGE
+  displayName: OpenShift Release Image
+  description: The release image for the version of OpenShift you wish to install.
+  # 0.0.6
+  value: quay.io/openshift-release-dev/ocp-release:4.0.0-5
 
 objects:
 - apiVersion: v1
@@ -87,6 +92,7 @@ objects:
       hiveImagePullPolicy: "${HIVE_IMAGE_PULL_POLICY}"
       installerImage: "${INSTALLER_IMAGE}"
       installerImagePullPolicy: "${INSTALLER_IMAGE_PULL_POLICY}"
+      releaseImage: "${OPENSHIFT_RELEASE_IMAGE}"
     config:
       sshKey:
         name: "${CLUSTER_NAME}-ssh-key"

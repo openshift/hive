@@ -127,6 +127,14 @@ func GenerateInstallerJob(
 			},
 		}...)
 	}
+	if cd.Spec.Images.ReleaseImage != "" {
+		env = append(env, []corev1.EnvVar{
+			{
+				Name:  "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
+				Value: cd.Spec.Images.ReleaseImage,
+			},
+		}...)
+	}
 
 	if cd.Spec.Config.SSHKey != nil {
 		env = append(env, corev1.EnvVar{

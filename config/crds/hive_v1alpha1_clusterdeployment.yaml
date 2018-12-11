@@ -238,11 +238,14 @@ spec:
                   type: string
                 installerImagePullPolicy:
                   type: string
+                releaseImage:
+                  type: string
               required:
               - installerImage
               - installerImagePullPolicy
               - hiveImage
               - hiveImagePullPolicy
+              - releaseImage
               type: object
             platformSecrets:
               properties:

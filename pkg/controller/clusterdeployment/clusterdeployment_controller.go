@@ -486,7 +486,11 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	// Uninstall job exists, check it's status and if successful, remove the finalizer:
 	if isSuccessful(existingJob) {
 		cdLog.Infof("uninstall job successful, removing finalizer")
-		return reconcile.Result{}, r.removeClusterDeploymentFinalizer(cd)
+		err = r.removeClusterDeploymentFinalizer(cd)
+		if err != nil {
+			cdLog.WithError(err).Error("error removing finalizer")
+		}
+		return reconcile.Result{}, err
 	}
 
 	cdLog.Infof("uninstall job not yet successful")

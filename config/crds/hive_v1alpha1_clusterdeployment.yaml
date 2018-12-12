@@ -238,11 +238,8 @@ spec:
                   type: string
                 installerImagePullPolicy:
                   type: string
-              required:
-              - installerImage
-              - installerImagePullPolicy
-              - hiveImage
-              - hiveImagePullPolicy
+                releaseImage:
+                  type: string
               type: object
             platformSecrets:
               properties:
@@ -257,7 +254,6 @@ spec:
           required:
           - config
           - platformSecrets
-          - images
           type: object
         status:
           properties:
@@ -329,11 +325,6 @@ spec:
               type: string
           required:
           - installed
-          - adminKubeconfigSecret
-          - adminPasswordSecret
-          - clusterVersionStatus
-          - apiURL
-          - webConsoleURL
           type: object
   version: v1alpha1
 status:

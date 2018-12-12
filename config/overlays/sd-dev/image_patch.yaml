@@ -33,9 +33,7 @@ spec:
     spec:
       containers:
       - name: hiveadmission
-        # TODO: After initial PR is merged, the next release to SD needs to change
-        #       this from ":debug" to the date stamp of the new release.
-        image: quay.io/twiest/hive-controller:debug
+        image: quay.io/twiest/hive-controller:20181212
         imagePullPolicy: Always
         command:
         - "/opt/services/hiveadmission"

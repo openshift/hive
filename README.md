@@ -101,3 +101,12 @@ After deleting your cluster deployment you will see an uninstall job created. If
     * Get your cluster UUID from the clusterdeployment.Spec.ClusterUUID.
     * `make hiveutil`
     * `bin/hiveutil aws-tag-deprovision --loglevel=debug --cluster-name CLUSTER_NAME openshiftClusterID=CLUSTER_UUID kubernetes.io/cluster/CLUSTER_NAME=owned`
+
+### Troubleshooting HiveAdmission
+
+To diagnose a hiveadmission failure, try running the operation directly against the registered hiveadmission API server.
+
+For instance, try this:
+```sh
+# kubectl create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
+```

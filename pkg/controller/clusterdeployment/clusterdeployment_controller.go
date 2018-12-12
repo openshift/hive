@@ -219,6 +219,10 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	cdLog.Debug("loading SSH key secret")
+	if cd.Spec.Config.SSHKey == nil {
+		cdLog.Error("cluster has no ssh key set, unable to launch install")
+		return reconcile.Result{}, fmt.Errorf("cluster has no ssh key set, unable to launch install")
+	}
 	sshKey, err := r.loadSecretData(cd.Spec.Config.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {

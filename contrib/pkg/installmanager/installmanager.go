@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -37,10 +38,13 @@ const (
 	// relative to our WorkDir.
 	metadataRelativePath                = "metadata.json"
 	adminKubeConfigRelativePath         = "auth/kubeconfig"
+	adminPasswordRelativePath           = "auth/kubeadmin-password"
 	uuidKey                             = "openshiftClusterID"
 	kubernetesKeyPrefix                 = "kubernetes.io/cluster/"
+	kubeadminUsername                   = "kubeadmin"
 	metadataConfigmapStringTemplate     = "%s-metadata"
 	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"
+	adminPasswordSecretStringTemplate   = "%s-admin-password"
 	sleepBetweenRetries                 = time.Second * 5
 )
 
@@ -58,8 +62,9 @@ type InstallManager struct {
 	DynamicClient                 client.Client
 	runUninstaller                func(clusterName, region, uuid string, logger log.FieldLogger) error
 	uploadClusterMetadata         func(*hivev1.ClusterDeployment, *InstallManager) error
-	updateClusterDeploymentStatus func(*hivev1.ClusterDeployment, string, *InstallManager) error
+	updateClusterDeploymentStatus func(*hivev1.ClusterDeployment, string, string, *InstallManager) error
 	uploadAdminKubeconfig         func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
+	uploadAdminPassword           func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -114,6 +119,7 @@ func (m *InstallManager) Complete(args []string) error {
 	m.uploadClusterMetadata = uploadClusterMetadata
 	m.updateClusterDeploymentStatus = updateClusterDeploymentStatus
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
+	m.uploadAdminPassword = uploadAdminPassword
 	m.runUninstaller = runUninstaller
 
 	// Set log level
@@ -195,7 +201,14 @@ func (m *InstallManager) Run() error {
 		return fmt.Errorf("error trying to save admin kubeconfig: %v", err)
 	}
 
-	if err := m.updateClusterDeploymentStatus(cd, adminKubeconfigSecret.Name, m); err != nil {
+	adminPasswordSecret, err := m.uploadAdminPassword(cd, m)
+	if err != nil {
+		// also fatal. without admin password we have no cluster
+		m.log.WithError(err).Error("error uploading admin password")
+		return fmt.Errorf("error trying to save admin password: %v", err)
+	}
+
+	if err := m.updateClusterDeploymentStatus(cd, adminKubeconfigSecret.Name, adminPasswordSecret.Name, m); err != nil {
 		// non-fatal. log and continue.
 		// will fix up any updates to the clusterdeployment in the periodic controller
 		m.log.WithError(err).Warning("error updating cluster deployment status")
@@ -236,6 +249,10 @@ func (m *InstallManager) cleanupBeforeInstall() error {
 	}
 
 	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
+		return err
+	}
+
+	if err := m.cleanupAdminPasswordSecret(); err != nil {
 		return err
 	}
 
@@ -414,32 +431,76 @@ func uploadAdminKubeconfig(cd *hivev1.ClusterDeployment, m *InstallManager) (*co
 		return nil, err
 	}
 
+	return kubeconfigSecret, uploadSecretWithRetries(kubeconfigSecret, m)
+}
+
+func uploadAdminPassword(cd *hivev1.ClusterDeployment, m *InstallManager) (*corev1.Secret, error) {
+	m.log.Infoln("uploading admin username/password")
+	fullPath := filepath.Join(m.WorkDir, adminPasswordRelativePath)
+
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		m.log.WithField("path", fullPath).Error("admin password file does not exist")
+		return nil, err
+	}
+
+	passwordBytes, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin password file")
+		return nil, err
+	}
+
+	// Need to trim trailing newlines from the password
+	password := strings.TrimSpace(string(passwordBytes))
+
+	s := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterName),
+			Namespace: m.Namespace,
+		},
+		Data: map[string][]byte{
+			"username": []byte(kubeadminUsername),
+			"password": []byte(password),
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cd, s, scheme.Scheme); err != nil {
+		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
+		return nil, err
+	}
+
+	return s, uploadSecretWithRetries(s, m)
+}
+
+func uploadSecretWithRetries(s *corev1.Secret, m *InstallManager) error {
+
 	secretUploaded := false
+	var err error
 	// try 10 times to save the admin kubeconfig with some sleeps between attempts
 	for i := 1; i < 11; i++ {
-		err = m.DynamicClient.Create(context.Background(), kubeconfigSecret)
+		err = m.DynamicClient.Create(context.Background(), s)
 		if err != nil {
-			m.log.WithError(err).Warningf("error creating admmin kubeconfig secret (attempt %d)", i)
+			m.log.WithError(err).WithField("secretName", s.Name).Warningf("error creating secret (attempt %d)", i)
 			time.Sleep(sleepBetweenRetries)
 			continue
 		}
-		m.log.WithField("secretName", kubeconfigSecret.Name).Info("uploaded admin kubeconfig secret")
+		m.log.WithField("secretName", s.Name).Info("uploaded secret")
 		secretUploaded = true
 		break
 	}
 
 	if !secretUploaded {
-		m.log.WithError(err).Error("failed to save admin kubeconfig secret")
-		return nil, err
+		m.log.WithError(err).WithField("secretName", s.Name).Error("failed to save secret")
+		return err
 	}
 
-	return kubeconfigSecret, nil
+	return nil
 }
 
-func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName string, m *InstallManager) error {
+func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName, adminPasswordSecretName string, m *InstallManager) error {
 	// Update the cluster deployment status with a reference to the admin kubeconfig secret:
 	m.log.Info("updating cluster deployment status")
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
+	cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: adminPasswordSecretName}
 	return m.DynamicClient.Status().Update(context.Background(), cd)
 }
 
@@ -501,6 +562,28 @@ func (m *InstallManager) cleanupAdminKubeconfigSecret() error {
 	err := m.deleteAnyExistingObject(namespacedName, populatedSecret, emptySecret)
 	if err != nil {
 		m.log.WithError(err).Error("failed to fetch/delete any pre-existing kubeconfig secret")
+		return err
+	}
+
+	return nil
+}
+
+func (m *InstallManager) cleanupAdminPasswordSecret() error {
+	// find/delete any previous admin password secret
+	namespacedName := types.NamespacedName{
+		Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterName),
+		Namespace: m.Namespace,
+	}
+	emptySecret := &corev1.Secret{}
+	populatedSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      namespacedName.Name,
+			Namespace: namespacedName.Namespace,
+		},
+	}
+	err := m.deleteAnyExistingObject(namespacedName, populatedSecret, emptySecret)
+	if err != nil {
+		m.log.WithError(err).Error("failed to fetch/delete any pre-existing admin password secret")
 		return err
 	}
 

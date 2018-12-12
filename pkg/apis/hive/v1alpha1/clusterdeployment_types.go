@@ -87,6 +87,9 @@ type ClusterDeploymentStatus struct {
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret"`
 
+	// AdminPasswordSecret references the secret containing the admin username/password which can be used to login to this cluster.
+	AdminPasswordSecret corev1.LocalObjectReference `json:"adminPasswordSecret"`
+
 	// ClusterVersionStatus will hold a copy of the remote cluster's ClusterVersion.Status
 	ClusterVersionStatus openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus"`
 

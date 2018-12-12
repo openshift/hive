@@ -52,6 +52,7 @@ WORKDIR=%s
 echo '{"clusterName":"test-cluster","aws":{"region":"us-east-1","identifier":{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}' > $WORKDIR/metadata.json
 mkdir -p $WORKDIR/auth/
 echo "fakekubeconfig" > $WORKDIR/auth/kubeconfig
+echo "fakepassword" > $WORKDIR/auth/kubeadmin-password
 `
 )
 
@@ -62,11 +63,12 @@ func init() {
 func TestInstallManager(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
-		name                 string
-		existing             []runtime.Object
-		failedMetadataSave   bool
-		failedKubeconfigSave bool
-		failedStatusUpdate   bool
+		name                    string
+		existing                []runtime.Object
+		failedMetadataSave      bool
+		failedKubeconfigSave    bool
+		failedStatusUpdate      bool
+		failedAdminPasswordSave bool
 	}{
 		{
 			name:     "successful install",
@@ -90,6 +92,11 @@ func TestInstallManager(t *testing.T) {
 			name:                 "failed admin kubeconfig save", // fatal error
 			existing:             []runtime.Object{testClusterDeployment()},
 			failedKubeconfigSave: true,
+		},
+		{
+			name:                    "failed admin username/password save", // fatal error
+			existing:                []runtime.Object{testClusterDeployment()},
+			failedAdminPasswordSave: true,
 		},
 	}
 	for _, test := range tests {
@@ -132,7 +139,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.failedStatusUpdate {
-				im.updateClusterDeploymentStatus = func(*hivev1.ClusterDeployment, string, *InstallManager) error {
+				im.updateClusterDeploymentStatus = func(*hivev1.ClusterDeployment, string, string, *InstallManager) error {
 					return fmt.Errorf("failed to update clusterdeployment status")
 				}
 			}
@@ -143,12 +150,18 @@ func TestInstallManager(t *testing.T) {
 				}
 			}
 
+			if test.failedAdminPasswordSave {
+				im.uploadAdminPassword = func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error) {
+					return nil, fmt.Errorf("failed to save admin password")
+				}
+			}
+
 			// We don't want to run the uninstaller, so stub it out
 			im.runUninstaller = alwaysSucceedUninstall
 
 			err = im.Run()
 
-			if test.failedKubeconfigSave {
+			if test.failedKubeconfigSave || test.failedAdminPasswordSave {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
@@ -170,7 +183,7 @@ func TestInstallManager(t *testing.T) {
 				assert.True(t, ok)
 			}
 
-			if !test.failedKubeconfigSave {
+			if !test.failedKubeconfigSave && !test.failedAdminPasswordSave {
 				// Ensure we uploaded admin kubeconfig secret:
 				adminKubeconfig := &corev1.Secret{}
 				err = fakeClient.Get(context.Background(),
@@ -198,6 +211,39 @@ func TestInstallManager(t *testing.T) {
 						t.Fail()
 					}
 					assert.Equal(t, adminKubeconfig.Name, cd.Status.AdminKubeconfigSecret.Name)
+				}
+			}
+
+			// We don't get to this point if we failed a kubeconfig save:
+			if !test.failedAdminPasswordSave && !test.failedKubeconfigSave {
+				// Ensure we uploaded admin password secret:
+				adminPassword := &corev1.Secret{}
+				err = fakeClient.Get(context.Background(),
+					types.NamespacedName{
+						Namespace: testNamespace,
+						Name:      fmt.Sprintf("%s-admin-password", testClusterName),
+					},
+					adminPassword)
+				if !assert.NoError(t, err) {
+					t.Fail()
+				}
+
+				assert.Equal(t, "kubeadmin", string(adminPassword.Data["username"]))
+				assert.Equal(t, "fakepassword", string(adminPassword.Data["password"]))
+
+				if !test.failedStatusUpdate {
+					// Ensure we set a status reference to the admin password secret:
+					cd := &hivev1.ClusterDeployment{}
+					err = fakeClient.Get(context.Background(),
+						types.NamespacedName{
+							Namespace: testNamespace,
+							Name:      testClusterName,
+						},
+						cd)
+					if !assert.NoError(t, err) {
+						t.Fail()
+					}
+					assert.Equal(t, adminPassword.Name, cd.Status.AdminPasswordSecret.Name)
 				}
 			}
 

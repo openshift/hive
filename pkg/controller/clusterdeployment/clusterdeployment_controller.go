@@ -390,7 +390,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		}
 
 		cdLog.Debugf("remote cluster version status: %+v", remoteClusterVersion.Status)
-		fixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
+		controllerutils.FixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
 		remoteClusterVersion.Status.DeepCopyInto(&cd.Status.ClusterVersionStatus)
 	}
 
@@ -645,19 +645,4 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	finalizers := sets.NewString(object.GetFinalizers()...)
 	finalizers.Delete(finalizer)
 	object.SetFinalizers(finalizers.List())
-}
-
-func fixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.ClusterVersionStatus) {
-
-	// Fetching clusterVersion object can results in nil clusterVersion.Status.AvailableUpdates
-	// and clusterVersion.Status.Conditions.
-	// Place an empty list if needed to satisfy the object validation.
-
-	if clusterVersionStatus.AvailableUpdates == nil {
-		clusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
-	}
-
-	if clusterVersionStatus.Conditions == nil {
-		clusterVersionStatus.Conditions = []openshiftapiv1.ClusterOperatorStatusCondition{}
-	}
 }

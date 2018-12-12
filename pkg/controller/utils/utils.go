@@ -19,6 +19,8 @@ package utils
 import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 )
 
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient usin the provided kubeconfig
@@ -34,4 +36,20 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	}
 
 	return client.New(cfg, client.Options{})
+}
+
+// FixupEmptyClusterVersionFields will un-'nil' fields that would fail validation in the ClusterVersion.Status
+func FixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.ClusterVersionStatus) {
+
+	// Fetching clusterVersion object can results in nil clusterVersion.Status.AvailableUpdates
+	// and clusterVersion.Status.Conditions.
+	// Place an empty list if needed to satisfy the object validation.
+
+	if clusterVersionStatus.AvailableUpdates == nil {
+		clusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
+	}
+
+	if clusterVersionStatus.Conditions == nil {
+		clusterVersionStatus.Conditions = []openshiftapiv1.ClusterOperatorStatusCondition{}
+	}
 }

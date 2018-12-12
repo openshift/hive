@@ -18,6 +18,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -501,6 +502,7 @@ func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfig
 	m.log.Info("updating cluster deployment status")
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
 	cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: adminPasswordSecretName}
+	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return m.DynamicClient.Status().Update(context.Background(), cd)
 }
 

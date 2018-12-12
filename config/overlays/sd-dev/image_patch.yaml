@@ -9,7 +9,7 @@ spec:
       containers:
       # Run from a defined image published to quay as necessary for SD's needs:
       - name: manager
-        image: quay.io/twiest/hive-controller:20181119
+        image: quay.io/twiest/hive-controller:20181212
         imagePullPolicy: Always
         resources:
           limits:

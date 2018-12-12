@@ -54,9 +54,9 @@ API driven OpenShift cluster provisioning and management
   export ADMIN_PASSWORD="letmein"
   export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
   export PULL_SECRET="$(cat ${HOME}/config.json)"
-  export HIVE_IMAGE="quay.io/twiest/hive-controller:20181119"
+  export HIVE_IMAGE="quay.io/twiest/hive-controller:20181212"
   export HIVE_IMAGE_PULL_POLICY="Always"
-  export INSTALLER_IMAGE="quay.io/twiest/installer:20181119"
+  export INSTALLER_IMAGE="quay.io/twiest/installer:20181212"
   export INSTALLER_IMAGE_PULL_POLICY="Always"
 
   oc process -f config/templates/cluster-deployment.yaml \

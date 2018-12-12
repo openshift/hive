@@ -45,24 +45,23 @@ type ClusterDeploymentSpec struct {
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
 
 	// Images allows overriding the default images used to provision and manage the cluster.
-	// +optional
-	Images ProvisionImages `json:"images"`
+	Images ProvisionImages `json:"images,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
 type ProvisionImages struct {
 	// InstallerImage is the image containing the openshift-install binary that will be used to install.
-	InstallerImage string `json:"installerImage"`
+	InstallerImage string `json:"installerImage,omitempty"`
 	// InstallerImagePullPolicy is the pull policy for the installer image.
-	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy"`
+	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy,omitempty"`
 	// HiveImage is the image used in the sidecar container to manage execution of openshift-install.
-	HiveImage string `json:"hiveImage"`
+	HiveImage string `json:"hiveImage,omitempty"`
 	// HiveImagePullPolicy is the pull policy for the installer image.
-	HiveImagePullPolicy corev1.PullPolicy `json:"hiveImagePullPolicy"`
+	HiveImagePullPolicy corev1.PullPolicy `json:"hiveImagePullPolicy,omitempty"`
 
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
-	ReleaseImage string `json:"releaseImage"`
+	ReleaseImage string `json:"releaseImage,omitempty"`
 }
 
 // PlatformSecrets defines the secrets to be used by various clouds.
@@ -89,19 +88,19 @@ type ClusterDeploymentStatus struct {
 	Installed bool `json:"installed"`
 
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
-	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret"`
+	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
 
 	// AdminPasswordSecret references the secret containing the admin username/password which can be used to login to this cluster.
-	AdminPasswordSecret corev1.LocalObjectReference `json:"adminPasswordSecret"`
+	AdminPasswordSecret corev1.LocalObjectReference `json:"adminPasswordSecret,omitempty"`
 
 	// ClusterVersionStatus will hold a copy of the remote cluster's ClusterVersion.Status
-	ClusterVersionStatus openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus"`
+	ClusterVersionStatus openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus,omitempty"`
 
 	// APIURL is the URL where the cluster's API can be accessed.
-	APIURL string `json:"apiURL"`
+	APIURL string `json:"apiURL,omitempty"`
 
 	// WebConsoleURL is the URL for the cluster's web console UI.
-	WebConsoleURL string `json:"webConsoleURL"`
+	WebConsoleURL string `json:"webConsoleURL,omitempty"`
 }
 
 // +genclient

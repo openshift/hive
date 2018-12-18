@@ -2,8 +2,9 @@ BINDIR = bin
 SRC_DIRS = pkg contrib
 GOFILES = $(shell find $(SRC_DIRS) -name '*.go')
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
-DOCKER_CMD ?= docker
 
+# To use docker build, specify BUILD_CMD="docker build"
+BUILD_CMD ?= imagebuilder
 
 
 # Image URL to use all building/pushing image targets
@@ -124,14 +125,8 @@ generate:
 
 # Build the docker image
 .PHONY: docker-build
-docker-build: manager hiveutil hiveadmission
-	$(eval build_path := ./build/hive)
-	$(eval tmp_build_path := "$(build_path)/tmp")
-	mkdir -p $(tmp_build_path)
-	cp $(build_path)/Dockerfile $(tmp_build_path)
-	cp ./bin/* $(tmp_build_path)
-	$(DOCKER_CMD) build -t ${IMG} $(tmp_build_path)
-	rm -rf $(tmp_build_path)
+docker-build: generate
+	$(BUILD_CMD) -t ${IMG} .
 
 # Push the docker image
 .PHONY: docker-push
@@ -140,11 +135,5 @@ docker-push:
 
 # Build the image with buildah
 .PHONY: buildah-build
-buildah-build: manager hiveutil hiveadmission
-	$(eval build_path := ./build/hive)
-	$(eval tmp_build_path := "$(build_path)/tmp")
-	mkdir -p $(tmp_build_path)
-	cp $(build_path)/Dockerfile $(tmp_build_path)
-	cp ./bin/* $(tmp_build_path)
-	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} $(tmp_build_path)
-	rm -rf $(tmp_build_path)
+buildah-build: generate
+	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .

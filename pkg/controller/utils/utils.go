@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
+
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 )
 
@@ -35,7 +37,13 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 		return nil, err
 	}
 
-	return client.New(cfg, client.Options{})
+	scheme, err := capiv1.SchemeBuilder.Build()
+	if err != nil {
+		return nil, err
+	}
+	return client.New(cfg, client.Options{
+		Scheme: scheme,
+	})
 }
 
 // FixupEmptyClusterVersionFields will un-'nil' fields that would fail validation in the ClusterVersion.Status

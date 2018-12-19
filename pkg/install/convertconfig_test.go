@@ -43,7 +43,6 @@ const (
 	adminPassword   = "adminpassword"
 	adminSSHKey     = "adminSSH"
 	pullSecret      = "pullSecret"
-	vpcID           = "vpcID"
 	vpcCIDRBlock    = "10.1.0.0/16"
 	awsInstanceType = "fake-aws-type"
 	awsRegion       = "us-east-1"
@@ -72,7 +71,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 						UserTags: map[string]string{
 							"foo": "bar",
 						},
-						VPCID:        vpcID,
 						VPCCIDRBlock: vpcCIDRBlock,
 						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
 							InstanceType: awsInstanceType,
@@ -153,7 +151,6 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				UserTags: map[string]string{
 					"foo": "bar",
 				},
-				VPCID:        vpcID,
 				VPCCIDRBlock: vpcCIDRBlock,
 				DefaultMachinePlatform: &installawstypes.MachinePool{
 					InstanceType: awsInstanceType,

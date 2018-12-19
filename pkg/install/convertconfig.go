@@ -50,7 +50,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		platform.AWS = &installeraws.Platform{
 			Region:       aws.Region,
 			UserTags:     aws.UserTags,
-			VPCID:        aws.VPCID,
 			VPCCIDRBlock: aws.VPCCIDRBlock,
 		}
 		if aws.DefaultMachinePlatform != nil {

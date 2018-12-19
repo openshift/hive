@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/openshift/hive/contrib/pkg/awstagdeprovision"
+	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/spf13/cobra"
 
 	log "github.com/sirupsen/logrus"
@@ -29,7 +29,7 @@ import (
 
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
 func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
-	opt := &awstagdeprovision.ClusterUninstaller{}
+	opt := &aws.ClusterUninstaller{}
 	cmd := &cobra.Command{
 		Use:   "aws-tag-deprovision KEY=VALUE ...",
 		Short: "Deprovision AWS assets (as created by openshift-installer) with the given tag(s)",
@@ -51,9 +51,9 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	return cmd
 }
 
-func completeAWSUninstaller(o *awstagdeprovision.ClusterUninstaller, args []string) error {
+func completeAWSUninstaller(o *aws.ClusterUninstaller, args []string) error {
 	for _, arg := range args {
-		filter := awstagdeprovision.AWSFilter{}
+		filter := aws.Filter{}
 		err := parseFilter(filter, arg)
 		if err != nil {
 			return fmt.Errorf("cannot parse filter %s: %v", arg, err)
@@ -80,7 +80,7 @@ func completeAWSUninstaller(o *awstagdeprovision.ClusterUninstaller, args []stri
 	return nil
 }
 
-func parseFilter(filterMap awstagdeprovision.AWSFilter, str string) error {
+func parseFilter(filterMap aws.Filter, str string) error {
 	parts := strings.SplitN(str, "=", 2)
 	if len(parts) != 2 {
 		return fmt.Errorf("incorrectly formatted filter")

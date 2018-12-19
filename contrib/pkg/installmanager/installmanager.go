@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/openshift/hive/contrib/pkg/awstagdeprovision"
+	"github.com/openshift/installer/pkg/destroy/aws"
 )
 
 const (
@@ -294,11 +294,11 @@ func (m *InstallManager) cleanupTerraformFiles() error {
 
 func runUninstaller(clusterName, region, uuid string, logger log.FieldLogger) error {
 	// run the uninstaller to clean up any cloud resources previously created
-	filters := []awstagdeprovision.AWSFilter{
+	filters := []aws.Filter{
 		{uuidKey: uuid},
 		{kubernetesKeyPrefix + clusterName: "owned"},
 	}
-	uninstaller := &awstagdeprovision.ClusterUninstaller{
+	uninstaller := &aws.ClusterUninstaller{
 		Filters:     filters,
 		Region:      region,
 		ClusterName: clusterName,

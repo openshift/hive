@@ -23,7 +23,8 @@ required = [
 
 [prune]
   go-tests = true
-
+  non-go = true
+  unused-packages = true
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
@@ -58,8 +59,8 @@ version="v1.4.7"
   version="kubernetes-1.11.2"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/openshift/installer"
+	revision = "a7468d16b81d5fee95de4dc632fabe7b88d17f05"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"

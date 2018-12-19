@@ -18,7 +18,6 @@ package install
 
 import (
 	"fmt"
-	"net"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
@@ -50,8 +49,7 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		platform.AWS = &installeraws.Platform{
 			Region:       aws.Region,
 			UserTags:     aws.UserTags,
-			VPCID:        aws.VPCID,
-			VPCCIDRBlock: aws.VPCCIDRBlock,
+			VPCCIDRBlock: parseCIDR(aws.VPCCIDRBlock),
 		}
 		if aws.DefaultMachinePlatform != nil {
 			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
@@ -98,13 +96,9 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		SSHKey:     sshKey,
 		BaseDomain: spec.Config.BaseDomain,
 		Networking: types.Networking{
-			Type: networkType,
-			ServiceCIDR: ipnet.IPNet{
-				IPNet: parseCIDR(spec.Config.Networking.ServiceCIDR),
-			},
-			PodCIDR: &ipnet.IPNet{
-				IPNet: parseCIDR(spec.Config.Networking.PodCIDR),
-			},
+			Type:        networkType,
+			ServiceCIDR: *parseCIDR(spec.Config.Networking.ServiceCIDR),
+			PodCIDR:     parseCIDR(spec.Config.Networking.PodCIDR),
 		},
 		PullSecret: pullSecret,
 		Platform:   platform,
@@ -113,12 +107,11 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 	return ic, nil
 }
 
-func parseCIDR(s string) net.IPNet {
+func parseCIDR(s string) *ipnet.IPNet {
 	if s == "" {
-		return net.IPNet{}
+		return &ipnet.IPNet{}
 	}
-	_, cidr, _ := net.ParseCIDR(s)
-	return *cidr
+	return ipnet.MustParseCIDR(s)
 }
 
 func convertNetworkingType(hnt hivev1.NetworkType) (netopv1.NetworkType, error) {

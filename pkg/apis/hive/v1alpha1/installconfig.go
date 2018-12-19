@@ -71,14 +71,9 @@ type AWSPlatform struct {
 	// platform configuration.
 	DefaultMachinePlatform *AWSMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
 
-	// VPCID specifies the vpc to associate with the cluster.
-	// If empty, new vpc will be created.
-	// +optional
-	VPCID string `json:"vpcID"`
-
 	// VPCCIDRBlock
 	// +optional
-	VPCCIDRBlock string `json:"vpcCIDRBlock"`
+	VPCCIDRBlock string `json:"vpcCIDRBlock,omitempty"`
 }
 
 // LibvirtPlatform stores all the global configuration that

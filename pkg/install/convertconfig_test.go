@@ -43,13 +43,16 @@ const (
 	adminPassword   = "adminpassword"
 	adminSSHKey     = "adminSSH"
 	pullSecret      = "pullSecret"
-	vpcCIDRBlock    = "10.1.0.0/16"
 	awsInstanceType = "fake-aws-type"
 	awsRegion       = "us-east-1"
 	iamRoleName     = "rolename"
 	ec2VolIOPS      = 100
 	ec2VolSize      = 500
 	ec2VolType      = "sometype"
+)
+
+var (
+	vpcCIDRBlock = ipnet.MustParseCIDR("10.1.0.0/16")
 )
 
 func buildValidClusterDeployment() *hivev1.ClusterDeployment {
@@ -71,7 +74,7 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 						UserTags: map[string]string{
 							"foo": "bar",
 						},
-						VPCCIDRBlock: vpcCIDRBlock,
+						VPCCIDRBlock: vpcCIDRBlock.String(),
 						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
 							InstanceType: awsInstanceType,
 							IAMRoleName:  iamRoleName,
@@ -137,13 +140,9 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		PullSecret: pullSecret,
 		Networking: installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
-			Type: "OpenshiftSDN",
-			ServiceCIDR: ipnet.IPNet{
-				IPNet: parseCIDR("172.30.0.0/16"),
-			},
-			PodCIDR: &ipnet.IPNet{
-				IPNet: parseCIDR("10.128.0.0/14"),
-			},
+			Type:        "OpenshiftSDN",
+			ServiceCIDR: *ipnet.MustParseCIDR("172.30.0.0/16"),
+			PodCIDR:     ipnet.MustParseCIDR("10.128.0.0/14"),
 		},
 		Platform: installtypes.Platform{
 			AWS: &installawstypes.Platform{

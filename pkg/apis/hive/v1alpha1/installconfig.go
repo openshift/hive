@@ -72,7 +72,8 @@ type AWSPlatform struct {
 	DefaultMachinePlatform *AWSMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
 
 	// VPCCIDRBlock
-	VPCCIDRBlock string `json:"vpcCIDRBlock"`
+	// +optional
+	VPCCIDRBlock string `json:"vpcCIDRBlock,omitempty"`
 }
 
 // LibvirtPlatform stores all the global configuration that

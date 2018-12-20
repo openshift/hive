@@ -258,7 +258,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	cdLog = cdLog.WithField("job", job.Name)
 
-	cdLog.Debug("checking if install-config.yml config map exists")
+	cdLog.Debug("checking if install-config.yaml config map exists")
 	// Check if the ConfigMap already exists for this ClusterDeployment:
 	existingCfgMap := &kapi.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)

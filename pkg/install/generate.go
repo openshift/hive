@@ -70,7 +70,7 @@ func GenerateInstallerJob(
 		},
 		Data: map[string]string{
 			// Filename should match installer default:
-			"install-config.yml": installConfig,
+			"install-config.yaml": installConfig,
 		},
 	}
 
@@ -223,7 +223,7 @@ func GenerateInstallerJob(
 				"--log-level",
 				"debug",
 				"--install-config",
-				"/installconfig/install-config.yml",
+				"/installconfig/install-config.yaml",
 				"--cluster-uuid",
 				cd.Spec.ClusterUUID,
 				"--region",

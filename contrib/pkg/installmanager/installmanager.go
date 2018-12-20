@@ -110,7 +110,7 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags.StringVar(&im.ClusterUUID, "cluster-uuid", "", "UUID to tag cloud resources with")
 	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
-	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yml", "location of install-config.yml to copy into work-dir")
+	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yaml", "location of install-config.yaml to copy into work-dir")
 	return cmd
 }
 
@@ -175,7 +175,7 @@ func (m *InstallManager) Run() error {
 
 	m.waitForInstallerBinaries()
 
-	dstInstallConfig := filepath.Join(m.WorkDir, "install-config.yml")
+	dstInstallConfig := filepath.Join(m.WorkDir, "install-config.yaml")
 	m.log.Debugf("copying %s to %s", m.InstallConfig, dstInstallConfig)
 	err = m.copyFile(m.InstallConfig, dstInstallConfig)
 	if err != nil {

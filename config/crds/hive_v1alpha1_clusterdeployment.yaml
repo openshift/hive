@@ -170,12 +170,8 @@ spec:
                           type: object
                         vpcCIDRBlock:
                           type: string
-                        vpcID:
-                          type: string
                       required:
                       - region
-                      - vpcID
-                      - vpcCIDRBlock
                       type: object
                     libvirt:
                       properties:

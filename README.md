@@ -6,22 +6,23 @@ API driven OpenShift cluster provisioning and management
  * Install mockgen:
    * `$ go get github.com/golang/mock/gomock; go install github.com/golang/mock/mockgen`
 
-## Deploying In-Cluster
+## Deployment Options
 
-* Ensure that you have access to an OpenShift cluster and have administrator permissions. This could be oc cluster up, minishift, or an actual cluster you can oc login to.
-* Build and deploy to Minishift:
-  * `$ hack/minishift-deploy.sh`
-* Build and deploy to current kubectl context using local container image:
-   * `$ make deploy`
-* Build and deploy to current kubectl context using remote container image:
-   * `$ make deploy-sd-dev`
+### Deploying To OpenShift 4.x Using Latest Published Images
 
-## Running from Source
+This method uses the latest published Hive image on the CI registry: `registry.svc.ci.openshift.org/openshift/hive-v4.0:hive`
+
+1. Provision an OpenShift 4.0 Cluster with openshift-install.
+1. Login as a cluster admin after installation completes:
+  * `$ export KUBECONFIG=/home/dgoodwin/installdir/auth/kubeconfig`
+1. Install Hive to the openshift-hive namespace:
+  * `$ make deploy`
+
+### Running from Source
 
 * Create the ClusterDeployment and DNSZone CRDs:
-  * `$ kubectl apply -f config/crds/hive_v1alpha1_clusterdeployment.yaml`
-  * `$ kubectl apply -f config/crds/hive_v1alpha1_dnszone.yaml`
-* Run the Hive controllers from source:
+  * `$ make install`
+* Run Hive from local source:
   * `$ make run`
 
 ## Using Hive

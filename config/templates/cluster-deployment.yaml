@@ -29,11 +29,11 @@ parameters:
 - name: HIVE_IMAGE
   displayName: Hive image URL
   description: Hive image URL
-  value: "hive-controller:latest"
+  value: "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 - name: HIVE_IMAGE_PULL_POLICY
   displayName: Hive image pull policy
   description: Hive image pull policy
-  value: Never
+  value: Always
 - name: INSTALLER_IMAGE
   displayName: OpenShift Installer image URL
   description: OpenShift Installer image URL

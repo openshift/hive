@@ -48,9 +48,8 @@ spec:
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission
-        image: hive-controller:latest
-        #imagePullPolicy: IfNotPresent
-        imagePullPolicy: Never
+        image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+        imagePullPolicy: Always
         command:
         - "/opt/services/hiveadmission"
         - "--secure-port=9443"

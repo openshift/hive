@@ -49,7 +49,8 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests docker-build deploy-hiveadmission
+deploy: manifests deploy-hiveadmission
+	kubectl apply -f manifests/
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 

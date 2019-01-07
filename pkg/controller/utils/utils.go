@@ -41,6 +41,11 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	if err != nil {
 		return nil, err
 	}
+
+	if err := openshiftapiv1.Install(scheme); err != nil {
+		return nil, err
+	}
+
 	return client.New(cfg, client.Options{
 		Scheme: scheme,
 	})

@@ -1,9 +1,10 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
 	"net"
+
+	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // InstallConfig is the configuration for an OpenShift install.
@@ -42,9 +43,17 @@ type Platform struct {
 
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
-	Type        NetworkType `json:"type"`
-	ServiceCIDR string      `json:"serviceCIDR"`
-	PodCIDR     string      `json:"podCIDR"`
+	// MachineCIDR is the IP address space from which to assign machine IPs.
+	MachineCIDR string `json:"machineCIDR"`
+
+	// Type is the network type to install
+	Type NetworkType `json:"type"`
+
+	// ServiceCIDR is the IP address space from which to assign service IPs.
+	ServiceCIDR string `json:"serviceCIDR"`
+
+	// ClusterNetworks is the IP address space from which to assign pod IPs.
+	ClusterNetworks []netopv1.ClusterNetwork `json:"clusterNetworks,omitempty"`
 }
 
 // NetworkType defines the pod network provider in the cluster.
@@ -70,10 +79,6 @@ type AWSPlatform struct {
 	// installing on AWS for machine pools which do not define their own
 	// platform configuration.
 	DefaultMachinePlatform *AWSMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
-
-	// VPCCIDRBlock
-	// +optional
-	VPCCIDRBlock string `json:"vpcCIDRBlock,omitempty"`
 }
 
 // LibvirtPlatform stores all the global configuration that

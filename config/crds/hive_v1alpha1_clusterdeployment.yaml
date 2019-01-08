@@ -117,16 +117,29 @@ spec:
                   type: array
                 networking:
                   properties:
-                    podCIDR:
+                    clusterNetworks:
+                      items:
+                        properties:
+                          cidr:
+                            type: string
+                          hostSubnetLength:
+                            format: int32
+                            type: integer
+                        required:
+                        - cidr
+                        - hostSubnetLength
+                        type: object
+                      type: array
+                    machineCIDR:
                       type: string
                     serviceCIDR:
                       type: string
                     type:
                       type: string
                   required:
+                  - machineCIDR
                   - type
                   - serviceCIDR
-                  - podCIDR
                   type: object
                 platform:
                   properties:
@@ -168,8 +181,6 @@ spec:
                           type: string
                         userTags:
                           type: object
-                        vpcCIDRBlock:
-                          type: string
                       required:
                       - region
                       type: object

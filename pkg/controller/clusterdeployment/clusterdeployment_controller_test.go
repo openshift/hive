@@ -185,6 +185,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testMetadataConfigMap(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -470,9 +471,7 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 	cm.Namespace = testNamespace
 	metadataJSON := `{
 		"aws": {
-			"identifier": {
-				"openshiftClusterID": "testFooClusterUUID"
-			}
+			"identifier": [{"openshiftClusterID": "testFooClusterUUID"}]
 		}
 	}`
 	cm.Data = map[string]string{"metadata.json": metadataJSON}

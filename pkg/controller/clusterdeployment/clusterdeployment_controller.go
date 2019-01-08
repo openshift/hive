@@ -47,7 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	instaws "github.com/openshift/installer/pkg/types/aws"
+	installertypes "github.com/openshift/installer/pkg/types"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -179,23 +179,27 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 				return reconcile.Result{}, err
 			}
 
-			var md instaws.Metadata
+			var md installertypes.ClusterMetadata
 			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &md); err != nil {
 				cdLog.WithError(err).Error("error reading cluster metadata json from configmap")
 				return reconcile.Result{}, err
 			}
 
-			for _, m := range md.Identifier {
-				clusterID, ok := m["openshiftClusterID"]
-				if ok {
-					cd.Status.ClusterID = clusterID
-					cdLog.WithField("clusterID", clusterID).Debug("found clusterID")
-					break
+			if md.ClusterPlatformMetadata.AWS != nil {
+				for _, m := range md.ClusterPlatformMetadata.AWS.Identifier {
+					clusterID, ok := m["openshiftClusterID"]
+					if ok {
+						cd.Status.ClusterID = clusterID
+						cdLog.WithField("clusterID", clusterID).Debug("found clusterID")
+						break
+					}
 				}
-			}
-			if cd.Status.ClusterID == "" {
-				cdLog.Error("cluster metadata did not contain openshiftClusterID")
-				return reconcile.Result{}, fmt.Errorf("cluster metadata did not contain openshiftClusterID")
+				if cd.Status.ClusterID == "" {
+					cdLog.Error("cluster metadata did not contain openshiftClusterID")
+					return reconcile.Result{}, fmt.Errorf("cluster metadata did not contain openshiftClusterID")
+				}
+			} else {
+				cdLog.Warn("cluster metadata did not contain AWS platform")
 			}
 		}
 	}

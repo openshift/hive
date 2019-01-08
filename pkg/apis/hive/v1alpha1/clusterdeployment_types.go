@@ -35,7 +35,7 @@ const (
 type ClusterDeploymentSpec struct {
 
 	// ClusterUUID is a unique identifier for this cluster. Will be generated if none is provided.
-	// TODO: omitempty for now so we don't have to specify when creating.
+	// WARNING: this is going to be removed soon, see status.clusterID.
 	ClusterUUID string `json:"clusterUUID,omitempty"`
 
 	// Config contains the desired configuration for the cluster.
@@ -83,6 +83,9 @@ type AWSPlatformSecrets struct {
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment
 type ClusterDeploymentStatus struct {
+
+	// ClusterID is a unique identifier for this cluster generated during installation.
+	ClusterID string `json:"clusterID,omitempty"`
 
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`

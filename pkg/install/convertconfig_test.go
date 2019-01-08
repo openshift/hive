@@ -25,6 +25,8 @@ import (
 	installtypes "github.com/openshift/installer/pkg/types"
 	installawstypes "github.com/openshift/installer/pkg/types/aws"
 
+	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+
 	corev1 "k8s.io/api/core/v1"
 
 	log "github.com/sirupsen/logrus"
@@ -74,7 +76,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 						UserTags: map[string]string{
 							"foo": "bar",
 						},
-						VPCCIDRBlock: vpcCIDRBlock.String(),
 						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
 							InstanceType: awsInstanceType,
 							IAMRoleName:  iamRoleName,
@@ -89,7 +90,13 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 				Networking: hivev1.Networking{
 					Type:        hivev1.NetworkTypeOpenshiftSDN,
 					ServiceCIDR: "172.30.0.0/16",
-					PodCIDR:     "10.128.0.0/14",
+					ClusterNetworks: []netopv1.ClusterNetwork{
+						{
+							CIDR:             "10.128.0.0/14",
+							HostSubnetLength: 9,
+						},
+					},
+					MachineCIDR: vpcCIDRBlock.String(),
 				},
 				Machines: []hivev1.MachinePool{
 					{
@@ -142,7 +149,13 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 			// TODO: Hardcoded to match installer for now.
 			Type:        "OpenshiftSDN",
 			ServiceCIDR: *ipnet.MustParseCIDR("172.30.0.0/16"),
-			PodCIDR:     ipnet.MustParseCIDR("10.128.0.0/14"),
+			ClusterNetworks: []netopv1.ClusterNetwork{
+				{
+					CIDR:             "10.128.0.0/14",
+					HostSubnetLength: 9,
+				},
+			},
+			MachineCIDR: *vpcCIDRBlock,
 		},
 		Platform: installtypes.Platform{
 			AWS: &installawstypes.Platform{
@@ -150,7 +163,6 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				UserTags: map[string]string{
 					"foo": "bar",
 				},
-				VPCCIDRBlock: vpcCIDRBlock,
 				DefaultMachinePlatform: &installawstypes.MachinePool{
 					InstanceType: awsInstanceType,
 					IAMRoleName:  iamRoleName,
@@ -240,14 +252,17 @@ func TestConvert(t *testing.T) {
 			name: "no networking CIDRs",
 			cd: func() *hivev1.ClusterDeployment {
 				cd := buildValidClusterDeployment()
-				cd.Spec.Config.Networking.PodCIDR = ""
+				cd.Spec.Config.Networking.ClusterNetworks = []netopv1.ClusterNetwork{}
 				cd.Spec.Config.Networking.ServiceCIDR = ""
+				cd.Spec.Config.Networking.MachineCIDR = ""
 				return cd
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
 				ic := buildBaseExpectedInstallConfig()
-				ic.Networking.PodCIDR = &ipnet.IPNet{}
 				ic.Networking.ServiceCIDR = ipnet.IPNet{}
+				ic.Networking.PodCIDR = nil
+				ic.Networking.MachineCIDR = ipnet.IPNet{}
+				ic.Networking.ClusterNetworks = []netopv1.ClusterNetwork{}
 				return ic
 			}(),
 		},

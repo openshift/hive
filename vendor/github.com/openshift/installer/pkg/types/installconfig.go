@@ -5,17 +5,24 @@ import (
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/libvirt"
+	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
-	// PlatformNames is a slice with all the supported platform names in
-	// alphabetical order.
+	// PlatformNames is a slice with all the visibly-supported
+	// platform names in alphabetical order. This is the list of
+	// platforms presented to the user in the interactive wizard.
 	PlatformNames = []string{
 		aws.Name,
-		libvirt.Name,
 		openstack.Name,
+	}
+	// HiddenPlatformNames is a slice with all the
+	// hidden-but-supported platform names. This list isn't presented
+	// to the user in the interactive wizard.
+	HiddenPlatformNames = []string{
+		none.Name,
 	}
 )
 
@@ -69,6 +76,10 @@ type Platform struct {
 	// Libvirt is the configuration used when installing on libvirt.
 	Libvirt *libvirt.Platform `json:"libvirt,omitempty"`
 
+	// None is the empty configuration used when installing on an unsupported
+	// platform.
+	None *none.Platform `json:"none,omitempty"`
+
 	// OpenStack is the configuration used when installing on OpenStack.
 	OpenStack *openstack.Platform `json:"openstack,omitempty"`
 }
@@ -86,6 +97,9 @@ func (p *Platform) Name() string {
 	if p.Libvirt != nil {
 		return libvirt.Name
 	}
+	if p.None != nil {
+		return none.Name
+	}
 	if p.OpenStack != nil {
 		return openstack.Name
 	}
@@ -94,10 +108,13 @@ func (p *Platform) Name() string {
 
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
+	// MachineCIDR is the IP address space from which to assign machine IPs.
+	MachineCIDR ipnet.IPNet `json:"machineCIDR"`
+
 	// Type is the network type to install
 	Type netopv1.NetworkType `json:"type"`
 
-	// ServiceCIDR is the ip block from which to assign service IPs
+	// ServiceCIDR is the IP address space from which to assign service IPs.
 	ServiceCIDR ipnet.IPNet `json:"serviceCIDR"`
 
 	// ClusterNetworks is the IP address space from which to assign pod IPs.

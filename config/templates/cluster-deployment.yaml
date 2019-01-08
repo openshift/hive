@@ -101,12 +101,13 @@ objects:
       networking:
         type: OpenshiftSDN
         serviceCIDR: "10.3.0.0/16"
-        podCIDR: "10.2.0.0/16"
+        machineCIDR: "10.0.0.0/16"
+        clusterNetworks:
+          - cidr: "10.2.0.0/16"
+            hostSubnetLength: 9
       platform:
         aws:
           region: us-east-1
-          vpcID: ""
-          vpcCIDRBlock: 10.0.0.0/16
       pullSecret:
         name: "${CLUSTER_NAME}-pull-secret"
       machines:

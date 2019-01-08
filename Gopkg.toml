@@ -60,7 +60,7 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-	revision = "a7468d16b81d5fee95de4dc632fabe7b88d17f05"
+  revision = "87a44e789ff9c9739b214aa131107c8e89ba21be"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"

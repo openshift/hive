@@ -46,6 +46,7 @@ import (
 const (
 	testName              = "foo-lqmsh"
 	testClusterID         = "bar"
+	testClusterUUID       = "testFooClusterUUID"
 	installJobName        = "foo-lqmsh-install"
 	uninstallJobName      = "foo-lqmsh-uninstall"
 	testNamespace         = "default"
@@ -184,11 +185,31 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testMetadataConfigMap(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443/console", cd.Status.WebConsoleURL)
+			},
+		},
+		{
+			name: "Parse cluster UUID from metadata",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					return cd
+				}(),
+				testInstallJob(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testMetadataConfigMap(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.Equal(t, testClusterUUID, cd.Status.ClusterID)
 			},
 		},
 		{
@@ -450,9 +471,7 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 	cm.Namespace = testNamespace
 	metadataJSON := `{
 		"aws": {
-			"identifier": {
-				"openshiftClusterID": "testFooClusterUUID"
-			}
+			"identifier": [{"openshiftClusterID": "testFooClusterUUID"}]
 		}
 	}`
 	cm.Data = map[string]string{"metadata.json": metadataJSON}

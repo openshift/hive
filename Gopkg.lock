@@ -561,7 +561,7 @@
   version = "v.1.11.0"
 
 [[projects]]
-  digest = "1:d8ee02db9a87871c287a944fbd2d00aa07a519ce12c8beb0c0067a491f3c4fd0"
+  digest = "1:9b2a666055dae74d68ab6f0ae24fadd106e65462eebd4da02ac900d4d04d232e"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/machines/aws",
@@ -571,10 +571,11 @@
     "pkg/types",
     "pkg/types/aws",
     "pkg/types/libvirt",
+    "pkg/types/none",
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "a7468d16b81d5fee95de4dc632fabe7b88d17f05"
+  revision = "87a44e789ff9c9739b214aa131107c8e89ba21be"
 
 [[projects]]
   branch = "master"

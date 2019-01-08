@@ -47,9 +47,8 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 	if spec.Config.Platform.AWS != nil {
 		aws := spec.Config.Platform.AWS
 		platform.AWS = &installeraws.Platform{
-			Region:       aws.Region,
-			UserTags:     aws.UserTags,
-			VPCCIDRBlock: parseCIDR(aws.VPCCIDRBlock),
+			Region:   aws.Region,
+			UserTags: aws.UserTags,
 		}
 		if aws.DefaultMachinePlatform != nil {
 			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
@@ -96,9 +95,10 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		SSHKey:     sshKey,
 		BaseDomain: spec.Config.BaseDomain,
 		Networking: types.Networking{
-			Type:        networkType,
-			ServiceCIDR: *parseCIDR(spec.Config.Networking.ServiceCIDR),
-			PodCIDR:     parseCIDR(spec.Config.Networking.PodCIDR),
+			Type:            networkType,
+			ServiceCIDR:     *parseCIDR(spec.Config.Networking.ServiceCIDR),
+			ClusterNetworks: spec.Config.Networking.ClusterNetworks,
+			MachineCIDR:     *parseCIDR(spec.Config.Networking.MachineCIDR),
 		},
 		PullSecret: pullSecret,
 		Platform:   platform,

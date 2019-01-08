@@ -259,6 +259,8 @@ spec:
               type: object
             apiURL:
               type: string
+            clusterID:
+              type: string
             clusterVersionStatus:
               properties:
                 availableUpdates:

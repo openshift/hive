@@ -18,6 +18,7 @@ package clusterdeployment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
@@ -45,6 +46,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	instaws "github.com/openshift/installer/pkg/types/aws"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -162,6 +165,39 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	if err != nil {
 		cdLog.WithError(err).Error("error setting up service account and role")
 		return reconcile.Result{}, err
+	}
+
+	if cd.Status.Installed {
+		if cd.Status.ClusterID == "" {
+			cdLog.Debug("setting cluster ID")
+			metadataCfgMap := &kapi.ConfigMap{}
+			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
+			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
+			if err != nil {
+				// This would be pretty strange for a cluster that is installed:
+				cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
+				return reconcile.Result{}, err
+			}
+
+			var md instaws.Metadata
+			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &md); err != nil {
+				cdLog.WithError(err).Error("error reading cluster metadata json from configmap")
+				return reconcile.Result{}, err
+			}
+
+			for _, m := range md.Identifier {
+				clusterID, ok := m["openshiftClusterID"]
+				if ok {
+					cd.Status.ClusterID = clusterID
+					cdLog.WithField("clusterID", clusterID).Debug("found clusterID")
+					break
+				}
+			}
+			if cd.Status.ClusterID == "" {
+				cdLog.Error("cluster metadata did not contain openshiftClusterID")
+				return reconcile.Result{}, fmt.Errorf("cluster metadata did not contain openshiftClusterID")
+			}
+		}
 	}
 
 	if cd.DeletionTimestamp != nil {

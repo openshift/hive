@@ -103,3 +103,17 @@ For instance, try this:
 ```sh
 # kubectl create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
 ```
+
+### Installing Federation
+
+Ensure that you have the kubefed2 command installed:
+
+```
+go get -u github.com/kubernetes-sigs/federation-v2/cmd/kubefed2
+```
+
+Install federation components:
+
+```
+make install-federation
+```

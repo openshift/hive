@@ -138,3 +138,6 @@ docker-push:
 .PHONY: buildah-build
 buildah-build: generate
 	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .
+
+install-federation:
+	./hack/install-federation.sh

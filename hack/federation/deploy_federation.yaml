@@ -4,6 +4,11 @@ apiVersion: v1
 metadata:
   name: federation-system
 ---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: kube-multicluster-public
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

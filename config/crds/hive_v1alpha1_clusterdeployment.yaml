@@ -321,6 +321,8 @@ spec:
               - conditions
               - availableUpdates
               type: object
+            federated:
+              type: boolean
             installed:
               type: boolean
             webConsoleURL:

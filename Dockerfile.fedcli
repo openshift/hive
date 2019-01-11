@@ -1,0 +1,7 @@
+FROM registry.svc.ci.openshift.org/openshift/release:golang-1.10 as builder
+WORKDIR /go
+RUN go get -u github.com/kubernetes-sigs/federation-v2/cmd/kubefed2
+
+FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+COPY --from=builder /go/bin/kubefed2 /usr/bin
+ENTRYPOINT ["/usr/bin/kubefed2"]

@@ -247,9 +247,12 @@ spec:
                   - credentials
                   type: object
               type: object
+            preserveOnDelete:
+              type: boolean
           required:
           - config
           - platformSecrets
+          - preserveOnDelete
           type: object
         status:
           properties:

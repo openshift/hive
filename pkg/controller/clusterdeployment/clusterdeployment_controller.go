@@ -459,6 +459,19 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
 	}
 
+	// Skips creation of uninstall job if PreserveOnDelete is true
+	if cd.Spec.PreserveOnDelete {
+		cdLog.Warn("skipping creation of uninstall job, due to PreserveOnDelete")
+		if HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+			err = r.removeClusterDeploymentFinalizer(cd)
+			if err != nil {
+				cdLog.WithError(err).Error("error removing finalizer")
+			}
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
 	// Generate an uninstall job:
 	uninstallJob, err := install.GenerateUninstallerJob(cd)
 	if err != nil {

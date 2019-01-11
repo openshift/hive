@@ -33,8 +33,8 @@ import (
 const (
 	defaultInstallerImage           = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 	defaultInstallerImagePullPolicy = corev1.PullAlways
-	defaultHiveImage                = "hive-controller:latest"
-	defaultHiveImagePullPolicy      = corev1.PullNever
+	defaultHiveImage                = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+	defaultHiveImagePullPolicy      = corev1.PullAlways
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster

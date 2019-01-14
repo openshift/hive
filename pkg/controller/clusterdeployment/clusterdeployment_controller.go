@@ -154,6 +154,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		"namespace":         cd.Namespace,
 	})
 	cdLog.Info("reconciling cluster deployment")
+	origCD := cd
 	cd = cd.DeepCopy()
 
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
@@ -331,7 +332,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		cdLog.Infof("cluster job exists, successful: %v", cd.Status.Installed)
 	}
 
-	err = r.updateClusterDeploymentStatus(cd, existingJob, cdLog)
+	err = r.updateClusterDeploymentStatus(cd, origCD, existingJob, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Errorf("error updating cluster deployment status")
 		return reconcile.Result{}, err
@@ -359,10 +360,8 @@ func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataK
 	return string(retStr), nil
 }
 
-func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, origCD *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {
 	cdLog.Debug("updating cluster deployment status")
-	origCD := cd
-	cd = cd.DeepCopy()
 	if job != nil && job.Name != "" && job.Namespace != "" {
 		// Job exists, check it's status:
 		cd.Status.Installed = isSuccessful(job)

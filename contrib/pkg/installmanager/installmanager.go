@@ -56,12 +56,12 @@ type InstallManager struct {
 	LogLevel                      string
 	WorkDir                       string
 	InstallConfig                 string
-	ClusterUUID                   string
+	ClusterID                     string
 	Region                        string
 	ClusterName                   string
 	Namespace                     string
 	DynamicClient                 client.Client
-	runUninstaller                func(clusterName, region, uuid string, logger log.FieldLogger) error
+	runUninstaller                func(clusterName, region, clusterID string, logger log.FieldLogger) error
 	uploadClusterMetadata         func(*hivev1.ClusterDeployment, *InstallManager) error
 	updateClusterDeploymentStatus func(*hivev1.ClusterDeployment, string, string, *InstallManager) error
 	uploadAdminKubeconfig         func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
@@ -107,7 +107,7 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
-	flags.StringVar(&im.ClusterUUID, "cluster-uuid", "", "UUID to tag cloud resources with")
+	flags.StringVar(&im.ClusterID, "cluster-id", "", "UUID to cleanup from a past attempted install")
 	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
 	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yaml", "location of install-config.yaml to copy into work-dir")
@@ -153,9 +153,6 @@ func (m *InstallManager) Complete(args []string) error {
 
 // Validate ensures the given options and arguments are valid.
 func (m *InstallManager) Validate() error {
-	if m.ClusterUUID == "" {
-		m.log.Fatalf("cluster-uuid parameter must be provided")
-	}
 	return nil
 }
 
@@ -261,8 +258,12 @@ func (m *InstallManager) cleanupBeforeInstall() error {
 		return err
 	}
 
-	if err := m.runUninstaller(m.ClusterName, m.Region, m.ClusterUUID, m.log); err != nil {
-		return err
+	if m.ClusterID != "" {
+		if err := m.runUninstaller(m.ClusterName, m.Region, m.ClusterID, m.log); err != nil {
+			return err
+		}
+	} else {
+		m.log.Warn("skipping cleanup as no cluster ID set")
 	}
 
 	return nil
@@ -292,10 +293,10 @@ func (m *InstallManager) cleanupTerraformFiles() error {
 	return nil
 }
 
-func runUninstaller(clusterName, region, uuid string, logger log.FieldLogger) error {
+func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogger) error {
 	// run the uninstaller to clean up any cloud resources previously created
 	filters := []aws.Filter{
-		{uuidKey: uuid},
+		{uuidKey: clusterID},
 		{kubernetesKeyPrefix + clusterName: "owned"},
 	}
 	uninstaller := &aws.ClusterUninstaller{

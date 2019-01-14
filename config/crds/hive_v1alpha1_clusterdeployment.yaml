@@ -24,8 +24,6 @@ spec:
           type: object
         spec:
           properties:
-            clusterUUID:
-              type: string
             config:
               properties:
                 baseDomain:

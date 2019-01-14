@@ -273,7 +273,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
 				SSHKey: &corev1.LocalObjectReference{
 					Name: "ssh-key",

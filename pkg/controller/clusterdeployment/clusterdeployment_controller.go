@@ -25,7 +25,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -156,10 +155,6 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	})
 	cdLog.Info("reconciling cluster deployment")
 	cd = cd.DeepCopy()
-
-	if cd.Spec.ClusterUUID == "" {
-		return reconcile.Result{}, r.setClusterUUID(cd, cdLog)
-	}
 
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
@@ -463,25 +458,6 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 	return nil
 }
 
-// setClusterUUID sets the
-func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	cdLog.Debug("setting cluster UUID")
-	cd = cd.DeepCopy()
-
-	if cd.Spec.ClusterUUID != "" {
-		return fmt.Errorf("cluster UUID already set")
-	}
-
-	cd.Spec.ClusterUUID = uuid.New()
-	cdLog.WithField("clusterUUID", cd.Spec.ClusterUUID).Info("generated new cluster UUID")
-	err := r.Update(context.TODO(), cd)
-	if err != nil {
-		cdLog.WithError(err).Errorf("error updating cluster deployment")
-		return err
-	}
-
-	return nil
-}
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 
 	// Delete the install job in case it's still running:
@@ -507,45 +483,54 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
 	}
 
-	// Generate an uninstall job:
-	uninstallJob, err := install.GenerateUninstallerJob(cd)
-	if err != nil {
-		cdLog.Errorf("error generating uninstaller job: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	err = controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
-	if err != nil {
-		cdLog.Errorf("error setting controller reference on job: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Check if uninstall job already exists:
-	existingJob := &batchv1.Job{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(context.TODO(), uninstallJob)
-		if err != nil {
-			cdLog.Errorf("error creating uninstall job: %v", err)
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		cdLog.Errorf("error getting uninstall job: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Uninstall job exists, check it's status and if successful, remove the finalizer:
-	if isSuccessful(existingJob) {
-		cdLog.Infof("uninstall job successful, removing finalizer")
+	if cd.Status.ClusterID == "" {
+		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error removing finalizer")
 		}
-		return reconcile.Result{}, err
+	} else {
+		// Generate an uninstall job:
+		uninstallJob, err := install.GenerateUninstallerJob(cd)
+		if err != nil {
+			cdLog.Errorf("error generating uninstaller job: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		err = controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
+		if err != nil {
+			cdLog.Errorf("error setting controller reference on job: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		// Check if uninstall job already exists:
+		existingJob := &batchv1.Job{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
+		if err != nil && errors.IsNotFound(err) {
+			err = r.Create(context.TODO(), uninstallJob)
+			if err != nil {
+				cdLog.Errorf("error creating uninstall job: %v", err)
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		} else if err != nil {
+			cdLog.Errorf("error getting uninstall job: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		// Uninstall job exists, check it's status and if successful, remove the finalizer:
+		if isSuccessful(existingJob) {
+			cdLog.Infof("uninstall job successful, removing finalizer")
+			err = r.removeClusterDeploymentFinalizer(cd)
+			if err != nil {
+				cdLog.WithError(err).Error("error removing finalizer")
+			}
+			return reconcile.Result{}, err
+		}
+
+		cdLog.Infof("uninstall job not yet successful")
 	}
 
-	cdLog.Infof("uninstall job not yet successful")
 	return reconcile.Result{}, nil
 }
 

@@ -28,6 +28,7 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -141,6 +142,9 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 	replicas := int64(3)
 	return &installtypes.InstallConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1beta1",
+		},
 		ClusterID:  testClusterID,
 		BaseDomain: "test.example.com",
 		SSHKey:     adminSSHKey,

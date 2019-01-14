@@ -94,7 +94,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1beta1",
 		},
-		ClusterID:  cd.Spec.ClusterUUID,
 		SSHKey:     sshKey,
 		BaseDomain: spec.Config.BaseDomain,
 		Networking: types.Networking{

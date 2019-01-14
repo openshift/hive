@@ -62,7 +62,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 	replicas := int64(3)
 	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterUUID: testClusterID,
 			Config: hivev1.InstallConfig{
 				BaseDomain: "test.example.com",
 				SSHKey: &corev1.LocalObjectReference{
@@ -145,7 +144,6 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1beta1",
 		},
-		ClusterID:  testClusterID,
 		BaseDomain: "test.example.com",
 		SSHKey:     adminSSHKey,
 		PullSecret: pullSecret,

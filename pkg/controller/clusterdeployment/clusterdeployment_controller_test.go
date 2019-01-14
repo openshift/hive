@@ -375,7 +375,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterUUID: testUUID,
 			Config: hivev1.InstallConfig{
 				ClusterID: testClusterID,
 				SSHKey: &corev1.LocalObjectReference{
@@ -404,6 +403,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			ClusterID: testClusterUUID,
 		},
 	}
 }

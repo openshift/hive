@@ -34,10 +34,6 @@ const (
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
 
-	// ClusterUUID is a unique identifier for this cluster. Will be generated if none is provided.
-	// WARNING: this is going to be removed soon, see status.clusterID.
-	ClusterUUID string `json:"clusterUUID,omitempty"`
-
 	// Config contains the desired configuration for the cluster.
 	Config InstallConfig `json:"config"`
 

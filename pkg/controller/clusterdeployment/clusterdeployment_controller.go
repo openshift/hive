@@ -379,14 +379,43 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", cd.Name)}
 	}
 
-	if cd.Status.AdminKubeconfigSecret.Name != "" &&
-		(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
-
+	if cd.Status.AdminKubeconfigSecret.Name != "" {
 		adminKubeconfigSecret := &corev1.Secret{}
 		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Warn("admin kubeconfig does not yet exist")
+			} else {
+				return err
+			}
+		} else {
+			err = r.setAdminKubeconfigStatus(cd, adminKubeconfigSecret, cdLog)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Update cluster deployment status if changed:
+	if !reflect.DeepEqual(cd.Status, origCD.Status) {
+		cdLog.Infof("status has changed, updating cluster deployment")
+		cdLog.Debugf("orig: %v", origCD)
+		cdLog.Debugf("new : %v", cd.Status)
+		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.Errorf("error updating cluster deployment: %v", err)
 			return err
 		}
+	} else {
+		cdLog.Infof("cluster deployment status unchanged")
+	}
+
+	return nil
+}
+
+// setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
+func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecret *corev1.Secret, cdLog log.FieldLogger) error {
+	if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
 
 		// Parse the admin kubeconfig for the server URL:
 		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
@@ -412,13 +441,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 
 	// Update remote cluster's version into our status
 	if cd.Status.AdminKubeconfigSecret.Name != "" {
-		kubeconfig, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
-		if err != nil {
-			cdLog.WithError(err).Error("error loading remote cluster's kubeconfig")
-			return err
-		}
-
-		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(kubeconfig)
+		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
 		if err != nil {
 			cdLog.WithError(err).Error("error building remote cluster-api client connection")
 			return err
@@ -437,21 +460,6 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		controllerutils.FixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
 		remoteClusterVersion.Status.DeepCopyInto(&cd.Status.ClusterVersionStatus)
 	}
-
-	// Update cluster deployment status if changed:
-	if !reflect.DeepEqual(cd.Status, origCD.Status) {
-		cdLog.Infof("status has changed, updating cluster deployment")
-		cdLog.Debugf("orig: %v", origCD)
-		cdLog.Debugf("new : %v", cd.Status)
-		err := r.Status().Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.Errorf("error updating cluster deployment: %v", err)
-			return err
-		}
-	} else {
-		cdLog.Infof("cluster deployment status unchanged")
-	}
-
 	return nil
 }
 

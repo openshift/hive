@@ -273,18 +273,16 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			Config: hivev1.InstallConfig{
-				SSHKey: &corev1.LocalObjectReference{
-					Name: "ssh-key",
-				},
-				Machines: []hivev1.MachinePool{},
-				PullSecret: corev1.LocalObjectReference{
-					Name: "pull-secret",
-				},
-				Platform: hivev1.Platform{
-					AWS: &hivev1.AWSPlatform{
-						Region: "us-east-1",
-					},
+			SSHKey: &corev1.LocalObjectReference{
+				Name: "ssh-key",
+			},
+			Machines: []hivev1.MachinePool{},
+			PullSecret: corev1.LocalObjectReference{
+				Name: "pull-secret",
+			},
+			Platform: hivev1.Platform{
+				AWS: &hivev1.AWSPlatform{
+					Region: "us-east-1",
 				},
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{

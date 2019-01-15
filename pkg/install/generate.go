@@ -77,7 +77,7 @@ func GenerateInstallerJob(
 	env := []corev1.EnvVar{
 		{
 			Name:  "OPENSHIFT_INSTALL_BASE_DOMAIN",
-			Value: cd.Spec.Config.BaseDomain,
+			Value: cd.Spec.BaseDomain,
 		},
 		{
 			Name:  "OPENSHIFT_INSTALL_CLUSTER_NAME",
@@ -87,17 +87,17 @@ func GenerateInstallerJob(
 			Name: "OPENSHIFT_INSTALL_PULL_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: cd.Spec.Config.PullSecret,
+					LocalObjectReference: cd.Spec.PullSecret,
 					Key:                  ".dockercfg",
 				},
 			},
 		},
 	}
-	if cd.Spec.Config.AWS != nil {
+	if cd.Spec.AWS != nil {
 		env = append(env, []corev1.EnvVar{
 			{
 				Name:  "OPENSHIFT_INSTALL_AWS_REGION",
-				Value: cd.Spec.Config.AWS.Region,
+				Value: cd.Spec.AWS.Region,
 			},
 			{
 				Name:  "OPENSHIFT_INSTALL_PLATFORM",
@@ -136,12 +136,12 @@ func GenerateInstallerJob(
 		}...)
 	}
 
-	if cd.Spec.Config.SSHKey != nil {
+	if cd.Spec.SSHKey != nil {
 		env = append(env, corev1.EnvVar{
 			Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: *cd.Spec.Config.SSHKey,
+					LocalObjectReference: *cd.Spec.SSHKey,
 					Key:                  "ssh-publickey",
 				},
 			},
@@ -227,7 +227,7 @@ func GenerateInstallerJob(
 				"--cluster-id",
 				cd.Status.ClusterID,
 				"--region",
-				cd.Spec.Config.Platform.AWS.Region,
+				cd.Spec.Platform.AWS.Region,
 				cd.Namespace,
 				cd.Name,
 			},
@@ -275,7 +275,7 @@ func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
 func GenerateUninstallerJob(
 	cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
 
-	if cd.Spec.Config.AWS == nil {
+	if cd.Spec.AWS == nil {
 		return nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
 	}
 
@@ -328,7 +328,7 @@ func GenerateUninstallerJob(
 				cd.Name,
 				fmt.Sprintf("openshiftClusterID=%s", cd.Status.ClusterID),
 				fmt.Sprintf("tectonicClusterID=%s", cd.Status.ClusterID),
-				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Spec.Config.ClusterID),
+				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Spec.ClusterName),
 			},
 		},
 	}

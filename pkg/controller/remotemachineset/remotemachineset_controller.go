@@ -298,7 +298,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 		if workerPool.Platform.AWS.AMIID == "" {
 			// A default AMI should be set by the clusterdeployment controller,
 			// return error if no AMI has been set
-			defaultAMI := cd.Spec.Config.AWS.DefaultMachinePlatform.AMIID
+			defaultAMI := cd.Spec.AWS.DefaultMachinePlatform.AMIID
 			if defaultAMI == "" {
 				return nil, fmt.Errorf("cluster deployment has no default AMI")
 			}
@@ -337,7 +337,7 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 	cd = cd.DeepCopy()
 
 	cdLog.Debug("loading SSH key secret")
-	sshKey, err := r.loadSecretData(cd.Spec.Config.SSHKey.Name,
+	sshKey, err := r.loadSecretData(cd.Spec.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -345,7 +345,7 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 	}
 
 	cdLog.Debug("loading pull secret secret")
-	pullSecret, err := r.loadSecretData(cd.Spec.Config.PullSecret.Name, cd.Namespace, pullSecretKey)
+	pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, pullSecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load pull secret from secret")
 		return nil, err
@@ -378,9 +378,9 @@ func (r *ReconcileRemoteMachineSet) getAWSClient(cd *hivev1.ClusterDeployment) (
 	// This allows for using host profiles for AWS auth.
 	var secretName, regionName string
 
-	if cd != nil && cd.Spec.Config.AWS != nil && cd.Spec.PlatformSecrets.AWS != nil {
+	if cd != nil && cd.Spec.AWS != nil && cd.Spec.PlatformSecrets.AWS != nil {
 		secretName = cd.Spec.PlatformSecrets.AWS.Credentials.Name
-		regionName = cd.Spec.Config.AWS.Region
+		regionName = cd.Spec.AWS.Region
 	}
 
 	awsClient, err := r.awsClientBuilder(r.Client, secretName, cd.Namespace, regionName)

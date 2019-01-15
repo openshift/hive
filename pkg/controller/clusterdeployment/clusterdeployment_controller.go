@@ -239,27 +239,27 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	// Ensure we have an AMI set, if not lookup the latest:
-	if cd.Spec.Config.Platform.AWS != nil && !isDefaultAMISet(cd) {
+	if cd.Spec.Platform.AWS != nil && !isDefaultAMISet(cd) {
 		cdLog.Debugf("looking up a default AMI for cluster")
-		if cd.Spec.Config.Platform.AWS.DefaultMachinePlatform == nil {
-			cd.Spec.Config.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
+		if cd.Spec.Platform.AWS.DefaultMachinePlatform == nil {
+			cd.Spec.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
 		}
 		ami, err := r.amiLookupFunc(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error looking up default AMI for cluster")
 			return reconcile.Result{}, err
 		}
-		cd.Spec.Config.AWS.DefaultMachinePlatform.AMIID = ami
+		cd.Spec.AWS.DefaultMachinePlatform.AMIID = ami
 		cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
 	cdLog.Debug("loading SSH key secret")
-	if cd.Spec.Config.SSHKey == nil {
+	if cd.Spec.SSHKey == nil {
 		cdLog.Error("cluster has no ssh key set, unable to launch install")
 		return reconcile.Result{}, fmt.Errorf("cluster has no ssh key set, unable to launch install")
 	}
-	sshKey, err := r.loadSecretData(cd.Spec.Config.SSHKey.Name,
+	sshKey, err := r.loadSecretData(cd.Spec.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -267,7 +267,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	cdLog.Debug("loading pull secret secret")
-	pullSecret, err := r.loadSecretData(cd.Spec.Config.PullSecret.Name, cd.Namespace, pullSecretKey)
+	pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, pullSecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load pull secret from secret")
 		return reconcile.Result{}, err
@@ -416,7 +416,7 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 		if err != nil {
 			return err
 		}
-		cluster, ok := config.Clusters[cd.Spec.Config.ClusterID]
+		cluster, ok := config.Clusters[cd.Spec.ClusterName]
 		if !ok {
 			return fmt.Errorf("error parsing admin kubeconfig secret data")
 		}

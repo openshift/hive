@@ -97,24 +97,24 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 				},
 				MachineCIDR: vpcCIDRBlock.String(),
 			},
-			Machines: []hivev1.MachinePool{
-				{
-					Name:     "masters",
-					Replicas: &replicas,
-					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
-							InstanceType: awsInstanceType,
-							IAMRoleName:  iamRoleName,
-							EC2RootVolume: hivev1.EC2RootVolume{
-								IOPS: ec2VolIOPS,
-								Size: ec2VolSize,
-								Type: ec2VolType,
-							},
-							AMIID: testAMI,
-							Zones: []string{"us-east-1a", "us-east-1b"},
+			ControlPlane: hivev1.MachinePool{
+				Name:     "master",
+				Replicas: &replicas,
+				Platform: hivev1.MachinePoolPlatform{
+					AWS: &hivev1.AWSMachinePoolPlatform{
+						InstanceType: awsInstanceType,
+						IAMRoleName:  iamRoleName,
+						EC2RootVolume: hivev1.EC2RootVolume{
+							IOPS: ec2VolIOPS,
+							Size: ec2VolSize,
+							Type: ec2VolType,
 						},
+						AMIID: testAMI,
+						Zones: []string{"us-east-1a", "us-east-1b"},
 					},
 				},
+			},
+			Compute: []hivev1.MachinePool{
 				{
 					Name:     "workers",
 					Replicas: &replicas,
@@ -176,7 +176,7 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		},
 		Machines: []installtypes.MachinePool{
 			{
-				Name:     "masters",
+				Name:     "master",
 				Replicas: &replicas,
 				Platform: installtypes.MachinePoolPlatform{
 					AWS: &installawstypes.MachinePool{
@@ -265,6 +265,15 @@ func TestConvert(t *testing.T) {
 				ic.Networking.ClusterNetworks = []netopv1.ClusterNetwork{}
 				return ic
 			}(),
+		},
+		{
+			name: "control plane pool name not master",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := buildValidClusterDeployment()
+				cd.Spec.ControlPlane.Name = "notmaster"
+				return cd
+			}(),
+			expectedInstallConfig: buildBaseExpectedInstallConfig(),
 		},
 	}
 	for _, test := range tests {

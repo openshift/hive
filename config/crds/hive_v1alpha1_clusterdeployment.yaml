@@ -28,20 +28,7 @@ spec:
               type: string
             clusterName:
               type: string
-            images:
-              properties:
-                hiveImage:
-                  type: string
-                hiveImagePullPolicy:
-                  type: string
-                installerImage:
-                  type: string
-                installerImagePullPolicy:
-                  type: string
-                releaseImage:
-                  type: string
-              type: object
-            machines:
+            compute:
               items:
                 properties:
                   name:
@@ -124,6 +111,100 @@ spec:
                 - platform
                 type: object
               type: array
+            controlPlane:
+              properties:
+                name:
+                  type: string
+                platform:
+                  properties:
+                    aws:
+                      properties:
+                        amiID:
+                          type: string
+                        iamRoleName:
+                          type: string
+                        rootVolume:
+                          properties:
+                            iops:
+                              format: int64
+                              type: integer
+                            size:
+                              format: int64
+                              type: integer
+                            type:
+                              type: string
+                          required:
+                          - iops
+                          - size
+                          - type
+                          type: object
+                        type:
+                          type: string
+                        zones:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - type
+                      - iamRoleName
+                      - rootVolume
+                      type: object
+                    libvirt:
+                      properties:
+                        image:
+                          type: string
+                        imagePool:
+                          type: string
+                        imageVolume:
+                          type: string
+                      required:
+                      - image
+                      type: object
+                    openstack:
+                      properties:
+                        rootVolume:
+                          properties:
+                            iops:
+                              format: int64
+                              type: integer
+                            size:
+                              format: int64
+                              type: integer
+                            type:
+                              type: string
+                          required:
+                          - iops
+                          - size
+                          - type
+                          type: object
+                        type:
+                          type: string
+                      required:
+                      - type
+                      - rootVolume
+                      type: object
+                  type: object
+                replicas:
+                  format: int64
+                  type: integer
+              required:
+              - name
+              - replicas
+              - platform
+              type: object
+            images:
+              properties:
+                hiveImage:
+                  type: string
+                hiveImagePullPolicy:
+                  type: string
+                installerImage:
+                  type: string
+                installerImagePullPolicy:
+                  type: string
+                releaseImage:
+                  type: string
+              type: object
             networking:
               properties:
                 clusterNetworks:
@@ -250,7 +331,8 @@ spec:
           - clusterName
           - baseDomain
           - networking
-          - machines
+          - controlPlane
+          - compute
           - platform
           - pullSecret
           - platformSecrets

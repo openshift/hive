@@ -379,7 +379,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			SSHKey: &corev1.LocalObjectReference{
 				Name: sshKeySecret,
 			},
-			Machines: []hivev1.MachinePool{},
+			ControlPlane: hivev1.MachinePool{},
+			Compute:      []hivev1.MachinePool{},
 			PullSecret: corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},

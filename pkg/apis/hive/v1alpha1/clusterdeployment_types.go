@@ -52,8 +52,11 @@ type ClusterDeploymentSpec struct {
 	// Networking defines the pod network provider in the cluster.
 	Networking `json:"networking"`
 
-	// Machines is the list of MachinePools that need to be installed.
-	Machines []MachinePool `json:"machines"`
+	// ControlPlane is the MachinePool containing control plane nodes that need to be installed.
+	ControlPlane MachinePool `json:"controlPlane"`
+
+	// Compute is the list of MachinePools containing compute nodes that need to be installed.
+	Compute []MachinePool `json:"compute"`
 
 	// Platform is the configuration for the specific platform upon which to
 	// perform the installation.

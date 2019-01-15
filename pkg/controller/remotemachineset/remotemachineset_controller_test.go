@@ -327,26 +327,24 @@ func testClusterDeployment(machinePools []hivev1.MachinePool) *hivev1.ClusterDep
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			Config: hivev1.InstallConfig{
-				SSHKey: &corev1.LocalObjectReference{
-					Name: sshKeySecret,
-				},
-				ClusterID: testName,
-				Machines:  machinePools,
-				PullSecret: corev1.LocalObjectReference{
-					Name: pullSecretSecret,
-				},
-				Platform: hivev1.Platform{
-					AWS: &hivev1.AWSPlatform{
-						Region: "us-east-1",
-						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
-							AMIID: testAMI,
-						},
+			SSHKey: &corev1.LocalObjectReference{
+				Name: sshKeySecret,
+			},
+			ClusterName: testName,
+			Machines:    machinePools,
+			PullSecret: corev1.LocalObjectReference{
+				Name: pullSecretSecret,
+			},
+			Platform: hivev1.Platform{
+				AWS: &hivev1.AWSPlatform{
+					Region: "us-east-1",
+					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
+						AMIID: testAMI,
 					},
 				},
-				Networking: hivev1.Networking{
-					Type: hivev1.NetworkTypeOpenshiftSDN,
-				},
+			},
+			Networking: hivev1.Networking{
+				Type: hivev1.NetworkTypeOpenshiftSDN,
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
 				AWS: &hivev1.AWSPlatformSecrets{

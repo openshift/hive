@@ -27,7 +27,7 @@ import (
 
 func isDefaultAMISet(cd *hivev1.ClusterDeployment) bool {
 	defaultAMIKnown := false
-	if cd.Spec.Config.Platform.AWS.DefaultMachinePlatform != nil && cd.Spec.Config.Platform.AWS.DefaultMachinePlatform.AMIID != "" {
+	if cd.Spec.Platform.AWS.DefaultMachinePlatform != nil && cd.Spec.Platform.AWS.DefaultMachinePlatform.AMIID != "" {
 		defaultAMIKnown = true
 	}
 	return defaultAMIKnown
@@ -40,5 +40,5 @@ func lookupAMI(cd *hivev1.ClusterDeployment) (string, error) {
 	// function to do so.
 	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
 	defer cancel()
-	return rhcos.AMI(ctx, rhcos.DefaultChannel, cd.Spec.Config.AWS.Region)
+	return rhcos.AMI(ctx, rhcos.DefaultChannel, cd.Spec.AWS.Region)
 }

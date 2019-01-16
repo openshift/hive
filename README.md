@@ -117,3 +117,12 @@ Install federation components:
 ```
 make install-federation
 ```
+
+### Testing Federation (alpha)
+
+1. Install Hive normally.
+2. Add cluster-admin role to Hive service account (current limitation with cli):
+  ```
+  oc adm policy add-cluster-role-to-user cluster-admin -z hive-controller-manager-service -n openshift-hive
+  ```
+3. Install federation as explained above.

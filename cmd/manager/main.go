@@ -28,14 +28,15 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/controller"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
-	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 )
 
 const (
@@ -80,6 +81,10 @@ func newRootCommand() *cobra.Command {
 			}
 
 			if err := openshiftapiv1.Install(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := apiextv1.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

@@ -110,6 +110,9 @@ type ClusterDeploymentStatus struct {
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`
 
+	// Federated is true if the cluster deployment has been federated with the host cluster.
+	Federated bool `json:"federated,omitempty"`
+
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
 

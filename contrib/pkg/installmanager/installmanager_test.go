@@ -113,12 +113,12 @@ func TestInstallManager(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 
 			im := InstallManager{
-				LogLevel:      "debug",
-				WorkDir:       tempDir,
-				InstallConfig: filepath.Join(tempDir, "tempinstallconfig.yml"),
-				ClusterName:   testClusterName,
-				Namespace:     testNamespace,
-				DynamicClient: fakeClient,
+				LogLevel:              "debug",
+				WorkDir:               tempDir,
+				InstallConfig:         filepath.Join(tempDir, "tempinstallconfig.yml"),
+				ClusterDeploymentName: testClusterName,
+				Namespace:             testNamespace,
+				DynamicClient:         fakeClient,
 			}
 			im.Complete([]string{})
 

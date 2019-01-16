@@ -59,8 +59,9 @@ type InstallManager struct {
 	WorkDir                       string
 	InstallConfig                 string
 	ClusterID                     string
-	Region                        string
 	ClusterName                   string
+	Region                        string
+	ClusterDeploymentName         string
 	Namespace                     string
 	DynamicClient                 client.Client
 	runUninstaller                func(clusterName, region, clusterID string, logger log.FieldLogger) error
@@ -74,7 +75,7 @@ type InstallManager struct {
 func NewInstallManagerCommand() *cobra.Command {
 	im := &InstallManager{}
 	cmd := &cobra.Command{
-		Use:   "install-manager NAMESPACE CLUSTER_NAME",
+		Use:   "install-manager NAMESPACE CLUSTER_DEPLOYMENT_NAME",
 		Short: "Executes and oversees the openshift-installer.",
 		Long:  "The Hive Install Manager runs the phases of the openshift-installer, edits generated assets before completing install, and monitors for artifacts that need to be uploaded back to Hive.",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -88,7 +89,7 @@ func NewInstallManagerCommand() *cobra.Command {
 				im.log.Fatal("invalid command arguments")
 			}
 			// Parse the namespace/name for our cluster deployment:
-			im.Namespace, im.ClusterName = args[0], args[1]
+			im.Namespace, im.ClusterDeploymentName = args[0], args[1]
 
 			if err := im.Validate(); err != nil {
 				log.WithError(err).Error("invalid command options")
@@ -170,6 +171,8 @@ func (m *InstallManager) Run() error {
 		m.log.Warn("cluster is already installed, exiting")
 		os.Exit(0)
 	}
+
+	m.ClusterName = cd.Spec.ClusterName
 
 	m.waitForInstallerBinaries()
 
@@ -442,7 +445,7 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 
 	metadataCfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(metadataConfigmapStringTemplate, m.ClusterName),
+			Name:      fmt.Sprintf(metadataConfigmapStringTemplate, m.ClusterDeploymentName),
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
@@ -468,7 +471,7 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 
 func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, error) {
 	cd := &hivev1.ClusterDeployment{}
-	err := m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterName}, cd)
+	err := m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: m.ClusterDeploymentName}, cd)
 	if err != nil {
 		m.log.WithError(err).Error("error getting cluster deployment")
 		return nil, err
@@ -493,7 +496,7 @@ func uploadAdminKubeconfig(cd *hivev1.ClusterDeployment, m *InstallManager) (*co
 
 	kubeconfigSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterName),
+			Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterDeploymentName),
 			Namespace: m.Namespace,
 		},
 		Data: map[string][]byte{
@@ -529,7 +532,7 @@ func uploadAdminPassword(cd *hivev1.ClusterDeployment, m *InstallManager) (*core
 
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterName),
+			Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterDeploymentName),
 			Namespace: m.Namespace,
 		},
 		Data: map[string][]byte{
@@ -607,7 +610,7 @@ func (m *InstallManager) copyFile(src, dst string) error {
 func (m *InstallManager) cleanupMetadataConfigmap() error {
 	// find/delete any previous metadata configmap
 	namespacedName := types.NamespacedName{
-		Name:      fmt.Sprintf(metadataConfigmapStringTemplate, m.ClusterName),
+		Name:      fmt.Sprintf(metadataConfigmapStringTemplate, m.ClusterDeploymentName),
 		Namespace: m.Namespace,
 	}
 	emptyCfgMap := &corev1.ConfigMap{}
@@ -629,7 +632,7 @@ func (m *InstallManager) cleanupMetadataConfigmap() error {
 func (m *InstallManager) cleanupAdminKubeconfigSecret() error {
 	// find/delete any previous admin kubeconfig secret
 	namespacedName := types.NamespacedName{
-		Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterName),
+		Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterDeploymentName),
 		Namespace: m.Namespace,
 	}
 	emptySecret := &corev1.Secret{}
@@ -651,7 +654,7 @@ func (m *InstallManager) cleanupAdminKubeconfigSecret() error {
 func (m *InstallManager) cleanupAdminPasswordSecret() error {
 	// find/delete any previous admin password secret
 	namespacedName := types.NamespacedName{
-		Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterName),
+		Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterDeploymentName),
 		Namespace: m.Namespace,
 	}
 	emptySecret := &corev1.Secret{}

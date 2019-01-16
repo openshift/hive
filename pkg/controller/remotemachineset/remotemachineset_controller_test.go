@@ -317,7 +317,7 @@ func testMachineSet(name string, replicas int) *capiv1.MachineSet {
 	}
 }
 
-func testClusterDeployment(machinePools []hivev1.MachinePool) *hivev1.ClusterDeployment {
+func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testName,
@@ -330,8 +330,9 @@ func testClusterDeployment(machinePools []hivev1.MachinePool) *hivev1.ClusterDep
 			SSHKey: &corev1.LocalObjectReference{
 				Name: sshKeySecret,
 			},
-			ClusterName: testName,
-			Machines:    machinePools,
+			ClusterName:  testName,
+			ControlPlane: hivev1.MachinePool{},
+			Compute:      computePools,
 			PullSecret: corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},

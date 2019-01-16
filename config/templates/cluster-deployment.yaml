@@ -109,8 +109,8 @@ objects:
         region: us-east-1
     pullSecret:
       name: "${CLUSTER_NAME}-pull-secret"
-    machines:
-    - name: master
+    controlPlane:
+      name: master
       replicas: 3
       platform:
         aws:
@@ -120,6 +120,7 @@ objects:
             iops: 100 # TODO
             size: 22
             type: gp2
+    compute:
     - name: worker
       replicas: 3
       platform:
@@ -130,4 +131,3 @@ objects:
             iops: 100 # TODO
             size: 22
             type: gp2
-

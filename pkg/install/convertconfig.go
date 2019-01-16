@@ -66,7 +66,18 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 	}
 
 	machinePools := []types.MachinePool{}
-	for _, mp := range spec.Machines {
+
+	// combinedMachinePools contains spec.ControlPlane and spec.Compute MachinePools
+	combinedMachinePools := []hivev1.MachinePool{}
+	if spec.ControlPlane.Name != "master" {
+		spec.ControlPlane.Name = "master"
+	}
+	combinedMachinePools = append(combinedMachinePools, spec.ControlPlane)
+	for _, mp := range spec.Compute {
+		combinedMachinePools = append(combinedMachinePools, mp)
+	}
+
+	for _, mp := range combinedMachinePools {
 		newMP := types.MachinePool{
 			Name:     mp.Name,
 			Replicas: mp.Replicas,

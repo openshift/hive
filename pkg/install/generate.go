@@ -326,6 +326,8 @@ func GenerateUninstallerJob(
 				"debug",
 				"--cluster-name",
 				cd.Name,
+				"--region",
+				cd.Spec.AWS.Region,
 				fmt.Sprintf("openshiftClusterID=%s", cd.Status.ClusterID),
 				fmt.Sprintf("tectonicClusterID=%s", cd.Status.ClusterID),
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Spec.ClusterName),

@@ -29,5 +29,8 @@ func main() {
 	// TODO: figure out a way to combine logrus and glog logging levels. The team has decided that hardcoding this is ok for now.
 	log.SetLevel(log.InfoLevel)
 
-	admissionCmd.RunAdmissionServer(&hivevalidatingwebhooks.DNSZoneValidatingAdmissionHook{})
+	admissionCmd.RunAdmissionServer(
+		&hivevalidatingwebhooks.DNSZoneValidatingAdmissionHook{},
+		&hivevalidatingwebhooks.ClusterDeploymentValidatingAdmissionHook{},
+	)
 }

@@ -42,14 +42,15 @@ import (
 const (
 	testClusterName = "test-cluster"
 	testNamespace   = "test-namespace"
-	testUUID        = "fake-cluster-UUID"
+	// testClusterID matches the json blob below:
+	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
 
 	installerBinary     = "openshift-install"
 	fakeInstallerBinary = `#!/bin/sh
 echo "Fake Installer"
 echo $@
 WORKDIR=%s
-echo '{"clusterName":"test-cluster","aws":{"region":"us-east-1","identifier":{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}' > $WORKDIR/metadata.json
+echo '{"clusterName":"test-cluster","aws":{"region":"us-east-1","identifier":[{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}, {"kubernetes.io/cluster/dgoodwin-dev":"owned"}]}}' > $WORKDIR/metadata.json
 mkdir -p $WORKDIR/auth/
 echo "fakekubeconfig" > $WORKDIR/auth/kubeconfig
 echo "fakepassword" > $WORKDIR/auth/kubeadmin-password
@@ -107,7 +108,7 @@ func TestInstallManager(t *testing.T) {
 			}
 			defer os.RemoveAll(tempDir)
 			testLog := log.WithField("test", test.name)
-			testLog.WithField("dir", tempDir).Infof("using temporary directory")
+			testLog.WithField("dir", tempDir).Infof("################## using temporary directory")
 
 			fakeClient := fake.NewFakeClient(test.existing...)
 
@@ -119,7 +120,6 @@ func TestInstallManager(t *testing.T) {
 				Namespace:     testNamespace,
 				DynamicClient: fakeClient,
 			}
-			testLog.Debugf("%v", im)
 			im.Complete([]string{})
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
@@ -161,7 +161,7 @@ func TestInstallManager(t *testing.T) {
 
 			err = im.Run()
 
-			if test.failedKubeconfigSave || test.failedAdminPasswordSave {
+			if test.failedMetadataSave || test.failedKubeconfigSave || test.failedAdminPasswordSave {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
@@ -181,9 +181,22 @@ func TestInstallManager(t *testing.T) {
 				}
 				_, ok := metadata.Data["metadata.json"]
 				assert.True(t, ok)
+
+				// Ensure we set the cluster ID:
+				cd := &hivev1.ClusterDeployment{}
+				err = fakeClient.Get(context.Background(),
+					types.NamespacedName{
+						Namespace: testNamespace,
+						Name:      testClusterName,
+					},
+					cd)
+				if !assert.NoError(t, err) {
+					t.Fail()
+				}
+				assert.Equal(t, testClusterID, cd.Status.ClusterID)
 			}
 
-			if !test.failedKubeconfigSave && !test.failedAdminPasswordSave {
+			if !test.failedMetadataSave && !test.failedKubeconfigSave && !test.failedAdminPasswordSave {
 				// Ensure we uploaded admin kubeconfig secret:
 				adminKubeconfig := &corev1.Secret{}
 				err = fakeClient.Get(context.Background(),
@@ -215,7 +228,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			// We don't get to this point if we failed a kubeconfig save:
-			if !test.failedAdminPasswordSave && !test.failedKubeconfigSave {
+			if !test.failedMetadataSave && !test.failedAdminPasswordSave && !test.failedKubeconfigSave {
 				// Ensure we uploaded admin password secret:
 				adminPassword := &corev1.Secret{}
 				err = fakeClient.Get(context.Background(),

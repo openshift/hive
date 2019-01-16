@@ -18,7 +18,6 @@ package clusterdeployment
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
@@ -45,8 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	installertypes "github.com/openshift/installer/pkg/types"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -163,16 +160,17 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	if cd.Status.Installed {
+	/*
 		if cd.Status.ClusterID == "" {
 			cdLog.Debug("setting cluster ID")
 			metadataCfgMap := &kapi.ConfigMap{}
 			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
 			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
 			if err != nil {
-				// This would be pretty strange for a cluster that is installed:
-				cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
-				return reconcile.Result{}, err
+				if !errors.IsNotFound(err) {
+					cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
+					return reconcile.Result{}, err
+				}
 			}
 
 			var md installertypes.ClusterMetadata
@@ -198,7 +196,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 				cdLog.Warn("cluster metadata did not contain AWS platform")
 			}
 		}
-	}
+	*/
 
 	if cd.DeletionTimestamp != nil {
 		if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {

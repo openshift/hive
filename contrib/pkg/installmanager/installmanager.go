@@ -3,6 +3,7 @@ package installmanager
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/openshift/installer/pkg/destroy/aws"
+	installertypes "github.com/openshift/installer/pkg/types"
 )
 
 const (
@@ -100,14 +102,13 @@ func NewInstallManagerCommand() *cobra.Command {
 			}
 
 			if err := im.Run(); err != nil {
-				log.WithError(err).Error("runtime error")
+				log.WithError(err).Fatal("runtime error")
 			}
 		},
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
-	flags.StringVar(&im.ClusterID, "cluster-id", "", "UUID to cleanup from a past attempted install")
 	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
 	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yaml", "location of install-config.yaml to copy into work-dir")
@@ -180,16 +181,28 @@ func (m *InstallManager) Run() error {
 			m.InstallConfig, dstInstallConfig)
 	}
 
-	installErr := m.runInstaller()
-	if installErr != nil {
-		m.log.WithError(installErr).Error("error running openshift-install")
+	// If the cluster deployment has a clusterID set, this implies we failed an install
+	// and are re-trying. Cleanup any resources that may have been provisioned.
+	if err := m.cleanupBeforeInstall(cd); err != nil {
+		m.log.WithError(err).Error("error while trying to preemptively clean up")
+		return err
 	}
 
-	// Try to upload any artifacts that exist regardless if the install errored or not.
-	// We may need to cleanup.
+	// Generate installer assets we need to modify or upload.
+	if err := m.generateAssets(cd); err != nil {
+		return err
+	}
+
+	// We should now have cluster metadata.json we can parse for the clusterID. If we fail
+	// to extract the ID and upload it, this is a critical failure and we should restart.
+	// No cloud resources have been provisioned at this point.
 	if err := m.uploadClusterMetadata(cd, m); err != nil {
-		// non-fatal. log and continue.
-		m.log.WithError(err).Warning("error uploading cluster metadata.json")
+		return err
+	}
+
+	installErr := m.provisionCluster(cd)
+	if installErr != nil {
+		m.log.WithError(installErr).Error("error running openshift-install")
 	}
 
 	adminKubeconfigSecret, err := m.uploadAdminKubeconfig(cd, m)
@@ -213,7 +226,8 @@ func (m *InstallManager) Run() error {
 	}
 
 	if installErr != nil {
-		m.log.WithError(installErr).Fatal("failed due to install error")
+		m.log.WithError(installErr).Error("failed due to install error")
+		return installErr
 	}
 
 	return nil
@@ -241,7 +255,7 @@ func (m *InstallManager) waitForInstallerBinaries() {
 }
 
 // cleanupBeforeInstall allows recovering from an installation error and allows retries
-func (m *InstallManager) cleanupBeforeInstall() error {
+func (m *InstallManager) cleanupBeforeInstall(cd *hivev1.ClusterDeployment) error {
 	if err := m.cleanupMetadataConfigmap(); err != nil {
 		return err
 	}
@@ -258,10 +272,19 @@ func (m *InstallManager) cleanupBeforeInstall() error {
 		return err
 	}
 
-	if m.ClusterID != "" {
-		if err := m.runUninstaller(m.ClusterName, m.Region, m.ClusterID, m.log); err != nil {
+	if cd.Status.ClusterID != "" {
+		if err := m.runUninstaller(m.ClusterName, m.Region, cd.Status.ClusterID, m.log); err != nil {
 			return err
 		}
+		// Cleanup successful, we must now clear the UUID from status:
+		cd.Status.ClusterID = ""
+		if err := m.DynamicClient.Status().Update(context.Background(), cd); err != nil {
+			// This will cause a job re-try, which is fine as we'll just try to cleanup and
+			// find nothing.
+			m.log.WithError(err).Error("error clearing cluster ID in status")
+			return err
+		}
+
 	} else {
 		m.log.Warn("skipping cleanup as no cluster ID set")
 	}
@@ -306,19 +329,36 @@ func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogge
 		Logger:      logger,
 	}
 
-	err := uninstaller.Run()
-	return err
+	return uninstaller.Run()
 }
 
-func (m *InstallManager) runInstaller() error {
-
-	if err := m.cleanupBeforeInstall(); err != nil {
-		m.log.WithError(err).Error("error while trying to preemptively clean up")
+// generateAssets runs openshift-install commands to generate on-disk assets we need to
+// upload or modify prior to provisioning resources in the cloud.
+func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
+	m.log.Info("running openshift-install create ignition-configs")
+	err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir, "--log-level", "debug"})
+	if err != nil {
+		m.log.WithError(err).Error("error generating installer assets")
 		return err
 	}
+	return nil
+}
 
-	m.log.Info("running openshift-install")
-	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), []string{"create", "cluster", "--dir", m.WorkDir, "--log-level", "debug"}...)
+// provisionCluster invokes the openshift-install create cluster command to provision resources
+// in the cloud.
+func (m *InstallManager) provisionCluster(cd *hivev1.ClusterDeployment) error {
+
+	m.log.Info("running openshift-install create cluster")
+	err := m.runOpenShiftInstallCommand([]string{"create", "cluster", "--dir", m.WorkDir, "--log-level", "debug"})
+	if err != nil {
+		m.log.WithError(err).Errorf("error provisioning cluster")
+		return err
+	}
+	return nil
+}
+
+func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
+	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), args...)
 
 	// Copy all stdout/stderr output from the child process:
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -354,7 +394,7 @@ func (m *InstallManager) runInstaller() error {
 }
 
 func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) error {
-	m.log.Infoln("uploading cluster metadata")
+	m.log.Infoln("extracting cluster ID and uploading cluster metadata")
 	fullMetadataPath := filepath.Join(m.WorkDir, metadataRelativePath)
 	if _, err := os.Stat(fullMetadataPath); os.IsNotExist(err) {
 		m.log.WithField("path", fullMetadataPath).Error("cluster metadata file does not exist")
@@ -364,6 +404,39 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 	metadataBytes, err := ioutil.ReadFile(fullMetadataPath)
 	if err != nil {
 		m.log.WithError(err).WithField("metadata", fullMetadataPath).Error("error reading cluster metadata file")
+		return err
+	}
+
+	// Extract and save the cluster ID, this step is critical and a failure here
+	// should abort the install. Note that this is run *before* we begin provisioning cloud
+	// resources.
+	var md installertypes.ClusterMetadata
+	if err := json.Unmarshal(metadataBytes, &md); err != nil {
+		m.log.WithError(err).Error("error unmarshalling cluster metadata")
+		return err
+	}
+
+	if md.ClusterPlatformMetadata.AWS != nil {
+		for _, ids := range md.ClusterPlatformMetadata.AWS.Identifier {
+			clusterID, ok := ids["openshiftClusterID"]
+			if ok {
+				cd.Status.ClusterID = clusterID
+				m.log.WithField("clusterID", clusterID).Debug("found clusterID")
+				break
+			}
+		}
+		if cd.Status.ClusterID == "" {
+			m.log.Error("cluster metadata did not contain openshiftClusterID")
+			return fmt.Errorf("cluster metadata did not contain openshiftClusterID")
+		}
+	} else {
+		// TODO: handle other cloud providers here
+		return fmt.Errorf("cluster metadata did not contain AWS platform")
+	}
+	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	err = m.DynamicClient.Status().Update(context.Background(), cd)
+	if err != nil {
+		m.log.WithError(err).Error("error updating cluster ID in status")
 		return err
 	}
 
@@ -501,8 +574,12 @@ func uploadSecretWithRetries(s *corev1.Secret, m *InstallManager) error {
 func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName, adminPasswordSecretName string, m *InstallManager) error {
 	// Update the cluster deployment status with a reference to the admin kubeconfig secret:
 	m.log.Info("updating cluster deployment status")
-	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
-	cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: adminPasswordSecretName}
+	if adminKubeconfigSecretName != "" {
+		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
+	}
+	if adminPasswordSecretName != "" {
+		cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: adminPasswordSecretName}
+	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return m.DynamicClient.Status().Update(context.Background(), cd)
 }

@@ -137,7 +137,12 @@ docker-push:
 # Build the image with buildah
 .PHONY: buildah-build
 buildah-build: generate
-	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .
+	sudo buildah bud --tag ${IMG} .
+
+# Push the buildah image
+.PHONY: buildah-push
+buildah-push: buildah-build
+	sudo buildah push ${IMG}
 
 install-federation:
 	./hack/install-federation.sh

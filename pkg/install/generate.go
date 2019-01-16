@@ -224,8 +224,6 @@ func GenerateInstallerJob(
 				"debug",
 				"--install-config",
 				"/installconfig/install-config.yaml",
-				"--cluster-id",
-				cd.Status.ClusterID,
 				"--region",
 				cd.Spec.Platform.AWS.Region,
 				cd.Namespace,

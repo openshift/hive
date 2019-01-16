@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -41,13 +40,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	"github.com/openshift/hive/pkg/federation"
+	federationjob "github.com/openshift/hive/pkg/federation"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
 const (
-	// serviceAccountName will be a service account that can run the installer and then
-	// upload artifacts to the cluster's namespace.
+	// serviceAccountName will be a service account that can federate a target cluster
 	serviceAccountName = "cluster-federator"
 	roleName           = "cluster-admin"
 	roleBindingPrefix  = "cluster-federator"
@@ -160,11 +158,7 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		return reconcile.Result{}, err
 	}
 
-	// requeueAfter will be used to determine if cluster should be requeued after
-	// reconcile has completed
-	var requeueAfter time.Duration
-
-	job, secret, err := federation.GenerateFederationJob(
+	job, secret, err := federationjob.GenerateFederationJob(
 		cd,
 		[]byte(kubeconfig),
 		serviceAccountName)
@@ -203,7 +197,7 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
-		// If the ClusterDeployment is already installed, we do not need to create a new job:
+		// If the ClusterDeployment is already federated, we do not need to create a new job:
 		if cd.Status.Federated {
 			cdLog.Debug("cluster is already federated, no job needed")
 		} else {
@@ -218,7 +212,7 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		cdLog.WithError(err).Error("error getting job")
 		return reconcile.Result{}, err
 	} else {
-		cdLog.Infof("cluster job exists, successful: %v", cd.Status.Installed)
+		cdLog.Infof("federation job exists, successful: %v", cd.Status.Federated)
 	}
 
 	err = r.updateClusterDeploymentStatus(cd, existingJob, cdLog)
@@ -228,11 +222,6 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 	}
 
 	cdLog.Debugf("reconcile complete")
-	// Check for requeueAfter duration
-	if requeueAfter != 0 {
-		cdLog.Debugf("cluster will re-sync in: %v", requeueAfter)
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
-	}
 	return reconcile.Result{}, nil
 }
 
@@ -281,8 +270,7 @@ func (r *ReconcileClusterDeploymentFederation) isFederationInstalled() (bool, er
 	return err == nil, nil
 }
 
-// setupClusterInstallServiceAccount ensures a service account exists which can upload
-// the required artifacts after running the installer in a pod. (metadata, admin kubeconfig)
+// setupClusterFederationServiceAccount ensures a service account exists which can federate a target cluster
 func (r *ReconcileClusterDeploymentFederation) setupClusterFederationServiceAccount(namespace string, cdLog log.FieldLogger) (*corev1.ServiceAccount, error) {
 	// create new serviceaccount if it doesn't already exist
 	currentSA := &corev1.ServiceAccount{}

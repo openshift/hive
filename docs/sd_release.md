@@ -13,7 +13,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > export INSTALLER_GOPATH=/path/to/openshift/installer/gopath
   > export INSTALLER_SRC=${INSTALLER_GOPATH}/src/github.com/openshift/installer
   > export INSTALLER_IMAGE_TAG=quay.io/twiest/installer:${RELEASE_VER}
-  > export AUTHFILE=~/.docker/config
+  > export AUTHFILE=~/.docker/config.json
   ```
 
 - Get the latest installer code
@@ -41,7 +41,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > export HIVE_GOPATH=/path/to/openshift/installer/gopath
   > export HIVE_SRC=${HIVE_GOPATH}/src/github.com/openshift/hive
   > export HIVE_IMAGE_TAG=quay.io/twiest/hive-controller:${RELEASE_VER}
-  > export AUTHFILE=~/.docker/config
+  > export AUTHFILE=~/.docker/config.json
   ```
 
 - Get the latest installer code
@@ -55,7 +55,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
 - Build the installer container
   ```shell
   > cd "${HIVE_SRC}"
-  > IMG="${HIVE_IMAGE_TAG}" make buildah-build
+  > GOPATH="${HIVE_GOPATH}" IMG="${HIVE_IMAGE_TAG}" make buildah-build
   ```
 
 - Push the build installer image to quay

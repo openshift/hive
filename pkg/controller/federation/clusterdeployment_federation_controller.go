@@ -105,6 +105,11 @@ type ReconcileClusterDeploymentFederation struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and federates it if it's installed
 // and federation is present in the cluster.
+//
+// Automatically generate RBAC rules to allow the Controller to read and write ClusterDeployments
+//
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 
 	federationInstalled, err := r.isFederationInstalled()

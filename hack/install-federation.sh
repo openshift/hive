@@ -15,3 +15,4 @@ kubectl apply --validate=false -f "${SRC_DIR}/hack/federation/cluster-registry-c
 for filename in ${SRC_DIR}/hack/federation/federatedirectives/*.yaml; do
   kubefed2 federate enable -f "${filename}" --federation-namespace="federation-system"
 done
+kubefed2 federate enable clusterrolebindings --federation-namespace="federation-system"

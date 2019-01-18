@@ -130,7 +130,7 @@ func GenerateInstallerJob(
 	if cd.Spec.Images.ReleaseImage != "" {
 		env = append(env, []corev1.EnvVar{
 			{
-				Name:  "_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
+				Name:  "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
 				Value: cd.Spec.Images.ReleaseImage,
 			},
 		}...)

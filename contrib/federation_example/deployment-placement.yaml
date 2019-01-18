@@ -1,0 +1,9 @@
+apiVersion: primitives.federation.k8s.io/v1alpha1
+kind: FederatedDeploymentPlacement
+metadata:
+  name: etcd-operator
+  namespace: etcd-operator
+spec:
+  clusterSelector:
+    matchLabels:
+      etcdoperator: "yes"

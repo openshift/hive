@@ -118,11 +118,22 @@ Install federation components:
 make install-federation
 ```
 
-### Testing Federation (alpha)
+### Federation Example
 
-1. Install Hive normally.
-2. Add cluster-admin role to Hive service account (current limitation with cli):
-  ```
-  oc adm policy add-cluster-role-to-user cluster-admin -z hive-controller-manager-service -n openshift-hive
-  ```
-3. Install federation as explained above.
+An example etcd operator deployment is included in `contrib/federation_example`.
+
+To deploy the example, run:
+
+```
+kubectl apply -f ./contrib/federation_example
+```
+
+The example artifacts install etcd-operator on a cluster with the label `etcdoperator: yes`
+
+In order to automatically install the operator on a cluster  you create with Hive,
+first create the cluster, then label its corresponding `federatedcluster` resource with
+the appropriate label:
+
+```
+kubectl label federatedcluster/CLUSTER_NAME -n federation-system etcdoperator=yes
+```

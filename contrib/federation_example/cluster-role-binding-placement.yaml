@@ -1,0 +1,8 @@
+apiVersion: primitives.federation.k8s.io/v1alpha1
+kind: FederatedClusterRoleBindingPlacement
+metadata:
+  name: etcd-operator
+spec:
+  clusterSelector:
+    matchLabels:
+      etcdoperator: "yes"

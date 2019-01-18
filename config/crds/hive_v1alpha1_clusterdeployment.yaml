@@ -323,6 +323,8 @@ spec:
                   - credentials
                   type: object
               type: object
+            preserveOnDelete:
+              type: boolean
             pullSecret:
               type: object
             sshKey:
@@ -336,6 +338,7 @@ spec:
           - platform
           - pullSecret
           - platformSecrets
+          - preserveOnDelete
           type: object
         status:
           properties:

@@ -330,6 +330,31 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "Test PreserveOnDelete",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					cd.Spec.PreserveOnDelete = true
+					return cd
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job, _, _ := install.GenerateInstallerJob(
+						testExpiredClusterDeployment(),
+						"fakeserviceaccount",
+						"sshkey",
+						"pullsecret")
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				uninstallJob := getUninstallJob(c)
+				assert.Nil(t, uninstallJob)
+			},
+		},
 	}
 
 	for _, test := range tests {

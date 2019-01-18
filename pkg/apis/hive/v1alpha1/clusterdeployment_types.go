@@ -69,6 +69,9 @@ type ClusterDeploymentSpec struct {
 
 	// Images allows overriding the default images used to provision and manage the cluster.
 	Images ProvisionImages `json:"images,omitempty"`
+
+	// PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it
+	PreserveOnDelete bool `json:"preserveOnDelete"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.

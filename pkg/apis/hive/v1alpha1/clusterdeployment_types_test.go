@@ -27,11 +27,17 @@ import (
 
 func TestStorageClusterDeployment(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
+	replicas := int64(3)
 	created := &ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
 		Spec: ClusterDeploymentSpec{
-			Config: InstallConfig{
-				Machines: []MachinePool{},
+			ControlPlane: MachinePool{
+				Replicas: &replicas,
+			},
+			Compute: []MachinePool{
+				{
+					Replicas: &replicas,
+				},
 			},
 		},
 	}

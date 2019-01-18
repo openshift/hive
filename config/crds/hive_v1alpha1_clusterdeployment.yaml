@@ -24,205 +24,173 @@ spec:
           type: object
         spec:
           properties:
-            clusterUUID:
+            baseDomain:
               type: string
-            config:
-              properties:
-                baseDomain:
-                  type: string
-                clusterID:
-                  type: string
-                machines:
-                  items:
+            clusterName:
+              type: string
+            compute:
+              items:
+                properties:
+                  name:
+                    type: string
+                  platform:
                     properties:
-                      name:
-                        type: string
-                      platform:
+                      aws:
                         properties:
-                          aws:
+                          amiID:
+                            type: string
+                          iamRoleName:
+                            type: string
+                          rootVolume:
                             properties:
-                              amiID:
-                                type: string
-                              iamRoleName:
-                                type: string
-                              rootVolume:
-                                properties:
-                                  iops:
-                                    format: int64
-                                    type: integer
-                                  size:
-                                    format: int64
-                                    type: integer
-                                  type:
-                                    type: string
-                                required:
-                                - iops
-                                - size
-                                - type
-                                type: object
-                              type:
-                                type: string
-                              zones:
-                                items:
-                                  type: string
-                                type: array
-                            required:
-                            - type
-                            - iamRoleName
-                            - rootVolume
-                            type: object
-                          libvirt:
-                            properties:
-                              image:
-                                type: string
-                              imagePool:
-                                type: string
-                              imageVolume:
-                                type: string
-                            required:
-                            - image
-                            type: object
-                          openstack:
-                            properties:
-                              rootVolume:
-                                properties:
-                                  iops:
-                                    format: int64
-                                    type: integer
-                                  size:
-                                    format: int64
-                                    type: integer
-                                  type:
-                                    type: string
-                                required:
-                                - iops
-                                - size
-                                - type
-                                type: object
+                              iops:
+                                format: int64
+                                type: integer
+                              size:
+                                format: int64
+                                type: integer
                               type:
                                 type: string
                             required:
+                            - iops
+                            - size
                             - type
-                            - rootVolume
                             type: object
+                          type:
+                            type: string
+                          zones:
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - type
+                        - iamRoleName
+                        - rootVolume
                         type: object
-                      replicas:
-                        format: int64
-                        type: integer
-                    required:
-                    - name
-                    - replicas
-                    - platform
+                      libvirt:
+                        properties:
+                          image:
+                            type: string
+                          imagePool:
+                            type: string
+                          imageVolume:
+                            type: string
+                        required:
+                        - image
+                        type: object
+                      openstack:
+                        properties:
+                          rootVolume:
+                            properties:
+                              iops:
+                                format: int64
+                                type: integer
+                              size:
+                                format: int64
+                                type: integer
+                              type:
+                                type: string
+                            required:
+                            - iops
+                            - size
+                            - type
+                            type: object
+                          type:
+                            type: string
+                        required:
+                        - type
+                        - rootVolume
+                        type: object
                     type: object
-                  type: array
-                networking:
-                  properties:
-                    podCIDR:
-                      type: string
-                    serviceCIDR:
-                      type: string
-                    type:
-                      type: string
-                  required:
-                  - type
-                  - serviceCIDR
-                  - podCIDR
-                  type: object
+                  replicas:
+                    format: int64
+                    type: integer
+                required:
+                - name
+                - replicas
+                - platform
+                type: object
+              type: array
+            controlPlane:
+              properties:
+                name:
+                  type: string
                 platform:
                   properties:
                     aws:
                       properties:
-                        defaultMachinePlatform:
+                        amiID:
+                          type: string
+                        iamRoleName:
+                          type: string
+                        rootVolume:
                           properties:
-                            amiID:
-                              type: string
-                            iamRoleName:
-                              type: string
-                            rootVolume:
-                              properties:
-                                iops:
-                                  format: int64
-                                  type: integer
-                                size:
-                                  format: int64
-                                  type: integer
-                                type:
-                                  type: string
-                              required:
-                              - iops
-                              - size
-                              - type
-                              type: object
+                            iops:
+                              format: int64
+                              type: integer
+                            size:
+                              format: int64
+                              type: integer
                             type:
                               type: string
-                            zones:
-                              items:
-                                type: string
-                              type: array
                           required:
+                          - iops
+                          - size
                           - type
-                          - iamRoleName
-                          - rootVolume
                           type: object
-                        region:
+                        type:
                           type: string
-                        userTags:
-                          type: object
-                        vpcCIDRBlock:
-                          type: string
+                        zones:
+                          items:
+                            type: string
+                          type: array
                       required:
-                      - region
+                      - type
+                      - iamRoleName
+                      - rootVolume
                       type: object
                     libvirt:
                       properties:
-                        URI:
+                        image:
                           type: string
-                        defaultMachinePlatform:
-                          properties:
-                            image:
-                              type: string
-                            imagePool:
-                              type: string
-                            imageVolume:
-                              type: string
-                          required:
-                          - image
-                          type: object
-                        masterIPs:
-                          items:
-                            format: byte
-                            type: string
-                          type: array
-                        network:
-                          properties:
-                            if:
-                              type: string
-                            ipRange:
-                              type: string
-                            name:
-                              type: string
-                          required:
-                          - name
-                          - if
-                          - ipRange
-                          type: object
+                        imagePool:
+                          type: string
+                        imageVolume:
+                          type: string
                       required:
-                      - URI
-                      - network
-                      - masterIPs
+                      - image
+                      type: object
+                    openstack:
+                      properties:
+                        rootVolume:
+                          properties:
+                            iops:
+                              format: int64
+                              type: integer
+                            size:
+                              format: int64
+                              type: integer
+                            type:
+                              type: string
+                          required:
+                          - iops
+                          - size
+                          - type
+                          type: object
+                        type:
+                          type: string
+                      required:
+                      - type
+                      - rootVolume
                       type: object
                   type: object
-                pullSecret:
-                  type: object
-                sshKey:
-                  type: object
+                replicas:
+                  format: int64
+                  type: integer
               required:
-              - clusterID
-              - baseDomain
-              - networking
-              - machines
+              - name
+              - replicas
               - platform
-              - pullSecret
               type: object
             images:
               properties:
@@ -237,6 +205,114 @@ spec:
                 releaseImage:
                   type: string
               type: object
+            networking:
+              properties:
+                clusterNetworks:
+                  items:
+                    properties:
+                      cidr:
+                        type: string
+                      hostSubnetLength:
+                        format: int32
+                        type: integer
+                    required:
+                    - cidr
+                    - hostSubnetLength
+                    type: object
+                  type: array
+                machineCIDR:
+                  type: string
+                serviceCIDR:
+                  type: string
+                type:
+                  type: string
+              required:
+              - machineCIDR
+              - type
+              - serviceCIDR
+              type: object
+            platform:
+              properties:
+                aws:
+                  properties:
+                    defaultMachinePlatform:
+                      properties:
+                        amiID:
+                          type: string
+                        iamRoleName:
+                          type: string
+                        rootVolume:
+                          properties:
+                            iops:
+                              format: int64
+                              type: integer
+                            size:
+                              format: int64
+                              type: integer
+                            type:
+                              type: string
+                          required:
+                          - iops
+                          - size
+                          - type
+                          type: object
+                        type:
+                          type: string
+                        zones:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - type
+                      - iamRoleName
+                      - rootVolume
+                      type: object
+                    region:
+                      type: string
+                    userTags:
+                      type: object
+                  required:
+                  - region
+                  type: object
+                libvirt:
+                  properties:
+                    URI:
+                      type: string
+                    defaultMachinePlatform:
+                      properties:
+                        image:
+                          type: string
+                        imagePool:
+                          type: string
+                        imageVolume:
+                          type: string
+                      required:
+                      - image
+                      type: object
+                    masterIPs:
+                      items:
+                        format: byte
+                        type: string
+                      type: array
+                    network:
+                      properties:
+                        if:
+                          type: string
+                        ipRange:
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - name
+                      - if
+                      - ipRange
+                      type: object
+                  required:
+                  - URI
+                  - network
+                  - masterIPs
+                  type: object
+              type: object
             platformSecrets:
               properties:
                 aws:
@@ -249,8 +325,18 @@ spec:
               type: object
             preserveOnDelete:
               type: boolean
+            pullSecret:
+              type: object
+            sshKey:
+              type: object
           required:
-          - config
+          - clusterName
+          - baseDomain
+          - networking
+          - controlPlane
+          - compute
+          - platform
+          - pullSecret
           - platformSecrets
           - preserveOnDelete
           type: object
@@ -261,6 +347,8 @@ spec:
             adminPasswordSecret:
               type: object
             apiURL:
+              type: string
+            clusterID:
               type: string
             clusterVersionStatus:
               properties:
@@ -318,6 +406,8 @@ spec:
               - conditions
               - availableUpdates
               type: object
+            federated:
+              type: boolean
             installed:
               type: boolean
             webConsoleURL:

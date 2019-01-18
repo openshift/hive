@@ -49,7 +49,8 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests docker-build deploy-hiveadmission
+deploy: manifests deploy-hiveadmission
+	kubectl apply -f manifests/
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 
@@ -136,4 +137,12 @@ docker-push:
 # Build the image with buildah
 .PHONY: buildah-build
 buildah-build: generate
-	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .
+	sudo buildah bud --tag ${IMG} .
+
+# Push the buildah image
+.PHONY: buildah-push
+buildah-push: buildah-build
+	sudo buildah push ${IMG}
+
+install-federation:
+	./hack/install-federation.sh

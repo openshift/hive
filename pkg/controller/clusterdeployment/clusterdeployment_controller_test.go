@@ -45,7 +45,8 @@ import (
 
 const (
 	testName              = "foo-lqmsh"
-	testClusterID         = "bar"
+	testClusterName       = "bar"
+	testClusterID         = "testFooClusterUUID"
 	installJobName        = "foo-lqmsh-install"
 	uninstallJobName      = "foo-lqmsh-uninstall"
 	testNamespace         = "default"
@@ -145,7 +146,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd == nil || cd.Spec.Config.Platform.AWS.DefaultMachinePlatform.AMIID != testAMI {
+				if cd == nil || cd.Spec.Platform.AWS.DefaultMachinePlatform.AMIID != testAMI {
 					t.Errorf("did not get expected default AMI")
 				}
 			},
@@ -184,11 +185,31 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
 				testSecret(pullSecretSecret, pullSecretKey, "{}"),
 				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testMetadataConfigMap(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443/console", cd.Status.WebConsoleURL)
+			},
+		},
+		{
+			name: "Parse cluster UUID from metadata",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					return cd
+				}(),
+				testInstallJob(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testMetadataConfigMap(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.Equal(t, testClusterID, cd.Status.ClusterID)
 			},
 		},
 		{
@@ -379,27 +400,25 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterUUID: testUUID,
-			Config: hivev1.InstallConfig{
-				ClusterID: testClusterID,
-				SSHKey: &corev1.LocalObjectReference{
-					Name: sshKeySecret,
-				},
-				Machines: []hivev1.MachinePool{},
-				PullSecret: corev1.LocalObjectReference{
-					Name: pullSecretSecret,
-				},
-				Platform: hivev1.Platform{
-					AWS: &hivev1.AWSPlatform{
-						Region: "us-east-1",
-						DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
-							AMIID: testAMI,
-						},
+			ClusterName: testClusterName,
+			SSHKey: &corev1.LocalObjectReference{
+				Name: sshKeySecret,
+			},
+			ControlPlane: hivev1.MachinePool{},
+			Compute:      []hivev1.MachinePool{},
+			PullSecret: corev1.LocalObjectReference{
+				Name: pullSecretSecret,
+			},
+			Platform: hivev1.Platform{
+				AWS: &hivev1.AWSPlatform{
+					Region: "us-east-1",
+					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
+						AMIID: testAMI,
 					},
 				},
-				Networking: hivev1.Networking{
-					Type: hivev1.NetworkTypeOpenshiftSDN,
-				},
+			},
+			Networking: hivev1.Networking{
+				Type: hivev1.NetworkTypeOpenshiftSDN,
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
 				AWS: &hivev1.AWSPlatformSecrets{
@@ -408,6 +427,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			ClusterID: testClusterID,
 		},
 	}
 }
@@ -442,7 +464,7 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 
 func testNoDefaultAMIClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
-	cd.Spec.Config.Platform.AWS.DefaultMachinePlatform.AMIID = ""
+	cd.Spec.Platform.AWS.DefaultMachinePlatform.AMIID = ""
 	return cd
 }
 
@@ -475,9 +497,7 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 	cm.Namespace = testNamespace
 	metadataJSON := `{
 		"aws": {
-			"identifier": {
-				"openshiftClusterID": "testFooClusterUUID"
-			}
+			"identifier": [{"openshiftClusterID": "testFooClusterUUID"}]
 		}
 	}`
 	cm.Data = map[string]string{"metadata.json": metadataJSON}

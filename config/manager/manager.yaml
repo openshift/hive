@@ -53,11 +53,9 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      # By default we are assuming a development setup with the image pushed to
-      # the local registry. Pull policy should be Never in this case, it will be
-      # modified in overrides for actual environments.
-      - image: hive-controller:latest
-        imagePullPolicy: Never
+      # By default we will use the latest CI images published from hive master:
+      - image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+        imagePullPolicy: Always
         name: manager
         resources:
           limits:

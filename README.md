@@ -6,22 +6,23 @@ API driven OpenShift cluster provisioning and management
  * Install mockgen:
    * `$ go get github.com/golang/mock/gomock; go install github.com/golang/mock/mockgen`
 
-## Deploying In-Cluster
+## Deployment Options
 
-* Ensure that you have access to an OpenShift cluster and have administrator permissions. This could be oc cluster up, minishift, or an actual cluster you can oc login to.
-* Build and deploy to Minishift:
-  * `$ hack/minishift-deploy.sh`
-* Build and deploy to current kubectl context using local container image:
-   * `$ make deploy`
-* Build and deploy to current kubectl context using remote container image:
-   * `$ make deploy-sd-dev`
+### Deploying To OpenShift 4.x Using Latest Published Images
 
-## Running from Source
+This method uses the latest published Hive image on the CI registry: `registry.svc.ci.openshift.org/openshift/hive-v4.0:hive`
+
+1. Provision an OpenShift 4.0 Cluster with openshift-install.
+1. Login as a cluster admin after installation completes:
+  * `$ export KUBECONFIG=/home/dgoodwin/installdir/auth/kubeconfig`
+1. Install Hive to the openshift-hive namespace:
+  * `$ make deploy`
+
+### Running from Source
 
 * Create the ClusterDeployment and DNSZone CRDs:
-  * `$ kubectl apply -f config/crds/hive_v1alpha1_clusterdeployment.yaml`
-  * `$ kubectl apply -f config/crds/hive_v1alpha1_dnszone.yaml`
-* Run the Hive controllers from source:
+  * `$ make install`
+* Run Hive from local source:
   * `$ make run`
 
 ## Using Hive
@@ -30,15 +31,11 @@ API driven OpenShift cluster provisioning and management
   * Assuming AWS credentials set in the standard environment variables, and our usual SSH key.
   ```bash
   export CLUSTER_NAME="${USER}"
-  export ADMIN_EMAIL="${USER}@redhat.com"
-  export ADMIN_PASSWORD="letmein"
   export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
   export PULL_SECRET="$(cat ${HOME}/config.json)"
 
   oc process -f config/templates/cluster-deployment.yaml \
      CLUSTER_NAME="${CLUSTER_NAME}" \
-     ADMIN_EMAIL="${ADMIN_EMAIL}" \
-     ADMIN_PASSWORD="${ADMIN_PASSWORD}" \
      SSH_KEY="${SSH_PUB_KEY}" \
      PULL_SECRET="${PULL_SECRET}" \
      AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
@@ -50,19 +47,15 @@ API driven OpenShift cluster provisioning and management
   * Assuming AWS credentials set in the standard environment variables, and our usual SSH key.
   ```bash
   export CLUSTER_NAME="${USER}"
-  export ADMIN_EMAIL="${USER}@redhat.com"
-  export ADMIN_PASSWORD="letmein"
   export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
   export PULL_SECRET="$(cat ${HOME}/config.json)"
-  export HIVE_IMAGE="quay.io/twiest/hive-controller:20181212"
+  export HIVE_IMAGE="quay.io/twiest/hive-controller:20190116"
   export HIVE_IMAGE_PULL_POLICY="Always"
-  export INSTALLER_IMAGE="quay.io/twiest/installer:20181212"
+  export INSTALLER_IMAGE="quay.io/twiest/installer:20190116"
   export INSTALLER_IMAGE_PULL_POLICY="Always"
 
   oc process -f config/templates/cluster-deployment.yaml \
      CLUSTER_NAME="${CLUSTER_NAME}" \
-     ADMIN_EMAIL="${ADMIN_EMAIL}" \
-     ADMIN_PASSWORD="${ADMIN_PASSWORD}" \
      SSH_KEY="${SSH_PUB_KEY}" \
      PULL_SECRET="${PULL_SECRET}" \
      AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
@@ -110,3 +103,26 @@ For instance, try this:
 ```sh
 # kubectl create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
 ```
+
+### Installing Federation
+
+Ensure that you have the kubefed2 command installed:
+
+```
+go get -u github.com/kubernetes-sigs/federation-v2/cmd/kubefed2
+```
+
+Install federation components:
+
+```
+make install-federation
+```
+
+### Testing Federation (alpha)
+
+1. Install Hive normally.
+2. Add cluster-admin role to Hive service account (current limitation with cli):
+  ```
+  oc adm policy add-cluster-role-to-user cluster-admin -z hive-controller-manager-service -n openshift-hive
+  ```
+3. Install federation as explained above.

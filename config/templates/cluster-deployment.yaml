@@ -29,11 +29,11 @@ parameters:
 - name: HIVE_IMAGE
   displayName: Hive image URL
   description: Hive image URL
-  value: "hive-controller:latest"
+  value: "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 - name: HIVE_IMAGE_PULL_POLICY
   displayName: Hive image pull policy
   description: Hive image pull policy
-  value: Never
+  value: Always
 - name: INSTALLER_IMAGE
   displayName: OpenShift Installer image URL
   description: OpenShift Installer image URL
@@ -93,41 +93,41 @@ objects:
       installerImage: "${INSTALLER_IMAGE}"
       installerImagePullPolicy: "${INSTALLER_IMAGE_PULL_POLICY}"
       releaseImage: "${OPENSHIFT_RELEASE_IMAGE}"
-    config:
-      sshKey:
-        name: "${CLUSTER_NAME}-ssh-key"
-      clusterID: ${CLUSTER_NAME} # TODO: what kind of ID is this
-      baseDomain: ${BASE_DOMAIN}
-      networking:
-        type: OpenshiftSDN
-        serviceCIDR: "10.3.0.0/16"
-        podCIDR: "10.2.0.0/16"
+    sshKey:
+      name: "${CLUSTER_NAME}-ssh-key"
+    clusterName: ${CLUSTER_NAME}
+    baseDomain: ${BASE_DOMAIN}
+    networking:
+      type: OpenshiftSDN
+      serviceCIDR: "10.3.0.0/16"
+      machineCIDR: "10.0.0.0/16"
+      clusterNetworks:
+        - cidr: "10.2.0.0/16"
+          hostSubnetLength: 9
+    platform:
+      aws:
+        region: us-east-1
+    pullSecret:
+      name: "${CLUSTER_NAME}-pull-secret"
+    controlPlane:
+      name: master
+      replicas: 3
       platform:
         aws:
-          region: us-east-1
-          vpcID: ""
-          vpcCIDRBlock: 10.0.0.0/16
-      pullSecret:
-        name: "${CLUSTER_NAME}-pull-secret"
-      machines:
-      - name: master
-        replicas: 3
-        platform:
-          aws:
-            type: m4.large
-            iamRoleName: ""
-            rootVolume:
-              iops: 100 # TODO
-              size: 22
-              type: gp2
-      - name: worker
-        replicas: 3
-        platform:
-          aws:
-            type: m4.large
-            iamRoleName: ""
-            rootVolume:
-              iops: 100 # TODO
-              size: 22
-              type: gp2
-
+          type: m4.large
+          iamRoleName: ""
+          rootVolume:
+            iops: 100 # TODO
+            size: 22
+            type: gp2
+    compute:
+    - name: worker
+      replicas: 3
+      platform:
+        aws:
+          type: m4.large
+          iamRoleName: ""
+          rootVolume:
+            iops: 100 # TODO
+            size: 22
+            type: gp2

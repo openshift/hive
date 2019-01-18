@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pborman/uuid"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -152,17 +151,52 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		"namespace":         cd.Namespace,
 	})
 	cdLog.Info("reconciling cluster deployment")
+	origCD := cd
 	cd = cd.DeepCopy()
-
-	if cd.Spec.ClusterUUID == "" {
-		return reconcile.Result{}, r.setClusterUUID(cd, cdLog)
-	}
 
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("error setting up service account and role")
 		return reconcile.Result{}, err
 	}
+
+	/*
+		if cd.Status.ClusterID == "" {
+			cdLog.Debug("setting cluster ID")
+			metadataCfgMap := &kapi.ConfigMap{}
+			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
+			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
+					return reconcile.Result{}, err
+				}
+			}
+
+			var md installertypes.ClusterMetadata
+			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &md); err != nil {
+				cdLog.WithError(err).Error("error reading cluster metadata json from configmap")
+				return reconcile.Result{}, err
+			}
+
+			if md.ClusterPlatformMetadata.AWS != nil {
+				for _, m := range md.ClusterPlatformMetadata.AWS.Identifier {
+					clusterID, ok := m["openshiftClusterID"]
+					if ok {
+						cd.Status.ClusterID = clusterID
+						cdLog.WithField("clusterID", clusterID).Debug("found clusterID")
+						break
+					}
+				}
+				if cd.Status.ClusterID == "" {
+					cdLog.Error("cluster metadata did not contain openshiftClusterID")
+					return reconcile.Result{}, fmt.Errorf("cluster metadata did not contain openshiftClusterID")
+				}
+			} else {
+				cdLog.Warn("cluster metadata did not contain AWS platform")
+			}
+		}
+	*/
 
 	if cd.DeletionTimestamp != nil {
 		if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
@@ -203,27 +237,27 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	// Ensure we have an AMI set, if not lookup the latest:
-	if cd.Spec.Config.Platform.AWS != nil && !isDefaultAMISet(cd) {
+	if cd.Spec.Platform.AWS != nil && !isDefaultAMISet(cd) {
 		cdLog.Debugf("looking up a default AMI for cluster")
-		if cd.Spec.Config.Platform.AWS.DefaultMachinePlatform == nil {
-			cd.Spec.Config.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
+		if cd.Spec.Platform.AWS.DefaultMachinePlatform == nil {
+			cd.Spec.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
 		}
 		ami, err := r.amiLookupFunc(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error looking up default AMI for cluster")
 			return reconcile.Result{}, err
 		}
-		cd.Spec.Config.AWS.DefaultMachinePlatform.AMIID = ami
+		cd.Spec.AWS.DefaultMachinePlatform.AMIID = ami
 		cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
 	cdLog.Debug("loading SSH key secret")
-	if cd.Spec.Config.SSHKey == nil {
+	if cd.Spec.SSHKey == nil {
 		cdLog.Error("cluster has no ssh key set, unable to launch install")
 		return reconcile.Result{}, fmt.Errorf("cluster has no ssh key set, unable to launch install")
 	}
-	sshKey, err := r.loadSecretData(cd.Spec.Config.SSHKey.Name,
+	sshKey, err := r.loadSecretData(cd.Spec.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -231,7 +265,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	}
 
 	cdLog.Debug("loading pull secret secret")
-	pullSecret, err := r.loadSecretData(cd.Spec.Config.PullSecret.Name, cd.Namespace, pullSecretKey)
+	pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, pullSecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load pull secret from secret")
 		return reconcile.Result{}, err
@@ -296,7 +330,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		cdLog.Infof("cluster job exists, successful: %v", cd.Status.Installed)
 	}
 
-	err = r.updateClusterDeploymentStatus(cd, existingJob, cdLog)
+	err = r.updateClusterDeploymentStatus(cd, origCD, existingJob, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Errorf("error updating cluster deployment status")
 		return reconcile.Result{}, err
@@ -324,10 +358,8 @@ func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataK
 	return string(retStr), nil
 }
 
-func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, origCD *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {
 	cdLog.Debug("updating cluster deployment status")
-	origCD := cd
-	cd = cd.DeepCopy()
 	if job != nil && job.Name != "" && job.Namespace != "" {
 		// Job exists, check it's status:
 		cd.Status.Installed = isSuccessful(job)
@@ -339,63 +371,21 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", cd.Name)}
 	}
 
-	if cd.Status.AdminKubeconfigSecret.Name != "" &&
-		(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
-
+	if cd.Status.AdminKubeconfigSecret.Name != "" {
 		adminKubeconfigSecret := &corev1.Secret{}
 		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
 		if err != nil {
-			return err
+			if errors.IsNotFound(err) {
+				log.Warn("admin kubeconfig does not yet exist")
+			} else {
+				return err
+			}
+		} else {
+			err = r.setAdminKubeconfigStatus(cd, adminKubeconfigSecret, cdLog)
+			if err != nil {
+				return err
+			}
 		}
-
-		// Parse the admin kubeconfig for the server URL:
-		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
-		if err != nil {
-			return err
-		}
-		cluster, ok := config.Clusters[cd.Spec.Config.ClusterID]
-		if !ok {
-			return fmt.Errorf("error parsing admin kubeconfig secret data")
-		}
-
-		// We should be able to assume only one cluster in here:
-		server := cluster.Server
-		cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
-		u, err := url.Parse(server)
-		if err != nil {
-			return err
-		}
-		cd.Status.APIURL = server
-		u.Path = path.Join(u.Path, "console")
-		cd.Status.WebConsoleURL = u.String()
-	}
-
-	// Update remote cluster's version into our status
-	if cd.Status.AdminKubeconfigSecret.Name != "" {
-		kubeconfig, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
-		if err != nil {
-			cdLog.WithError(err).Error("error loading remote cluster's kubeconfig")
-			return err
-		}
-
-		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(kubeconfig)
-		if err != nil {
-			cdLog.WithError(err).Error("error building remote cluster-api client connection")
-			return err
-		}
-
-		remoteClusterVersion := &openshiftapiv1.ClusterVersion{}
-		err = remoteClusterAPIClient.Get(context.Background(),
-			types.NamespacedName{Name: clusterVersionObjectName},
-			remoteClusterVersion)
-		if err != nil {
-			cdLog.WithError(err).Error("error fetching remote clusterversion object")
-			return err
-		}
-
-		cdLog.Debugf("remote cluster version status: %+v", remoteClusterVersion.Status)
-		controllerutils.FixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
-		remoteClusterVersion.Status.DeepCopyInto(&cd.Status.ClusterVersionStatus)
 	}
 
 	// Update cluster deployment status if changed:
@@ -415,25 +405,56 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	return nil
 }
 
-// setClusterUUID sets the
-func (r *ReconcileClusterDeployment) setClusterUUID(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	cdLog.Debug("setting cluster UUID")
-	cd = cd.DeepCopy()
+// setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
+func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecret *corev1.Secret, cdLog log.FieldLogger) error {
+	if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
 
-	if cd.Spec.ClusterUUID != "" {
-		return fmt.Errorf("cluster UUID already set")
+		// Parse the admin kubeconfig for the server URL:
+		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
+		if err != nil {
+			return err
+		}
+		cluster, ok := config.Clusters[cd.Spec.ClusterName]
+		if !ok {
+			return fmt.Errorf("error parsing admin kubeconfig secret data")
+		}
+
+		// We should be able to assume only one cluster in here:
+		server := cluster.Server
+		cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
+		u, err := url.Parse(server)
+		if err != nil {
+			return err
+		}
+		cd.Status.APIURL = server
+		u.Path = path.Join(u.Path, "console")
+		cd.Status.WebConsoleURL = u.String()
 	}
 
-	cd.Spec.ClusterUUID = uuid.New()
-	cdLog.WithField("clusterUUID", cd.Spec.ClusterUUID).Info("generated new cluster UUID")
-	err := r.Update(context.TODO(), cd)
-	if err != nil {
-		cdLog.WithError(err).Errorf("error updating cluster deployment")
-		return err
-	}
+	// Update remote cluster's version into our status
+	if cd.Status.AdminKubeconfigSecret.Name != "" {
+		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
+		if err != nil {
+			cdLog.WithError(err).Error("error building remote cluster-api client connection")
+			return err
+		}
 
+		remoteClusterVersion := &openshiftapiv1.ClusterVersion{}
+		err = remoteClusterAPIClient.Get(context.Background(),
+			types.NamespacedName{Name: clusterVersionObjectName},
+			remoteClusterVersion)
+		if err != nil {
+			cdLog.WithError(err).Error("error fetching remote clusterversion object")
+			return err
+		}
+
+		cdLog.Debugf("remote cluster version status: %+v", remoteClusterVersion.Status)
+		controllerutils.FixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
+		remoteClusterVersion.Status.DeepCopyInto(&cd.Status.ClusterVersionStatus)
+	}
 	return nil
 }
+
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 
 	// Delete the install job in case it's still running:
@@ -471,46 +492,55 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		}
 		return reconcile.Result{}, nil
 	}
-
-	// Generate an uninstall job:
-	uninstallJob, err := install.GenerateUninstallerJob(cd)
-	if err != nil {
-		cdLog.Errorf("error generating uninstaller job: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	err = controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
-	if err != nil {
-		cdLog.Errorf("error setting controller reference on job: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Check if uninstall job already exists:
-	existingJob := &batchv1.Job{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
-	if err != nil && errors.IsNotFound(err) {
-		err = r.Create(context.TODO(), uninstallJob)
-		if err != nil {
-			cdLog.Errorf("error creating uninstall job: %v", err)
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		cdLog.Errorf("error getting uninstall job: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Uninstall job exists, check it's status and if successful, remove the finalizer:
-	if isSuccessful(existingJob) {
-		cdLog.Infof("uninstall job successful, removing finalizer")
+	
+	if cd.Status.ClusterID == "" {
+		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error removing finalizer")
 		}
-		return reconcile.Result{}, err
+	} else {
+		// Generate an uninstall job:
+		uninstallJob, err := install.GenerateUninstallerJob(cd)
+		if err != nil {
+			cdLog.Errorf("error generating uninstaller job: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		err = controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
+		if err != nil {
+			cdLog.Errorf("error setting controller reference on job: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		// Check if uninstall job already exists:
+		existingJob := &batchv1.Job{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
+		if err != nil && errors.IsNotFound(err) {
+			err = r.Create(context.TODO(), uninstallJob)
+			if err != nil {
+				cdLog.Errorf("error creating uninstall job: %v", err)
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		} else if err != nil {
+			cdLog.Errorf("error getting uninstall job: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		// Uninstall job exists, check it's status and if successful, remove the finalizer:
+		if isSuccessful(existingJob) {
+			cdLog.Infof("uninstall job successful, removing finalizer")
+			err = r.removeClusterDeploymentFinalizer(cd)
+			if err != nil {
+				cdLog.WithError(err).Error("error removing finalizer")
+			}
+			return reconcile.Result{}, err
+		}
+
+		cdLog.Infof("uninstall job not yet successful")
 	}
 
-	cdLog.Infof("uninstall job not yet successful")
 	return reconcile.Result{}, nil
 }
 

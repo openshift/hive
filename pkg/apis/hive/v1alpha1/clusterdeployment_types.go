@@ -17,9 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	openshiftapiv1 "github.com/openshift/api/config/v1"
+	"net"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -34,13 +38,32 @@ const (
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
 
-	// ClusterUUID is a unique identifier for this cluster. Will be generated if none is provided.
-	// TODO: omitempty for now so we don't have to specify when creating.
-	ClusterUUID string `json:"clusterUUID,omitempty"`
+	// ClusterName is the friendly name of the cluster. It is used for subdomains,
+	// some resource tagging, and other instances where a friendly name for the
+	// cluster is useful.
+	ClusterName string `json:"clusterName"`
 
-	// Config contains the desired configuration for the cluster.
-	Config InstallConfig `json:"config"`
+	// SSHKey is the reference to the secret that contains a public key to use for access to compute instances.
+	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
 
+	// BaseDomain is the base domain to which the cluster should belong.
+	BaseDomain string `json:"baseDomain"`
+
+	// Networking defines the pod network provider in the cluster.
+	Networking `json:"networking"`
+
+	// ControlPlane is the MachinePool containing control plane nodes that need to be installed.
+	ControlPlane MachinePool `json:"controlPlane"`
+
+	// Compute is the list of MachinePools containing compute nodes that need to be installed.
+	Compute []MachinePool `json:"compute"`
+
+	// Platform is the configuration for the specific platform upon which to
+	// perform the installation.
+	Platform `json:"platform"`
+
+	// PullSecret is the reference to the secret to use when pulling images.
+	PullSecret corev1.LocalObjectReference `json:"pullSecret"`
 	// PlatformSecrets contains credentials and secrets for the cluster infrastructure.
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
 
@@ -87,8 +110,14 @@ type AWSPlatformSecrets struct {
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment
 type ClusterDeploymentStatus struct {
 
+	// ClusterID is a unique identifier for this cluster generated during installation.
+	ClusterID string `json:"clusterID,omitempty"`
+
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`
+
+	// Federated is true if the cluster deployment has been federated with the host cluster.
+	Federated bool `json:"federated,omitempty"`
 
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
@@ -127,6 +156,85 @@ type ClusterDeploymentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterDeployment `json:"items"`
+}
+
+// Platform is the configuration for the specific platform upon which to perform
+// the installation. Only one of the platform configuration should be set.
+type Platform struct {
+	// AWS is the configuration used when installing on AWS.
+	AWS *AWSPlatform `json:"aws,omitempty"`
+	// Libvirt is the configuration used when installing on libvirt.
+	Libvirt *LibvirtPlatform `json:"libvirt,omitempty"`
+}
+
+// Networking defines the pod network provider in the cluster.
+type Networking struct {
+	// MachineCIDR is the IP address space from which to assign machine IPs.
+	MachineCIDR string `json:"machineCIDR"`
+
+	// Type is the network type to install
+	Type NetworkType `json:"type"`
+
+	// ServiceCIDR is the IP address space from which to assign service IPs.
+	ServiceCIDR string `json:"serviceCIDR"`
+
+	// ClusterNetworks is the IP address space from which to assign pod IPs.
+	ClusterNetworks []netopv1.ClusterNetwork `json:"clusterNetworks,omitempty"`
+}
+
+// NetworkType defines the pod network provider in the cluster.
+type NetworkType string
+
+const (
+	// NetworkTypeOpenshiftSDN is used to install with SDN.
+	NetworkTypeOpenshiftSDN NetworkType = "OpenshiftSDN"
+	// NetworkTypeOpenshiftOVN is used to install with OVN.
+	NetworkTypeOpenshiftOVN NetworkType = "OVNKubernetes"
+)
+
+// AWSPlatform stores all the global configuration that
+// all machinesets use.
+type AWSPlatform struct {
+	// Region specifies the AWS region where the cluster will be created.
+	Region string `json:"region"`
+
+	// UserTags specifies additional tags for AWS resources created for the cluster.
+	UserTags map[string]string `json:"userTags,omitempty"`
+
+	// DefaultMachinePlatform is the default configuration used when
+	// installing on AWS for machine pools which do not define their own
+	// platform configuration.
+	DefaultMachinePlatform *AWSMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
+}
+
+// LibvirtPlatform stores all the global configuration that
+// all machinesets use.
+type LibvirtPlatform struct {
+	// URI is the identifier for the libvirtd connection.  It must be
+	// reachable from both the host (where the installer is run) and the
+	// cluster (where the cluster-API controller pod will be running).
+	URI string `json:"URI"`
+
+	// DefaultMachinePlatform is the default configuration used when
+	// installing on AWS for machine pools which do not define their own
+	// platform configuration.
+	DefaultMachinePlatform *LibvirtMachinePoolPlatform `json:"defaultMachinePlatform,omitempty"`
+
+	// Network
+	Network LibvirtNetwork `json:"network"`
+
+	// MasterIPs
+	MasterIPs []net.IP `json:"masterIPs"`
+}
+
+// LibvirtNetwork is the configuration of the libvirt network.
+type LibvirtNetwork struct {
+	// Name is the name of the nework.
+	Name string `json:"name"`
+	// IfName is the name of the network interface.
+	IfName string `json:"if"`
+	// IPRange is the range of IPs to use.
+	IPRange string `json:"ipRange"`
 }
 
 func init() {

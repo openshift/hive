@@ -38,18 +38,17 @@ import (
 func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret string) (*types.InstallConfig, error) {
 	spec := cd.Spec
 
-	networkType, err := convertNetworkingType(spec.Config.Networking.Type)
+	networkType, err := convertNetworkingType(spec.Networking.Type)
 	if err != nil {
 		return nil, err
 	}
 
 	platform := types.Platform{}
-	if spec.Config.Platform.AWS != nil {
-		aws := spec.Config.Platform.AWS
+	if spec.Platform.AWS != nil {
+		aws := spec.Platform.AWS
 		platform.AWS = &installeraws.Platform{
-			Region:       aws.Region,
-			UserTags:     aws.UserTags,
-			VPCCIDRBlock: parseCIDR(aws.VPCCIDRBlock),
+			Region:   aws.Region,
+			UserTags: aws.UserTags,
 		}
 		if aws.DefaultMachinePlatform != nil {
 			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
@@ -67,7 +66,18 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 	}
 
 	machinePools := []types.MachinePool{}
-	for _, mp := range spec.Config.Machines {
+
+	// combinedMachinePools contains spec.ControlPlane and spec.Compute MachinePools
+	combinedMachinePools := []hivev1.MachinePool{}
+	if spec.ControlPlane.Name != "master" {
+		spec.ControlPlane.Name = "master"
+	}
+	combinedMachinePools = append(combinedMachinePools, spec.ControlPlane)
+	for _, mp := range spec.Compute {
+		combinedMachinePools = append(combinedMachinePools, mp)
+	}
+
+	for _, mp := range combinedMachinePools {
 		newMP := types.MachinePool{
 			Name:     mp.Name,
 			Replicas: mp.Replicas,
@@ -90,15 +100,18 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 
 	ic := &types.InstallConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: spec.Config.ClusterID,
+			Name: spec.ClusterName,
 		},
-		ClusterID:  cd.Spec.ClusterUUID,
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1beta1",
+		},
 		SSHKey:     sshKey,
-		BaseDomain: spec.Config.BaseDomain,
+		BaseDomain: spec.BaseDomain,
 		Networking: types.Networking{
-			Type:        networkType,
-			ServiceCIDR: *parseCIDR(spec.Config.Networking.ServiceCIDR),
-			PodCIDR:     parseCIDR(spec.Config.Networking.PodCIDR),
+			Type:            networkType,
+			ServiceCIDR:     *parseCIDR(spec.Networking.ServiceCIDR),
+			ClusterNetworks: spec.Networking.ClusterNetworks,
+			MachineCIDR:     *parseCIDR(spec.Networking.MachineCIDR),
 		},
 		PullSecret: pullSecret,
 		Platform:   platform,

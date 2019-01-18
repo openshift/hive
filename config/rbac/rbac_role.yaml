@@ -70,10 +70,17 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - apiextensions.k8s.io
   resources:
-  - clusterroles
-  - clusterrolebindings
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - clusterregistry.k8s.io
+  resources:
+  - clusters
   verbs:
   - get
   - list
@@ -83,10 +90,14 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - apiextensions.k8s.io
+  - core.federation.k8s.io
   resources:
-  - customresourcedefinitions
+  - federatedclusters
   verbs:
   - get
   - list
   - watch
+  - create
+  - update
+  - patch
+  - delete

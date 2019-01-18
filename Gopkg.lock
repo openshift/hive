@@ -427,6 +427,31 @@
   version = "v1.0.1"
 
 [[projects]]
+  digest = "1:871c474d560306910f0b2b8ab9bf93187635620cbbc4276ef35a4573bffa5123"
+  name = "github.com/kubernetes-sigs/federation-v2"
+  packages = [
+    "pkg/apis/core/common",
+    "pkg/apis/core/typeconfig",
+    "pkg/apis/core/v1alpha1",
+    "pkg/apis/multiclusterdns/v1alpha1",
+    "pkg/apis/scheduling/v1alpha1",
+    "pkg/client/clientset/versioned",
+    "pkg/client/clientset/versioned/scheme",
+    "pkg/client/clientset/versioned/typed/core/v1alpha1",
+    "pkg/client/clientset/versioned/typed/multiclusterdns/v1alpha1",
+    "pkg/client/clientset/versioned/typed/scheduling/v1alpha1",
+    "pkg/controller/util",
+    "pkg/kubefed2",
+    "pkg/kubefed2/federate",
+    "pkg/kubefed2/options",
+    "pkg/kubefed2/util",
+    "pkg/version",
+  ]
+  pruneopts = "NUT"
+  revision = "0bd7dcc7394b777eb373e6bb8131290abf97b2c6"
+  version = "v0.0.3"
+
+[[projects]]
   branch = "master"
   digest = "1:84a5a2b67486d5d67060ac393aa255d05d24ed5ee41daecd5635ec22657b6492"
   name = "github.com/mailru/easyjson"
@@ -1316,6 +1341,19 @@
   version = "kubernetes-1.11.2"
 
 [[projects]]
+  digest = "1:5cc43ecb31ff1ed9338da92c4aa5f1faefa88a02363f4e70a55ca5867ee8060e"
+  name = "k8s.io/cluster-registry"
+  packages = [
+    "pkg/apis/clusterregistry/v1alpha1",
+    "pkg/client/clientset/versioned",
+    "pkg/client/clientset/versioned/scheme",
+    "pkg/client/clientset/versioned/typed/clusterregistry/v1alpha1",
+  ]
+  pruneopts = "NUT"
+  revision = "423735c7f10cbbc83ccee14d62b266ddcf9709dd"
+  version = "v0.0.6"
+
+[[projects]]
   branch = "master"
   digest = "1:8a5d7d39d58442d70717601f367e8cd9513615579fdeda93335ee1dca50f6ffd"
   name = "k8s.io/code-generator"
@@ -1471,6 +1509,8 @@
     "github.com/ghodss/yaml",
     "github.com/golang/glog",
     "github.com/golang/mock/gomock",
+    "github.com/kubernetes-sigs/federation-v2/pkg/controller/util",
+    "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",
@@ -1483,7 +1523,6 @@
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",
     "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
-    "github.com/pborman/uuid",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
@@ -1510,6 +1549,7 @@
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",

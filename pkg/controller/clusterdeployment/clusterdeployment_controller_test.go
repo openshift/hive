@@ -228,7 +228,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				assert.Equal(t, "4.0.0", cd.Status.ClusterVersionStatus.Current.Version)
+				assert.Equal(t, "4.0.0", cd.Status.ClusterVersionStatus.History[0].Version)
 			},
 		},
 		{
@@ -532,9 +532,12 @@ func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error)
 
 func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
 	status := openshiftapiv1.ClusterVersionStatus{
-		Current: openshiftapiv1.Update{
-			Version: testRemoteClusterCurrentVersion,
-			Payload: "TESTPAYLOAD",
+		History: []openshiftapiv1.UpdateHistory{
+			{
+				State:   openshiftapiv1.CompletedUpdate,
+				Version: testRemoteClusterCurrentVersion,
+				Payload: "TESTPAYLOAD",
+			},
 		},
 		Generation:  123456789,
 		VersionHash: "TESTVERSIONHASH",

@@ -555,7 +555,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ca0fe06e1a04bfb05069b912c06cdf3eee9edbb5a764c6aaad679fbbad373a83"
+  digest = "1:62f6d47ba4b96e4cf750ddeb64a4b7e3843448729ec00fcfd64f0ed690e9b288"
   name = "github.com/openshift/api"
   packages = [
     "config/v1",
@@ -563,7 +563,7 @@
     "operator/v1alpha1",
   ]
   pruneopts = "NUT"
-  revision = "e7dc90658844828191986cb07f3e44eeeba0b03a"
+  revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
 
 [[projects]]
   digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
@@ -1549,7 +1549,6 @@
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
-    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",

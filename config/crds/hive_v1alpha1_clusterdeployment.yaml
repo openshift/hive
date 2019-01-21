@@ -384,7 +384,7 @@ spec:
                     - lastTransitionTime
                     type: object
                   type: array
-                current:
+                desired:
                   properties:
                     payload:
                       type: string
@@ -397,10 +397,34 @@ spec:
                 generation:
                   format: int64
                   type: integer
+                history:
+                  items:
+                    properties:
+                      completionTime:
+                        format: date-time
+                        type: string
+                      payload:
+                        type: string
+                      startedTime:
+                        format: date-time
+                        type: string
+                      state:
+                        type: string
+                      version:
+                        type: string
+                    required:
+                    - state
+                    - startedTime
+                    - completionTime
+                    - version
+                    - payload
+                    type: object
+                  type: array
                 versionHash:
                   type: string
               required:
-              - current
+              - desired
+              - history
               - generation
               - versionHash
               - conditions

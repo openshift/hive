@@ -179,7 +179,8 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		"",      /* secretName */
 		true,    /* addToRegistry */
 		false,   /* limitedScope */
-		false)   /* dryRun */
+		false,   /* dryRun */
+		true)    /* idempotent */
 
 	if err != nil {
 		cdLog.WithError(err).Error("Federating cluster failed")

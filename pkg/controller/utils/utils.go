@@ -54,8 +54,8 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 // FixupEmptyClusterVersionFields will un-'nil' fields that would fail validation in the ClusterVersion.Status
 func FixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.ClusterVersionStatus) {
 
-	// Fetching clusterVersion object can results in nil clusterVersion.Status.AvailableUpdates
-	// and clusterVersion.Status.Conditions.
+	// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates,
+	// clusterVersion.Status.Conditions, and clusterVersion.Status.History
 	// Place an empty list if needed to satisfy the object validation.
 
 	if clusterVersionStatus.AvailableUpdates == nil {
@@ -64,5 +64,9 @@ func FixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.Cluster
 
 	if clusterVersionStatus.Conditions == nil {
 		clusterVersionStatus.Conditions = []openshiftapiv1.ClusterOperatorStatusCondition{}
+	}
+
+	if clusterVersionStatus.History == nil {
+		clusterVersionStatus.History = []openshiftapiv1.UpdateHistory{}
 	}
 }

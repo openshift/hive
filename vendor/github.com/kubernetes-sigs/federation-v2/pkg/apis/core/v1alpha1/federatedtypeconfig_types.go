@@ -52,11 +52,7 @@ type FederatedTypeConfigSpec struct {
 	// resource should be changed from the template when in certain member
 	// clusters. If not provided, the group and version will default to those
 	// provided for the template resource.
-	// +optional
-	Override *APIResource `json:"override,omitempty"`
-	// The list of name:path pairs of the fields to override in target template.
-	// +optional
-	OverridePaths []OverridePath `json:"overridePaths,omitempty"`
+	Override APIResource `json:"override"`
 	// Configuration for the status type that holds information about which type
 	// holds the status of the federated resource. If not provided, the group
 	// and version will default to those provided for the template resource.
@@ -84,22 +80,27 @@ type APIResource struct {
 	PluralName string `json:"pluralName,omitempty"`
 }
 
-// OverridePath is the name:path pair of the field to override in target template.
-type OverridePath struct {
-	// Name of the override field in the override spec.
-	// If left empty, Defaults to the last (. separated) portion of the
-	// Path string.
-	Name string `json:"name,omitempty"`
-	// The . separated complete path (in target template spec) of the
-	// field to override. For example 'spec.replicas' for ReplicaSets.
-	Path string `json:"path"`
-}
+// ControllerStatus defines the current state of the controller
+type ControllerStatus string
+
+const (
+	// ControllerStatusRunning means controller is in "running" state
+	ControllerStatusRunning ControllerStatus = "Running"
+	// ControllerStatusNotRunning means controller is in "notrunning" state
+	ControllerStatusNotRunning ControllerStatus = "NotRunning"
+)
 
 // FederatedTypeConfigStatus defines the observed state of FederatedTypeConfig
 type FederatedTypeConfigStatus struct {
 	// ObservedGeneration is the generation as observed by the controller consuming the FederatedTypeConfig.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// PropagationController tracks the status of the sync controller.
+	// +optional
+	PropagationController ControllerStatus `json:"propagationController,omitempty"`
+	// StatusController tracks the status of the status controller.
+	// +optional
+	StatusController ControllerStatus `json:"statusController,omitempty"`
 }
 
 // +genclient
@@ -140,15 +141,9 @@ func SetFederatedTypeConfigDefaults(obj *FederatedTypeConfig) {
 	setStringDefault(&obj.Spec.Placement.PluralName, PluralName(obj.Spec.Placement.Kind))
 	setStringDefault(&obj.Spec.Placement.Group, obj.Spec.Template.Group)
 	setStringDefault(&obj.Spec.Placement.Version, obj.Spec.Template.Version)
-	if obj.Spec.Override != nil {
-		setStringDefault(&obj.Spec.Override.PluralName, PluralName(obj.Spec.Override.Kind))
-		setStringDefault(&obj.Spec.Override.Group, obj.Spec.Template.Group)
-		setStringDefault(&obj.Spec.Override.Version, obj.Spec.Template.Version)
-		for index, overridePath := range obj.Spec.OverridePaths {
-			splitPath := strings.Split(overridePath.Path, ".")
-			setStringDefault(&obj.Spec.OverridePaths[index].Name, splitPath[len(splitPath)-1])
-		}
-	}
+	setStringDefault(&obj.Spec.Override.PluralName, PluralName(obj.Spec.Override.Kind))
+	setStringDefault(&obj.Spec.Override.Group, obj.Spec.Template.Group)
+	setStringDefault(&obj.Spec.Override.Version, obj.Spec.Template.Version)
 	if obj.Spec.Status != nil {
 		setStringDefault(&obj.Spec.Status.PluralName, PluralName(obj.Spec.Status.Kind))
 		setStringDefault(&obj.Spec.Status.Group, obj.Spec.Template.Group)
@@ -173,6 +168,10 @@ func PluralName(kind string) string {
 		strings.HasSuffix(lowerKind, "ch") || strings.HasSuffix(lowerKind, "sh") ||
 		strings.HasSuffix(lowerKind, "z") || strings.HasSuffix(lowerKind, "o") {
 		return fmt.Sprintf("%ses", lowerKind)
+	}
+	if strings.HasSuffix(lowerKind, "y") {
+		lowerKind = strings.TrimSuffix(lowerKind, "y")
+		return fmt.Sprintf("%sies", lowerKind)
 	}
 	return fmt.Sprintf("%ss", lowerKind)
 }
@@ -202,37 +201,13 @@ func (f *FederatedTypeConfig) GetTemplate() metav1.APIResource {
 }
 
 func (f *FederatedTypeConfig) GetPlacement() metav1.APIResource {
-	// Special-case namespace placement scope since it will hopefully
-	// be the only instance of the scope of a federation primitive
-	// differing from the scope of its target.
-	namespaced := f.Spec.Namespaced
-	if f.Name == "namespaces" {
-		// Namespace placement is namespaced to allow the control
-		// plane to run with only namespace-scoped permissions.
-		namespaced = true
-	}
-
+	namespaced := f.isPrimitiveNamespaced()
 	return apiResourceToMeta(f.Spec.Placement, namespaced)
 }
 
-func (f *FederatedTypeConfig) GetOverride() *metav1.APIResource {
-	if f.Spec.Override == nil {
-		return nil
-	}
-	metaAPIResource := apiResourceToMeta(*f.Spec.Override, f.Spec.Namespaced)
-	return &metaAPIResource
-}
-
-func (f *FederatedTypeConfig) GetOverridePaths() map[string][]string {
-	if len(f.Spec.OverridePaths) == 0 {
-		return nil
-	}
-
-	overridePaths := make(map[string][]string, len(f.Spec.OverridePaths))
-	for _, overridePath := range f.Spec.OverridePaths {
-		overridePaths[overridePath.Name] = strings.Split(overridePath.Path, ".")
-	}
-	return overridePaths
+func (f *FederatedTypeConfig) GetOverride() metav1.APIResource {
+	namespaced := f.isPrimitiveNamespaced()
+	return apiResourceToMeta(f.Spec.Override, namespaced)
 }
 
 func (f *FederatedTypeConfig) GetStatus() *metav1.APIResource {
@@ -245,6 +220,20 @@ func (f *FederatedTypeConfig) GetStatus() *metav1.APIResource {
 
 func (f *FederatedTypeConfig) GetEnableStatus() bool {
 	return f.Spec.EnableStatus
+}
+
+func (f *FederatedTypeConfig) isPrimitiveNamespaced() bool {
+	// Special-case the scope of namespace primitives since it will
+	// hopefully be the only instance of the scope of a federation
+	// primitive differing from the scope of its target.
+
+	// TODO(marun) Use the constant in pkg/controller/util
+	if f.Name == "namespaces" {
+		// Namespace placement is namespaced to allow the control
+		// plane to run with only namespace-scoped permissions.
+		return true
+	}
+	return f.Spec.Namespaced
 }
 
 func apiResourceToMeta(apiResource APIResource, namespaced bool) metav1.APIResource {

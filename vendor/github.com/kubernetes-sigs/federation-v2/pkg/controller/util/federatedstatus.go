@@ -14,32 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package util
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// FederatedDeploymentSpec defines the desired state of FederatedDeployment
-type FederatedDeploymentSpec struct {
-	Template appsv1.Deployment `json:"template,omitempty"`
-}
-
-// FederatedDeploymentStatus defines the observed state of FederatedDeployment
-type FederatedDeploymentStatus struct {
-}
-
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// FederatedDeployment
-// +k8s:openapi-gen=true
-// +kubebuilder:resource:path=federateddeployments
-type FederatedDeployment struct {
+// FederatedResource is a generic representation of a federated type
+type FederatedResource struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   FederatedDeploymentSpec   `json:"spec,omitempty"`
-	Status FederatedDeploymentStatus `json:"status,omitempty"`
+	ClusterStatus []ResourceClusterStatus `json:"clusterStatus,omitempty"`
+}
+
+// ResourceClusterStatus defines the status of federated resource within a cluster
+type ResourceClusterStatus struct {
+	ClusterName string                 `json:"clusterName,omitempty"`
+	Status      map[string]interface{} `json:"status,omitempty"`
 }

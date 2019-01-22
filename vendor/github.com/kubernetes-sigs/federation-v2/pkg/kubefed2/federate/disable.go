@@ -116,26 +116,15 @@ func (j *disableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 		return fmt.Errorf("Failed to get host cluster config: %v", err)
 	}
 
-	apiResource, err := LookupAPIResource(hostConfig, j.targetName)
-	if err != nil {
-		return err
-	}
-	glog.V(2).Infof("Found resource %q", resourceKey(*apiResource))
-
 	typeConfigName := ctlutil.QualifiedName{
 		Namespace: j.FederationNamespace,
-		Name:      groupQualifiedName(*apiResource),
+		Name:      j.targetName,
 	}
 
-	err = DisableFederation(hostConfig, typeConfigName, j.delete, j.DryRun)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return DisableFederation(cmdOut, hostConfig, typeConfigName, j.delete, j.DryRun)
 }
 
-func DisableFederation(config *rest.Config, typeConfigName ctlutil.QualifiedName, delete, dryRun bool) error {
+func DisableFederation(cmdOut io.Writer, config *rest.Config, typeConfigName ctlutil.QualifiedName, delete, dryRun bool) error {
 	fedClient, err := util.FedClientset(config)
 	if err != nil {
 		return fmt.Errorf("Failed to get federation clientset: %v", err)
@@ -149,26 +138,38 @@ func DisableFederation(config *rest.Config, typeConfigName ctlutil.QualifiedName
 		return nil
 	}
 
-	typeConfig.Spec.PropagationEnabled = false
-	_, err = fedClient.CoreV1alpha1().FederatedTypeConfigs(typeConfig.Namespace).Update(typeConfig)
-	if err != nil {
-		return fmt.Errorf("Error disabling propagation for FederatedTypeConfig %q: %v", typeConfigName, err)
+	write := func(data string) {
+		if cmdOut != nil {
+			cmdOut.Write([]byte(data))
+		}
+	}
+
+	if typeConfig.Spec.PropagationEnabled {
+		typeConfig.Spec.PropagationEnabled = false
+		_, err = fedClient.CoreV1alpha1().FederatedTypeConfigs(typeConfig.Namespace).Update(typeConfig)
+		if err != nil {
+			return fmt.Errorf("Error disabling propagation for FederatedTypeConfig %q: %v", typeConfigName, err)
+		}
+		write(fmt.Sprintf("Disabled propagation for FederatedTypeConfig %q\n", typeConfigName))
+	} else {
+		write(fmt.Sprintf("Propagation already disabled for FederatedTypeConfig %q\n", typeConfigName))
 	}
 	if !delete {
 		return nil
 	}
 
 	// TODO(marun) consider waiting for the sync controller to be stopped before attempting deletion
-	deletePrimitives(config, typeConfig)
+	deletePrimitives(config, typeConfig, write)
 	err = fedClient.CoreV1alpha1().FederatedTypeConfigs(typeConfigName.Namespace).Delete(typeConfigName.Name, nil)
 	if err != nil {
 		return fmt.Errorf("Error deleting FederatedTypeConfig %q: %v", typeConfigName, err)
 	}
+	write(fmt.Sprintf("federatedtypeconfig %q deleted\n", typeConfigName))
 
 	return nil
 }
 
-func deletePrimitives(config *rest.Config, typeConfig typeconfig.Interface) error {
+func deletePrimitives(config *rest.Config, typeConfig typeconfig.Interface, write func(string)) error {
 	client, err := apiextv1b1client.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("Error creating crd client: %v", err)
@@ -181,7 +182,9 @@ func deletePrimitives(config *rest.Config, typeConfig typeconfig.Interface) erro
 		if err != nil && !errors.IsNotFound(err) {
 			glog.Errorf("Failed to delete crd %q: %v", crdName, err)
 			failedDeletion = append(failedDeletion, crdName)
+			continue
 		}
+		write(fmt.Sprintf("customresourcedefinition %q deleted\n", crdName))
 	}
 	if len(failedDeletion) > 0 {
 		return fmt.Errorf("The following crds were not deleted successfully (see error log for details): %v", failedDeletion)
@@ -191,13 +194,9 @@ func deletePrimitives(config *rest.Config, typeConfig typeconfig.Interface) erro
 }
 
 func primitiveCRDNames(typeConfig typeconfig.Interface) []string {
-	names := []string{
-		groupQualifiedName(typeConfig.GetTemplate()),
-		groupQualifiedName(typeConfig.GetPlacement()),
+	return []string{
+		typeconfig.GroupQualifiedName(typeConfig.GetTemplate()),
+		typeconfig.GroupQualifiedName(typeConfig.GetPlacement()),
+		typeconfig.GroupQualifiedName(typeConfig.GetOverride()),
 	}
-	overrideAPIResource := typeConfig.GetOverride()
-	if overrideAPIResource != nil {
-		names = append(names, groupQualifiedName(*overrideAPIResource))
-	}
-	return names
 }

@@ -18,16 +18,36 @@ package federate
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	apiextv1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+
+	"github.com/kubernetes-sigs/federation-v2/pkg/apis/core/typeconfig"
 )
 
-func CrdForAPIResource(apiResource metav1.APIResource) *apiextv1b1.CustomResourceDefinition {
+func DecodeYAMLFromFile(filename string, obj interface{}) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return DecodeYAML(f, obj)
+}
+
+func DecodeYAML(r io.Reader, obj interface{}) error {
+	decoder := yaml.NewYAMLToJSONDecoder(r)
+	return decoder.Decode(obj)
+}
+
+func CrdForAPIResource(apiResource metav1.APIResource, validation *apiextv1b1.CustomResourceValidation) *apiextv1b1.CustomResourceDefinition {
 	scope := apiextv1b1.ClusterScoped
 	if apiResource.Namespaced {
 		scope = apiextv1b1.NamespaceScoped
@@ -40,7 +60,7 @@ func CrdForAPIResource(apiResource metav1.APIResource) *apiextv1b1.CustomResourc
 			APIVersion: "apiextensions.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: groupQualifiedName(apiResource),
+			Name: typeconfig.GroupQualifiedName(apiResource),
 		},
 		Spec: apiextv1b1.CustomResourceDefinitionSpec{
 			Group:   apiResource.Group,
@@ -50,18 +70,16 @@ func CrdForAPIResource(apiResource metav1.APIResource) *apiextv1b1.CustomResourc
 				Plural: apiResource.Name,
 				Kind:   apiResource.Kind,
 			},
+			Validation: validation,
 		},
 	}
 }
 
-func LookupAPIResource(config *rest.Config, key string) (*metav1.APIResource, error) {
+func LookupAPIResource(config *rest.Config, key, targetVersion string) (*metav1.APIResource, error) {
 	client, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating discovery client: %v", err)
 	}
-
-	// TODO(marun) Allow the targeting of a specific group
-	// TODO(marun) Allow the targeting of a specific version
 
 	resourceLists, err := client.ServerPreferredResources()
 	if err != nil {
@@ -72,10 +90,19 @@ func LookupAPIResource(config *rest.Config, key string) (*metav1.APIResource, er
 	lowerKey := strings.ToLower(key)
 	var targetResource *metav1.APIResource
 	for _, resourceList := range resourceLists {
+		// The list holds the GroupVersion for its list of APIResources
+		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing GroupVersion: %v", err)
+		}
+		if len(targetVersion) > 0 && gv.Version != targetVersion {
+			continue
+		}
 		for _, resource := range resourceList.APIResources {
 			if lowerKey == resource.Name ||
 				lowerKey == resource.SingularName ||
-				lowerKey == strings.ToLower(resource.Kind) {
+				lowerKey == strings.ToLower(resource.Kind) ||
+				lowerKey == fmt.Sprintf("%s.%s", resource.Name, gv.Group) {
 
 				targetResource = &resource
 				break
@@ -91,11 +118,6 @@ func LookupAPIResource(config *rest.Config, key string) (*metav1.APIResource, er
 			}
 		}
 		if targetResource != nil {
-			// The list holds the GroupVersion for its list of APIResources
-			gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
-			if err != nil {
-				return nil, fmt.Errorf("Error parsing GroupVersion: %v", err)
-			}
 			targetResource.Group = gv.Group
 			targetResource.Version = gv.Version
 			break
@@ -122,11 +144,4 @@ func resourceKey(apiResource metav1.APIResource) string {
 		version = apiResource.Version
 	}
 	return fmt.Sprintf("%s.%s/%s", apiResource.Name, group, version)
-}
-
-func groupQualifiedName(apiResource metav1.APIResource) string {
-	if len(apiResource.Group) == 0 {
-		return apiResource.Name
-	}
-	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
 }

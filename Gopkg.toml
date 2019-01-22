@@ -36,11 +36,11 @@ required = [
   name="sigs.k8s.io/controller-tools"
   version="v0.1.1"
 
-[[constraint]]
+[[override]]
   name="k8s.io/api"
   version="kubernetes-1.11.2"
 
-[[constraint]]
+[[override]]
   name="k8s.io/apimachinery"
   version="kubernetes-1.11.2"
 
@@ -54,7 +54,7 @@ version="v1.4.7"
   name = "github.com/sirupsen/logrus"
   version = "1.0.6"
 
-[[constraint]]
+[[override]]
   name = "k8s.io/client-go"
   version="kubernetes-1.11.2"
 
@@ -66,10 +66,16 @@ version="v1.4.7"
   name = "github.com/openshift/generic-admission-server"
   version = "v.1.11.0"
 
-[[constraint]]
+[[override]]
   name = "k8s.io/apiserver"
   version="kubernetes-1.11.2"
 
 [[constraint]]
   branch = "master"
   name = "github.com/openshift/api"
+
+[[override]]
+  name = "github.com/kubernetes-sigs/federation-v2"
+  ## TODO: Revert to upstream when idempotent join is available
+  source = "github.com/csrwng/federation-v2"
+  branch = "idempotent_join"

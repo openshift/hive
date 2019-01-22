@@ -29,7 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
+	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 
+	fedv1alpha1 "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1"
 	federationutil "github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
@@ -134,13 +137,24 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		"namespace":         cd.Namespace,
 	})
 
+	if cd.DeletionTimestamp != nil {
+		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerFederation) {
+			return reconcile.Result{}, nil
+		}
+		return r.syncDeletedClusterDeployment(cd, cdLog)
+	}
+
 	// Filter on deleted clusterdeployments or ones that are not
 	// installed yet.
-	if cd.DeletionTimestamp != nil ||
-		!cd.Status.Installed ||
+	if !cd.Status.Installed ||
 		cd.Status.AdminKubeconfigSecret.Name == "" {
 		cdLog.Debug("cluster deployment not ready for federation")
 		return reconcile.Result{}, nil
+	}
+
+	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerFederation) {
+		cdLog.Debugf("adding clusterdeployment finalizer")
+		return reconcile.Result{}, r.addFederationFinalizer(cd, cdLog)
 	}
 
 	// If already federated, skip
@@ -170,17 +184,19 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		return reconcile.Result{}, err
 	}
 
+	name := federatedClusterName(cd)
+
 	err = kubefed2.JoinCluster(hostConfig,
 		targetConfig,
 		federationutil.DefaultFederationSystemNamespace,
 		federationutil.MulticlusterPublicNamespace,
-		"hive",  /* hostContext */
-		cd.Name, /* clusterName */
-		"",      /* secretName */
-		true,    /* addToRegistry */
-		false,   /* limitedScope */
-		false,   /* dryRun */
-		true)    /* idempotent */
+		"hive", /* hostContext */
+		name,   /* clusterName */
+		name,   /* secretName */
+		true,   /* addToRegistry */
+		false,  /* limitedScope */
+		false,  /* dryRun */
+		true)   /* idempotent */
 
 	if err != nil {
 		cdLog.WithError(err).Error("Federating cluster failed")
@@ -212,6 +228,60 @@ func (r *ReconcileClusterDeploymentFederation) loadSecretData(secretName, namesp
 	return string(retStr), nil
 }
 
+func (r *ReconcileClusterDeploymentFederation) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+
+	// Delete the federated cluster
+	federatedCluster := &fedv1alpha1.FederatedCluster{}
+	name := federatedClusterName(cd)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: federationutil.DefaultFederationSystemNamespace}, federatedCluster)
+	if err != nil && !errors.IsNotFound(err) {
+		cdLog.WithError(err).Error("cannot retrieve federated cluster for cleanup")
+		return reconcile.Result{}, err
+	}
+	if err == nil {
+		err = r.Delete(context.TODO(), federatedCluster)
+		if err != nil {
+			cdLog.WithError(err).Error("cannot delete federated cluster for cleanup")
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Delete the secret for the federated cluster
+	federatedClusterSecret := &corev1.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: federationutil.DefaultFederationSystemNamespace}, federatedClusterSecret)
+	if err != nil && !errors.IsNotFound(err) {
+		cdLog.WithError(err).Error("cannot retrieve federated cluster secret for cleanup")
+		return reconcile.Result{}, err
+	}
+	if err == nil {
+		err = r.Delete(context.TODO(), federatedClusterSecret)
+		if err != nil {
+			cdLog.WithError(err).Error("cannot delete federated cluster secret for cleanup")
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Delete the cluster registry cluster
+	clusterRegistryCluster := &crv1alpha1.Cluster{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: federationutil.MulticlusterPublicNamespace}, clusterRegistryCluster)
+	if err != nil && !errors.IsNotFound(err) {
+		cdLog.WithError(err).Error("cannot retrieve clusterregistry cluster for cleanup")
+		return reconcile.Result{}, err
+	}
+	if err == nil {
+		err = r.Delete(context.TODO(), clusterRegistryCluster)
+		if err != nil {
+			cdLog.WithError(err).Error("cannot delete clusterregistry cluster for cleanup")
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Remove finalizer from ClusterDeployment
+	err = r.removeFederationFinalizer(cd, cdLog)
+
+	return reconcile.Result{}, err
+}
+
 func (r *ReconcileClusterDeploymentFederation) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	cdLog.Debug("updating cluster deployment status")
 	origCD := cd
@@ -240,4 +310,28 @@ func (r *ReconcileClusterDeploymentFederation) isFederationInstalled() (bool, er
 		return false, err
 	}
 	return err == nil, nil
+}
+
+func (r *ReconcileClusterDeploymentFederation) addFederationFinalizer(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cd = cd.DeepCopy()
+	controllerutils.AddFinalizer(cd, hivev1.FinalizerFederation)
+	err := r.Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot add federation finalizer")
+	}
+	return err
+}
+
+func (r *ReconcileClusterDeploymentFederation) removeFederationFinalizer(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cd = cd.DeepCopy()
+	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerFederation)
+	err := r.Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot remove federation finalizer")
+	}
+	return err
+}
+
+func federatedClusterName(cd *hivev1.ClusterDeployment) string {
+	return fmt.Sprintf("%s-%s", cd.Namespace, cd.Name)
 }

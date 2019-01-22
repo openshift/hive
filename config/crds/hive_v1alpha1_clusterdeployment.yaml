@@ -338,7 +338,6 @@ spec:
           - platform
           - pullSecret
           - platformSecrets
-          - preserveOnDelete
           type: object
         status:
           properties:

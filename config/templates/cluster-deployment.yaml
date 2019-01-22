@@ -45,8 +45,7 @@ parameters:
 - name: OPENSHIFT_RELEASE_IMAGE
   displayName: OpenShift Release Image
   description: The release image for the version of OpenShift you wish to install.
-  # 0.0.6
-  value: quay.io/openshift-release-dev/ocp-release:4.0.0-5
+  value: quay.io/openshift-release-dev/ocp-release:4.0.0-0.1
 
 objects:
 - apiVersion: v1
@@ -99,10 +98,10 @@ objects:
     baseDomain: ${BASE_DOMAIN}
     networking:
       type: OpenshiftSDN
-      serviceCIDR: "10.3.0.0/16"
+      serviceCIDR: "172.30.0.0/16"
       machineCIDR: "10.0.0.0/16"
       clusterNetworks:
-        - cidr: "10.2.0.0/16"
+        - cidr: "10.128.0.0/14"
           hostSubnetLength: 9
     platform:
       aws:

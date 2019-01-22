@@ -5,12 +5,26 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// ConfigMapReference references the location of a configmap.
-type ConfigMapReference struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
+// ConfigMapFileReference references a config map in a specific namespace.
+// The namespace must be specified at the point of use.
+type ConfigMapFileReference struct {
+	Name string `json:"name"`
 	// Key allows pointing to a specific key/value inside of the configmap.  This is useful for logical file references.
-	Key string `json:"filename,omitempty"`
+	Key string `json:"key,omitempty"`
+}
+
+// ConfigMapNameReference references a config map in a specific namespace.
+// The namespace must be specified at the point of use.
+type ConfigMapNameReference struct {
+	// name is the metadata.name of the referenced config map
+	Name string `json:"name"`
+}
+
+// SecretNameReference references a secret in a specific namespace.
+// The namespace must be specified at the point of use.
+type SecretNameReference struct {
+	// name is the metadata.name of the referenced secret
+	Name string `json:"name"`
 }
 
 // HTTPServingInfo holds configuration for serving HTTP
@@ -245,12 +259,8 @@ type ClientConnectionOverrides struct {
 	Burst int32 `json:"burst"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // GenericControllerConfig provides information to configure a controller
 type GenericControllerConfig struct {
-	metav1.TypeMeta `json:",inline"`
-
 	// ServingInfo is the HTTP serving information for the controller's endpoints
 	ServingInfo HTTPServingInfo `json:"servingInfo,omitempty"`
 

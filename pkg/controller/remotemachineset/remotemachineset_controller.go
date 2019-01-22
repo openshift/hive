@@ -185,6 +185,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 		cdLog.WithError(err).Error("unable to generate machine sets from cluster deployment")
 		return err
 	}
+
 	cdLog.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
 	machineSetsToDelete := []*capiv1.MachineSet{}
@@ -285,29 +286,40 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
-	workerPool := workerPool(ic.Machines)
+	workerPools := workerPools(ic.Machines)
 	switch ic.Platform.Name() {
 	case "aws":
+		for _, workerPool := range workerPools {
+			if len(workerPool.Platform.AWS.Zones) == 0 {
+				awsClient, err := r.getAWSClient(cd)
+				if err != nil {
+					return nil, err
+				}
+				azs, err := fetchAvailabilityZones(awsClient, ic.Platform.AWS.Region)
+				if err != nil {
+					return nil, err
+				}
+				// Safety net from deleting machine sets. Do we expect to return 0 availability zones successfully?
+				if len(azs) == 0 {
+					return nil, fmt.Errorf("fetched 0 availability zones")
+				}
+				workerPool.Platform.AWS.Zones = azs
+			}
 
-		if len(workerPool.Platform.AWS.Zones) == 0 {
-			awsClient, err := r.getAWSClient(cd)
+			hivePool := findHiveMachinePool(cd, workerPool.Name)
+
+			defaultIAMRole := cd.Status.ClusterID + "-worker-role"
+			if hivePool.Platform.AWS.IAMRoleName == "" {
+				workerPool.Platform.AWS.IAMRoleName = defaultIAMRole
+			}
+
+			icMachineSets, err := installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
 			if err != nil {
 				return nil, err
 			}
-			azs, err := fetchAvailabilityZones(awsClient, ic.Platform.AWS.Region)
-			if err != nil {
-				return nil, err
+			for _, ms := range icMachineSets {
+				installerMachineSets = append(installerMachineSets, ms)
 			}
-			// Safety net from deleting machine sets. Do we expect to return 0 availability zones successfully?
-			if len(azs) == 0 {
-				return nil, fmt.Errorf("fetched 0 availability zones")
-			}
-			workerPool.Platform.AWS.Zones = azs
-		}
-
-		installerMachineSets, err = installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, "worker", "worker-user-data")
-		if err != nil {
-			return nil, err
 		}
 	// TODO: Add other platforms. openstack does not currently support openstack.MachineSets()
 	default:
@@ -330,13 +342,14 @@ func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.
 	return nil
 }
 
-func workerPool(pools []installtypes.MachinePool) installtypes.MachinePool {
+func workerPools(pools []installtypes.MachinePool) []installtypes.MachinePool {
+	workerPools := []installtypes.MachinePool{}
 	for idx, pool := range pools {
-		if pool.Name == "worker" {
-			return pools[idx]
+		if pool.Name != "master" {
+			workerPools = append(workerPools, pools[idx])
 		}
 	}
-	return installtypes.MachinePool{}
+	return workerPools
 }
 
 func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installtypes.InstallConfig, error) {

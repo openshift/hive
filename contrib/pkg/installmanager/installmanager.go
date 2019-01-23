@@ -338,8 +338,8 @@ func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogge
 // generateAssets runs openshift-install commands to generate on-disk assets we need to
 // upload or modify prior to provisioning resources in the cloud.
 func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
-	m.log.Info("running openshift-install create ignition-configs")
-	err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir, "--log-level", "debug"})
+	m.log.Info("running openshift-install create pre-cluster")
+	err := m.runOpenShiftInstallCommand([]string{"create", "pre-cluster", "--dir", m.WorkDir, "--log-level", "debug"})
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err

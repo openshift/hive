@@ -73,3 +73,12 @@ version="v1.4.7"
 [[constraint]]
   branch = "master"
   name = "github.com/openshift/api"
+
+[[constraint]]
+  name = "sigs.k8s.io/cluster-api"
+  branch = "master"
+
+[[override]]
+  name = "sigs.k8s.io/cluster-api-provider-aws"
+  source = "https://github.com/openshift/cluster-api-provider-aws.git"
+  branch = "master"

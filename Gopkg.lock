@@ -1379,6 +1379,14 @@
   revision = "4242d8e6c5dba56827bb7bcf14ad11cda38f3991"
 
 [[projects]]
+  digest = "1:9cc257b3c9ff6a0158c9c661ab6eebda1fe8a4a4453cd5c4044dc9a2ebfb992b"
+  name = "k8s.io/klog"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "a5bc97fbc634d635061f3146511332c7e313a55a"
+  version = "v0.1.0"
+
+[[projects]]
   branch = "master"
   digest = "1:25f872c25580e69d8fa2ca39c261616695bc061b422f4fba488ca2bd0fd033de"
   name = "k8s.io/kube-openapi"
@@ -1401,22 +1409,22 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:488c1053132b017c5d7c5ccb229fe5ed5a3e05337564415e7cdfb9965fd4a62d"
+  digest = "1:3eaf497f58fd507d9cfd0b3d2c7a4332fb19f1b53c3df61cb12521b2a07e4f17"
   name = "sigs.k8s.io/cluster-api"
   packages = [
     "pkg/apis/cluster/common",
     "pkg/apis/cluster/v1alpha1",
   ]
   pruneopts = "NUT"
-  revision = "0734939e05aeb64ab198e3feeee8b4e90ee5cbb2"
+  revision = "40d9d12e7bf4e1d0c6a3453e018c4eed1007ae0a"
 
 [[projects]]
   branch = "master"
-  digest = "1:70e659b4cad21aaf34189b548b3c050783713330972b54fe30959f2b43b0ef78"
+  digest = "1:5ade82a27c5ca576a8aa699320fea3ae5a4d47c95e6a2212191ea31e4c49f27c"
   name = "sigs.k8s.io/cluster-api-provider-aws"
   packages = ["pkg/apis/awsproviderconfig/v1alpha1"]
   pruneopts = "NUT"
-  revision = "e6986093d1fbac2084c50b04fe2f78125ffca582"
+  revision = "acf4a8e03420aa0981b3bd2d702d039e0d499e62"
   source = "https://github.com/openshift/cluster-api-provider-aws.git"
 
 [[projects]]

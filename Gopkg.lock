@@ -42,11 +42,12 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
-  digest = "1:3bf50e90c34a900f12f557a50ec5d3dad534f6249b71132c51b230deea4eb83f"
+  digest = "1:c34d40a8d9bbfc92fb388968f0860deb28921f2d2e0db948df6e73229ac8b810"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     ".",
     "aws",
+    "aws/arn",
     "aws/awserr",
     "aws/awsutil",
     "aws/client",
@@ -55,6 +56,7 @@
     "aws/credentials",
     "aws/credentials/ec2rolecreds",
     "aws/credentials/endpointcreds",
+    "aws/credentials/processcreds",
     "aws/credentials/stscreds",
     "aws/csm",
     "aws/defaults",
@@ -63,6 +65,7 @@
     "aws/request",
     "aws/session",
     "aws/signer/v4",
+    "internal/ini",
     "internal/s3err",
     "internal/sdkio",
     "internal/sdkrand",
@@ -72,12 +75,13 @@
     "private/protocol/ec2query",
     "private/protocol/eventstream",
     "private/protocol/eventstream/eventstreamapi",
+    "private/protocol/json/jsonutil",
+    "private/protocol/jsonrpc",
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
     "private/protocol/restxml",
     "private/protocol/xml/xmlutil",
-    "service/autoscaling",
     "service/ec2",
     "service/ec2/ec2iface",
     "service/elb",
@@ -85,6 +89,7 @@
     "service/elbv2",
     "service/iam",
     "service/iam/iamiface",
+    "service/resourcegroupstaggingapi",
     "service/route53",
     "service/route53/route53iface",
     "service/s3",
@@ -93,8 +98,8 @@
     "service/sts",
   ]
   pruneopts = "NUT"
-  revision = "572272ee7c4503c8a32f79ec16b959c9e8a211c3"
-  version = "v1.15.55"
+  revision = "c1afd6c3340feedd0a2c1cd929dcb291d4bd09ba"
+  version = "v1.16.23"
 
 [[projects]]
   branch = "master"
@@ -191,14 +196,6 @@
   pruneopts = "NUT"
   revision = "0ca9ea5df5451ffdf184b4428c902747c2c11cd7"
   version = "v1.0.0"
-
-[[projects]]
-  digest = "1:c204ec81f754234f2c3c4093cc8cc42151aadedd1129b32539a472fd7881e689"
-  name = "github.com/go-ini/ini"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "9c8236e659b76e87bf02044d06fde8683008ff3e"
-  version = "v1.39.0"
 
 [[projects]]
   branch = "master"
@@ -396,11 +393,11 @@
   version = "v1.0"
 
 [[projects]]
-  digest = "1:ac6d01547ec4f7f673311b4663909269bfb8249952de3279799289467837c3cc"
+  digest = "1:1f2aebae7e7c856562355ec0198d8ca2fa222fb05e5b1b66632a1fce39631885"
   name = "github.com/jmespath/go-jmespath"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "0b12d6b5"
+  revision = "c2b33e84"
 
 [[projects]]
   digest = "1:da62aa6632d04e080b8a8b85a59ed9ed1550842a0099a55f3ae3a20d02a3745a"
@@ -586,7 +583,7 @@
   version = "v.1.11.0"
 
 [[projects]]
-  digest = "1:9b2a666055dae74d68ab6f0ae24fadd106e65462eebd4da02ac900d4d04d232e"
+  digest = "1:51f8d4485b90d1d50cb8487aa2f6008a11bfa77a6a9577aa22496d85e56a9f0f"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/machines/aws",
@@ -600,7 +597,7 @@
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "87a44e789ff9c9739b214aa131107c8e89ba21be"
+  revision = "4b9866659d277572a567e38074db7e5a926a5f55"
 
 [[projects]]
   branch = "master"

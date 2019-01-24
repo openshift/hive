@@ -30,12 +30,13 @@ import (
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
 func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	opt := &aws.ClusterUninstaller{}
+	var logLevel string
 	cmd := &cobra.Command{
 		Use:   "aws-tag-deprovision KEY=VALUE ...",
 		Short: "Deprovision AWS assets (as created by openshift-installer) with the given tag(s)",
 		Long:  "Deprovision AWS assets (as created by openshift-installer) with the given tag(s).  A resource matches the filter if any of the key/value pairs are in its tags.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := completeAWSUninstaller(opt, args); err != nil {
+			if err := completeAWSUninstaller(opt, logLevel, args); err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
 			}
@@ -45,13 +46,13 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.LogLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
 	flags.StringVar(&opt.ClusterName, "cluster-name", "", "Name that cluster was installed with")
 	return cmd
 }
 
-func completeAWSUninstaller(o *aws.ClusterUninstaller, args []string) error {
+func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []string) error {
 	for _, arg := range args {
 		filter := aws.Filter{}
 		err := parseFilter(filter, arg)
@@ -62,7 +63,7 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, args []string) error {
 	}
 
 	// Set log level
-	level, err := log.ParseLevel(o.LogLevel)
+	level, err := log.ParseLevel(logLevel)
 	if err != nil {
 		log.WithError(err).Error("cannot parse log level")
 		return err

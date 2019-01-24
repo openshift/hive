@@ -145,17 +145,17 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		BaseDomain: "test.example.com",
 		SSHKey:     adminSSHKey,
 		PullSecret: pullSecret,
-		Networking: installtypes.Networking{
+		Networking: &installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
 			Type:        "OpenshiftSDN",
-			ServiceCIDR: *ipnet.MustParseCIDR("172.30.0.0/16"),
+			ServiceCIDR: ipnet.MustParseCIDR("172.30.0.0/16"),
 			ClusterNetworks: []netopv1.ClusterNetwork{
 				{
 					CIDR:             "10.128.0.0/14",
 					HostSubnetLength: 9,
 				},
 			},
-			MachineCIDR: *vpcCIDRBlock,
+			MachineCIDR: vpcCIDRBlock,
 		},
 		Platform: installtypes.Platform{
 			AWS: &installawstypes.Platform{
@@ -187,7 +187,6 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 							Size: ec2VolSize,
 							Type: ec2VolType,
 						},
-						AMIID: testAMI,
 						Zones: []string{"us-east-1a", "us-east-1b"},
 					},
 				},
@@ -259,9 +258,9 @@ func TestConvert(t *testing.T) {
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
 				ic := buildBaseExpectedInstallConfig()
-				ic.Networking.ServiceCIDR = ipnet.IPNet{}
+				ic.Networking.ServiceCIDR = &ipnet.IPNet{}
 				ic.Networking.PodCIDR = nil
-				ic.Networking.MachineCIDR = ipnet.IPNet{}
+				ic.Networking.MachineCIDR = &ipnet.IPNet{}
 				ic.Networking.ClusterNetworks = []netopv1.ClusterNetwork{}
 				return ic
 			}(),

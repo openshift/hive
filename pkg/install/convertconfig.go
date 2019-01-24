@@ -59,7 +59,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 					Size: aws.DefaultMachinePlatform.EC2RootVolume.Size,
 					Type: aws.DefaultMachinePlatform.EC2RootVolume.Type,
 				},
-				AMIID: aws.DefaultMachinePlatform.AMIID,
 				Zones: aws.DefaultMachinePlatform.Zones,
 			}
 		}
@@ -91,7 +90,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 					Size: mp.Platform.AWS.EC2RootVolume.Size,
 					Type: mp.Platform.AWS.EC2RootVolume.Type,
 				},
-				AMIID: mp.Platform.AWS.AMIID,
 				Zones: mp.Platform.AWS.Zones,
 			}
 		}
@@ -107,11 +105,11 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		},
 		SSHKey:     sshKey,
 		BaseDomain: spec.BaseDomain,
-		Networking: types.Networking{
+		Networking: &types.Networking{
 			Type:            networkType,
-			ServiceCIDR:     *parseCIDR(spec.Networking.ServiceCIDR),
+			ServiceCIDR:     parseCIDR(spec.Networking.ServiceCIDR),
 			ClusterNetworks: spec.Networking.ClusterNetworks,
-			MachineCIDR:     *parseCIDR(spec.Networking.MachineCIDR),
+			MachineCIDR:     parseCIDR(spec.Networking.MachineCIDR),
 		},
 		PullSecret: pullSecret,
 		Platform:   platform,

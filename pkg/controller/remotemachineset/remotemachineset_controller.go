@@ -276,10 +276,15 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 		return nil, err
 	}
 
+	// TODO: once AMIs are referenced in the release image, this field should be
+	// removed from our API, both a default, and per machine pool.
+	defaultAMI := cd.Spec.AWS.DefaultMachinePlatform.AMIID
+
 	// Generate expected MachineSets for Platform from InstallConfig
 	workerPool := workerPool(ic.Machines)
 	switch ic.Platform.Name() {
 	case "aws":
+
 		if len(workerPool.Platform.AWS.Zones) == 0 {
 			awsClient, err := r.getAWSClient(cd)
 			if err != nil {
@@ -295,16 +300,18 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 			}
 			workerPool.Platform.AWS.Zones = azs
 		}
-		if workerPool.Platform.AWS.AMIID == "" {
+
+		hivePool := findHiveMachinePool(cd, workerPool.Name)
+		osImage := hivePool.Platform.AWS.AMIID
+		if osImage == "" {
 			// A default AMI should be set by the clusterdeployment controller,
 			// return error if no AMI has been set
-			defaultAMI := cd.Spec.AWS.DefaultMachinePlatform.AMIID
 			if defaultAMI == "" {
 				return nil, fmt.Errorf("cluster deployment has no default AMI")
 			}
-			workerPool.Platform.AWS.AMIID = defaultAMI
+			osImage = defaultAMI
 		}
-		installerMachineSets, err = installaws.MachineSets(ic, &workerPool, "worker", "worker-user-data")
+		installerMachineSets, err = installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, osImage, "worker", "worker-user-data")
 		if err != nil {
 			return nil, err
 		}
@@ -318,6 +325,15 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 		generatedMachineSets = append(generatedMachineSets, &nMS)
 	}
 	return generatedMachineSets, nil
+}
+
+func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.MachinePool {
+	for _, mp := range cd.Spec.Compute {
+		if mp.Name == poolName {
+			return &mp
+		}
+	}
+	return nil
 }
 
 func workerPool(pools []installtypes.MachinePool) installtypes.MachinePool {

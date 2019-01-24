@@ -9,11 +9,8 @@ type Platform struct {
 	// DefaultMachinePlatform is the default configuration used when
 	// installing on OpenStack for machine pools which do not define their own
 	// platform configuration.
+	// +optional
 	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
-
-	// BaseImage
-	// Name of image to use from OpenStack cloud
-	BaseImage string `json:"baseImage"`
 
 	// Cloud
 	// Name of OpenStack cloud to use from clouds.yaml
@@ -26,4 +23,8 @@ type Platform struct {
 	// FlavorName
 	// The OpenStack compute flavor to use for servers.
 	FlavorName string `json:"computeFlavor"`
+
+	// TrunkSupport
+	// Whether OpenStack ports can be trunked
+	TrunkSupport string `json:"trunkSupport"`
 }

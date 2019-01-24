@@ -18,7 +18,7 @@ import (
 )
 
 // Machines returns a list of machines for a machinepool.
-func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDataSecret string) ([]clusterapi.Machine, error) {
+func Machines(clusterID string, config *types.InstallConfig, pool *types.MachinePool, osImage, role, userDataSecret string) ([]clusterapi.Machine, error) {
 	if configPlatform := config.Platform.Name(); configPlatform != aws.Name {
 		return nil, fmt.Errorf("non-AWS configuration: %q", configPlatform)
 	}
@@ -37,7 +37,7 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 	var machines []clusterapi.Machine
 	for idx := int64(0); idx < total; idx++ {
 		azIndex := int(idx) % len(azs)
-		provider, err := provider(config.ClusterID, clustername, platform, mpool, azIndex, role, userDataSecret)
+		provider, err := provider(clusterID, clustername, platform, mpool, osImage, azIndex, role, userDataSecret)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create provider")
 		}
@@ -56,7 +56,7 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 				},
 			},
 			Spec: clusterapi.MachineSpec{
-				ProviderConfig: clusterapi.ProviderConfig{
+				ProviderSpec: clusterapi.ProviderSpec{
 					Value: &runtime.RawExtension{Object: provider},
 				},
 				// we don't need to set Versions, because we control those via operators.
@@ -69,8 +69,9 @@ func Machines(config *types.InstallConfig, pool *types.MachinePool, role, userDa
 	return machines, nil
 }
 
-func provider(clusterID, clusterName string, platform *aws.Platform, mpool *aws.MachinePool, azIdx int, role, userDataSecret string) (*awsprovider.AWSMachineProviderConfig, error) {
+func provider(clusterID, clusterName string, platform *aws.Platform, mpool *aws.MachinePool, osImage string, azIdx int, role, userDataSecret string) (*awsprovider.AWSMachineProviderConfig, error) {
 	az := mpool.Zones[azIdx]
+	amiID := osImage
 	tags, err := tagsFromUserTags(clusterID, clusterName, platform.UserTags)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create awsprovider.TagSpecifications from UserTags")
@@ -80,8 +81,17 @@ func provider(clusterID, clusterName string, platform *aws.Platform, mpool *aws.
 			APIVersion: "awsproviderconfig.k8s.io/v1alpha1",
 			Kind:       "AWSMachineProviderConfig",
 		},
-		InstanceType:       mpool.InstanceType,
-		AMI:                awsprovider.AWSResourceReference{ID: &mpool.AMIID},
+		InstanceType: mpool.InstanceType,
+		BlockDevices: []awsprovider.BlockDeviceMappingSpec{
+			{
+				EBS: &awsprovider.EBSBlockDeviceSpec{
+					VolumeType: pointer.StringPtr(mpool.Type),
+					VolumeSize: pointer.Int64Ptr(int64(mpool.Size)),
+					Iops:       pointer.Int64Ptr(int64(mpool.IOPS)),
+				},
+			},
+		},
+		AMI:                awsprovider.AWSResourceReference{ID: &amiID},
 		Tags:               tags,
 		IAMInstanceProfile: &awsprovider.AWSResourceReference{ID: pointer.StringPtr(fmt.Sprintf("%s-%s-profile", clusterName, role))},
 		UserDataSecret:     &corev1.LocalObjectReference{Name: userDataSecret},
@@ -122,9 +132,9 @@ func tagsFromUserTags(clusterID, clusterName string, usertags map[string]string)
 // ConfigMasters sets the PublicIP flag and assigns a set of load balancers to the given machines
 func ConfigMasters(machines []clusterapi.Machine, clusterName string) {
 	for _, machine := range machines {
-		providerConfig := machine.Spec.ProviderConfig.Value.Object.(*awsprovider.AWSMachineProviderConfig)
-		providerConfig.PublicIP = pointer.BoolPtr(true)
-		providerConfig.LoadBalancers = []awsprovider.LoadBalancerReference{
+		providerSpec := machine.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
+		providerSpec.PublicIP = pointer.BoolPtr(true)
+		providerSpec.LoadBalancers = []awsprovider.LoadBalancerReference{
 			{
 				Name: fmt.Sprintf("%s-ext", clusterName),
 				Type: awsprovider.NetworkLoadBalancerType,

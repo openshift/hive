@@ -23,6 +23,7 @@ import (
 	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 )
 
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient usin the provided kubeconfig
@@ -43,6 +44,10 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	}
 
 	if err := openshiftapiv1.Install(scheme); err != nil {
+		return nil, err
+	}
+
+	if err := routev1.Install(scheme); err != nil {
 		return nil, err
 	}
 

@@ -40,6 +40,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
 
@@ -116,7 +117,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd == nil || !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+				if cd == nil || !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 					t.Errorf("did not get expected clusterdeployment finalizer")
 				}
 			},

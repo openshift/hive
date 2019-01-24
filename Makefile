@@ -6,9 +6,19 @@ VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 # To use docker build, specify BUILD_CMD="docker build"
 BUILD_CMD ?= imagebuilder
 
-
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
+
+# Look up distro name (e.g. Fedora)
+DISTRO ?= $(shell lsb_release -si)
+
+# Default fedora to not using sudo since it's not needed
+ifeq ($(DISTRO),Fedora)
+	SUDO_CMD =
+else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
+	SUDO_CMD = sudo
+endif
+
 
 all: fmt vet test build
 
@@ -137,12 +147,12 @@ docker-push:
 # Build the image with buildah
 .PHONY: buildah-build
 buildah-build: generate
-	sudo buildah bud --tag ${IMG} .
+	$(SUDO_CMD) buildah bud --tag ${IMG} .
 
 # Push the buildah image
 .PHONY: buildah-push
 buildah-push: buildah-build
-	sudo buildah push ${IMG}
+	$(SUDO_CMD) buildah push ${IMG}
 
 install-federation:
 	./hack/install-federation.sh

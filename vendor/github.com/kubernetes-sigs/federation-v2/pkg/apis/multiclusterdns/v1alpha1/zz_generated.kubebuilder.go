@@ -204,6 +204,9 @@ var (
 						"metadata": v1beta1.JSONSchemaProps{
 							Type: "object",
 						},
+						"nameServer": v1beta1.JSONSchemaProps{
+							Type: "string",
+						},
 					},
 					Required: []string{
 						"domain",
@@ -318,6 +321,9 @@ var (
 									Type: "string",
 								},
 								"domainRef": v1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+								"externalName": v1beta1.JSONSchemaProps{
 									Type: "string",
 								},
 								"recordTTL": v1beta1.JSONSchemaProps{

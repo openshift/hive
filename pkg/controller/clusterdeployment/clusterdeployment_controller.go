@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -199,7 +198,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	*/
 
 	if cd.DeletionTimestamp != nil {
-		if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			return reconcile.Result{}, nil
 		}
 		return r.syncDeletedClusterDeployment(cd, cdLog)
@@ -231,7 +230,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		}
 	}
 
-	if !HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment finalizer")
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
@@ -483,7 +482,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	// Skips creation of uninstall job if PreserveOnDelete is true
 	if cd.Spec.PreserveOnDelete {
 		cdLog.Warn("skipping creation of uninstall job, due to PreserveOnDelete")
-		if HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+		if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			err = r.removeClusterDeploymentFinalizer(cd)
 			if err != nil {
 				cdLog.WithError(err).Error("error removing finalizer")
@@ -546,13 +545,13 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 
 func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
 	cd = cd.DeepCopy()
-	AddFinalizer(cd, hivev1.FinalizerDeprovision)
+	controllerutils.AddFinalizer(cd, hivev1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cd)
 }
 
 func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
 	cd = cd.DeepCopy()
-	DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
+	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cd)
 }
 
@@ -672,28 +671,4 @@ func isSuccessful(job *batchv1.Job) bool {
 
 func isFailed(job *batchv1.Job) bool {
 	return getJobConditionStatus(job, batchv1.JobFailed) == kapi.ConditionTrue
-}
-
-// HasFinalizer returns true if the given object has the given finalizer
-func HasFinalizer(object metav1.Object, finalizer string) bool {
-	for _, f := range object.GetFinalizers() {
-		if f == finalizer {
-			return true
-		}
-	}
-	return false
-}
-
-// AddFinalizer adds a finalizer to the given object
-func AddFinalizer(object metav1.Object, finalizer string) {
-	finalizers := sets.NewString(object.GetFinalizers()...)
-	finalizers.Insert(finalizer)
-	object.SetFinalizers(finalizers.List())
-}
-
-// DeleteFinalizer removes a finalizer from the given object
-func DeleteFinalizer(object metav1.Object, finalizer string) {
-	finalizers := sets.NewString(object.GetFinalizers()...)
-	finalizers.Delete(finalizer)
-	object.SetFinalizers(finalizers.List())
 }

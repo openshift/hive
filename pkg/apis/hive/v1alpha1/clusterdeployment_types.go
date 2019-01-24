@@ -33,6 +33,10 @@ const (
 	// FinalizerDeprovision is used on ClusterDeployments to ensure we run a successful deprovision
 	// job before cleaning up the API object.
 	FinalizerDeprovision string = "hive.openshift.io/deprovision"
+
+	// FinalizerFederation is used on ClusterDeployments to ensure that federation-related artifacts are cleaned up from
+	// the host cluster before a ClusterDeployment is deleted.
+	FinalizerFederation string = "hive.openshift.io/federation"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment

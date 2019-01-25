@@ -147,7 +147,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd == nil || cd.Spec.Platform.AWS.DefaultMachinePlatform.AMIID != testAMI {
+				if cd == nil || cd.Annotations[hiveDefaultAMIAnnotation] != testAMI {
 					t.Errorf("did not get expected default AMI")
 				}
 			},
@@ -394,11 +394,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        testName,
-			Namespace:   testNamespace,
-			Finalizers:  []string{hivev1.FinalizerDeprovision},
-			UID:         types.UID("1234"),
-			Annotations: map[string]string{},
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{hivev1.FinalizerDeprovision},
+			UID:        types.UID("1234"),
+			Annotations: map[string]string{
+				hiveDefaultAMIAnnotation: testAMI,
+			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
@@ -413,9 +415,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Platform: hivev1.Platform{
 				AWS: &hivev1.AWSPlatform{
 					Region: "us-east-1",
-					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
-						AMIID: testAMI,
-					},
 				},
 			},
 			Networking: hivev1.Networking{
@@ -465,7 +464,7 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 
 func testNoDefaultAMIClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
-	cd.Spec.Platform.AWS.DefaultMachinePlatform.AMIID = ""
+	cd.Annotations[hiveDefaultAMIAnnotation] = ""
 	return cd
 }
 

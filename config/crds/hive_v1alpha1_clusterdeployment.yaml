@@ -37,8 +37,6 @@ spec:
                     properties:
                       aws:
                         properties:
-                          amiID:
-                            type: string
                           iamRoleName:
                             type: string
                           rootVolume:
@@ -119,8 +117,6 @@ spec:
                   properties:
                     aws:
                       properties:
-                        amiID:
-                          type: string
                         iamRoleName:
                           type: string
                         rootVolume:
@@ -237,8 +233,6 @@ spec:
                   properties:
                     defaultMachinePlatform:
                       properties:
-                        amiID:
-                          type: string
                         iamRoleName:
                           type: string
                         rootVolume:

@@ -39,19 +39,20 @@ func init() {
 }
 
 const (
-	testName        = "foo"
-	testNamespace   = "default"
-	testClusterID   = "foo"
-	testAMI         = "ami-totallyfake"
-	adminPassword   = "adminpassword"
-	adminSSHKey     = "adminSSH"
-	pullSecret      = "pullSecret"
-	awsInstanceType = "fake-aws-type"
-	awsRegion       = "us-east-1"
-	iamRoleName     = "rolename"
-	ec2VolIOPS      = 100
-	ec2VolSize      = 500
-	ec2VolType      = "sometype"
+	testName                 = "foo"
+	testNamespace            = "default"
+	testClusterID            = "foo"
+	testAMI                  = "ami-totallyfake"
+	adminPassword            = "adminpassword"
+	adminSSHKey              = "adminSSH"
+	pullSecret               = "pullSecret"
+	awsInstanceType          = "fake-aws-type"
+	awsRegion                = "us-east-1"
+	iamRoleName              = "rolename"
+	ec2VolIOPS               = 100
+	ec2VolSize               = 500
+	ec2VolType               = "sometype"
+	hiveDefaultAMIAnnotation = "hive.openshift.io/default-AMI"
 )
 
 var (
@@ -61,6 +62,11 @@ var (
 func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 	replicas := int64(3)
 	return &hivev1.ClusterDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				hiveDefaultAMIAnnotation: testAMI,
+			},
+		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			BaseDomain: "test.example.com",
 			SSHKey: &corev1.LocalObjectReference{
@@ -109,7 +115,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 							Size: ec2VolSize,
 							Type: ec2VolType,
 						},
-						AMIID: testAMI,
 						Zones: []string{"us-east-1a", "us-east-1b"},
 					},
 				},

@@ -282,7 +282,6 @@ func testMachinePool(name string, replicas int, iamRoleName string, zones []stri
 		Replicas: &mpReplicas,
 		Platform: hivev1.MachinePoolPlatform{
 			AWS: &hivev1.AWSMachinePoolPlatform{
-				AMIID:        testAMI,
 				InstanceType: "m4.large",
 				IAMRoleName:  iamRoleName,
 			},
@@ -320,11 +319,13 @@ func testMachineSet(name string, replicas int) *capiv1.MachineSet {
 func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        testName,
-			Namespace:   testNamespace,
-			Finalizers:  []string{hivev1.FinalizerDeprovision},
-			UID:         types.UID("1234"),
-			Annotations: map[string]string{},
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{hivev1.FinalizerDeprovision},
+			UID:        types.UID("1234"),
+			Annotations: map[string]string{
+				hiveDefaultAMIAnnotation: testAMI,
+			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			SSHKey: &corev1.LocalObjectReference{
@@ -339,9 +340,6 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			Platform: hivev1.Platform{
 				AWS: &hivev1.AWSPlatform{
 					Region: "us-east-1",
-					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
-						AMIID: testAMI,
-					},
 				},
 			},
 			Networking: hivev1.Networking{

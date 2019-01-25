@@ -25,12 +25,20 @@ import (
 	"github.com/openshift/installer/pkg/rhcos"
 )
 
+const (
+	hiveDefaultAMIAnnotation = "hive.openshift.io/default-AMI"
+)
+
 func isDefaultAMISet(cd *hivev1.ClusterDeployment) bool {
-	defaultAMIKnown := false
-	if cd.Spec.Platform.AWS.DefaultMachinePlatform != nil && cd.Spec.Platform.AWS.DefaultMachinePlatform.AMIID != "" {
-		defaultAMIKnown = true
+	defaultAMI, ok := cd.Annotations[hiveDefaultAMIAnnotation]
+	if ok && defaultAMI != "" {
+		return true
 	}
-	return defaultAMIKnown
+	return false
+}
+
+func setDefaultAMI(cd *hivev1.ClusterDeployment, ami string) {
+	cd.Annotations[hiveDefaultAMIAnnotation] = ami
 }
 
 // lookupAMI uses installer code to lookup the latest AMI from the RHCOS webapp.

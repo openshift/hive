@@ -62,6 +62,7 @@ const (
 	adminCredsSecretPasswordKey = "password"
 	pullSecretKey               = ".dockercfg"
 	adminSSHKeySecretKey        = "ssh-publickey"
+	hiveDefaultAMIAnnotation    = "hive.openshift.io/default-AMI"
 )
 
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
@@ -278,7 +279,10 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 
 	// TODO: once AMIs are referenced in the release image, this field should be
 	// removed from our API, both a default, and per machine pool.
-	defaultAMI := cd.Spec.AWS.DefaultMachinePlatform.AMIID
+	defaultAMI := cd.Annotations[hiveDefaultAMIAnnotation]
+	if defaultAMI == "" {
+		return nil, fmt.Errorf("cluster deployment has no default AMI")
+	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
 	workerPool := workerPool(ic.Machines)
@@ -301,17 +305,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 			workerPool.Platform.AWS.Zones = azs
 		}
 
-		hivePool := findHiveMachinePool(cd, workerPool.Name)
-		osImage := hivePool.Platform.AWS.AMIID
-		if osImage == "" {
-			// A default AMI should be set by the clusterdeployment controller,
-			// return error if no AMI has been set
-			if defaultAMI == "" {
-				return nil, fmt.Errorf("cluster deployment has no default AMI")
-			}
-			osImage = defaultAMI
-		}
-		installerMachineSets, err = installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, osImage, "worker", "worker-user-data")
+		installerMachineSets, err = installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, "worker", "worker-user-data")
 		if err != nil {
 			return nil, err
 		}

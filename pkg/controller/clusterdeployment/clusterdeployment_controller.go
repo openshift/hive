@@ -235,20 +235,30 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
 	}
 
-	// Ensure we have an AMI set, if not lookup the latest:
-	if cd.Spec.Platform.AWS != nil && !isDefaultAMISet(cd) {
-		cdLog.Debugf("looking up a default AMI for cluster")
-		if cd.Spec.Platform.AWS.DefaultMachinePlatform == nil {
-			cd.Spec.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
-		}
-		ami, err := r.amiLookupFunc(cd)
-		if err != nil {
-			cdLog.WithError(err).Error("error looking up default AMI for cluster")
+	if cd.Spec.Platform.AWS != nil {
+		if !isDefaultAMISet(cd) {
+			// Ensure we have an AMI set, if not lookup the latest:
+			// TODO: this will be obsolete by the design for OS image lifecycle, we will no
+			// longer need to lookup, pin, and set on machine sets. In cluster components will do
+			// this for us.
+			cdLog.Debugf("looking up a default AMI for cluster")
+			if cd.Spec.Platform.AWS.DefaultMachinePlatform == nil {
+				cd.Spec.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
+			}
+			ami, err := r.amiLookupFunc(cd)
+			if err != nil {
+				cdLog.WithError(err).Error("error looking up default AMI for cluster")
+				return reconcile.Result{}, err
+			}
+			setDefaultAMI(cd, ami)
+			cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
+			err = r.Update(context.TODO(), cd)
+			if err != nil {
+				cdLog.WithError(err).Error("error updating default machine platform")
+			}
 			return reconcile.Result{}, err
 		}
-		cd.Spec.AWS.DefaultMachinePlatform.AMIID = ami
-		cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
-		return reconcile.Result{}, r.Update(context.TODO(), cd)
+		cdLog.Debug("default AMI already set")
 	}
 
 	cdLog.Debug("loading SSH key secret")

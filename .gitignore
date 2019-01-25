@@ -4,8 +4,6 @@
 *.dll
 *.so
 *.dylib
-<<<<<<< HEAD
-=======
 bin/**
 
 # Test binary, build with `go test -c`

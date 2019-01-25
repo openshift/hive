@@ -30,8 +30,13 @@ all: fmt vet test build
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
+.PHONY: test-integration
 test-integration: generate
 	go test ./test/integration/... -coverprofile cover.out
+
+.PHONY: test-e2e
+test-e2e:
+	hack/e2e-test.sh
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build

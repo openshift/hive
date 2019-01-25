@@ -242,9 +242,6 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			// longer need to lookup, pin, and set on machine sets. In cluster components will do
 			// this for us.
 			cdLog.Debugf("looking up a default AMI for cluster")
-			if cd.Spec.Platform.AWS.DefaultMachinePlatform == nil {
-				cd.Spec.AWS.DefaultMachinePlatform = &hivev1.AWSMachinePoolPlatform{}
-			}
 			ami, err := r.amiLookupFunc(cd)
 			if err != nil {
 				cdLog.WithError(err).Error("error looking up default AMI for cluster")
@@ -254,7 +251,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
 			err = r.Update(context.TODO(), cd)
 			if err != nil {
-				cdLog.WithError(err).Error("error updating default machine platform")
+				cdLog.WithError(err).Error("error updating default machine annotation")
 			}
 			return reconcile.Result{}, err
 		}

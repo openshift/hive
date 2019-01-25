@@ -584,7 +584,7 @@
   version = "v.1.11.0"
 
 [[projects]]
-  digest = "1:51f8d4485b90d1d50cb8487aa2f6008a11bfa77a6a9577aa22496d85e56a9f0f"
+  digest = "1:c942a2c49ace42720fc6d8739c2af36c0cedd954f393b0bba0407a515002fd81"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/machines/aws",
@@ -598,7 +598,7 @@
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "4b9866659d277572a567e38074db7e5a926a5f55"
+  revision = "7af6b141c34dd133f104b61b64c78d82e57f3d52"
 
 [[projects]]
   branch = "master"
@@ -1523,6 +1523,7 @@
     "github.com/ghodss/yaml",
     "github.com/golang/glog",
     "github.com/golang/mock/gomock",
+    "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1",
     "github.com/kubernetes-sigs/federation-v2/pkg/controller/util",
     "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2",
     "github.com/onsi/ginkgo",
@@ -1563,6 +1564,7 @@
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",

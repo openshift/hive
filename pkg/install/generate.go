@@ -35,6 +35,8 @@ const (
 	defaultInstallerImagePullPolicy = corev1.PullAlways
 	defaultHiveImage                = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 	defaultHiveImagePullPolicy      = corev1.PullAlways
+
+	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -55,6 +57,12 @@ func GenerateInstallerJob(
 	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	tryOnce := false
+	if cd.Annotations != nil {
+		value, exists := cd.Annotations[tryInstallOnceAnnotation]
+		tryOnce = exists && value == "true"
 	}
 
 	d, err := yaml.Marshal(ic)
@@ -233,9 +241,14 @@ func GenerateInstallerJob(
 		},
 	}
 
+	restartPolicy := corev1.RestartPolicyOnFailure
+	if tryOnce {
+		restartPolicy = corev1.RestartPolicyNever
+	}
+
 	podSpec := corev1.PodSpec{
 		DNSPolicy:          corev1.DNSClusterFirst,
-		RestartPolicy:      corev1.RestartPolicyOnFailure,
+		RestartPolicy:      restartPolicy,
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
@@ -244,6 +257,9 @@ func GenerateInstallerJob(
 	completions := int32(1)
 	deadline := int64((24 * time.Hour).Seconds())
 	backoffLimit := int32(123456) // effectively limitless
+	if tryOnce {
+		backoffLimit = int32(0)
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

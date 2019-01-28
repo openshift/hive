@@ -152,49 +152,24 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	origCD := cd
 	cd = cd.DeepCopy()
 
+	// TODO: We may want to remove this fix in future.
+	// Handle pre-existing clusters with older status version structs that did not have the new
+	// cluster version mandatory fields defined.
+	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	if !reflect.DeepEqual(origCD.Status, cd.Status) {
+		cdLog.Info("correcting empty cluster version fields")
+		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Error("error updating cluster deployment")
+		}
+		return reconcile.Result{}, err
+	}
+
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("error setting up service account and role")
 		return reconcile.Result{}, err
 	}
-
-	/*
-		if cd.Status.ClusterID == "" {
-			cdLog.Debug("setting cluster ID")
-			metadataCfgMap := &kapi.ConfigMap{}
-			configMapName := fmt.Sprintf("%s-metadata", cd.Name)
-			err := r.Get(context.TODO(), types.NamespacedName{Name: configMapName, Namespace: cd.Namespace}, metadataCfgMap)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					cdLog.WithField("configmap", configMapName).WithError(err).Warn("error looking up metadata configmap")
-					return reconcile.Result{}, err
-				}
-			}
-
-			var md installertypes.ClusterMetadata
-			if err := json.Unmarshal([]byte(metadataCfgMap.Data["metadata.json"]), &md); err != nil {
-				cdLog.WithError(err).Error("error reading cluster metadata json from configmap")
-				return reconcile.Result{}, err
-			}
-
-			if md.ClusterPlatformMetadata.AWS != nil {
-				for _, m := range md.ClusterPlatformMetadata.AWS.Identifier {
-					clusterID, ok := m["openshiftClusterID"]
-					if ok {
-						cd.Status.ClusterID = clusterID
-						cdLog.WithField("clusterID", clusterID).Debug("found clusterID")
-						break
-					}
-				}
-				if cd.Status.ClusterID == "" {
-					cdLog.Error("cluster metadata did not contain openshiftClusterID")
-					return reconcile.Result{}, fmt.Errorf("cluster metadata did not contain openshiftClusterID")
-				}
-			} else {
-				cdLog.Warn("cluster metadata did not contain AWS platform")
-			}
-		}
-	*/
 
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
@@ -248,6 +223,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			}
 			setDefaultAMI(cd, ami)
 			cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
+			controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 			err = r.Update(context.TODO(), cd)
 			if err != nil {
 				cdLog.WithError(err).Error("error updating default machine annotation")

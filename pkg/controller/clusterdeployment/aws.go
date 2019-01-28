@@ -38,6 +38,9 @@ func isDefaultAMISet(cd *hivev1.ClusterDeployment) bool {
 }
 
 func setDefaultAMI(cd *hivev1.ClusterDeployment, ami string) {
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
+	}
 	cd.Annotations[hiveDefaultAMIAnnotation] = ami
 }
 

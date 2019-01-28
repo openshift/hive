@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -35,12 +36,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1alpha1"
+	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
 	installtypes "github.com/openshift/installer/pkg/types"
@@ -308,7 +310,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 
 			hivePool := findHiveMachinePool(cd, workerPool.Name)
 
-			defaultIAMRole := cd.Status.ClusterID + "-worker-role"
+			defaultIAMRole := fmt.Sprintf("%s-worker-role", ic.ObjectMeta.Name)
 			if hivePool.Platform.AWS.IAMRoleName == "" {
 				workerPool.Platform.AWS.IAMRoleName = defaultIAMRole
 			}
@@ -318,6 +320,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				return nil, err
 			}
 			for _, ms := range icMachineSets {
+				updateMachineSetAWSMachineProviderConfig(&ms, ic.ObjectMeta.Name)
 				installerMachineSets = append(installerMachineSets, ms)
 			}
 		}
@@ -331,6 +334,29 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 		generatedMachineSets = append(generatedMachineSets, &nMS)
 	}
 	return generatedMachineSets, nil
+}
+
+// updateMachineSetAWSMachineProviderConfig modifies values in a MachineSet's AWSMachineProviderConfig.
+// Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
+// the values match the worker pool originally created by the installer.
+func updateMachineSetAWSMachineProviderConfig(machineSet *capiv1.MachineSet, clusterName string) {
+	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
+	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: pointer.StringPtr(fmt.Sprintf("%s-worker-profile", clusterName))}
+	providerConfig.Subnet = awsprovider.AWSResourceReference{
+		Filters: []awsprovider.Filter{{
+			Name:   "tag:Name",
+			Values: []string{fmt.Sprintf("%s-worker-%s", clusterName, providerConfig.Placement.AvailabilityZone)},
+		}},
+	}
+	providerConfig.SecurityGroups = []awsprovider.AWSResourceReference{{
+		Filters: []awsprovider.Filter{{
+			Name:   "tag:Name",
+			Values: []string{fmt.Sprintf("%s_worker_sg", clusterName)},
+		}},
+	}}
+	machineSet.Spec.Template.Spec.ProviderSpec = capiv1.ProviderSpec{
+		Value: &runtime.RawExtension{Object: providerConfig},
+	}
 }
 
 func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.MachinePool {

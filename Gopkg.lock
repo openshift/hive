@@ -110,6 +110,14 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
+  digest = "1:65d39e3a7e262416eb6f855d213954282921a3506125ce88e59514ae396dd690"
+  name = "github.com/certifi/gocertifi"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "deb3ae2ef2610fde3330947281941c562861188b"
+  version = "2018.01.18"
+
+[[projects]]
   digest = "1:913d0a501196096674150d3a6fa99465e4b3735e851c22cab3ea0544e329e07d"
   name = "github.com/coreos/etcd"
   packages = [
@@ -188,6 +196,14 @@
   pruneopts = "NUT"
   revision = "72bf35d0ff611848c1dc9df0f976c81192392fa5"
   version = "v4.1.0"
+
+[[projects]]
+  digest = "1:b96091e0b0ef04e3c2a4fbcce53d3866edc0ed4295f1264e122f8ca34175a11e"
+  name = "github.com/getsentry/raven-go"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "f04e7487e9a6b9d9837d52743fb5f40576c56411"
+  version = "v0.2.0"
 
 [[projects]]
   digest = "1:81466b4218bf6adddac2572a30ac733a9255919bc2f470b4827a317bd4ee1756"
@@ -553,12 +569,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:62f6d47ba4b96e4cf750ddeb64a4b7e3843448729ec00fcfd64f0ed690e9b288"
+  digest = "1:4d1d0cb5127e6a21a3ceeb9e923067e33c6b6be6ed73379f73ae23d0de996920"
   name = "github.com/openshift/api"
   packages = [
     "config/v1",
     "operator/v1",
     "operator/v1alpha1",
+    "route/v1",
   ]
   pruneopts = "NUT"
   revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
@@ -602,14 +619,29 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:eae3b01dfe912d48c3684ba4c71b6d6a5a1a80cd289715c7c862ee702a65c81e"
+  digest = "1:8e84986b12141f19d17cc6e74f96bac8e719a249fb96fa860b6c4f5e6b697c7f"
   name = "github.com/openshift/library-go"
   packages = [
     "pkg/operator/resource/resourcemerge",
     "pkg/operator/v1alpha1helpers",
+    "pkg/serviceability",
   ]
   pruneopts = "NUT"
   revision = "08e93f1ee0f48016a6d3d8979630b457cb530553"
+
+[[projects]]
+  digest = "1:749ce02f10cf3dc55bc22ad50dd3ffdeaa022bd288460f7638f4e1e9a5dc7fc6"
+  name = "github.com/openshift/origin"
+  packages = [
+    "pkg/api/apihelpers",
+    "pkg/build/apis/build",
+    "pkg/cmd/server/apis/config",
+    "pkg/cmd/util",
+    "pkg/cmd/util/pem",
+  ]
+  pruneopts = "NUT"
+  revision = "0cbc58b117403b9d9169dbafdfac59ef104bb997"
+  version = "v3.11.0"
 
 [[projects]]
   digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
@@ -642,6 +674,14 @@
   pruneopts = "NUT"
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
+
+[[projects]]
+  digest = "1:de406937d444963016a8644b65e56e2f241a1d81f76418ce59ed12257fabb5ad"
+  name = "github.com/pkg/profile"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "5b67d428864e92711fcbd2f8629456121a56d91f"
+  version = "v1.2.1"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
@@ -1410,6 +1450,14 @@
   revision = "a45bc6067dfdd3d84ec6d0993c141170c04f7f37"
 
 [[projects]]
+  digest = "1:6b26c6e2f5a9000b16eef4043b892d0d84c804253db7bae1fb7a21271b066bb2"
+  name = "k8s.io/kubernetes"
+  packages = ["pkg/apis/core"]
+  pruneopts = "NUT"
+  revision = "cff46ab41ff0bb44d8584413b598ad8360ec1def"
+  version = "v1.13.2"
+
+[[projects]]
   digest = "1:ff54706d46de40c865b5fcfc4bde1087c02510cd12e0150de8e405ab427d9907"
   name = "k8s.io/utils"
   packages = ["pointer"]
@@ -1529,6 +1577,7 @@
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",
+    "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/machines/aws",
@@ -1538,6 +1587,7 @@
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",
     "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
+    "github.com/openshift/origin/pkg/cmd/server/apis/config",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",

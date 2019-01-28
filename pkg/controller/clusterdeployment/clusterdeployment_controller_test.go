@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -66,6 +67,9 @@ const (
 `
 	testRemoteClusterCurrentVersion = "4.0.0"
 	remoteClusterVersionObjectName  = "version"
+
+	remoteClusterRouteObjectName      = "console"
+	remoteClusterRouteObjectNamespace = "openshift-console"
 )
 
 func init() {
@@ -75,6 +79,7 @@ func init() {
 func TestClusterDeploymentReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	openshiftapiv1.Install(scheme.Scheme)
+	routev1.Install(scheme.Scheme)
 
 	// Utility function to get the test CD from the fake client
 	getCD := func(c client.Client) *hivev1.ClusterDeployment {
@@ -525,8 +530,15 @@ func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error)
 	}
 	remoteClusterVersion.Status = testRemoteClusterVersionStatus()
 
-	remoteClient := fake.NewFakeClient(remoteClusterVersion)
+	remoteClusterRouteObject := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      remoteClusterRouteObjectName,
+			Namespace: remoteClusterRouteObjectNamespace,
+		},
+	}
+	remoteClusterRouteObject.Spec.Host = "https://bar-api.clusters.example.com:6443/console"
 
+	remoteClient := fake.NewFakeClient(remoteClusterVersion, remoteClusterRouteObject)
 	return remoteClient, nil
 }
 

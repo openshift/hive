@@ -19,8 +19,6 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"path"
 	"reflect"
 	"time"
 
@@ -45,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -413,8 +412,12 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 
 // setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
 func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecret *corev1.Secret, cdLog log.FieldLogger) error {
+	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
+	if err != nil {
+		cdLog.WithError(err).Error("error building remote cluster-api client connection")
+		return err
+	}
 	if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
-
 		// Parse the admin kubeconfig for the server URL:
 		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
 		if err != nil {
@@ -428,23 +431,20 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 		// We should be able to assume only one cluster in here:
 		server := cluster.Server
 		cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
-		u, err := url.Parse(server)
+		cd.Status.APIURL = server
+		routeObject := &routev1.Route{}
+		err = remoteClusterAPIClient.Get(context.Background(),
+			types.NamespacedName{Namespace: "openshift-console", Name: "console"}, routeObject)
 		if err != nil {
+			cdLog.WithError(err).Error("error fetching remote route object")
 			return err
 		}
-		cd.Status.APIURL = server
-		u.Path = path.Join(u.Path, "console")
-		cd.Status.WebConsoleURL = u.String()
+		cdLog.Debugf("read remote route object: %s", routeObject)
+		cd.Status.WebConsoleURL = routeObject.Spec.Host
 	}
 
 	// Update remote cluster's version into our status
 	if cd.Status.AdminKubeconfigSecret.Name != "" {
-		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
-		if err != nil {
-			cdLog.WithError(err).Error("error building remote cluster-api client connection")
-			return err
-		}
-
 		remoteClusterVersion := &openshiftapiv1.ClusterVersion{}
 		err = remoteClusterAPIClient.Get(context.Background(),
 			types.NamespacedName{Name: clusterVersionObjectName},

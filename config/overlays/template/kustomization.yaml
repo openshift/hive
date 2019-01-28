@@ -1,0 +1,5 @@
+# Customizations for the Service Delivery Development environment:
+bases:
+- ../../default
+patches:
+- image_patch.yaml

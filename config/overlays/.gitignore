@@ -1,0 +1,8 @@
+# Ignore all files
+*
+
+# Except the ones we care about
+!.gitignore
+!*/
+!sd-dev/*
+!template/*

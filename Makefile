@@ -9,8 +9,11 @@ BUILD_CMD ?= imagebuilder
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
+# Image to use when deploying
+DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+
 # Look up distro name (e.g. Fedora)
-DISTRO ?= $(shell lsb_release -si)
+DISTRO ?= $(shell if which lsb_release; then lsb_release -si; else echo "Unknown"; fi)
 
 # Default fedora to not using sudo since it's not needed
 ifeq ($(DISTRO),Fedora)
@@ -62,7 +65,15 @@ install: manifests
 deploy: manifests deploy-hiveadmission
 	kubectl apply -f manifests/
 	kubectl apply -f config/crds
-	kustomize build config/default | kubectl apply -f -
+	mkdir -p config/overlays/deploy
+	cp config/overlays/template/* config/overlays/deploy
+	if [[ "`uname`" == "Darwin" ]]; then \
+	    sed -i "" -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" config/overlays/deploy/image_patch.yaml; \
+	else \
+	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" config/overlays/deploy/image_patch.yaml; \
+	fi
+	kustomize build config/overlays/deploy | kubectl apply -f -
+	rm -rf config/overlays/deploy
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev

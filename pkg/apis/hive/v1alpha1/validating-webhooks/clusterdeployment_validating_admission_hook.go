@@ -227,8 +227,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		contextLogger.Data["oldObject.Name"] = oldObject.Name
 	}
 
-	if hasChangedImmutableField(&oldObject.Spec, &newObject.Spec) {
-		message := fmt.Sprintf("ClusterDeployment.Spec is immutable except for %v", mutableFields)
+	hasChangedImmutableField, changedFieldName := hasChangedImmutableField(&oldObject.Spec, &newObject.Spec)
+	if hasChangedImmutableField {
+		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec.%v. ClusterDeployment.Spec is immutable except for %v", changedFieldName, mutableFields)
 		contextLogger.Infof("Failed validation: %v", message)
 
 		return &admissionv1beta1.AdmissionResponse{
@@ -259,7 +260,7 @@ func isFieldMutable(value string) bool {
 }
 
 // hasChangedImmutableField determines if a ClusterDeployment.spec immutable field was changed.
-func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {
+func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec) (bool, string) {
 	ooElem := reflect.ValueOf(oldObject).Elem()
 	noElem := reflect.ValueOf(newObject).Elem()
 
@@ -270,9 +271,9 @@ func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec
 
 		if !isFieldMutable(ooFieldName) && !reflect.DeepEqual(ooValue, noValue) {
 			// The field isn't mutable -and- has been changed. DO NOT ALLOW.
-			return true
+			return true, ooFieldName
 		}
 	}
 
-	return false
+	return false, ""
 }

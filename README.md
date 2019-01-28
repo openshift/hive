@@ -42,6 +42,7 @@ This method uses the latest published Hive image on the CI registry: `registry.s
      AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
      | oc apply -f -
   ```
+  * **NOTE:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com".
 * Create a ClusterDeployment using remote container images:
   * Place the OpenShift images pull secret in a known location like `$HOME/config.json`
   * Assuming AWS credentials set in the standard environment variables, and our usual SSH key.
@@ -66,6 +67,7 @@ This method uses the latest published Hive image on the CI registry: `registry.s
      INSTALLER_IMAGE_PULL_POLICY="${INSTALLER_IMAGE_PULL_POLICY}" \
      | oc apply -f -
   ```
+  * **NOTE:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com".
 * Delete your ClusterDeployment:
   ```bash
   $ oc delete clusterdeployment $USER

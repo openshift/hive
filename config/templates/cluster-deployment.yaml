@@ -46,6 +46,10 @@ parameters:
   displayName: OpenShift Release Image
   description: The release image for the version of OpenShift you wish to install.
   value: quay.io/openshift-release-dev/ocp-release:4.0.0-0.1
+- name: TRY_INSTALL_ONCE
+  displayName: Try Install Only Once
+  description: If set, install will only be tried once.
+  value: "false"
 
 objects:
 - apiVersion: v1
@@ -80,6 +84,7 @@ objects:
       controller-tools.k8s.io: "1.0"
     annotations:
       hive.openshift.io/delete-after: "8h"
+      hive.openshift.io/try-install-once: "${TRY_INSTALL_ONCE}"
     name: ${CLUSTER_NAME}
   spec:
     platformSecrets:

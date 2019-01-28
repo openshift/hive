@@ -67,7 +67,7 @@ const (
 	testRemoteClusterCurrentVersion = "4.0.0"
 	remoteClusterVersionObjectName  = "version"
 
-	remoteClusterRouteObjectName = "console"
+	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"
 )
 
@@ -532,7 +532,7 @@ func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error)
 
 	remoteClusterRouteObject := &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: remoteClusterRouteObjectName,
+			Name:      remoteClusterRouteObjectName,
 			Namespace: remoteClusterRouteObjectNamespace,
 		},
 	}

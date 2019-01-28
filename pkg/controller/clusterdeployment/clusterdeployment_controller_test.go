@@ -397,7 +397,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
+	cd := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       testName,
 			Namespace:  testNamespace,
@@ -437,6 +437,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			ClusterID: testClusterID,
 		},
 	}
+	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	return cd
 }
 
 func testClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {

@@ -27,8 +27,8 @@ import (
 	"testing"
 )
 
-var (
-	validClusterDeployment = &hivev1.ClusterDeployment{
+func validClusterDeployment() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: "SameClusterName",
 			Compute: []hivev1.MachinePool{
@@ -38,9 +38,11 @@ var (
 			},
 		},
 	}
+}
 
-	// Meant to be used to compare new and old as the same values.
-	validClusterDeploymentSameValues = &hivev1.ClusterDeployment{
+// Meant to be used to compare new and old as the same values.
+func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: "SameClusterName",
 			Compute: []hivev1.MachinePool{
@@ -50,8 +52,10 @@ var (
 			},
 		},
 	}
+}
 
-	validClusterDeploymentDifferentImmutableValue = &hivev1.ClusterDeployment{
+func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: "DifferentClusterName",
 			Compute: []hivev1.MachinePool{
@@ -61,8 +65,10 @@ var (
 			},
 		},
 	}
+}
 
-	validClusterDeploymentDifferentMutableValue = &hivev1.ClusterDeployment{
+func validClusterDeploymentDifferentMutableValue() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: "SameClusterName",
 			Compute: []hivev1.MachinePool{
@@ -72,7 +78,7 @@ var (
 			},
 		},
 	}
-)
+}
 
 func TestClusterDeploymentValidatingResource(t *testing.T) {
 	// Arrange
@@ -116,36 +122,47 @@ func TestClusterDeploymentValidate(t *testing.T) {
 	}{
 		{
 			name:            "Test Create Operation is allowed even with mismatch objects",
-			oldObject:       validClusterDeployment,
+			oldObject:       validClusterDeployment(),
 			newObject:       nil,
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Delete Operation is allowed even with mismatch objects",
-			oldObject:       validClusterDeployment,
-			newObject:       validClusterDeploymentDifferentImmutableValue,
+			oldObject:       validClusterDeployment(),
+			newObject:       validClusterDeploymentDifferentImmutableValue(),
 			operation:       admissionv1beta1.Delete,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with same data",
-			oldObject:       validClusterDeployment,
-			newObject:       validClusterDeploymentSameValues,
+			oldObject:       validClusterDeployment(),
+			newObject:       validClusterDeploymentSameValues(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with different mutable data",
-			oldObject:       validClusterDeployment,
-			newObject:       validClusterDeploymentDifferentMutableValue,
+			oldObject:       validClusterDeployment(),
+			newObject:       validClusterDeploymentDifferentMutableValue(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test Update PreserveOnDelete",
+			oldObject: validClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.PreserveOnDelete = true
+				return cd
+			}(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is NOT allowed with different immutable data",
-			oldObject:       validClusterDeployment,
-			newObject:       validClusterDeploymentDifferentImmutableValue,
+			oldObject:       validClusterDeployment(),
+			newObject:       validClusterDeploymentDifferentImmutableValue(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},

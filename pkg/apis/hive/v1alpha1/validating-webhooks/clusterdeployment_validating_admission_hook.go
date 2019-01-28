@@ -40,7 +40,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"Compute"}
+	mutableFields = []string{"Compute", "PreserveOnDelete"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.

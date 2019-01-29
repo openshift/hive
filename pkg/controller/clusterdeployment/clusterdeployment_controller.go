@@ -416,7 +416,7 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 			return err
 		}
 		cdLog.Debugf("read remote route object: %s", routeObject)
-		cd.Status.WebConsoleURL = routeObject.Spec.Host
+		cd.Status.WebConsoleURL = "https://" + routeObject.Spec.Host
 	}
 
 	// Update remote cluster's version into our status

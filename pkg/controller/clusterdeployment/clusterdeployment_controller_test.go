@@ -538,7 +538,7 @@ func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error)
 			Namespace: remoteClusterRouteObjectNamespace,
 		},
 	}
-	remoteClusterRouteObject.Spec.Host = "https://bar-api.clusters.example.com:6443/console"
+	remoteClusterRouteObject.Spec.Host = "bar-api.clusters.example.com:6443/console"
 
 	remoteClient := fake.NewFakeClient(remoteClusterVersion, remoteClusterRouteObject)
 	return remoteClient, nil

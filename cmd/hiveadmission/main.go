@@ -21,7 +21,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivevalidatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1alpha1/validating-webhooks"
-	_ "github.com/openshift/origin/pkg/cmd/server/apis/config"
 )
 
 func main() {

@@ -190,7 +190,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 
 	cdLog.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
-	machineSetsToDelete := []*capiv1.MachineSet{}
+	machineSetsToDelete := []capiv1.MachineSet{}
 	machineSetsToCreate := []*capiv1.MachineSet{}
 	machineSetsToUpdate := []*capiv1.MachineSet{}
 
@@ -233,7 +233,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 			}
 		}
 		if !found {
-			machineSetsToDelete = append(machineSetsToDelete, &rMS)
+			machineSetsToDelete = append(machineSetsToDelete, rMS)
 		}
 	}
 
@@ -257,7 +257,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 
 	for _, ms := range machineSetsToDelete {
 		cdLog.WithField("machineset", ms.Name).Info("deleting machineset: ", ms)
-		err = remoteClusterAPIClient.Delete(context.Background(), ms)
+		err = remoteClusterAPIClient.Delete(context.Background(), &ms)
 		if err != nil {
 			cdLog.WithError(err).Error("unable to delete machine set")
 			return err

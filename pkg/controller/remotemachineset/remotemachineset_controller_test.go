@@ -284,6 +284,35 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				}
 			}(),
 		},
+		{
+			name: "Delete additional machinepool machinesets",
+			localExisting: []runtime.Object{
+				testClusterDeployment([]hivev1.MachinePool{
+					testMachinePool("alpha", 3, testName+"-worker", []string{}),
+				}),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{
+				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
+				testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
+				testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
+				testMachineSet("foo-beta-us-east-1a", "alpha", true, 1, 0),
+				testMachineSet("foo-beta-us-east-1b", "alpha", true, 1, 0),
+				testMachineSet("foo-beta-us-east-1c", "alpha", true, 1, 0),
+			},
+			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
+				return &capiv1.MachineSetList{
+					Items: []capiv1.MachineSet{
+						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
+						*testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
+						*testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
+					},
+				}
+			}(),
+		},
 	}
 
 	for _, test := range tests {

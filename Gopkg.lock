@@ -553,12 +553,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:62f6d47ba4b96e4cf750ddeb64a4b7e3843448729ec00fcfd64f0ed690e9b288"
+  digest = "1:4d1d0cb5127e6a21a3ceeb9e923067e33c6b6be6ed73379f73ae23d0de996920"
   name = "github.com/openshift/api"
   packages = [
     "config/v1",
     "operator/v1",
     "operator/v1alpha1",
+    "route/v1",
   ]
   pruneopts = "NUT"
   revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
@@ -1529,6 +1530,7 @@
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",
+    "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/machines/aws",

@@ -13,7 +13,7 @@ IMG ?= hive-controller:latest
 DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
 
 # Look up distro name (e.g. Fedora)
-DISTRO ?= $(shell if which lsb_release; then lsb_release -si; else echo "Unknown"; fi)
+DISTRO ?= $(shell if which lsb_release &> /dev/null; then lsb_release -si; else echo "Unknown"; fi)
 
 # Default fedora to not using sudo since it's not needed
 ifeq ($(DISTRO),Fedora)

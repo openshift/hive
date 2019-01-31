@@ -289,6 +289,10 @@ func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
 func GenerateUninstallerJob(
 	cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
 
+	if cd.Spec.PreserveOnDelete {
+		return nil, fmt.Errorf("no creation of uninstaller job, because of PreserveOnDelete")
+	}
+
 	if cd.Spec.AWS == nil {
 		return nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
 	}

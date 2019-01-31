@@ -1,5 +1,9 @@
 package v1alpha1
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 // MachinePool is a pool of machines to be installed.
 type MachinePool struct {
 	// Name is the name of the machine pool.
@@ -11,6 +15,17 @@ type MachinePool struct {
 
 	// Platform is configuration for machine pool specific to the platfrom.
 	Platform MachinePoolPlatform `json:"platform"`
+
+	// Map of label string keys and values that will be applied to the created MachineSet's
+	// MachineSpec. This list will overwrite any modifications made to Node labels on an
+	// ongoing basis.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// List of taints that will be applied to the created MachineSet's MachineSpec.
+	// This list will overwrite any modifications made to Node taints on an ongoing basis.
+	// +optional
+	Taints []corev1.Taint `json:"taints,omitempty"`
 }
 
 // MachinePoolPlatform is the platform-specific configuration for a machine

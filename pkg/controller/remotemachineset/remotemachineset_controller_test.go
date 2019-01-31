@@ -365,10 +365,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								assert.Equal(t, *eMS.Spec.Replicas, *rMS.Spec.Replicas)
 								assert.Equal(t, eMS.Generation, rMS.Generation)
 								if !reflect.DeepEqual(eMS.ObjectMeta.Labels, rMS.ObjectMeta.Labels) {
-									t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.ObjectMeta.Labels, rMS.ObjectMeta.Labels)
+									t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, rMS.Labels)
 								}
 								if !reflect.DeepEqual(eMS.ObjectMeta.Annotations, rMS.ObjectMeta.Annotations) {
-									t.Errorf("machineset %v has unexpected annotations:\nexpected: %v\nactual: %v", eMS.Name, eMS.ObjectMeta.Labels, rMS.ObjectMeta.Labels)
+									t.Errorf("machineset %v has unexpected annotations:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, rMS.Labels)
+								}
+								if !reflect.DeepEqual(eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels) {
+									t.Errorf("machineset %v machinespec has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels)
+								}
+								if !reflect.DeepEqual(eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints) {
+									t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 								}
 							}
 						}
@@ -404,6 +410,16 @@ func testMachinePool(name string, replicas int, zones []string) hivev1.MachinePo
 				InstanceType: "m4.large",
 			},
 		},
+		Labels: map[string]string{
+			"infra": "true",
+		},
+		Taints: []corev1.Taint{
+			{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: corev1.TaintEffectNoSchedule,
+			},
+		},
 	}
 
 	if len(zones) != 0 {
@@ -428,6 +444,22 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 		},
 		Spec: machineapi.MachineSetSpec{
 			Replicas: &msReplicas,
+			Template: machineapi.MachineTemplateSpec{
+				Spec: machineapi.MachineSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"infra": "true",
+						},
+					},
+					Taints: []corev1.Taint{
+						{
+							Key:    "foo",
+							Value:  "bar",
+							Effect: corev1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
 		},
 	}
 	// Add a pre-existing annotation which we will ensure remains in updated machinesets.

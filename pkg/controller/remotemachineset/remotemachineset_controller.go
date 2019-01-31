@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -35,12 +36,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1alpha1"
+	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
 	installtypes "github.com/openshift/installer/pkg/types"
@@ -185,9 +187,10 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 		cdLog.WithError(err).Error("unable to generate machine sets from cluster deployment")
 		return err
 	}
+
 	cdLog.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
-	machineSetsToDelete := []*capiv1.MachineSet{}
+	machineSetsToDelete := []capiv1.MachineSet{}
 	machineSetsToCreate := []*capiv1.MachineSet{}
 	machineSetsToUpdate := []*capiv1.MachineSet{}
 
@@ -230,7 +233,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 			}
 		}
 		if !found {
-			machineSetsToDelete = append(machineSetsToDelete, &rMS)
+			machineSetsToDelete = append(machineSetsToDelete, rMS)
 		}
 	}
 
@@ -254,7 +257,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 
 	for _, ms := range machineSetsToDelete {
 		cdLog.WithField("machineset", ms.Name).Info("deleting machineset: ", ms)
-		err = remoteClusterAPIClient.Delete(context.Background(), ms)
+		err = remoteClusterAPIClient.Delete(context.Background(), &ms)
 		if err != nil {
 			cdLog.WithError(err).Error("unable to delete machine set")
 			return err
@@ -285,29 +288,41 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
-	workerPool := workerPool(ic.Machines)
+	workerPools := workerPools(ic.Machines)
 	switch ic.Platform.Name() {
 	case "aws":
+		for _, workerPool := range workerPools {
+			if len(workerPool.Platform.AWS.Zones) == 0 {
+				awsClient, err := r.getAWSClient(cd)
+				if err != nil {
+					return nil, err
+				}
+				azs, err := fetchAvailabilityZones(awsClient, ic.Platform.AWS.Region)
+				if err != nil {
+					return nil, err
+				}
+				// Safety net from deleting machine sets. Do we expect to return 0 availability zones successfully?
+				if len(azs) == 0 {
+					return nil, fmt.Errorf("fetched 0 availability zones")
+				}
+				workerPool.Platform.AWS.Zones = azs
+			}
 
-		if len(workerPool.Platform.AWS.Zones) == 0 {
-			awsClient, err := r.getAWSClient(cd)
+			hivePool := findHiveMachinePool(cd, workerPool.Name)
+
+			defaultIAMRole := fmt.Sprintf("%s-worker-role", ic.ObjectMeta.Name)
+			if hivePool.Platform.AWS.IAMRoleName == "" {
+				workerPool.Platform.AWS.IAMRoleName = defaultIAMRole
+			}
+
+			icMachineSets, err := installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
 			if err != nil {
 				return nil, err
 			}
-			azs, err := fetchAvailabilityZones(awsClient, ic.Platform.AWS.Region)
-			if err != nil {
-				return nil, err
+			for _, ms := range icMachineSets {
+				updateMachineSetAWSMachineProviderConfig(&ms, ic.ObjectMeta.Name)
+				installerMachineSets = append(installerMachineSets, ms)
 			}
-			// Safety net from deleting machine sets. Do we expect to return 0 availability zones successfully?
-			if len(azs) == 0 {
-				return nil, fmt.Errorf("fetched 0 availability zones")
-			}
-			workerPool.Platform.AWS.Zones = azs
-		}
-
-		installerMachineSets, err = installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, "worker", "worker-user-data")
-		if err != nil {
-			return nil, err
 		}
 	// TODO: Add other platforms. openstack does not currently support openstack.MachineSets()
 	default:
@@ -321,6 +336,29 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	return generatedMachineSets, nil
 }
 
+// updateMachineSetAWSMachineProviderConfig modifies values in a MachineSet's AWSMachineProviderConfig.
+// Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
+// the values match the worker pool originally created by the installer.
+func updateMachineSetAWSMachineProviderConfig(machineSet *capiv1.MachineSet, clusterName string) {
+	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
+	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: pointer.StringPtr(fmt.Sprintf("%s-worker-profile", clusterName))}
+	providerConfig.Subnet = awsprovider.AWSResourceReference{
+		Filters: []awsprovider.Filter{{
+			Name:   "tag:Name",
+			Values: []string{fmt.Sprintf("%s-worker-%s", clusterName, providerConfig.Placement.AvailabilityZone)},
+		}},
+	}
+	providerConfig.SecurityGroups = []awsprovider.AWSResourceReference{{
+		Filters: []awsprovider.Filter{{
+			Name:   "tag:Name",
+			Values: []string{fmt.Sprintf("%s_worker_sg", clusterName)},
+		}},
+	}}
+	machineSet.Spec.Template.Spec.ProviderSpec = capiv1.ProviderSpec{
+		Value: &runtime.RawExtension{Object: providerConfig},
+	}
+}
+
 func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.MachinePool {
 	for _, mp := range cd.Spec.Compute {
 		if mp.Name == poolName {
@@ -330,13 +368,14 @@ func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.
 	return nil
 }
 
-func workerPool(pools []installtypes.MachinePool) installtypes.MachinePool {
+func workerPools(pools []installtypes.MachinePool) []installtypes.MachinePool {
+	workerPools := []installtypes.MachinePool{}
 	for idx, pool := range pools {
-		if pool.Name == "worker" {
-			return pools[idx]
+		if pool.Name != "master" {
+			workerPools = append(workerPools, pools[idx])
 		}
 	}
-	return installtypes.MachinePool{}
+	return workerPools
 }
 
 func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installtypes.InstallConfig, error) {

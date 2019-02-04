@@ -32,7 +32,7 @@ import (
 // as ClusterDeployment is used as a CRD API.
 //
 // It is assumed the caller will lookup the admin password and ssh key from their respective secrets.
-func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret string) (*types.InstallConfig, error) {
+func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret string, generateForInstall bool) (*types.InstallConfig, error) {
 	spec := cd.Spec
 
 	platform := types.Platform{}
@@ -60,6 +60,17 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 	}
 	controlPlaneMachinePool := convertMachinePools(spec.ControlPlane)[0]
 	computeMachinePools := convertMachinePools(spec.Compute...)
+
+	if generateForInstall {
+		computeWorkerPool := []hivev1.MachinePool{}
+		for _, mp := range spec.Compute {
+			// Only add "worker" pool when generating config for installer.
+			if mp.Name == "worker" {
+				computeWorkerPool = append(computeWorkerPool, mp)
+			}
+		}
+		computeMachinePools = convertMachinePools(computeWorkerPool...)
+	}
 
 	ic := &types.InstallConfig{
 		ObjectMeta: metav1.ObjectMeta{

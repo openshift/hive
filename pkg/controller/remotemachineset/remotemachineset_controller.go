@@ -383,7 +383,7 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 		return nil, err
 	}
 
-	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret)
+	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret, false)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to generate install config")
 		return nil, err

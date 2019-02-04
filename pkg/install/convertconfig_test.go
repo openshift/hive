@@ -117,7 +117,7 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			Compute: []hivev1.MachinePool{
 				{
-					Name:     "workers",
+					Name:     "worker",
 					Replicas: &replicas,
 					Platform: hivev1.MachinePoolPlatform{
 						AWS: &hivev1.AWSMachinePoolPlatform{
@@ -191,7 +191,7 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 
 		Compute: []installtypes.MachinePool{
 			{
-				Name:     "workers",
+				Name:     "worker",
 				Replicas: &replicas,
 				Platform: installtypes.MachinePoolPlatform{
 					AWS: &installawstypes.MachinePool{
@@ -210,14 +210,16 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 
 func TestConvert(t *testing.T) {
 	tests := []struct {
-		name                  string
-		cd                    *hivev1.ClusterDeployment
-		expectedInstallConfig *installtypes.InstallConfig
+		name                     string
+		cd                       *hivev1.ClusterDeployment
+		expectedInstallConfig    *installtypes.InstallConfig
+		generateConfigForInstall bool
 	}{
 		{
 			name: "full copy",
 			cd:   buildValidClusterDeployment(),
-			expectedInstallConfig: buildBaseExpectedInstallConfig(),
+			expectedInstallConfig:    buildBaseExpectedInstallConfig(),
+			generateConfigForInstall: true,
 		},
 		{
 			name: "no default machine pool",
@@ -231,6 +233,7 @@ func TestConvert(t *testing.T) {
 				ic.Platform.AWS.DefaultMachinePlatform = nil
 				return ic
 			}(),
+			generateConfigForInstall: true,
 		},
 		{
 			name: "no platform",
@@ -244,6 +247,7 @@ func TestConvert(t *testing.T) {
 				ic.Platform.AWS = nil
 				return ic
 			}(),
+			generateConfigForInstall: true,
 		},
 		{
 			name: "no networking CIDRs",
@@ -261,6 +265,7 @@ func TestConvert(t *testing.T) {
 				ic.Networking.ClusterNetworks = []installtypes.ClusterNetworkEntry{}
 				return ic
 			}(),
+			generateConfigForInstall: true,
 		},
 		{
 			name: "control plane pool name not master",
@@ -269,12 +274,82 @@ func TestConvert(t *testing.T) {
 				cd.Spec.ControlPlane.Name = "notmaster"
 				return cd
 			}(),
-			expectedInstallConfig: buildBaseExpectedInstallConfig(),
+			expectedInstallConfig:    buildBaseExpectedInstallConfig(),
+			generateConfigForInstall: true,
+		},
+		{
+			name: "remove non-worker compute pool for install job",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := buildValidClusterDeployment()
+				replicas := int64(3)
+				extraPool := hivev1.MachinePool{
+					Name:     "extra",
+					Replicas: &replicas,
+					Platform: hivev1.MachinePoolPlatform{
+						AWS: &hivev1.AWSMachinePoolPlatform{
+							InstanceType: awsInstanceType,
+							EC2RootVolume: hivev1.EC2RootVolume{
+								IOPS: ec2VolIOPS,
+								Size: ec2VolSize,
+								Type: ec2VolType,
+							},
+						},
+					},
+				}
+				cd.Spec.Compute = append(cd.Spec.Compute, extraPool)
+				return cd
+			}(),
+			expectedInstallConfig:    buildBaseExpectedInstallConfig(),
+			generateConfigForInstall: true,
+		},
+		{
+			name: "leave non-worker pool when not generating for install job",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := buildValidClusterDeployment()
+				replicas := int64(3)
+				extraPool := hivev1.MachinePool{
+					Name:     "extra",
+					Replicas: &replicas,
+					Platform: hivev1.MachinePoolPlatform{
+						AWS: &hivev1.AWSMachinePoolPlatform{
+							InstanceType: awsInstanceType,
+							EC2RootVolume: hivev1.EC2RootVolume{
+								IOPS: ec2VolIOPS,
+								Size: ec2VolSize,
+								Type: ec2VolType,
+							},
+						},
+					},
+				}
+				cd.Spec.Compute = append(cd.Spec.Compute, extraPool)
+				return cd
+			}(),
+			expectedInstallConfig: func() *installtypes.InstallConfig {
+				ic := buildBaseExpectedInstallConfig()
+				replicas := int64(3)
+				extraPool := installtypes.MachinePool{
+					Name:     "extra",
+					Replicas: &replicas,
+					Platform: installtypes.MachinePoolPlatform{
+						AWS: &installawstypes.MachinePool{
+							InstanceType: awsInstanceType,
+							EC2RootVolume: installawstypes.EC2RootVolume{
+								IOPS: ec2VolIOPS,
+								Size: ec2VolSize,
+								Type: ec2VolType,
+							},
+						},
+					},
+				}
+				ic.Compute = append(ic.Compute, extraPool)
+				return ic
+			}(),
+			generateConfigForInstall: false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ic, err := GenerateInstallConfig(test.cd, adminSSHKey, pullSecret)
+			ic, err := GenerateInstallConfig(test.cd, adminSSHKey, pullSecret, test.generateConfigForInstall)
 			if assert.NoError(t, err) {
 				assert.Equal(t, test.expectedInstallConfig, ic)
 			}

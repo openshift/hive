@@ -30,19 +30,19 @@ required = [
 
 [[constraint]]
   name="sigs.k8s.io/controller-runtime"
-  version="v0.1.1"
+  version="v0.1.8"
 
 [[constraint]]
   name="sigs.k8s.io/controller-tools"
-  version="v0.1.1"
+  version="v0.1.8"
 
 [[override]]
   name="k8s.io/api"
-  version="kubernetes-1.11.2"
+  version="kubernetes-1.12.3"
 
 [[override]]
   name="k8s.io/apimachinery"
-  version="kubernetes-1.11.2"
+  version="kubernetes-1.12.3"
 
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
@@ -56,7 +56,7 @@ version="v1.4.7"
 
 [[override]]
   name = "k8s.io/client-go"
-  version="kubernetes-1.11.2"
+  version="kubernetes-1.12.3"
 
 [[constraint]]
   name = "github.com/openshift/installer"
@@ -64,11 +64,13 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"
-  version = "v.1.11.0"
+  # version = "v.1.11.0"
+  branch = "update_to_112"
+  source = "github.com/csrwng/generic-admission-server"
 
 [[override]]
   name = "k8s.io/apiserver"
-  version="kubernetes-1.11.2"
+  version="kubernetes-1.12.3"
 
 [[constraint]]
   branch = "master"
@@ -80,7 +82,7 @@ version="v1.4.7"
 
 [[override]]
   name = "sigs.k8s.io/cluster-api-provider-aws"
-  source = "https://github.com/openshift/cluster-api-provider-aws.git"
+  source = "github.com/openshift/cluster-api-provider-aws"
   branch = "master"
 
 [[override]]
@@ -88,3 +90,8 @@ version="v1.4.7"
   ## TODO: Revert to upstream when idempotent join is available
   source = "github.com/csrwng/federation-v2"
   branch = "idempotent_join"
+
+[[override]]
+  name = "github.com/docker/docker"
+  revision = "a9fbbdc8dd8794b20af358382ab780559bca589d"
+

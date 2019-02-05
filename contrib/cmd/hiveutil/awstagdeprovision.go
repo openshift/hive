@@ -48,7 +48,6 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
-	flags.StringVar(&opt.ClusterName, "cluster-name", "", "Name that cluster was installed with")
 	return cmd
 }
 

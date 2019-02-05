@@ -82,8 +82,8 @@ func TestReconcileOldStyle(t *testing.T) {
 			key:  "namespace/somezone",
 		},
 		{
-			name: "DNSZone found, Create hostedzone as no corresponding route53 hostedzone exists",
-			key:  validDNSZone.Namespace + "/" + validDNSZone.Name,
+			name:                     "DNSZone found, Create hostedzone as no corresponding route53 hostedzone exists",
+			key:                      validDNSZone.Namespace + "/" + validDNSZone.Name,
 			expectHostedZoneCreation: true,
 			dnsZone:                  validDNSZone.DeepCopy(),
 			listHostedZonesOutput: &route53.ListHostedZonesOutput{
@@ -95,8 +95,8 @@ func TestReconcileOldStyle(t *testing.T) {
 			},
 		},
 		{
-			name: "DNSZone found, Status Generation doesn't match object generation (sync needed)",
-			key:  validDNSZone.Namespace + "/" + validDNSZone.Name,
+			name:                     "DNSZone found, Status Generation doesn't match object generation (sync needed)",
+			key:                      validDNSZone.Namespace + "/" + validDNSZone.Name,
 			expectHostedZoneCreation: true,
 			dnsZone:                  validDNSZoneGensDontMatch.DeepCopy(),
 			listHostedZonesOutput:    &route53.ListHostedZonesOutput{},
@@ -113,9 +113,9 @@ func TestReconcileOldStyle(t *testing.T) {
 			key:     validDNSZone.Namespace + "/" + validDNSZone.Name,
 		},
 		{
-			name:    "DNSZone found, Status Generation Timestamp outside sync period (sync needed)",
-			dnsZone: validDNSZoneGenTimestampSyncNeeded.DeepCopy(),
-			key:     validDNSZone.Namespace + "/" + validDNSZone.Name,
+			name:                     "DNSZone found, Status Generation Timestamp outside sync period (sync needed)",
+			dnsZone:                  validDNSZoneGenTimestampSyncNeeded.DeepCopy(),
+			key:                      validDNSZone.Namespace + "/" + validDNSZone.Name,
 			expectHostedZoneCreation: true,
 			listHostedZonesOutput:    &route53.ListHostedZonesOutput{},
 		},

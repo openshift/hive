@@ -17,8 +17,6 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
-
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,11 +36,6 @@ import (
 func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret string) (*types.InstallConfig, error) {
 	spec := cd.Spec
 
-	networkType, err := convertNetworkingType(spec.Networking.Type)
-	if err != nil {
-		return nil, err
-	}
-
 	platform := types.Platform{}
 	if spec.Platform.AWS != nil {
 		aws := spec.Platform.AWS
@@ -53,7 +46,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		if aws.DefaultMachinePlatform != nil {
 			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
 				InstanceType: aws.DefaultMachinePlatform.InstanceType,
-				IAMRoleName:  aws.DefaultMachinePlatform.IAMRoleName,
 				EC2RootVolume: installeraws.EC2RootVolume{
 					IOPS: aws.DefaultMachinePlatform.EC2RootVolume.IOPS,
 					Size: aws.DefaultMachinePlatform.EC2RootVolume.Size,
@@ -64,36 +56,12 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		}
 	}
 
-	machinePools := []types.MachinePool{}
+	controlPlane := convertMachinePool(&spec.ControlPlane)
+	controlPlane.Name = "master"
 
-	// combinedMachinePools contains spec.ControlPlane and spec.Compute MachinePools
-	combinedMachinePools := []hivev1.MachinePool{}
-	if spec.ControlPlane.Name != "master" {
-		spec.ControlPlane.Name = "master"
-	}
-	combinedMachinePools = append(combinedMachinePools, spec.ControlPlane)
-	for _, mp := range spec.Compute {
-		combinedMachinePools = append(combinedMachinePools, mp)
-	}
-
-	for _, mp := range combinedMachinePools {
-		newMP := types.MachinePool{
-			Name:     mp.Name,
-			Replicas: mp.Replicas,
-		}
-		if mp.Platform.AWS != nil {
-			newMP.Platform.AWS = &installeraws.MachinePool{
-				InstanceType: mp.Platform.AWS.InstanceType,
-				IAMRoleName:  mp.Platform.AWS.IAMRoleName,
-				EC2RootVolume: installeraws.EC2RootVolume{
-					IOPS: mp.Platform.AWS.EC2RootVolume.IOPS,
-					Size: mp.Platform.AWS.EC2RootVolume.Size,
-					Type: mp.Platform.AWS.EC2RootVolume.Type,
-				},
-				Zones: mp.Platform.AWS.Zones,
-			}
-		}
-		machinePools = append(machinePools, newMP)
+	compute := make([]types.MachinePool, len(spec.Compute))
+	for i, mp := range spec.Compute {
+		compute[i] = *convertMachinePool(&mp)
 	}
 
 	ic := &types.InstallConfig{
@@ -106,15 +74,17 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		SSHKey:     sshKey,
 		BaseDomain: spec.BaseDomain,
 		Networking: &types.Networking{
-			Type:            networkType,
+			Type:            convertNetworkingType(spec.Networking.Type),
 			ServiceCIDR:     parseCIDR(spec.Networking.ServiceCIDR),
-			ClusterNetworks: spec.Networking.ClusterNetworks,
+			ClusterNetworks: convertClusterNetworks(spec.Networking.ClusterNetworks),
 			MachineCIDR:     parseCIDR(spec.Networking.MachineCIDR),
 		},
-		PullSecret: pullSecret,
-		Platform:   platform,
-		Machines:   machinePools,
+		PullSecret:   pullSecret,
+		Platform:     platform,
+		ControlPlane: controlPlane,
+		Compute:      compute,
 	}
+
 	return ic, nil
 }
 
@@ -125,13 +95,39 @@ func parseCIDR(s string) *ipnet.IPNet {
 	return ipnet.MustParseCIDR(s)
 }
 
-func convertNetworkingType(hnt hivev1.NetworkType) (netopv1.NetworkType, error) {
-	switch hnt {
-	case hivev1.NetworkTypeOpenshiftOVN:
-		return netopv1.NetworkTypeOVNKubernetes, nil
-	case hivev1.NetworkTypeOpenshiftSDN:
-		return netopv1.NetworkTypeOpenshiftSDN, nil
-	default:
-		return "", fmt.Errorf("unknown NetworkType: %s", hnt)
+func convertNetworkingType(hnt hivev1.NetworkType) string {
+	if hnt == hivev1.NetworkTypeOpenshiftSDN {
+		return "OpenShiftSDN"
 	}
+	return string(hnt)
+}
+
+func convertClusterNetworks(cns []netopv1.ClusterNetwork) []types.ClusterNetworkEntry {
+	convertedCNs := make([]types.ClusterNetworkEntry, len(cns))
+	for i, cn := range cns {
+		convertedCNs[i] = types.ClusterNetworkEntry{
+			CIDR:             *parseCIDR(cn.CIDR),
+			HostSubnetLength: int32(cn.HostSubnetLength),
+		}
+	}
+	return convertedCNs
+}
+
+func convertMachinePool(mp *hivev1.MachinePool) *types.MachinePool {
+	newMP := &types.MachinePool{
+		Name:     mp.Name,
+		Replicas: mp.Replicas,
+	}
+	if mp.Platform.AWS != nil {
+		newMP.Platform.AWS = &installeraws.MachinePool{
+			InstanceType: mp.Platform.AWS.InstanceType,
+			EC2RootVolume: installeraws.EC2RootVolume{
+				IOPS: mp.Platform.AWS.EC2RootVolume.IOPS,
+				Size: mp.Platform.AWS.EC2RootVolume.Size,
+				Type: mp.Platform.AWS.EC2RootVolume.Type,
+			},
+			Zones: mp.Platform.AWS.Zones,
+		}
+	}
+	return newMP
 }

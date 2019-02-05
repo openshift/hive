@@ -328,7 +328,6 @@ func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogge
 	uninstaller := &aws.ClusterUninstaller{
 		Filters:     filters,
 		Region:      region,
-		ClusterName: clusterName,
 		Logger:      logger,
 	}
 

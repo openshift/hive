@@ -288,10 +288,9 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
-	workerPools := workerPools(ic.Machines)
 	switch ic.Platform.Name() {
 	case "aws":
-		for _, workerPool := range workerPools {
+		for _, workerPool := range ic.Compute {
 			if len(workerPool.Platform.AWS.Zones) == 0 {
 				awsClient, err := r.getAWSClient(cd)
 				if err != nil {
@@ -306,13 +305,6 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 					return nil, fmt.Errorf("fetched 0 availability zones")
 				}
 				workerPool.Platform.AWS.Zones = azs
-			}
-
-			hivePool := findHiveMachinePool(cd, workerPool.Name)
-
-			defaultIAMRole := fmt.Sprintf("%s-worker-role", ic.ObjectMeta.Name)
-			if hivePool.Platform.AWS.IAMRoleName == "" {
-				workerPool.Platform.AWS.IAMRoleName = defaultIAMRole
 			}
 
 			icMachineSets, err := installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
@@ -366,16 +358,6 @@ func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.
 		}
 	}
 	return nil
-}
-
-func workerPools(pools []installtypes.MachinePool) []installtypes.MachinePool {
-	workerPools := []installtypes.MachinePool{}
-	for idx, pool := range pools {
-		if pool.Name != "master" {
-			workerPools = append(workerPools, pools[idx])
-		}
-	}
-	return workerPools
 }
 
 func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installtypes.InstallConfig, error) {

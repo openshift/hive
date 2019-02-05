@@ -92,7 +92,7 @@ func TestReconcile(t *testing.T) {
 		LastSyncTimestampCheck     func(timeToCheck *metav1.Time, start, end time.Time) bool
 	}{
 		{
-			name: "DNSZone found, No corresponding route53 hostedzone",
+			name:                     "DNSZone found, No corresponding route53 hostedzone",
 			expectHostedZoneCreation: true,
 			dnsZone:                  validDNSZone.DeepCopy(),
 			listHostedZonesOutput: &route53.ListHostedZonesOutput{

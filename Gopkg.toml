@@ -60,7 +60,8 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "7af6b141c34dd133f104b61b64c78d82e57f3d52"
+  branch = "separate_control_plane_machine_pool"
+  source = "github.com/staebler/installer"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"

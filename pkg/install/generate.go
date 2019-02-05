@@ -31,10 +31,10 @@ import (
 )
 
 const (
-	defaultInstallerImage           = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-	defaultInstallerImagePullPolicy = corev1.PullAlways
-	defaultHiveImage                = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
-	defaultHiveImagePullPolicy      = corev1.PullAlways
+	defaultHiveImage              = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+	defaultHiveImagePullPolicy    = corev1.PullAlways
+	defaultReleaseImage           = "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
+	defaultReleaseImagePullPolicy = corev1.PullAlways
 
 	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
 )
@@ -82,36 +82,25 @@ func GenerateInstallerJob(
 		},
 	}
 
+	releaseImage := defaultReleaseImage
+	if cd.Spec.Images.ReleaseImage != "" {
+		releaseImage = cd.Spec.Images.ReleaseImage
+	}
+
+	releaseImagePullPolicy := defaultReleaseImagePullPolicy
+	if cd.Spec.Images.ReleaseImagePullPolicy != "" {
+		releaseImagePullPolicy = cd.Spec.Images.ReleaseImagePullPolicy
+	}
+
 	env := []corev1.EnvVar{
 		{
-			Name:  "OPENSHIFT_INSTALL_BASE_DOMAIN",
-			Value: cd.Spec.BaseDomain,
+			Name:  "OPENSHIFT_RELEASE_IMAGE",
+			Value: releaseImage,
 		},
 		{
-			Name:  "OPENSHIFT_INSTALL_CLUSTER_NAME",
-			Value: cd.Name,
+			Name:  "OPENSHIFT_RELEASE_IMAGE_PULL_POLICY",
+			Value: releaseImagePullPolicy,
 		},
-		{
-			Name: "OPENSHIFT_INSTALL_PULL_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: cd.Spec.PullSecret,
-					Key:                  ".dockercfg",
-				},
-			},
-		},
-	}
-	if cd.Spec.AWS != nil {
-		env = append(env, []corev1.EnvVar{
-			{
-				Name:  "OPENSHIFT_INSTALL_AWS_REGION",
-				Value: cd.Spec.AWS.Region,
-			},
-			{
-				Name:  "OPENSHIFT_INSTALL_PLATFORM",
-				Value: "aws",
-			},
-		}...)
 	}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
 		env = append(env, []corev1.EnvVar{
@@ -134,26 +123,6 @@ func GenerateInstallerJob(
 				},
 			},
 		}...)
-	}
-	if cd.Spec.Images.ReleaseImage != "" {
-		env = append(env, []corev1.EnvVar{
-			{
-				Name:  "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
-				Value: cd.Spec.Images.ReleaseImage,
-			},
-		}...)
-	}
-
-	if cd.Spec.SSHKey != nil {
-		env = append(env, corev1.EnvVar{
-			Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: *cd.Spec.SSHKey,
-					Key:                  "ssh-publickey",
-				},
-			},
-		})
 	}
 
 	volumes := []corev1.Volume{
@@ -186,16 +155,6 @@ func GenerateInstallerJob(
 		},
 	}
 
-	installerImage := defaultInstallerImage
-	if cd.Spec.Images.InstallerImage != "" {
-		installerImage = cd.Spec.Images.InstallerImage
-	}
-
-	installerImagePullPolicy := defaultInstallerImagePullPolicy
-	if cd.Spec.Images.InstallerImagePullPolicy != "" {
-		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
-	}
-
 	hiveImage := defaultHiveImage
 	if cd.Spec.Images.HiveImage != "" {
 		hiveImage = cd.Spec.Images.HiveImage
@@ -211,11 +170,14 @@ func GenerateInstallerJob(
 	containers := []corev1.Container{
 		{
 			Name:            "installer",
-			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			Image:           releaseImage,
+			ImagePullPolicy: releaseImagePullPolicy,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			Args:            []string{"cp -v /bin/openshift-install /output && ls -la /output"},
+// FIXME: should this code or the remote container find and execute the installer container?
+// $ oc adm release info --image-for installer registry.svc.ci.openshift.org/openshift/origin-release:v4.0
+// registry.svc.ci.openshift.org/openshift/origin-v4.0-2019-02-05-150550@sha256:33a38e5e93d29e283ca93da8dde370b792b128181deac4b7e0d3c78e473deccd
 			VolumeMounts:    volumeMounts,
 		},
 		{

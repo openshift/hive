@@ -101,7 +101,7 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 			Name: spec.ClusterName,
 		},
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1beta1",
+			APIVersion: "v1beta1", // FIXME: from installer package
 		},
 		SSHKey:     sshKey,
 		BaseDomain: spec.BaseDomain,

@@ -34,18 +34,14 @@ parameters:
   displayName: Hive image pull policy
   description: Hive image pull policy
   value: Always
-- name: INSTALLER_IMAGE
-  displayName: OpenShift Installer image URL
-  description: OpenShift Installer image URL
-  value: "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-- name: INSTALLER_IMAGE_PULL_POLICY
-  displayName: OpenShift Installer image pull policy
-  description: OpenShift Installer image pull policy
-  value: Always
 - name: OPENSHIFT_RELEASE_IMAGE
   displayName: OpenShift Release Image
   description: The release image for the version of OpenShift you wish to install.
   value: quay.io/openshift-release-dev/ocp-release:4.0.0-0.1
+- name: OPENSHIFT_RELEASE_IMAGE_PULL_POLICY
+  displayName: OpenShift release image pull policy
+  description: OpenShift release image pull policy
+  value: Always
 - name: TRY_INSTALL_ONCE
   displayName: Try Install Only Once
   description: If set, install will only be tried once.
@@ -94,9 +90,8 @@ objects:
     images:
       hiveImage: "${HIVE_IMAGE}"
       hiveImagePullPolicy: "${HIVE_IMAGE_PULL_POLICY}"
-      installerImage: "${INSTALLER_IMAGE}"
-      installerImagePullPolicy: "${INSTALLER_IMAGE_PULL_POLICY}"
       releaseImage: "${OPENSHIFT_RELEASE_IMAGE}"
+      releaseImagePullPolicy: "${OPENSHIFT_RELEASE_IMAGE_PULL_POLICY}"
     sshKey:
       name: "${CLUSTER_NAME}-ssh-key"
     clusterName: ${CLUSTER_NAME}

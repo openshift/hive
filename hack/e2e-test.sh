@@ -5,7 +5,6 @@ set -e
 component=hive
 TEST_IMAGE=$(eval "echo $IMAGE_FORMAT")
 component=installer
-INSTALLER_IMAGE=$(eval "echo $IMAGE_FORMAT")
 
 ln -s $(which oc) $(pwd)/kubectl
 export PATH=$PATH:$(pwd)
@@ -56,7 +55,6 @@ oc process -f config/templates/cluster-deployment.yaml \
    AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
    AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
    BASE_DOMAIN="${BASE_DOMAIN}" \
-   INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
    OPENSHIFT_RELEASE_IMAGE="" \
    TRY_INSTALL_ONCE="true" \
    | oc apply -f -

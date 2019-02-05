@@ -52,8 +52,8 @@ This method uses the latest published Hive image on the CI registry: `registry.s
   export PULL_SECRET="$(cat ${HOME}/config.json)"
   export HIVE_IMAGE="quay.io/twiest/hive-controller:20190128"
   export HIVE_IMAGE_PULL_POLICY="Always"
-  export INSTALLER_IMAGE="quay.io/twiest/installer:20190128"
-  export INSTALLER_IMAGE_PULL_POLICY="Always"
+  export OPENSHIFT_RELEASE_IMAGE="quay.io/twiest/openshift:20190128"
+  export OPENSHIFT_RELEASE_IMAGE_PULL_POLICY="Always"
 
   oc process -f config/templates/cluster-deployment.yaml \
      CLUSTER_NAME="${CLUSTER_NAME}" \
@@ -63,8 +63,8 @@ This method uses the latest published Hive image on the CI registry: `registry.s
      AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
      HIVE_IMAGE="${HIVE_IMAGE}" \
      HIVE_IMAGE_PULL_POLICY="${HIVE_IMAGE_PULL_POLICY}" \
-     INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-     INSTALLER_IMAGE_PULL_POLICY="${INSTALLER_IMAGE_PULL_POLICY}" \
+     OPENSHIFT_RELEASE_IMAGE="${OPENSHIFT_RELEASE_IMAGE}" \
+     OPENSHIFT_RELEASE_IMAGE_PULL_POLICY="${OPENSHIFT_RELEASE_IMAGE_PULL_POLICY}" \
      | oc apply -f -
   ```
   * **NOTE:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com".

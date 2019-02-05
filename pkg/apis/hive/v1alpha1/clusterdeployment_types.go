@@ -80,10 +80,6 @@ type ClusterDeploymentSpec struct {
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
 type ProvisionImages struct {
-	// InstallerImage is the image containing the openshift-install binary that will be used to install.
-	InstallerImage string `json:"installerImage,omitempty"`
-	// InstallerImagePullPolicy is the pull policy for the installer image.
-	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy,omitempty"`
 	// HiveImage is the image used in the sidecar container to manage execution of openshift-install.
 	HiveImage string `json:"hiveImage,omitempty"`
 	// HiveImagePullPolicy is the pull policy for the installer image.
@@ -92,6 +88,8 @@ type ProvisionImages struct {
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
 	ReleaseImage string `json:"releaseImage,omitempty"`
+	// ReleaseImagePullPolicy is the pull policy for the release image.
+	ReleaseImagePullPolicy corev1.PullPolicy `json:"releaseImagePullPolicy,omitempty"`
 }
 
 // PlatformSecrets defines the secrets to be used by various clouds.

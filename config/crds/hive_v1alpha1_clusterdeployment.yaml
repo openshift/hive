@@ -194,11 +194,9 @@ spec:
                   type: string
                 hiveImagePullPolicy:
                   type: string
-                installerImage:
-                  type: string
-                installerImagePullPolicy:
-                  type: string
                 releaseImage:
+                  type: string
+                releaseImagePullPolicy:
                   type: string
               type: object
             networking:

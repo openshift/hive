@@ -38,6 +38,7 @@ export AWS_SECRET_ACCESS_KEY="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_secr
 
 function teardown() {
 	oc logs -c hive job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_install_job.log" || true
+	cat "${ARTIFACT_DIR}/hive_install_job.log"
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
 	oc delete clusterdeployment ${CLUSTER_NAME}
 }
@@ -65,6 +66,6 @@ SRC_ROOT=$(git rev-parse --show-toplevel)
 
 echo "Waiting for job ${CLUSTER_NAME}-install to start and complete"
 
-go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" --log-level=debug "${CLUSTER_NAME}-install"
+go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}-install"
 
 echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"

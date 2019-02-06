@@ -12,6 +12,34 @@ spec:
   ports:
   - port: 443
     targetPort: 9443
+
+
+---
+# register as aggregated apiserver; this has a number of benefits:
+#
+# - allows other kubernetes components to talk to the the admission webhook using the `kubernetes.default.svc` service
+# - allows other kubernetes components to use their in-cluster credentials to communicate with the webhook
+# - allows you to test the webhook using kubectl
+# - allows you to govern access to the webhook using RBAC
+# - prevents other extension API servers from leaking their service account tokens to the webhook
+#
+# for more information, see: https://kubernetes.io/blog/2018/01/extensible-admission-is-beta
+apiVersion: apiregistration.k8s.io/v1beta1
+kind: APIService
+metadata:
+  name: v1alpha1.admission.hive.openshift.io
+  annotations:
+    service.alpha.openshift.io/inject-cabundle: "true"
+spec:
+  group: admission.hive.openshift.io
+  groupPriorityMinimum: 1000
+  versionPriority: 15
+  service:
+    name: hiveadmission
+    namespace: openshift-hive
+  version: v1alpha1
+
+
 ---
 # to be able to assign powers to the process
 apiVersion: v1
@@ -19,6 +47,8 @@ kind: ServiceAccount
 metadata:
   namespace: openshift-hive
   name: hiveadmission
+
+
 ---
 # to create the namespace-reservation-server
 apiVersion: apps/v1
@@ -78,3 +108,59 @@ spec:
         secret:
           defaultMode: 420
           secretName: hiveadmission-serving-cert
+
+
+---
+# register to intercept DNSZone object creates and updates
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: dnszones.admission.hive.openshift.io
+webhooks:
+- name: dnszones.admission.hive.openshift.io
+  clientConfig:
+    caBundle: "" # Empty string on purpose
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/dnszones
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - dnszones
+  failurePolicy: Fail
+
+
+---
+# register to intercept ClusterDeployment object creates and updates
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: clusterdeployments.admission.hive.openshift.io
+webhooks:
+- name: clusterdeployments.admission.hive.openshift.io
+  clientConfig:
+    caBundle: "" # Empty string on purpose
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/clusterdeployments
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - clusterdeployments
+  failurePolicy: Fail

@@ -3,8 +3,12 @@ API driven OpenShift cluster provisioning and management
 
 ## Prerequisites
 
+ * Install kustomize and controller-tools
+   * `$ go get sigs.k8s.io/kustomize; go get sigs.k8s.io/controller-tools`
  * Install mockgen:
    * `$ go get github.com/golang/mock/gomock; go install github.com/golang/mock/mockgen`
+ * Checkout via go get
+   * `$ go get github.com/openshift/hive; cd $GOPATH/src/github.com/openshift/hive`
 
 ## Deployment Options
 

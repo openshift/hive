@@ -26,6 +26,9 @@ parameters:
 - name: AWS_SECRET_ACCESS_KEY
   required: true
   description: Base64 encoded AWS secret access key that can be used to provision cluster resources.
+- name: AWS_REGION
+  description: AWS region to deploy into.
+  value: us-east-1
 - name: HIVE_IMAGE
   displayName: Hive image URL
   description: Hive image URL
@@ -50,6 +53,22 @@ parameters:
   displayName: Try Install Only Once
   description: If set, install will only be tried once.
   value: "false"
+- name: OPENSHIFT_MASTER_COUNT
+  displayName: OpenShift Master Count
+  description: The number of master nodes to create.
+  value: "3"
+- name: OPENSHIFT_WORKER_COUNT
+  displayName: OpenShift WORKER Count
+  description: The number of worker nodes to create.
+  value: "3"
+- name: OPENSHIFT_MASTER_INSTANCE_TYPE
+  displayName: OpenShift Master Instance Type
+  description: The AWS Instance type for master nodes.
+  value: m4.large
+- name: OPENSHIFT_WORKER_INSTANCE_TYPE
+  displayName: OpenShift Worker Instance Type
+  description: The AWS Instance type for worker nodes.
+  value: m4.large
 
 objects:
 - apiVersion: v1
@@ -110,15 +129,15 @@ objects:
           hostSubnetLength: 9
     platform:
       aws:
-        region: us-east-1
+        region: ${AWS_REGION}
     pullSecret:
       name: "${CLUSTER_NAME}-pull-secret"
     controlPlane:
       name: master
-      replicas: 3
+      replicas: ${{OPENSHIFT_MASTER_COUNT}}
       platform:
         aws:
-          type: m4.large
+          type: ${OPENSHIFT_MASTER_INSTANCE_TYPE}
           iamRoleName: ""
           rootVolume:
             iops: 100 # TODO
@@ -126,10 +145,10 @@ objects:
             type: gp2
     compute:
     - name: worker
-      replicas: 3
+      replicas: ${{OPENSHIFT_WORKER_COUNT}}
       platform:
         aws:
-          type: m4.large
+          type: ${OPENSHIFT_WORKER_INSTANCE_TYPE}
           iamRoleName: ""
           rootVolume:
             iops: 100 # TODO

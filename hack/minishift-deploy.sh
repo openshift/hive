@@ -9,5 +9,5 @@ current_project="$(oc project -q)"
 #$HIVE_DOCKER_CMD login -u admin -p "$(oc whoami -t)" $minishift_registry
 #$HIVE_DOCKER_CMD tag ${IMG} $minishift_registry/$current_project/${IMG}
 #$HIVE_DOCKER_CMD push $minishift_registry/$current_project/${IMG}
-kustomize build config/default | kubectl apply -f -
+kustomize build config | kubectl apply -f -
 kubectl delete pod -l deploymentconfig=hive-controller-manager

@@ -82,8 +82,8 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
 - Update image versions in Kustomize and README:
   ```shell
   > cd "${HIVE_SRC}"
-  > sed -r -i -e "s%quay.io/twiest/hive-controller:[0-9]{8}%quay.io/twiest/hive-controller:${RELEASE_VER}%" README.md config/overlays/sd-dev/image_patch.yaml
-  > sed -r -i -e "s%quay.io/twiest/installer:[0-9]{8}%quay.io/twiest/installer:${RELEASE_VER}%" README.md config/overlays/sd-dev/image_patch.yaml
+  > sed -r -i -e "s%quay.io/twiest/hive-controller:[0-9]{8}%quay.io/twiest/hive-controller:${RELEASE_VER}%" README.md overlays/sd-dev/image_patch.yaml
+  > sed -r -i -e "s%quay.io/twiest/installer:[0-9]{8}%quay.io/twiest/installer:${RELEASE_VER}%" README.md overlays/sd-dev/image_patch.yaml
   ```
 
 - Commit and push changes

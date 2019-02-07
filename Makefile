@@ -70,21 +70,21 @@ install: manifests
 deploy: manifests deploy-hiveadmission
 	kubectl apply -f manifests/
 	kubectl apply -f config/crds
-	mkdir -p config/overlays/deploy
-	cp config/overlays/template/* config/overlays/deploy
+	mkdir -p overlays/deploy
+	cp overlays/template/* overlays/deploy
 	if [[ "`uname`" == "Darwin" ]]; then \
-	    sed -i "" -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" config/overlays/deploy/image_patch.yaml; \
+	    sed -i "" -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	else \
-	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" config/overlays/deploy/image_patch.yaml; \
+	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	fi
-	kustomize build config/overlays/deploy | kubectl apply -f -
-	rm -rf config/overlays/deploy
+	kustomize build overlays/deploy | kubectl apply -f -
+	rm -rf overlays/deploy
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
 deploy-sd-dev: manifests deploy-hiveadmission
 	kubectl apply -f config/crds
-	kustomize build config/overlays/sd-dev | kubectl apply -f -
+	kustomize build overlays/sd-dev | kubectl apply -f -
 
 .PHONY: deploy-hiveadmission
 deploy-hiveadmission:

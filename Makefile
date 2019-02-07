@@ -92,7 +92,7 @@ deploy-hiveadmission:
 	$(eval service_ca := $(shell oc get secret -n openshift-service-cert-signer "service-serving-cert-signer-signing-key" -o json | jq -r '.data."tls.crt"'))
 	$(eval kube_ca := $(shell oc get secret -n kube-system "$(kube_service_account)" -o json | jq -r '.data."ca.crt"'))
 	@oc process -f config/templates/hiveadmission.yaml SERVICE_CA="$(service_ca)" KUBE_CA="$(kube_ca)" | oc apply -n openshift-hive -f -
-	@oc apply -f config/rbac/hiveadmission_rbac_role.yaml -f config/rbac/hiveadmission_rbac_role_binding.yaml
+	@oc apply -f config/default/rbac/hiveadmission_rbac_role.yaml -f config/default/rbac/hiveadmission_rbac_role_binding.yaml
 
 # Generate manifests e.g. CRD, RBAC etc.
 .PHONY: manifests

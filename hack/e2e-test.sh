@@ -52,7 +52,7 @@ oc process -f config/templates/cluster-deployment.yaml \
    AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
    BASE_DOMAIN="${BASE_DOMAIN}" \
    INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-   OPENSHIFT_RELEASE_IMAGE="" \
+   RELEASE_IMAGE="" \
    TRY_INSTALL_ONCE="true" \
    | oc apply -f -
 

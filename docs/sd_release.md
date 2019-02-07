@@ -16,13 +16,14 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > export AUTHFILE=~/.docker/config.json
   ```
 
-- Get the latest installer code
+- Checkout the installer version branch you wish to build. Latest is usually announced on aos-devel.
   ```shell
   > cd "${INSTALLER_SRC}"
-  > git checkout master
   > git fetch upstream
-  > git reset --hard upstream/master
+  > git checkout upstream/master-0.12.0
   ```
+
+- Identify the release image pinned for this installer. This is unfortunately not committed to the release branch, I believe wking may do it manually before he builds and published the binary.  (i.e. quay.io/openshift-release-dev/ocp-release:4.0.0-0.3)
 
 - Build the installer container
   ```shell
@@ -35,7 +36,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > BUILDAH_ISOLATION=chroot sudo buildah push --authfile ${AUTHFILE} ${INSTALLER_IMAGE_TAG} docker://${INSTALLER_IMAGE_TAG}
   ```
 
-## Build the hive-controller Image
+## Build the hive-controller image
 - Setup some useful variables:
   ```shell
   > export HIVE_GOPATH=/path/to/openshift/installer/gopath
@@ -44,7 +45,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > export AUTHFILE=~/.docker/config.json
   ```
 
-- Get the latest installer code
+- Get the latest hive code
   ```shell
   > cd "${HIVE_SRC}"
   > git checkout master
@@ -63,7 +64,12 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > BUILDAH_ISOLATION=chroot sudo buildah push --authfile ${AUTHFILE} ${HIVE_IMAGE_TAG} docker://${HIVE_IMAGE_TAG}
   ```
 
+## Update Stable Pinned Image CI Job for the new images
+
+TODO
+
 ## Change the OpenShift Hive SD Deploy to point to the new images
+
 - Setup some useful variables:
   ```shell
   > export HIVE_SD_RELEASE_BRANCH="sd-release-${RELEASE_VER}"
@@ -79,12 +85,14 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
   > git push -u origin "${HIVE_SD_RELEASE_BRANCH}"
   ```
 
-- Update image versions in Kustomize and README:
+- Update hive/installer image versions in Kustomize and README:
   ```shell
   > cd "${HIVE_SRC}"
   > sed -r -i -e "s%quay.io/twiest/hive-controller:[0-9]{8}%quay.io/twiest/hive-controller:${RELEASE_VER}%" README.md overlays/sd-dev/image_patch.yaml
   > sed -r -i -e "s%quay.io/twiest/installer:[0-9]{8}%quay.io/twiest/installer:${RELEASE_VER}%" README.md overlays/sd-dev/image_patch.yaml
   ```
+
+- Update export RELEASE_IMAGE in README using the value your identified above from the installer.
 
 - Commit and push changes
   ```shell

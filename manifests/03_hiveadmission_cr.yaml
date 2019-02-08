@@ -1,9 +1,9 @@
+# Custom resource to configure an installation of hiveadmission via the hive operator.
 apiVersion: hive.openshift.io/v1alpha1
 kind: HiveAdmission
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: hiveadmission-sample
+  name: hiveadmission-install
 spec:
-  # Add fields here
   foo: bar

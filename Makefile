@@ -27,7 +27,7 @@ all: fmt vet test build
 
 # Run tests
 .PHONY: test
-test: generate fmt vet manifests
+test: generate fmt vet crd rbac
 	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
 .PHONY: test-integration
@@ -70,12 +70,12 @@ run-operator: generate fmt vet
 
 # Install CRDs into a cluster
 .PHONY: install
-install: manifests
+install: crd rbac
 	kubectl apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests deploy-hiveadmission
+deploy: crd rbac deploy-hiveadmission
 	kubectl apply -f manifests/
 	kubectl apply -f config/crds
 	mkdir -p config/overlays/deploy
@@ -88,9 +88,23 @@ deploy: manifests deploy-hiveadmission
 	kustomize build config/overlays/deploy | kubectl apply -f -
 	rm -rf config/overlays/deploy
 
+# Update the manifest directory of artifacts OLM will deploy. Copies files in from
+# the locations kubebuilder generates them.
+.PHONY: manifests
+manifests: crd rbac
+	# TODO: right now just copying the hiveadmission crd for the operator, should
+	# the operator apply the other CRDs or should they be included in manifests here?
+	rm manifests/*.yaml
+	cp config/namespace.yaml manifests/00_namespace.yaml
+	cp config/crds/hive_v1alpha1_hiveadmission.yaml manifests/01_hiveadmission_crd.yaml
+	cp config/rbac/rbac_role.yaml manifests/01_rbac_role.yaml
+	cp config/rbac/rbac_role_binding.yaml manifests/01_rbac_role_binding.yaml
+	cp config/operator/operator.yaml manifests/02_hive_operator.yaml
+	cp config/samples/hive_v1alpha1_hiveadmission.yaml manifests/03_hiveadmission_cr.yaml
+
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
-deploy-sd-dev: manifests deploy-hiveadmission
+deploy-sd-dev: crd rbac deploy-hiveadmission
 	kubectl apply -f config/crds
 	kustomize build config/overlays/sd-dev | kubectl apply -f -
 
@@ -102,10 +116,15 @@ deploy-hiveadmission:
 	@oc process -f config/templates/hiveadmission.yaml SERVICE_CA="$(service_ca)" KUBE_CA="$(kube_ca)" | oc apply -n openshift-hive -f -
 	@oc apply -f config/rbac/hiveadmission_rbac_role.yaml -f config/rbac/hiveadmission_rbac_role_binding.yaml
 
-# Generate manifests e.g. CRD, RBAC etc.
-.PHONY: manifests
-manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+# Generate CRD yaml from our api types:
+.PHONY: crd
+crd:
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
+
+# Generate RBAC yaml from our kubebuilder controller annotations:
+.PHONY: rbac
+rbac:
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac
 
 # Run go fmt against code
 .PHONY: fmt

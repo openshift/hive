@@ -21,5 +21,6 @@ resources:
 - ../rbac/rbac_role_binding.yaml
 - ../rbac/rbac_role.yaml
 - ../manager/manager.yaml
+- ../manager/operator.yaml
 - ../hiveadmission/hiveadmission.yaml
 

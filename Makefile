@@ -40,12 +40,15 @@ test-e2e:
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: manager hiveutil hiveadmission
+build: manager hiveutil hiveadmission operator
 
 
 # Build manager binary
 manager: generate
 	go build -o bin/manager github.com/openshift/hive/cmd/manager
+
+operator: generate
+	go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
 
 # Build hiveutil binary
 hiveutil: generate
@@ -59,6 +62,11 @@ hiveadmission:
 .PHONY: run
 run: generate fmt vet
 	go run ./cmd/manager/main.go --log-level=debug
+
+# Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run-operator
+run-operator: generate fmt vet
+	go run ./cmd/operator/main.go --log-level=debug
 
 # Install CRDs into a cluster
 .PHONY: install

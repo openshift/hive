@@ -124,7 +124,7 @@ type ClusterDeploymentStatus struct {
 	Federated bool `json:"federated,omitempty"`
 
 	// FederatedClusterRef is the reference to the federated cluster resource associated with
-	// this ClusterDeployment
+	// this ClusterDeployment.
 	FederatedClusterRef *corev1.ObjectReference `json:"federatedClusterRef,omitempty"`
 
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.

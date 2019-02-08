@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 
@@ -57,8 +58,7 @@ const (
 
 	federatedClustersCRDName = "federatedclusters.core.federation.k8s.io"
 
-	clusterDeploymentNamespaceAnnotation = "hive.openshift.io/cluster-deployment-namespace"
-	clusterDeploymentNameAnnotation      = "hive.openshift.io/cluster-deployment-name"
+	clusterDeploymentReferenceAnnotation = "hive.openshift.io/cluster-deployment-ref"
 )
 
 // Add creates a new ClusterDeployment Federation Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -178,7 +178,11 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		return reconcile.Result{}, r.setFederatedClusterRef(cd, cdLog)
 	}
 
-	r.joinCluster(cd, cdLog)
+	err = r.joinCluster(cd, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Errorf("federating the cluster failed")
+		return reconcile.Result{}, err
+	}
 
 	err = r.setClusterFederated(cd, cdLog)
 	if err != nil {
@@ -360,9 +364,11 @@ func (r *ReconcileClusterDeploymentFederation) updateFederatedCluster(cd *hivev1
 		federatedCluster.Annotations = map[string]string{}
 	}
 
-	federatedCluster.Annotations[clusterDeploymentNamespaceAnnotation] = cd.Namespace
-	federatedCluster.Annotations[clusterDeploymentNameAnnotation] = cd.Name
-
+	refKey, err := cache.MetaNamespaceKeyFunc(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot create a namespaced key for cluster deployment")
+	}
+	federatedCluster.Annotations[clusterDeploymentReferenceAnnotation] = refKey
 	federatedCluster.Labels = cd.Labels
 
 	if !reflect.DeepEqual(federatedCluster.ObjectMeta, original.ObjectMeta) {

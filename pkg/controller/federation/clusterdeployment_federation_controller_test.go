@@ -2,6 +2,7 @@ package federation
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -50,8 +52,10 @@ func TestReconcile(t *testing.T) {
 		federationNotInstalled    bool
 		existing                  []runtime.Object
 		expectJoinClusterCalled   bool
+		expectError               bool
 		validateClusterDeployment func(*testing.T, *hivev1.ClusterDeployment)
 		validateFederatedCluster  func(*testing.T, *fedv1alpha1.FederatedCluster)
+		joinCluster               func(*hivev1.ClusterDeployment, log.FieldLogger) error
 	}{
 		{
 			name: "federation not installed -> noop",
@@ -79,6 +83,14 @@ func TestReconcile(t *testing.T) {
 			existing:                  []runtime.Object{withFedClusterRef(withFinalizer(installed(testClusterDeployment())))},
 			validateClusterDeployment: isFederated,
 			expectJoinClusterCalled:   true,
+		},
+		{
+			name:        "if joinCluster returns an error, expect an error from Reconcile",
+			existing:    []runtime.Object{withFedClusterRef(withFinalizer(installed(testClusterDeployment())))},
+			expectError: true,
+			joinCluster: func(*hivev1.ClusterDeployment, log.FieldLogger) error {
+				return fmt.Errorf("error")
+			},
 		},
 		{
 			name: "cluster deployment federated -> fed cluster should get annotations and labels set",
@@ -122,12 +134,19 @@ func TestReconcile(t *testing.T) {
 					return nil
 				},
 			}
+			if test.joinCluster != nil {
+				r.joinCluster = test.joinCluster
+			}
 			cdName := types.NamespacedName{Name: testName, Namespace: testNamespace}
 			_, err := r.Reconcile(reconcile.Request{
 				NamespacedName: cdName,
 			})
-			if err != nil {
+			if err != nil && !test.expectError {
 				t.Errorf("unexpected error from Reconcile: %v", err)
+				return
+			}
+			if err == nil && test.expectError {
+				t.Errorf("expected error but got none")
 				return
 			}
 			if test.expectJoinClusterCalled && !joinClusterCalled {
@@ -297,8 +316,11 @@ func hasAnnotationsAndLabels(t *testing.T, fc *fedv1alpha1.FederatedCluster) {
 		t.Errorf("federated cluster has no annotations")
 		return
 	}
-	name := fc.Annotations[clusterDeploymentNameAnnotation]
-	namespace := fc.Annotations[clusterDeploymentNamespaceAnnotation]
+	ref := fc.Annotations[clusterDeploymentReferenceAnnotation]
+	namespace, name, err := cache.SplitMetaNamespaceKey(ref)
+	if err != nil {
+		t.Errorf("cannot parse cluster deployment reference: %v", err)
+	}
 	if name != testName || namespace != testNamespace {
 		t.Errorf("federated cluster name and/or namespace annotations have unexpected values: %s/%s", namespace, name)
 	}

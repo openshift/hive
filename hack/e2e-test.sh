@@ -32,6 +32,8 @@ export AWS_ACCESS_KEY_ID="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_access_k
 export AWS_SECRET_ACCESS_KEY="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_secret_access_key/ { print $3; exit; }')"
 
 function teardown() {
+	oc get configmap/${CLUSTER_NAME}-installconfig -o jsonpath='{ .data.install-config\.yaml }' > "${ARTIFACT_DIR}/install-config.yaml" || true
+	oc logs -c installer job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_installer_container.log" || true
 	oc logs -c hive job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_install_job.log" || true
 	cat "${ARTIFACT_DIR}/hive_install_job.log"
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"

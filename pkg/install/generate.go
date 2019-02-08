@@ -28,15 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"strconv"
 )
 
 const (
-	defaultInstallerImage           = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-	defaultInstallerImagePullPolicy = corev1.PullAlways
-	defaultHiveImagePullPolicy      = corev1.PullAlways
-
-	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
-	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	defaultInstallerImage                 = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+	defaultInstallerImagePullPolicy       = corev1.PullAlways
+	defaultHiveImagePullPolicy            = corev1.PullAlways
+	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
+	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
+	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -54,8 +55,8 @@ func GenerateInstallerJob(
 	})
 
 	cdLog.Debug("generating installer job")
-
 	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret, true)
+	annotations := map[string]string{clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10)}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,8 +75,9 @@ func GenerateInstallerJob(
 
 	cfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-installconfig", cd.Name),
-			Namespace: cd.Namespace,
+			Name:        fmt.Sprintf("%s-installconfig", cd.Name),
+			Namespace:   cd.Namespace,
+			Annotations: annotations,
 		},
 		Data: map[string]string{
 			// Filename should match installer default:
@@ -263,8 +265,9 @@ func GenerateInstallerJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      GetInstallJobName(cd),
-			Namespace: cd.Namespace,
+			Name:        GetInstallJobName(cd),
+			Namespace:   cd.Namespace,
+			Annotations: annotations,
 		},
 		Spec: batchv1.JobSpec{
 			Completions:           &completions,

@@ -23,6 +23,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -95,6 +98,7 @@ type ReconcileHiveAdmission struct {
 // TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
 // a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
+// TODO: this lumps in with the hive controller rbac, should we manually manage our RBAC to separate the two?
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=hiveadmissions,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile.Result, error) {

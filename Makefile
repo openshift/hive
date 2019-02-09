@@ -176,6 +176,7 @@ verify-go-vet: generate
 .PHONY: generate
 generate:
 	go generate ./pkg/... ./cmd/...
+	hack/update-bindata.sh
 
 # Build the docker image
 .PHONY: docker-build

@@ -54,7 +54,6 @@ objects:
         namespace: default
         name: kubernetes
         path: /apis/admission.hive.openshift.io/v1alpha1/dnszones
-      caBundle: ${KUBE_CA}
     rules:
     - operations:
       - CREATE
@@ -80,7 +79,6 @@ objects:
         namespace: default
         name: kubernetes
         path: /apis/admission.hive.openshift.io/v1alpha1/clusterdeployments
-      caBundle: ${KUBE_CA}
     rules:
     - operations:
       - CREATE

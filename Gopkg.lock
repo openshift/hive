@@ -445,6 +445,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  digest = "1:a8a735b55809cd73bb01f1f35cb124dc07f737c799d65a6cb57cfa88e66d3a16"
+  name = "github.com/jteeuwen/go-bindata"
+  packages = ["."]
+  pruneopts = "NT"
+  revision = "bbd0c6e271208dce66d8fda4bc536453cd27fc4a"
+  version = "v3.0.7"
+
+[[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -582,12 +590,53 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1f1c35021583995af000a3f1023790c4705c59d61a5b6a4116bed8a0bb28e106"
+  digest = "1:4623dc2b408f4f7d45801d0d7b4afce26bc81dd942dfc828e4b58a48b00f26f2"
   name = "github.com/openshift/api"
   packages = [
+    ".",
+    "apps",
+    "apps/v1",
+    "authorization",
+    "authorization/v1",
+    "build",
+    "build/v1",
+    "config",
     "config/v1",
+    "image",
+    "image/docker10",
+    "image/dockerpre012",
+    "image/v1",
+    "kubecontrolplane",
+    "kubecontrolplane/v1",
+    "legacyconfig/v1",
+    "network",
+    "network/v1",
+    "oauth",
+    "oauth/v1",
+    "openshiftcontrolplane",
+    "openshiftcontrolplane/v1",
+    "operator",
     "operator/v1",
+    "operator/v1alpha1",
+    "osin",
+    "osin/v1",
+    "pkg/serialization",
+    "project",
+    "project/v1",
+    "quota",
+    "quota/v1",
+    "route",
     "route/v1",
+    "security",
+    "security/v1",
+    "servicecertsigner",
+    "servicecertsigner/v1alpha1",
+    "template",
+    "template/v1",
+    "user",
+    "user/v1",
+    "webconsole",
+    "webconsole/v1",
   ]
   pruneopts = "NUT"
   revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
@@ -632,9 +681,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d633d24c39b813f2182406a8c8d08fd8c2c23ec35f0ca538077de432b95b8668"
+  digest = "1:8d36c572e3765cd84a664c0c3529e3fbca8cf17bb58649d64cb719647f683cec"
   name = "github.com/openshift/library-go"
-  packages = ["pkg/operator/resource/resourcemerge"]
+  packages = [
+    "pkg/operator/events",
+    "pkg/operator/resource/resourceapply",
+    "pkg/operator/resource/resourcemerge",
+    "pkg/operator/resource/resourceread",
+  ]
   pruneopts = "NUT"
   revision = "28fcc8fa9009d38d2297d178a2d112f009a08d12"
 
@@ -1021,7 +1075,7 @@
   version = "v2.2.1"
 
 [[projects]]
-  digest = "1:1d34342a53d8f8c625260d6c4c2e5c99442b1635bbf4208f426bd12aa210b870"
+  digest = "1:b3f8152a68d73095a40fdcf329a93fc42e8eadb3305171df23fdb6b4e41a6417"
   name = "k8s.io/api"
   packages = [
     "admission/v1beta1",
@@ -1045,6 +1099,7 @@
     "core/v1",
     "events/v1beta1",
     "extensions/v1beta1",
+    "imagepolicy/v1alpha1",
     "networking/v1",
     "policy/v1beta1",
     "rbac/v1",
@@ -1434,6 +1489,20 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:90d6ee5d30e63fe75a49916394f75e013338becf12a17b51da0a442624d75ed5"
+  name = "k8s.io/kube-aggregator"
+  packages = [
+    "pkg/apis/apiregistration",
+    "pkg/apis/apiregistration/v1",
+    "pkg/apis/apiregistration/v1beta1",
+    "pkg/client/clientset_generated/clientset/scheme",
+    "pkg/client/clientset_generated/clientset/typed/apiregistration/v1",
+  ]
+  pruneopts = "NUT"
+  revision = "94c15b5e9af38403cf982482e0c09668e64954a9"
+
+[[projects]]
+  branch = "master"
   digest = "1:25f872c25580e69d8fa2ca39c261616695bc061b422f4fba488ca2bd0fd033de"
   name = "k8s.io/kube-openapi"
   packages = [
@@ -1580,6 +1649,7 @@
     "github.com/ghodss/yaml",
     "github.com/golang/glog",
     "github.com/golang/mock/gomock",
+    "github.com/jteeuwen/go-bindata",
     "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1",
     "github.com/kubernetes-sigs/federation-v2/pkg/controller/util",
     "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2",
@@ -1595,7 +1665,10 @@
     "github.com/openshift/installer/pkg/rhcos",
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",
+    "github.com/openshift/library-go/pkg/operator/events",
+    "github.com/openshift/library-go/pkg/operator/resource/resourceapply",
     "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
+    "github.com/openshift/library-go/pkg/operator/resource/resourceread",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
@@ -1603,6 +1676,7 @@
     "golang.org/x/net/context",
     "gopkg.in/yaml.v2",
     "k8s.io/api/admission/v1beta1",
+    "k8s.io/api/apps/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/rbac/v1",

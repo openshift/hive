@@ -100,7 +100,7 @@ manifests: crd rbac
 	cp config/rbac/rbac_role.yaml manifests/01_rbac_role.yaml
 	cp config/rbac/rbac_role_binding.yaml manifests/01_rbac_role_binding.yaml
 	cp config/operator/operator.yaml manifests/02_hive_operator.yaml
-	cp config/samples/hive_v1alpha1_hiveadmission.yaml manifests/03_hiveadmission_cr.yaml
+	cp config/operator/hiveadmission-cr.yaml manifests/03_hiveadmission_cr.yaml
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev

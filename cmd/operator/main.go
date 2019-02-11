@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/hive/pkg/operator"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -75,6 +76,10 @@ func newRootCommand() *cobra.Command {
 
 			// Setup Scheme for all resources
 			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := apiregistrationv1.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

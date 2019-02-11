@@ -18,20 +18,27 @@ package hiveadmission
 
 import (
 	"context"
-	"reflect"
+	//"reflect"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/operator/assets"
+
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+
+	apiregclientv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -66,6 +73,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	r.(*ReconcileHiveAdmission).kubeClient, err = kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+
+	r.(*ReconcileHiveAdmission).apiregClient, err = apiregclientv1.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to HiveAdmission
 	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveAdmission{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
@@ -90,7 +107,9 @@ var _ reconcile.Reconciler = &ReconcileHiveAdmission{}
 // ReconcileHiveAdmission reconciles a HiveAdmission object
 type ReconcileHiveAdmission struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme       *runtime.Scheme
+	kubeClient   kubernetes.Interface
+	apiregClient *apiregclientv1.ApiregistrationV1Client
 }
 
 // Reconcile reads that state of the cluster for a HiveAdmission object and makes changes based on the state read
@@ -118,57 +137,106 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this to be the object type created by your controller
-	// Define the desired Deployment object
-	deploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-deployment",
-			Namespace: instance.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"deployment": instance.Name + "-deployment"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"deployment": instance.Name + "-deployment"}},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx",
-						},
-					},
-				},
-			},
-		},
+	//assetFile := "config/hiveadmission/hiveadmission.yaml"
+	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(request.Namespace), "hive-operator", &corev1.ObjectReference{
+		Name:      request.Name,
+		Namespace: request.Namespace,
+	})
+
+	asset, err := assets.Asset("config/hiveadmission/service.yaml")
+	if err != nil {
+		haLog.WithError(err).Error("error loading asset")
+		return reconcile.Result{}, err
 	}
-	if err := controllerutil.SetControllerReference(instance, deploy, r.scheme); err != nil {
+	haLog.Debug("reading service")
+	hiveAdmService := resourceread.ReadServiceV1OrDie(asset)
+
+	asset, err = assets.Asset("config/hiveadmission/service-account.yaml")
+	if err != nil {
+		haLog.WithError(err).Error("error loading asset")
+		return reconcile.Result{}, err
+	}
+	haLog.Debug("reading service account")
+	hiveAdmServiceAcct := resourceread.ReadServiceAccountV1OrDie(asset)
+
+	asset, err = assets.Asset("config/hiveadmission/daemonset.yaml")
+	if err != nil {
+		haLog.WithError(err).Error("error loading asset")
+		return reconcile.Result{}, err
+	}
+	haLog.Debug("reading daemonset")
+	hiveAdmDaemonSet := resourceread.ReadDaemonSetV1OrDie(asset)
+
+	asset, err = assets.Asset("config/hiveadmission/apiservice.yaml")
+	if err != nil {
+		haLog.WithError(err).Error("error loading asset")
+		return reconcile.Result{}, err
+	}
+	haLog.Debug("reading apiservice")
+	hiveAdmAPIService := ReadAPIServiceV1Beta1OrDie(asset, r.scheme)
+
+	// Set owner refs on all objects in the deployment so deleting the operator CRD u
+	// will clean everything up:
+	if err := controllerutil.SetControllerReference(instance, hiveAdmService, r.scheme); err != nil {
+		haLog.WithError(err).Info("error setting service owner ref")
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Check if the Deployment already exists
-	found := &appsv1.Deployment{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		log.Printf("Creating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Create(context.TODO(), deploy)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	} else if err != nil {
+	if err := controllerutil.SetControllerReference(instance, hiveAdmServiceAcct, r.scheme); err != nil {
+		haLog.WithError(err).Info("error setting service account owner ref")
 		return reconcile.Result{}, err
 	}
 
-	// TODO(user): Change this for the object type created by your controller
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log.Printf("Updating Deployment %s/%s\n", deploy.Namespace, deploy.Name)
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+	if err := controllerutil.SetControllerReference(instance, hiveAdmDaemonSet, r.scheme); err != nil {
+		haLog.WithError(err).Info("error setting daemonset owner ref")
+		return reconcile.Result{}, err
+	}
+
+	if err := controllerutil.SetControllerReference(instance, hiveAdmAPIService, r.scheme); err != nil {
+		haLog.WithError(err).Info("error setting apiservice owner ref")
+		return reconcile.Result{}, err
+	}
+
+	_, changed, err := resourceapply.ApplyService(r.kubeClient.CoreV1(), recorder, hiveAdmService)
+	if err != nil {
+		haLog.WithError(err).Error("error applying service")
+		return reconcile.Result{}, err
+	} else {
+		haLog.WithField("changed", changed).Info("service updated")
+	}
+
+	_, changed, err = resourceapply.ApplyServiceAccount(r.kubeClient.CoreV1(), recorder, hiveAdmServiceAcct)
+	if err != nil {
+		haLog.WithError(err).Error("error applying service account")
+		return reconcile.Result{}, err
+	} else {
+		haLog.WithField("changed", changed).Info("service account updated")
+	}
+
+	expectedDSGen := int64(0)
+	currentDS := &appsv1.DaemonSet{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: hiveAdmDaemonSet.Name, Namespace: hiveAdmDaemonSet.Namespace}, currentDS)
+	if err != nil && !errors.IsNotFound(err) {
+		haLog.WithError(err).Error("error looking up current daemonset")
+		return reconcile.Result{}, err
+	} else if err == nil {
+		expectedDSGen = currentDS.ObjectMeta.Generation
+	}
+
+	_, changed, err = resourceapply.ApplyDaemonSet(r.kubeClient.AppsV1(), recorder, hiveAdmDaemonSet, expectedDSGen, false)
+	if err != nil {
+		haLog.WithError(err).Error("error applying daemonset")
+		return reconcile.Result{}, err
+	} else {
+		haLog.WithField("changed", changed).Info("daemonset updated")
+	}
+
+	_, changed, err = resourceapply.ApplyAPIService(r.apiregClient, hiveAdmAPIService)
+	if err != nil {
+		haLog.WithError(err).Error("error applying apiservice")
+		return reconcile.Result{}, err
+	} else {
+		haLog.WithField("changed", changed).Info("apiservice updated")
 	}
 	return reconcile.Result{}, nil
 }

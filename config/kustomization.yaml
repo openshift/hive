@@ -18,8 +18,8 @@ namespace: openshift-hive
 # YAML string, with resources separated by document
 # markers ("---").
 resources:
-- ../rbac/rbac_role_binding.yaml
-- ../rbac/rbac_role.yaml
-- ../manager/manager.yaml
-- ../hiveadmission/hiveadmission.yaml
+- rbac/rbac_role_binding.yaml
+- rbac/rbac_role.yaml
+- manager/manager.yaml
+- hiveadmission/hiveadmission.yaml
 

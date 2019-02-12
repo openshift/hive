@@ -18,7 +18,6 @@ package hiveadmission
 
 import (
 	"context"
-	//"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -48,14 +47,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new HiveAdmission Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-// USER ACTION REQUIRED: update cmd/manager/main.go to call this hive.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
 }
@@ -122,7 +115,7 @@ type ReconcileHiveAdmission struct {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=hiveadmissions,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	haLog := log.WithField("controller", "hiveadmission")
-	haLog.Info("Reconciling HiveAdmission deployment")
+	haLog.Info("Reconciling HiveAdmission components")
 
 	// Fetch the HiveAdmission instance
 	instance := &hivev1alpha1.HiveAdmission{}
@@ -137,7 +130,6 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
-	//assetFile := "config/hiveadmission/hiveadmission.yaml"
 	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(request.Namespace), "hive-operator", &corev1.ObjectReference{
 		Name:      request.Name,
 		Namespace: request.Namespace,
@@ -175,25 +167,25 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 	haLog.Debug("reading apiservice")
 	hiveAdmAPIService := ReadAPIServiceV1Beta1OrDie(asset, r.scheme)
 
-	// Set owner refs on all objects in the deployment so deleting the operator CRD u
+	// Set owner refs on all objects in the deployment so deleting the operator CRD
 	// will clean everything up:
 	if err := controllerutil.SetControllerReference(instance, hiveAdmService, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting service owner ref")
+		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}
 
 	if err := controllerutil.SetControllerReference(instance, hiveAdmServiceAcct, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting service account owner ref")
+		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}
 
 	if err := controllerutil.SetControllerReference(instance, hiveAdmDaemonSet, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting daemonset owner ref")
+		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}
 
 	if err := controllerutil.SetControllerReference(instance, hiveAdmAPIService, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting apiservice owner ref")
+		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}
 

@@ -1,0 +1,8 @@
+apiVersion: hive.openshift.io/v1alpha1
+kind: Hive
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: hive
+spec:
+  foo: bar

@@ -20,7 +20,10 @@ namespace: openshift-hive
 resources:
 - ../rbac/rbac_role_binding.yaml
 - ../rbac/rbac_role.yaml
-- ../manager/manager.yaml
-- ../manager/operator.yaml
-- ../hiveadmission/hiveadmission.yaml
+- ../manager/service.yaml
+- ../manager/deployment.yaml
+- ../hiveadmission/service.yaml
+- ../hiveadmission/service-account.yaml
+- ../hiveadmission/daemonset.yaml
+- ../hiveadmission/apiservice.yaml
 

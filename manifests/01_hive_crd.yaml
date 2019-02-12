@@ -4,12 +4,12 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: hiveadmissions.hive.openshift.io
+  name: hives.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
-    kind: HiveAdmission
-    plural: hiveadmissions
+    kind: Hive
+    plural: hives
   scope: Namespaced
   validation:
     openAPIV3Schema:

@@ -5,7 +5,8 @@ set -e
 component=hive
 TEST_IMAGE=$(eval "echo $IMAGE_FORMAT")
 component=installer
-INSTALLER_IMAGE=$(eval "echo $IMAGE_FORMAT")
+# TODO: temporarily disabled due to installer bug
+INSTALLER_IMAGE="quay.io/twiest/installer:20190128"
 
 ln -s $(which oc) $(pwd)/kubectl
 export PATH=$PATH:$(pwd)

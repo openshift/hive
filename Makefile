@@ -93,9 +93,6 @@ deploy: crd rbac deploy-hiveadmission
 # the locations kubebuilder generates them.
 .PHONY: manifests
 manifests: crd rbac
-	# TODO: right now just copying the hiveadmission crd for the operator, should
-	# the operator apply the other CRDs or should they be included in manifests here?
-	cp config/namespace.yaml manifests/00_namespace.yaml
 	cp config/crds/hive_v1alpha1_hiveadmission.yaml manifests/01_hiveadmission_crd.yaml
 	cp config/crds/hive_v1alpha1_hive.yaml manifests/01_hive_crd.yaml
 	cp config/rbac/rbac_role.yaml manifests/01_rbac_role.yaml

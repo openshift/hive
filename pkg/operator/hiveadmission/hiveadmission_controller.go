@@ -107,12 +107,6 @@ type ReconcileHiveAdmission struct {
 
 // Reconcile reads that state of the cluster for a HiveAdmission object and makes changes based on the state read
 // and what is in the HiveAdmission.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// TODO: this lumps in with the hive controller rbac, should we manually manage our RBAC to separate the two?
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=hiveadmissions,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	haLog := log.WithField("controller", "hiveadmission")
 	haLog.Info("Reconciling HiveAdmission components")

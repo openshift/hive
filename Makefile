@@ -66,6 +66,8 @@ run: generate fmt vet
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run-operator
 run-operator: generate fmt vet
+	# scale down the operator so we can run it from source
+	kubectl scale deployment.v1.apps/hive-operator --replicas=0
 	go run ./cmd/operator/main.go --log-level=debug
 
 # Install CRDs into a cluster
@@ -75,7 +77,7 @@ install: crd rbac
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: crd rbac deploy-hiveadmission
+deploy: crd rbac
 	# Deploy the operator manifests:
 	kubectl apply -f manifests/
 	mkdir -p overlays/deploy
@@ -100,17 +102,9 @@ manifests: crd rbac
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
-deploy-sd-dev: crd rbac deploy-hiveadmission
+deploy-sd-dev: crd rbac
 	kubectl apply -f config/crds
 	kustomize build overlays/sd-dev | kubectl apply -f -
-
-.PHONY: deploy-hiveadmission
-deploy-hiveadmission:
-	$(eval kube_service_account := $(shell oc get secret -n kube-system | awk "/kubernetes.io\/service-account-token/ { line=\$$1 } END{print line}"))
-	$(eval service_ca := $(shell oc get secret -n openshift-service-cert-signer "service-serving-cert-signer-signing-key" -o json | jq -r '.data."tls.crt"'))
-	$(eval kube_ca := $(shell oc get secret -n kube-system "$(kube_service_account)" -o json | jq -r '.data."ca.crt"'))
-	@oc process -f config/templates/hiveadmission.yaml SERVICE_CA="$(service_ca)" KUBE_CA="$(kube_ca)" | oc apply -n openshift-hive -f -
-	@oc apply -f config/rbac/hiveadmission_rbac_role.yaml -f config/rbac/hiveadmission_rbac_role_binding.yaml
 
 # Generate CRD yaml from our api types:
 .PHONY: crd

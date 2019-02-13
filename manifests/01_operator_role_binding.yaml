@@ -2,11 +2,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   creationTimestamp: null
-  name: operator-rolebinding
+  name: hive-operator-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: operator-role
+  name: hive-operator-role
 subjects:
 - kind: ServiceAccount
   name: hive-operator

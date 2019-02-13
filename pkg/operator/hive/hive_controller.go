@@ -227,5 +227,26 @@ func (r *ReconcileHive) Reconcile(request reconcile.Request) (reconcile.Result, 
 		hLog.WithField("changed", changed).Info("service updated")
 	}
 
+	expectedDeploymentGen := int64(0)
+	currentDeployment := &appsv1.Deployment{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: hiveDeployment.Name, Namespace: hiveDeployment.Namespace}, currentDeployment)
+	if err != nil && !errors.IsNotFound(err) {
+		hLog.WithError(err).Error("error looking up current deployment")
+		return reconcile.Result{}, err
+	} else if err == nil {
+		expectedDeploymentGen = currentDeployment.ObjectMeta.Generation
+	}
+
+	_, changed, err = resourceapply.ApplyDeployment(r.kubeClient.AppsV1(),
+		recorder, hiveDeployment, expectedDeploymentGen, false)
+	if err != nil {
+		hLog.WithError(err).Error("error applying deployment")
+		return reconcile.Result{}, err
+	} else {
+		hLog.WithField("changed", changed).Info("deployment updated")
+	}
+
+	hLog.Info("Hive components reconciled")
+
 	return reconcile.Result{}, nil
 }

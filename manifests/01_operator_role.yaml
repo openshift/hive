@@ -2,14 +2,18 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: operator-role
+  name: hive-operator-role
 rules:
 - apiGroups:
   - ""
   resources:
   - serviceaccounts
+  - serviceaccounts/finalizers
   - secrets
+  - secrets/finalizers
   - services
+  - services/finalizers
+  - events
   verbs:
   - get
   - list
@@ -34,6 +38,7 @@ rules:
   - apiregistration.k8s.io
   resources:
   - apiservices
+  - apiservices/finalizers
   verbs:
   - get
   - list
@@ -46,7 +51,9 @@ rules:
   - apps
   resources:
   - deployments
+  - deployments/finalizers
   - daemonsets
+  - daemonsets/finalizers
   verbs:
   - get
   - list
@@ -60,6 +67,7 @@ rules:
   - apps.openshift.io
   resources:
   - deploymentconfigs
+  - deploymentconfigs/finalizers
   verbs:
   - get
   - list
@@ -73,6 +81,8 @@ rules:
   resources:
   - hives
   - hiveadmissions
+  - hives/finalizers
+  - hiveadmissions/finalizers
   verbs:
   - get
   - list

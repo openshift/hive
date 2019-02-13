@@ -224,5 +224,8 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 	} else {
 		haLog.WithField("changed", changed).Info("apiservice updated")
 	}
+
+	hLog.Info("HiveAdmission components reconciled")
+
 	return reconcile.Result{}, nil
 }

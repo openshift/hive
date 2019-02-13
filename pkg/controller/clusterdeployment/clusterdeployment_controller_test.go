@@ -201,25 +201,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Fetch remote cluster version status into clusterdeployment status",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-					return cd
-				}(),
-				testInstallJob(),
-				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				assert.Equal(t, "4.0.0", cd.Status.ClusterVersionStatus.History[0].Version)
-			},
-		},
-		{
 			name: "Completed install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),

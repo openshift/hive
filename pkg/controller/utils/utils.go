@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
@@ -75,6 +77,16 @@ func FixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.Cluster
 
 	if clusterVersionStatus.History == nil {
 		clusterVersionStatus.History = []openshiftapiv1.UpdateHistory{}
+	}
+
+	// The CompletionTime is clearly optional, but it is not labeled with
+	// omitempty in the Openshift API.
+	// TODO: Fix upstream
+	for i, h := range clusterVersionStatus.History {
+		if h.CompletionTime == nil {
+			zero := metav1.NewTime(time.Unix(0, 0))
+			clusterVersionStatus.History[i].CompletionTime = &zero
+		}
 	}
 }
 

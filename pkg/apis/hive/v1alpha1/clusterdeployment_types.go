@@ -123,6 +123,10 @@ type ClusterDeploymentStatus struct {
 	// Federated is true if the cluster deployment has been federated with the host cluster.
 	Federated bool `json:"federated,omitempty"`
 
+	// FederatedClusterRef is the reference to the federated cluster resource associated with
+	// this ClusterDeployment.
+	FederatedClusterRef *corev1.ObjectReference `json:"federatedClusterRef,omitempty"`
+
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
 

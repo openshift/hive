@@ -18,11 +18,11 @@ namespace: openshift-hive
 # YAML string, with resources separated by document
 # markers ("---").
 resources:
-- ../../manifests/00_namespace.yaml
-- ../../manifests/01_hiveadmission_crd.yaml
-- ../../manifests/01_hive_crd.yaml
-- ../../manifests/01_rbac_role.yaml
-- ../../manifests/01_rbac_role_binding.yaml
-- ../../manifests/02_hive_operator.yaml
-- ../../manifests/03_hiveadmission_cr.yaml
-- ../../manifests/03_hive_cr.yaml
+- ../manifests/00_namespace.yaml
+- ../manifests/01_hiveadmission_crd.yaml
+- ../manifests/01_hive_crd.yaml
+- ../manifests/01_rbac_role.yaml
+- ../manifests/01_rbac_role_binding.yaml
+- ../manifests/02_hive_operator.yaml
+- ../manifests/03_hiveadmission_cr.yaml
+- ../manifests/03_hive_cr.yaml

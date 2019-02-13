@@ -78,16 +78,16 @@ install: crd rbac
 deploy: crd rbac deploy-hiveadmission
 	# Deploy the operator manifests:
 	kubectl apply -f manifests/
-	mkdir -p config/overlays/deploy
-	cp config/overlays/template/* config/overlays/deploy
+	mkdir -p overlays/deploy
+	cp overlays/template/* overlays/deploy
 	if [[ "`uname`" == "Darwin" ]]; then \
-	    sed -i "" -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" config/overlays/deploy/image_patch.yaml; \
+	    sed -i "" -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	else \
-	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" config/overlays/deploy/image_patch.yaml; \
+	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	fi
 	echo $(DEPLOY_IMAGE)
-	kustomize build config/overlays/deploy | kubectl apply -f -
-	rm -rf config/overlays/deploy
+	kustomize build overlays/deploy | kubectl apply -f -
+	rm -rf overlays/deploy
 
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
 # the locations kubebuilder generates them.
@@ -102,7 +102,7 @@ manifests: crd rbac
 .PHONY: deploy-sd-dev
 deploy-sd-dev: crd rbac deploy-hiveadmission
 	kubectl apply -f config/crds
-	kustomize build config/overlays/sd-dev | kubectl apply -f -
+	kustomize build overlays/sd-dev | kubectl apply -f -
 
 .PHONY: deploy-hiveadmission
 deploy-hiveadmission:

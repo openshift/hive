@@ -11,13 +11,8 @@ ln -s $(which oc) $(pwd)/kubectl
 export PATH=$PATH:$(pwd)
 
 # download kustomize so we can use it for deploying
-opsys=linux
-curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases/latest |\
-  grep browser_download |\
-  grep $opsys |\
-  cut -d '"' -f 4 |\
-  xargs curl -O -L
-mv kustomize_*_${opsys}_amd64 kustomize
+curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.0/kustomize_2.0.0_linux_amd64
+mv kustomize_2.0.0_linux_amd64 kustomize
 chmod u+x kustomize
 
 oc new-project cluster-test

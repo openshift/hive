@@ -308,13 +308,6 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				workerPool.Platform.AWS.Zones = azs
 			}
 
-			hivePool := findHiveMachinePool(cd, workerPool.Name)
-
-			defaultIAMRole := fmt.Sprintf("%s-worker-role", ic.ObjectMeta.Name)
-			if hivePool.Platform.AWS.IAMRoleName == "" {
-				workerPool.Platform.AWS.IAMRoleName = defaultIAMRole
-			}
-
 			icMachineSets, err := installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
 			if err != nil {
 				return nil, err

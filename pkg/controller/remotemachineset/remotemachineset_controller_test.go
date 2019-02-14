@@ -104,7 +104,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "No-op",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, testName+"-worker", []string{}),
+					testMachinePool("worker", 3, []string{}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -130,7 +130,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Update machine set replicas",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, testName+"-worker", []string{}),
+					testMachinePool("worker", 3, []string{}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -156,7 +156,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Create missing machine set",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, testName+"-worker", []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
+					testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -181,7 +181,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Delete extra machine set",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, testName+"-worker", []string{}),
+					testMachinePool("worker", 3, []string{}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -208,8 +208,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Multiple machineset noop",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, testName+"-worker", []string{"us-east-1a"}),
-					testMachinePool("beta", 3, testName+"-worker", []string{"us-east-1b"}),
+					testMachinePool("alpha", 3, []string{"us-east-1a"}),
+					testMachinePool("beta", 3, []string{"us-east-1b"}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -233,8 +233,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Update multiple machineset replicas",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, testName+"-worker", []string{"us-east-1a"}),
-					testMachinePool("beta", 3, testName+"-worker", []string{"us-east-1b"}),
+					testMachinePool("alpha", 3, []string{"us-east-1a"}),
+					testMachinePool("beta", 3, []string{"us-east-1b"}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -258,8 +258,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Create additional machinepool machinesets",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, testName+"-worker", []string{}),
-					testMachinePool("beta", 3, testName+"-worker", []string{}),
+					testMachinePool("alpha", 3, []string{}),
+					testMachinePool("beta", 3, []string{}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -288,7 +288,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Delete additional machinepool machinesets",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, testName+"-worker", []string{}),
+					testMachinePool("alpha", 3, []string{}),
 				}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
@@ -391,7 +391,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	}
 }
 
-func testMachinePool(name string, replicas int, iamRoleName string, zones []string) hivev1.MachinePool {
+func testMachinePool(name string, replicas int, zones []string) hivev1.MachinePool {
 	mpReplicas := int64(replicas)
 
 	testMachinePool := hivev1.MachinePool{
@@ -400,7 +400,6 @@ func testMachinePool(name string, replicas int, iamRoleName string, zones []stri
 		Platform: hivev1.MachinePoolPlatform{
 			AWS: &hivev1.AWSMachinePoolPlatform{
 				InstanceType: "m4.large",
-				IAMRoleName:  iamRoleName,
 			},
 		},
 	}

@@ -326,10 +326,9 @@ func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogge
 		{kubernetesKeyPrefix + clusterName: "owned"},
 	}
 	uninstaller := &aws.ClusterUninstaller{
-		Filters:     filters,
-		Region:      region,
-		ClusterName: clusterName,
-		Logger:      logger,
+		Filters: filters,
+		Region:  region,
+		Logger:  logger,
 	}
 
 	return uninstaller.Run()

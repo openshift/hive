@@ -1528,7 +1528,8 @@
   version = "v0.1.9"
 
 [[projects]]
-  digest = "1:946a62b07e59b9abd1f475a5b5c8d590255c1d40627f386d34fd073d3de9ecb8"
+  branch = "add_optional_comment_tag_support_v0.1.8"
+  digest = "1:ee619d029ebf100a74b2bc72587c02d1b7c945cc372e8baff59c60239db93d3d"
   name = "sigs.k8s.io/controller-tools"
   packages = [
     "cmd/controller-gen",
@@ -1543,8 +1544,8 @@
     "pkg/webhook/internal",
   ]
   pruneopts = "NUT"
-  revision = "950a0e88e4effb864253b3c7504b326cc83b9d11"
-  version = "v0.1.8"
+  revision = "533484c3ea1c76560817b5aa67cb8919ff57d8a1"
+  source = "github.com/twiest/controller-tools"
 
 [[projects]]
   digest = "1:237ad09ac561f3e3a2a2e9f3fee85fea98c0f41f381ac80562b05bdaa9fe89c6"

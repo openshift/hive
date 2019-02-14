@@ -596,7 +596,9 @@ func (b *APIs) getMembers(t *types.Type, found sets.String) (map[string]v1beta1.
 			m, r := b.typeToJSONSchemaProps(member.Type, found, member.CommentLines, false)
 			members[name] = m
 			result[name] = r
-			if !strings.HasSuffix(strat, "omitempty") {
+
+			// A field is only required if it is missing both omitempty -and- the "+optional" comment tag.
+			if !strings.HasSuffix(strat, "omitempty") && !hasOptionalCommentTag(member.CommentLines) {
 				required = append(required, name)
 			}
 		}
@@ -604,4 +606,17 @@ func (b *APIs) getMembers(t *types.Type, found sets.String) (map[string]v1beta1.
 
 	defer found.Delete(t.Name.String())
 	return members, result, required
+}
+
+// hasOptionalCommentTag loops through a member's CommentLines looking for the "+optional" comment tag.
+func hasOptionalCommentTag(commentLines []string) bool {
+	for _, commentLine := range commentLines {
+		commentLine = strings.TrimLeft(commentLine, " ")
+		if strings.HasPrefix(commentLine, "+optional") {
+			return true
+		}
+	}
+
+	// none of the commentLines had the "+optional" comment tag.
+	return false
 }

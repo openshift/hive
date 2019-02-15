@@ -893,6 +893,36 @@ func config_hiveadmission_apiservice_yaml() ([]byte, error) {
 	return _config_hiveadmission_apiservice_yaml, nil
 }
 
+var _config_hiveadmission_clusterdeployment_webhook_yaml = []byte(`---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: clusterdeployments.admission.hive.openshift.io
+webhooks:
+- name: clusterdeployments.admission.hive.openshift.io
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/clusterdeployments
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - clusterdeployments
+  failurePolicy: Fail
+`)
+
+func config_hiveadmission_clusterdeployment_webhook_yaml() ([]byte, error) {
+	return _config_hiveadmission_clusterdeployment_webhook_yaml, nil
+}
+
 var _config_hiveadmission_daemonset_yaml = []byte(`---
 # to create the namespace-reservation-server
 apiVersion: apps/v1
@@ -956,6 +986,37 @@ spec:
 
 func config_hiveadmission_daemonset_yaml() ([]byte, error) {
 	return _config_hiveadmission_daemonset_yaml, nil
+}
+
+var _config_hiveadmission_dnszones_webhook_yaml = []byte(`---
+# register to intercept DNSZone object creates and updates
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: dnszones.admission.hive.openshift.io
+webhooks:
+- name: dnszones.admission.hive.openshift.io
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/dnszones
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - dnszones
+  failurePolicy: Fail
+`)
+
+func config_hiveadmission_dnszones_webhook_yaml() ([]byte, error) {
+	return _config_hiveadmission_dnszones_webhook_yaml, nil
 }
 
 var _config_hiveadmission_service_account_yaml = []byte(`---
@@ -1079,16 +1140,18 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() ([]byte, error){
-	"config/crds/hive_v1alpha1_clusterdeployment.yaml": config_crds_hive_v1alpha1_clusterdeployment_yaml,
-	"config/crds/hive_v1alpha1_dnszone.yaml":           config_crds_hive_v1alpha1_dnszone_yaml,
-	"config/crds/hive_v1alpha1_hive.yaml":              config_crds_hive_v1alpha1_hive_yaml,
-	"config/crds/hive_v1alpha1_hiveadmission.yaml":     config_crds_hive_v1alpha1_hiveadmission_yaml,
-	"config/hiveadmission/apiservice.yaml":             config_hiveadmission_apiservice_yaml,
-	"config/hiveadmission/daemonset.yaml":              config_hiveadmission_daemonset_yaml,
-	"config/hiveadmission/service-account.yaml":        config_hiveadmission_service_account_yaml,
-	"config/hiveadmission/service.yaml":                config_hiveadmission_service_yaml,
-	"config/manager/deployment.yaml":                   config_manager_deployment_yaml,
-	"config/manager/service.yaml":                      config_manager_service_yaml,
+	"config/crds/hive_v1alpha1_clusterdeployment.yaml":    config_crds_hive_v1alpha1_clusterdeployment_yaml,
+	"config/crds/hive_v1alpha1_dnszone.yaml":              config_crds_hive_v1alpha1_dnszone_yaml,
+	"config/crds/hive_v1alpha1_hive.yaml":                 config_crds_hive_v1alpha1_hive_yaml,
+	"config/crds/hive_v1alpha1_hiveadmission.yaml":        config_crds_hive_v1alpha1_hiveadmission_yaml,
+	"config/hiveadmission/apiservice.yaml":                config_hiveadmission_apiservice_yaml,
+	"config/hiveadmission/clusterdeployment-webhook.yaml": config_hiveadmission_clusterdeployment_webhook_yaml,
+	"config/hiveadmission/daemonset.yaml":                 config_hiveadmission_daemonset_yaml,
+	"config/hiveadmission/dnszones-webhook.yaml":          config_hiveadmission_dnszones_webhook_yaml,
+	"config/hiveadmission/service-account.yaml":           config_hiveadmission_service_account_yaml,
+	"config/hiveadmission/service.yaml":                   config_hiveadmission_service_yaml,
+	"config/manager/deployment.yaml":                      config_manager_deployment_yaml,
+	"config/manager/service.yaml":                         config_manager_service_yaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -1140,10 +1203,12 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 			"hive_v1alpha1_hiveadmission.yaml":     {config_crds_hive_v1alpha1_hiveadmission_yaml, map[string]*_bintree_t{}},
 		}},
 		"hiveadmission": {nil, map[string]*_bintree_t{
-			"apiservice.yaml":      {config_hiveadmission_apiservice_yaml, map[string]*_bintree_t{}},
-			"daemonset.yaml":       {config_hiveadmission_daemonset_yaml, map[string]*_bintree_t{}},
-			"service-account.yaml": {config_hiveadmission_service_account_yaml, map[string]*_bintree_t{}},
-			"service.yaml":         {config_hiveadmission_service_yaml, map[string]*_bintree_t{}},
+			"apiservice.yaml":                {config_hiveadmission_apiservice_yaml, map[string]*_bintree_t{}},
+			"clusterdeployment-webhook.yaml": {config_hiveadmission_clusterdeployment_webhook_yaml, map[string]*_bintree_t{}},
+			"daemonset.yaml":                 {config_hiveadmission_daemonset_yaml, map[string]*_bintree_t{}},
+			"dnszones-webhook.yaml":          {config_hiveadmission_dnszones_webhook_yaml, map[string]*_bintree_t{}},
+			"service-account.yaml":           {config_hiveadmission_service_account_yaml, map[string]*_bintree_t{}},
+			"service.yaml":                   {config_hiveadmission_service_yaml, map[string]*_bintree_t{}},
 		}},
 		"manager": {nil, map[string]*_bintree_t{
 			"deployment.yaml": {config_manager_deployment_yaml, map[string]*_bintree_t{}},

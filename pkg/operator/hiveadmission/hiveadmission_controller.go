@@ -161,9 +161,35 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 	haLog.Debug("reading apiservice")
 	hiveAdmAPIService := ReadAPIServiceV1Beta1OrDie(asset, r.scheme)
 
+	asset, err = assets.Asset("config/hiveadmission/dnszones-webhook.yaml")
+	if err != nil {
+		haLog.WithError(err).Error("error loading asset")
+		return reconcile.Result{}, err
+	}
+	haLog.Debug("reading DNSZones webhook")
+	dnsZonesWebhook := ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
+
+	asset, err = assets.Asset("config/hiveadmission/clusterdeployment-webhook.yaml")
+	if err != nil {
+		haLog.WithError(err).Error("error loading asset")
+		return reconcile.Result{}, err
+	}
+	haLog.Debug("reading ClusterDeployment webhook")
+	cdWebhook := ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
+
 	// Set owner refs on all objects in the deployment so deleting the operator CRD
 	// will clean everything up:
 	if err := controllerutil.SetControllerReference(instance, hiveAdmService, r.scheme); err != nil {
+		haLog.WithError(err).Info("error setting owner ref")
+		return reconcile.Result{}, err
+	}
+
+	if err := controllerutil.SetControllerReference(instance, dnsZonesWebhook, r.scheme); err != nil {
+		haLog.WithError(err).Info("error setting owner ref")
+		return reconcile.Result{}, err
+	}
+
+	if err := controllerutil.SetControllerReference(instance, cdWebhook, r.scheme); err != nil {
 		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}
@@ -225,7 +251,23 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 		haLog.WithField("changed", changed).Info("apiservice updated")
 	}
 
-	hLog.Info("HiveAdmission components reconciled")
+	_, changed, err = ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), dnsZonesWebhook)
+	if err != nil {
+		haLog.WithError(err).Error("error applying DNSZones webhook")
+		return reconcile.Result{}, err
+	} else {
+		haLog.WithField("changed", changed).Info("DNSZones webhook updated")
+	}
+
+	_, changed, err = ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), cdWebhook)
+	if err != nil {
+		haLog.WithError(err).Error("error applying ClusterDeployment webhook")
+		return reconcile.Result{}, err
+	} else {
+		haLog.WithField("changed", changed).Info("ClusterDeployment webhook updated")
+	}
+
+	haLog.Info("HiveAdmission components reconciled")
 
 	return reconcile.Result{}, nil
 }

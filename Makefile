@@ -66,8 +66,6 @@ run: generate fmt vet
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run-operator
 run-operator: generate fmt vet
-	# scale down the operator so we can run it from source
-	kubectl scale deployment.v1.apps/hive-operator --replicas=0
 	go run ./cmd/operator/main.go --log-level=debug
 
 # Install CRDs into a cluster

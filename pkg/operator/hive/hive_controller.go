@@ -137,6 +137,7 @@ func (r *ReconcileHive) Reconcile(request reconcile.Request) (reconcile.Result, 
 	})
 
 	// Ensure legacy DeploymentConfig is deleted, we switched to a Deployment:
+	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
 	dc := &oappsv1.DeploymentConfig{}
 	err = r.Get(context.Background(), types.NamespacedName{Name: legacyDeploymentConfig, Namespace: "openshift-hive"}, dc)
 	if err != nil && !errors.IsNotFound(err) {

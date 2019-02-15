@@ -20,14 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// HiveSpec defines the desired state of Hive
-type HiveSpec struct {
+// HiveConfigSpec defines the desired state of Hive
+type HiveConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
-// HiveStatus defines the observed state of Hive
-type HiveStatus struct {
+// HiveConfigStatus defines the observed state of Hive
+type HiveConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -35,25 +35,25 @@ type HiveStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Hive is the Schema for the hives API
+// HiveConfig is the Schema for the hives API
 // +k8s:openapi-gen=true
-type Hive struct {
+type HiveConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HiveSpec   `json:"spec,omitempty"`
-	Status HiveStatus `json:"status,omitempty"`
+	Spec   HiveConfigSpec   `json:"spec,omitempty"`
+	Status HiveConfigStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HiveList contains a list of Hive
-type HiveList struct {
+// HiveConfigList contains a list of Hive
+type HiveConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Hive `json:"items"`
+	Items           []HiveConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Hive{}, &HiveList{})
+	SchemeBuilder.Register(&HiveConfig{}, &HiveConfigList{})
 }

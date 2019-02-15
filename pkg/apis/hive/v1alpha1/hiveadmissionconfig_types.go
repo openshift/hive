@@ -20,14 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// HiveAdmissionSpec defines the desired state of HiveAdmission
-type HiveAdmissionSpec struct {
+// HiveAdmissionConfigSpec defines the desired state of HiveAdmission
+type HiveAdmissionConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
-// HiveAdmissionStatus defines the observed state of HiveAdmission
-type HiveAdmissionStatus struct {
+// HiveAdmissionConfigStatus defines the observed state of HiveAdmission
+type HiveAdmissionConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -35,25 +35,25 @@ type HiveAdmissionStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HiveAdmission is the Schema for the hiveadmissions API
+// HiveAdmissionConfig is the Schema for the hiveadmissions API
 // +k8s:openapi-gen=true
-type HiveAdmission struct {
+type HiveAdmissionConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   HiveAdmissionSpec   `json:"spec,omitempty"`
-	Status HiveAdmissionStatus `json:"status,omitempty"`
+	Spec   HiveAdmissionConfigSpec   `json:"spec,omitempty"`
+	Status HiveAdmissionConfigStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HiveAdmissionList contains a list of HiveAdmission
-type HiveAdmissionList struct {
+// HiveAdmissionConfigList contains a list of HiveAdmissionConfig.
+type HiveAdmissionConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []HiveAdmission `json:"items"`
+	Items           []HiveAdmissionConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&HiveAdmission{}, &HiveAdmissionList{})
+	SchemeBuilder.Register(&HiveAdmissionConfig{}, &HiveAdmissionConfigList{})
 }

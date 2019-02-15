@@ -773,18 +773,18 @@ func config_crds_hive_v1alpha1_dnszone_yaml() ([]byte, error) {
 	return _config_crds_hive_v1alpha1_dnszone_yaml, nil
 }
 
-var _config_crds_hive_v1alpha1_hive_yaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _config_crds_hive_v1alpha1_hiveadmissionconfig_yaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: hives.hive.openshift.io
+  name: hiveadmissionconfigs.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
-    kind: Hive
-    plural: hives
+    kind: HiveAdmissionConfig
+    plural: hiveadmissionconfigs
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -814,22 +814,22 @@ status:
   storedVersions: []
 `)
 
-func config_crds_hive_v1alpha1_hive_yaml() ([]byte, error) {
-	return _config_crds_hive_v1alpha1_hive_yaml, nil
+func config_crds_hive_v1alpha1_hiveadmissionconfig_yaml() ([]byte, error) {
+	return _config_crds_hive_v1alpha1_hiveadmissionconfig_yaml, nil
 }
 
-var _config_crds_hive_v1alpha1_hiveadmission_yaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _config_crds_hive_v1alpha1_hiveconfig_yaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: hiveadmissions.hive.openshift.io
+  name: hiveconfigs.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
-    kind: HiveAdmission
-    plural: hiveadmissions
+    kind: HiveConfig
+    plural: hiveconfigs
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -859,8 +859,8 @@ status:
   storedVersions: []
 `)
 
-func config_crds_hive_v1alpha1_hiveadmission_yaml() ([]byte, error) {
-	return _config_crds_hive_v1alpha1_hiveadmission_yaml, nil
+func config_crds_hive_v1alpha1_hiveconfig_yaml() ([]byte, error) {
+	return _config_crds_hive_v1alpha1_hiveconfig_yaml, nil
 }
 
 var _config_hiveadmission_apiservice_yaml = []byte(`---
@@ -1142,8 +1142,8 @@ func AssetNames() []string {
 var _bindata = map[string]func() ([]byte, error){
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":    config_crds_hive_v1alpha1_clusterdeployment_yaml,
 	"config/crds/hive_v1alpha1_dnszone.yaml":              config_crds_hive_v1alpha1_dnszone_yaml,
-	"config/crds/hive_v1alpha1_hive.yaml":                 config_crds_hive_v1alpha1_hive_yaml,
-	"config/crds/hive_v1alpha1_hiveadmission.yaml":        config_crds_hive_v1alpha1_hiveadmission_yaml,
+	"config/crds/hive_v1alpha1_hiveadmissionconfig.yaml":  config_crds_hive_v1alpha1_hiveadmissionconfig_yaml,
+	"config/crds/hive_v1alpha1_hiveconfig.yaml":           config_crds_hive_v1alpha1_hiveconfig_yaml,
 	"config/hiveadmission/apiservice.yaml":                config_hiveadmission_apiservice_yaml,
 	"config/hiveadmission/clusterdeployment-webhook.yaml": config_hiveadmission_clusterdeployment_webhook_yaml,
 	"config/hiveadmission/daemonset.yaml":                 config_hiveadmission_daemonset_yaml,
@@ -1197,10 +1197,10 @@ type _bintree_t struct {
 var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"config": {nil, map[string]*_bintree_t{
 		"crds": {nil, map[string]*_bintree_t{
-			"hive_v1alpha1_clusterdeployment.yaml": {config_crds_hive_v1alpha1_clusterdeployment_yaml, map[string]*_bintree_t{}},
-			"hive_v1alpha1_dnszone.yaml":           {config_crds_hive_v1alpha1_dnszone_yaml, map[string]*_bintree_t{}},
-			"hive_v1alpha1_hive.yaml":              {config_crds_hive_v1alpha1_hive_yaml, map[string]*_bintree_t{}},
-			"hive_v1alpha1_hiveadmission.yaml":     {config_crds_hive_v1alpha1_hiveadmission_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_clusterdeployment.yaml":   {config_crds_hive_v1alpha1_clusterdeployment_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_dnszone.yaml":             {config_crds_hive_v1alpha1_dnszone_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_hiveadmissionconfig.yaml": {config_crds_hive_v1alpha1_hiveadmissionconfig_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_hiveconfig.yaml":          {config_crds_hive_v1alpha1_hiveconfig_yaml, map[string]*_bintree_t{}},
 		}},
 		"hiveadmission": {nil, map[string]*_bintree_t{
 			"apiservice.yaml":                {config_hiveadmission_apiservice_yaml, map[string]*_bintree_t{}},

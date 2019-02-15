@@ -62,7 +62,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileHive{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileHiveConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -73,18 +73,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	r.(*ReconcileHive).kubeClient, err = kubernetes.NewForConfig(mgr.GetConfig())
+	r.(*ReconcileHiveConfig).kubeClient, err = kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
 
-	r.(*ReconcileHive).apiextClient, err = apiextclientv1beta1.NewForConfig(mgr.GetConfig())
+	r.(*ReconcileHiveConfig).apiextClient, err = apiextclientv1beta1.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Hive
-	err = c.Watch(&source.Kind{Type: &hivev1alpha1.Hive{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Uncomment watch a Deployment created by Hive - change this for objects you create
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1alpha1.Hive{},
+		OwnerType:    &hivev1alpha1.HiveConfig{},
 	})
 	if err != nil {
 		return err
@@ -102,10 +102,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileHive{}
+var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 
-// ReconcileHive reconciles a Hive object
-type ReconcileHive struct {
+// ReconcileHiveConfig reconciles a Hive object
+type ReconcileHiveConfig struct {
 	client.Client
 	scheme       *runtime.Scheme
 	kubeClient   kubernetes.Interface
@@ -114,13 +114,13 @@ type ReconcileHive struct {
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
 // and what is in the Hive.Spec
-func (r *ReconcileHive) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 
 	hLog := log.WithField("controller", "hive")
 	hLog.Info("Reconciling Hive components")
 
 	// Fetch the Hive instance
-	instance := &hivev1alpha1.Hive{}
+	instance := &hivev1alpha1.HiveConfig{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {

@@ -1,5 +1,5 @@
 apiVersion: hive.openshift.io/v1alpha1
-kind: Hive
+kind: HiveConfig
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"

@@ -47,7 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Add creates a new HiveAdmission Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// Add creates a new HiveAdmissionConfig Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -55,7 +55,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileHiveAdmission{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileHiveAdmissionConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -66,27 +66,27 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	r.(*ReconcileHiveAdmission).kubeClient, err = kubernetes.NewForConfig(mgr.GetConfig())
+	r.(*ReconcileHiveAdmissionConfig).kubeClient, err = kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
 
-	r.(*ReconcileHiveAdmission).apiregClient, err = apiregclientv1.NewForConfig(mgr.GetConfig())
+	r.(*ReconcileHiveAdmissionConfig).apiregClient, err = apiregclientv1.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to HiveAdmission
-	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveAdmission{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to HiveAdmissionConfig
+	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveAdmissionConfig{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by HiveAdmission - change this for objects you create
+	// Uncomment watch a Deployment created by HiveAdmissionConfig - change this for objects you create
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1alpha1.HiveAdmission{},
+		OwnerType:    &hivev1alpha1.HiveAdmissionConfig{},
 	})
 	if err != nil {
 		return err
@@ -95,24 +95,24 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileHiveAdmission{}
+var _ reconcile.Reconciler = &ReconcileHiveAdmissionConfig{}
 
-// ReconcileHiveAdmission reconciles a HiveAdmission object
-type ReconcileHiveAdmission struct {
+// ReconcileHiveAdmissionConfig reconciles a HiveAdmissionConfig object
+type ReconcileHiveAdmissionConfig struct {
 	client.Client
 	scheme       *runtime.Scheme
 	kubeClient   kubernetes.Interface
 	apiregClient *apiregclientv1.ApiregistrationV1Client
 }
 
-// Reconcile reads that state of the cluster for a HiveAdmission object and makes changes based on the state read
-// and what is in the HiveAdmission.Spec
-func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+// Reconcile reads that state of the cluster for a HiveAdmissionConfig object and makes changes based on the state read
+// and what is in the HiveAdmissionConfig.Spec
+func (r *ReconcileHiveAdmissionConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	haLog := log.WithField("controller", "hiveadmission")
-	haLog.Info("Reconciling HiveAdmission components")
+	haLog.Info("Reconciling HiveAdmissionConfig components")
 
-	// Fetch the HiveAdmission instance
-	instance := &hivev1alpha1.HiveAdmission{}
+	// Fetch the HiveAdmissionConfig instance
+	instance := &hivev1alpha1.HiveAdmissionConfig{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -267,7 +267,7 @@ func (r *ReconcileHiveAdmission) Reconcile(request reconcile.Request) (reconcile
 		haLog.WithField("changed", changed).Info("ClusterDeployment webhook updated")
 	}
 
-	haLog.Info("HiveAdmission components reconciled")
+	haLog.Info("HiveAdmissionConfig components reconciled")
 
 	return reconcile.Result{}, nil
 }

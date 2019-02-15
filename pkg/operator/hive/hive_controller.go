@@ -51,6 +51,7 @@ import (
 
 const (
 	legacyDeploymentConfig = "hive-controller-manager"
+	legacyService          = "hive-controller-manager-service"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -153,6 +154,25 @@ func (r *ReconcileHive) Reconcile(request reconcile.Request) (reconcile.Result, 
 			return reconcile.Result{}, err
 		}
 		hLog.WithField("DeploymentConfig", legacyDeploymentConfig).Info("deleted legacy DeploymentConfig")
+	}
+
+	// Ensure legacy Service is deleted, renamed.
+	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
+	oldSvc := &corev1.Service{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: legacyService, Namespace: "openshift-hive"}, oldSvc)
+	if err != nil && !errors.IsNotFound(err) {
+		hLog.WithError(err).Error("error looking up legacy Service")
+		return reconcile.Result{}, err
+	} else if err != nil {
+		hLog.WithField("Service", legacyService).Debug("legacy Service does not exist")
+	} else {
+		err = r.Delete(context.Background(), oldSvc)
+		if err != nil {
+			hLog.WithError(err).WithField("Service", legacyService).Error(
+				"error deleting legacy Service")
+			return reconcile.Result{}, err
+		}
+		hLog.WithField("Service", legacyService).Info("deleted legacy Service")
 	}
 
 	// Parse yaml for all Hive objects:

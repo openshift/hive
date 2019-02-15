@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: hive-controller-manager-service
+  name: hive-controllers-service
   namespace: openshift-hive
   labels:
     control-plane: controller-manager

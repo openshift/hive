@@ -1056,7 +1056,7 @@ var _config_manager_deployment_yaml = []byte(`---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hive-controller-manager
+  name: hive-controllers
   namespace: openshift-hive
   labels:
     control-plane: controller-manager
@@ -1101,7 +1101,7 @@ var _config_manager_service_yaml = []byte(`---
 apiVersion: v1
 kind: Service
 metadata:
-  name: hive-controller-manager-service
+  name: hive-controllers-service
   namespace: openshift-hive
   labels:
     control-plane: controller-manager

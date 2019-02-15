@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hive-controller-manager
+  name: hive-controllers
   namespace: openshift-hive
   labels:
     control-plane: controller-manager

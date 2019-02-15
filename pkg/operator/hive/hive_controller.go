@@ -258,6 +258,14 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		expectedDeploymentGen = currentDeployment.ObjectMeta.Generation
 	}
 
+	if instance.Spec.Image != "" {
+		hLog.WithFields(log.Fields{
+			"orig": hiveDeployment.Spec.Template.Spec.Containers[0].Image,
+			"new":  instance.Spec.Image,
+		}).Info("overriding deployment image")
+		hiveDeployment.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
+	}
+
 	_, changed, err = resourceapply.ApplyDeployment(r.kubeClient.AppsV1(),
 		recorder, hiveDeployment, expectedDeploymentGen, false)
 	if err != nil {

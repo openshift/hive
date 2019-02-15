@@ -5,4 +5,4 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: hive
 spec:
-  foo: bar
+  image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive

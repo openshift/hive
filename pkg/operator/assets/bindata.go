@@ -802,6 +802,11 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            image:
+              description: Image controls the image used for HiveAdmission pods. Default
+                is to use latest master images.
+              type: string
           type: object
         status:
           type: object
@@ -847,6 +852,12 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            image:
+              description: Image controls the image used for the Hive controllers,
+                as well as deprovision pods. The default if left empty is to use latest
+                master.
+              type: string
           type: object
         status:
           type: object

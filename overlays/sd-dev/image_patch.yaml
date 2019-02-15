@@ -52,3 +52,17 @@ spec:
             path: /healthz
             port: 9443
             scheme: HTTPS
+---
+apiVersion: hive.openshift.io/v1alpha1
+kind: HiveAdmissionConfig
+metadata:
+  name: hiveadmission
+spec:
+  image: quay.io/twiest/hive-controller:20190128
+---
+apiVersion: hive.openshift.io/v1alpha1
+kind: HiveConfig
+metadata:
+  name: hive
+spec:
+  image: quay.io/twiest/hive-controller:20190128

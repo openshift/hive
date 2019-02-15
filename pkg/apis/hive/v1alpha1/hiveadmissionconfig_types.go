@@ -22,14 +22,13 @@ import (
 
 // HiveAdmissionConfigSpec defines the desired state of HiveAdmission
 type HiveAdmissionConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Image controls the image used for HiveAdmission pods.
+	// Default is to use latest master images.
+	Image string `json:"image,omitempty"`
 }
 
 // HiveAdmissionConfigStatus defines the observed state of HiveAdmission
 type HiveAdmissionConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 }
 
 // +genclient

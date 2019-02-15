@@ -235,6 +235,17 @@ func (r *ReconcileHiveAdmissionConfig) Reconcile(request reconcile.Request) (rec
 		expectedDSGen = currentDS.ObjectMeta.Generation
 	}
 
+	if instance.Spec.Image != "" {
+		haLog.WithFields(log.Fields{
+			"orig": hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image,
+			"new":  instance.Spec.Image,
+		}).Info("overriding deployment image")
+		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
+	}
+	haLog.WithFields(log.Fields{
+		"orig": hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image,
+	}).Info("did it work?")
+
 	_, changed, err = resourceapply.ApplyDaemonSet(r.kubeClient.AppsV1(), recorder, hiveAdmDaemonSet, expectedDSGen, false)
 	if err != nil {
 		haLog.WithError(err).Error("error applying daemonset")

@@ -22,14 +22,13 @@ import (
 
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Image controls the image used for the Hive controllers, as well
+	// as deprovision pods. The default if left empty is to use latest master.
+	Image string `json:"image,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
 type HiveConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 }
 
 // +genclient

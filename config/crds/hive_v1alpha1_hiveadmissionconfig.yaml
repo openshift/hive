@@ -27,6 +27,11 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            image:
+              description: Image controls the image used for HiveAdmission pods. Default
+                is to use latest master images.
+              type: string
           type: object
         status:
           type: object

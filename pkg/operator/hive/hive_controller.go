@@ -52,6 +52,8 @@ import (
 const (
 	legacyDeploymentConfig = "hive-controller-manager"
 	legacyService          = "hive-controller-manager-service"
+	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
+	hiveConfigName = "hive"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -130,6 +132,13 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+
+	// We only support one HiveConfig per cluster, and it must be called "hive". This prevents installing
+	// Hive more than once in the cluster.
+	if instance.Name != hiveConfigName {
+		hLog.WithField("hiveConfig", instance.Name).Warn("invalid HiveConfig name, only one HiveConfig supported per cluster and must be named 'hive'")
+		return reconcile.Result{}, nil
 	}
 
 	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(request.Namespace), "hive-operator", &corev1.ObjectReference{

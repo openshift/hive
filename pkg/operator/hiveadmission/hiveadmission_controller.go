@@ -47,6 +47,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const (
+	// hiveAdmissionConfigName is the one and only name for a HiveAdmissionConfig supported in the cluster. Any others will be ignored.
+	hiveAdmissionConfigName = "hiveadmission"
+)
+
 // Add creates a new HiveAdmissionConfig Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -122,6 +127,13 @@ func (r *ReconcileHiveAdmissionConfig) Reconcile(request reconcile.Request) (rec
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+
+	// We only support one HiveAdmissionConfig per cluster, and it must be called "hiveadmission". This prevents installing
+	// Hive more than once in the cluster.
+	if instance.Name != hiveAdmissionConfigName {
+		haLog.WithField("hiveAdmissionConfig", instance.Name).Warn("invalid HiveAdmissionConfig name, only one HiveAdmissionConfig supported per cluster and must be named 'hiveadmission'")
+		return reconcile.Result{}, nil
 	}
 
 	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(request.Namespace), "hive-operator", &corev1.ObjectReference{

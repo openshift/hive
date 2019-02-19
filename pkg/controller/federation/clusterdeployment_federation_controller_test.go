@@ -101,6 +101,14 @@ func TestReconcile(t *testing.T) {
 			validateFederatedCluster: hasAnnotationsAndLabels,
 		},
 		{
+			name: "cluster deployment federated with no cluster ref -> fed cluster should get legacy cluster ref set",
+			existing: []runtime.Object{
+				federated(withFinalizer(installed(testClusterDeployment()))),
+				testFederatedCluster(),
+			},
+			validateClusterDeployment: hasLegacyFedClusterRef,
+		},
+		{
 			name: "cluster deployment with finalizer is deleted -> finalizer should be removed",
 			existing: []runtime.Object{
 				withDeletionTimestamp(withFinalizer(installed(testClusterDeployment()))),
@@ -290,6 +298,13 @@ func isSameCD(cd *hivev1.ClusterDeployment) func(*testing.T, *hivev1.ClusterDepl
 func hasFedClusterRef(t *testing.T, cd *hivev1.ClusterDeployment) {
 	if cd.Status.FederatedClusterRef == nil || cd.Status.FederatedClusterRef.Name == "" {
 		t.Errorf("federated cluster ref is not set")
+	}
+}
+
+func hasLegacyFedClusterRef(t *testing.T, cd *hivev1.ClusterDeployment) {
+	hasFedClusterRef(t, cd)
+	if cd.Status.FederatedClusterRef.Name != legacyFederatedClusterName(cd) {
+		t.Errorf("federated cluster ref is not legacy ref")
 	}
 }
 

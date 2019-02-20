@@ -82,8 +82,8 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
 - Update image versions in Kustomize and README:
   ```shell
   > cd "${HIVE_SRC}"
-  > sed -r -i -e "s%quay.io/twiest/hive-controller:[0-9]{8}%quay.io/twiest/hive-controller:${RELEASE_VER}%" README.md overlays/sd-dev/image_patch.yaml
-  > sed -r -i -e "s%quay.io/twiest/installer:[0-9]{8}%quay.io/twiest/installer:${RELEASE_VER}%" README.md overlays/sd-dev/image_patch.yaml
+  > sed -r -i -e "s%quay.io/twiest/hive-controller:[0-9]{8}%quay.io/twiest/hive-controller:${RELEASE_VER}%" README.md
+  > sed -r -i -e "s%quay.io/twiest/installer:[0-9]{8}%quay.io/twiest/installer:${RELEASE_VER}%" README.md
   ```
 
 - Commit and push changes
@@ -101,7 +101,7 @@ The purpose of this doc is to show how to do a deployment of OpenShift Hive for 
 - Deploy the new OpenShift Hive build:
   ```shell
   > cd "${HIVE_SRC}"
-  > GOPATH="${HIVE_GOPATH}" make deploy-sd-dev
+  > GOPATH="${HIVE_GOPATH}" DEPLOY_IMAGE="${HIVE_IMAGE_TAG}" make deploy
   ```
 - Test deploying a cluster using the instructions in the README. Make sure to use the instructions that use remote images and that the remote images are the new ones that were just built.
 

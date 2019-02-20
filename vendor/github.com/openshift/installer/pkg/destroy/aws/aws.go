@@ -1178,19 +1178,21 @@ func deleteRoute53(session *session.Session, arn arn.ARN, logger logrus.FieldLog
 	}
 
 	sharedEntries := map[string]*route53.ResourceRecordSet{}
-	err = client.ListResourceRecordSetsPages(
-		&route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(sharedZoneID)},
-		func(results *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
-			for _, recordSet := range results.ResourceRecordSets {
-				key := recordSetKey(recordSet)
-				sharedEntries[key] = recordSet
-			}
+	if len(sharedZoneID) != 0 {
+		err = client.ListResourceRecordSetsPages(
+			&route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(sharedZoneID)},
+			func(results *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+				for _, recordSet := range results.ResourceRecordSets {
+					key := recordSetKey(recordSet)
+					sharedEntries[key] = recordSet
+				}
 
-			return !lastPage
-		},
-	)
-	if err != nil {
-		return err
+				return !lastPage
+			},
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	var lastError error

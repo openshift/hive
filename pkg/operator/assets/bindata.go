@@ -773,56 +773,6 @@ func config_crds_hive_v1alpha1_dnszone_yaml() ([]byte, error) {
 	return _config_crds_hive_v1alpha1_dnszone_yaml, nil
 }
 
-var _config_crds_hive_v1alpha1_hiveadmissionconfig_yaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: hiveadmissionconfigs.hive.openshift.io
-spec:
-  group: hive.openshift.io
-  names:
-    kind: HiveAdmissionConfig
-    plural: hiveadmissionconfigs
-  scope: Namespaced
-  validation:
-    openAPIV3Schema:
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          properties:
-            image:
-              description: Image controls the image used for HiveAdmission pods. Default
-                is to use latest master images.
-              type: string
-          type: object
-        status:
-          type: object
-  version: v1alpha1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-`)
-
-func config_crds_hive_v1alpha1_hiveadmissionconfig_yaml() ([]byte, error) {
-	return _config_crds_hive_v1alpha1_hiveadmissionconfig_yaml, nil
-}
-
 var _config_crds_hive_v1alpha1_hiveconfig_yaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -1153,7 +1103,6 @@ func AssetNames() []string {
 var _bindata = map[string]func() ([]byte, error){
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":    config_crds_hive_v1alpha1_clusterdeployment_yaml,
 	"config/crds/hive_v1alpha1_dnszone.yaml":              config_crds_hive_v1alpha1_dnszone_yaml,
-	"config/crds/hive_v1alpha1_hiveadmissionconfig.yaml":  config_crds_hive_v1alpha1_hiveadmissionconfig_yaml,
 	"config/crds/hive_v1alpha1_hiveconfig.yaml":           config_crds_hive_v1alpha1_hiveconfig_yaml,
 	"config/hiveadmission/apiservice.yaml":                config_hiveadmission_apiservice_yaml,
 	"config/hiveadmission/clusterdeployment-webhook.yaml": config_hiveadmission_clusterdeployment_webhook_yaml,
@@ -1208,10 +1157,9 @@ type _bintree_t struct {
 var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"config": {nil, map[string]*_bintree_t{
 		"crds": {nil, map[string]*_bintree_t{
-			"hive_v1alpha1_clusterdeployment.yaml":   {config_crds_hive_v1alpha1_clusterdeployment_yaml, map[string]*_bintree_t{}},
-			"hive_v1alpha1_dnszone.yaml":             {config_crds_hive_v1alpha1_dnszone_yaml, map[string]*_bintree_t{}},
-			"hive_v1alpha1_hiveadmissionconfig.yaml": {config_crds_hive_v1alpha1_hiveadmissionconfig_yaml, map[string]*_bintree_t{}},
-			"hive_v1alpha1_hiveconfig.yaml":          {config_crds_hive_v1alpha1_hiveconfig_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_clusterdeployment.yaml": {config_crds_hive_v1alpha1_clusterdeployment_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_dnszone.yaml":           {config_crds_hive_v1alpha1_dnszone_yaml, map[string]*_bintree_t{}},
+			"hive_v1alpha1_hiveconfig.yaml":        {config_crds_hive_v1alpha1_hiveconfig_yaml, map[string]*_bintree_t{}},
 		}},
 		"hiveadmission": {nil, map[string]*_bintree_t{
 			"apiservice.yaml":                {config_hiveadmission_apiservice_yaml, map[string]*_bintree_t{}},

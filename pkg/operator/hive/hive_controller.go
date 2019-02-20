@@ -22,15 +22,13 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	"github.com/openshift/hive/pkg/operator/assets"
 
 	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 
 	apiextclientv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	apiregclientv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +38,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -78,6 +75,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	r.(*ReconcileHiveConfig).apiregClient, err = apiregclientv1.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+
 	r.(*ReconcileHiveConfig).apiextClient, err = apiextclientv1beta1.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
@@ -85,6 +87,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to HiveConfig:
 	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Monitor changes to DaemonSets:
+	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1alpha1.HiveConfig{},
+	})
 	if err != nil {
 		return err
 	}
@@ -110,6 +121,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,
 	// and our config is namespaced)
 
+	// TODO: it would be nice to monitor the global resources ValidatingWebhookConfiguration
+	// and APIService, CRDs, but these cannot have OwnerReferences (which are not namespaced) as they
+	// are global. Need to use a different predicate to the Watch function.
+
 	return nil
 }
 
@@ -121,6 +136,7 @@ type ReconcileHiveConfig struct {
 	scheme       *runtime.Scheme
 	kubeClient   kubernetes.Interface
 	apiextClient *apiextclientv1beta1.ApiextensionsV1beta1Client
+	apiregClient *apiregclientv1.ApiregistrationV1Client
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
@@ -157,13 +173,37 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Namespace: request.Namespace,
 	})
 
+	err = r.deleteLegacyComponents(hLog)
+	if err != nil {
+		hLog.WithError(err).Error("error deleting legacy components")
+		return reconcile.Result{}, err
+	}
+
+	err = r.deployHive(hLog, instance, recorder)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying Hive")
+		return reconcile.Result{}, err
+	}
+
+	err = r.deployHiveAdmission(hLog, instance, recorder)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying HiveAdmission")
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
+}
+
+// deleteLegacyComponents deletes Hive components that once existed but have since
+// been removed or renamed.
+func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error {
 	// Ensure legacy DeploymentConfig is deleted, we switched to a Deployment:
 	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
 	dc := &oappsv1.DeploymentConfig{}
-	err = r.Get(context.Background(), types.NamespacedName{Name: legacyDeploymentConfig, Namespace: "openshift-hive"}, dc)
+	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDeploymentConfig, Namespace: "openshift-hive"}, dc)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up legacy DeploymentConfig")
-		return reconcile.Result{}, err
+		return err
 	} else if err != nil {
 		hLog.WithField("DeploymentConfig", legacyDeploymentConfig).Debug("legacy DeploymentConfig does not exist")
 	} else {
@@ -171,7 +211,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		if err != nil {
 			hLog.WithError(err).WithField("DeploymentConfig", legacyDeploymentConfig).Error(
 				"error deleting legacy DeploymentConfig")
-			return reconcile.Result{}, err
+			return err
 		}
 		hLog.WithField("DeploymentConfig", legacyDeploymentConfig).Info("deleted legacy DeploymentConfig")
 	}
@@ -182,7 +222,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	err = r.Get(context.Background(), types.NamespacedName{Name: legacyService, Namespace: "openshift-hive"}, oldSvc)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up legacy Service")
-		return reconcile.Result{}, err
+		return err
 	} else if err != nil {
 		hLog.WithField("Service", legacyService).Debug("legacy Service does not exist")
 	} else {
@@ -190,112 +230,9 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		if err != nil {
 			hLog.WithError(err).WithField("Service", legacyService).Error(
 				"error deleting legacy Service")
-			return reconcile.Result{}, err
+			return err
 		}
 		hLog.WithField("Service", legacyService).Info("deleted legacy Service")
 	}
-
-	// Parse yaml for all Hive objects:
-	asset, err := assets.Asset("config/crds/hive_v1alpha1_clusterdeployment.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return reconcile.Result{}, err
-	}
-	hLog.Debug("reading ClusterDeployment CRD")
-	clusterDeploymentCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
-
-	asset, err = assets.Asset("config/crds/hive_v1alpha1_dnszone.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return reconcile.Result{}, err
-	}
-	hLog.Debug("reading DNSZone CRD")
-	dnsZoneCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
-
-	asset, err = assets.Asset("config/manager/service.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return reconcile.Result{}, err
-	}
-	hLog.Debug("reading service")
-	hiveSvc := resourceread.ReadServiceV1OrDie(asset)
-
-	asset, err = assets.Asset("config/manager/deployment.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return reconcile.Result{}, err
-	}
-	hLog.Debug("reading deployment")
-	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
-
-	// Set owner refs on all objects in the deployment so deleting the operator CRD
-	// will clean everything up:
-	// NOTE: we do not cleanup the CRDs themselves so as not to destroy data.
-	if err := controllerutil.SetControllerReference(instance, hiveSvc, r.scheme); err != nil {
-		hLog.WithError(err).Info("error setting owner ref")
-		return reconcile.Result{}, err
-	}
-
-	if err := controllerutil.SetControllerReference(instance, hiveDeployment, r.scheme); err != nil {
-		hLog.WithError(err).Info("error setting owner ref")
-		return reconcile.Result{}, err
-	}
-
-	_, changed, err := resourceapply.ApplyCustomResourceDefinition(r.apiextClient,
-		recorder, clusterDeploymentCRD)
-	if err != nil {
-		hLog.WithError(err).Error("error applying ClusterDeployment CRD")
-		return reconcile.Result{}, err
-	} else {
-		hLog.WithField("changed", changed).Info("ClusterDeployment CRD updated")
-	}
-
-	_, changed, err = resourceapply.ApplyCustomResourceDefinition(r.apiextClient,
-		recorder, dnsZoneCRD)
-	if err != nil {
-		hLog.WithError(err).Error("error applying DNSZone CRD")
-		return reconcile.Result{}, err
-	} else {
-		hLog.WithField("changed", changed).Info("DNSZone CRD updated")
-	}
-
-	_, changed, err = resourceapply.ApplyService(r.kubeClient.CoreV1(),
-		recorder, hiveSvc)
-	if err != nil {
-		hLog.WithError(err).Error("error applying service")
-		return reconcile.Result{}, err
-	} else {
-		hLog.WithField("changed", changed).Info("service updated")
-	}
-
-	expectedDeploymentGen := int64(0)
-	currentDeployment := &appsv1.Deployment{}
-	err = r.Get(context.Background(), types.NamespacedName{Name: hiveDeployment.Name, Namespace: hiveDeployment.Namespace}, currentDeployment)
-	if err != nil && !errors.IsNotFound(err) {
-		hLog.WithError(err).Error("error looking up current deployment")
-		return reconcile.Result{}, err
-	} else if err == nil {
-		expectedDeploymentGen = currentDeployment.ObjectMeta.Generation
-	}
-
-	if instance.Spec.Image != "" {
-		hLog.WithFields(log.Fields{
-			"orig": hiveDeployment.Spec.Template.Spec.Containers[0].Image,
-			"new":  instance.Spec.Image,
-		}).Info("overriding deployment image")
-		hiveDeployment.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
-	}
-
-	_, changed, err = resourceapply.ApplyDeployment(r.kubeClient.AppsV1(),
-		recorder, hiveDeployment, expectedDeploymentGen, false)
-	if err != nil {
-		hLog.WithError(err).Error("error applying deployment")
-		return reconcile.Result{}, err
-	} else {
-		hLog.WithField("changed", changed).Info("deployment updated")
-	}
-
-	hLog.Info("Hive components reconciled")
-
-	return reconcile.Result{}, nil
+	return nil
 }

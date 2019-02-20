@@ -25,13 +25,6 @@ spec:
       terminationGracePeriodSeconds: 10
 ---
 apiVersion: hive.openshift.io/v1alpha1
-kind: HiveAdmissionConfig
-metadata:
-  name: hiveadmission
-spec:
-  image: IMAGE_REF
----
-apiVersion: hive.openshift.io/v1alpha1
 kind: HiveConfig
 metadata:
   name: hive

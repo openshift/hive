@@ -30,16 +30,14 @@ import (
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 
-	//apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextclientv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/kubernetes"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -85,14 +83,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to Hive
+	// Watch for changes to HiveConfig:
 	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by Hive - change this for objects you create
+	// Monitor changes to Deployments:
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1alpha1.HiveConfig{},
@@ -100,6 +97,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	// Monitor changes to Services:
+	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1alpha1.HiveConfig{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,
+	// and our config is namespaced)
 
 	return nil
 }
@@ -128,9 +137,11 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
+			hLog.Debug("HiveConfig not found, deleted?")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		hLog.WithError(err).Error("error reading HiveConfig")
 		return reconcile.Result{}, err
 	}
 

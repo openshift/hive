@@ -31,7 +31,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -87,15 +86,36 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by HiveAdmissionConfig - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+	// Monitor changes to DaemonSets:
+	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1alpha1.HiveAdmissionConfig{},
 	})
 	if err != nil {
 		return err
 	}
+
+	// Monitor changes to Services:
+	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1alpha1.HiveAdmissionConfig{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Monitor changes to ServiceAccounts:
+	err = c.Watch(&source.Kind{Type: &corev1.ServiceAccount{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1alpha1.HiveAdmissionConfig{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// TODO: it would be nice to monitor the global resources ValidatingWebhookConfiguration
+	// and APIService, CRDs, but these cannot have OwnerReferences (which are not namespaced) as they
+	// are global. Need to use a different predicate to the Watch function.
 
 	return nil
 }
@@ -118,14 +138,17 @@ func (r *ReconcileHiveAdmissionConfig) Reconcile(request reconcile.Request) (rec
 
 	// Fetch the HiveAdmissionConfig instance
 	instance := &hivev1alpha1.HiveAdmissionConfig{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.Get(context.Background(), request.NamespacedName, instance)
+	haLog.Debugf("%v", request.NamespacedName)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
+			haLog.WithError(err).Debug("HiveAdmissionConfig not found, deleted?")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		haLog.WithError(err).Error("error reading HiveAdmissionConfig")
 		return reconcile.Result{}, err
 	}
 
@@ -196,27 +219,12 @@ func (r *ReconcileHiveAdmissionConfig) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	if err := controllerutil.SetControllerReference(instance, dnsZonesWebhook, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting owner ref")
-		return reconcile.Result{}, err
-	}
-
-	if err := controllerutil.SetControllerReference(instance, cdWebhook, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting owner ref")
-		return reconcile.Result{}, err
-	}
-
 	if err := controllerutil.SetControllerReference(instance, hiveAdmServiceAcct, r.scheme); err != nil {
 		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}
 
 	if err := controllerutil.SetControllerReference(instance, hiveAdmDaemonSet, r.scheme); err != nil {
-		haLog.WithError(err).Info("error setting owner ref")
-		return reconcile.Result{}, err
-	}
-
-	if err := controllerutil.SetControllerReference(instance, hiveAdmAPIService, r.scheme); err != nil {
 		haLog.WithError(err).Info("error setting owner ref")
 		return reconcile.Result{}, err
 	}

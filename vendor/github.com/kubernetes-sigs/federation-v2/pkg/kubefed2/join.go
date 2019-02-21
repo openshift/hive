@@ -17,8 +17,10 @@ limitations under the License.
 package kubefed2
 
 import (
+	goerrors "errors"
 	"io"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -89,6 +91,7 @@ type joinFederationOptions struct {
 	secretName      string
 	addToRegistry   bool
 	limitedScope    bool
+	hostClusterName string
 	errorOnExisting bool
 }
 
@@ -103,6 +106,8 @@ func (o *joinFederationOptions) Bind(flags *pflag.FlagSet) {
 		"Add the cluster to the cluster registry that is aggregated with the kubernetes API server running in the host cluster context.")
 	flags.BoolVar(&o.limitedScope, "limited-scope", false,
 		"Whether the federation namespace (configurable via --federation-namespace) will be the only target for federation.  If true, join will add a service account with access only to the federation namespace in the target cluster.")
+	flags.StringVar(&o.hostClusterName, "host-cluster-name", "",
+		"If set, overrides the use of host-cluster-context name in resource names created in the target cluster. This option must be used when the context name has characters invalid for kubernetes resources like \"/\" and \":\".")
 	flags.BoolVar(&o.errorOnExisting, "error-on-existing", false,
 		"Whether the join operation will throw an error if it encounters existing artifacts with the same name as those it's trying to create. If false, the join operation will update existing artifacts to match its own specification.")
 }
@@ -149,6 +154,14 @@ func (j *joinFederation) Complete(args []string) error {
 		j.clusterContext = j.ClusterName
 	}
 
+	if j.hostClusterName != "" && strings.ContainsAny(j.hostClusterName, ":/") {
+		return goerrors.New("host-cluster-name may not contain \"/\" or \":\"")
+	}
+
+	if j.hostClusterName == "" && strings.ContainsAny(j.HostClusterContext, ":/") {
+		glog.Fatal("host-cluster-name must be set if the name of the host cluster context contains one of \":\" or \"/\"")
+	}
+
 	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, registry-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, limited-scope: %v, dry-run: %v",
 		j.ClusterName, j.HostClusterContext, j.FederationNamespace, j.ClusterNamespace, j.Kubeconfig, j.clusterContext,
 		j.secretName, j.limitedScope, j.DryRun)
@@ -172,14 +185,19 @@ func (j *joinFederation) Run(cmdOut io.Writer, config util.FedConfig) error {
 		return err
 	}
 
+	hostClusterName := j.HostClusterContext
+	if j.hostClusterName != "" {
+		hostClusterName = j.hostClusterName
+	}
+
 	return JoinCluster(hostConfig, clusterConfig, j.FederationNamespace, j.ClusterNamespace,
-		j.HostClusterContext, j.ClusterName, j.secretName, j.addToRegistry, j.limitedScope, j.DryRun, j.errorOnExisting)
+		hostClusterName, j.ClusterName, j.secretName, j.addToRegistry, j.limitedScope, j.DryRun, j.errorOnExisting)
 }
 
 // JoinCluster performs all the necessary steps to join a cluster to the
 // federation provided the required set of parameters are passed in.
 func JoinCluster(hostConfig, clusterConfig *rest.Config, federationNamespace, clusterNamespace,
-	hostClusterContext, joiningClusterName, secretName string, addToRegistry, limitedScope, dryRun, errorOnExisting bool) error {
+	hostClusterName, joiningClusterName, secretName string, addToRegistry, limitedScope, dryRun, errorOnExisting bool) error {
 	hostClientset, err := util.HostClientset(hostConfig)
 	if err != nil {
 		glog.V(2).Infof("Failed to get host cluster clientset: %v", err)
@@ -199,7 +217,7 @@ func JoinCluster(hostConfig, clusterConfig *rest.Config, federationNamespace, cl
 	}
 
 	glog.V(2).Infof("Performing preflight checks.")
-	err = performPreflightChecks(clusterClientset, joiningClusterName, hostClusterContext, federationNamespace, errorOnExisting)
+	err = performPreflightChecks(clusterClientset, joiningClusterName, hostClusterName, federationNamespace, errorOnExisting)
 	if err != nil {
 		return err
 	}
@@ -233,7 +251,7 @@ func JoinCluster(hostConfig, clusterConfig *rest.Config, federationNamespace, cl
 	glog.V(2).Info("Creating cluster credentials secret")
 
 	secret, err := createRBACSecret(hostClientset, clusterClientset,
-		federationNamespace, joiningClusterName, hostClusterContext,
+		federationNamespace, joiningClusterName, hostClusterName,
 		secretName, limitedScope, dryRun, errorOnExisting)
 	if err != nil {
 		glog.V(2).Infof("Could not create cluster credentials secret: %v", err)
@@ -257,10 +275,10 @@ func JoinCluster(hostConfig, clusterConfig *rest.Config, federationNamespace, cl
 
 // performPreflightChecks checks that the host and joining clusters are in
 // a consistent state.
-func performPreflightChecks(clusterClientset client.Interface, name, hostClusterContext,
+func performPreflightChecks(clusterClientset client.Interface, name, hostClusterName,
 	federationNamespace string, errorOnExisting bool) error {
 	// Make sure there is no existing service account in the joining cluster.
-	saName := util.ClusterServiceAccountName(name, hostClusterContext)
+	saName := util.ClusterServiceAccountName(name, hostClusterName)
 	_, err := clusterClientset.CoreV1().ServiceAccounts(federationNamespace).Get(saName,
 		metav1.GetOptions{})
 
@@ -412,7 +430,7 @@ func createFederatedCluster(fedClientset fedclient.Interface, joiningClusterName
 	default:
 		fedCluster, err = fedClientset.CoreV1alpha1().FederatedClusters(federationNamespace).Create(fedCluster)
 		if err != nil {
-			glog.V(2).Infof("Could not created federated cluster %s due to %v", fedCluster.Name, err)
+			glog.V(2).Infof("Could not create federated cluster %s due to %v", fedCluster.Name, err)
 			return nil, err
 		}
 		return fedCluster, nil

@@ -462,7 +462,7 @@
 
 [[projects]]
   branch = "idempotent_join"
-  digest = "1:14dca68179869d854bb8ac77833dcd35a57a9162ed3bbf2fe49adcc48619723d"
+  digest = "1:752d95f0e80c7e8845230834b59038e92eeac45368d93dbb06b32aa5c9b178c6"
   name = "github.com/kubernetes-sigs/federation-v2"
   packages = [
     "pkg/apis/core/common",
@@ -483,7 +483,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "2c2f8fefbd2dfac2a6654933550ab01fbde5ccd0"
+  revision = "145f95e3b161d83bda2de155c54a2db88d865d4d"
   source = "github.com/csrwng/federation-v2"
 
 [[projects]]
@@ -625,6 +625,29 @@
   revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
 
 [[projects]]
+  branch = "master"
+  digest = "1:af1e2473c2f486475a443cb284779c8dfd7fe0df8f7b597577b2d42d47713749"
+  name = "github.com/openshift/cloud-credential-operator"
+  packages = [
+    "pkg/apis/cloudcredential/v1beta1",
+    "pkg/aws",
+    "pkg/controller/assets",
+    "pkg/controller/utils",
+  ]
+  pruneopts = "NUT"
+  revision = "47261953fd5974ba24072148d53ec4c919f6ad8f"
+
+[[projects]]
+  digest = "1:35a1d3d1166a3a74d696180e74d6fd0e5179747d2626ca4586bdc9ca45641544"
+  name = "github.com/openshift/cluster-api"
+  packages = [
+    "pkg/apis/machine/common",
+    "pkg/apis/machine/v1beta1",
+  ]
+  pruneopts = "NUT"
+  revision = "91fca585a85b163ddfd119fd09c128c9feadddca"
+
+[[projects]]
   digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
   name = "github.com/openshift/cluster-network-operator"
   packages = ["pkg/apis/networkoperator/v1"]
@@ -646,7 +669,8 @@
   source = "github.com/csrwng/generic-admission-server"
 
 [[projects]]
-  digest = "1:c7b223f08823b75d6f290d860aa833f3a5345757e8e3028be63973f7800c5d1a"
+  branch = "master"
+  digest = "1:d96bae09081244ee11330c8aef996bec80c6bcab1908f115aca87f1725e372d0"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -662,8 +686,7 @@
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "b9dbde6de9c0c80716a87312032df38a013d3af2"
-  version = "v0.12.0"
+  revision = "c957fa46636b78189b5dbac076b7371f53fe8831"
 
 [[projects]]
   branch = "master"
@@ -1042,6 +1065,14 @@
   pruneopts = "NUT"
   revision = "d2d2541c53f18d2a059457998ce2876cc8e67cbf"
   version = "v0.9.1"
+
+[[projects]]
+  digest = "1:d74ba1aea6244ead12e4f16d5f61a15ced9a2f2d1cae2021fbb76088b27e7afa"
+  name = "gopkg.in/ini.v1"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "c85607071cf08ca1adaf48319cd1aa322e81d8c1"
+  version = "v1.42.0"
 
 [[projects]]
   digest = "1:80c34337e8a734e190f2d1b716cae774cca74db98315166f92074434e9af0227"
@@ -1520,12 +1551,11 @@
   revision = "40d9d12e7bf4e1d0c6a3453e018c4eed1007ae0a"
 
 [[projects]]
-  branch = "master"
-  digest = "1:5ade82a27c5ca576a8aa699320fea3ae5a4d47c95e6a2212191ea31e4c49f27c"
+  digest = "1:40d29d9c2961a32804a4340db00ed1b2f709cfabf090b43583e4c95abe9e1837"
   name = "sigs.k8s.io/cluster-api-provider-aws"
-  packages = ["pkg/apis/awsproviderconfig/v1alpha1"]
+  packages = ["pkg/apis/awsproviderconfig/v1beta1"]
   pruneopts = "NUT"
-  revision = "acf4a8e03420aa0981b3bd2d702d039e0d499e62"
+  revision = "15fe4b4ea5636f8516c238490fc6a85d44161181"
   source = "github.com/openshift/cluster-api-provider-aws"
 
 [[projects]]
@@ -1676,7 +1706,7 @@
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "k8s.io/utils/pointer",
-    "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1alpha1",
+    "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1",
     "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",

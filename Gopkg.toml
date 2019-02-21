@@ -62,7 +62,7 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  version = "v0.12.0"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"
@@ -85,7 +85,7 @@ version="v1.4.7"
 [[override]]
   name = "sigs.k8s.io/cluster-api-provider-aws"
   source = "github.com/openshift/cluster-api-provider-aws"
-  branch = "master"
+  revision = "15fe4b4ea5636f8516c238490fc6a85d44161181"
 
 [[override]]
   name = "github.com/kubernetes-sigs/federation-v2"

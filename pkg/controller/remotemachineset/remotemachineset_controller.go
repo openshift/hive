@@ -41,7 +41,7 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1alpha1"
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"

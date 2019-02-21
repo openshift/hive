@@ -2,6 +2,8 @@
 
 set -e
 
+max_tries=60
+sleep_between_tries=10
 component=hive
 TEST_IMAGE=$(eval "echo $IMAGE_FORMAT")
 component=installer
@@ -15,12 +17,39 @@ curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.0
 mv kustomize_2.0.0_linux_amd64 kustomize
 chmod u+x kustomize
 
-oc new-project cluster-test
+
+i=1
+while [ $i -le ${max_tries} ]; do
+  if [ $i -gt 1 ]; then
+    # Don't sleep on first loop
+    echo "sleeping ${sleep_between_tries} seconds"
+    sleep ${sleep_between_tries}
+  fi
+
+  echo -n "Creating project cluster-test. Try #${i}/${max_tries}... "
+  if oc new-project cluster-test ; then
+    echo "Success"
+    break
+  else
+    echo -n "Failed, "
+  fi
+
+  i=$((i + 1))
+done
+
+if [ $i -ge ${max_tries} ] ; then
+  # Failed the maximum amount of times.
+  echo "exiting"
+  exit 10
+fi
+
 
 # Install Hive
 make deploy DEPLOY_IMAGE="${TEST_IMAGE}"
 
 CLOUD_CREDS_DIR="/tmp/cluster"
+CLUSTER_DEPLOYMENT_FILE="/tmp/cluster-deployment.json"
+
 
 # Create a new cluster deployment
 # TODO: Determine which domain to use to create Hive clusters
@@ -42,19 +71,68 @@ trap 'teardown' EXIT
 # TODO: Determine how to wait for readiness of the validation webhook
 sleep 120
 
-echo "Creating ClusterDeployment ${CLUSTER_NAME}"
 
-oc process -f config/templates/cluster-deployment.yaml \
-   CLUSTER_NAME="${CLUSTER_NAME}" \
-   SSH_KEY="${SSH_PUB_KEY}" \
-   PULL_SECRET="${PULL_SECRET}" \
-   AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-   AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-   BASE_DOMAIN="${BASE_DOMAIN}" \
-   INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-   OPENSHIFT_RELEASE_IMAGE="" \
-   TRY_INSTALL_ONCE="true" \
-   | oc apply -f -
+i=1
+while [ $i -le ${max_tries} ]; do
+  if [ $i -gt 1 ]; then
+    # Don't sleep on first loop
+    echo "sleeping ${sleep_between_tries} seconds"
+    sleep ${sleep_between_tries}
+  fi
+
+  echo "Generating ClusterDeployment File ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
+  if oc process -f config/templates/cluster-deployment.yaml \
+         CLUSTER_NAME="${CLUSTER_NAME}" \
+         SSH_KEY="${SSH_PUB_KEY}" \
+         PULL_SECRET="${PULL_SECRET}" \
+         AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+         AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+         BASE_DOMAIN="${BASE_DOMAIN}" \
+         INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
+         OPENSHIFT_RELEASE_IMAGE="" \
+         TRY_INSTALL_ONCE="true" \
+      > ${CLUSTER_DEPLOYMENT_FILE} ; then
+    echo "Success"
+    break
+  else
+    echo -n "Failed, "
+  fi
+
+  i=$((i + 1))
+done
+
+if [ $i -ge ${max_tries} ] ; then
+  # Failed the maximum amount of times.
+  echo "exiting"
+  exit 10
+fi
+
+
+i=1
+while [ $i -le ${max_tries} ]; do
+  if [ $i -gt 1 ]; then
+    # Don't sleep on first loop
+    echo "sleeping ${sleep_between_tries} seconds"
+    sleep ${sleep_between_tries}
+  fi
+
+  echo "Applying ClusterDeployment File ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
+  if oc apply -f ${CLUSTER_DEPLOYMENT_FILE} ; then
+    echo "Success"
+    break
+  else
+    echo -n "Failed, "
+  fi
+
+  i=$((i + 1))
+done
+
+if [ $i -ge ${max_tries} ] ; then
+  # Failed the maximum amount of times.
+  echo "exiting"
+  exit 10
+fi
+
 
 # Wait for the cluster deployment to be installed
 SRC_ROOT=$(git rev-parse --show-toplevel)

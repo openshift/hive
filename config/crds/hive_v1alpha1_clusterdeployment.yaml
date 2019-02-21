@@ -650,7 +650,7 @@ spec:
               type: boolean
             federatedClusterRef:
               description: FederatedClusterRef is the reference to the federated cluster
-                resource associated with this ClusterDeployment
+                resource associated with this ClusterDeployment.
               type: object
             installed:
               description: Installed is true if the installer job has successfully

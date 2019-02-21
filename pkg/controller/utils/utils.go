@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 
-	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -40,7 +40,7 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 		return nil, err
 	}
 
-	scheme, err := capiv1.SchemeBuilder.Build()
+	scheme, err := machineapi.SchemeBuilder.Build()
 	if err != nil {
 		return nil, err
 	}

@@ -40,17 +40,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
-	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
 
 const (
 	testName                 = "foo"
 	testNamespace            = "default"
-	clusterAPINamespace      = "openshift-cluster-api"
+	machineAPINamespace      = "openshift-machine-api"
 	metadataName             = "foo-metadata"
 	adminKubeconfigSecret    = "foo-admin-kubeconfig"
 	adminKubeconfigSecretKey = "kubeconfig"
@@ -70,13 +70,13 @@ func init() {
 
 func TestRemoteMachineSetReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
-	capiv1.SchemeBuilder.AddToScheme(scheme.Scheme)
+	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
 
 	// Utility function to list test MachineSets from the fake client
-	getRMSL := func(rc client.Client) (*capiv1.MachineSetList, error) {
-		rMSL := &capiv1.MachineSetList{}
+	getRMSL := func(rc client.Client) (*machineapi.MachineSetList, error) {
+		rMSL := &machineapi.MachineSetList{}
 		tm := metav1.TypeMeta{}
-		tm.SetGroupVersionKind(capiv1.SchemeGroupVersion.WithKind("MachineSet"))
+		tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("MachineSet"))
 		err := rc.List(context.TODO(), &client.ListOptions{
 			Raw: &metav1.ListOptions{TypeMeta: tm},
 		}, rMSL)
@@ -91,7 +91,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		localExisting             []runtime.Object
 		remoteExisting            []runtime.Object
 		expectErr                 bool
-		expectedRemoteMachineSets *capiv1.MachineSetList
+		expectedRemoteMachineSets *machineapi.MachineSetList
 	}{
 		{
 			name: "Kubeconfig doesn't exist yet",
@@ -116,9 +116,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 				testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
@@ -142,9 +142,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 				testMachineSet("foo-worker-us-east-1c", "worker", true, 0, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 1),
@@ -167,9 +167,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
 				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1c", "worker", false, 1, 0),
@@ -194,9 +194,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
 				testMachineSet("foo-worker-us-east-1d", "worker", true, 1, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
 						*testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
@@ -220,9 +220,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 3, 0),
 				testMachineSet("foo-beta-us-east-1b", "beta", true, 3, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 3, 0),
 						*testMachineSet("foo-beta-us-east-1b", "beta", true, 3, 0),
 					},
@@ -245,9 +245,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 4, 0),
 				testMachineSet("foo-beta-us-east-1b", "beta", true, 4, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 3, 1),
 						*testMachineSet("foo-beta-us-east-1b", "beta", true, 3, 1),
 					},
@@ -271,9 +271,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
 				testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
 						*testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
 						*testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
@@ -303,9 +303,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-beta-us-east-1b", "alpha", true, 1, 0),
 				testMachineSet("foo-beta-us-east-1c", "alpha", true, 1, 0),
 			},
-			expectedRemoteMachineSets: func() *capiv1.MachineSetList {
-				return &capiv1.MachineSetList{
-					Items: []capiv1.MachineSet{
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
 						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
 						*testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
 						*testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
@@ -317,7 +317,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		apis.AddToScheme(scheme.Scheme)
-		capiv1.SchemeBuilder.AddToScheme(scheme.Scheme)
+		machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.localExisting...)
 			remoteFakeClient := fake.NewFakeClient(test.remoteExisting...)
@@ -411,12 +411,12 @@ func testMachinePool(name string, replicas int, zones []string) hivev1.MachinePo
 	return testMachinePool
 }
 
-func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *capiv1.MachineSet {
+func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
 	msReplicas := int32(replicas)
-	ms := capiv1.MachineSet{
+	ms := machineapi.MachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: clusterAPINamespace,
+			Namespace: machineAPINamespace,
 			Labels: map[string]string{
 				"sigs.k8s.io/cluster-api-machine-type": machineType,
 				"sigs.k8s.io/cluster-api-cluster":      testName,
@@ -424,7 +424,7 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 			},
 			Generation: int64(generation),
 		},
-		Spec: capiv1.MachineSetSpec{
+		Spec: machineapi.MachineSetSpec{
 			Replicas: &msReplicas,
 		},
 	}

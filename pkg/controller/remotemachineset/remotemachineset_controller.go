@@ -41,8 +41,8 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
-	capiv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
 	installtypes "github.com/openshift/installer/pkg/types"
@@ -56,9 +56,9 @@ import (
 const (
 	controllerName = "remotemachineset"
 
-	// remoteClusterAPINamespace is the namespace in which the remote cluster-api stores
+	// remoteMachineAPINamespace is the namespace in which the remote cluster-api stores
 	// MachineSets
-	remoteClusterAPINamespace = "openshift-cluster-api"
+	remoteMachineAPINamespace = "openshift-machine-api"
 
 	adminKubeConfigKey          = "kubeconfig"
 	adminCredsSecretPasswordKey = "password"
@@ -169,9 +169,9 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 	cdLog.Info("reconciling machine sets for cluster deployment")
 
 	// List MachineSets from remote cluster
-	remoteMachineSets := &capiv1.MachineSetList{}
+	remoteMachineSets := &machineapi.MachineSetList{}
 	tm := metav1.TypeMeta{}
-	tm.SetGroupVersionKind(capiv1.SchemeGroupVersion.WithKind("MachineSet"))
+	tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("MachineSet"))
 	err := remoteClusterAPIClient.List(context.Background(), &client.ListOptions{
 		Raw: &metav1.ListOptions{TypeMeta: tm},
 	}, remoteMachineSets)
@@ -190,9 +190,9 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 
 	cdLog.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
-	machineSetsToDelete := []capiv1.MachineSet{}
-	machineSetsToCreate := []*capiv1.MachineSet{}
-	machineSetsToUpdate := []*capiv1.MachineSet{}
+	machineSetsToDelete := []machineapi.MachineSet{}
+	machineSetsToCreate := []*machineapi.MachineSet{}
+	machineSetsToUpdate := []*machineapi.MachineSet{}
 
 	// Find MachineSets that need updating/creating
 	for _, ms := range generatedMachineSets {
@@ -270,9 +270,9 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 
 // generateMachineSetsFromClusterDeployment generates expected MachineSets for a ClusterDeployment
 // using the installer MachineSets API for the MachinePool Platform.
-func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd *hivev1.ClusterDeployment) ([]*capiv1.MachineSet, error) {
-	generatedMachineSets := []*capiv1.MachineSet{}
-	installerMachineSets := []capiv1.MachineSet{}
+func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd *hivev1.ClusterDeployment) ([]*machineapi.MachineSet, error) {
+	generatedMachineSets := []*machineapi.MachineSet{}
+	installerMachineSets := []machineapi.MachineSet{}
 
 	// Generate InstallConfig from ClusterDeployment
 	ic, err := r.generateInstallConfigFromClusterDeployment(cd)
@@ -288,7 +288,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
-	workerPools := workerPools(ic.Machines)
+	workerPools := ic.Compute
 	switch ic.Platform.Name() {
 	case "aws":
 		for _, workerPool := range workerPools {
@@ -313,15 +313,15 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				return nil, err
 			}
 			for _, ms := range icMachineSets {
-				updateMachineSetAWSMachineProviderConfig(&ms, ic.ObjectMeta.Name)
-				installerMachineSets = append(installerMachineSets, ms)
+				updateMachineSetAWSMachineProviderConfig(ms, ic.ObjectMeta.Name)
+				installerMachineSets = append(installerMachineSets, *ms)
 			}
 		}
 	// TODO: Add other platforms. openstack does not currently support openstack.MachineSets()
 	default:
 		return nil, fmt.Errorf("invalid platform")
 	}
-	// Convert installer API []capiv1.MachineSets to []*capiv1.MachineSets
+	// Convert installer API []machineapi.MachineSets to []*machineapi.MachineSets
 	for _, ms := range installerMachineSets {
 		nMS := ms
 		generatedMachineSets = append(generatedMachineSets, &nMS)
@@ -332,7 +332,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 // updateMachineSetAWSMachineProviderConfig modifies values in a MachineSet's AWSMachineProviderConfig.
 // Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
 // the values match the worker pool originally created by the installer.
-func updateMachineSetAWSMachineProviderConfig(machineSet *capiv1.MachineSet, clusterName string) {
+func updateMachineSetAWSMachineProviderConfig(machineSet *machineapi.MachineSet, clusterName string) {
 	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
 	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: pointer.StringPtr(fmt.Sprintf("%s-worker-profile", clusterName))}
 	providerConfig.Subnet = awsprovider.AWSResourceReference{
@@ -347,7 +347,7 @@ func updateMachineSetAWSMachineProviderConfig(machineSet *capiv1.MachineSet, clu
 			Values: []string{fmt.Sprintf("%s_worker_sg", clusterName)},
 		}},
 	}}
-	machineSet.Spec.Template.Spec.ProviderSpec = capiv1.ProviderSpec{
+	machineSet.Spec.Template.Spec.ProviderSpec = machineapi.ProviderSpec{
 		Value: &runtime.RawExtension{Object: providerConfig},
 	}
 }
@@ -359,16 +359,6 @@ func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.
 		}
 	}
 	return nil
-}
-
-func workerPools(pools []installtypes.MachinePool) []installtypes.MachinePool {
-	workerPools := []installtypes.MachinePool{}
-	for idx, pool := range pools {
-		if pool.Name != "master" {
-			workerPools = append(workerPools, pools[idx])
-		}
-	}
-	return workerPools
 }
 
 func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installtypes.InstallConfig, error) {

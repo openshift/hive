@@ -128,15 +128,20 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 	}
 
 	if instance.Spec.Image != "" {
-		haLog.WithFields(log.Fields{
-			"orig": hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image,
-			"new":  instance.Spec.Image,
-		}).Info("overriding deployment image")
 		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
 	}
-	haLog.WithFields(log.Fields{
-		"orig": hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image,
-	}).Info("did it work?")
+
+	// ApplyDaemonSet does not check much of the Spec for changes. Do some manual
+	// checking and if we see something we care about has changed, force an update
+	// by changing the expected deployment generation.
+	if currentDS.Spec.Template.Spec.Containers[0].Image !=
+		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image {
+		haLog.WithFields(log.Fields{
+			"current": currentDS.Spec.Template.Spec.Containers[0].Image,
+			"new":     hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image,
+		}).Info("overriding daemonset image")
+		expectedDSGen = expectedDSGen - 1
+	}
 
 	_, changed, err = resourceapply.ApplyDaemonSet(r.kubeClient.AppsV1(), recorder, hiveAdmDaemonSet, expectedDSGen, false)
 	if err != nil {

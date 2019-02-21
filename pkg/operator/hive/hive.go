@@ -120,11 +120,19 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1a
 	}
 
 	if instance.Spec.Image != "" {
-		hLog.WithFields(log.Fields{
-			"orig": hiveDeployment.Spec.Template.Spec.Containers[0].Image,
-			"new":  instance.Spec.Image,
-		}).Info("overriding deployment image")
 		hiveDeployment.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
+	}
+
+	// ApplyDeployment does not check much of the Spec for changes. Do some manual
+	// checking and if we see something we care about has changed, force an update
+	// by changing the expected deployment generation.
+	if currentDeployment.Spec.Template.Spec.Containers[0].Image !=
+		hiveDeployment.Spec.Template.Spec.Containers[0].Image {
+		hLog.WithFields(log.Fields{
+			"current": currentDeployment.Spec.Template.Spec.Containers[0].Image,
+			"new":     hiveDeployment.Spec.Template.Spec.Containers[0].Image,
+		}).Info("overriding deployment image")
+		expectedDeploymentGen = expectedDeploymentGen - 1
 	}
 
 	_, changed, err = resourceapply.ApplyDeployment(r.kubeClient.AppsV1(),

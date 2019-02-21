@@ -65,6 +65,11 @@ const (
 	adminKubeconfigKey          = "kubeconfig"
 	clusterVersionObjectName    = "version"
 	clusterVersionUnknown       = "undef"
+	defaultHiveImage            = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+
+	// hiveConfigName is the only supported instance of a HiveConfig we respect in a cluster.
+	hiveConfigName      = "hive"
+	hiveConfigNamespace = "openshift-hive"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -252,8 +257,14 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	hiveImage, err := r.getHiveImage(cdLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	job, cfgMap, err := install.GenerateInstallerJob(
 		cd,
+		hiveImage,
 		serviceAccountName,
 		sshKey,
 		pullSecret)
@@ -324,6 +335,21 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeployment) getHiveImage(cdLog log.FieldLogger) (string, error) {
+	hiveImage := defaultHiveImage
+	hiveConfig := &hivev1.HiveConfig{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName, Namespace: hiveConfigNamespace}, hiveConfig)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.Warn("no HiveConfig in cluster, using default hive image: %s", defaultHiveImage)
+	} else if err != nil {
+		cdLog.WithError(err).Error("error loading HiveConfig")
+		return "", err
+	} else if hiveConfig.Spec.Image != "" {
+		hiveImage = hiveConfig.Spec.Image
+	}
+	return hiveImage, nil
 }
 
 func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataKey string) (string, error) {
@@ -475,6 +501,11 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, nil
 	}
 
+	hiveImage, err := r.getHiveImage(cdLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if cd.Status.ClusterID == "" {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
@@ -483,7 +514,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		}
 	} else {
 		// Generate an uninstall job:
-		uninstallJob, err := install.GenerateUninstallerJob(cd)
+		uninstallJob, err := install.GenerateUninstallerJob(cd, hiveImage)
 		if err != nil {
 			cdLog.Errorf("error generating uninstaller job: %v", err)
 			return reconcile.Result{}, err

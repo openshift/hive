@@ -33,7 +33,6 @@ import (
 const (
 	defaultInstallerImage           = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 	defaultInstallerImagePullPolicy = corev1.PullAlways
-	defaultHiveImage                = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 	defaultHiveImagePullPolicy      = corev1.PullAlways
 
 	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
@@ -43,6 +42,7 @@ const (
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
+	hiveImage string,
 	serviceAccountName string,
 	sshKey string,
 	pullSecret string) (*batchv1.Job, *corev1.ConfigMap, error) {
@@ -196,7 +196,6 @@ func GenerateInstallerJob(
 		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
 	}
 
-	hiveImage := defaultHiveImage
 	if cd.Spec.Images.HiveImage != "" {
 		hiveImage = cd.Spec.Images.HiveImage
 	}
@@ -287,7 +286,7 @@ func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
 // GenerateUninstallerJob creates a job to uninstall an OpenShift cluster
 // given a ClusterDeployment and an installer image.
 func GenerateUninstallerJob(
-	cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
+	cd *hivev1.ClusterDeployment, hiveImage string) (*batchv1.Job, error) {
 
 	if cd.Spec.PreserveOnDelete {
 		return nil, fmt.Errorf("no creation of uninstaller job, because of PreserveOnDelete")
@@ -321,7 +320,6 @@ func GenerateUninstallerJob(
 		}...)
 	}
 
-	hiveImage := defaultHiveImage
 	if cd.Spec.Images.HiveImage != "" {
 		hiveImage = cd.Spec.Images.HiveImage
 	}

@@ -17,17 +17,14 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
-
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	networkv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
 	installeraws "github.com/openshift/installer/pkg/types/aws"
-
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 )
 
 // GenerateInstallConfig builds an InstallConfig for the installer from our ClusterDeploymentSpec.
@@ -37,11 +34,6 @@ import (
 // It is assumed the caller will lookup the admin password and ssh key from their respective secrets.
 func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret string) (*types.InstallConfig, error) {
 	spec := cd.Spec
-
-	networkType, err := convertNetworkingType(spec.Networking.Type)
-	if err != nil {
-		return nil, err
-	}
 
 	platform := types.Platform{}
 	if spec.Platform.AWS != nil {
@@ -53,7 +45,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		if aws.DefaultMachinePlatform != nil {
 			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
 				InstanceType: aws.DefaultMachinePlatform.InstanceType,
-				IAMRoleName:  aws.DefaultMachinePlatform.IAMRoleName,
 				EC2RootVolume: installeraws.EC2RootVolume{
 					IOPS: aws.DefaultMachinePlatform.EC2RootVolume.IOPS,
 					Size: aws.DefaultMachinePlatform.EC2RootVolume.Size,
@@ -84,7 +75,6 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		if mp.Platform.AWS != nil {
 			newMP.Platform.AWS = &installeraws.MachinePool{
 				InstanceType: mp.Platform.AWS.InstanceType,
-				IAMRoleName:  mp.Platform.AWS.IAMRoleName,
 				EC2RootVolume: installeraws.EC2RootVolume{
 					IOPS: mp.Platform.AWS.EC2RootVolume.IOPS,
 					Size: mp.Platform.AWS.EC2RootVolume.Size,
@@ -101,14 +91,14 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 			Name: spec.ClusterName,
 		},
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1beta1",
+			APIVersion: types.InstallConfigVersion,
 		},
 		SSHKey:     sshKey,
 		BaseDomain: spec.BaseDomain,
 		Networking: &types.Networking{
-			Type:            networkType,
+			Type:            string(spec.Networking.Type),
 			ServiceCIDR:     parseCIDR(spec.Networking.ServiceCIDR),
-			ClusterNetworks: spec.Networking.ClusterNetworks,
+			ClusterNetworks: convertClusterNetworks(spec.Networking.ClusterNetworks),
 			MachineCIDR:     parseCIDR(spec.Networking.MachineCIDR),
 		},
 		PullSecret: pullSecret,
@@ -125,13 +115,13 @@ func parseCIDR(s string) *ipnet.IPNet {
 	return ipnet.MustParseCIDR(s)
 }
 
-func convertNetworkingType(hnt hivev1.NetworkType) (netopv1.NetworkType, error) {
-	switch hnt {
-	case hivev1.NetworkTypeOpenshiftOVN:
-		return netopv1.NetworkTypeOVNKubernetes, nil
-	case hivev1.NetworkTypeOpenshiftSDN:
-		return netopv1.NetworkTypeOpenshiftSDN, nil
-	default:
-		return "", fmt.Errorf("unknown NetworkType: %s", hnt)
+func convertClusterNetworks(networks []networkv1.ClusterNetwork) []types.ClusterNetworkEntry {
+	output := make([]types.ClusterNetworkEntry, 0, len(networks))
+	for _, network := range networks {
+		output = append(output, types.ClusterNetworkEntry{
+			CIDR:             *parseCIDR(network.CIDR),
+			HostSubnetLength: int32(network.HostSubnetLength),
+		})
 	}
+	return output
 }

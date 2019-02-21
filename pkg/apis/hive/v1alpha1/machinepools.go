@@ -36,10 +36,6 @@ type AWSMachinePoolPlatform struct {
 	// eg. m4-large
 	InstanceType string `json:"type"`
 
-	// IAMRoleName defines the IAM role associated
-	// with the ec2 instance.
-	IAMRoleName string `json:"iamRoleName"`
-
 	// EC2RootVolume defines the storage for ec2 instance.
 	EC2RootVolume `json:"rootVolume"`
 }

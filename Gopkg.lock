@@ -445,6 +445,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  branch = "master"
+  digest = "1:cf68a79fd02ab0f6942b9567d03d054b6568212fcc22de2a4afdefd096923749"
+  name = "github.com/kballard/go-shellquote"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "95032a82bc518f77982ea72343cc1ade730072f0"
+
+[[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -454,7 +462,7 @@
 
 [[projects]]
   branch = "idempotent_join"
-  digest = "1:19fad8ca79d4a6132476db3e1895a74f5187056d95b113e8088f7cd66787697d"
+  digest = "1:14dca68179869d854bb8ac77833dcd35a57a9162ed3bbf2fe49adcc48619723d"
   name = "github.com/kubernetes-sigs/federation-v2"
   packages = [
     "pkg/apis/core/common",
@@ -475,7 +483,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "ab1eb86541166648b887a1f7c6823cff3e7a7b8d"
+  revision = "2c2f8fefbd2dfac2a6654933550ab01fbde5ccd0"
   source = "github.com/csrwng/federation-v2"
 
 [[projects]]
@@ -507,12 +515,36 @@
   revision = "81af80346b1a01caae0cbc27fd3c1ba5b11e189f"
 
 [[projects]]
+  digest = "1:9785a54031460a402fab4e4bbb3124c8dd9e9f7b1982109fef605cb91632d480"
+  name = "github.com/mattn/go-colorable"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "efa589957cd060542a26d2dd7832fd6a6c6c3ade"
+  version = "v0.1.0"
+
+[[projects]]
+  digest = "1:bffa444ca07c69c599ae5876bc18b25bfd5fa85b297ca10a25594d284a7e9c5d"
+  name = "github.com/mattn/go-isatty"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c"
+  version = "v0.0.4"
+
+[[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
   pruneopts = "NUT"
   revision = "c12348ce28de40eed0136aa2b644d0ee0650e56c"
   version = "v1.0.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:063d55b87e200bced5e2be658cc70acafb4c5bbc4afa04d4b82f66298b73d089"
+  name = "github.com/mgutz/ansi"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "9520e82c474b0a04dd04f8a40959027271bab992"
 
 [[projects]]
   digest = "1:2f42fa12d6911c7b7659738758631bec870b7e9b4c6be5444f963cdcfccc191f"
@@ -614,21 +646,24 @@
   source = "github.com/csrwng/generic-admission-server"
 
 [[projects]]
-  digest = "1:c942a2c49ace42720fc6d8739c2af36c0cedd954f393b0bba0407a515002fd81"
+  digest = "1:c7b223f08823b75d6f290d860aa833f3a5345757e8e3028be63973f7800c5d1a"
   name = "github.com/openshift/installer"
   packages = [
+    "pkg/asset/installconfig/aws",
     "pkg/asset/machines/aws",
     "pkg/destroy/aws",
     "pkg/ipnet",
     "pkg/rhcos",
     "pkg/types",
     "pkg/types/aws",
+    "pkg/types/aws/validation",
     "pkg/types/libvirt",
     "pkg/types/none",
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "7af6b141c34dd133f104b61b64c78d82e57f3d52"
+  revision = "b9dbde6de9c0c80716a87312032df38a013d3af2"
+  version = "v0.12.0"
 
 [[projects]]
   branch = "master"
@@ -978,6 +1013,18 @@
   pruneopts = "NUT"
   revision = "8dea3dc473e90c8179e519d91302d0597c0ca1d1"
   version = "v1.15.0"
+
+[[projects]]
+  digest = "1:acce65b46e283672291c073e642b3cadbb2817d4689a2f8babc5bad08724c99c"
+  name = "gopkg.in/AlecAivazis/survey.v1"
+  packages = [
+    ".",
+    "core",
+    "terminal",
+  ]
+  pruneopts = "NUT"
+  revision = "ee72c28b95a5ff3e227cfd403f556f0ef4b07ca5"
+  version = "v1.8.2"
 
 [[projects]]
   digest = "1:1b91ae0dc69a41d4c2ed23ea5cffb721ea63f5037ca4b81e6d6771fbb8f45129"
@@ -1615,6 +1662,7 @@
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/errors",
+    "k8s.io/apimachinery/pkg/util/rand",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
@@ -1623,6 +1671,7 @@
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
+    "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/deepcopy-gen",

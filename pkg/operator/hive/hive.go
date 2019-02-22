@@ -21,7 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	"github.com/openshift/hive/pkg/operator/assets"
 
@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1alpha1.HiveConfig, recorder events.Recorder) error {
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	// Parse yaml for all Hive objects:
 	asset, err := assets.Asset("config/crds/hive_v1alpha1_clusterdeployment.yaml")
 	if err != nil {
@@ -87,27 +87,24 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1a
 	if err != nil {
 		hLog.WithError(err).Error("error applying ClusterDeployment CRD")
 		return err
-	} else {
-		hLog.WithField("changed", changed).Info("ClusterDeployment CRD updated")
 	}
+	hLog.WithField("changed", changed).Info("ClusterDeployment CRD updated")
 
 	_, changed, err = resourceapply.ApplyCustomResourceDefinition(r.apiextClient,
 		recorder, dnsZoneCRD)
 	if err != nil {
 		hLog.WithError(err).Error("error applying DNSZone CRD")
 		return err
-	} else {
-		hLog.WithField("changed", changed).Info("DNSZone CRD updated")
 	}
+	hLog.WithField("changed", changed).Info("DNSZone CRD updated")
 
 	_, changed, err = resourceapply.ApplyService(r.kubeClient.CoreV1(),
 		recorder, hiveSvc)
 	if err != nil {
 		hLog.WithError(err).Error("error applying service")
 		return err
-	} else {
-		hLog.WithField("changed", changed).Info("service updated")
 	}
+	hLog.WithField("changed", changed).Info("service updated")
 
 	expectedDeploymentGen := int64(0)
 	currentDeployment := &appsv1.Deployment{}
@@ -140,9 +137,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1a
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
-	} else {
-		hLog.WithField("changed", changed).Info("deployment updated")
 	}
+	hLog.WithField("changed", changed).Info("deployment updated")
 
 	hLog.Info("Hive components reconciled")
 	return nil

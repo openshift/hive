@@ -1,6 +1,6 @@
 BINDIR = bin
 SRC_DIRS = pkg contrib
-GOFILES = $(shell find $(SRC_DIRS) -name '*.go')
+GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata)
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
 # To use docker build, specify BUILD_CMD="docker build"

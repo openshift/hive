@@ -21,7 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 
@@ -86,7 +86,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to HiveConfig:
-	err = c.Watch(&source.Kind{Type: &hivev1alpha1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &hivev1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Monitor changes to DaemonSets:
 	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1alpha1.HiveConfig{},
+		OwnerType:    &hivev1.HiveConfig{},
 	})
 	if err != nil {
 		return err
@@ -103,7 +103,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Monitor changes to Deployments:
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1alpha1.HiveConfig{},
+		OwnerType:    &hivev1.HiveConfig{},
 	})
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Monitor changes to Services:
 	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1alpha1.HiveConfig{},
+		OwnerType:    &hivev1.HiveConfig{},
 	})
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	hLog.Info("Reconciling Hive components")
 
 	// Fetch the Hive instance
-	instance := &hivev1alpha1.HiveConfig{}
+	instance := &hivev1.HiveConfig{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {

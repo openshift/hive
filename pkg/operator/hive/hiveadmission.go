@@ -21,7 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	"github.com/openshift/hive/pkg/operator/assets"
 
@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instance *hivev1alpha1.HiveConfig, recorder events.Recorder) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	asset, err := assets.Asset("config/hiveadmission/service.yaml")
 	if err != nil {
 		haLog.WithError(err).Error("error loading asset")
@@ -105,17 +105,15 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 	if err != nil {
 		haLog.WithError(err).Error("error applying service")
 		return err
-	} else {
-		haLog.WithField("changed", changed).Info("service updated")
 	}
+	haLog.WithField("changed", changed).Info("service updated")
 
 	_, changed, err = resourceapply.ApplyServiceAccount(r.kubeClient.CoreV1(), recorder, hiveAdmServiceAcct)
 	if err != nil {
 		haLog.WithError(err).Error("error applying service account")
 		return err
-	} else {
-		haLog.WithField("changed", changed).Info("service account updated")
 	}
+	haLog.WithField("changed", changed).Info("service account updated")
 
 	expectedDSGen := int64(0)
 	currentDS := &appsv1.DaemonSet{}
@@ -147,33 +145,29 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 	if err != nil {
 		haLog.WithError(err).Error("error applying daemonset")
 		return err
-	} else {
-		haLog.WithField("changed", changed).Info("daemonset updated")
 	}
+	haLog.WithField("changed", changed).Info("daemonset updated")
 
 	_, changed, err = resourceapply.ApplyAPIService(r.apiregClient, hiveAdmAPIService)
 	if err != nil {
 		haLog.WithError(err).Error("error applying apiservice")
 		return err
-	} else {
-		haLog.WithField("changed", changed).Info("apiservice updated")
 	}
+	haLog.WithField("changed", changed).Info("apiservice updated")
 
 	_, changed, err = ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), dnsZonesWebhook)
 	if err != nil {
 		haLog.WithError(err).Error("error applying DNSZones webhook")
 		return err
-	} else {
-		haLog.WithField("changed", changed).Info("DNSZones webhook updated")
 	}
+	haLog.WithField("changed", changed).Info("DNSZones webhook updated")
 
 	_, changed, err = ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), cdWebhook)
 	if err != nil {
 		haLog.WithError(err).Error("error applying ClusterDeployment webhook")
 		return err
-	} else {
-		haLog.WithField("changed", changed).Info("ClusterDeployment webhook updated")
 	}
+	haLog.WithField("changed", changed).Info("ClusterDeployment webhook updated")
 
 	haLog.Info("HiveAdmissionConfig components reconciled")
 

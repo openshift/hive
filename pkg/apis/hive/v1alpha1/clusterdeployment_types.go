@@ -195,7 +195,7 @@ type NetworkType string
 
 const (
 	// NetworkTypeOpenshiftSDN is used to install with SDN.
-	NetworkTypeOpenshiftSDN NetworkType = "OpenshiftSDN"
+	NetworkTypeOpenshiftSDN NetworkType = "OpenShiftSDN"
 	// NetworkTypeOpenshiftOVN is used to install with OVN.
 	NetworkTypeOpenshiftOVN NetworkType = "OVNKubernetes"
 )

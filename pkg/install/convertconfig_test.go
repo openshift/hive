@@ -148,7 +148,7 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		PullSecret: pullSecret,
 		Networking: &installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
-			Type:        "OpenshiftSDN",
+			Type:        "OpenShiftSDN",
 			ServiceCIDR: ipnet.MustParseCIDR("172.30.0.0/16"),
 			ClusterNetworks: []installtypes.ClusterNetworkEntry{
 				{

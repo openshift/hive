@@ -6,10 +6,22 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: clusterdeployments.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.baseDomain
+    name: BaseDomain
+    type: string
+  - JSONPath: .status.installed
+    name: Installed
+    type: boolean
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
     plural: clusterdeployments
+    shortNames:
+    - cd
   scope: Namespaced
   subresources:
     status: {}

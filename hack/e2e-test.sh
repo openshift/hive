@@ -133,6 +133,36 @@ if [ $i -ge ${max_tries} ] ; then
   exit 10
 fi
 
+# Sanity check the cluster deployment printer
+i=1
+while [ $i -le ${max_tries} ]; do
+  if [ $i -gt 1 ]; then
+    # Don't sleep on first loop
+    echo "sleeping ${sleep_between_tries} seconds"
+    sleep ${sleep_between_tries}
+  fi
+
+  echo "Getting ClusterDeployment ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
+
+  GET_BY_SHORT_NAME=$(oc get cd)
+
+  if echo "${GET_BY_SHORT_NAME}" | grep 'BASEDOMAIN' ; then
+    echo "Success"
+    break
+  else
+    echo -n "Failed, "
+  fi
+
+  i=$((i + 1))
+done
+
+if [ $i -ge ${max_tries} ] ; then
+  # Failed the maximum amount of times.
+  echo "exiting"
+  exit 10
+fi
+
+
 # Wait for the cluster deployment to be installed
 SRC_ROOT=$(git rev-parse --show-toplevel)
 

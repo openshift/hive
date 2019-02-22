@@ -22,8 +22,9 @@ import (
 
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
-	// Image controls the image used for the Hive controllers, as well
-	// as deprovision pods. The default if left empty is to use latest master.
+	// Image controls the image used for the Hive controllers, Hiveadmission, as well
+	// as provision/deprovision pods, provided the ClusterDeployment itself does not have an image override.
+	// Defaults to use latest master image from CI if left empty.
 	Image string `json:"image,omitempty"`
 }
 

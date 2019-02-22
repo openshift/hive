@@ -24,6 +24,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	"github.com/openshift/hive/pkg/operator/assets"
+	"github.com/openshift/hive/pkg/operator/util"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
@@ -66,7 +67,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 		return err
 	}
 	haLog.Debug("reading apiservice")
-	hiveAdmAPIService := ReadAPIServiceV1Beta1OrDie(asset, r.scheme)
+	hiveAdmAPIService := util.ReadAPIServiceV1Beta1OrDie(asset, r.scheme)
 
 	asset, err = assets.Asset("config/hiveadmission/dnszones-webhook.yaml")
 	if err != nil {
@@ -74,7 +75,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 		return err
 	}
 	haLog.Debug("reading DNSZones webhook")
-	dnsZonesWebhook := ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
+	dnsZonesWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
 
 	asset, err = assets.Asset("config/hiveadmission/clusterdeployment-webhook.yaml")
 	if err != nil {
@@ -82,7 +83,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 		return err
 	}
 	haLog.Debug("reading ClusterDeployment webhook")
-	cdWebhook := ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
+	cdWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
 
 	// Set owner refs on all objects in the deployment so deleting the operator CRD
 	// will clean everything up:
@@ -155,14 +156,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 	}
 	haLog.WithField("changed", changed).Info("apiservice updated")
 
-	_, changed, err = ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), dnsZonesWebhook)
+	_, changed, err = util.ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), dnsZonesWebhook)
 	if err != nil {
 		haLog.WithError(err).Error("error applying DNSZones webhook")
 		return err
 	}
 	haLog.WithField("changed", changed).Info("DNSZones webhook updated")
 
-	_, changed, err = ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), cdWebhook)
+	_, changed, err = util.ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), cdWebhook)
 	if err != nil {
 		haLog.WithError(err).Error("error applying ClusterDeployment webhook")
 		return err

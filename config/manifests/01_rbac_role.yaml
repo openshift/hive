@@ -2,18 +2,66 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: hive-operator-role
+  name: manager-role
 rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - ""
   resources:
   - serviceaccounts
-  - serviceaccounts/finalizers
   - secrets
-  - secrets/finalizers
-  - services
-  - services/finalizers
-  - events
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  - clusterdeployments/status
+  - clusterdeployments/finalizers
+  - hiveconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - dnszones
   verbs:
   - get
   - list
@@ -30,15 +78,10 @@ rules:
   - get
   - list
   - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
-  - apiregistration.k8s.io
+  - clusterregistry.k8s.io
   resources:
-  - apiservices
-  - apiservices/finalizers
+  - clusters
   verbs:
   - get
   - list
@@ -48,53 +91,9 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - admissionregistration.k8s.io
+  - core.federation.k8s.io
   resources:
-  - validatingwebhookconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - deployments/finalizers
-  - daemonsets
-  - daemonsets/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-# Just to cleanup legacy DeploymentConfig
-- apiGroups:
-  - apps.openshift.io
-  resources:
-  - deploymentconfigs
-  - deploymentconfigs/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - hives
-  - hiveadmissions
-  - hives/finalizers
-  - hiveadmissions/finalizers
+  - federatedclusters
   verbs:
   - get
   - list

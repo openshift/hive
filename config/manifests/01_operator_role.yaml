@@ -2,65 +2,18 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: hive-operator-role
 rules:
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
   - ""
   resources:
   - serviceaccounts
+  - serviceaccounts/finalizers
   - secrets
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  - clusterdeployments/status
-  - clusterdeployments/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - dnszones
+  - secrets/finalizers
+  - services
+  - services/finalizers
+  - events
   verbs:
   - get
   - list
@@ -77,10 +30,15 @@ rules:
   - get
   - list
   - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
-  - clusterregistry.k8s.io
+  - apiregistration.k8s.io
   resources:
-  - clusters
+  - apiservices
+  - apiservices/finalizers
   verbs:
   - get
   - list
@@ -90,9 +48,51 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - core.federation.k8s.io
+  - admissionregistration.k8s.io
   resources:
-  - federatedclusters
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - deployments/finalizers
+  - daemonsets
+  - daemonsets/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Just to cleanup legacy DeploymentConfig
+- apiGroups:
+  - apps.openshift.io
+  resources:
+  - deploymentconfigs
+  - deploymentconfigs/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - hiveconfigs
+  - hiveconfigs/finalizers
   verbs:
   - get
   - list

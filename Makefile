@@ -77,7 +77,6 @@ install: crd rbac
 .PHONY: deploy
 deploy: crd rbac
 	# Deploy the operator manifests:
-	kubectl apply -f manifests/
 	mkdir -p overlays/deploy
 	cp overlays/template/* overlays/deploy
 	if [[ "`uname`" == "Darwin" ]]; then \
@@ -93,9 +92,9 @@ deploy: crd rbac
 # the locations kubebuilder generates them.
 .PHONY: manifests
 manifests: crd rbac
-	cp config/crds/hive_v1alpha1_hiveconfig.yaml manifests/01_hiveconfig_crd.yaml
-	cp config/rbac/rbac_role.yaml manifests/01_rbac_role.yaml
-	cp config/rbac/rbac_role_binding.yaml manifests/01_rbac_role_binding.yaml
+	cp config/crds/hive_v1alpha1_hiveconfig.yaml config/manifests/01_hiveconfig_crd.yaml
+	cp config/rbac/rbac_role.yaml config/manifests/01_rbac_role.yaml
+	cp config/rbac/rbac_role_binding.yaml config/manifests/01_rbac_role_binding.yaml
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev

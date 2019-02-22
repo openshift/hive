@@ -520,9 +520,6 @@ spec:
                           the update version. When this field is part of spec, version
                           is optional if payload is specified.
                         type: string
-                    required:
-                    - version
-                    - payload
                     type: object
                   type: array
                 conditions:
@@ -579,9 +576,6 @@ spec:
                         update version. When this field is part of spec, version is
                         optional if payload is specified.
                       type: string
-                  required:
-                  - version
-                  - payload
                   type: object
                 generation:
                   description: generation reports which version of the spec is being
@@ -634,7 +628,6 @@ spec:
                     - state
                     - startedTime
                     - completionTime
-                    - version
                     - payload
                     type: object
                   type: array
@@ -657,7 +650,7 @@ spec:
               type: boolean
             federatedClusterRef:
               description: FederatedClusterRef is the reference to the federated cluster
-                resource associated with this ClusterDeployment
+                resource associated with this ClusterDeployment.
               type: object
             installed:
               description: Installed is true if the installer job has successfully

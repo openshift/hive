@@ -49,6 +49,7 @@ rules:
   - clusterdeployments
   - clusterdeployments/status
   - clusterdeployments/finalizers
+  - hiveconfigs
   verbs:
   - get
   - list

@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	userapiv1 "github.com/openshift/api/user/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 )
 
@@ -76,6 +77,9 @@ type ClusterDeploymentSpec struct {
 
 	// PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it
 	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
+
+	// Groups is a list of groups that are present.
+	Groups []userapiv1.Group `json:"groups,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.

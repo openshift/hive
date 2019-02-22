@@ -462,7 +462,7 @@
 
 [[projects]]
   branch = "idempotent_join"
-  digest = "1:14dca68179869d854bb8ac77833dcd35a57a9162ed3bbf2fe49adcc48619723d"
+  digest = "1:752d95f0e80c7e8845230834b59038e92eeac45368d93dbb06b32aa5c9b178c6"
   name = "github.com/kubernetes-sigs/federation-v2"
   packages = [
     "pkg/apis/core/common",
@@ -483,7 +483,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "2c2f8fefbd2dfac2a6654933550ab01fbde5ccd0"
+  revision = "145f95e3b161d83bda2de155c54a2db88d865d4d"
   source = "github.com/csrwng/federation-v2"
 
 [[projects]]
@@ -614,12 +614,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1f1c35021583995af000a3f1023790c4705c59d61a5b6a4116bed8a0bb28e106"
+  digest = "1:3d4f8cc0d17d15cf49e3e69cc0e581f725bae5bd1eaea850c5faaf7f3a844a52"
   name = "github.com/openshift/api"
   packages = [
     "config/v1",
     "operator/v1",
     "route/v1",
+    "user/v1",
   ]
   pruneopts = "NUT"
   revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
@@ -1635,6 +1636,7 @@
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/openshift/api/user/v1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/machines/aws",

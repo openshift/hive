@@ -62,10 +62,6 @@ spec:
                         description: AWS is the configuration used when installing
                           on AWS.
                         properties:
-                          iamRoleName:
-                            description: IAMRoleName defines the IAM role associated
-                              with the ec2 instance.
-                            type: string
                           rootVolume:
                             description: EC2RootVolume defines the storage for ec2
                               instance.
@@ -98,7 +94,6 @@ spec:
                             type: array
                         required:
                         - type
-                        - iamRoleName
                         - rootVolume
                         type: object
                       libvirt:
@@ -179,10 +174,6 @@ spec:
                       description: AWS is the configuration used when installing on
                         AWS.
                       properties:
-                        iamRoleName:
-                          description: IAMRoleName defines the IAM role associated
-                            with the ec2 instance.
-                          type: string
                         rootVolume:
                           description: EC2RootVolume defines the storage for ec2 instance.
                           properties:
@@ -214,7 +205,6 @@ spec:
                           type: array
                       required:
                       - type
-                      - iamRoleName
                       - rootVolume
                       type: object
                     libvirt:
@@ -352,10 +342,6 @@ spec:
                         used when installing on AWS for machine pools which do not
                         define their own platform configuration.
                       properties:
-                        iamRoleName:
-                          description: IAMRoleName defines the IAM role associated
-                            with the ec2 instance.
-                          type: string
                         rootVolume:
                           description: EC2RootVolume defines the storage for ec2 instance.
                           properties:
@@ -387,7 +373,6 @@ spec:
                           type: array
                       required:
                       - type
-                      - iamRoleName
                       - rootVolume
                       type: object
                     region:
@@ -670,6 +655,10 @@ spec:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
               type: boolean
+            federatedClusterRef:
+              description: FederatedClusterRef is the reference to the federated cluster
+                resource associated with this ClusterDeployment
+              type: object
             installed:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.

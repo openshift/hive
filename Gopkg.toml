@@ -39,7 +39,9 @@ required = [
 
 [[constraint]]
   name="sigs.k8s.io/controller-tools"
-  version="v0.1.8"
+  #version="v0.1.8" # TODO: go back to using upstream when this issue is resolved: https://github.com/kubernetes-sigs/controller-tools/issues/137
+  source = "github.com/twiest/controller-tools"
+  branch = "add_optional_comment_tag_support_v0.1.8"
 
 [[override]]
   name="k8s.io/api"
@@ -65,7 +67,7 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "7af6b141c34dd133f104b61b64c78d82e57f3d52"
+  version = "v0.12.0"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"

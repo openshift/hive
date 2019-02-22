@@ -23,11 +23,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 
@@ -56,6 +57,8 @@ const (
 	adminKubeconfigKey = "kubeconfig"
 
 	federatedClustersCRDName = "federatedclusters.core.federation.k8s.io"
+
+	clusterDeploymentReferenceAnnotation = "hive.openshift.io/cluster-deployment-ref"
 )
 
 // Add creates a new ClusterDeployment Federation Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -66,10 +69,14 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterDeploymentFederation{
+	reconciler := &ReconcileClusterDeploymentFederation{
 		Client: mgr.GetClient(),
 		scheme: mgr.GetScheme(),
 	}
+	reconciler.isFederationInstalled = reconciler.isFederatedClusterCRDPresent
+	reconciler.joinCluster = reconciler.federateTargetCluster
+
+	return reconciler
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -86,15 +93,6 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for jobs created for a ClusterDeployment:
-	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -104,6 +102,10 @@ var _ reconcile.Reconciler = &ReconcileClusterDeploymentFederation{}
 type ReconcileClusterDeploymentFederation struct {
 	client.Client
 	scheme *runtime.Scheme
+
+	// functions pointers used in unit testing
+	isFederationInstalled func() (bool, error)
+	joinCluster           func(*hivev1.ClusterDeployment, log.FieldLogger) error
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and federates it if it's installed
@@ -159,53 +161,30 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 
 	// If already federated, skip
 	if cd.Status.Federated {
-		cdLog.Debug("cluster already federated, nothing to do")
+		// If already federated, ensure federated cluster is in sync
+		// with the cluster deployment
+		err = r.updateFederatedCluster(cd, cdLog)
+		if err != nil {
+			cdLog.WithError(err).Error("cannot update federated cluster")
+			return reconcile.Result{}, err
+		}
 		return reconcile.Result{}, nil
 	}
 
 	cdLog.Info("reconciling cluster deployment for federation")
 
-	// Obtain cluster's kubeconfig secret
-	kubeconfig, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
+	if cd.Status.FederatedClusterRef == nil || len(cd.Status.FederatedClusterRef.Name) == 0 {
+		cdLog.Debugf("setting federated cluster name reference")
+		return reconcile.Result{}, r.setFederatedClusterRef(cd, cdLog)
+	}
+
+	err = r.joinCluster(cd, cdLog)
 	if err != nil {
-		cdLog.WithError(err).Error("error retrieving kubeconfig for cluster")
+		cdLog.WithError(err).Errorf("federating the cluster failed")
 		return reconcile.Result{}, err
 	}
 
-	hostConfig, err := config.GetConfig()
-	if err != nil {
-		cdLog.WithError(err).Error("cannot obtain host client configuration")
-		return reconcile.Result{}, err
-	}
-
-	targetConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
-	if err != nil {
-		cdLog.WithError(err).Error("cannot create target cluster client config")
-		return reconcile.Result{}, err
-	}
-
-	name := federatedClusterName(cd)
-
-	err = kubefed2.JoinCluster(hostConfig,
-		targetConfig,
-		federationutil.DefaultFederationSystemNamespace,
-		federationutil.MulticlusterPublicNamespace,
-		"hive", /* hostContext */
-		name,   /* clusterName */
-		name,   /* secretName */
-		true,   /* addToRegistry */
-		false,  /* limitedScope */
-		false,  /* dryRun */
-		true)   /* idempotent */
-
-	if err != nil {
-		cdLog.WithError(err).Error("Federating cluster failed")
-		// TODO: Until the join command is idempotent, returning error here will only
-		// result in a quick backoff loop.
-		return reconcile.Result{}, nil
-	}
-
-	err = r.updateClusterDeploymentStatus(cd, cdLog)
+	err = r.setClusterFederated(cd, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Errorf("error updating cluster deployment status")
 		return reconcile.Result{}, err
@@ -213,6 +192,44 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 
 	cdLog.Debugf("reconcile complete")
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeploymentFederation) federateTargetCluster(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	// Obtain cluster's kubeconfig secret
+	kubeconfig, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
+	if err != nil {
+		cdLog.WithError(err).Error("error retrieving kubeconfig for cluster")
+		return err
+	}
+
+	hostConfig, err := config.GetConfig()
+	if err != nil {
+		cdLog.WithError(err).Error("cannot obtain host client configuration")
+		return err
+	}
+
+	targetConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
+	if err != nil {
+		cdLog.WithError(err).Error("cannot create target cluster client config")
+		return err
+	}
+
+	err = kubefed2.JoinCluster(hostConfig,
+		targetConfig,
+		federationutil.DefaultFederationSystemNamespace,
+		federationutil.MulticlusterPublicNamespace,
+		"hive", /* hostContext */
+		cd.Status.FederatedClusterRef.Name, /* clusterName */
+		cd.Status.FederatedClusterRef.Name, /* secretName */
+		true,  /* addToRegistry */
+		false, /* limitedScope */
+		false, /* dryRun */
+		true)  /* idempotent */
+
+	if err != nil {
+		cdLog.WithError(err).Error("Federating cluster failed")
+	}
+	return err
 }
 
 func (r *ReconcileClusterDeploymentFederation) loadSecretData(secretName, namespace, dataKey string) (string, error) {
@@ -229,35 +246,48 @@ func (r *ReconcileClusterDeploymentFederation) loadSecretData(secretName, namesp
 }
 
 func (r *ReconcileClusterDeploymentFederation) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
-
 	// Delete the federated cluster
+	if cd.Status.FederatedClusterRef != nil {
+		err := r.removeFederatedResources(cd.Status.FederatedClusterRef, cdLog)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Remove finalizer from ClusterDeployment
+	err := r.removeFederationFinalizer(cd, cdLog)
+	return reconcile.Result{}, err
+}
+
+func (r *ReconcileClusterDeploymentFederation) removeFederatedResources(ref *corev1.ObjectReference, cdLog log.FieldLogger) error {
+	name := ref.Name
+	namespace := ref.Namespace
 	federatedCluster := &fedv1alpha1.FederatedCluster{}
-	name := federatedClusterName(cd)
-	err := r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: federationutil.DefaultFederationSystemNamespace}, federatedCluster)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, federatedCluster)
 	if err != nil && !errors.IsNotFound(err) {
 		cdLog.WithError(err).Error("cannot retrieve federated cluster for cleanup")
-		return reconcile.Result{}, err
+		return err
 	}
 	if err == nil {
 		err = r.Delete(context.TODO(), federatedCluster)
 		if err != nil {
 			cdLog.WithError(err).Error("cannot delete federated cluster for cleanup")
-			return reconcile.Result{}, err
+			return err
 		}
 	}
 
 	// Delete the secret for the federated cluster
 	federatedClusterSecret := &corev1.Secret{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: federationutil.DefaultFederationSystemNamespace}, federatedClusterSecret)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, federatedClusterSecret)
 	if err != nil && !errors.IsNotFound(err) {
 		cdLog.WithError(err).Error("cannot retrieve federated cluster secret for cleanup")
-		return reconcile.Result{}, err
+		return err
 	}
 	if err == nil {
 		err = r.Delete(context.TODO(), federatedClusterSecret)
 		if err != nil {
 			cdLog.WithError(err).Error("cannot delete federated cluster secret for cleanup")
-			return reconcile.Result{}, err
+			return err
 		}
 	}
 
@@ -266,23 +296,20 @@ func (r *ReconcileClusterDeploymentFederation) syncDeletedClusterDeployment(cd *
 	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: federationutil.MulticlusterPublicNamespace}, clusterRegistryCluster)
 	if err != nil && !errors.IsNotFound(err) {
 		cdLog.WithError(err).Error("cannot retrieve clusterregistry cluster for cleanup")
-		return reconcile.Result{}, err
+		return err
 	}
 	if err == nil {
 		err = r.Delete(context.TODO(), clusterRegistryCluster)
 		if err != nil {
 			cdLog.WithError(err).Error("cannot delete clusterregistry cluster for cleanup")
-			return reconcile.Result{}, err
+			return err
 		}
 	}
 
-	// Remove finalizer from ClusterDeployment
-	err = r.removeFederationFinalizer(cd, cdLog)
-
-	return reconcile.Result{}, err
+	return nil
 }
 
-func (r *ReconcileClusterDeploymentFederation) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeploymentFederation) setClusterFederated(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	cdLog.Debug("updating cluster deployment status")
 	origCD := cd
 	cd = cd.DeepCopy()
@@ -303,7 +330,55 @@ func (r *ReconcileClusterDeploymentFederation) updateClusterDeploymentStatus(cd 
 	return nil
 }
 
-func (r *ReconcileClusterDeploymentFederation) isFederationInstalled() (bool, error) {
+func (r *ReconcileClusterDeploymentFederation) setFederatedClusterRef(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+
+	cd.Status.FederatedClusterRef = &corev1.ObjectReference{
+		Name:      federatedClusterName(cd),
+		Namespace: federationutil.DefaultFederationSystemNamespace,
+	}
+
+	err := r.Status().Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Errorf("error setting federated cluster reference")
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterDeploymentFederation) updateFederatedCluster(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	clusterRef := cd.Status.FederatedClusterRef
+	if clusterRef == nil {
+		err := fmt.Errorf("invalid federated clusterdeployment, clusterRef is nil")
+		cdLog.WithError(err).Error("cannot update federated cluster")
+		return err
+	}
+	federatedCluster := &fedv1alpha1.FederatedCluster{}
+	err := r.Get(context.TODO(), types.NamespacedName{Namespace: clusterRef.Namespace, Name: clusterRef.Name}, federatedCluster)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot fetch federated cluster")
+	}
+
+	original := federatedCluster.DeepCopy()
+
+	if federatedCluster.Annotations == nil {
+		federatedCluster.Annotations = map[string]string{}
+	}
+
+	refKey, err := cache.MetaNamespaceKeyFunc(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot create a namespaced key for cluster deployment")
+	}
+	federatedCluster.Annotations[clusterDeploymentReferenceAnnotation] = refKey
+	federatedCluster.Labels = cd.Labels
+
+	if !reflect.DeepEqual(federatedCluster.ObjectMeta, original.ObjectMeta) {
+		return r.Update(context.TODO(), federatedCluster)
+	}
+
+	return nil
+}
+
+func (r *ReconcileClusterDeploymentFederation) isFederatedClusterCRDPresent() (bool, error) {
 	crd := &apiextv1.CustomResourceDefinition{}
 	err := r.Get(context.TODO(), types.NamespacedName{Name: federatedClustersCRDName}, crd)
 	if err != nil && !errors.IsNotFound(err) {
@@ -333,5 +408,5 @@ func (r *ReconcileClusterDeploymentFederation) removeFederationFinalizer(cd *hiv
 }
 
 func federatedClusterName(cd *hivev1.ClusterDeployment) string {
-	return fmt.Sprintf("%s-%s", cd.Namespace, cd.Name)
+	return fmt.Sprintf("%s-%s", cd.Name, rand.String(8))
 }

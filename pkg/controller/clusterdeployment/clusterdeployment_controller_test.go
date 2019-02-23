@@ -49,6 +49,7 @@ const (
 	testName              = "foo-lqmsh"
 	testClusterName       = "bar"
 	testClusterID         = "testFooClusterUUID"
+	testInfraID           = "testFooInfraID"
 	installJobName        = "foo-lqmsh-install"
 	uninstallJobName      = "foo-lqmsh-uninstall"
 	testNamespace         = "default"
@@ -416,6 +417,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			ClusterID: testClusterID,
+			InfraID:   testInfraID,
 		},
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)

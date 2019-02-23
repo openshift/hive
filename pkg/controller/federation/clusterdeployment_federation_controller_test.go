@@ -222,6 +222,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			ClusterID: "cluster-id",
+			InfraID:   "infra-id",
 		},
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)

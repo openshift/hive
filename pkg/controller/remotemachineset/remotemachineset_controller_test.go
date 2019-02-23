@@ -50,7 +50,8 @@ import (
 const (
 	testName                 = "foo"
 	testNamespace            = "default"
-	testClusterID            = "foo-12345"
+	testClusterID            = "foo-12345-uuid"
+	testInfraID              = "foo-12345"
 	machineAPINamespace      = "openshift-machine-api"
 	metadataName             = "foo-metadata"
 	adminKubeconfigSecret    = "foo-admin-kubeconfig"
@@ -420,7 +421,7 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 			Namespace: machineAPINamespace,
 			Labels: map[string]string{
 				"sigs.k8s.io/cluster-api-machine-type": machineType,
-				"sigs.k8s.io/cluster-api-cluster":      testClusterID,
+				"sigs.k8s.io/cluster-api-cluster":      testInfraID,
 				"sigs.k8s.io/cluster-api-machine-role": machineType,
 			},
 			Generation: int64(generation),
@@ -479,6 +480,7 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			Installed:             true,
 			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
 			ClusterID:             testClusterID,
+			InfraID:               testInfraID,
 		},
 	}
 }

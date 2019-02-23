@@ -41,7 +41,6 @@ func init() {
 const (
 	testName                 = "foo"
 	testNamespace            = "default"
-	testClusterID            = "foo"
 	testAMI                  = "ami-totallyfake"
 	adminPassword            = "adminpassword"
 	adminSSHKey              = "adminSSH"

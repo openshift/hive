@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	operatorv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,10 +27,13 @@ type HiveConfigSpec struct {
 	// as provision/deprovision pods, provided the ClusterDeployment itself does not have an image override.
 	// Defaults to use latest master image from CI if left empty.
 	Image string `json:"image,omitempty"`
+
+	operatorv1.OperatorSpec `json:",inline"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
 type HiveConfigStatus struct {
+	operatorv1.OperatorStatus `json:",inline"`
 }
 
 // +genclient

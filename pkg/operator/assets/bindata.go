@@ -787,8 +787,9 @@ spec:
           properties:
             image:
               description: Image controls the image used for the Hive controllers,
-                as well as deprovision pods. The default if left empty is to use latest
-                master.
+                Hiveadmission, as well as provision/deprovision pods, provided the
+                ClusterDeployment itself does not have an image override. Defaults
+                to use latest master image from CI if left empty.
               type: string
           type: object
         status:

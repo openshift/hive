@@ -114,8 +114,11 @@ type AWSPlatformSecrets struct {
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment
 type ClusterDeploymentStatus struct {
 
-	// ClusterID is a unique identifier for this cluster generated during installation.
+	// ClusterID is a globally unique identifier for this cluster generated during installation. Used for reporting metrics among other places.
 	ClusterID string `json:"clusterID,omitempty"`
+
+	// InfraID is an identifier for this cluster generated during installation and used for tagging/naming resources in cloud providers.
+	InfraID string `json:"infraID,omitempty"`
 
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`

@@ -344,7 +344,7 @@ func GenerateUninstallerJob(
 				"debug",
 				"--region",
 				cd.Spec.AWS.Region,
-				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Status.ClusterID),
+				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Status.InfraID),
 			},
 		},
 	}

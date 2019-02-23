@@ -475,8 +475,8 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, nil
 	}
 
-	if cd.Status.ClusterID == "" {
-		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
+	if cd.Status.InfraID == "" {
+		cdLog.Warn("skipping uninstall for cluster that never had infraID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error removing finalizer")

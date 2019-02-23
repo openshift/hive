@@ -43,7 +43,9 @@ const (
 	testClusterName = "test-cluster"
 	testNamespace   = "test-namespace"
 	// testClusterID matches the json blob below:
-	testClusterID = "test-cluster-fe9531"
+	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
+	// testInfraID matches the json blob below:
+	testInfraID = "test-cluster-fe9531"
 
 	installerBinary     = "openshift-install"
 	fakeInstallerBinary = `#!/bin/sh

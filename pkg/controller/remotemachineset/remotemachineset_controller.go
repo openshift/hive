@@ -308,7 +308,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				workerPool.Platform.AWS.Zones = azs
 			}
 
-			icMachineSets, err := installaws.MachineSets(cd.Status.ClusterID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
+			icMachineSets, err := installaws.MachineSets(cd.Status.InfraID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
 			if err != nil {
 				return nil, err
 			}

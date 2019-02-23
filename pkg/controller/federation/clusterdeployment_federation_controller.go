@@ -159,8 +159,16 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 		return reconcile.Result{}, r.addFederationFinalizer(cd, cdLog)
 	}
 
-	// If already federated, skip
+	// If already federated, ensure the federated cluster is in sync
 	if cd.Status.Federated {
+
+		// TODO: Remove in the future. This is here for the case when a cluster has been federated
+		// and it used a previous name-namespace name instead of the new randomly-generated name.
+		if cd.Status.FederatedClusterRef == nil || len(cd.Status.FederatedClusterRef.Name) == 0 {
+			cdLog.Debugf("setting federated cluster name reference on legacy cluster deployment")
+			return reconcile.Result{}, r.setFederatedClusterRef(cd, legacyFederatedClusterName, cdLog)
+		}
+
 		// If already federated, ensure federated cluster is in sync
 		// with the cluster deployment
 		err = r.updateFederatedCluster(cd, cdLog)
@@ -175,7 +183,7 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 
 	if cd.Status.FederatedClusterRef == nil || len(cd.Status.FederatedClusterRef.Name) == 0 {
 		cdLog.Debugf("setting federated cluster name reference")
-		return reconcile.Result{}, r.setFederatedClusterRef(cd, cdLog)
+		return reconcile.Result{}, r.setFederatedClusterRef(cd, federatedClusterName, cdLog)
 	}
 
 	err = r.joinCluster(cd, cdLog)
@@ -330,10 +338,9 @@ func (r *ReconcileClusterDeploymentFederation) setClusterFederated(cd *hivev1.Cl
 	return nil
 }
 
-func (r *ReconcileClusterDeploymentFederation) setFederatedClusterRef(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-
+func (r *ReconcileClusterDeploymentFederation) setFederatedClusterRef(cd *hivev1.ClusterDeployment, nameFunc func(cd *hivev1.ClusterDeployment) string, cdLog log.FieldLogger) error {
 	cd.Status.FederatedClusterRef = &corev1.ObjectReference{
-		Name:      federatedClusterName(cd),
+		Name:      nameFunc(cd),
 		Namespace: federationutil.DefaultFederationSystemNamespace,
 	}
 
@@ -409,4 +416,8 @@ func (r *ReconcileClusterDeploymentFederation) removeFederationFinalizer(cd *hiv
 
 func federatedClusterName(cd *hivev1.ClusterDeployment) string {
 	return fmt.Sprintf("%s-%s", cd.Name, rand.String(8))
+}
+
+func legacyFederatedClusterName(cd *hivev1.ClusterDeployment) string {
+	return fmt.Sprintf("%s-%s", cd.Namespace, cd.Name)
 }

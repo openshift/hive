@@ -42,7 +42,6 @@ const (
 	metadataRelativePath                = "metadata.json"
 	adminKubeConfigRelativePath         = "auth/kubeconfig"
 	adminPasswordRelativePath           = "auth/kubeadmin-password"
-	uuidKey                             = "openshiftClusterID"
 	kubernetesKeyPrefix                 = "kubernetes.io/cluster/"
 	kubeadminUsername                   = "kubeadmin"
 	metadataConfigmapStringTemplate     = "%s-metadata"
@@ -322,8 +321,7 @@ func (m *InstallManager) cleanupTerraformFiles() error {
 func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogger) error {
 	// run the uninstaller to clean up any cloud resources previously created
 	filters := []aws.Filter{
-		{uuidKey: clusterID},
-		{kubernetesKeyPrefix + clusterName: "owned"},
+		{kubernetesKeyPrefix + clusterID: "owned"},
 	}
 	uninstaller := &aws.ClusterUninstaller{
 		Filters: filters,
@@ -418,23 +416,12 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 		return err
 	}
 
-	if md.ClusterPlatformMetadata.AWS != nil {
-		for _, ids := range md.ClusterPlatformMetadata.AWS.Identifier {
-			clusterID, ok := ids["openshiftClusterID"]
-			if ok {
-				cd.Status.ClusterID = clusterID
-				m.log.WithField("clusterID", clusterID).Debug("found clusterID")
-				break
-			}
-		}
-		if cd.Status.ClusterID == "" {
-			m.log.Error("cluster metadata did not contain openshiftClusterID")
-			return fmt.Errorf("cluster metadata did not contain openshiftClusterID")
-		}
-	} else {
-		// TODO: handle other cloud providers here
-		return fmt.Errorf("cluster metadata did not contain AWS platform")
+	cd.Status.ClusterID = md.InfraID
+	if cd.Status.ClusterID == "" {
+		m.log.Error("cluster metadata did not contain clusterID")
+		return fmt.Errorf("cluster metadata did not contain clusterID")
 	}
+
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	err = m.DynamicClient.Status().Update(context.Background(), cd)
 	if err != nil {

@@ -43,14 +43,14 @@ const (
 	testClusterName = "test-cluster"
 	testNamespace   = "test-namespace"
 	// testClusterID matches the json blob below:
-	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
+	testClusterID = "test-cluster-fe9531"
 
 	installerBinary     = "openshift-install"
 	fakeInstallerBinary = `#!/bin/sh
 echo "Fake Installer"
 echo $@
 WORKDIR=%s
-echo '{"clusterName":"test-cluster","aws":{"region":"us-east-1","identifier":[{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}, {"kubernetes.io/cluster/dgoodwin-dev":"owned"}]}}' > $WORKDIR/metadata.json
+echo '{"clusterName":"test-cluster","infraID":"test-cluster-fe9531","clusterID":"fe953108-f64c-4166-bb8e-20da7665ba00", "aws":{"region":"us-east-1","identifier":[{"kubernetes.io/cluster/dgoodwin-dev":"owned"}]}}' > $WORKDIR/metadata.json
 mkdir -p $WORKDIR/auth/
 echo "fakekubeconfig" > $WORKDIR/auth/kubeconfig
 echo "fakepassword" > $WORKDIR/auth/kubeadmin-password

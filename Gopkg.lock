@@ -670,7 +670,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d96bae09081244ee11330c8aef996bec80c6bcab1908f115aca87f1725e372d0"
+  digest = "1:1fa01b732b051b54b767479943f91b728bfc2a5db30fe00d291de1a6ba1d9ec8"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -686,7 +686,7 @@
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "c957fa46636b78189b5dbac076b7371f53fe8831"
+  revision = "c09f146dcc70711d552e0441ab26a4fe232a1b57"
 
 [[projects]]
   branch = "master"
@@ -1540,17 +1540,6 @@
   revision = "4c3feeb576b06ef8fea769809bd3db5e5e78dc23"
 
 [[projects]]
-  branch = "master"
-  digest = "1:3eaf497f58fd507d9cfd0b3d2c7a4332fb19f1b53c3df61cb12521b2a07e4f17"
-  name = "sigs.k8s.io/cluster-api"
-  packages = [
-    "pkg/apis/cluster/common",
-    "pkg/apis/cluster/v1alpha1",
-  ]
-  pruneopts = "NUT"
-  revision = "40d9d12e7bf4e1d0c6a3453e018c4eed1007ae0a"
-
-[[projects]]
   digest = "1:40d29d9c2961a32804a4340db00ed1b2f709cfabf090b43583e4c95abe9e1837"
   name = "sigs.k8s.io/cluster-api-provider-aws"
   packages = ["pkg/apis/awsproviderconfig/v1beta1"]
@@ -1665,6 +1654,7 @@
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/machines/aws",
@@ -1707,7 +1697,6 @@
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "k8s.io/utils/pointer",
     "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1",
-    "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/client/fake",

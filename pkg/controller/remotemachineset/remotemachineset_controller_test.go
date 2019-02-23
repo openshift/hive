@@ -50,6 +50,7 @@ import (
 const (
 	testName                 = "foo"
 	testNamespace            = "default"
+	testClusterID            = "foo-12345"
 	machineAPINamespace      = "openshift-machine-api"
 	metadataName             = "foo-metadata"
 	adminKubeconfigSecret    = "foo-admin-kubeconfig"
@@ -112,16 +113,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 					},
 				}
 			}(),
@@ -138,16 +139,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1c", "worker", true, 0, 0),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 0, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 1),
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 1),
 					},
 				}
 			}(),
@@ -164,15 +165,15 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1c", "worker", false, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
 					},
 				}
 			}(),
@@ -189,17 +190,17 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
-				testMachineSet("foo-worker-us-east-1d", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1d", "worker", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-worker-us-east-1a", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1b", "worker", true, 1, 0),
-						*testMachineSet("foo-worker-us-east-1c", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 					},
 				}
 			}(),
@@ -217,14 +218,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 3, 0),
-				testMachineSet("foo-beta-us-east-1b", "beta", true, 3, 0),
+				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 0),
+				testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 3, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 3, 0),
-						*testMachineSet("foo-beta-us-east-1b", "beta", true, 3, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 0),
+						*testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 3, 0),
 					},
 				}
 			}(),
@@ -242,14 +243,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 4, 0),
-				testMachineSet("foo-beta-us-east-1b", "beta", true, 4, 0),
+				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 4, 0),
+				testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 4, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 3, 1),
-						*testMachineSet("foo-beta-us-east-1b", "beta", true, 3, 1),
+						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 1),
+						*testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 3, 1),
 					},
 				}
 			}(),
@@ -267,19 +268,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
-				testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
-				testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
-						*testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
-						*testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
-						*testMachineSet("foo-beta-us-east-1a", "beta", false, 1, 0),
-						*testMachineSet("foo-beta-us-east-1b", "beta", false, 1, 0),
-						*testMachineSet("foo-beta-us-east-1c", "beta", false, 1, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-beta-us-east-1a", "beta", false, 1, 0),
+						*testMachineSet("foo-12345-beta-us-east-1b", "beta", false, 1, 0),
+						*testMachineSet("foo-12345-beta-us-east-1c", "beta", false, 1, 0),
 					},
 				}
 			}(),
@@ -296,19 +297,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
-				testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
-				testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
-				testMachineSet("foo-beta-us-east-1a", "alpha", true, 1, 0),
-				testMachineSet("foo-beta-us-east-1b", "alpha", true, 1, 0),
-				testMachineSet("foo-beta-us-east-1c", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-beta-us-east-1a", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-beta-us-east-1b", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-beta-us-east-1c", "alpha", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-alpha-us-east-1a", "alpha", true, 1, 0),
-						*testMachineSet("foo-alpha-us-east-1b", "alpha", true, 1, 0),
-						*testMachineSet("foo-alpha-us-east-1c", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
 					},
 				}
 			}(),
@@ -419,7 +420,7 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 			Namespace: machineAPINamespace,
 			Labels: map[string]string{
 				"sigs.k8s.io/cluster-api-machine-type": machineType,
-				"sigs.k8s.io/cluster-api-cluster":      testName,
+				"sigs.k8s.io/cluster-api-cluster":      testClusterID,
 				"sigs.k8s.io/cluster-api-machine-role": machineType,
 			},
 			Generation: int64(generation),
@@ -477,6 +478,7 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 		Status: hivev1.ClusterDeploymentStatus{
 			Installed:             true,
 			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
+			ClusterID:             testClusterID,
 		},
 	}
 }

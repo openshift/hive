@@ -200,25 +200,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Parse cluster UUID from metadata",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					return cd
-				}(),
-				testInstallJob(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				testMetadataConfigMap(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				assert.Equal(t, testClusterID, cd.Status.ClusterID)
-			},
-		},
-		{
 			name: "Fetch remote cluster version status into clusterdeployment status",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {

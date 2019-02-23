@@ -71,7 +71,6 @@ trap 'teardown' EXIT
 # TODO: Determine how to wait for readiness of the validation webhook
 sleep 120
 
-
 i=1
 while [ $i -le ${max_tries} ]; do
   if [ $i -gt 1 ]; then
@@ -88,6 +87,7 @@ while [ $i -le ${max_tries} ]; do
          AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
          AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
          BASE_DOMAIN="${BASE_DOMAIN}" \
+         HIVE_IMAGE="${TEST_IMAGE}" \
          INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
          OPENSHIFT_RELEASE_IMAGE="" \
          TRY_INSTALL_ONCE="true" \
@@ -132,7 +132,6 @@ if [ $i -ge ${max_tries} ] ; then
   echo "exiting"
   exit 10
 fi
-
 
 # Wait for the cluster deployment to be installed
 SRC_ROOT=$(git rev-parse --show-toplevel)

@@ -55,19 +55,40 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		}
 	}
 
-	machinePools := []types.MachinePool{}
-
-	// combinedMachinePools contains spec.ControlPlane and spec.Compute MachinePools
-	combinedMachinePools := []hivev1.MachinePool{}
 	if spec.ControlPlane.Name != "master" {
 		spec.ControlPlane.Name = "master"
 	}
-	combinedMachinePools = append(combinedMachinePools, spec.ControlPlane)
-	for _, mp := range spec.Compute {
-		combinedMachinePools = append(combinedMachinePools, mp)
-	}
+	controlPlaneMachinePool := convertMachinePools(spec.ControlPlane)[0]
+	computeMachinePools := convertMachinePools(spec.Compute...)
 
-	for _, mp := range combinedMachinePools {
+	ic := &types.InstallConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: spec.ClusterName,
+		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: types.InstallConfigVersion,
+		},
+		SSHKey:     sshKey,
+		BaseDomain: spec.BaseDomain,
+		Networking: &types.Networking{
+			Type:            string(spec.Networking.Type),
+			ServiceCIDR:     parseCIDR(spec.Networking.ServiceCIDR),
+			ClusterNetworks: convertClusterNetworks(spec.Networking.ClusterNetworks),
+			MachineCIDR:     parseCIDR(spec.Networking.MachineCIDR),
+		},
+		PullSecret:   pullSecret,
+		Platform:     platform,
+		ControlPlane: &controlPlaneMachinePool,
+		Compute:      computeMachinePools,
+	}
+	return ic, nil
+}
+
+func convertMachinePools(pools ...hivev1.MachinePool) []types.MachinePool {
+
+	machinePools := []types.MachinePool{}
+
+	for _, mp := range pools {
 		newMP := types.MachinePool{
 			Name:     mp.Name,
 			Replicas: mp.Replicas,
@@ -86,26 +107,7 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		machinePools = append(machinePools, newMP)
 	}
 
-	ic := &types.InstallConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: spec.ClusterName,
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: types.InstallConfigVersion,
-		},
-		SSHKey:     sshKey,
-		BaseDomain: spec.BaseDomain,
-		Networking: &types.Networking{
-			Type:            string(spec.Networking.Type),
-			ServiceCIDR:     parseCIDR(spec.Networking.ServiceCIDR),
-			ClusterNetworks: convertClusterNetworks(spec.Networking.ClusterNetworks),
-			MachineCIDR:     parseCIDR(spec.Networking.MachineCIDR),
-		},
-		PullSecret: pullSecret,
-		Platform:   platform,
-		Machines:   machinePools,
-	}
-	return ic, nil
+	return machinePools
 }
 
 func parseCIDR(s string) *ipnet.IPNet {

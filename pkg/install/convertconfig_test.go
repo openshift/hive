@@ -41,7 +41,6 @@ func init() {
 const (
 	testName                 = "foo"
 	testNamespace            = "default"
-	testClusterID            = "foo"
 	testAMI                  = "ami-totallyfake"
 	adminPassword            = "adminpassword"
 	adminSSHKey              = "adminSSH"
@@ -174,22 +173,23 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				},
 			},
 		},
-		Machines: []installtypes.MachinePool{
-			{
-				Name:     "master",
-				Replicas: &replicas,
-				Platform: installtypes.MachinePoolPlatform{
-					AWS: &installawstypes.MachinePool{
-						InstanceType: awsInstanceType,
-						EC2RootVolume: installawstypes.EC2RootVolume{
-							IOPS: ec2VolIOPS,
-							Size: ec2VolSize,
-							Type: ec2VolType,
-						},
-						Zones: []string{"us-east-1a", "us-east-1b"},
+		ControlPlane: &installtypes.MachinePool{
+			Name:     "master",
+			Replicas: &replicas,
+			Platform: installtypes.MachinePoolPlatform{
+				AWS: &installawstypes.MachinePool{
+					InstanceType: awsInstanceType,
+					EC2RootVolume: installawstypes.EC2RootVolume{
+						IOPS: ec2VolIOPS,
+						Size: ec2VolSize,
+						Type: ec2VolType,
 					},
+					Zones: []string{"us-east-1a", "us-east-1b"},
 				},
 			},
+		},
+
+		Compute: []installtypes.MachinePool{
 			{
 				Name:     "workers",
 				Replicas: &replicas,

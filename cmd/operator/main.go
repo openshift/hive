@@ -70,7 +70,7 @@ func newRootCommand() *cobra.Command {
 			}
 
 			// Create a new Cmd to provide shared dependencies and start components
-			mgr, err := manager.New(cfg, manager.Options{})
+			mgr, err := manager.New(cfg, manager.Options{Namespace: "openshift-hive"})
 			if err != nil {
 				log.Fatal(err)
 			}

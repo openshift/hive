@@ -110,12 +110,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 
 	expectedDeploymentGen := int64(0)
 	currentDeployment := &appsv1.Deployment{}
+	foundCurrentDeployment := false
 	err = r.Get(context.Background(), types.NamespacedName{Name: hiveDeployment.Name, Namespace: hiveDeployment.Namespace}, currentDeployment)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up current deployment")
 		return err
 	} else if err == nil {
 		expectedDeploymentGen = currentDeployment.ObjectMeta.Generation
+		foundCurrentDeployment = true
 	}
 
 	if instance.Spec.Image != "" {
@@ -133,7 +135,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 	// ApplyDeployment does not check much of the Spec for changes. Do some manual
 	// checking and if we see something we care about has changed, force an update
 	// by changing the expected deployment generation.
-	if currentDeployment.Spec.Template.Spec.Containers[0].Image !=
+	if foundCurrentDeployment && currentDeployment.Spec.Template.Spec.Containers[0].Image !=
 		hiveDeployment.Spec.Template.Spec.Containers[0].Image {
 		hLog.WithFields(log.Fields{
 			"current": currentDeployment.Spec.Template.Spec.Containers[0].Image,

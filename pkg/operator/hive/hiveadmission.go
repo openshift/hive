@@ -118,12 +118,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 
 	expectedDSGen := int64(0)
 	currentDS := &appsv1.DaemonSet{}
+	foundCurrentDS := false
 	err = r.Get(context.Background(), types.NamespacedName{Name: hiveAdmDaemonSet.Name, Namespace: hiveAdmDaemonSet.Namespace}, currentDS)
 	if err != nil && !errors.IsNotFound(err) {
 		haLog.WithError(err).Error("error looking up current daemonset")
 		return err
 	} else if err == nil {
 		expectedDSGen = currentDS.ObjectMeta.Generation
+		foundCurrentDS = true
 	}
 
 	if instance.Spec.Image != "" {
@@ -133,7 +135,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 	// ApplyDaemonSet does not check much of the Spec for changes. Do some manual
 	// checking and if we see something we care about has changed, force an update
 	// by changing the expected deployment generation.
-	if currentDS.Spec.Template.Spec.Containers[0].Image !=
+	if foundCurrentDS && currentDS.Spec.Template.Spec.Containers[0].Image !=
 		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image {
 		haLog.WithFields(log.Fields{
 			"current": currentDS.Spec.Template.Spec.Containers[0].Image,

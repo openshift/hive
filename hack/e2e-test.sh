@@ -89,7 +89,7 @@ while [ $i -le ${max_tries} ]; do
          BASE_DOMAIN="${BASE_DOMAIN}" \
          HIVE_IMAGE="${TEST_IMAGE}" \
          INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-         OPENSHIFT_RELEASE_IMAGE="" \
+         RELEASE_IMAGE="" \
          TRY_INSTALL_ONCE="true" \
       > ${CLUSTER_DEPLOYMENT_FILE} ; then
     echo "Success"
@@ -161,7 +161,6 @@ if [ $i -ge ${max_tries} ] ; then
   echo "exiting"
   exit 10
 fi
-
 
 # Wait for the cluster deployment to be installed
 SRC_ROOT=$(git rev-parse --show-toplevel)

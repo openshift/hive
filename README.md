@@ -41,53 +41,59 @@ NOTE: assumes you have previously deployed using one of the above methods.
 
 ## Using Hive
 
-* Create a ClusterDeployment using local container images:
-  * Place the OpenShift images pull secret in a known location like `$HOME/config.json`
-  * Assuming AWS credentials set in the standard environment variables, and our usual SSH key.
-  ```bash
-  export CLUSTER_NAME="${USER}"
-  export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
-  export PULL_SECRET="$(cat ${HOME}/config.json)"
+1. Obtain a pull secret from try.openshift.com and place in a known location like `$HOME/config.json`.
+1. **WARNING:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com". This will soon be fixed in the installer and no longer a requirement.
+1. Ensure your AWS credentials are set in the normal environment variables: AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY
+1. Note the use of an SSH key below to access the instances if necessary. (this should typically not be required)
 
-  oc process -f config/templates/cluster-deployment.yaml \
-     CLUSTER_NAME="${CLUSTER_NAME}" \
-     SSH_KEY="${SSH_PUB_KEY}" \
-     PULL_SECRET="${PULL_SECRET}" \
-     AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-     AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-     | oc apply -f -
-  ```
-  * **NOTE:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com".
-* Create a ClusterDeployment using remote container images:
-  * Place the OpenShift images pull secret in a known location like `$HOME/config.json`
-  * Assuming AWS credentials set in the standard environment variables, and our usual SSH key.
-  ```bash
-  export CLUSTER_NAME="${USER}"
-  export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
-  export PULL_SECRET="$(cat ${HOME}/config.json)"
-  export HIVE_IMAGE="quay.io/twiest/hive-controller:20190128"
-  export HIVE_IMAGE_PULL_POLICY="Always"
-  export INSTALLER_IMAGE="quay.io/twiest/installer:20190128"
-  export INSTALLER_IMAGE_PULL_POLICY="Always"
+### Create a ClusterDeployment using the latest OpenShift release and installer image
 
-  oc process -f config/templates/cluster-deployment.yaml \
-     CLUSTER_NAME="${CLUSTER_NAME}" \
-     SSH_KEY="${SSH_PUB_KEY}" \
-     PULL_SECRET="${PULL_SECRET}" \
-     AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-     AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-     HIVE_IMAGE="${HIVE_IMAGE}" \
-     HIVE_IMAGE_PULL_POLICY="${HIVE_IMAGE_PULL_POLICY}" \
-     INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-     INSTALLER_IMAGE_PULL_POLICY="${INSTALLER_IMAGE_PULL_POLICY}" \
-     | oc apply -f -
-  ```
-  * **NOTE:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com".
-* Delete your ClusterDeployment:
-  ```bash
-  $ oc delete clusterdeployment $USER
-  ```
+```bash
+export CLUSTER_NAME="${USER}"
+export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
+export PULL_SECRET="$(cat ${HOME}/config.json)"
 
+oc process -f config/templates/cluster-deployment.yaml \
+   CLUSTER_NAME="${CLUSTER_NAME}" \
+   SSH_KEY="${SSH_PUB_KEY}" \
+   PULL_SECRET="${PULL_SECRET}" \
+   AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+   AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+   | oc apply -f -
+```
+
+### Create a ClusterDeployment using latest pinned and known stable container images:
+
+```bash
+export CLUSTER_NAME="${USER}"
+export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
+export PULL_SECRET="$(cat ${HOME}/config.json)"
+export HIVE_IMAGE="quay.io/twiest/hive-controller:20190128"
+export HIVE_IMAGE_PULL_POLICY="Always"
+export INSTALLER_IMAGE="quay.io/twiest/installer:20190128"
+export INSTALLER_IMAGE_PULL_POLICY="Always"
+export RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.0.0-0.1"
+
+oc process -f config/templates/cluster-deployment.yaml \
+   CLUSTER_NAME="${CLUSTER_NAME}" \
+   SSH_KEY="${SSH_PUB_KEY}" \
+   PULL_SECRET="${PULL_SECRET}" \
+   AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+   AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+   HIVE_IMAGE="${HIVE_IMAGE}" \
+   HIVE_IMAGE_PULL_POLICY="${HIVE_IMAGE_PULL_POLICY}" \
+   INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
+   INSTALLER_IMAGE_PULL_POLICY="${INSTALLER_IMAGE_PULL_POLICY}" \
+   RELEASE_IMAGE="${RELEASE_IMAGE}" \
+   | oc apply -f -
+```
+
+
+### Delete your ClusterDeployment:
+
+```bash
+$ oc delete clusterdeployment $USER
+```
 ## Tips
 
 ### Using the Admin Kubeconfig

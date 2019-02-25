@@ -43,7 +43,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -444,22 +443,6 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 		cdLog.Debugf("read remote route object: %s", routeObject)
 		cd.Status.WebConsoleURL = "https://" + routeObject.Spec.Host
 	}
-
-	// Update remote cluster's version into our status
-	if cd.Status.AdminKubeconfigSecret.Name != "" {
-		remoteClusterVersion := &openshiftapiv1.ClusterVersion{}
-		err = remoteClusterAPIClient.Get(context.Background(),
-			types.NamespacedName{Name: clusterVersionObjectName},
-			remoteClusterVersion)
-		if err != nil {
-			cdLog.WithError(err).Error("error fetching remote clusterversion object")
-			return err
-		}
-
-		cdLog.Debugf("remote cluster version status: %+v", remoteClusterVersion.Status)
-		controllerutils.FixupEmptyClusterVersionFields(&remoteClusterVersion.Status)
-		remoteClusterVersion.Status.DeepCopyInto(&cd.Status.ClusterVersionStatus)
-	}
 	return nil
 }
 
@@ -506,7 +489,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 
-	if cd.Status.ClusterID == "" {
+	if cd.Status.InfraID == "" {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {

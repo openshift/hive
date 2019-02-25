@@ -15,6 +15,8 @@ const (
 	testClusterName  = "bar"
 	sshKeySecret     = "ssh-key"
 	pullSecretSecret = "pull-secret"
+	testClusterID    = "cluster-id"
+	testInfraID      = "infra-id"
 )
 
 func init() {
@@ -68,6 +70,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			ClusterID: testClusterID,
+			InfraID:   testInfraID,
 		},
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)

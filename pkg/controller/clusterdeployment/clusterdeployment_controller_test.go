@@ -49,6 +49,7 @@ const (
 	testName              = "foo-lqmsh"
 	testClusterName       = "bar"
 	testClusterID         = "testFooClusterUUID"
+	testInfraID           = "testFooInfraID"
 	installJobName        = "foo-lqmsh-install"
 	uninstallJobName      = "foo-lqmsh-uninstall"
 	testNamespace         = "default"
@@ -197,44 +198,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443/console", cd.Status.WebConsoleURL)
-			},
-		},
-		{
-			name: "Parse cluster UUID from metadata",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					return cd
-				}(),
-				testInstallJob(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				testMetadataConfigMap(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				assert.Equal(t, testClusterID, cd.Status.ClusterID)
-			},
-		},
-		{
-			name: "Fetch remote cluster version status into clusterdeployment status",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-					return cd
-				}(),
-				testInstallJob(),
-				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				assert.Equal(t, "4.0.0", cd.Status.ClusterVersionStatus.History[0].Version)
 			},
 		},
 		{
@@ -437,6 +400,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			ClusterID: testClusterID,
+			InfraID:   testInfraID,
 		},
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)

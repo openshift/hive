@@ -71,7 +71,6 @@ trap 'teardown' EXIT
 # TODO: Determine how to wait for readiness of the validation webhook
 sleep 120
 
-
 i=1
 while [ $i -le ${max_tries} ]; do
   if [ $i -gt 1 ]; then
@@ -88,6 +87,7 @@ while [ $i -le ${max_tries} ]; do
          AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
          AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
          BASE_DOMAIN="${BASE_DOMAIN}" \
+         HIVE_IMAGE="${TEST_IMAGE}" \
          INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
          OPENSHIFT_RELEASE_IMAGE="" \
          TRY_INSTALL_ONCE="true" \
@@ -118,6 +118,35 @@ while [ $i -le ${max_tries} ]; do
 
   echo "Applying ClusterDeployment File ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
   if oc apply -f ${CLUSTER_DEPLOYMENT_FILE} ; then
+    echo "Success"
+    break
+  else
+    echo -n "Failed, "
+  fi
+
+  i=$((i + 1))
+done
+
+if [ $i -ge ${max_tries} ] ; then
+  # Failed the maximum amount of times.
+  echo "exiting"
+  exit 10
+fi
+
+# Sanity check the cluster deployment printer
+i=1
+while [ $i -le ${max_tries} ]; do
+  if [ $i -gt 1 ]; then
+    # Don't sleep on first loop
+    echo "sleeping ${sleep_between_tries} seconds"
+    sleep ${sleep_between_tries}
+  fi
+
+  echo "Getting ClusterDeployment ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
+
+  GET_BY_SHORT_NAME=$(oc get cd)
+
+  if echo "${GET_BY_SHORT_NAME}" | grep 'BASEDOMAIN' ; then
     echo "Success"
     break
   else

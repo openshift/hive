@@ -172,7 +172,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
-	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(request.Namespace), "hive-operator", &corev1.ObjectReference{
+	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(hiveNamespace), "hive-operator", &corev1.ObjectReference{
 		Name:      request.Name,
 		Namespace: hiveNamespace,
 	})

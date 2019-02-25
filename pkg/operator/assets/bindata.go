@@ -317,10 +317,22 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: clusterdeployments.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.baseDomain
+    name: BaseDomain
+    type: string
+  - JSONPath: .status.installed
+    name: Installed
+    type: boolean
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
     plural: clusterdeployments
+    shortNames:
+    - cd
   scope: Namespaced
   subresources:
     status: {}
@@ -799,8 +811,9 @@ spec:
               description: APIURL is the URL where the cluster's API can be accessed.
               type: string
             clusterID:
-              description: ClusterID is a unique identifier for this cluster generated
-                during installation.
+              description: ClusterID is a globally unique identifier for this cluster
+                generated during installation. Used for reporting metrics among other
+                places.
               type: string
             clusterVersionStatus:
               description: ClusterVersionStatus will hold a copy of the remote cluster's
@@ -956,6 +969,10 @@ spec:
               description: FederatedClusterRef is the reference to the federated cluster
                 resource associated with this ClusterDeployment.
               type: object
+            infraID:
+              description: InfraID is an identifier for this cluster generated during
+                installation and used for tagging/naming resources in cloud providers.
+              type: string
             installed:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
@@ -986,7 +1003,7 @@ func configCrdsHive_v1alpha1_clusterdeploymentYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeployment.yaml", size: 30910, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeployment.yaml", size: 31466, mode: os.FileMode(436), modTime: time.Unix(1551112876, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1076,7 +1093,7 @@ func configCrdsHive_v1alpha1_dnszoneYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_dnszone.yaml", size: 2605, mode: os.FileMode(436), modTime: time.Unix(1551111484, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_dnszone.yaml", size: 2605, mode: os.FileMode(436), modTime: time.Unix(1551112876, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1291,7 +1308,7 @@ func configCrdsHive_v1alpha1_hiveconfigYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_hiveconfig.yaml", size: 8168, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_hiveconfig.yaml", size: 8168, mode: os.FileMode(436), modTime: time.Unix(1551112876, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

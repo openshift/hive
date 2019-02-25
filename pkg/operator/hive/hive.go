@@ -55,14 +55,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 	hLog.Debug("reading DNSZone CRD")
 	dnsZoneCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
 
-	asset, err = assets.Asset("config/manager/service.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return err
-	}
-	hLog.Debug("reading service")
-	hiveSvc := resourceread.ReadServiceV1OrDie(asset)
-
 	asset, err = assets.Asset("config/manager/deployment.yaml")
 	if err != nil {
 		hLog.WithError(err).Error("error loading asset")
@@ -74,10 +66,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 	// Set owner refs on all objects in the deployment so deleting the operator CRD
 	// will clean everything up:
 	// NOTE: we do not cleanup the CRDs themselves so as not to destroy data.
-	if err := controllerutil.SetControllerReference(instance, hiveSvc, r.scheme); err != nil {
-		hLog.WithError(err).Info("error setting owner ref")
-		return err
-	}
 
 	if err := controllerutil.SetControllerReference(instance, hiveDeployment, r.scheme); err != nil {
 		hLog.WithError(err).Info("error setting owner ref")
@@ -99,14 +87,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 		return err
 	}
 	hLog.WithField("changed", changed).Info("DNSZone CRD updated")
-
-	_, changed, err = resourceapply.ApplyService(r.kubeClient.CoreV1(),
-		recorder, hiveSvc)
-	if err != nil {
-		hLog.WithError(err).Error("error applying service")
-		return err
-	}
-	hLog.WithField("changed", changed).Info("service updated")
 
 	expectedDeploymentGen := int64(0)
 	currentDeployment := &appsv1.Deployment{}

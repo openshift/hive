@@ -1193,27 +1193,6 @@ func config_manager_deployment_yaml() ([]byte, error) {
 	return _config_manager_deployment_yaml, nil
 }
 
-var _config_manager_service_yaml = []byte(`---
-apiVersion: v1
-kind: Service
-metadata:
-  name: hive-controllers-service
-  namespace: openshift-hive
-  labels:
-    control-plane: controller-manager
-    controller-tools.k8s.io: "1.0"
-spec:
-  selector:
-    control-plane: controller-manager
-    controller-tools.k8s.io: "1.0"
-  ports:
-  - port: 443
-`)
-
-func config_manager_service_yaml() ([]byte, error) {
-	return _config_manager_service_yaml, nil
-}
-
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -1246,7 +1225,6 @@ var _bindata = map[string]func() ([]byte, error){
 	"config/hiveadmission/service-account.yaml":           config_hiveadmission_service_account_yaml,
 	"config/hiveadmission/service.yaml":                   config_hiveadmission_service_yaml,
 	"config/manager/deployment.yaml":                      config_manager_deployment_yaml,
-	"config/manager/service.yaml":                         config_manager_service_yaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -1306,7 +1284,6 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 		}},
 		"manager": {nil, map[string]*_bintree_t{
 			"deployment.yaml": {config_manager_deployment_yaml, map[string]*_bintree_t{}},
-			"service.yaml":    {config_manager_service_yaml, map[string]*_bintree_t{}},
 		}},
 	}},
 }}

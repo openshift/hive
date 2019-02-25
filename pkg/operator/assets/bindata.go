@@ -767,7 +767,7 @@ spec:
   names:
     kind: HiveConfig
     plural: hiveconfigs
-  scope: Namespaced
+  scope: Cluster
   validation:
     openAPIV3Schema:
       properties:

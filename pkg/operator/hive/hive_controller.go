@@ -47,6 +47,8 @@ import (
 const (
 	legacyDeploymentConfig = "hive-controller-manager"
 	legacyService          = "hive-controller-manager-service"
+	// hiveNamespace is the assumed and only supported namespace where Hive will be deployed.
+	hiveNamespace = "openshift-hive"
 	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
 	hiveConfigName = "hive"
 )
@@ -148,7 +150,9 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Fetch the Hive instance
 	instance := &hivev1.HiveConfig{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	// NOTE: ignoring the Namespace that seems to get set on request when syncing on namespaced objects,
+	// when our HiveConfig is ClusterScoped.
+	err := r.Get(context.TODO(), types.NamespacedName{Name: request.NamespacedName.Name}, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -170,7 +174,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 
 	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(request.Namespace), "hive-operator", &corev1.ObjectReference{
 		Name:      request.Name,
-		Namespace: request.Namespace,
+		Namespace: hiveNamespace,
 	})
 
 	err = r.deleteLegacyComponents(hLog)
@@ -200,7 +204,7 @@ func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error
 	// Ensure legacy DeploymentConfig is deleted, we switched to a Deployment:
 	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
 	dc := &oappsv1.DeploymentConfig{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDeploymentConfig, Namespace: "openshift-hive"}, dc)
+	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDeploymentConfig, Namespace: hiveNamespace}, dc)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up legacy DeploymentConfig")
 		return err
@@ -219,7 +223,7 @@ func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error
 	// Ensure legacy Service is deleted, renamed.
 	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
 	oldSvc := &corev1.Service{}
-	err = r.Get(context.Background(), types.NamespacedName{Name: legacyService, Namespace: "openshift-hive"}, oldSvc)
+	err = r.Get(context.Background(), types.NamespacedName{Name: legacyService, Namespace: hiveNamespace}, oldSvc)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up legacy Service")
 		return err

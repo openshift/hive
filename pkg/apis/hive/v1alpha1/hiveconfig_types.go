@@ -36,7 +36,7 @@ type HiveConfigStatus struct {
 	operatorv1.OperatorStatus `json:",inline"`
 }
 
-// +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HiveConfig is the Schema for the hives API

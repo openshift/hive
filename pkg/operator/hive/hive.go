@@ -22,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivecdctrlr "github.com/openshift/hive/pkg/controller/clusterdeployment"
 
 	"github.com/openshift/hive/pkg/operator/assets"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -118,6 +120,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 
 	if instance.Spec.Image != "" {
 		hiveDeployment.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
+		// NOTE: overwriting all environment vars here, there are no others at the time of
+		// writing:
+		hiveDeployment.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+			{
+				Name:  hivecdctrlr.HiveImageEnvVar,
+				Value: instance.Spec.Image,
+			},
+		}
 	}
 
 	// ApplyDeployment does not check much of the Spec for changes. Do some manual

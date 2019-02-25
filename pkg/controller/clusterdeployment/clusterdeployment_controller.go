@@ -19,6 +19,7 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -67,9 +68,10 @@ const (
 	clusterVersionUnknown       = "undef"
 	defaultHiveImage            = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 
-	// hiveConfigName is the only supported instance of a HiveConfig we respect in a cluster.
-	hiveConfigName      = "hive"
-	hiveConfigNamespace = "openshift-hive"
+	// HiveImageEnvVar is the optional environment variable that overrides the image to use
+	// for provisioning/deprovisioning. Typically this originates from the HiveConfig and is
+	// set as an EnvVar on the deployment.
+	HiveImageEnvVar = "HIVE_IMAGE"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -135,7 +137,7 @@ type ReconcileClusterDeployment struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments;clusterdeployments/status;clusterdeployments/finalizers;hiveconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments;clusterdeployments/status;clusterdeployments/finalizers,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
@@ -257,7 +259,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	hiveImage, err := r.getHiveImage(cdLog)
+	hiveImage := r.getHiveImage(cdLog)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -337,19 +339,17 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterDeployment) getHiveImage(cdLog log.FieldLogger) (string, error) {
-	hiveImage := defaultHiveImage
-	hiveConfig := &hivev1.HiveConfig{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName, Namespace: hiveConfigNamespace}, hiveConfig)
-	if err != nil && errors.IsNotFound(err) {
-		cdLog.Warn("no HiveConfig in cluster, using default hive image: %s", defaultHiveImage)
-	} else if err != nil {
-		cdLog.WithError(err).Error("error loading HiveConfig")
-		return "", err
-	} else if hiveConfig.Spec.Image != "" {
-		hiveImage = hiveConfig.Spec.Image
+// getHiveImage will return the image set in the HIVE_IMAGE env var, if set. This is typically
+// done by the operator using the value from HiveConfig, passed through as an EnvVar on the
+// hive controllers deployment. If unset, we use the default. (latest master)
+func (r *ReconcileClusterDeployment) getHiveImage(cdLog log.FieldLogger) string {
+	hiveImage, ok := os.LookupEnv(HiveImageEnvVar)
+	if !ok {
+		cdLog.Debugf("using default hive image: %s", hiveImage)
+		return defaultHiveImage
 	}
-	return hiveImage, nil
+	cdLog.Debugf("using hive image from %s env var: %s", HiveImageEnvVar, hiveImage)
+	return hiveImage
 }
 
 func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataKey string) (string, error) {
@@ -501,7 +501,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, nil
 	}
 
-	hiveImage, err := r.getHiveImage(cdLog)
+	hiveImage := r.getHiveImage(cdLog)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

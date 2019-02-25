@@ -152,6 +152,10 @@ type ClusterDeploymentStatus struct {
 // ClusterDeployment is the Schema for the clusterdeployments API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
+// +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".status.installed"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:resource:path=clusterdeployments,shortName=cd
 type ClusterDeployment struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

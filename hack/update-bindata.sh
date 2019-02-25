@@ -14,6 +14,7 @@ go build -o ./bin/go-bindata ./vendor/github.com/jteeuwen/go-bindata/go-bindata
 # TODO: add more components (hive, possibly all our non-operator CRDs / RBAC?)
 "./bin/go-bindata" \
         -nocompress \
+	-nometadata \
         -pkg "assets" \
         -o "${OUTPUT_FILE}" \
         -ignore "OWNERS" \

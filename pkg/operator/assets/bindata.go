@@ -90,7 +90,7 @@ func configHiveadmissionApiserviceYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/hiveadmission/apiservice.yaml", size: 958, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/hiveadmission/apiservice.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -131,7 +131,7 @@ func configHiveadmissionClusterdeploymentWebhookYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/hiveadmission/clusterdeployment-webhook.yaml", size: 615, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/hiveadmission/clusterdeployment-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -207,7 +207,7 @@ func configHiveadmissionDaemonsetYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/hiveadmission/daemonset.yaml", size: 1516, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/hiveadmission/daemonset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -249,7 +249,7 @@ func configHiveadmissionDnszonesWebhookYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/hiveadmission/dnszones-webhook.yaml", size: 634, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/hiveadmission/dnszones-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -273,7 +273,7 @@ func configHiveadmissionServiceAccountYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/hiveadmission/service-account.yaml", size: 159, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/hiveadmission/service-account.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -304,7 +304,7 @@ func configHiveadmissionServiceYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/hiveadmission/service.yaml", size: 277, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/hiveadmission/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1003,7 +1003,7 @@ func configCrdsHive_v1alpha1_clusterdeploymentYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeployment.yaml", size: 31466, mode: os.FileMode(436), modTime: time.Unix(1551112876, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1093,7 +1093,7 @@ func configCrdsHive_v1alpha1_dnszoneYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_dnszone.yaml", size: 2605, mode: os.FileMode(436), modTime: time.Unix(1551112876, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_dnszone.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1308,7 +1308,7 @@ func configCrdsHive_v1alpha1_hiveconfigYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_hiveconfig.yaml", size: 8168, mode: os.FileMode(436), modTime: time.Unix(1551112876, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_hiveconfig.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1364,7 +1364,7 @@ func configManagerDeploymentYaml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/manager/deployment.yaml", size: 977, mode: os.FileMode(436), modTime: time.Unix(1551111580, 0)}
+	info := bindataFileInfo{name: "config/manager/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

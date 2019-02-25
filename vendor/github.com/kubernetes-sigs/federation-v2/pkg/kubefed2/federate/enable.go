@@ -17,13 +17,13 @@ limitations under the License.
 package federate
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -61,7 +61,7 @@ var (
 
 	enable_example = `
 		# Enable federation of Services with service type overrideable
-		kubefed2 federate enable Service --override-paths=spec.type --host-cluster-context=cluster1`
+		kubefed2 enable Service --override-paths=spec.type --host-cluster-context=cluster1`
 )
 
 type enableType struct {
@@ -70,15 +70,15 @@ type enableType struct {
 }
 
 type enableTypeOptions struct {
-	targetName         string
-	targetVersion      string
-	rawComparisonField string
-	primitiveVersion   string
-	primitiveGroup     string
-	output             string
-	outputYAML         bool
-	filename           string
-	federateDirective  *FederateDirective
+	targetName          string
+	targetVersion       string
+	rawComparisonField  string
+	primitiveVersion    string
+	primitiveGroup      string
+	output              string
+	outputYAML          bool
+	filename            string
+	enableTypeDirective *EnableTypeDirective
 }
 
 // Bind adds the join specific arguments to the flagset passed in as an
@@ -96,9 +96,9 @@ func (o *enableTypeOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVarP(&o.filename, "filename", "f", "", "If provided, the command will be configured from the provided yaml file.  Only --output wll be accepted from the command line")
 }
 
-// NewCmdFederateEnable defines the `federate enable` command that
+// NewCmdTypeEnable defines the `enable` command that
 // enables federation of a Kubernetes API type.
-func NewCmdFederateEnable(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
+func NewCmdTypeEnable(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
 	opts := &enableType{}
 
 	cmd := &cobra.Command{
@@ -128,19 +128,19 @@ func NewCmdFederateEnable(cmdOut io.Writer, config util.FedConfig) *cobra.Comman
 
 // Complete ensures that options are valid and marshals them if necessary.
 func (j *enableType) Complete(args []string) error {
-	j.federateDirective = NewFederateDirective()
-	fd := j.federateDirective
+	j.enableTypeDirective = NewEnableTypeDirective()
+	fd := j.enableTypeDirective
 
 	if j.output == "yaml" {
 		j.outputYAML = true
 	} else if len(j.output) > 0 {
-		return fmt.Errorf("Invalid value for --output: %s", j.output)
+		return errors.Errorf("Invalid value for --output: %s", j.output)
 	}
 
 	if len(j.filename) > 0 {
 		err := DecodeYAMLFromFile(j.filename, fd)
 		if err != nil {
-			return fmt.Errorf("Failed to load yaml from file %q: %v", j.filename, err)
+			return errors.Wrapf(err, "Failed to load yaml from file %q", j.filename)
 		}
 		return nil
 	}
@@ -155,7 +155,7 @@ func (j *enableType) Complete(args []string) error {
 
 		fd.Spec.ComparisonField = apicommon.VersionComparisonField(j.rawComparisonField)
 	} else {
-		return fmt.Errorf("comparison field must be %q or %q",
+		return errors.Errorf("comparison field must be %q or %q",
 			apicommon.ResourceVersionField, apicommon.GenerationField,
 		)
 	}
@@ -172,14 +172,14 @@ func (j *enableType) Complete(args []string) error {
 	return nil
 }
 
-// Run is the implementation of the `federate enable` command.
+// Run is the implementation of the `enable` command.
 func (j *enableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 	hostConfig, err := config.HostConfig(j.HostClusterContext, j.Kubeconfig)
 	if err != nil {
-		return fmt.Errorf("Failed to get host cluster config: %v", err)
+		return errors.Wrap(err, "Failed to get host cluster config")
 	}
 
-	resources, err := GetResources(hostConfig, j.federateDirective)
+	resources, err := GetResources(hostConfig, j.enableTypeDirective)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func (j *enableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 		}
 		err := writeObjectsToYAML(objects, cmdOut)
 		if err != nil {
-			return fmt.Errorf("Failed to write objects to YAML: %v", err)
+			return errors.Wrap(err, "Failed to write objects to YAML")
 		}
 		// -o yaml implies dry run
 		return nil
@@ -211,18 +211,18 @@ type typeResources struct {
 	CRDs       []*apiextv1b1.CustomResourceDefinition
 }
 
-func GetResources(config *rest.Config, federateDirective *FederateDirective) (*typeResources, error) {
-	apiResource, err := LookupAPIResource(config, federateDirective.Name, federateDirective.Spec.TargetVersion)
+func GetResources(config *rest.Config, enableTypeDirective *EnableTypeDirective) (*typeResources, error) {
+	apiResource, err := LookupAPIResource(config, enableTypeDirective.Name, enableTypeDirective.Spec.TargetVersion)
 	if err != nil {
 		return nil, err
 	}
 	glog.V(2).Infof("Found resource %q", resourceKey(*apiResource))
 
-	typeConfig := typeConfigForTarget(*apiResource, federateDirective)
+	typeConfig := typeConfigForTarget(*apiResource, enableTypeDirective)
 
 	accessor, err := newSchemaAccessor(config, *apiResource)
 	if err != nil {
-		return nil, fmt.Errorf("Error initializing validation schema accessor: %v", err)
+		return nil, errors.Wrap(err, "Error initializing validation schema accessor")
 	}
 	crds, err := primitiveCRDs(typeConfig, accessor)
 	if err != nil {
@@ -247,32 +247,32 @@ func CreateResources(cmdOut io.Writer, config *rest.Config, resources *typeResou
 
 	crdClient, err := apiextv1b1client.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("Failed to create crd clientset: %v", err)
+		return errors.Wrap(err, "Failed to create crd clientset")
 	}
 	for _, crd := range resources.CRDs {
 		_, err := crdClient.CustomResourceDefinitions().Create(crd)
 		if err != nil {
-			return fmt.Errorf("Error creating CRD %q: %v", crd.Name, err)
+			return errors.Wrapf(err, "Error creating CRD %q", crd.Name)
 		}
 		write(fmt.Sprintf("customresourcedefinition.apiextensions.k8s.io/%s created\n", crd.Name))
 	}
 
 	fedClient, err := util.FedClientset(config)
 	if err != nil {
-		return fmt.Errorf("Failed to get federation clientset: %v", err)
+		return errors.Wrap(err, "Failed to get federation clientset")
 	}
 	concreteTypeConfig := resources.TypeConfig.(*fedv1a1.FederatedTypeConfig)
 	_, err = fedClient.CoreV1alpha1().FederatedTypeConfigs(namespace).Create(concreteTypeConfig)
 	if err != nil {
-		return fmt.Errorf("Error creating FederatedTypeConfig %q: %v", concreteTypeConfig.Name, err)
+		return errors.Wrapf(err, "Error creating FederatedTypeConfig %q", concreteTypeConfig.Name)
 	}
 	write(fmt.Sprintf("federatedtypeconfig.core.federation.k8s.io/%s created in namespace %s\n", concreteTypeConfig.Name, namespace))
 
 	return nil
 }
 
-func typeConfigForTarget(apiResource metav1.APIResource, federateDirective *FederateDirective) typeconfig.Interface {
-	spec := federateDirective.Spec
+func typeConfigForTarget(apiResource metav1.APIResource, enableTypeDirective *EnableTypeDirective) typeconfig.Interface {
+	spec := enableTypeDirective.Spec
 	kind := apiResource.Kind
 	pluralName := apiResource.Name
 	typeConfig := &fedv1a1.FederatedTypeConfig{
@@ -346,7 +346,7 @@ func writeObjectsToYAML(objects []pkgruntime.Object, w io.Writer) error {
 		w.Write([]byte("---\n"))
 		err := writeObjectToYAML(obj, w)
 		if err != nil {
-			return fmt.Errorf("Error encoding resource to yaml: %v ", err)
+			return errors.Wrap(err, "Error encoding resource to yaml")
 		}
 	}
 	return nil

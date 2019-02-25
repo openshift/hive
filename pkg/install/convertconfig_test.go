@@ -41,14 +41,12 @@ func init() {
 const (
 	testName                 = "foo"
 	testNamespace            = "default"
-	testClusterID            = "foo"
 	testAMI                  = "ami-totallyfake"
 	adminPassword            = "adminpassword"
 	adminSSHKey              = "adminSSH"
 	pullSecret               = "pullSecret"
 	awsInstanceType          = "fake-aws-type"
 	awsRegion                = "us-east-1"
-	iamRoleName              = "rolename"
 	ec2VolIOPS               = 100
 	ec2VolSize               = 500
 	ec2VolType               = "sometype"
@@ -83,7 +81,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 					},
 					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
 						InstanceType: awsInstanceType,
-						IAMRoleName:  iamRoleName,
 						EC2RootVolume: hivev1.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
@@ -109,7 +106,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 				Platform: hivev1.MachinePoolPlatform{
 					AWS: &hivev1.AWSMachinePoolPlatform{
 						InstanceType: awsInstanceType,
-						IAMRoleName:  iamRoleName,
 						EC2RootVolume: hivev1.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
@@ -126,7 +122,6 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 					Platform: hivev1.MachinePoolPlatform{
 						AWS: &hivev1.AWSMachinePoolPlatform{
 							InstanceType: awsInstanceType,
-							IAMRoleName:  iamRoleName,
 							EC2RootVolume: hivev1.EC2RootVolume{
 								IOPS: ec2VolIOPS,
 								Size: ec2VolSize,
@@ -145,18 +140,18 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 	replicas := int64(3)
 	return &installtypes.InstallConfig{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1beta1",
+			APIVersion: installtypes.InstallConfigVersion,
 		},
 		BaseDomain: "test.example.com",
 		SSHKey:     adminSSHKey,
 		PullSecret: pullSecret,
 		Networking: &installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
-			Type:        "OpenshiftSDN",
+			Type:        "OpenShiftSDN",
 			ServiceCIDR: ipnet.MustParseCIDR("172.30.0.0/16"),
-			ClusterNetworks: []netopv1.ClusterNetwork{
+			ClusterNetworks: []installtypes.ClusterNetworkEntry{
 				{
-					CIDR:             "10.128.0.0/14",
+					CIDR:             *ipnet.MustParseCIDR("10.128.0.0/14"),
 					HostSubnetLength: 9,
 				},
 			},
@@ -170,7 +165,6 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				},
 				DefaultMachinePlatform: &installawstypes.MachinePool{
 					InstanceType: awsInstanceType,
-					IAMRoleName:  iamRoleName,
 					EC2RootVolume: installawstypes.EC2RootVolume{
 						IOPS: ec2VolIOPS,
 						Size: ec2VolSize,
@@ -179,30 +173,29 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 				},
 			},
 		},
-		Machines: []installtypes.MachinePool{
-			{
-				Name:     "master",
-				Replicas: &replicas,
-				Platform: installtypes.MachinePoolPlatform{
-					AWS: &installawstypes.MachinePool{
-						InstanceType: awsInstanceType,
-						IAMRoleName:  iamRoleName,
-						EC2RootVolume: installawstypes.EC2RootVolume{
-							IOPS: ec2VolIOPS,
-							Size: ec2VolSize,
-							Type: ec2VolType,
-						},
-						Zones: []string{"us-east-1a", "us-east-1b"},
+		ControlPlane: &installtypes.MachinePool{
+			Name:     "master",
+			Replicas: &replicas,
+			Platform: installtypes.MachinePoolPlatform{
+				AWS: &installawstypes.MachinePool{
+					InstanceType: awsInstanceType,
+					EC2RootVolume: installawstypes.EC2RootVolume{
+						IOPS: ec2VolIOPS,
+						Size: ec2VolSize,
+						Type: ec2VolType,
 					},
+					Zones: []string{"us-east-1a", "us-east-1b"},
 				},
 			},
+		},
+
+		Compute: []installtypes.MachinePool{
 			{
 				Name:     "workers",
 				Replicas: &replicas,
 				Platform: installtypes.MachinePoolPlatform{
 					AWS: &installawstypes.MachinePool{
 						InstanceType: awsInstanceType,
-						IAMRoleName:  iamRoleName,
 						EC2RootVolume: installawstypes.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
@@ -264,9 +257,8 @@ func TestConvert(t *testing.T) {
 			expectedInstallConfig: func() *installtypes.InstallConfig {
 				ic := buildBaseExpectedInstallConfig()
 				ic.Networking.ServiceCIDR = &ipnet.IPNet{}
-				ic.Networking.PodCIDR = nil
 				ic.Networking.MachineCIDR = &ipnet.IPNet{}
-				ic.Networking.ClusterNetworks = []netopv1.ClusterNetwork{}
+				ic.Networking.ClusterNetworks = []installtypes.ClusterNetworkEntry{}
 				return ic
 			}(),
 		},

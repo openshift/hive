@@ -42,7 +42,6 @@ const (
 	metadataRelativePath                = "metadata.json"
 	adminKubeConfigRelativePath         = "auth/kubeconfig"
 	adminPasswordRelativePath           = "auth/kubeadmin-password"
-	uuidKey                             = "openshiftClusterID"
 	kubernetesKeyPrefix                 = "kubernetes.io/cluster/"
 	kubeadminUsername                   = "kubeadmin"
 	metadataConfigmapStringTemplate     = "%s-metadata"
@@ -275,12 +274,13 @@ func (m *InstallManager) cleanupBeforeInstall(cd *hivev1.ClusterDeployment) erro
 		return err
 	}
 
-	if cd.Status.ClusterID != "" {
-		if err := m.runUninstaller(m.ClusterName, m.Region, cd.Status.ClusterID, m.log); err != nil {
+	if cd.Status.InfraID != "" {
+		if err := m.runUninstaller(m.ClusterName, m.Region, cd.Status.InfraID, m.log); err != nil {
 			return err
 		}
-		// Cleanup successful, we must now clear the UUID from status:
+		// Cleanup successful, we must now clear the clusterID and infraID from status:
 		cd.Status.ClusterID = ""
+		cd.Status.InfraID = ""
 		if err := m.DynamicClient.Status().Update(context.Background(), cd); err != nil {
 			// This will cause a job re-try, which is fine as we'll just try to cleanup and
 			// find nothing.
@@ -319,17 +319,15 @@ func (m *InstallManager) cleanupTerraformFiles() error {
 	return nil
 }
 
-func runUninstaller(clusterName, region, clusterID string, logger log.FieldLogger) error {
+func runUninstaller(clusterName, region, infraID string, logger log.FieldLogger) error {
 	// run the uninstaller to clean up any cloud resources previously created
 	filters := []aws.Filter{
-		{uuidKey: clusterID},
-		{kubernetesKeyPrefix + clusterName: "owned"},
+		{kubernetesKeyPrefix + infraID: "owned"},
 	}
 	uninstaller := &aws.ClusterUninstaller{
-		Filters:     filters,
-		Region:      region,
-		ClusterName: clusterName,
-		Logger:      logger,
+		Filters: filters,
+		Region:  region,
+		Logger:  logger,
 	}
 
 	return uninstaller.Run()
@@ -419,23 +417,13 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 		return err
 	}
 
-	if md.ClusterPlatformMetadata.AWS != nil {
-		for _, ids := range md.ClusterPlatformMetadata.AWS.Identifier {
-			clusterID, ok := ids["openshiftClusterID"]
-			if ok {
-				cd.Status.ClusterID = clusterID
-				m.log.WithField("clusterID", clusterID).Debug("found clusterID")
-				break
-			}
-		}
-		if cd.Status.ClusterID == "" {
-			m.log.Error("cluster metadata did not contain openshiftClusterID")
-			return fmt.Errorf("cluster metadata did not contain openshiftClusterID")
-		}
-	} else {
-		// TODO: handle other cloud providers here
-		return fmt.Errorf("cluster metadata did not contain AWS platform")
+	cd.Status.ClusterID = md.ClusterID
+	cd.Status.InfraID = md.InfraID
+	if cd.Status.InfraID == "" {
+		m.log.Error("cluster metadata did not contain infraID")
+		return fmt.Errorf("cluster metadata did not contain infraID")
 	}
+
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	err = m.DynamicClient.Status().Update(context.Background(), cd)
 	if err != nil {

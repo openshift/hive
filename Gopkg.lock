@@ -445,6 +445,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  branch = "master"
+  digest = "1:cf68a79fd02ab0f6942b9567d03d054b6568212fcc22de2a4afdefd096923749"
+  name = "github.com/kballard/go-shellquote"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "95032a82bc518f77982ea72343cc1ade730072f0"
+
+[[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -454,7 +462,7 @@
 
 [[projects]]
   branch = "idempotent_join"
-  digest = "1:19fad8ca79d4a6132476db3e1895a74f5187056d95b113e8088f7cd66787697d"
+  digest = "1:752d95f0e80c7e8845230834b59038e92eeac45368d93dbb06b32aa5c9b178c6"
   name = "github.com/kubernetes-sigs/federation-v2"
   packages = [
     "pkg/apis/core/common",
@@ -475,7 +483,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "ab1eb86541166648b887a1f7c6823cff3e7a7b8d"
+  revision = "145f95e3b161d83bda2de155c54a2db88d865d4d"
   source = "github.com/csrwng/federation-v2"
 
 [[projects]]
@@ -507,12 +515,36 @@
   revision = "81af80346b1a01caae0cbc27fd3c1ba5b11e189f"
 
 [[projects]]
+  digest = "1:9785a54031460a402fab4e4bbb3124c8dd9e9f7b1982109fef605cb91632d480"
+  name = "github.com/mattn/go-colorable"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "efa589957cd060542a26d2dd7832fd6a6c6c3ade"
+  version = "v0.1.0"
+
+[[projects]]
+  digest = "1:bffa444ca07c69c599ae5876bc18b25bfd5fa85b297ca10a25594d284a7e9c5d"
+  name = "github.com/mattn/go-isatty"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "6ca4dbf54d38eea1a992b3c722a76a5d1c4cb25c"
+  version = "v0.0.4"
+
+[[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
   pruneopts = "NUT"
   revision = "c12348ce28de40eed0136aa2b644d0ee0650e56c"
   version = "v1.0.1"
+
+[[projects]]
+  branch = "master"
+  digest = "1:063d55b87e200bced5e2be658cc70acafb4c5bbc4afa04d4b82f66298b73d089"
+  name = "github.com/mgutz/ansi"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "9520e82c474b0a04dd04f8a40959027271bab992"
 
 [[projects]]
   digest = "1:2f42fa12d6911c7b7659738758631bec870b7e9b4c6be5444f963cdcfccc191f"
@@ -593,6 +625,29 @@
   revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
 
 [[projects]]
+  branch = "master"
+  digest = "1:af1e2473c2f486475a443cb284779c8dfd7fe0df8f7b597577b2d42d47713749"
+  name = "github.com/openshift/cloud-credential-operator"
+  packages = [
+    "pkg/apis/cloudcredential/v1beta1",
+    "pkg/aws",
+    "pkg/controller/assets",
+    "pkg/controller/utils",
+  ]
+  pruneopts = "NUT"
+  revision = "47261953fd5974ba24072148d53ec4c919f6ad8f"
+
+[[projects]]
+  digest = "1:35a1d3d1166a3a74d696180e74d6fd0e5179747d2626ca4586bdc9ca45641544"
+  name = "github.com/openshift/cluster-api"
+  packages = [
+    "pkg/apis/machine/common",
+    "pkg/apis/machine/v1beta1",
+  ]
+  pruneopts = "NUT"
+  revision = "91fca585a85b163ddfd119fd09c128c9feadddca"
+
+[[projects]]
   digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
   name = "github.com/openshift/cluster-network-operator"
   packages = ["pkg/apis/networkoperator/v1"]
@@ -614,21 +669,24 @@
   source = "github.com/csrwng/generic-admission-server"
 
 [[projects]]
-  digest = "1:c942a2c49ace42720fc6d8739c2af36c0cedd954f393b0bba0407a515002fd81"
+  branch = "master"
+  digest = "1:1fa01b732b051b54b767479943f91b728bfc2a5db30fe00d291de1a6ba1d9ec8"
   name = "github.com/openshift/installer"
   packages = [
+    "pkg/asset/installconfig/aws",
     "pkg/asset/machines/aws",
     "pkg/destroy/aws",
     "pkg/ipnet",
     "pkg/rhcos",
     "pkg/types",
     "pkg/types/aws",
+    "pkg/types/aws/validation",
     "pkg/types/libvirt",
     "pkg/types/none",
     "pkg/types/openstack",
   ]
   pruneopts = "NUT"
-  revision = "7af6b141c34dd133f104b61b64c78d82e57f3d52"
+  revision = "c09f146dcc70711d552e0441ab26a4fe232a1b57"
 
 [[projects]]
   branch = "master"
@@ -980,6 +1038,18 @@
   version = "v1.15.0"
 
 [[projects]]
+  digest = "1:acce65b46e283672291c073e642b3cadbb2817d4689a2f8babc5bad08724c99c"
+  name = "gopkg.in/AlecAivazis/survey.v1"
+  packages = [
+    ".",
+    "core",
+    "terminal",
+  ]
+  pruneopts = "NUT"
+  revision = "ee72c28b95a5ff3e227cfd403f556f0ef4b07ca5"
+  version = "v1.8.2"
+
+[[projects]]
   digest = "1:1b91ae0dc69a41d4c2ed23ea5cffb721ea63f5037ca4b81e6d6771fbb8f45129"
   name = "gopkg.in/fsnotify.v1"
   packages = ["."]
@@ -995,6 +1065,14 @@
   pruneopts = "NUT"
   revision = "d2d2541c53f18d2a059457998ce2876cc8e67cbf"
   version = "v0.9.1"
+
+[[projects]]
+  digest = "1:d74ba1aea6244ead12e4f16d5f61a15ced9a2f2d1cae2021fbb76088b27e7afa"
+  name = "gopkg.in/ini.v1"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "c85607071cf08ca1adaf48319cd1aa322e81d8c1"
+  version = "v1.42.0"
 
 [[projects]]
   digest = "1:80c34337e8a734e190f2d1b716cae774cca74db98315166f92074434e9af0227"
@@ -1462,23 +1540,11 @@
   revision = "4c3feeb576b06ef8fea769809bd3db5e5e78dc23"
 
 [[projects]]
-  branch = "master"
-  digest = "1:3eaf497f58fd507d9cfd0b3d2c7a4332fb19f1b53c3df61cb12521b2a07e4f17"
-  name = "sigs.k8s.io/cluster-api"
-  packages = [
-    "pkg/apis/cluster/common",
-    "pkg/apis/cluster/v1alpha1",
-  ]
-  pruneopts = "NUT"
-  revision = "40d9d12e7bf4e1d0c6a3453e018c4eed1007ae0a"
-
-[[projects]]
-  branch = "master"
-  digest = "1:5ade82a27c5ca576a8aa699320fea3ae5a4d47c95e6a2212191ea31e4c49f27c"
+  digest = "1:40d29d9c2961a32804a4340db00ed1b2f709cfabf090b43583e4c95abe9e1837"
   name = "sigs.k8s.io/cluster-api-provider-aws"
-  packages = ["pkg/apis/awsproviderconfig/v1alpha1"]
+  packages = ["pkg/apis/awsproviderconfig/v1beta1"]
   pruneopts = "NUT"
-  revision = "acf4a8e03420aa0981b3bd2d702d039e0d499e62"
+  revision = "15fe4b4ea5636f8516c238490fc6a85d44161181"
   source = "github.com/openshift/cluster-api-provider-aws"
 
 [[projects]]
@@ -1528,7 +1594,8 @@
   version = "v0.1.9"
 
 [[projects]]
-  digest = "1:946a62b07e59b9abd1f475a5b5c8d590255c1d40627f386d34fd073d3de9ecb8"
+  branch = "add_optional_comment_tag_support_v0.1.8"
+  digest = "1:ee619d029ebf100a74b2bc72587c02d1b7c945cc372e8baff59c60239db93d3d"
   name = "sigs.k8s.io/controller-tools"
   packages = [
     "cmd/controller-gen",
@@ -1543,8 +1610,8 @@
     "pkg/webhook/internal",
   ]
   pruneopts = "NUT"
-  revision = "950a0e88e4effb864253b3c7504b326cc83b9d11"
-  version = "v0.1.8"
+  revision = "533484c3ea1c76560817b5aa67cb8919ff57d8a1"
+  source = "github.com/twiest/controller-tools"
 
 [[projects]]
   digest = "1:237ad09ac561f3e3a2a2e9f3fee85fea98c0f41f381ac80562b05bdaa9fe89c6"
@@ -1587,6 +1654,7 @@
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/machines/aws",
@@ -1614,6 +1682,7 @@
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/errors",
+    "k8s.io/apimachinery/pkg/util/rand",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
@@ -1622,12 +1691,12 @@
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
+    "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "k8s.io/utils/pointer",
-    "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1alpha1",
-    "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",
+    "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/client/fake",

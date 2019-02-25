@@ -6,10 +6,22 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: clusterdeployments.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.baseDomain
+    name: BaseDomain
+    type: string
+  - JSONPath: .status.installed
+    name: Installed
+    type: boolean
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
     plural: clusterdeployments
+    shortNames:
+    - cd
   scope: Namespaced
   subresources:
     status: {}
@@ -55,10 +67,6 @@ spec:
                         description: AWS is the configuration used when installing
                           on AWS.
                         properties:
-                          iamRoleName:
-                            description: IAMRoleName defines the IAM role associated
-                              with the ec2 instance.
-                            type: string
                           rootVolume:
                             description: EC2RootVolume defines the storage for ec2
                               instance.
@@ -91,7 +99,6 @@ spec:
                             type: array
                         required:
                         - type
-                        - iamRoleName
                         - rootVolume
                         type: object
                       libvirt:
@@ -172,10 +179,6 @@ spec:
                       description: AWS is the configuration used when installing on
                         AWS.
                       properties:
-                        iamRoleName:
-                          description: IAMRoleName defines the IAM role associated
-                            with the ec2 instance.
-                          type: string
                         rootVolume:
                           description: EC2RootVolume defines the storage for ec2 instance.
                           properties:
@@ -207,7 +210,6 @@ spec:
                           type: array
                       required:
                       - type
-                      - iamRoleName
                       - rootVolume
                       type: object
                     libvirt:
@@ -345,10 +347,6 @@ spec:
                         used when installing on AWS for machine pools which do not
                         define their own platform configuration.
                       properties:
-                        iamRoleName:
-                          description: IAMRoleName defines the IAM role associated
-                            with the ec2 instance.
-                          type: string
                         rootVolume:
                           description: EC2RootVolume defines the storage for ec2 instance.
                           properties:
@@ -380,7 +378,6 @@ spec:
                           type: array
                       required:
                       - type
-                      - iamRoleName
                       - rootVolume
                       type: object
                     region:
@@ -503,8 +500,9 @@ spec:
               description: APIURL is the URL where the cluster's API can be accessed.
               type: string
             clusterID:
-              description: ClusterID is a unique identifier for this cluster generated
-                during installation.
+              description: ClusterID is a globally unique identifier for this cluster
+                generated during installation. Used for reporting metrics among other
+                places.
               type: string
             clusterVersionStatus:
               description: ClusterVersionStatus will hold a copy of the remote cluster's
@@ -528,9 +526,6 @@ spec:
                           the update version. When this field is part of spec, version
                           is optional if payload is specified.
                         type: string
-                    required:
-                    - version
-                    - payload
                     type: object
                   type: array
                 conditions:
@@ -587,9 +582,6 @@ spec:
                         update version. When this field is part of spec, version is
                         optional if payload is specified.
                       type: string
-                  required:
-                  - version
-                  - payload
                   type: object
                 generation:
                   description: generation reports which version of the spec is being
@@ -642,7 +634,6 @@ spec:
                     - state
                     - startedTime
                     - completionTime
-                    - version
                     - payload
                     type: object
                   type: array
@@ -663,6 +654,14 @@ spec:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
               type: boolean
+            federatedClusterRef:
+              description: FederatedClusterRef is the reference to the federated cluster
+                resource associated with this ClusterDeployment.
+              type: object
+            infraID:
+              description: InfraID is an identifier for this cluster generated during
+                installation and used for tagging/naming resources in cloud providers.
+              type: string
             installed:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.

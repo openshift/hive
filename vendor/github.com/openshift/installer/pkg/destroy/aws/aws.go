@@ -47,18 +47,14 @@ type ClusterUninstaller struct {
 	//   }
 	//
 	// will match resources with (a:b and c:d) or d:e.
-	Filters     []Filter // filter(s) we will be searching for
-	Logger      logrus.FieldLogger
-	Region      string
-	ClusterName string
+	Filters []Filter // filter(s) we will be searching for
+	Logger  logrus.FieldLogger
+	Region  string
 }
 
 func (o *ClusterUninstaller) validate() error {
 	if len(o.Filters) == 0 {
 		return errors.Errorf("you must specify at least one tag filter")
-	}
-	if len(o.ClusterName) == 0 {
-		return errors.Errorf("you must specify cluster-name")
 	}
 	return nil
 }
@@ -143,6 +139,7 @@ func (o *ClusterUninstaller) Run() error {
 				if err != nil {
 					err = errors.Wrapf(err, "get tagged resources")
 					o.Logger.Info(err)
+					matched = true
 					loopError = err
 				}
 			}
@@ -341,24 +338,62 @@ func getSharedHostedZone(client *route53.Route53, privateID string, logger logru
 		return "", err
 	}
 
-	if !*response.HostedZone.Config.PrivateZone {
-		return "", errors.Errorf("getShareedHostedZone requires a private ID, but was passed the public %s", privateID)
-	}
 	privateName := *response.HostedZone.Name
 
+	if response.HostedZone.Config != nil && response.HostedZone.Config.PrivateZone != nil {
+		if !*response.HostedZone.Config.PrivateZone {
+			return "", errors.Errorf("getSharedHostedZone requires a private ID, but was passed the public %s", privateID)
+		}
+	} else {
+		logger.WithField("hosted zone", privateName).Warn("could not determine whether hosted zone is private")
+	}
+
+	domain := privateName
+	parents := []string{domain}
+	for {
+		idx := strings.Index(domain, ".")
+		if idx == -1 {
+			break
+		}
+		if len(domain[idx+1:]) > 0 {
+			parents = append(parents, domain[idx+1:])
+		}
+		domain = domain[idx+1:]
+	}
+
+	for _, p := range parents {
+		sZone, err := findPublicRoute53(client, p, logger)
+		if err != nil {
+			return "", err
+		}
+		if sZone != "" {
+			return sZone, nil
+		}
+	}
+	return "", nil
+}
+
+// findPublicRoute53 finds a public route53 zone matching the dnsName.
+// It returns "", when no public route53 zone could be found.
+func findPublicRoute53(client *route53.Route53, dnsName string, logger logrus.FieldLogger) (string, error) {
 	request := &route53.ListHostedZonesByNameInput{
-		DNSName: aws.String(privateName),
+		DNSName: aws.String(dnsName),
 	}
 	for i := 0; true; i++ {
-		logger.Debugf("listing AWS hosted zones (page %d)", i)
+		logger.Debugf("listing AWS hosted zones %q (page %d)", dnsName, i)
 		list, err := client.ListHostedZonesByName(request)
 		if err != nil {
 			return "", err
 		}
 
 		for _, zone := range list.HostedZones {
-			if *zone.Name != privateName {
+			if *zone.Name != dnsName {
+				// No name after this can match dnsName
 				return "", nil
+			}
+			if zone.Config == nil || zone.Config.PrivateZone == nil {
+				logger.WithField("hosted zone", *zone.Name).Warn("could not determine whether hosted zone is private")
+				continue
 			}
 			if !*zone.Config.PrivateZone {
 				return *zone.Id, nil
@@ -372,7 +407,6 @@ func getSharedHostedZone(client *route53.Route53, privateID string, logger logru
 
 		break
 	}
-
 	return "", nil
 }
 
@@ -478,6 +512,9 @@ func deleteEC2Instance(ec2Client *ec2.EC2, iamClient *iam.IAM, id string, logger
 		},
 	})
 	if err != nil {
+		if err.(awserr.Error).Code() == "InvalidInstanceID.NotFound" {
+			return nil
+		}
 		return err
 	}
 
@@ -519,6 +556,10 @@ func deleteEC2InternetGateway(client *ec2.EC2, id string, logger logrus.FieldLog
 
 	for _, gateway := range response.InternetGateways {
 		for _, vpc := range gateway.Attachments {
+			if vpc.VpcId == nil {
+				logger.Warn("gateway does not have a VPC ID")
+				continue
+			}
 			_, err := client.DetachInternetGateway(&ec2.DetachInternetGatewayInput{
 				InternetGatewayId: gateway.InternetGatewayId,
 				VpcId:             vpc.VpcId,
@@ -838,11 +879,18 @@ func deleteElasticLoadBalancerClassicByVPC(client *elb.ELB, vpc string, logger l
 		&elb.DescribeLoadBalancersInput{},
 		func(results *elb.DescribeLoadBalancersOutput, lastPage bool) bool {
 			for _, lb := range results.LoadBalancerDescriptions {
+				lbLogger := logger.WithField("classic load balancer", *lb.LoadBalancerName)
+
+				if lb.VPCId == nil {
+					lbLogger.Warn("classic load balancer does not have a VPC ID so could not determine whether it should be deleted")
+					continue
+				}
+
 				if *lb.VPCId != vpc {
 					continue
 				}
 
-				lastError = deleteElasticLoadBalancerClassic(client, *lb.LoadBalancerName, logger.WithField("classic load balancer", *lb.LoadBalancerName))
+				lastError = deleteElasticLoadBalancerClassic(client, *lb.LoadBalancerName, lbLogger)
 				if lastError != nil {
 					lastError = errors.Wrapf(lastError, "deleting classic load balancer %s", *lb.LoadBalancerName)
 					logger.Info(lastError)
@@ -877,6 +925,11 @@ func deleteElasticLoadBalancerTargetGroupsByVPC(client *elbv2.ELBV2, vpc string,
 		&elbv2.DescribeTargetGroupsInput{},
 		func(results *elbv2.DescribeTargetGroupsOutput, lastPage bool) bool {
 			for _, group := range results.TargetGroups {
+				if group.VpcId == nil {
+					logger.WithField("target group", *group.TargetGroupArn).Warn("load balancer target group does not have a VPC ID so could not determine whether it should be deleted")
+					continue
+				}
+
 				if *group.VpcId != vpc {
 					continue
 				}
@@ -924,6 +977,11 @@ func deleteElasticLoadBalancerV2ByVPC(client *elbv2.ELBV2, vpc string, logger lo
 		&elbv2.DescribeLoadBalancersInput{},
 		func(results *elbv2.DescribeLoadBalancersOutput, lastPage bool) bool {
 			for _, lb := range results.LoadBalancers {
+				if lb.VpcId == nil {
+					logger.WithField("load balancer", *lb.LoadBalancerArn).Warn("load balancer does not have a VPC ID so could not determine whether it should be deleted")
+					continue
+				}
+
 				if *lb.VpcId != vpc {
 					continue
 				}
@@ -1181,19 +1239,23 @@ func deleteRoute53(session *session.Session, arn arn.ARN, logger logrus.FieldLog
 	}
 
 	sharedEntries := map[string]*route53.ResourceRecordSet{}
-	err = client.ListResourceRecordSetsPages(
-		&route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(sharedZoneID)},
-		func(results *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
-			for _, recordSet := range results.ResourceRecordSets {
-				key := recordSetKey(recordSet)
-				sharedEntries[key] = recordSet
-			}
+	if len(sharedZoneID) != 0 {
+		err = client.ListResourceRecordSetsPages(
+			&route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(sharedZoneID)},
+			func(results *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
+				for _, recordSet := range results.ResourceRecordSets {
+					key := recordSetKey(recordSet)
+					sharedEntries[key] = recordSet
+				}
 
-			return !lastPage
-		},
-	)
-	if err != nil {
-		return err
+				return !lastPage
+			},
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		logger.Debug("shared public zone not found")
 	}
 
 	var lastError error

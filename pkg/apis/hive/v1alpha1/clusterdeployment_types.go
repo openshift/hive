@@ -114,14 +114,21 @@ type AWSPlatformSecrets struct {
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment
 type ClusterDeploymentStatus struct {
 
-	// ClusterID is a unique identifier for this cluster generated during installation.
+	// ClusterID is a globally unique identifier for this cluster generated during installation. Used for reporting metrics among other places.
 	ClusterID string `json:"clusterID,omitempty"`
+
+	// InfraID is an identifier for this cluster generated during installation and used for tagging/naming resources in cloud providers.
+	InfraID string `json:"infraID,omitempty"`
 
 	// Installed is true if the installer job has successfully completed for this cluster.
 	Installed bool `json:"installed"`
 
 	// Federated is true if the cluster deployment has been federated with the host cluster.
 	Federated bool `json:"federated,omitempty"`
+
+	// FederatedClusterRef is the reference to the federated cluster resource associated with
+	// this ClusterDeployment.
+	FederatedClusterRef *corev1.ObjectReference `json:"federatedClusterRef,omitempty"`
 
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
@@ -145,6 +152,10 @@ type ClusterDeploymentStatus struct {
 // ClusterDeployment is the Schema for the clusterdeployments API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
+// +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".status.installed"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:resource:path=clusterdeployments,shortName=cd
 type ClusterDeployment struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -191,7 +202,7 @@ type NetworkType string
 
 const (
 	// NetworkTypeOpenshiftSDN is used to install with SDN.
-	NetworkTypeOpenshiftSDN NetworkType = "OpenshiftSDN"
+	NetworkTypeOpenshiftSDN NetworkType = "OpenShiftSDN"
 	// NetworkTypeOpenshiftOVN is used to install with OVN.
 	NetworkTypeOpenshiftOVN NetworkType = "OVNKubernetes"
 )

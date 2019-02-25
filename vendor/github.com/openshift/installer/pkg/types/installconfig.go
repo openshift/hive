@@ -1,13 +1,19 @@
 package types
 
 import (
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	"fmt"
+
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// InstallConfigVersion is the version supported by this package.
+	InstallConfigVersion = "v1beta3"
 )
 
 var (
@@ -43,11 +49,14 @@ type InstallConfig struct {
 	// Networking defines the pod network provider in the cluster.
 	*Networking `json:"networking,omitempty"`
 
-	// Machines is the list of MachinePools that need to be installed.
+	// ControlPlane is the configuration for the machines that comprise the
+	// control plane.
 	// +optional
-	// Default on AWS and OpenStack is 3 masters and 3 workers.
-	// Default on Libvirt is 1 master and 1 worker.
-	Machines []MachinePool `json:"machines,omitempty"`
+	ControlPlane *MachinePool `json:"controlPlane,omitempty"`
+
+	// Compute is the list of compute MachinePools that need to be installed.
+	// +optional
+	Compute []MachinePool `json:"compute,omitempty"`
 
 	// Platform is the configuration for the specific platform upon which to
 	// perform the installation.
@@ -57,15 +66,9 @@ type InstallConfig struct {
 	PullSecret string `json:"pullSecret"`
 }
 
-// MasterCount returns the number of replicas in the master machine pool,
-// defaulting to one if no machine pool was found.
-func (c *InstallConfig) MasterCount() int {
-	for _, m := range c.Machines {
-		if m.Name == "master" && m.Replicas != nil {
-			return int(*m.Replicas)
-		}
-	}
-	return 1
+// ClusterDomain returns the DNS domain that all records for a cluster must belong to.
+func (c *InstallConfig) ClusterDomain() string {
+	return fmt.Sprintf("%s.%s", c.ObjectMeta.Name, c.BaseDomain)
 }
 
 // Platform is the configuration for the specific platform upon which to perform
@@ -120,8 +123,8 @@ type Networking struct {
 
 	// Type is the network type to install
 	// +optional
-	// Default is OpenshiftSDN.
-	Type netopv1.NetworkType `json:"type,omitempty"`
+	// Default is OpenShiftSDN.
+	Type string `json:"type,omitempty"`
 
 	// ServiceCIDR is the IP address space from which to assign service IPs.
 	// +optional
@@ -131,14 +134,17 @@ type Networking struct {
 	// ClusterNetworks is the IP address space from which to assign pod IPs.
 	// +optional
 	// Default is a single cluster network with a CIDR of 10.128.0.0/14
-	// and a host subnet length of 9. The default is only applicable if PodCIDR
-	// is not present.
-	ClusterNetworks []netopv1.ClusterNetwork `json:"clusterNetworks,omitempty"`
+	// and a host subnet length of 9.
+	ClusterNetworks []ClusterNetworkEntry `json:"clusterNetworks,omitempty"`
+}
 
-	// PodCIDR is deprecated (and badly named; it should have always
-	// been called ClusterCIDR. If no ClusterNetworks are specified,
-	// we will fall back to the PodCIDR
-	// TODO(cdc) remove this.
-	// +optional
-	PodCIDR *ipnet.IPNet `json:"podCIDR,omitempty"`
+// ClusterNetworkEntry is a single IP address block for pod IP blocks. IP blocks
+// are allocated with size 2^HostSubnetLength.
+type ClusterNetworkEntry struct {
+	// The IP block address pool
+	CIDR ipnet.IPNet `json:"cidr"`
+
+	// The size of blocks to allocate from the larger pool.
+	// This is the length in bits - so a 9 here will allocate a /23.
+	HostSubnetLength int32 `json:"hostSubnetLength"`
 }

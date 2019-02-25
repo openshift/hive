@@ -39,27 +39,15 @@ import (
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	// Parse yaml for all Hive objects:
-	asset, err := assets.Asset("config/crds/hive_v1alpha1_clusterdeployment.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset := assets.MustAsset("config/crds/hive_v1alpha1_clusterdeployment.yaml")
 	hLog.Debug("reading ClusterDeployment CRD")
 	clusterDeploymentCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
 
-	asset, err = assets.Asset("config/crds/hive_v1alpha1_dnszone.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/crds/hive_v1alpha1_dnszone.yaml")
 	hLog.Debug("reading DNSZone CRD")
 	dnsZoneCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
 
-	asset, err = assets.Asset("config/manager/deployment.yaml")
-	if err != nil {
-		hLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/manager/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 

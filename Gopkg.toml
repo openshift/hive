@@ -105,5 +105,5 @@ version="v1.4.7"
 
 [[override]]
   name = "github.com/jteeuwen/go-bindata"
-  version = "3.0.7"
+  revision = "a0ff2567cfb70903282db057e799fd826784d41d"
 

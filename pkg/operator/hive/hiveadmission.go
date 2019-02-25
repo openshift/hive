@@ -37,51 +37,27 @@ import (
 )
 
 func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
-	asset, err := assets.Asset("config/hiveadmission/service.yaml")
-	if err != nil {
-		haLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset := assets.MustAsset("config/hiveadmission/service.yaml")
 	haLog.Debug("reading service")
 	hiveAdmService := resourceread.ReadServiceV1OrDie(asset)
 
-	asset, err = assets.Asset("config/hiveadmission/service-account.yaml")
-	if err != nil {
-		haLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/hiveadmission/service-account.yaml")
 	haLog.Debug("reading service account")
 	hiveAdmServiceAcct := resourceread.ReadServiceAccountV1OrDie(asset)
 
-	asset, err = assets.Asset("config/hiveadmission/daemonset.yaml")
-	if err != nil {
-		haLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/hiveadmission/daemonset.yaml")
 	haLog.Debug("reading daemonset")
 	hiveAdmDaemonSet := resourceread.ReadDaemonSetV1OrDie(asset)
 
-	asset, err = assets.Asset("config/hiveadmission/apiservice.yaml")
-	if err != nil {
-		haLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
 	haLog.Debug("reading apiservice")
 	hiveAdmAPIService := util.ReadAPIServiceV1Beta1OrDie(asset, r.scheme)
 
-	asset, err = assets.Asset("config/hiveadmission/dnszones-webhook.yaml")
-	if err != nil {
-		haLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/hiveadmission/dnszones-webhook.yaml")
 	haLog.Debug("reading DNSZones webhook")
 	dnsZonesWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
 
-	asset, err = assets.Asset("config/hiveadmission/clusterdeployment-webhook.yaml")
-	if err != nil {
-		haLog.WithError(err).Error("error loading asset")
-		return err
-	}
+	asset = assets.MustAsset("config/hiveadmission/clusterdeployment-webhook.yaml")
 	haLog.Debug("reading ClusterDeployment webhook")
 	cdWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
 

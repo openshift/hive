@@ -445,12 +445,11 @@
   version = "v1.1.5"
 
 [[projects]]
-  digest = "1:a8a735b55809cd73bb01f1f35cb124dc07f737c799d65a6cb57cfa88e66d3a16"
+  digest = "1:4a26d01840733b60e9af432d24df6104660a537bb756d4e05c24e097ab68d726"
   name = "github.com/jteeuwen/go-bindata"
   packages = ["."]
   pruneopts = "NT"
-  revision = "bbd0c6e271208dce66d8fda4bc536453cd27fc4a"
-  version = "v3.0.7"
+  revision = "a0ff2567cfb70903282db057e799fd826784d41d"
 
 [[projects]]
   branch = "master"
@@ -470,7 +469,7 @@
 
 [[projects]]
   branch = "idempotent_join"
-  digest = "1:14dca68179869d854bb8ac77833dcd35a57a9162ed3bbf2fe49adcc48619723d"
+  digest = "1:752d95f0e80c7e8845230834b59038e92eeac45368d93dbb06b32aa5c9b178c6"
   name = "github.com/kubernetes-sigs/federation-v2"
   packages = [
     "pkg/apis/core/common",
@@ -491,7 +490,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "2c2f8fefbd2dfac2a6654933550ab01fbde5ccd0"
+  revision = "145f95e3b161d83bda2de155c54a2db88d865d4d"
   source = "github.com/csrwng/federation-v2"
 
 [[projects]]
@@ -1703,7 +1702,9 @@
     "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/api/apps/v1",
     "github.com/openshift/api/config/v1",
+    "github.com/openshift/api/operator/v1",
     "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
@@ -1724,16 +1725,19 @@
     "golang.org/x/net/context",
     "gopkg.in/yaml.v2",
     "k8s.io/api/admission/v1beta1",
+    "k8s.io/api/admissionregistration/v1beta1",
     "k8s.io/api/apps/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/rbac/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+    "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/equality",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
+    "k8s.io/apimachinery/pkg/runtime/serializer",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/rand",
@@ -1743,12 +1747,15 @@
     "k8s.io/apiserver/pkg/util/logs",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
+    "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
+    "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1",
     "k8s.io/utils/pointer",
     "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1alpha1",
     "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1",

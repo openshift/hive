@@ -75,7 +75,7 @@ install: crd rbac
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: crd rbac
+deploy: generate manifests
 	# Deploy the operator manifests:
 	mkdir -p overlays/deploy
 	cp overlays/template/* overlays/deploy

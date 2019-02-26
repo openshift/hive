@@ -39,15 +39,7 @@ import (
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	// Parse yaml for all Hive objects:
-	asset := assets.MustAsset("config/crds/hive_v1alpha1_clusterdeployment.yaml")
-	hLog.Debug("reading ClusterDeployment CRD")
-	clusterDeploymentCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
-
-	asset = assets.MustAsset("config/crds/hive_v1alpha1_dnszone.yaml")
-	hLog.Debug("reading DNSZone CRD")
-	dnsZoneCRD := resourceread.ReadCustomResourceDefinitionV1Beta1OrDie(asset)
-
-	asset = assets.MustAsset("config/manager/deployment.yaml")
+	asset := assets.MustAsset("config/manager/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 
@@ -60,26 +52,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 		return err
 	}
 
-	_, changed, err := resourceapply.ApplyCustomResourceDefinition(r.apiextClient,
-		recorder, clusterDeploymentCRD)
-	if err != nil {
-		hLog.WithError(err).Error("error applying ClusterDeployment CRD")
-		return err
-	}
-	hLog.WithField("changed", changed).Info("ClusterDeployment CRD updated")
-
-	_, changed, err = resourceapply.ApplyCustomResourceDefinition(r.apiextClient,
-		recorder, dnsZoneCRD)
-	if err != nil {
-		hLog.WithError(err).Error("error applying DNSZone CRD")
-		return err
-	}
-	hLog.WithField("changed", changed).Info("DNSZone CRD updated")
-
 	expectedDeploymentGen := int64(0)
 	currentDeployment := &appsv1.Deployment{}
 	foundCurrentDeployment := false
-	err = r.Get(context.Background(), types.NamespacedName{Name: hiveDeployment.Name, Namespace: hiveDeployment.Namespace}, currentDeployment)
+	err := r.Get(context.Background(), types.NamespacedName{Name: hiveDeployment.Name, Namespace: hiveDeployment.Namespace}, currentDeployment)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up current deployment")
 		return err
@@ -112,6 +88,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 		expectedDeploymentGen = expectedDeploymentGen - 1
 	}
 
+	var changed bool
 	_, changed, err = resourceapply.ApplyDeployment(r.kubeClient.AppsV1(),
 		recorder, hiveDeployment, expectedDeploymentGen, false)
 	if err != nil {

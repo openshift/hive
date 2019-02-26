@@ -19,6 +19,7 @@ package remotemachineset
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -209,6 +210,16 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 					objectModified = true
 				}
 
+				if !reflect.DeepEqual(rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels) {
+					rMS.Spec.Template.Spec.Labels = ms.Spec.Template.Spec.Labels
+					objectModified = true
+				}
+
+				if !reflect.DeepEqual(rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints) {
+					rMS.Spec.Template.Spec.Taints = ms.Spec.Template.Spec.Taints
+					objectModified = true
+				}
+
 				if *objectMetaModified || objectModified {
 					rMS.Generation++
 					machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
@@ -312,7 +323,18 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 			if err != nil {
 				return nil, err
 			}
+			hivePool := findHiveMachinePool(cd, workerPool.Name)
 			for _, ms := range icMachineSets {
+				// Apply hive MachinePool labels to MachineSet MachineSpec.
+				ms.Spec.Template.Spec.ObjectMeta.Labels = map[string]string{}
+				for key, value := range hivePool.Labels {
+					ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
+				}
+
+				// Apply hive MachinePool taints to MachineSet MachineSpec.
+				ms.Spec.Template.Spec.Taints = hivePool.Taints
+
+				// Re-use existing AWS resources for generated MachineSets.
 				updateMachineSetAWSMachineProviderConfig(ms, ic.ObjectMeta.Name)
 				installerMachineSets = append(installerMachineSets, *ms)
 			}

@@ -62,9 +62,27 @@ export AWS_SECRET_ACCESS_KEY="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_secr
 
 function teardown() {
 	oc logs -c hive job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_install_job.log" || true
+	echo "************* INSTALL JOB LOG *************"
 	cat "${ARTIFACT_DIR}/hive_install_job.log"
+	echo ""
+	echo ""
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
-	oc delete clusterdeployment ${CLUSTER_NAME}
+	oc delete --wait=false clusterdeployment ${CLUSTER_NAME}
+	errorOnUninstall=0
+	if ! go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}-uninstall"; then
+		errorOnUninstall=1
+	fi
+	oc logs job/${CLUSTER_NAME}-uninstall &> "${ARTIFACT_DIR}/hive_uninstall_job.log" || true
+
+	echo "************* UNINSTALL JOB LOG *************"
+	cat "${ARTIFACT_DIR}/hive_uninstall_job.log"
+	echo ""
+	echo ""
+
+	if [[ $errorOnUninstall == 1 ]]; then
+		echo "Uninstall job failed."
+		exit 1
+	fi
 }
 trap 'teardown' EXIT
 
@@ -91,6 +109,7 @@ while [ $i -le ${max_tries} ]; do
          INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
          OPENSHIFT_RELEASE_IMAGE="" \
          TRY_INSTALL_ONCE="true" \
+         TRY_UNINSTALL_ONCE="true" \
       > ${CLUSTER_DEPLOYMENT_FILE} ; then
     echo "Success"
     break

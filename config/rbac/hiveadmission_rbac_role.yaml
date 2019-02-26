@@ -6,7 +6,7 @@ items:
   kind: ClusterRole
   metadata:
     annotations:
-    name: system:openshift:hive:hiveadmission:dnszones
+    name: system:openshift:hive:hiveadmission
   rules:
   - apiGroups:
     - admission.hive.openshift.io
@@ -16,6 +16,12 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
 
 
 # this should be a default for an aggregated apiserver

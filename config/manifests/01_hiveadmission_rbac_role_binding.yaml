@@ -24,7 +24,7 @@ items:
   roleRef:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
-    name: system:openshift:hive:hiveadmission:dnszones
+    name: system:openshift:hive:hiveadmission
   subjects:
   - kind: ServiceAccount
     namespace: openshift-hive

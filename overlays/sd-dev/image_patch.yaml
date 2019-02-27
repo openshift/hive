@@ -12,9 +12,6 @@ spec:
         image: quay.io/twiest/hive-controller:20190128
         imagePullPolicy: Always
         resources:
-          limits:
-            cpu: 100m
-            memory: 256Mi
           requests:
             cpu: 100m
             memory: 75Mi

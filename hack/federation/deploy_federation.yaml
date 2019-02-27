@@ -717,9 +717,6 @@ spec:
         image: quay.io/kubernetes-multicluster/federation-v2:latest
         name: controller-manager
         resources:
-          limits:
-            cpu: 100m
-            memory: 128Mi
           requests:
             cpu: 100m
             memory: 64Mi

@@ -485,9 +485,6 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	hiveImage := r.getHiveImage(cdLog)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
 
 	if cd.Status.InfraID == "" {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")

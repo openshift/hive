@@ -1354,6 +1354,7 @@ spec:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
+      serviceAccountName: hive-controllers
       containers:
       # By default we will use the latest CI images published from hive master:
       - image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive

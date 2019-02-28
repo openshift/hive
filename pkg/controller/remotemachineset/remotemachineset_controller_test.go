@@ -411,7 +411,9 @@ func testMachinePool(name string, replicas int, zones []string) hivev1.MachinePo
 			},
 		},
 		Labels: map[string]string{
-			"infra": "true",
+			"machine.openshift.io/cluster-api-cluster":      testInfraID,
+			"machine.openshift.io/cluster-api-machine-role": name,
+			"machine.openshift.io/cluster-api-machine-type": name,
 		},
 		Taints: []corev1.Taint{
 			{
@@ -436,9 +438,9 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 			Name:      name,
 			Namespace: machineAPINamespace,
 			Labels: map[string]string{
-				"sigs.k8s.io/cluster-api-machine-type": machineType,
-				"sigs.k8s.io/cluster-api-cluster":      testInfraID,
-				"sigs.k8s.io/cluster-api-machine-role": machineType,
+				"machine.openshift.io/cluster-api-cluster":      testInfraID,
+				"machine.openshift.io/cluster-api-machine-role": machineType,
+				"machine.openshift.io/cluster-api-machine-type": machineType,
 			},
 			Generation: int64(generation),
 		},
@@ -448,7 +450,9 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 				Spec: machineapi.MachineSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							"infra": "true",
+							"machine.openshift.io/cluster-api-cluster":      testInfraID,
+							"machine.openshift.io/cluster-api-machine-role": machineType,
+							"machine.openshift.io/cluster-api-machine-type": machineType,
 						},
 					},
 					Taints: []corev1.Taint{

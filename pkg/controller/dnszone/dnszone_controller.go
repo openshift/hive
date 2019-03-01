@@ -86,6 +86,21 @@ type ReconcileDNSZone struct {
 	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
 }
 
+// NewReconcileDNSZone creates a new reconciler for testing purposes
+func NewReconcileDNSZone(client client.Client, scheme *runtime.Scheme, logger log.FieldLogger, awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)) *ReconcileDNSZone {
+	return &ReconcileDNSZone{
+		Client:           client,
+		scheme:           scheme,
+		logger:           logger,
+		awsClientBuilder: awsClientBuilder,
+	}
+}
+
+// SetAWSClientBuilder sets the AWS client builder for testing purposes
+func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)) {
+	r.awsClientBuilder = awsClientBuilder
+}
+
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
 // and what is in the DNSZone.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write DNSZones

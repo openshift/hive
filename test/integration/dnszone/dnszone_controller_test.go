@@ -22,6 +22,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -33,10 +34,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/mock/gomock"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+
+	"github.com/openshift/hive/pkg/controller/dnszone"
 )
 
 type testContext struct {
-	controller *ReconcileDNSZone
+	controller *dnszone.ReconcileDNSZone
 	mocks      *mocks
 }
 
@@ -46,13 +49,14 @@ func setupTestContext(t *testing.T) *testContext {
 
 	ctx := &testContext{
 		mocks: mocks,
-		controller: &ReconcileDNSZone{
-			Client: mocks.fakeKubeClient,
-			logger: log.WithField("controller", "dnszone"),
-			awsClientBuilder: func(client.Client, string, string, string) (awsclient.Client, error) {
+		controller: dnszone.NewReconcileDNSZone(
+			mocks.fakeKubeClient,
+			scheme.Scheme,
+			log.WithField("controller", "dnszone"),
+			func(client.Client, string, string, string) (awsclient.Client, error) {
 				return mocks.mockAWSClient, nil
 			},
-		},
+		),
 	}
 
 	return ctx
@@ -146,9 +150,9 @@ func TestReconcileOldStyle(t *testing.T) {
 
 			if tc.dnsZone != nil {
 				setFakeDNSZoneInKube(ctx.mocks, tc.dnsZone)
-				ctx.controller.awsClientBuilder = func(client.Client, string, string, string) (awsclient.Client, error) {
+				ctx.controller.SetAWSClientBuilder(func(client.Client, string, string, string) (awsclient.Client, error) {
 					return ctx.mocks.mockAWSClient, tc.awsClientBuilderError
-				}
+				})
 
 				if tc.listHostedZonesOutput != nil {
 					listHostedZonesMock := ctx.mocks.mockAWSClient.EXPECT().

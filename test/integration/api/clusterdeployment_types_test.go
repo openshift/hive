@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package api
 
 import (
 	"testing"
@@ -23,18 +23,20 @@ import (
 	"golang.org/x/net/context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
 func TestStorageClusterDeployment(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
 	replicas := int64(3)
-	created := &ClusterDeployment{
+	created := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-		Spec: ClusterDeploymentSpec{
-			ControlPlane: MachinePool{
+		Spec: hivev1.ClusterDeploymentSpec{
+			ControlPlane: hivev1.MachinePool{
 				Replicas: &replicas,
 			},
-			Compute: []MachinePool{
+			Compute: []hivev1.MachinePool{
 				{
 					Replicas: &replicas,
 				},
@@ -44,7 +46,7 @@ func TestStorageClusterDeployment(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create
-	fetched := &ClusterDeployment{}
+	fetched := &hivev1.ClusterDeployment{}
 	g.Expect(c.Create(context.TODO(), created)).NotTo(gomega.HaveOccurred())
 
 	g.Expect(c.Get(context.TODO(), key, fetched)).NotTo(gomega.HaveOccurred())

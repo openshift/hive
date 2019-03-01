@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package api
 
 import (
 	"testing"
@@ -23,15 +23,17 @@ import (
 	"golang.org/x/net/context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
 func TestStorageDNSZone(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
-	created := &DNSZone{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	created := &hivev1.DNSZone{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create
-	fetched := &DNSZone{}
+	fetched := &hivev1.DNSZone{}
 	g.Expect(c.Create(context.TODO(), created)).NotTo(gomega.HaveOccurred())
 
 	g.Expect(c.Get(context.TODO(), key, fetched)).NotTo(gomega.HaveOccurred())

@@ -45,12 +45,14 @@ func main() {
 	cmd.PersistentFlags().StringVar(&opts.logLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
 	cmd.PersistentFlags().DurationVar(&opts.existenceTimeout, "job-existence-timeout", defaultJobExistenceTimeout, "Maximum time to wait for the named job to be created")
 	cmd.PersistentFlags().DurationVar(&opts.executionTimeout, "job-execution-timeout", defaultJobExecutionTimeout, "Maximum time to wait for the job to execute")
+	cmd.PersistentFlags().BoolVar(&opts.notFoundOK, "not-found-ok", false, "Do not exit with an error if the job is not found")
 	cmd.Execute()
 }
 
 type waitForJobOpts struct {
 	logLevel         string
 	jobName          string
+	notFoundOK       bool
 	existenceTimeout time.Duration
 	executionTimeout time.Duration
 }
@@ -94,6 +96,10 @@ func (w *waitForJobOpts) waitForJobExistence(client clientset.Interface, namespa
 		logger.Info("Job found")
 		return true, nil
 	})
+	if err == wait.ErrWaitTimeout && w.notFoundOK {
+		logger.Warn("timed out waiting for job to exist, it may have already been deleted")
+		return nil
+	}
 	return err
 }
 
@@ -103,6 +109,10 @@ func (w *waitForJobOpts) waitForJobExecution(client clientset.Interface, namespa
 		logger.Debug("Retrieving job")
 		job, err := client.BatchV1().Jobs(namespace).Get(w.jobName, metav1.GetOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) && w.notFoundOK {
+				logger.Warn("Job no longer exists. It may have already been deleted")
+				return true, nil
+			}
 			logger.WithError(err).Error("Could not fetch job")
 			return false, err
 		}

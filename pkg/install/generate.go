@@ -35,7 +35,8 @@ const (
 	defaultInstallerImagePullPolicy = corev1.PullAlways
 	defaultHiveImagePullPolicy      = corev1.PullAlways
 
-	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
+	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
+	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -296,6 +297,12 @@ func GenerateUninstallerJob(
 		return nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
 	}
 
+	tryOnce := false
+	if cd.Annotations != nil {
+		value, exists := cd.Annotations[tryUninstallOnceAnnotation]
+		tryOnce = exists && value == "true"
+	}
+
 	env := []corev1.EnvVar{}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
 		env = append(env, []corev1.EnvVar{
@@ -347,9 +354,14 @@ func GenerateUninstallerJob(
 		},
 	}
 
+	restartPolicy := corev1.RestartPolicyOnFailure
+	if tryOnce {
+		restartPolicy = corev1.RestartPolicyNever
+	}
+
 	podSpec := corev1.PodSpec{
 		DNSPolicy:     corev1.DNSClusterFirst,
-		RestartPolicy: corev1.RestartPolicyOnFailure,
+		RestartPolicy: restartPolicy,
 		Containers:    containers,
 	}
 

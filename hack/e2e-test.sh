@@ -69,18 +69,19 @@ function teardown() {
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
 	oc delete --wait=false clusterdeployment ${CLUSTER_NAME}
 	errorOnUninstall=0
-	if ! go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}-uninstall"; then
+	if ! go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" --log-level=debug --not-found-ok=true "${CLUSTER_NAME}-uninstall"; then
 		errorOnUninstall=1
 	fi
-	oc logs job/${CLUSTER_NAME}-uninstall &> "${ARTIFACT_DIR}/hive_uninstall_job.log" || true
-
-	echo "************* UNINSTALL JOB LOG *************"
-	cat "${ARTIFACT_DIR}/hive_uninstall_job.log"
-	echo ""
-	echo ""
 
 	if [[ $errorOnUninstall == 1 ]]; then
-		echo "Uninstall job failed."
+		if oc logs job/${CLUSTER_NAME}-uninstall &> "${ARTIFACT_DIR}/hive_uninstall_job.log"; then
+			echo "************* UNINSTALL JOB LOG *************"
+			cat "${ARTIFACT_DIR}/hive_uninstall_job.log"
+			echo ""
+			echo ""
+		else
+			echo "Waiting for uninstall job failed"
+		fi
 		exit 1
 	fi
 }

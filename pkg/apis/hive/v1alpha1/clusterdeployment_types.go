@@ -144,6 +144,14 @@ type ClusterDeploymentStatus struct {
 
 	// WebConsoleURL is the URL for the cluster's web console UI.
 	WebConsoleURL string `json:"webConsoleURL,omitempty"`
+
+	// SyncResources is the list of SyncStatus for objects that have been synced.
+	// +optional
+	SyncResources []SyncStatus `json:"syncResources,omitempty"`
+
+	// SyncPatches is the list of SyncStatus for patches that have been applied.
+	// +optional
+	SyncPatches []SyncStatus `json:"syncPatches,omitempty"`
 }
 
 // +genclient

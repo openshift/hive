@@ -251,6 +251,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *batchv1.Job {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
+						"example.com/fake:latest",
 						"fakeserviceaccount",
 						"sshkey",
 						"pullsecret")
@@ -313,6 +314,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *batchv1.Job {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
+						"example.com/fake:latest",
 						"fakeserviceaccount",
 						"sshkey",
 						"pullsecret")

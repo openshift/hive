@@ -1,6 +1,6 @@
 BINDIR = bin
 SRC_DIRS = pkg contrib
-GOFILES = $(shell find $(SRC_DIRS) -name '*.go')
+GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata)
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
 # To use docker build, specify BUILD_CMD="docker build"
@@ -27,7 +27,7 @@ all: fmt vet test build
 
 # Run tests
 .PHONY: test
-test: generate fmt vet manifests
+test: generate fmt vet crd rbac
 	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
 .PHONY: test-integration
@@ -40,12 +40,15 @@ test-e2e:
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: manager hiveutil hiveadmission
+build: manager hiveutil hiveadmission operator
 
 
 # Build manager binary
 manager: generate
 	go build -o bin/manager github.com/openshift/hive/cmd/manager
+
+operator: generate
+	go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
 
 # Build hiveutil binary
 hiveutil: generate
@@ -60,16 +63,20 @@ hiveadmission:
 run: generate fmt vet
 	go run ./cmd/manager/main.go --log-level=debug
 
+# Run against the configured Kubernetes cluster in ~/.kube/config
+.PHONY: run-operator
+run-operator: generate fmt vet
+	go run ./cmd/operator/main.go --log-level=debug
+
 # Install CRDs into a cluster
 .PHONY: install
-install: manifests
+install: crd rbac
 	kubectl apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests deploy-hiveadmission
-	kubectl apply -f manifests/
-	kubectl apply -f config/crds
+deploy: generate manifests
+	# Deploy the operator manifests:
 	mkdir -p overlays/deploy
 	cp overlays/template/* overlays/deploy
 	if [[ "`uname`" == "Darwin" ]]; then \
@@ -77,27 +84,37 @@ deploy: manifests deploy-hiveadmission
 	else \
 	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	fi
+	echo $(DEPLOY_IMAGE)
 	kustomize build overlays/deploy | kubectl apply -f -
 	rm -rf overlays/deploy
 
+# Update the manifest directory of artifacts OLM will deploy. Copies files in from
+# the locations kubebuilder generates them.
+.PHONY: manifests
+manifests: crd rbac
+	cp config/crds/hive_v1alpha1_hiveconfig.yaml config/manifests/01_hiveconfig_crd.yaml
+	cp config/crds/hive_v1alpha1_clusterdeployment.yaml config/manifests/01_clusterdeployment_crd.yaml
+	cp config/crds/hive_v1alpha1_dnszone.yaml config/manifests/01_dnszone_crd.yaml
+	cp config/rbac/rbac_role.yaml config/manifests/01_rbac_role.yaml
+	cp config/rbac/rbac_role_binding.yaml config/manifests/01_rbac_role_binding.yaml
+	cp config/rbac/hiveadmission_rbac_role.yaml config/manifests/01_hiveadmission_rbac_role.yaml
+	cp config/rbac/hiveadmission_rbac_role_binding.yaml config/manifests/01_hiveadmission_rbac_role_binding.yaml
+
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
-deploy-sd-dev: manifests deploy-hiveadmission
+deploy-sd-dev: crd rbac
 	kubectl apply -f config/crds
 	kustomize build overlays/sd-dev | kubectl apply -f -
 
-.PHONY: deploy-hiveadmission
-deploy-hiveadmission:
-	$(eval kube_service_account := $(shell oc get secret -n kube-system | awk "/kubernetes.io\/service-account-token/ { line=\$$1 } END{print line}"))
-	$(eval service_ca := $(shell oc get secret -n openshift-service-cert-signer "service-serving-cert-signer-signing-key" -o json | jq -r '.data."tls.crt"'))
-	$(eval kube_ca := $(shell oc get secret -n kube-system "$(kube_service_account)" -o json | jq -r '.data."ca.crt"'))
-	@oc process -f config/templates/hiveadmission.yaml SERVICE_CA="$(service_ca)" KUBE_CA="$(kube_ca)" | oc apply -n openshift-hive -f -
-	@oc apply -f config/rbac/hiveadmission_rbac_role.yaml -f config/rbac/hiveadmission_rbac_role_binding.yaml
+# Generate CRD yaml from our api types:
+.PHONY: crd
+crd:
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
 
-# Generate manifests e.g. CRD, RBAC etc.
-.PHONY: manifests
-manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+# Generate RBAC yaml from our kubebuilder controller annotations:
+.PHONY: rbac
+rbac:
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac
 
 # Run go fmt against code
 .PHONY: fmt
@@ -149,6 +166,7 @@ verify-go-vet: generate
 .PHONY: generate
 generate:
 	go generate ./pkg/... ./cmd/...
+	hack/update-bindata.sh
 
 # Build the docker image
 .PHONY: docker-build

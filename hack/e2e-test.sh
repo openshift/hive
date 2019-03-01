@@ -165,6 +165,12 @@ fi
 # Wait for the cluster deployment to be installed
 SRC_ROOT=$(git rev-parse --show-toplevel)
 
+sleep 120
+
+oc get deployments -n openshift-hive
+oc get pods -n openshift-hive
+oc get events -n openshift-hive
+
 echo "Waiting for job ${CLUSTER_NAME}-install to start and complete"
 
 go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}-install"

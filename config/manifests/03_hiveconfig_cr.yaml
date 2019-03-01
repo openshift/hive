@@ -1,0 +1,14 @@
+apiVersion: hive.openshift.io/v1alpha1
+kind: HiveConfig
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: hive
+spec:
+  image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+  # WARNING: these are not hooked up to anything yet
+  managementState: "Managed"
+  logLevel: "Debug"
+  operandSpecs: []
+  observedConfig: {}
+  unsupportedConfigOverrides: {}

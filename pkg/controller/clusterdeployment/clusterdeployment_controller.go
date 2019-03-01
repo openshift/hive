@@ -19,6 +19,7 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -64,6 +65,12 @@ const (
 	adminKubeconfigKey          = "kubeconfig"
 	clusterVersionObjectName    = "version"
 	clusterVersionUnknown       = "undef"
+	defaultHiveImage            = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+
+	// HiveImageEnvVar is the optional environment variable that overrides the image to use
+	// for provisioning/deprovisioning. Typically this originates from the HiveConfig and is
+	// set as an EnvVar on the deployment.
+	HiveImageEnvVar = "HIVE_IMAGE"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -251,8 +258,14 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	hiveImage := r.getHiveImage(cdLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	job, cfgMap, err := install.GenerateInstallerJob(
 		cd,
+		hiveImage,
 		serviceAccountName,
 		sshKey,
 		pullSecret)
@@ -323,6 +336,19 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 	}
 	return reconcile.Result{}, nil
+}
+
+// getHiveImage will return the image set in the HIVE_IMAGE env var, if set. This is typically
+// done by the operator using the value from HiveConfig, passed through as an EnvVar on the
+// hive controllers deployment. If unset, we use the default. (latest master)
+func (r *ReconcileClusterDeployment) getHiveImage(cdLog log.FieldLogger) string {
+	hiveImage, ok := os.LookupEnv(HiveImageEnvVar)
+	if !ok {
+		cdLog.Debugf("using default hive image: %s", hiveImage)
+		return defaultHiveImage
+	}
+	cdLog.Debugf("using hive image from %s env var: %s", HiveImageEnvVar, hiveImage)
+	return hiveImage
 }
 
 func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataKey string) (string, error) {
@@ -458,15 +484,17 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, nil
 	}
 
+	hiveImage := r.getHiveImage(cdLog)
+
 	if cd.Status.InfraID == "" {
-		cdLog.Warn("skipping uninstall for cluster that never had infraID set")
+		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error removing finalizer")
 		}
 	} else {
 		// Generate an uninstall job:
-		uninstallJob, err := install.GenerateUninstallerJob(cd)
+		uninstallJob, err := install.GenerateUninstallerJob(cd, hiveImage)
 		if err != nil {
 			cdLog.Errorf("error generating uninstaller job: %v", err)
 			return reconcile.Result{}, err

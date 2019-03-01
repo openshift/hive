@@ -8,22 +8,36 @@ API driven OpenShift cluster provisioning and management
 
 ## Deployment Options
 
-### Deploying To OpenShift 4.x Using Latest Published Images
+Hive contains an operator which is responsible for handling deployment logic for the rest of the components. In the near future this operator may be installable via OLM.
 
-This method uses the latest published Hive image on the CI registry: `registry.svc.ci.openshift.org/openshift/hive-v4.0:hive`
+### Deploy Hive Operator Using Latest Master Images
 
-1. Provision an OpenShift 4.0 Cluster with openshift-install.
-1. Login as a cluster admin after installation completes:
-  * `$ export KUBECONFIG=/home/dgoodwin/installdir/auth/kubeconfig`
-1. Install Hive to the openshift-hive namespace:
-  * `$ make deploy`
+To deploy the operator from a git checkout:
 
-### Running from Source
+  `$ make deploy`
 
-* Create the ClusterDeployment and DNSZone CRDs:
-  * `$ make install`
-* Run Hive from local source:
-  * `$ make run`
+By default the operator will use the latest images published by CI from the master branch.
+
+You should now see hive-operator, hive-controllers, and hiveadmission pods running in the openshift-hive namespace.
+
+### Deploy Hive Operator Using Custom Images
+
+ 1. Build and publish a custom Hive image from your current working dir: `$ IMG=quay.io/dgoodwin/hive:latest make buildah-push`
+ 1. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/dgoodwin/hive:latest make deploy`
+
+### Run Hive Operator From Source
+
+NOTE: assumes you have previously deployed using one of the above methods.
+
+ 1. `$ kubectl scale -n openshift-hive deployment.v1.apps/hive-operator --replicas=0`
+ 1. `$ make run-operator`
+
+### Run Hive From Source
+
+NOTE: assumes you have previously deployed using one of the above methods.
+
+ 1. `$ kubectl scale -n openshift-hive deployment.v1.apps/hive-controllers --replicas=0`
+ 1. `$ make run`
 
 ## Using Hive
 
@@ -80,7 +94,6 @@ oc process -f config/templates/cluster-deployment.yaml \
 ```bash
 $ oc delete clusterdeployment $USER
 ```
-
 ## Tips
 
 ### Using the Admin Kubeconfig

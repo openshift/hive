@@ -6,6 +6,7 @@ required = [
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/stretchr/testify/assert",
     "golang.org/x/net/context",
+    "github.com/jteeuwen/go-bindata",
     "github.com/openshift/installer/pkg/types",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apiserver/pkg/util/logs",
@@ -25,6 +26,10 @@ required = [
   go-tests = true
   non-go = true
   unused-packages = true
+
+  [[prune.project]]
+    name = "github.com/jteeuwen/go-bindata"
+    unused-packages = false
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
@@ -92,4 +97,9 @@ version="v1.4.7"
 [[override]]
   name = "github.com/docker/docker"
   revision = "a9fbbdc8dd8794b20af358382ab780559bca589d"
+
+
+[[override]]
+  name = "github.com/jteeuwen/go-bindata"
+  revision = "a0ff2567cfb70903282db057e799fd826784d41d"
 

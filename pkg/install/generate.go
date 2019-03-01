@@ -55,7 +55,7 @@ func GenerateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 
-	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret)
+	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret, true)
 	if err != nil {
 		return nil, nil, err
 	}

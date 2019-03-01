@@ -32,5 +32,6 @@ func main() {
 	admissionCmd.RunAdmissionServer(
 		&hivevalidatingwebhooks.DNSZoneValidatingAdmissionHook{},
 		&hivevalidatingwebhooks.ClusterDeploymentValidatingAdmissionHook{},
+		&hivevalidatingwebhooks.ClusterImageSetValidatingAdmissionHook{},
 	)
 }

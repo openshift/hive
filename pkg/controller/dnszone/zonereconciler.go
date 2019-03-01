@@ -138,11 +138,7 @@ func (zr *ZoneReconciler) createRoute53HostedZone() error {
 	zr.addRateLimitingStatusEntries()
 
 	// Only add a finalizer after a route53 hostedzone was successfully created (nothing to clean up otherwise).
-	if err := zr.addDNSZoneFinalizer(zr.desiredState); err != nil {
-		return err
-	}
-
-	return nil
+	return zr.addDNSZoneFinalizer(zr.desiredState)
 }
 
 func (zr *ZoneReconciler) addDNSZoneFinalizer(dnsZone *hivev1.DNSZone) error {

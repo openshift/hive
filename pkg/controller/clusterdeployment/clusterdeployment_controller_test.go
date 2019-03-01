@@ -311,6 +311,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testDeletedClusterDeployment()
+					cd.Status.Installed = true
 					cd.Spec.PreserveOnDelete = true
 					return cd
 				}(),
@@ -359,6 +360,33 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				job := getInstallJob(c)
 				assert.Nil(t, job)
+			},
+		},
+		{
+			name: "Test creation of uninstall job when PreserveOnDelete is true but cluster deployment is not installed",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					cd.Spec.PreserveOnDelete = true
+					cd.Status.Installed = false
+					return cd
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job, _, _ := install.GenerateInstallerJob(
+						testDeletedClusterDeployment(),
+						"example.com/fake:latest",
+						"fakeserviceaccount",
+						"sshkey",
+						"pullsecret")
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				uninstallJob := getUninstallJob(c)
+				assert.NotNil(t, uninstallJob)
 			},
 		},
 		{

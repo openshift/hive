@@ -56,6 +56,12 @@ spec:
                 nodes that need to be installed.
               items:
                 properties:
+                  labels:
+                    description: Map of label string keys and values that will be
+                      applied to the created MachineSet's MachineSpec. This list will
+                      overwrite any modifications made to Node labels on an ongoing
+                      basis.
+                    type: object
                   name:
                     description: Name is the name of the machine pool.
                     type: string
@@ -158,6 +164,13 @@ spec:
                       pool. Default is 1.
                     format: int64
                     type: integer
+                  taints:
+                    description: List of taints that will be applied to the created
+                      MachineSet's MachineSpec. This list will overwrite any modifications
+                      made to Node taints on an ongoing basis.
+                    items:
+                      type: object
+                    type: array
                 required:
                 - name
                 - replicas
@@ -168,6 +181,11 @@ spec:
               description: ControlPlane is the MachinePool containing control plane
                 nodes that need to be installed.
               properties:
+                labels:
+                  description: Map of label string keys and values that will be applied
+                    to the created MachineSet's MachineSpec. This list will overwrite
+                    any modifications made to Node labels on an ongoing basis.
+                  type: object
                 name:
                   description: Name is the name of the machine pool.
                   type: string
@@ -269,6 +287,13 @@ spec:
                     pool. Default is 1.
                   format: int64
                   type: integer
+                taints:
+                  description: List of taints that will be applied to the created
+                    MachineSet's MachineSpec. This list will overwrite any modifications
+                    made to Node taints on an ongoing basis.
+                  items:
+                    type: object
+                  type: array
               required:
               - name
               - replicas
@@ -666,6 +691,134 @@ spec:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
               type: boolean
+            syncPatches:
+              description: SyncPatches is the list of SyncStatus for patches that
+                have been applied.
+              items:
+                properties:
+                  conditions:
+                    description: Conditions is the list of conditions indicating success
+                      or failure of object create, update and delete as well as patch
+                      application.
+                    items:
+                      properties:
+                        lastProbeTime:
+                          description: LastProbeTime is the last time we probed the
+                            condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: LastTransitionTime is the last time the condition
+                            transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is a human-readable message indicating
+                            details about last transition.
+                          type: string
+                        reason:
+                          description: Reason is a unique, one-word, CamelCase reason
+                            for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status is the status of the condition.
+                          type: string
+                        type:
+                          description: Type is the type of the condition.
+                          type: string
+                      required:
+                      - type
+                      - status
+                      type: object
+                    type: array
+                  groupVersionKind:
+                    description: GroupVersionKind is the Group, Version and Kind of
+                      the object that was synced or patched.
+                    type: object
+                  hash:
+                    description: Hash is the unique md5 hash of the resource or patch.
+                    format: byte
+                    type: string
+                  name:
+                    description: Name is the name of the object that was synced or
+                      patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace of the object that was
+                      synced or patched.
+                    type: string
+                required:
+                - groupVersionKind
+                - name
+                - namespace
+                - hash
+                - conditions
+                type: object
+              type: array
+            syncResources:
+              description: SyncResources is the list of SyncStatus for objects that
+                have been synced.
+              items:
+                properties:
+                  conditions:
+                    description: Conditions is the list of conditions indicating success
+                      or failure of object create, update and delete as well as patch
+                      application.
+                    items:
+                      properties:
+                        lastProbeTime:
+                          description: LastProbeTime is the last time we probed the
+                            condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: LastTransitionTime is the last time the condition
+                            transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is a human-readable message indicating
+                            details about last transition.
+                          type: string
+                        reason:
+                          description: Reason is a unique, one-word, CamelCase reason
+                            for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status is the status of the condition.
+                          type: string
+                        type:
+                          description: Type is the type of the condition.
+                          type: string
+                      required:
+                      - type
+                      - status
+                      type: object
+                    type: array
+                  groupVersionKind:
+                    description: GroupVersionKind is the Group, Version and Kind of
+                      the object that was synced or patched.
+                    type: object
+                  hash:
+                    description: Hash is the unique md5 hash of the resource or patch.
+                    format: byte
+                    type: string
+                  name:
+                    description: Name is the name of the object that was synced or
+                      patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace of the object that was
+                      synced or patched.
+                    type: string
+                required:
+                - groupVersionKind
+                - name
+                - namespace
+                - hash
+                - conditions
+                type: object
+              type: array
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.

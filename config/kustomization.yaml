@@ -29,4 +29,3 @@ resources:
 - ./manifests/01_hiveadmission_rbac_role.yaml
 - ./manifests/01_hiveadmission_rbac_role_binding.yaml
 - ./manifests/02_hive_operator.yaml
-- ./manifests/03_hiveconfig_cr.yaml

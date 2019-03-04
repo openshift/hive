@@ -104,8 +104,8 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 		foundCurrentDS = true
 	}
 
-	if instance.Spec.Image != "" {
-		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
+	if r.hiveImage != "" {
+		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 	}
 
 	// ApplyDaemonSet does not check much of the Spec for changes. Do some manual

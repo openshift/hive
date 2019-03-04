@@ -64,14 +64,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 		foundCurrentDeployment = true
 	}
 
-	if instance.Spec.Image != "" {
-		hiveDeployment.Spec.Template.Spec.Containers[0].Image = instance.Spec.Image
+	if r.hiveImage != "" {
+		hiveDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 		// NOTE: overwriting all environment vars here, there are no others at the time of
 		// writing:
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
 			{
 				Name:  images.HiveImageEnvVar,
-				Value: instance.Spec.Image,
+				Value: r.hiveImage,
 			},
 		}
 	}

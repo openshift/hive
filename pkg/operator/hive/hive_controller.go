@@ -23,6 +23,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -33,6 +34,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -51,6 +53,8 @@ const (
 	hiveNamespace = "openshift-hive"
 	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
 	hiveConfigName = "hive"
+
+	hiveOperatorDeploymentName = "hive-operator"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -120,6 +124,57 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Regular manager client is not fully initialized here, create our own for some
+	// initialization API communication:
+	tempClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+	if err != nil {
+		return err
+	}
+
+	// If no HiveConfig exists, the operator should create a default one, giving the controller
+	// something to sync on.
+	log.Debug("checking if HiveConfig 'hive' exists")
+	instance := &hivev1.HiveConfig{}
+	err = tempClient.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName}, instance)
+	if err != nil && errors.IsNotFound(err) {
+		log.Info("no HiveConfig exists, creating default")
+		instance = &hivev1.HiveConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: hiveConfigName,
+			},
+			Spec: hivev1.HiveConfigSpec{
+				OperatorSpec: operatorv1.OperatorSpec{
+					ObservedConfig:             runtime.RawExtension{Raw: []byte{}},
+					OperandSpecs:               []operatorv1.OperandSpec{},
+					UnsupportedConfigOverrides: runtime.RawExtension{Raw: []byte{}},
+				},
+			},
+			Status: hivev1.HiveConfigStatus{
+				OperatorStatus: operatorv1.OperatorStatus{
+					Generations: []operatorv1.GenerationStatus{},
+				},
+			},
+		}
+		err = tempClient.Create(context.TODO(), instance)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Lookup the hive-operator Deployment image, we will assume hive components should all be
+	// using the same image as the operator.
+	operatorDeployment := &appsv1.Deployment{}
+	err = tempClient.Get(context.Background(),
+		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: hiveNamespace},
+		operatorDeployment)
+	if err == nil {
+		img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
+		log.Debugf("loaded hive image from hive-operator deployment: %s", img)
+		r.(*ReconcileHiveConfig).hiveImage = img
+	} else {
+		log.WithError(err).Warn("unable to lookup hive image from hive-operator Deployment, image overriding disabled")
+	}
+
 	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,
 	// and our config is namespaced)
 
@@ -139,6 +194,7 @@ type ReconcileHiveConfig struct {
 	kubeClient   kubernetes.Interface
 	apiextClient *apiextclientv1beta1.ApiextensionsV1beta1Client
 	apiregClient *apiregclientv1.ApiregistrationV1Client
+	hiveImage    string
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read

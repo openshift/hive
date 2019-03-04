@@ -1421,12 +1421,6 @@ spec:
           type: object
         spec:
           properties:
-            image:
-              description: Image controls the image used for the Hive controllers,
-                Hiveadmission, as well as provision/deprovision pods, provided the
-                ClusterDeployment itself does not have an image override. Defaults
-                to use latest master image from CI if left empty.
-              type: string
             logLevel:
               description: logLevel is an intent based logging for an overall component.  It
                 does not give fine grained control, but it is a simple way to manage

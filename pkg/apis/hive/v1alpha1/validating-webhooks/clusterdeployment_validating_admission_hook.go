@@ -40,7 +40,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"Compute", "PreserveOnDelete"}
+	mutableFields = []string{"Compute", "Ingress", "PreserveOnDelete"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -174,6 +174,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 
 	// TODO: Put Create Validation Here (or in openAPIV3Schema validation section of crd)
 
+	if !validateIngressList(&newObject.Spec) {
+		message := "If defining the Ingress list, it must include a default ingress entry"
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
@@ -241,6 +252,35 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
+	// First check whether the newlist is valid at all
+	if !validateIngressList(&newObject.Spec) {
+		message := fmt.Sprintf("Ingress list must include a default entry")
+		contextLogger.Infof("Failed validation: %v", message)
+
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
+	// Now catch the case where there was a previously defined list and now it's being emptied
+	hasClearedOutPreviouslyDefinedIngressList := hasClearedOutPreviouslyDefinedIngressList(&oldObject.Spec, &newObject.Spec)
+	if hasClearedOutPreviouslyDefinedIngressList {
+		message := fmt.Sprintf("Previously defined a list of ingress objects, must provide a default ingress object")
+		contextLogger.Infof("Failed validation: %v", message)
+
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
@@ -276,4 +316,33 @@ func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec
 	}
 
 	return false, ""
+}
+
+func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {
+	// We don't allow a ClusterDeployment which had previously defined a list of Ingress objects
+	// to then be cleared out. It either must be cleared from the begining (ie just use default behavior),
+	// or the ClusterDeployment must continue to define at least the 'default' ingress object.
+	if len(oldObject.Ingress) > 0 && len(newObject.Ingress) == 0 {
+		return true
+	}
+
+	return false
+}
+
+func validateIngressList(newObject *hivev1.ClusterDeploymentSpec) bool {
+	if len(newObject.Ingress) == 0 {
+		return true
+	}
+
+	defaultFound := false
+	for _, ingress := range newObject.Ingress {
+		if ingress.Name == "default" {
+			defaultFound = true
+		}
+	}
+	if !defaultFound {
+		return false
+	}
+
+	return true
 }

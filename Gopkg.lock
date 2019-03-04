@@ -2134,6 +2134,7 @@
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",
     "github.com/openshift/api/config/v1",
+    "github.com/openshift/api/operator/v1",
     "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",

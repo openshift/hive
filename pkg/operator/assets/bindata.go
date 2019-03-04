@@ -367,6 +367,12 @@ spec:
                 nodes that need to be installed.
               items:
                 properties:
+                  labels:
+                    description: Map of label string keys and values that will be
+                      applied to the created MachineSet's MachineSpec. This list will
+                      overwrite any modifications made to Node labels on an ongoing
+                      basis.
+                    type: object
                   name:
                     description: Name is the name of the machine pool.
                     type: string
@@ -469,6 +475,13 @@ spec:
                       pool. Default is 1.
                     format: int64
                     type: integer
+                  taints:
+                    description: List of taints that will be applied to the created
+                      MachineSet's MachineSpec. This list will overwrite any modifications
+                      made to Node taints on an ongoing basis.
+                    items:
+                      type: object
+                    type: array
                 required:
                 - name
                 - replicas
@@ -479,6 +492,11 @@ spec:
               description: ControlPlane is the MachinePool containing control plane
                 nodes that need to be installed.
               properties:
+                labels:
+                  description: Map of label string keys and values that will be applied
+                    to the created MachineSet's MachineSpec. This list will overwrite
+                    any modifications made to Node labels on an ongoing basis.
+                  type: object
                 name:
                   description: Name is the name of the machine pool.
                   type: string
@@ -580,6 +598,13 @@ spec:
                     pool. Default is 1.
                   format: int64
                   type: integer
+                taints:
+                  description: List of taints that will be applied to the created
+                    MachineSet's MachineSpec. This list will overwrite any modifications
+                    made to Node taints on an ongoing basis.
+                  items:
+                    type: object
+                  type: array
               required:
               - name
               - replicas
@@ -1128,12 +1153,6 @@ spec:
           type: object
         spec:
           properties:
-            image:
-              description: Image controls the image used for the Hive controllers,
-                Hiveadmission, as well as provision/deprovision pods, provided the
-                ClusterDeployment itself does not have an image override. Defaults
-                to use latest master image from CI if left empty.
-              type: string
             logLevel:
               description: logLevel is an intent based logging for an overall component.  It
                 does not give fine grained control, but it is a simple way to manage

@@ -717,8 +717,7 @@
   source = "github.com/csrwng/generic-admission-server"
 
 [[projects]]
-  branch = "master"
-  digest = "1:b06c1d2f9e9b6860706d1b8f5efb051740ba7890d531b843650f0371d9a5cca3"
+  digest = "1:b898453105c406ecec684335a93f19f0502d4b8cf53085215bfa8b426606d695"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -735,7 +734,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "2b65c9d4f31f0905a9845322c419b87973194fe0"
+  revision = "c91cdbc819851fb9f813ec0b3e3b76ed86ae43a3"
 
 [[projects]]
   branch = "master"

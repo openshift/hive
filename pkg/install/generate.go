@@ -32,9 +32,13 @@ import (
 )
 
 const (
-	defaultInstallerImage                 = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-	defaultInstallerImagePullPolicy       = corev1.PullAlways
-	defaultHiveImagePullPolicy            = corev1.PullAlways
+	// DefaultInstallerImage is the image that will be used to install a ClusterDeployment if no
+	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
+	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+
+	defaultInstallerImagePullPolicy = corev1.PullAlways
+	defaultHiveImagePullPolicy      = corev1.PullAlways
+
 	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
 	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
@@ -189,18 +193,14 @@ func GenerateInstallerJob(
 		},
 	}
 
-	installerImage := defaultInstallerImage
-	if cd.Spec.Images.InstallerImage != "" {
-		installerImage = cd.Spec.Images.InstallerImage
+	if cd.Status.InstallerImage == nil {
+		return nil, nil, fmt.Errorf("installer image not resolved")
 	}
+	installerImage := *cd.Status.InstallerImage
 
 	installerImagePullPolicy := defaultInstallerImagePullPolicy
 	if cd.Spec.Images.InstallerImagePullPolicy != "" {
 		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
-	}
-
-	if cd.Spec.Images.HiveImage != "" {
-		hiveImage = cd.Spec.Images.HiveImage
 	}
 
 	hiveImagePullPolicy := defaultHiveImagePullPolicy
@@ -328,10 +328,6 @@ func GenerateUninstallerJob(
 				},
 			},
 		}...)
-	}
-
-	if cd.Spec.Images.HiveImage != "" {
-		hiveImage = cd.Spec.Images.HiveImage
 	}
 
 	hiveImagePullPolicy := defaultHiveImagePullPolicy

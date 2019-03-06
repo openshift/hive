@@ -299,6 +299,18 @@ spec:
               - replicas
               - platform
               type: object
+            imageSet:
+              description: ImageSet is a reference to a ClusterImageSet. If values
+                are specified for Images, those will take precedence over the ones
+                from the ClusterImageSet.
+              properties:
+                name:
+                  description: Name is the name of the ClusterImageSet that this refers
+                    to
+                  type: string
+              required:
+              - name
+              type: object
             images:
               description: Images allows overriding the default images used to provision
                 and manage the cluster.
@@ -675,6 +687,39 @@ spec:
               - conditions
               - availableUpdates
               type: object
+            conditions:
+              description: Conditions includes more detailed status for the cluster
+                deployment
+              items:
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
             federated:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
@@ -691,6 +736,10 @@ spec:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
               type: boolean
+            installerImage:
+              description: InstallerImage is the name of the installer image to use
+                when installing the target cluster
+              type: string
             syncPatches:
               description: SyncPatches is the list of SyncStatus for patches that
                 have been applied.

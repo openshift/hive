@@ -7,6 +7,7 @@
 // config/hiveadmission/service-account.yaml
 // config/hiveadmission/service.yaml
 // config/crds/hive_v1alpha1_clusterdeployment.yaml
+// config/crds/hive_v1alpha1_clusterimageset.yaml
 // config/crds/hive_v1alpha1_dnszone.yaml
 // config/crds/hive_v1alpha1_hiveconfig.yaml
 // config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml
@@ -614,6 +615,18 @@ spec:
               - replicas
               - platform
               type: object
+            imageSet:
+              description: ImageSet is a reference to a ClusterImageSet. If values
+                are specified for Images, those will take precedence over the ones
+                from the ClusterImageSet.
+              properties:
+                name:
+                  description: Name is the name of the ClusterImageSet that this refers
+                    to
+                  type: string
+              required:
+              - name
+              type: object
             images:
               description: Images allows overriding the default images used to provision
                 and manage the cluster.
@@ -990,6 +1003,39 @@ spec:
               - conditions
               - availableUpdates
               type: object
+            conditions:
+              description: Conditions includes more detailed status for the cluster
+                deployment
+              items:
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
             federated:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
@@ -1006,6 +1052,10 @@ spec:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
               type: boolean
+            installerImage:
+              description: InstallerImage is the name of the installer image to use
+                when installing the target cluster
+              type: string
             syncPatches:
               description: SyncPatches is the list of SyncStatus for patches that
                 have been applied.
@@ -1161,6 +1211,92 @@ func configCrdsHive_v1alpha1_clusterdeploymentYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHive_v1alpha1_clusterimagesetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: clusterimagesets.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.hiveImage
+    name: Hive
+    type: string
+  - JSONPath: .status.installerImage
+    name: Installer
+    type: string
+  - JSONPath: .spec.releaseImage
+    name: Release
+    type: string
+  group: hive.openshift.io
+  names:
+    kind: ClusterImageSet
+    plural: clusterimagesets
+    shortNames:
+    - imgset
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            hiveImage:
+              description: HiveImage is the Hive image to use when installing or destroying
+                a cluster. If not present, the default Hive image for the clusterdeployment
+                controller is used.
+              type: string
+            installerImage:
+              description: InstallerImage is the image used to install a cluster.
+                If not specified, the installer image reference is obtained from the
+                release image.
+              type: string
+            releaseImage:
+              description: ReleaseImage is the image that contains the payload to
+                use when installing a cluster. If the installer image is specified,
+                the release image is optional.
+              type: string
+          type: object
+        status:
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHive_v1alpha1_clusterimagesetYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1alpha1_clusterimagesetYaml, nil
+}
+
+func configCrdsHive_v1alpha1_clusterimagesetYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1alpha1_clusterimagesetYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3122,6 +3258,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/service-account.yaml":                   configHiveadmissionServiceAccountYaml,
 	"config/hiveadmission/service.yaml":                           configHiveadmissionServiceYaml,
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":            configCrdsHive_v1alpha1_clusterdeploymentYaml,
+	"config/crds/hive_v1alpha1_clusterimageset.yaml":              configCrdsHive_v1alpha1_clusterimagesetYaml,
 	"config/crds/hive_v1alpha1_dnszone.yaml":                      configCrdsHive_v1alpha1_dnszoneYaml,
 	"config/crds/hive_v1alpha1_hiveconfig.yaml":                   configCrdsHive_v1alpha1_hiveconfigYaml,
 	"config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml": configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml,
@@ -3175,6 +3312,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
 		"crds": {nil, map[string]*bintree{
 			"hive_v1alpha1_clusterdeployment.yaml":            {configCrdsHive_v1alpha1_clusterdeploymentYaml, map[string]*bintree{}},
+			"hive_v1alpha1_clusterimageset.yaml":              {configCrdsHive_v1alpha1_clusterimagesetYaml, map[string]*bintree{}},
 			"hive_v1alpha1_dnszone.yaml":                      {configCrdsHive_v1alpha1_dnszoneYaml, map[string]*bintree{}},
 			"hive_v1alpha1_hiveconfig.yaml":                   {configCrdsHive_v1alpha1_hiveconfigYaml, map[string]*bintree{}},
 			"hive_v1alpha1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml, map[string]*bintree{}},

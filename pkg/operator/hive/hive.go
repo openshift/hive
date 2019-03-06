@@ -22,7 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivecdctrlr "github.com/openshift/hive/pkg/controller/clusterdeployment"
+	"github.com/openshift/hive/pkg/controller/images"
 
 	"github.com/openshift/hive/pkg/operator/assets"
 
@@ -70,7 +70,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.
 		// writing:
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
 			{
-				Name:  hivecdctrlr.HiveImageEnvVar,
+				Name:  images.HiveImageEnvVar,
 				Value: instance.Spec.Image,
 			},
 		}

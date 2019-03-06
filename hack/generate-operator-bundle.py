@@ -6,6 +6,7 @@
 #
 # Usage ./hack/generate-operator-bundle.py OUTPUT_DIR GIT_HASH
 
+import datetime
 import os
 import sys
 import yaml
@@ -81,7 +82,12 @@ csv['spec']['install']['spec']['deployments'][0]['spec']['template']['spec']['co
 
 # Update the versions to include git hash:
 csv['metadata']['name'] = "hive-operator-%s" % git_hash
-csv['spec']['version'] = "%s-%s" % (csv['spec']['version'], git_hash)
+csv['spec']['version'] = git_hash
+
+# Set the CSV createdAt annotation:
+now = datetime.datetime.now()
+csv['metadata']['annotations']['createdAt'] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 # Write the CSV to disk:
 csv_file = os.path.join(outdir, 'hive-csv.yaml')

@@ -95,6 +95,7 @@ manifests: crd rbac
 	cp config/crds/hive_v1alpha1_hiveconfig.yaml config/manifests/01_hiveconfig_crd.yaml
 	cp config/crds/hive_v1alpha1_clusterdeployment.yaml config/manifests/01_clusterdeployment_crd.yaml
 	cp config/crds/hive_v1alpha1_dnszone.yaml config/manifests/01_dnszone_crd.yaml
+	cp config/crds/hive_v1alpha1_clusterimageset.yaml config/manifests/01_clusterimageset_crd.yaml
 	cp config/rbac/rbac_role.yaml config/manifests/01_rbac_role.yaml
 	cp config/rbac/rbac_role_binding.yaml config/manifests/01_rbac_role_binding.yaml
 	cp config/rbac/hiveadmission_rbac_role.yaml config/manifests/01_hiveadmission_rbac_role.yaml

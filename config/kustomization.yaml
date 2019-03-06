@@ -21,6 +21,7 @@ resources:
 - ./manifests/00_namespace.yaml
 - ./manifests/01_hiveconfig_crd.yaml
 - ./manifests/01_clusterdeployment_crd.yaml
+- ./manifests/01_clusterimageset_crd.yaml
 - ./manifests/01_dnszone_crd.yaml
 - ./manifests/01_operator_role.yaml
 - ./manifests/01_operator_role_binding.yaml

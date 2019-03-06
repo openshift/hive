@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -57,8 +58,7 @@ const (
 	roleBindingName    = "cluster-installer"
 
 	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
-	deleteAfterAnnotation = "hive.openshift.io/delete-after"
-
+	deleteAfterAnnotation       = "hive.openshift.io/delete-after"
 	adminCredsSecretPasswordKey = "password"
 	pullSecretKey               = ".dockercfg"
 	adminSSHKeySecretKey        = "ssh-publickey"
@@ -70,7 +70,8 @@ const (
 	// HiveImageEnvVar is the optional environment variable that overrides the image to use
 	// for provisioning/deprovisioning. Typically this originates from the HiveConfig and is
 	// set as an EnvVar on the deployment.
-	HiveImageEnvVar = "HIVE_IMAGE"
+	HiveImageEnvVar                       = "HIVE_IMAGE"
+	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -320,7 +321,17 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		cdLog.Errorf("error getting job: %v", err)
 		return reconcile.Result{}, err
 	} else {
-		cdLog.Infof("cluster job exists, successful: %v", cd.Status.Installed)
+		cdLog.Infof("cluster job exists, cluster deployment status: %v", cd.Status.Installed)
+		if !cd.Status.Installed {
+			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
+				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
+				if err != nil {
+					return reconcile.Result{}, err
+				} else if didGenerationChange {
+					return reconcile.Result{Requeue: true}, nil
+				}
+			}
+		}
 	}
 
 	err = r.updateClusterDeploymentStatus(cd, origCD, existingJob, cdLog)
@@ -349,6 +360,36 @@ func (r *ReconcileClusterDeployment) getHiveImage(cdLog log.FieldLogger) string 
 	}
 	cdLog.Debugf("using hive image from %s env var: %s", HiveImageEnvVar, hiveImage)
 	return hiveImage
+}
+
+// Deletes the job if it exists and its generation does not match the cluster deployment's
+// genetation. Updates the config map if it is outdated too
+func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration int64, existingJob *batchv1.Job, cfgMap *corev1.ConfigMap, cdLog log.FieldLogger) (bool, error) {
+	var err error
+	var didGenerationChange bool
+	if jobGeneration, ok := existingJob.Annotations[clusterDeploymentGenerationAnnotation]; ok {
+		convertedJobGeneration, _ := strconv.ParseInt(jobGeneration, 10, 64)
+		if convertedJobGeneration < cdGeneration {
+			didGenerationChange = true
+			err = r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+			if err != nil {
+				cdLog.WithError(err).Errorf("error deleting outdated install job")
+				return didGenerationChange, err
+			}
+		}
+	}
+	if cfgMapGeneration, ok := cfgMap.Annotations[clusterDeploymentGenerationAnnotation]; ok {
+		convertedMapGeneration, _ := strconv.ParseInt(cfgMapGeneration, 10, 64)
+		if convertedMapGeneration < cdGeneration {
+			didGenerationChange = true
+			err = r.Update(context.TODO(), cfgMap)
+			if err != nil {
+				cdLog.WithError(err).Errorf("error deleting outdated config map")
+				return didGenerationChange, err
+			}
+		}
+	}
+	return didGenerationChange, err
 }
 
 func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataKey string) (string, error) {

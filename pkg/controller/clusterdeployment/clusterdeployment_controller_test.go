@@ -326,6 +326,35 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Nil(t, uninstallJob)
 			},
 		},
+		{
+			name: "Test deletion of expired jobs",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = false
+					return cd
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job, _, _ := install.GenerateInstallerJob(
+						testClusterDeployment(),
+						"fakeserviceaccount",
+						"fakeserviceaccount",
+						"sshkey",
+						"pullsecret")
+					wrongGeneration := "-1"
+					job.Annotations[clusterDeploymentGenerationAnnotation] = wrongGeneration
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				job := getInstallJob(c)
+				assert.Nil(t, job)
+			},
+		},
 	}
 
 	for _, test := range tests {

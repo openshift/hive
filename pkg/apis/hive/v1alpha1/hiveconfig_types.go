@@ -17,18 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
-	operatorv1 "github.com/openshift/api/operator/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
-	operatorv1.OperatorSpec `json:",inline"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
 type HiveConfigStatus struct {
-	operatorv1.OperatorStatus `json:",inline"`
 }
 
 // +genclient:nonNamespaced

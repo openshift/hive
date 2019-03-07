@@ -23,7 +23,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -141,18 +140,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		instance = &hivev1.HiveConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: hiveConfigName,
-			},
-			Spec: hivev1.HiveConfigSpec{
-				OperatorSpec: operatorv1.OperatorSpec{
-					ObservedConfig:             runtime.RawExtension{Raw: []byte{}},
-					OperandSpecs:               []operatorv1.OperandSpec{},
-					UnsupportedConfigOverrides: runtime.RawExtension{Raw: []byte{}},
-				},
-			},
-			Status: hivev1.HiveConfigStatus{
-				OperatorStatus: operatorv1.OperatorStatus{
-					Generations: []operatorv1.GenerationStatus{},
-				},
 			},
 		}
 		err = tempClient.Create(context.TODO(), instance)

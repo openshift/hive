@@ -28,15 +28,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"strconv"
 )
 
 const (
-	defaultInstallerImage           = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+	// DefaultInstallerImage is the image that will be used to install a ClusterDeployment if no
+	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
+	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+
 	defaultInstallerImagePullPolicy = corev1.PullAlways
 	defaultHiveImagePullPolicy      = corev1.PullAlways
 
-	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
-	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
+	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
+	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -54,8 +59,8 @@ func GenerateInstallerJob(
 	})
 
 	cdLog.Debug("generating installer job")
-
 	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret, true)
+	annotations := map[string]string{clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10)}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,8 +79,9 @@ func GenerateInstallerJob(
 
 	cfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-installconfig", cd.Name),
-			Namespace: cd.Namespace,
+			Name:        fmt.Sprintf("%s-installconfig", cd.Name),
+			Namespace:   cd.Namespace,
+			Annotations: annotations,
 		},
 		Data: map[string]string{
 			// Filename should match installer default:
@@ -187,18 +193,14 @@ func GenerateInstallerJob(
 		},
 	}
 
-	installerImage := defaultInstallerImage
-	if cd.Spec.Images.InstallerImage != "" {
-		installerImage = cd.Spec.Images.InstallerImage
+	if cd.Status.InstallerImage == nil {
+		return nil, nil, fmt.Errorf("installer image not resolved")
 	}
+	installerImage := *cd.Status.InstallerImage
 
 	installerImagePullPolicy := defaultInstallerImagePullPolicy
 	if cd.Spec.Images.InstallerImagePullPolicy != "" {
 		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
-	}
-
-	if cd.Spec.Images.HiveImage != "" {
-		hiveImage = cd.Spec.Images.HiveImage
 	}
 
 	hiveImagePullPolicy := defaultHiveImagePullPolicy
@@ -263,8 +265,9 @@ func GenerateInstallerJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      GetInstallJobName(cd),
-			Namespace: cd.Namespace,
+			Name:        GetInstallJobName(cd),
+			Namespace:   cd.Namespace,
+			Annotations: annotations,
 		},
 		Spec: batchv1.JobSpec{
 			Completions:           &completions,
@@ -325,10 +328,6 @@ func GenerateUninstallerJob(
 				},
 			},
 		}...)
-	}
-
-	if cd.Spec.Images.HiveImage != "" {
-		hiveImage = cd.Spec.Images.HiveImage
 	}
 
 	hiveImagePullPolicy := defaultHiveImagePullPolicy

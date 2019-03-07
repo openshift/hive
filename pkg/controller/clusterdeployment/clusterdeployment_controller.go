@@ -19,8 +19,8 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -45,7 +45,9 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
 )
 
@@ -57,20 +59,17 @@ const (
 	roleBindingName    = "cluster-installer"
 
 	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
-	deleteAfterAnnotation = "hive.openshift.io/delete-after"
-
+	deleteAfterAnnotation       = "hive.openshift.io/delete-after"
 	adminCredsSecretPasswordKey = "password"
 	pullSecretKey               = ".dockercfg"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	adminKubeconfigKey          = "kubeconfig"
 	clusterVersionObjectName    = "version"
 	clusterVersionUnknown       = "undef"
-	defaultHiveImage            = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 
-	// HiveImageEnvVar is the optional environment variable that overrides the image to use
-	// for provisioning/deprovisioning. Typically this originates from the HiveConfig and is
-	// set as an EnvVar on the deployment.
-	HiveImageEnvVar = "HIVE_IMAGE"
+	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
+	clusterImageSetNotFoundReason         = "ClusterImageSetNotFound"
+	clusterImageSetFoundReason            = "ClusterImageSetFound"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -137,6 +136,8 @@ type ReconcileClusterDeployment struct {
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments;clusterdeployments/status;clusterdeployments/finalizers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets/status,verbs=get;update;patch
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
@@ -177,11 +178,16 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	hiveImage, err := r.getHiveImage(cd, cdLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			return reconcile.Result{}, nil
 		}
-		return r.syncDeletedClusterDeployment(cd, cdLog)
+		return r.syncDeletedClusterDeployment(cd, hiveImage, cdLog)
 	}
 
 	// requeueAfter will be used to determine if cluster should be requeued after
@@ -258,9 +264,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	hiveImage := r.getHiveImage(cdLog)
-	if err != nil {
-		return reconcile.Result{}, err
+	if cd.Status.InstallerImage == nil {
+		return reconcile.Result{}, r.resolveInstallerImage(cd, hiveImage, cdLog)
 	}
 
 	job, cfgMap, err := install.GenerateInstallerJob(
@@ -320,7 +325,17 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		cdLog.Errorf("error getting job: %v", err)
 		return reconcile.Result{}, err
 	} else {
-		cdLog.Infof("cluster job exists, successful: %v", cd.Status.Installed)
+		cdLog.Infof("cluster job exists, cluster deployment status: %v", cd.Status.Installed)
+		if !cd.Status.Installed {
+			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
+				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
+				if err != nil {
+					return reconcile.Result{}, err
+				} else if didGenerationChange {
+					return reconcile.Result{Requeue: true}, nil
+				}
+			}
+		}
 	}
 
 	err = r.updateClusterDeploymentStatus(cd, origCD, existingJob, cdLog)
@@ -338,17 +353,172 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	return reconcile.Result{}, nil
 }
 
-// getHiveImage will return the image set in the HIVE_IMAGE env var, if set. This is typically
-// done by the operator using the value from HiveConfig, passed through as an EnvVar on the
-// hive controllers deployment. If unset, we use the default. (latest master)
-func (r *ReconcileClusterDeployment) getHiveImage(cdLog log.FieldLogger) string {
-	hiveImage, ok := os.LookupEnv(HiveImageEnvVar)
-	if !ok {
-		cdLog.Debugf("using default hive image: %s", hiveImage)
-		return defaultHiveImage
+// getHiveImage looks for a Hive image to use in clusterdeployment jobs in the following order:
+// 1 - specified in the cluster deployment spec.images.hiveImage
+// 2 - referenced in the cluster deployment spec.imageSet
+// 3 - specified via environment variable to the hive controller
+// 4 - fallback default hardcoded image reference
+func (r *ReconcileClusterDeployment) getHiveImage(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (string, error) {
+	if cd.Spec.Images.HiveImage != "" {
+		return cd.Spec.Images.HiveImage, nil
 	}
-	cdLog.Debugf("using hive image from %s env var: %s", HiveImageEnvVar, hiveImage)
-	return hiveImage
+	if cd.Spec.ImageSet != nil {
+		imageSet := &hivev1.ClusterImageSet{}
+		err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
+		if err == nil && imageSet.Spec.HiveImage != nil {
+			return *imageSet.Spec.HiveImage, nil
+		}
+		if err != nil && !errors.IsNotFound(err) {
+			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
+			return "", err
+		}
+	}
+	return images.GetHiveImage(cdLog), nil
+}
+
+func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	err := r.Status().Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot update clusterdeployment status")
+	}
+	return err
+}
+
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) error {
+	if len(cd.Spec.Images.InstallerImage) > 0 {
+		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
+			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
+		cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
+		return r.statusUpdate(cd, cdLog)
+	}
+	if cd.Spec.ImageSet == nil {
+		// In the future, not having an ImageSet or an override installer image set should not
+		// be allowed. For now, we'll set a default one.
+		cdLog.Warn("no imageset reference or override installer image found on cluster deployment. Using default")
+		cd.Status.InstallerImage = strPtr(install.DefaultInstallerImage)
+		return r.statusUpdate(cd, cdLog)
+	}
+	imageSet := &hivev1.ClusterImageSet{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
+	if errors.IsNotFound(err) {
+		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Debug("clusterimageset not found, setting a condition to indicate the error")
+		_, err := r.setImageSetNotFoundCondition(cd, true, cdLog)
+		return err
+	}
+	if err != nil {
+		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("cannot get clusterimageset")
+		return err
+	}
+	modified, err := r.setImageSetNotFoundCondition(cd, false, cdLog)
+	if modified {
+		return err
+	}
+	if imageSet.Spec.InstallerImage != nil {
+		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
+		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
+		return r.statusUpdate(cd, cdLog)
+	}
+	if imageSet.Spec.ReleaseImage == nil {
+		// This is not expected to happen, but will be logged just in case.
+		cdLog.WithField("imageset", imageSet.Name).Error("invalid ClusterImageSet: no releaseImage specified")
+		// No need to requeue right away
+		return nil
+	}
+	cliImage := images.GetCLIImage(cdLog)
+	job := imageset.GenerateImageSetJob(cd, imageSet, serviceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
+	if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+		cdLog.WithError(err).Error("error setting controller reference on job")
+		return err
+	}
+
+	jobName := types.NamespacedName{Name: job.Name, Namespace: job.Namespace}
+	jobLog := cdLog.WithField("job", jobName)
+
+	existingJob := &batchv1.Job{}
+	err = r.Get(context.TODO(), jobName, existingJob)
+	switch {
+	// If job exists and is finished, delete so we can recreate it
+	case err == nil && controllerutils.IsFinished(existingJob):
+		jobLog.WithField("successful", controllerutils.IsSuccessful(existingJob)).
+			Warning("Finished job found, but installer image is not yet resolved. Deleting.")
+		err := r.Delete(context.Background(), existingJob,
+			client.PropagationPolicy(metav1.DeletePropagationForeground))
+		if err != nil {
+			jobLog.WithError(err).Error("cannot delete job")
+		}
+		return err
+	case errors.IsNotFound(err):
+		jobLog.Info("creating imageset job")
+		err = r.Create(context.TODO(), job)
+		if err != nil {
+			jobLog.WithError(err).Error("error creating job")
+		}
+		return err
+	case err != nil:
+		jobLog.WithError(err).Error("cannot get job")
+		return err
+	default:
+		jobLog.Debug("job exists and is in progress")
+	}
+	return nil
+}
+
+func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) (modified bool, err error) {
+	original := cd.DeepCopy()
+	status := corev1.ConditionFalse
+	reason := clusterImageSetFoundReason
+	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.ImageSet.Name)
+	if isNotFound {
+		status = corev1.ConditionTrue
+		reason = clusterImageSetNotFoundReason
+		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.ImageSet.Name)
+	}
+	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+		cd.Status.Conditions,
+		hivev1.ClusterImageSetNotFoundCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionNever)
+	if !reflect.DeepEqual(original.Status.Conditions, cd.Status.Conditions) {
+		cdLog.Debug("setting ClusterImageSetNotFoundCondition to %v", status)
+		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Error("cannot update status conditions")
+		}
+		return true, err
+	}
+	return false, nil
+}
+
+// Deletes the job if it exists and its generation does not match the cluster deployment's
+// genetation. Updates the config map if it is outdated too
+func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration int64, existingJob *batchv1.Job, cfgMap *corev1.ConfigMap, cdLog log.FieldLogger) (bool, error) {
+	var err error
+	var didGenerationChange bool
+	if jobGeneration, ok := existingJob.Annotations[clusterDeploymentGenerationAnnotation]; ok {
+		convertedJobGeneration, _ := strconv.ParseInt(jobGeneration, 10, 64)
+		if convertedJobGeneration < cdGeneration {
+			didGenerationChange = true
+			err = r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+			if err != nil {
+				cdLog.WithError(err).Errorf("error deleting outdated install job")
+				return didGenerationChange, err
+			}
+		}
+	}
+	if cfgMapGeneration, ok := cfgMap.Annotations[clusterDeploymentGenerationAnnotation]; ok {
+		convertedMapGeneration, _ := strconv.ParseInt(cfgMapGeneration, 10, 64)
+		if convertedMapGeneration < cdGeneration {
+			didGenerationChange = true
+			err = r.Update(context.TODO(), cfgMap)
+			if err != nil {
+				cdLog.WithError(err).Errorf("error deleting outdated config map")
+				return didGenerationChange, err
+			}
+		}
+	}
+	return didGenerationChange, err
 }
 
 func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataKey string) (string, error) {
@@ -368,7 +538,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	cdLog.Debug("updating cluster deployment status")
 	if job != nil && job.Name != "" && job.Namespace != "" {
 		// Job exists, check it's status:
-		cd.Status.Installed = isSuccessful(job)
+		cd.Status.Installed = controllerutils.IsSuccessful(job)
 	}
 
 	// The install manager sets this secret name, but we don't consider it a critical failure and
@@ -446,7 +616,7 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 	return nil
 }
 
-func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
 
 	// Delete the install job in case it's still running:
 	installJob := &batchv1.Job{}
@@ -484,8 +654,6 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, nil
 	}
 
-	hiveImage := r.getHiveImage(cdLog)
-
 	if cd.Status.InfraID == "" {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
@@ -522,7 +690,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		}
 
 		// Uninstall job exists, check it's status and if successful, remove the finalizer:
-		if isSuccessful(existingJob) {
+		if controllerutils.IsSuccessful(existingJob) {
 			cdLog.Infof("uninstall job successful, removing finalizer")
 			err = r.removeClusterDeploymentFinalizer(cd)
 			if err != nil {
@@ -648,21 +816,6 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 	return currentSA, nil
 }
 
-// getJobConditionStatus gets the status of the condition in the job. If the
-// condition is not found in the job, then returns False.
-func getJobConditionStatus(job *batchv1.Job, conditionType batchv1.JobConditionType) kapi.ConditionStatus {
-	for _, condition := range job.Status.Conditions {
-		if condition.Type == conditionType {
-			return condition.Status
-		}
-	}
-	return kapi.ConditionFalse
-}
-
-func isSuccessful(job *batchv1.Job) bool {
-	return getJobConditionStatus(job, batchv1.JobComplete) == kapi.ConditionTrue
-}
-
-func isFailed(job *batchv1.Job) bool {
-	return getJobConditionStatus(job, batchv1.JobFailed) == kapi.ConditionTrue
+func strPtr(s string) *string {
+	return &s
 }

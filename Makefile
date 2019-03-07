@@ -163,7 +163,7 @@ generate:
 
 # Build the docker image
 .PHONY: docker-build
-docker-build: generate
+docker-build:
 	$(BUILD_CMD) -t ${IMG} .
 
 # Push the docker image

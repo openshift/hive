@@ -32,6 +32,7 @@ var installPermissions = []string{
 	"ec2:CreateVpc",
 	"ec2:CreateVpcEndpoint",
 	"ec2:CreateVolume",
+	"ec2:DeleteSnapshot",
 	"ec2:DeregisterImage",
 	"ec2:DescribeAccountAttributes",
 	"ec2:DescribeAddresses",
@@ -211,6 +212,9 @@ func ValidateCreds(ssn *session.Session) error {
 	if err != nil {
 		return errors.Wrap(err, "mint credentials check")
 	}
+	if canMint {
+		return nil
+	}
 
 	// Check whether we can use the current credentials in passthrough mode to satisfy
 	// cluster services needing to interact with the cloud
@@ -218,10 +222,9 @@ func ValidateCreds(ssn *session.Session) error {
 	if err != nil {
 		return errors.Wrap(err, "passthrough credentials check")
 	}
-
-	if !canMint && !canPassthrough {
-		return errors.New("AWS credentials cannot be used to either create new creds or use as-is")
+	if canPassthrough {
+		return nil
 	}
 
-	return nil
+	return errors.New("AWS credentials cannot be used to either create new creds or use as-is")
 }

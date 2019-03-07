@@ -35,16 +35,16 @@ parameters:
   description: Hive image pull policy
   value: Always
 - name: INSTALLER_IMAGE
-  displayName: OpenShift Installer image URL
-  description: OpenShift Installer image URL
-  value: "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
+  displayName: OpenShift Installer image
+  description: OpenShift Installer image. Leave empty to use the default installer image from the release image.
+  value: ""
 - name: INSTALLER_IMAGE_PULL_POLICY
   displayName: OpenShift Installer image pull policy
   description: OpenShift Installer image pull policy
   value: Always
 - name: RELEASE_IMAGE
   displayName: OpenShift Release Image
-  description: The release image for the version of OpenShift you wish to install. Leave empty to allow installer to choose.
+  description: The release image for the version of OpenShift you wish to install. Leave empty to use latest release image.
   value: ""
 - name: TRY_INSTALL_ONCE
   displayName: Try Install Only Once
@@ -54,6 +54,14 @@ parameters:
   displayName: Try Uninstall Only Once
   description: If set, uninstall will only be tried once.
   value: "false"
+- name: CUSTOM_RELEASE_IMAGE
+  displayName: Custom release image in custom ClusterImageSet
+  description: Name of custom release image in custom ClusterImageSet. Defaults to latest in CI.
+  value: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
+- name: CLUSTER_IMAGE_SET
+  displayName: ClusterImageSet to use for the cluster deployment
+  description: Specify an alternate ClusterImageSet to reference from the cluster deployment. Default is origin-latest.
+  value: origin-latest
 
 objects:
 - apiVersion: v1
@@ -82,6 +90,24 @@ objects:
     ssh-publickey: "${SSH_KEY}"
 
 - apiVersion: hive.openshift.io/v1alpha1
+  kind: ClusterImageSet
+  metadata:
+    labels:
+      controller-tools.k8s.io: "1.0"
+    name: origin-latest
+  spec:
+    releaseImage: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
+
+- apiVersion: hive.openshift.io/v1alpha1
+  kind: ClusterImageSet
+  metadata:
+    labels:
+      controller-tools.k8s.io: "1.0"
+    name: custom
+  spec:
+    releaseImage: "${CUSTOM_RELEASE_IMAGE}"
+
+- apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment
   metadata:
     labels:
@@ -102,6 +128,8 @@ objects:
       installerImage: "${INSTALLER_IMAGE}"
       installerImagePullPolicy: "${INSTALLER_IMAGE_PULL_POLICY}"
       releaseImage: "${RELEASE_IMAGE}"
+    imageSet:
+      name: "${CLUSTER_IMAGE_SET}"
     sshKey:
       name: "${CLUSTER_NAME}-ssh-key"
     clusterName: ${CLUSTER_NAME}

@@ -74,6 +74,10 @@ type ClusterDeploymentSpec struct {
 	// Images allows overriding the default images used to provision and manage the cluster.
 	Images ProvisionImages `json:"images,omitempty"`
 
+	// ImageSet is a reference to a ClusterImageSet. If values are specified for Images,
+	// those will take precedence over the ones from the ClusterImageSet.
+	ImageSet *ClusterImageSetReference `json:"imageSet,omitempty"`
+
 	// PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it
 	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
 }
@@ -92,6 +96,12 @@ type ProvisionImages struct {
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
 	ReleaseImage string `json:"releaseImage,omitempty"`
+}
+
+// ClusterImageSetReference is a reference to a ClusterImageSet
+type ClusterImageSetReference struct {
+	// Name is the name of the ClusterImageSet that this refers to
+	Name string `json:"name"`
 }
 
 // PlatformSecrets defines the secrets to be used by various clouds.
@@ -144,7 +154,56 @@ type ClusterDeploymentStatus struct {
 
 	// WebConsoleURL is the URL for the cluster's web console UI.
 	WebConsoleURL string `json:"webConsoleURL,omitempty"`
+
+	// SyncResources is the list of SyncStatus for objects that have been synced.
+	// +optional
+	SyncResources []SyncStatus `json:"syncResources,omitempty"`
+
+	// SyncPatches is the list of SyncStatus for patches that have been applied.
+	// +optional
+	SyncPatches []SyncStatus `json:"syncPatches,omitempty"`
+
+	// InstallerImage is the name of the installer image to use when installing the target cluster
+	// +optional
+	InstallerImage *string `json:"installerImage,omitempty"`
+
+	// Conditions includes more detailed status for the cluster deployment
+	// +optional
+	Conditions []ClusterDeploymentCondition `json:"conditions,omitempty"`
 }
+
+// ClusterDeploymentCondition contains details for the current condition of a cluster deployment
+type ClusterDeploymentCondition struct {
+	// Type is the type of the condition.
+	Type ClusterDeploymentConditionType `json:"type"`
+	// Status is the status of the condition.
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// ClusterDeploymentConditionType is a valid value for ClusterDeploymentCondition.Type
+type ClusterDeploymentConditionType string
+
+const (
+	// ClusterImageSetNotFoundCondition is set when the ClusterImageSet referenced by the
+	// ClusterDeployment is not found.
+	ClusterImageSetNotFoundCondition ClusterDeploymentConditionType = "ClusterImageSetNotFound"
+
+	// InstallerImageResolutionFailedCondition is a condition that indicates whether the job
+	// to determine the installer image based on a release image was successful.
+	InstallerImageResolutionFailedCondition ClusterDeploymentConditionType = "InstallerImageResolutionFailed"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

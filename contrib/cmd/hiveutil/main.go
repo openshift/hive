@@ -25,6 +25,7 @@ import (
 
 	"github.com/openshift/hive/contrib/pkg/installmanager"
 	"github.com/openshift/hive/contrib/pkg/verification"
+	"github.com/openshift/hive/pkg/imageset"
 )
 
 func main() {
@@ -52,6 +53,7 @@ func newCOUtilityCommand() *cobra.Command {
 	cmd.AddCommand(NewDeprovisionAWSWithTagsCommand())
 	cmd.AddCommand(verification.NewVerifyImportsCommand())
 	cmd.AddCommand(installmanager.NewInstallManagerCommand())
+	cmd.AddCommand(imageset.NewUpdateInstallerImageCommand())
 
 	return cmd
 }

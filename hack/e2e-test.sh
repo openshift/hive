@@ -5,9 +5,8 @@ set -e
 max_tries=60
 sleep_between_tries=10
 component=hive
-TEST_IMAGE=$(eval "echo $IMAGE_FORMAT")
-component=installer
-INSTALLER_IMAGE=$(eval "echo $IMAGE_FORMAT")
+HIVE_IMAGE=$(eval "echo $IMAGE_FORMAT")
+RELEASE_IMAGE="registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest"
 
 ln -s $(which oc) $(pwd)/kubectl
 export PATH=$PATH:$(pwd)
@@ -45,7 +44,7 @@ fi
 
 
 # Install Hive
-make deploy DEPLOY_IMAGE="${TEST_IMAGE}"
+make deploy DEPLOY_IMAGE="${HIVE_IMAGE}"
 
 CLOUD_CREDS_DIR="/tmp/cluster"
 CLUSTER_DEPLOYMENT_FILE="/tmp/cluster-deployment.json"
@@ -106,9 +105,9 @@ while [ $i -le ${max_tries} ]; do
          AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
          AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
          BASE_DOMAIN="${BASE_DOMAIN}" \
-         HIVE_IMAGE="${TEST_IMAGE}" \
-         INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-         RELEASE_IMAGE="" \
+         HIVE_IMAGE="${HIVE_IMAGE}" \
+         CUSTOM_RELEASE_IMAGE="${RELEASE_IMAGE}" \
+         CLUSTER_IMAGE_SET="custom" \
          TRY_INSTALL_ONCE="true" \
          TRY_UNINSTALL_ONCE="true" \
       > ${CLUSTER_DEPLOYMENT_FILE} ; then

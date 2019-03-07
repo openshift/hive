@@ -41,6 +41,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -52,6 +53,7 @@ const (
 	testInfraID           = "testFooInfraID"
 	installJobName        = "foo-lqmsh-install"
 	uninstallJobName      = "foo-lqmsh-uninstall"
+	imageSetJobName       = "foo-lqmsh-imageset"
 	testNamespace         = "default"
 	metadataName          = "foo-lqmsh-metadata"
 	adminPasswordSecret   = "admin-password"
@@ -71,6 +73,7 @@ const (
 
 	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"
+	testClusterImageSetName           = "test-image-set"
 )
 
 func init() {
@@ -105,6 +108,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	}
 	getUninstallJob := func(c client.Client) *batchv1.Job {
 		return getJob(c, uninstallJobName)
+	}
+	getImageSetJob := func(c client.Client) *batchv1.Job {
+		return getJob(c, imageSetJobName)
 	}
 
 	tests := []struct {
@@ -326,6 +332,157 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Nil(t, uninstallJob)
 			},
 		},
+		{
+			name: "Test deletion of expired jobs",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = false
+					return cd
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job, _, _ := install.GenerateInstallerJob(
+						testClusterDeployment(),
+						"fakeserviceaccount",
+						"fakeserviceaccount",
+						"sshkey",
+						"pullsecret")
+					wrongGeneration := "-1"
+					job.Annotations[clusterDeploymentGenerationAnnotation] = wrongGeneration
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				job := getInstallJob(c)
+				assert.Nil(t, job)
+			},
+		},
+		{
+			name: "Resolve installer image from spec.images.installerimage",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Images.InstallerImage = "test-installer-image:latest"
+					return cd
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if cd.Status.InstallerImage == nil || *cd.Status.InstallerImage != "test-installer-image:latest" {
+					t.Errorf("unexpected status.installerImage")
+				}
+			},
+		},
+		{
+			name: "Resolve installer image from imageSet.spec.installerimage",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Images.InstallerImage = ""
+					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				func() *hivev1.ClusterImageSet {
+					cis := testClusterImageSet()
+					cis.Spec.InstallerImage = strPtr("test-cis-installer-image:latest")
+					return cis
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if cd.Status.InstallerImage == nil || *cd.Status.InstallerImage != "test-cis-installer-image:latest" {
+					t.Errorf("unexpected status.installerImage")
+				}
+			},
+		},
+		{
+			name: "Create job to resolve installer image",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Images.InstallerImage = ""
+					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				job := getImageSetJob(c)
+				if job == nil {
+					t.Errorf("did not find expected imageset job")
+				}
+			},
+		},
+		{
+			name: "Delete cluster deployment with image from clusterimageset",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					cd.Spec.Images.HiveImage = ""
+					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				func() *hivev1.ClusterImageSet {
+					cis := testClusterImageSet()
+					testHiveImage := "hive-image-from-image-set:latest"
+					cis.Spec.HiveImage = &testHiveImage
+					return cis
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				uninstallJob := getUninstallJob(c)
+				if uninstallJob == nil {
+					t.Errorf("did not find expected uninstall job")
+				}
+				// expect to get default hive image when missing clusterimageset
+				if jobImage := uninstallJob.Spec.Template.Spec.Containers[0].Image; jobImage != "hive-image-from-image-set:latest" {
+					t.Errorf("unexpected hive image in uninstall job: %s", jobImage)
+				}
+			},
+		},
+		{
+			name: "Delete cluster deployment with missing clusterimageset",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					cd.Spec.Images.HiveImage = ""
+					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				uninstallJob := getUninstallJob(c)
+				if uninstallJob == nil {
+					t.Errorf("did not find expected uninstall job")
+				}
+				// expect to get default hive image when missing clusterimageset
+				if jobImage := uninstallJob.Spec.Template.Spec.Containers[0].Image; jobImage != images.DefaultHiveImage {
+					t.Errorf("unexpected hive image in uninstall job: %s", jobImage)
+				}
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -399,8 +556,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 		Status: hivev1.ClusterDeploymentStatus{
-			ClusterID: testClusterID,
-			InfraID:   testInfraID,
+			ClusterID:      testClusterID,
+			InfraID:        testInfraID,
+			InstallerImage: strPtr("installer-image:latest"),
 		},
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
@@ -523,4 +681,11 @@ func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
 		VersionHash: "TESTVERSIONHASH",
 	}
 	return status
+}
+
+func testClusterImageSet() *hivev1.ClusterImageSet {
+	cis := &hivev1.ClusterImageSet{}
+	cis.Name = testClusterImageSetName
+	cis.Spec.ReleaseImage = strPtr("test-release-image:latest")
+	return cis
 }

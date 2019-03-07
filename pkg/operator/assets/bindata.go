@@ -2,6 +2,7 @@
 // sources:
 // config/hiveadmission/apiservice.yaml
 // config/hiveadmission/clusterdeployment-webhook.yaml
+// config/hiveadmission/clusterimageset-webhook.yaml
 // config/hiveadmission/daemonset.yaml
 // config/hiveadmission/dnszones-webhook.yaml
 // config/hiveadmission/service-account.yaml
@@ -137,6 +138,47 @@ func configHiveadmissionClusterdeploymentWebhookYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/hiveadmission/clusterdeployment-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: clusterdeployments.admission.hive.openshift.io
+webhooks:
+- name: clusterdeployments.admission.hive.openshift.io
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/clusterimagesets
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - clusterimagesets
+  failurePolicy: Fail
+`)
+
+func configHiveadmissionClusterimagesetWebhookYamlBytes() ([]byte, error) {
+	return _configHiveadmissionClusterimagesetWebhookYaml, nil
+}
+
+func configHiveadmissionClusterimagesetWebhookYaml() (*asset, error) {
+	bytes, err := configHiveadmissionClusterimagesetWebhookYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/hiveadmission/clusterimageset-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3253,6 +3295,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/apiservice.yaml":                        configHiveadmissionApiserviceYaml,
 	"config/hiveadmission/clusterdeployment-webhook.yaml":         configHiveadmissionClusterdeploymentWebhookYaml,
+	"config/hiveadmission/clusterimageset-webhook.yaml":           configHiveadmissionClusterimagesetWebhookYaml,
 	"config/hiveadmission/daemonset.yaml":                         configHiveadmissionDaemonsetYaml,
 	"config/hiveadmission/dnszones-webhook.yaml":                  configHiveadmissionDnszonesWebhookYaml,
 	"config/hiveadmission/service-account.yaml":                   configHiveadmissionServiceAccountYaml,
@@ -3323,6 +3366,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"hiveadmission": {nil, map[string]*bintree{
 			"apiservice.yaml":                {configHiveadmissionApiserviceYaml, map[string]*bintree{}},
 			"clusterdeployment-webhook.yaml": {configHiveadmissionClusterdeploymentWebhookYaml, map[string]*bintree{}},
+			"clusterimageset-webhook.yaml":   {configHiveadmissionClusterimagesetWebhookYaml, map[string]*bintree{}},
 			"daemonset.yaml":                 {configHiveadmissionDaemonsetYaml, map[string]*bintree{}},
 			"dnszones-webhook.yaml":          {configHiveadmissionDnszonesWebhookYaml, map[string]*bintree{}},
 			"service-account.yaml":           {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},

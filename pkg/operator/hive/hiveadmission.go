@@ -61,6 +61,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 	haLog.Debug("reading ClusterDeployment webhook")
 	cdWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
 
+	asset = assets.MustAsset("config/hiveadmission/clusterimageset-webhook.yaml")
+	haLog.Debug("reading ClusterImageSet webhook")
+	cisWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, r.scheme)
+
 	// Set owner refs on all objects in the deployment so deleting the operator CRD
 	// will clean everything up:
 	if err := controllerutil.SetControllerReference(instance, hiveAdmService, r.scheme); err != nil {
@@ -147,6 +151,13 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instanc
 		return err
 	}
 	haLog.WithField("changed", changed).Info("ClusterDeployment webhook updated")
+
+	_, changed, err = util.ApplyValidatingWebhookConfiguration(r.kubeClient.AdmissionregistrationV1beta1(), cisWebhook)
+	if err != nil {
+		haLog.WithError(err).Error("error applying ClusterImageSet webhook")
+		return err
+	}
+	haLog.WithField("changed", changed).Info("ClusterImageSet webhook updated")
 
 	haLog.Info("HiveAdmissionConfig components reconciled")
 

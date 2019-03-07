@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/installmanager"
+	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
 	"github.com/openshift/hive/pkg/imageset"
 )
@@ -54,6 +55,7 @@ func newCOUtilityCommand() *cobra.Command {
 	cmd.AddCommand(verification.NewVerifyImportsCommand())
 	cmd.AddCommand(installmanager.NewInstallManagerCommand())
 	cmd.AddCommand(imageset.NewUpdateInstallerImageCommand())
+	cmd.AddCommand(testresource.NewTestResourceCommand())
 
 	return cmd
 }

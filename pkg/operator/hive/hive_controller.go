@@ -33,6 +33,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -122,7 +123,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Regular manager client is not fully initialized here, create out own for some
+	// Regular manager client is not fully initialized here, create our own for some
 	// initialization API communication:
 	tempClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
 	if err != nil {
@@ -136,7 +137,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = tempClient.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName}, instance)
 	if err != nil && errors.IsNotFound(err) {
 		log.Info("no HiveConfig exists, creating default")
+		instance = &hivev1.HiveConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: hiveConfigName,
+			},
+		}
 		err = tempClient.Create(context.TODO(), instance)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Lookup the hive-operator Deployment image, we will assume hive components should all be

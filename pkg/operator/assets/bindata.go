@@ -1462,6 +1462,7 @@ spec:
         metadata:
           type: object
         spec:
+<<<<<<< HEAD
           properties:
             logLevel:
               description: logLevel is an intent based logging for an overall component.  It
@@ -1541,82 +1542,10 @@ spec:
           - operandSpecs
           - unsupportedConfigOverrides
           - observedConfig
+=======
+>>>>>>> up/master
           type: object
         status:
-          properties:
-            conditions:
-              description: conditions is a list of conditions and their status
-              items:
-                properties:
-                  lastTransitionTime:
-                    format: date-time
-                    type: string
-                  message:
-                    type: string
-                  reason:
-                    type: string
-                  status:
-                    type: string
-                  type:
-                    type: string
-                required:
-                - type
-                - status
-                type: object
-              type: array
-            generations:
-              description: generations are used to determine when an item needs to
-                be reconciled or has changed in a way that needs a reaction.
-              items:
-                properties:
-                  group:
-                    description: group is the group of the thing you're tracking
-                    type: string
-                  hash:
-                    description: hash is an optional field set for resources without
-                      generation that are content sensitive like secrets and configmaps
-                    type: string
-                  lastGeneration:
-                    description: lastGeneration is the last generation of the workload
-                      controller involved
-                    format: int64
-                    type: integer
-                  name:
-                    description: name is the name of the thing you're tracking
-                    type: string
-                  namespace:
-                    description: namespace is where the thing you're tracking is
-                    type: string
-                  resource:
-                    description: resource is the resource type of the thing you're
-                      tracking
-                    type: string
-                required:
-                - group
-                - resource
-                - namespace
-                - name
-                - lastGeneration
-                - hash
-                type: object
-              type: array
-            observedGeneration:
-              description: observedGeneration is the last generation change you've
-                dealt with
-              format: int64
-              type: integer
-            readyReplicas:
-              description: readyReplicas indicates how many replicas are ready and
-                at the desired state
-              format: int32
-              type: integer
-            version:
-              description: version is the level this availability applies to
-              type: string
-          required:
-          - version
-          - readyReplicas
-          - generations
           type: object
   version: v1alpha1
 status:

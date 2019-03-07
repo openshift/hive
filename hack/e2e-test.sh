@@ -186,9 +186,9 @@ SRC_ROOT=$(git rev-parse --show-toplevel)
 
 sleep 120
 
-oc get deployments -n openshift-hive
-oc get pods -n openshift-hive
-oc get events -n openshift-hive
+oc get deployments -n hive
+oc get pods -n hive
+oc get events -n hive
 
 echo "Waiting for job ${CLUSTER_NAME}-install to start and complete"
 

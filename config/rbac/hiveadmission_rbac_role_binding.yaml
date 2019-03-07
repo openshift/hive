@@ -5,14 +5,14 @@ items:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:
-    name: auth-delegator-openshift-hiveadmission
+    name: auth-delegator-hiveadmission
   roleRef:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:auth-delegator
   subjects:
   - kind: ServiceAccount
-    namespace: openshift-hive
+    namespace: hive
     name: hiveadmission
 
 
@@ -20,14 +20,14 @@ items:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:
-    name: hiveadmission-openshift-hive-hiveadmission
+    name: hiveadmission-hive-hiveadmission
   roleRef:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:openshift:hive:hiveadmission
   subjects:
   - kind: ServiceAccount
-    namespace: openshift-hive
+    namespace: hive
     name: hiveadmission
 
 # to read the config for terminating authentication
@@ -35,12 +35,12 @@ items:
   kind: RoleBinding
   metadata:
     namespace: kube-system
-    name: extension-server-authentication-reader-openshift-hiveadmission
+    name: extension-server-authentication-reader-hiveadmission
   roleRef:
     kind: Role
     apiGroup: rbac.authorization.k8s.io
     name: extension-apiserver-authentication-reader
   subjects:
   - kind: ServiceAccount
-    namespace: openshift-hive
+    namespace: hive
     name: hiveadmission

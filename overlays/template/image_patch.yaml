@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hive-operator
-  namespace: openshift-hive
+  namespace: hive
 spec:
   template:
     spec:

@@ -82,7 +82,7 @@ spec:
   versionPriority: 15
   service:
     name: hiveadmission
-    namespace: openshift-hive
+    namespace: hive
   version: v1alpha1
 `)
 
@@ -188,7 +188,7 @@ var _configHiveadmissionDaemonsetYaml = []byte(`---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  namespace: openshift-hive
+  namespace: hive
   name: hiveadmission
   labels:
     app: hiveadmission
@@ -306,7 +306,7 @@ var _configHiveadmissionServiceAccountYaml = []byte(`---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: openshift-hive
+  namespace: hive
   name: hiveadmission
 `)
 
@@ -329,7 +329,7 @@ var _configHiveadmissionServiceYaml = []byte(`---
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: openshift-hive
+  namespace: hive
   name: hiveadmission
   annotations:
     service.alpha.openshift.io/serving-cert-secret-name: hiveadmission-serving-cert
@@ -3031,7 +3031,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hive-controllers
-  namespace: openshift-hive
+  namespace: hive
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"

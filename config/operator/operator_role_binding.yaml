@@ -10,4 +10,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: hive-operator
-  namespace: openshift-hive
+  namespace: hive

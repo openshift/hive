@@ -18,7 +18,7 @@ To deploy the operator from a git checkout:
 
 By default the operator will use the latest images published by CI from the master branch.
 
-You should now see hive-operator, hive-controllers, and hiveadmission pods running in the openshift-hive namespace.
+You should now see hive-operator, hive-controllers, and hiveadmission pods running in the hive namespace.
 
 ### Deploy Hive Operator Using Custom Images
 
@@ -29,14 +29,14 @@ You should now see hive-operator, hive-controllers, and hiveadmission pods runni
 
 NOTE: assumes you have previously deployed using one of the above methods.
 
- 1. `$ kubectl scale -n openshift-hive deployment.v1.apps/hive-operator --replicas=0`
+ 1. `$ kubectl scale -n hive deployment.v1.apps/hive-operator --replicas=0`
  1. `$ make run-operator`
 
 ### Run Hive From Source
 
 NOTE: assumes you have previously deployed using one of the above methods.
 
- 1. `$ kubectl scale -n openshift-hive deployment.v1.apps/hive-controllers --replicas=0`
+ 1. `$ kubectl scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
  1. `$ make run`
 
 ## Using Hive

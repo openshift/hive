@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hive-controllers
-  namespace: openshift-hive
+  namespace: hive
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"

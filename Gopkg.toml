@@ -48,6 +48,18 @@ required = [
   version="kubernetes-1.12.3"
 
 [[override]]
+  name="github.com/russross/blackfriday"
+  version="=v1.4"
+
+[[override]]
+  name="k8s.io/kubernetes"
+  version="=v1.12.3"
+
+[[override]]
+  name="k8s.io/metrics"
+  version="kubernetes-1.12.3"
+
+[[override]]
   name="k8s.io/apimachinery"
   version="kubernetes-1.12.3"
 

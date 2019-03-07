@@ -72,6 +72,7 @@ run-operator: generate fmt vet
 .PHONY: install
 install: crd rbac
 	kubectl apply -f config/crds
+	kubectl apply -f config/rbac
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy

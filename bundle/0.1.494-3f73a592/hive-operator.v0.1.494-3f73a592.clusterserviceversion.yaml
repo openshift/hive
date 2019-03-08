@@ -1,0 +1,343 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    categories: A list of comma separated categories that your operator falls under.
+    certified: 'false'
+    containerImage: quay.io/dgoodwin/hive:latest
+    createdAt: '2019-03-08T15:51:08Z'
+    description: OpenShift cluster provisioning and management at scale.
+    support: Devan Goodwin
+  name: hive-operator.v0.1.494-3f73a592
+  namespace: placeholder
+spec:
+  customresourcedefinitions:
+    owned:
+    - description: Configuration for the Hive Operator
+      displayName: Hive Config
+      kind: HiveConfig
+      name: hiveconfigs.hive.openshift.io
+      version: v1alpha1
+    - description: Defines an OpenShift cluster to be created.
+      displayName: Cluster Deployment
+      kind: ClusterDeployment
+      name: clusterdeployments.hive.openshift.io
+      version: v1alpha1
+    - description: Defines a DNSZone to be managed in a cloud provider.
+      displayName: DNS Zone
+      kind: DNSZone
+      name: dnszones.hive.openshift.io
+      version: v1alpha1
+  description: OpenShift cluster provisioning and management at scale.
+  displayName: Hive
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ''
+          resources:
+          - serviceaccounts
+          - serviceaccounts/finalizers
+          - secrets
+          - secrets/finalizers
+          - services
+          - services/finalizers
+          - events
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apiregistration.k8s.io
+          resources:
+          - apiservices
+          - apiservices/finalizers
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingwebhookconfigurations
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - deployments/finalizers
+          - daemonsets
+          - daemonsets/finalizers
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apps.openshift.io
+          resources:
+          - deploymentconfigs
+          - deploymentconfigs/finalizers
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - hive.openshift.io
+          resources:
+          - hiveconfigs
+          - hiveconfigs/finalizers
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        serviceAccountName: hive-operator
+      - rules:
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ''
+          resources:
+          - serviceaccounts
+          - secrets
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - hive.openshift.io
+          resources:
+          - clusterdeployments
+          - clusterdeployments/status
+          - clusterdeployments/finalizers
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - hive.openshift.io
+          resources:
+          - clusterimagesets
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - hive.openshift.io
+          resources:
+          - clusterimagesets/status
+          verbs:
+          - get
+          - update
+          - patch
+        - apiGroups:
+          - hive.openshift.io
+          resources:
+          - dnszones
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - clusterregistry.k8s.io
+          resources:
+          - clusters
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - core.federation.k8s.io
+          resources:
+          - federatedclusters
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        serviceAccountName: default
+      - rules:
+        - apiGroups:
+          - admission.hive.openshift.io
+          resources:
+          - dnszones
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ''
+          resources:
+          - configmaps
+          verbs:
+          - get
+        - apiGroups:
+          - admissionregistration.k8s.io
+          resources:
+          - validatingwebhookconfigurations
+          - mutatingwebhookconfigurations
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ''
+          resources:
+          - namespaces
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: hiveadmission
+      deployments:
+      - name: hive-operator
+        spec:
+          replicas: 1
+          revisionHistoryLimit: 4
+          selector:
+            matchLabels:
+              control-plane: hive-operator
+              controller-tools.k8s.io: '1.0'
+          template:
+            metadata:
+              labels:
+                control-plane: hive-operator
+                controller-tools.k8s.io: '1.0'
+            spec:
+              containers:
+              - command:
+                - /opt/services/hive-operator
+                - --log-level
+                - debug
+                image: quay.io/dgoodwin/hive:latest
+                imagePullPolicy: Always
+                name: hive-operator
+                resources:
+                  limits:
+                    cpu: 100m
+                    memory: 256Mi
+                  requests:
+                    cpu: 100m
+                    memory: 75Mi
+              serviceAccountName: hive-operator
+              terminationGracePeriodSeconds: 10
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: false
+    type: AllNamespaces
+  keywords:
+  - kubernetes
+  - openshift
+  - multi-cluster
+  - cluster
+  maturity: alpha
+  provider:
+    name: Red Hat, Inc
+  replaces: hive-operator.v0.1.5-4b53b492
+  version: 0.1.494-3f73a592

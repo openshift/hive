@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: hive-catalog
+  namespace: hive
+spec:
+  sourceType: grpc
+  image: quay.io/dgoodwin/hive-registry:latest
+  displayName: Hive Test Registry
+  publisher: Devan Goodwin

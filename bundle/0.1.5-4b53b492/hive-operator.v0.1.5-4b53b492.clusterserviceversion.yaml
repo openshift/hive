@@ -1,0 +1,7 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  name: hive-operator.v0.1.5-4b53b492
+  namespace: placeholder
+spec:
+version: 0.1.5-4b53b492

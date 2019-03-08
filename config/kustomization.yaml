@@ -17,8 +17,24 @@ namespace: hive
 # files that kustomize reads, modifies and emits as a
 # YAML string, with resources separated by document
 # markers ("---").
+#
+# General rule here is anything deployed by OLM bundles should go here as well,
+# this is used in "make deploy" for developers and should mimic what OLM deploys
+# for you.
 resources:
 - ./namespace.yaml
+- ./rbac/rbac_role.yaml
+- ./rbac/rbac_role_binding.yaml
+- ./hiveadmission/hiveadmission_rbac_role.yaml
+- ./hiveadmission/hiveadmission_rbac_role_binding.yaml
+- ./crds/hive_v1alpha1_clusterdeployment.yaml
+- ./crds/hive_v1alpha1_clusterimageset.yaml
+- ./crds/hive_v1alpha1_dnszone.yaml
+- ./crds/hive_v1alpha1_hiveconfig.yaml
+- ./crds/hive_v1alpha1_selectorsyncidentityprovider.yaml
+- ./crds/hive_v1alpha1_selectorsyncset.yaml
+- ./crds/hive_v1alpha1_syncidentityprovider.yaml
+- ./crds/hive_v1alpha1_syncset.yaml
 - ./operator/operator_role.yaml
 - ./operator/operator_role_binding.yaml
 - ./operator/operator_deployment.yaml

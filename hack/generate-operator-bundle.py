@@ -56,11 +56,11 @@ with open('config/rbac/rbac_role.yaml', 'r') as stream:
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': hive_role['rules'],
-            'serviceAccountName': 'hive-controllers',
+            'serviceAccountName': 'default',
         })
 
 # Add our hiveadmission role to the CSV:
-with open('config/rbac/hiveadmission_rbac_role.yaml', 'r') as stream:
+with open('config/hiveadmission/hiveadmission_rbac_role.yaml', 'r') as stream:
     hiveadmission_role = yaml.load(stream)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {

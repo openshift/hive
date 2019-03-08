@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: openshift-hive
+namespace: hive
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-#namePrefix: openshift-hive-
+#namePrefix: hive-
 
 # Labels to add to all resources and selectors.
 #commonLabels:
@@ -17,16 +17,17 @@ namespace: openshift-hive
 # files that kustomize reads, modifies and emits as a
 # YAML string, with resources separated by document
 # markers ("---").
+#
+# General rule here is anything deployed by OLM bundles should go here as well,
+# this is used in "make deploy" for developers and should mimic what OLM deploys
+# for you. CRDs are an exception to this as we don't want to have to list them all
+# here. These are deployed via a "make install" dependency.
 resources:
-- ./manifests/00_namespace.yaml
-- ./manifests/01_hiveconfig_crd.yaml
-- ./manifests/01_clusterdeployment_crd.yaml
-- ./manifests/01_clusterimageset_crd.yaml
-- ./manifests/01_dnszone_crd.yaml
-- ./manifests/01_operator_role.yaml
-- ./manifests/01_operator_role_binding.yaml
-- ./manifests/01_rbac_role.yaml
-- ./manifests/01_rbac_role_binding.yaml
-- ./manifests/01_hiveadmission_rbac_role.yaml
-- ./manifests/01_hiveadmission_rbac_role_binding.yaml
-- ./manifests/02_hive_operator.yaml
+- ./namespace.yaml
+- ./rbac/rbac_role.yaml
+- ./rbac/rbac_role_binding.yaml
+- ./hiveadmission/hiveadmission_rbac_role.yaml
+- ./hiveadmission/hiveadmission_rbac_role_binding.yaml
+- ./operator/operator_role.yaml
+- ./operator/operator_role_binding.yaml
+- ./operator/operator_deployment.yaml

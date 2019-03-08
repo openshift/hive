@@ -20,5 +20,5 @@ spec:
   versionPriority: 15
   service:
     name: hiveadmission
-    namespace: openshift-hive
+    namespace: hive
   version: v1alpha1

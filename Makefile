@@ -70,12 +70,12 @@ run-operator: generate fmt vet
 
 # Install CRDs into a cluster
 .PHONY: install
-install: crd rbac
+install: crd
 	kubectl apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: generate manifests
+deploy: manifests install generate
 	# Deploy the operator manifests:
 	mkdir -p overlays/deploy
 	cp overlays/template/* overlays/deploy
@@ -92,14 +92,6 @@ deploy: generate manifests
 # the locations kubebuilder generates them.
 .PHONY: manifests
 manifests: crd rbac
-	cp config/crds/hive_v1alpha1_hiveconfig.yaml config/manifests/01_hiveconfig_crd.yaml
-	cp config/crds/hive_v1alpha1_clusterdeployment.yaml config/manifests/01_clusterdeployment_crd.yaml
-	cp config/crds/hive_v1alpha1_dnszone.yaml config/manifests/01_dnszone_crd.yaml
-	cp config/crds/hive_v1alpha1_clusterimageset.yaml config/manifests/01_clusterimageset_crd.yaml
-	cp config/rbac/rbac_role.yaml config/manifests/01_rbac_role.yaml
-	cp config/rbac/rbac_role_binding.yaml config/manifests/01_rbac_role_binding.yaml
-	cp config/rbac/hiveadmission_rbac_role.yaml config/manifests/01_hiveadmission_rbac_role.yaml
-	cp config/rbac/hiveadmission_rbac_role_binding.yaml config/manifests/01_hiveadmission_rbac_role_binding.yaml
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev

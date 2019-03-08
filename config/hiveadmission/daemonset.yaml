@@ -3,7 +3,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  namespace: openshift-hive
+  namespace: hive
   name: hiveadmission
   labels:
     app: hiveadmission

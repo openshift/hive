@@ -49,7 +49,7 @@ const (
 	legacyDeploymentConfig = "hive-controller-manager"
 	legacyService          = "hive-controller-manager-service"
 	// hiveNamespace is the assumed and only supported namespace where Hive will be deployed.
-	hiveNamespace = "openshift-hive"
+	hiveNamespace = "hive"
 	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
 	hiveConfigName = "hive"
 

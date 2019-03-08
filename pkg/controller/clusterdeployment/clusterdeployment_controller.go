@@ -641,17 +641,22 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
 	}
 
-	// Skips creation of uninstall job if PreserveOnDelete is true
+	// Skips creation of uninstall job if PreserveOnDelete is true and cluster is installed
 	if cd.Spec.PreserveOnDelete {
-		cdLog.Warn("skipping creation of uninstall job, due to PreserveOnDelete")
-		if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-			err = r.removeClusterDeploymentFinalizer(cd)
-			if err != nil {
-				cdLog.WithError(err).Error("error removing finalizer")
+		if cd.Status.Installed {
+			cdLog.Warn("skipping creation of uninstall job for installed cluster due to PreserveOnDelete=true")
+			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+				err = r.removeClusterDeploymentFinalizer(cd)
+				if err != nil {
+					cdLog.WithError(err).Error("error removing finalizer")
+				}
+				return reconcile.Result{}, err
 			}
-			return reconcile.Result{}, err
+			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, nil
+		// Overriding PreserveOnDelete because we might have deleted the cluster deployment before it finished
+		// installing, which can cause AWS resources to leak
+		cdLog.Infof("PreserveOnDelete=true but launching uninstall as cluster was never successfully provisioned")
 	}
 
 	if cd.Status.InfraID == "" {

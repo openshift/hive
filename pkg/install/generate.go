@@ -293,7 +293,9 @@ func GenerateUninstallerJob(
 	cd *hivev1.ClusterDeployment, hiveImage string) (*batchv1.Job, error) {
 
 	if cd.Spec.PreserveOnDelete {
-		return nil, fmt.Errorf("no creation of uninstaller job, because of PreserveOnDelete")
+		if cd.Status.Installed {
+			return nil, fmt.Errorf("no creation of uninstaller job, because of PreserveOnDelete")
+		}
 	}
 
 	if cd.Spec.AWS == nil {

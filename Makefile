@@ -68,9 +68,14 @@ run: generate fmt vet
 run-operator: generate fmt vet
 	go run ./cmd/operator/main.go --log-level=debug
 
+# Install CRDs into a cluster
+.PHONY: install
+install: crd
+	kubectl apply -f config/crds
+
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests generate
+deploy: manifests install generate
 	# Deploy the operator manifests:
 	mkdir -p overlays/deploy
 	cp overlays/template/* overlays/deploy

@@ -1,0 +1,4 @@
+packageName: hive-operator
+channels:
+- name: alpha
+  currentCSV: hive-operator.v0.1.494-3f73a592

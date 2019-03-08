@@ -1,0 +1,10 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: hive
+spec:
+  channel: alpha
+  # TODO: name here matches the dir in the registry, change to hive-operator
+  name: hive-operator
+  source: hive-catalog
+  sourceNamespace: hive

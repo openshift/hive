@@ -32,7 +32,7 @@ test: generate fmt vet crd rbac
 
 .PHONY: test-integration
 test-integration: generate
-	go test ./test/integration/... -coverprofile cover.out
+	go test ./test/integration/...
 
 .PHONY: test-e2e
 test-e2e:

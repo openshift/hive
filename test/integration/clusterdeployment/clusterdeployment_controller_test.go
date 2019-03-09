@@ -37,6 +37,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 var c client.Client
@@ -44,10 +45,10 @@ var c client.Client
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
 
 var jobKey = types.NamespacedName{Name: "foo-install", Namespace: "default"}
+var clusterDeploymentKey = types.NamespacedName{Name: "foo", Namespace: "default"}
 
 const (
 	timeout             = time.Second * 10
-	fakeClusterUUID     = "fe953108-f64c-4166-bb8e-20da7665ba00"
 	fakeClusterMetadata = `{"clusterName":"foo","aws":{"region":"us-east-1","identifier":{"openshiftClusterID":"fe953108-f64c-4166-bb8e-20da7665ba00"}}}`
 )
 
@@ -55,28 +56,37 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+func int64ptr(i int64) *int64 {
+	return &i
+}
+
+func strptr(s string) *string {
+	return &s
+}
+
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"hive.openshift.io/default-AMI": "test-default-ami",
+			},
+		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			Config: hivev1.InstallConfig{
-				Admin: hivev1.Admin{
-					Email: "user@example.com",
-					Password: corev1.LocalObjectReference{
-						Name: "admin-password",
-					},
-					SSHKey: &corev1.LocalObjectReference{
-						Name: "ssh-key",
-					},
-				},
-				Machines: []hivev1.MachinePool{},
-				PullSecret: corev1.LocalObjectReference{
-					Name: "pull-secret",
-				},
-				Platform: hivev1.Platform{
-					AWS: &hivev1.AWSPlatform{
-						Region: "us-east-1",
-					},
+			SSHKey: &corev1.LocalObjectReference{
+				Name: "ssh-key",
+			},
+			ControlPlane: hivev1.MachinePool{
+				Replicas: int64ptr(1),
+			},
+			Compute: []hivev1.MachinePool{},
+			PullSecret: corev1.LocalObjectReference{
+				Name: "pull-secret",
+			},
+			Platform: hivev1.Platform{
+				AWS: &hivev1.AWSPlatform{
+					Region: "us-east-1",
 				},
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
@@ -99,6 +109,12 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
 
+	err = c.Create(context.TODO(), testSecret("ssh-key", "ssh-publickey", "1234"))
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = c.Create(context.TODO(), testSecret("pull-secret", ".dockercfg", "1234"))
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
 	recFn, requests := SetupTestReconcile(clusterdeployment.NewReconciler(mgr))
 	g.Expect(clusterdeployment.AddToManager(mgr, recFn)).NotTo(gomega.HaveOccurred())
 	defer close(StartTestManager(mgr, g))
@@ -115,6 +131,34 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	}
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
+	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+
+	g.Eventually(func() error {
+		updatedCD := &hivev1.ClusterDeployment{}
+		err := c.Get(context.TODO(), expectedRequest.NamespacedName, updatedCD)
+		if err != nil {
+			return err
+		}
+		if !controllerutils.HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
+			return fmt.Errorf("cluster deployment does not have expected finalizer")
+		}
+		return nil
+	}, timeout).Should(gomega.Succeed())
+
+	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+
+	g.Eventually(func() error {
+		updatedCD := &hivev1.ClusterDeployment{}
+		err := c.Get(context.TODO(), expectedRequest.NamespacedName, updatedCD)
+		if err != nil {
+			return err
+		}
+		if updatedCD.Status.InstallerImage == nil {
+			return fmt.Errorf("expected to have an installer image in status")
+		}
+		return nil
+	}, timeout).Should(gomega.Succeed())
+
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
 	job := &kbatch.Job{}
@@ -137,10 +181,7 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 		if !updatedCD.Status.Installed {
 			return fmt.Errorf("cluster deployment status not marked installed")
 		}
-		if updatedCD.Status.ClusterUUID != fakeClusterUUID {
-			return fmt.Errorf("cluster deployment status does not have cluster UUID")
-		}
-		if !clusterdeployment.HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
+		if !controllerutils.HasFinalizer(updatedCD, hivev1.FinalizerDeprovision) {
 			return fmt.Errorf("cluster deployment does not have expected finalizer")
 		}
 		return nil
@@ -183,4 +224,17 @@ func fakeInstallJobSuccess(c client.Client, cd *hivev1.ClusterDeployment, job *k
 		},
 	}
 	return c.Status().Update(context.TODO(), job)
+}
+
+func testSecret(name, key, value string) *corev1.Secret {
+	s := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			key: []byte(value),
+		},
+	}
+	return s
 }

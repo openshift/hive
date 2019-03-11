@@ -25,6 +25,13 @@ You should now see hive-operator, hive-controllers, and hiveadmission pods runni
  1. Build and publish a custom Hive image from your current working dir: `$ IMG=quay.io/dgoodwin/hive:latest make buildah-push`
  1. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/dgoodwin/hive:latest make deploy`
 
+### Deploy Hive via OLM
+
+We do not currently publish an official OLM operator package, but you can run or work off the test script below to generate a ClusterServiceVersion, OLM bundle+package, registry image, catalog source, and subscription.
+
+`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry:latest" DEPLOY_IMG="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
+
+
 ### Run Hive Operator From Source
 
 NOTE: assumes you have previously deployed using one of the above methods.

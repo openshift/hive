@@ -3,12 +3,12 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     categories: A list of comma separated categories that your operator falls under.
-    certified: 'false'
+    certified: "false"
     containerImage: quay.io/dgoodwin/hive:latest
-    createdAt: '2019-03-08T15:51:08Z'
+    createdAt: "2019-03-11T13:23:27Z"
     description: OpenShift cluster provisioning and management at scale.
     support: Devan Goodwin
-  name: hive-operator.v0.1.494-3f73a592
+  name: hive-operator.v0.1.505-c57bd047
   namespace: placeholder
 spec:
   customresourcedefinitions:
@@ -35,7 +35,7 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - ''
+          - ""
           resources:
           - serviceaccounts
           - serviceaccounts/finalizers
@@ -145,7 +145,7 @@ spec:
           - patch
           - delete
         - apiGroups:
-          - ''
+          - ""
           resources:
           - serviceaccounts
           - secrets
@@ -260,7 +260,7 @@ spec:
           - list
           - watch
         - apiGroups:
-          - ''
+          - ""
           resources:
           - configmaps
           verbs:
@@ -275,7 +275,7 @@ spec:
           - list
           - watch
         - apiGroups:
-          - ''
+          - ""
           resources:
           - namespaces
           verbs:
@@ -297,12 +297,12 @@ spec:
           selector:
             matchLabels:
               control-plane: hive-operator
-              controller-tools.k8s.io: '1.0'
+              controller-tools.k8s.io: "1.0"
           template:
             metadata:
               labels:
                 control-plane: hive-operator
-                controller-tools.k8s.io: '1.0'
+                controller-tools.k8s.io: "1.0"
             spec:
               containers:
               - command:
@@ -339,5 +339,4 @@ spec:
   maturity: alpha
   provider:
     name: Red Hat, Inc
-  replaces: hive-operator.v0.1.5-4b53b492
-  version: 0.1.494-3f73a592
+  version: 0.1.505-c57bd047

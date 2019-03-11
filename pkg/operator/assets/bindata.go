@@ -340,6 +340,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
 
 `)
 

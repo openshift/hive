@@ -22,4 +22,10 @@ spec:
           - /opt/services/hive-operator
           - --log-level
           - debug
+        volumeMounts:
+        - name: kubectl-cache
+          mountPath: /var/cache/kubectl
+        env:
+        - name: CLI_CACHE_DIR
+          value: /var/cache/kubectl
       terminationGracePeriodSeconds: 10

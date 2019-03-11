@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -64,7 +66,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileHiveConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileHiveConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme(), restConfig: mgr.GetConfig()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -181,6 +183,7 @@ type ReconcileHiveConfig struct {
 	kubeClient   kubernetes.Interface
 	apiextClient *apiextclientv1beta1.ApiextensionsV1beta1Client
 	apiregClient *apiregclientv1.ApiregistrationV1Client
+	restConfig   *rest.Config
 	hiveImage    string
 }
 

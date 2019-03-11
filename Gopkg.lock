@@ -758,7 +758,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4623dc2b408f4f7d45801d0d7b4afce26bc81dd942dfc828e4b58a48b00f26f2"
+  digest = "1:95f7662a178a208d0566b75515506152896f0a3584f5001b287ff9f368b002e3"
   name = "github.com/openshift/api"
   packages = [
     ".",
@@ -807,7 +807,7 @@
     "webconsole/v1",
   ]
   pruneopts = "NUT"
-  revision = "b4c87b238bcc4a218221986b8d6231b3ed9cdaa7"
+  revision = "853a7faf74b1c63a56e4010d39057559fa13271f"
 
 [[projects]]
   branch = "master"
@@ -2134,7 +2134,6 @@
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",
     "github.com/openshift/api/config/v1",
-    "github.com/openshift/api/operator/v1",
     "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
@@ -2165,6 +2164,7 @@
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/equality",
     "k8s.io/apimachinery/pkg/api/errors",
+    "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
@@ -2176,11 +2176,15 @@
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apiserver/pkg/util/logs",
+    "k8s.io/cli-runtime/pkg/genericclioptions",
+    "k8s.io/cli-runtime/pkg/genericclioptions/printers",
+    "k8s.io/client-go/discovery",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
+    "k8s.io/client-go/restmapper",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
@@ -2188,6 +2192,7 @@
     "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
     "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1",
     "k8s.io/kubernetes/pkg/kubectl/cmd",
+    "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     "k8s.io/utils/pointer",
     "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1",
     "sigs.k8s.io/controller-runtime/pkg/client",

@@ -702,11 +702,11 @@ func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
 			{
 				State:   openshiftapiv1.CompletedUpdate,
 				Version: testRemoteClusterCurrentVersion,
-				Payload: "TESTPAYLOAD",
+				Image:   "TESTIMAGE",
 			},
 		},
-		Generation:  123456789,
-		VersionHash: "TESTVERSIONHASH",
+		ObservedGeneration: 123456789,
+		VersionHash:        "TESTVERSIONHASH",
 	}
 	return status
 }

@@ -68,6 +68,18 @@ func (DockerPullSecretControllerConfig) SwaggerDoc() map[string]string {
 	return map_DockerPullSecretControllerConfig
 }
 
+var map_FrontProxyConfig = map[string]string{
+	"clientCA":            "clientCA is a path to the CA bundle to use to verify the common name of the front proxy's client cert",
+	"allowedNames":        "allowedNames is an optional list of common names to require a match from.",
+	"usernameHeaders":     "usernameHeaders is the set of headers to check for the username",
+	"groupHeaders":        "groupHeaders is the set of headers to check for groups",
+	"extraHeaderPrefixes": "extraHeaderPrefixes is the set of header prefixes to check for user extra",
+}
+
+func (FrontProxyConfig) SwaggerDoc() map[string]string {
+	return map_FrontProxyConfig
+}
+
 var map_ImageConfig = map[string]string{
 	"":       "ImageConfig holds the necessary configuration options for building image names for system components",
 	"format": "Format is the format of the name to be built for the system component",
@@ -131,13 +143,13 @@ func (NetworkControllerConfig) SwaggerDoc() map[string]string {
 }
 
 var map_OpenShiftAPIServerConfig = map[string]string{
-	"imagePolicyConfig":                             "imagePolicyConfig feeds the image policy admission plugin",
-	"projectConfig":                                 "projectConfig feeds an admission plugin",
-	"routingConfig":                                 "routingConfig holds information about routing and route generation",
-	"serviceAccountOAuthGrantMethod":                "serviceAccountOAuthGrantMethod is used for determining client authorization for service account oauth client. It must be either: deny, prompt, or \"\"",
-	"jenkinsPipelineConfig":                         "jenkinsPipelineConfig holds information about the default Jenkins template used for JenkinsPipeline build strategy.",
-	"cloudProviderFile":                             "cloudProviderFile points to the cloud config file",
-	"enableDeprecatedOAPIThatWillBeRemovedVerySoon": "enableDeprecatedOAPIThatWillBeRemovedVerySoon allows the openshift-apiserver to serve oapi endpoints.  This option is going away along with the entire API. Consider yourself warned again. Deprecated",
+	"aggregatorConfig":               "aggregatorConfig contains information about how to verify the aggregator front proxy",
+	"imagePolicyConfig":              "imagePolicyConfig feeds the image policy admission plugin",
+	"projectConfig":                  "projectConfig feeds an admission plugin",
+	"routingConfig":                  "routingConfig holds information about routing and route generation",
+	"serviceAccountOAuthGrantMethod": "serviceAccountOAuthGrantMethod is used for determining client authorization for service account oauth client. It must be either: deny, prompt, or \"\"",
+	"jenkinsPipelineConfig":          "jenkinsPipelineConfig holds information about the default Jenkins template used for JenkinsPipeline build strategy.",
+	"cloudProviderFile":              "cloudProviderFile points to the cloud config file",
 }
 
 func (OpenShiftAPIServerConfig) SwaggerDoc() map[string]string {

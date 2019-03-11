@@ -16,9 +16,11 @@ type ClusterVersion struct {
 
 	// spec is the desired state of the cluster version - the operator will work
 	// to ensure that the desired version is applied to the cluster.
+	// +required
 	Spec ClusterVersionSpec `json:"spec"`
 	// status contains information about the available updates and any in-progress
 	// updates.
+	// +optional
 	Status ClusterVersionStatus `json:"status"`
 }
 
@@ -37,7 +39,8 @@ type ClusterVersionSpec struct {
 	// the current version does not match the desired version). The set of
 	// recommended update values is listed as part of available updates in
 	// status, and setting values outside that range may cause the upgrade
-	// to fail.
+	// to fail. You may specify the version field without setting image if
+	// an update exists with that version in the availableUpdates or history.
 	//
 	// If an upgrade fails the operator will halt and report status
 	// about the failing component. Setting the desired update value back to
@@ -45,19 +48,19 @@ type ClusterVersionSpec struct {
 	// rollbacks will succeed.
 	//
 	// +optional
-	DesiredUpdate *Update `json:"desiredUpdate"`
+	DesiredUpdate *Update `json:"desiredUpdate,omitempty"`
 
 	// upstream may be used to specify the preferred update server. By default
 	// it will use the appropriate update server for the cluster and region.
 	//
 	// +optional
-	Upstream URL `json:"upstream"`
+	Upstream URL `json:"upstream,omitempty"`
 	// channel is an identifier for explicitly requesting that a non-default
 	// set of updates be applied to this cluster. The default channel will be
 	// contain stable updates that are appropriate for production clusters.
 	//
 	// +optional
-	Channel string `json:"channel"`
+	Channel string `json:"channel,omitempty"`
 
 	// overrides is list of overides for components that are managed by
 	// cluster version operator. Marking a component unmanaged will prevent
@@ -75,7 +78,7 @@ type ClusterVersionSpec struct {
 type ClusterVersionStatus struct {
 	// desired is the version that the cluster is reconciling towards.
 	// If the cluster is not yet fully initialized desired will be set
-	// with the information available, which may be a payload or a tag.
+	// with the information available, which may be an image or a tag.
 	Desired Update `json:"desired"`
 
 	// history contains a list of the most recent versions applied to the cluster.
@@ -85,13 +88,13 @@ type ClusterVersionStatus struct {
 	// Completed if the rollout completed - if an update was failing or halfway
 	// applied the state will be Partial. Only a limited amount of update history
 	// is preserved.
-	History []UpdateHistory `json:"history"`
+	// +optional
+	History []UpdateHistory `json:"history,omitempty"`
 
-	// generation reports which version of the spec is being processed.
-	// If this value is not equal to metadata.generation, then the
-	// current and conditions fields have not yet been updated to reflect
-	// the latest request.
-	Generation int64 `json:"generation"`
+	// observedGeneration reports which version of the spec is being synced.
+	// If this value is not equal to metadata.generation, then the desired
+	// and conditions fields may represent from a previous version.
+	ObservedGeneration int64 `json:"observedGeneration"`
 
 	// versionHash is a fingerprint of the content that the cluster will be
 	// updated with. It is used by the operator to avoid unnecessary work
@@ -105,12 +108,14 @@ type ClusterVersionStatus struct {
 	// by a temporary or permanent error. Conditions are only valid for the
 	// current desiredUpdate when metadata.generation is equal to
 	// status.generation.
-	Conditions []ClusterOperatorStatusCondition `json:"conditions"`
+	// +optional
+	Conditions []ClusterOperatorStatusCondition `json:"conditions,omitempty"`
 
 	// availableUpdates contains the list of updates that are appropriate
 	// for this cluster. This list may be empty if no updates are recommended,
 	// if the update service is unavailable, or if an invalid channel has
 	// been specified.
+	// +nullable
 	AvailableUpdates []Update `json:"availableUpdates"`
 }
 
@@ -141,17 +146,18 @@ type UpdateHistory struct {
 	// that is currently being applied will have a null completion time.
 	// Completion time will always be set for entries that are not the current
 	// update (usually to the started time of the next update).
+	// +nullable
 	CompletionTime *metav1.Time `json:"completionTime"`
 
 	// version is a semantic versioning identifying the update version. If the
-	// requested payload does not define a version, or if a failure occurs
-	// retrieving the payload, this value may be empty.
+	// requested image does not define a version, or if a failure occurs
+	// retrieving the image, this value may be empty.
 	//
 	// +optional
 	Version string `json:"version"`
-	// payload is a container image location that contains the update. This value
+	// image is a container image location that contains the update. This value
 	// is always populated.
-	Payload string `json:"payload"`
+	Image string `json:"image"`
 }
 
 // ClusterID is string RFC4122 uuid.
@@ -182,20 +188,20 @@ type ComponentOverride struct {
 type URL string
 
 // Update represents a release of the ClusterVersionOperator, referenced by the
-// Payload member.
+// Image member.
 // +k8s:deepcopy-gen=true
 type Update struct {
 	// version is a semantic versioning identifying the update version. When this
-	// field is part of spec, version is optional if payload is specified.
+	// field is part of spec, version is optional if image is specified.
 	//
 	// +optional
 	Version string `json:"version"`
-	// payload is a container image location that contains the update. When this
-	// field is part of spec, payload is optional if version is specified and the
+	// image is a container image location that contains the update. When this
+	// field is part of spec, image is optional if version is specified and the
 	// availableUpdates field contains a matching version.
 	//
 	// +optional
-	Payload string `json:"payload"`
+	Image string `json:"image"`
 }
 
 // RetrievedUpdates reports whether available updates have been retrieved from

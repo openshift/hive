@@ -238,12 +238,12 @@ func testRemoteClusterVersionStatus() configv1.ClusterVersionStatus {
 			{
 				State:          configv1.CompletedUpdate,
 				Version:        testRemoteClusterCurrentVersion,
-				Payload:        "TESTPAYLOAD",
+				Image:          "TESTIMAGE",
 				CompletionTime: &zeroTime,
 			},
 		},
-		Generation:  123456789,
-		VersionHash: "TESTVERSIONHASH",
+		ObservedGeneration: 123456789,
+		VersionHash:        "TESTVERSIONHASH",
 	}
 	return status
 }

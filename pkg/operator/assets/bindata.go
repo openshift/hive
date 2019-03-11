@@ -1033,19 +1033,19 @@ spec:
                   description: availableUpdates contains the list of updates that
                     are appropriate for this cluster. This list may be empty if no
                     updates are recommended, if the update service is unavailable,
-                    or if an invalid channel has been specified.
+                    or if an invalid channel has been specified. +nullable
                   items:
                     properties:
-                      payload:
-                        description: payload is a container image location that contains
-                          the update. When this field is part of spec, payload is
-                          optional if version is specified and the availableUpdates
-                          field contains a matching version.
+                      image:
+                        description: image is a container image location that contains
+                          the update. When this field is part of spec, image is optional
+                          if version is specified and the availableUpdates field contains
+                          a matching version.
                         type: string
                       version:
                         description: version is a semantic versioning identifying
                           the update version. When this field is part of spec, version
-                          is optional if payload is specified.
+                          is optional if image is specified.
                         type: string
                     type: object
                   type: array
@@ -1089,28 +1089,21 @@ spec:
                 desired:
                   description: desired is the version that the cluster is reconciling
                     towards. If the cluster is not yet fully initialized desired will
-                    be set with the information available, which may be a payload
-                    or a tag.
+                    be set with the information available, which may be an image or
+                    a tag.
                   properties:
-                    payload:
-                      description: payload is a container image location that contains
-                        the update. When this field is part of spec, payload is optional
+                    image:
+                      description: image is a container image location that contains
+                        the update. When this field is part of spec, image is optional
                         if version is specified and the availableUpdates field contains
                         a matching version.
                       type: string
                     version:
                       description: version is a semantic versioning identifying the
                         update version. When this field is part of spec, version is
-                        optional if payload is specified.
+                        optional if image is specified.
                       type: string
                   type: object
-                generation:
-                  description: generation reports which version of the spec is being
-                    processed. If this value is not equal to metadata.generation,
-                    then the current and conditions fields have not yet been updated
-                    to reflect the latest request.
-                  format: int64
-                  type: integer
                 history:
                   description: history contains a list of the most recent versions
                     applied to the cluster. This value may be empty during cluster
@@ -1126,11 +1119,11 @@ spec:
                           fully applied. The update that is currently being applied
                           will have a null completion time. Completion time will always
                           be set for entries that are not the current update (usually
-                          to the started time of the next update).
+                          to the started time of the next update). +nullable
                         format: date-time
                         type: string
-                      payload:
-                        description: payload is a container image location that contains
+                      image:
+                        description: image is a container image location that contains
                           the update. This value is always populated.
                         type: string
                       startedTime:
@@ -1147,17 +1140,24 @@ spec:
                         type: string
                       version:
                         description: version is a semantic versioning identifying
-                          the update version. If the requested payload does not define
-                          a version, or if a failure occurs retrieving the payload,
+                          the update version. If the requested image does not define
+                          a version, or if a failure occurs retrieving the image,
                           this value may be empty.
                         type: string
                     required:
                     - state
                     - startedTime
                     - completionTime
-                    - payload
+                    - image
                     type: object
                   type: array
+                observedGeneration:
+                  description: observedGeneration reports which version of the spec
+                    is being synced. If this value is not equal to metadata.generation,
+                    then the desired and conditions fields may represent from a previous
+                    version.
+                  format: int64
+                  type: integer
                 versionHash:
                   description: versionHash is a fingerprint of the content that the
                     cluster will be updated with. It is used by the operator to avoid
@@ -1165,10 +1165,8 @@ spec:
                   type: string
               required:
               - desired
-              - history
-              - generation
+              - observedGeneration
               - versionHash
-              - conditions
               - availableUpdates
               type: object
             conditions:
@@ -1940,12 +1938,6 @@ spec:
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                      useUsernameIdentity:
-                        description: useUsernameIdentity indicates that users should
-                          be authenticated by username, not keystone ID DEPRECATED
-                          - only use this option for legacy systems to ensure backwards
-                          compatibility
-                        type: boolean
                     required:
                     - url
                     - domainName
@@ -2707,12 +2699,6 @@ spec:
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                      useUsernameIdentity:
-                        description: useUsernameIdentity indicates that users should
-                          be authenticated by username, not keystone ID DEPRECATED
-                          - only use this option for legacy systems to ensure backwards
-                          compatibility
-                        type: boolean
                     required:
                     - url
                     - domainName

@@ -17,8 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
@@ -63,30 +61,11 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 // FixupEmptyClusterVersionFields will un-'nil' fields that would fail validation in the ClusterVersion.Status
 func FixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.ClusterVersionStatus) {
 
-	// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates,
-	// clusterVersion.Status.Conditions, and clusterVersion.Status.History
+	// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates
 	// Place an empty list if needed to satisfy the object validation.
 
 	if clusterVersionStatus.AvailableUpdates == nil {
 		clusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
-	}
-
-	if clusterVersionStatus.Conditions == nil {
-		clusterVersionStatus.Conditions = []openshiftapiv1.ClusterOperatorStatusCondition{}
-	}
-
-	if clusterVersionStatus.History == nil {
-		clusterVersionStatus.History = []openshiftapiv1.UpdateHistory{}
-	}
-
-	// The CompletionTime is clearly optional, but it is not labeled with
-	// omitempty in the Openshift API.
-	// TODO: Fix upstream
-	for i, h := range clusterVersionStatus.History {
-		if h.CompletionTime == nil {
-			zero := metav1.NewTime(time.Unix(0, 0))
-			clusterVersionStatus.History[i].CompletionTime = &zero
-		}
 	}
 }
 

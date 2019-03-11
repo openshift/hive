@@ -8,32 +8,32 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// OpenShiftAPIServer provides information to configure an operator to manage openshift-apiserver.
-type OpenShiftAPIServer struct {
+// OpenShiftControllerManager provides information to configure an operator to manage openshift-controller-manager.
+type OpenShiftControllerManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
 	// +required
-	Spec   OpenShiftAPIServerSpec   `json:"spec"`
+	Spec   OpenShiftControllerManagerSpec   `json:"spec"`
 	// +optional
-	Status OpenShiftAPIServerStatus `json:"status"`
+	Status OpenShiftControllerManagerStatus `json:"status"`
 }
 
-type OpenShiftAPIServerSpec struct {
+type OpenShiftControllerManagerSpec struct {
 	OperatorSpec `json:",inline"`
 }
 
-type OpenShiftAPIServerStatus struct {
+type OpenShiftControllerManagerStatus struct {
 	OperatorStatus `json:",inline"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// OpenShiftAPIServerList is a collection of items
-type OpenShiftAPIServerList struct {
+// OpenShiftControllerManagerList is a collection of items
+type OpenShiftControllerManagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	metav1.ListMeta `json:"metadata"`
 	// Items contains the items
-	Items []OpenShiftAPIServer `json:"items"`
+	Items []OpenShiftControllerManager `json:"items"`
 }

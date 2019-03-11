@@ -73,13 +73,19 @@ func newApplyCommand() *cobra.Command {
 			content := mustRead(args[0])
 			kubeconfig := mustRead(kubeconfigPath)
 			helper := resource.NewHelper(kubeconfig, log.WithField("cmd", "apply"))
-			info, err := helper.Apply(content)
+			info, err := helper.Info(content)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
+				fmt.Printf("Error obtaining info: %v\n", err)
 				return
 			}
 			name := types.NamespacedName{Namespace: info.Namespace, Name: info.Name}
-			fmt.Printf("The resource %s (Kind: %s, APIVersion: %s) was applied successfully", name.String(), info.Kind, info.APIVersion)
+			fmt.Printf("The resource is %s (Kind: %s, APIVersion: %s)", name.String(), info.Kind, info.APIVersion)
+			err = helper.Apply(content)
+			if err != nil {
+				fmt.Printf("Error applying: %v\n", err)
+				return
+			}
+			fmt.Printf("The resource was applied successfully\n")
 		},
 	}
 	cmd.Flags().StringVarP(&kubeconfigPath, "kubeconfig", "k", os.Getenv("KUBECONFIG"), "Kubeconfig file to connect to target server")

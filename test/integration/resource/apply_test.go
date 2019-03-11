@@ -115,7 +115,12 @@ func TestApply(t *testing.T) {
 			}
 			t.Logf("The serialized resource:\n%s\n", buf.String())
 			h := resource.NewHelper(kubeconfig, logger)
-			info, err := h.Apply(buf.Bytes())
+			info, err := h.Info(buf.Bytes())
+			if err != nil {
+				t.Errorf("unexpected error calling info: %v", err)
+				return
+			}
+			err = h.Apply(buf.Bytes())
 			if err != nil {
 				t.Errorf("unexpected error calling apply: %v", err)
 				return

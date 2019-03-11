@@ -155,13 +155,13 @@ type ClusterDeploymentStatus struct {
 	// WebConsoleURL is the URL for the cluster's web console UI.
 	WebConsoleURL string `json:"webConsoleURL,omitempty"`
 
-	// SyncResources is the list of SyncStatus for objects that have been synced.
+	// SyncSetStatus is the list of status for SyncSets which apply to the cluster deployment.
 	// +optional
-	SyncResources []SyncStatus `json:"syncResources,omitempty"`
+	SyncSetStatus []SyncSetObjectStatus `json:"syncSetStatus,omitempty"`
 
-	// SyncPatches is the list of SyncStatus for patches that have been applied.
+	// SelectorSyncSetStatus is the list of status for SelectorSyncSets which apply to the cluster deployment.
 	// +optional
-	SyncPatches []SyncStatus `json:"syncPatches,omitempty"`
+	SelectorSyncSetStatus []SyncSetObjectStatus `json:"selectorSyncSetStatus,omitempty"`
 
 	// InstallerImage is the name of the installer image to use when installing the target cluster
 	// +optional

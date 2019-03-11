@@ -65,6 +65,7 @@ func (r *Helper) Apply(obj []byte) (*Info, error) {
 		r.logger.WithError(err).
 			WithField("stdout", ioStreams.Out.(*bytes.Buffer).String()).
 			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Error("running the apply command failed")
+		return nil, err
 	}
 	return resourceInfo, nil
 }

@@ -323,12 +323,6 @@ spec:
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                      useUsernameIdentity:
-                        description: useUsernameIdentity indicates that users should
-                          be authenticated by username, not keystone ID DEPRECATED
-                          - only use this option for legacy systems to ensure backwards
-                          compatibility
-                        type: boolean
                     required:
                     - url
                     - domainName

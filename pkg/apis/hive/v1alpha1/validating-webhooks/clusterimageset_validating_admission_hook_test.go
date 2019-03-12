@@ -108,12 +108,21 @@ func TestClusterImageSetValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
-			name: "Test ClusterImageSet.Spec is immutable (updates not allowed)",
+			name: "Test ClusterImageSet.Spec is mutable",
 			newSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: strptr("a:tag"),
 			},
 			oldSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: strptr("b:tag"),
+			},
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:    "Test ClusterImageSet.Spec is valid when updated",
+			newSpec: hivev1.ClusterImageSetSpec{},
+			oldSpec: hivev1.ClusterImageSetSpec{
+				ReleaseImage: strptr("a:tag"),
 			},
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,

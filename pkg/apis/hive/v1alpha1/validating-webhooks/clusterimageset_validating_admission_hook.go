@@ -19,7 +19,6 @@ package validatingwebhooks
 import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
-	"reflect"
 
 	"net/http"
 
@@ -230,10 +229,9 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 		contextLogger.Data["oldObject.Name"] = oldObject.Name
 	}
 
-	if !reflect.DeepEqual(oldObject.Spec, newObject.Spec) {
-		message := "ClusterImageSet.Spec is immutable"
-		contextLogger.Infof("Failed validation: %v", message)
-
+	if newObject.Spec.InstallerImage == nil && newObject.Spec.ReleaseImage == nil {
+		message := "Failed validation: you must specify either an installer image or a release image"
+		contextLogger.Infof(message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{

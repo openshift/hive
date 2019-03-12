@@ -61,7 +61,10 @@ pushd $SAAS_OPERATOR_DIR
 
 git add .
 
-MESSAGE=$'add version $GIT_COMMIT_COUNT-$GIT_HASH\n\nreplaces $PREV_VERSION'
+MESSAGE="add version $GIT_COMMIT_COUNT-$GIT_HASH
+
+replaces $PREV_VERSION"
+
 git commit -m "$MESSAGE"
 
 git push origin "$BRANCH_CHANNEL"

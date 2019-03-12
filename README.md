@@ -29,7 +29,7 @@ You should now see hive-operator, hive-controllers, and hiveadmission pods runni
 
 We do not currently publish an official OLM operator package, but you can run or work off the test script below to generate a ClusterServiceVersion, OLM bundle+package, registry image, catalog source, and subscription.
 
-`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry:latest" DEPLOY_IMG="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
+`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry" DEPLOY_IMG="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
 
 
 ### Run Hive Operator From Source

@@ -233,12 +233,6 @@ spec:
             path: /healthz
             port: 9443
             scheme: HTTPS
-      nodeSelector:
-        node-role.kubernetes.io/master: ""
-      tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
       volumes:
       - name: serving-cert
         secret:

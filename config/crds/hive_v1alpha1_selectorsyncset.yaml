@@ -36,10 +36,13 @@ spec:
               description: Patches is the list of patches to apply.
               items:
                 properties:
-                  groupVersionKind:
-                    description: GroupVersionKind is the Group, Version and Kind of
-                      the object to be patched.
-                    type: object
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the object
+                      to be patched.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the object to be patched.
+                    type: string
                   name:
                     description: Name is the name of the object to be patched.
                     type: string
@@ -56,7 +59,8 @@ spec:
                       "merge" or "strategic".
                     type: string
                 required:
-                - groupVersionKind
+                - apiVersion
+                - kind
                 - name
                 - patch
                 type: object

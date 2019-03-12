@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -55,8 +54,11 @@ const (
 
 // SyncObjectPatch represents a patch to be applied to a specific object
 type SyncObjectPatch struct {
-	// GroupVersionKind is the Group, Version and Kind of the object to be patched.
-	GroupVersionKind schema.GroupVersionKind `json:"groupVersionKind"`
+	// APIVersion is the Group and Version of the object to be patched.
+	APIVersion string `json:"apiVersion"`
+
+	// Kind is the Kind of the object to be patched.
+	Kind string `json:"kind"`
 
 	// Name is the name of the object to be patched.
 	Name string `json:"name"`
@@ -79,21 +81,17 @@ type SyncObjectPatch struct {
 type SyncConditionType string
 
 const (
-	// CreateSuccess indicates whether the resource has been created or not. If not,
-	// it should include a reason and message for the failure.
-	CreateSuccess SyncConditionType = "CreateSuccess"
+	// ApplySuccessSyncCondition indicates whether the resource or patch has been
+	// applied or not. If not, it should include a reason and message for the failure.
+	ApplySuccessSyncCondition SyncConditionType = "ApplySuccess"
 
-	// UpdateSuccess indicates whether the resource has been updates or not. If not,
-	// it should include a reason and message for the failure.
-	UpdateSuccess SyncConditionType = "UpdateSuccess"
+	// DeletionFailedSyncCondition indicates that resource deletion has failed.
+	// It should include a reason and message for the failure.
+	DeletionFailedSyncCondition SyncConditionType = "DeletionFailed"
 
-	// PatchSuccess indicates whether the patch has been applied or not. If not,
-	// it should include a reason and message for the failure.
-	PatchSuccess SyncConditionType = "PatchSuccess"
-
-	// DeletionFailed indicates that resource deletion has failed. It should include
-	// a reason and message for the failure.
-	DeletionFailed SyncConditionType = "DeletionFailed"
+	// UnknownObjectSyncCondition indicates that the resource type cannot be determined.
+	// It should include a reason and message for the failure.
+	UnknownObjectSyncCondition SyncConditionType = "UnknownObject"
 )
 
 // SyncCondition is a condition in a SyncStatus
@@ -116,12 +114,35 @@ type SyncCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// SyncSetObjectStatus describes the status of resources created or patches that have
+// been applied from a SyncSet or SelectorSyncSet.
+type SyncSetObjectStatus struct {
+	// Name is the name of the SyncSet.
+	Name string `json:"name"`
+
+	// Resources is the list of SyncStatus for objects that have been synced.
+	// +optional
+	Resources []SyncStatus `json:"resources,omitempty"`
+
+	// Patches is the list of SyncStatus for patches that have been applied.
+	// +optional
+	Patches []SyncStatus `json:"patches,omitempty"`
+
+	// Conditions is the list of SyncConditions used to indicate UnknownObject
+	// when a resource type cannot be determined from a SyncSet resource.
+	// +optional
+	Conditions []SyncCondition `json:"conditions,omitempty"`
+}
+
 // SyncStatus describes objects that have been created or patches that
 // have been applied using the unique md5 sum of the object or patch.
 type SyncStatus struct {
-	// GroupVersionKind is the Group, Version and Kind of the object that was
-	// synced or patched.
-	GroupVersionKind schema.GroupVersionKind `json:"groupVersionKind"`
+	// APIVersion is the Group and Version of the object that was synced or
+	// patched.
+	APIVersion string `json:"apiVersion"`
+
+	// Kind is the Kind of the object that was synced or patched.
+	Kind string `json:"kind"`
 
 	// Name is the name of the object that was synced or patched.
 	Name string `json:"name"`
@@ -177,8 +198,12 @@ type SyncSetSpec struct {
 	ClusterDeploymentRefs []corev1.LocalObjectReference `json:"clusterDeploymentRefs"`
 }
 
-// SyncSetStatus defines the observed state of SyncSet
+// SyncSetStatus defines the observed state of a SyncSet
 type SyncSetStatus struct {
+}
+
+// SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
+type SelectorSyncSetStatus struct {
 }
 
 // +genclient:nonNamespaced
@@ -190,8 +215,8 @@ type SelectorSyncSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SelectorSyncSetSpec `json:"spec,omitempty"`
-	Status SyncSetStatus       `json:"status,omitempty"`
+	Spec   SelectorSyncSetSpec   `json:"spec,omitempty"`
+	Status SelectorSyncSetStatus `json:"status,omitempty"`
 }
 
 // +genclient

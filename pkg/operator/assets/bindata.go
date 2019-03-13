@@ -3408,6 +3408,9 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       serviceAccountName: default
+      volumes:
+      - name: kubectl-cache
+        emptyDir: {}
       containers:
       # By default we will use the latest CI images published from hive master:
       - image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
@@ -3424,6 +3427,12 @@ spec:
           - /opt/services/manager
           - --log-level
           - debug
+        volumeMounts:
+        - name: kubectl-cache
+          mountPath: /var/cache/kubectl
+        env:
+        - name: CLI_CACHE_DIR
+          value: /var/cache/kubectl
       terminationGracePeriodSeconds: 10
 `)
 

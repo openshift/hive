@@ -17,87 +17,62 @@ limitations under the License.
 package hive
 
 import (
-	"context"
+	"bytes"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
-
 	"github.com/openshift/hive/pkg/operator/assets"
+	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
-	// Parse yaml for all Hive objects:
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
+
 	asset := assets.MustAsset("config/manager/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
-
-	// Set owner refs on all objects in the deployment so deleting the operator CRD
-	// will clean everything up:
-	// NOTE: we do not cleanup the CRDs themselves so as not to destroy data.
-
-	if err := controllerutil.SetControllerReference(instance, hiveDeployment, r.scheme); err != nil {
-		hLog.WithError(err).Info("error setting owner ref")
-		return err
-	}
-
-	expectedDeploymentGen := int64(0)
-	currentDeployment := &appsv1.Deployment{}
-	foundCurrentDeployment := false
-	err := r.Get(context.Background(), types.NamespacedName{Name: hiveDeployment.Name, Namespace: hiveDeployment.Namespace}, currentDeployment)
-	if err != nil && !errors.IsNotFound(err) {
-		hLog.WithError(err).Error("error looking up current deployment")
-		return err
-	} else if err == nil {
-		expectedDeploymentGen = currentDeployment.ObjectMeta.Generation
-		foundCurrentDeployment = true
-	}
 
 	if r.hiveImage != "" {
 		hiveDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 		// NOTE: overwriting all environment vars here, there are no others at the time of
 		// writing:
-		hiveDeployment.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
-			{
-				Name:  images.HiveImageEnvVar,
-				Value: r.hiveImage,
-			},
+		hiveImageEnvVar := corev1.EnvVar{
+			Name:  images.HiveImageEnvVar,
+			Value: r.hiveImage,
 		}
+
+		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
 	}
 
-	// ApplyDeployment does not check much of the Spec for changes. Do some manual
-	// checking and if we see something we care about has changed, force an update
-	// by changing the expected deployment generation.
-	if foundCurrentDeployment && currentDeployment.Spec.Template.Spec.Containers[0].Image !=
-		hiveDeployment.Spec.Template.Spec.Containers[0].Image {
-		hLog.WithFields(log.Fields{
-			"current": currentDeployment.Spec.Template.Spec.Containers[0].Image,
-			"new":     hiveDeployment.Spec.Template.Spec.Containers[0].Image,
-		}).Info("overriding deployment image")
-		expectedDeploymentGen = expectedDeploymentGen - 1
-	}
+	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
+		scheme.Scheme)
 
-	var changed bool
-	_, changed, err = resourceapply.ApplyDeployment(r.kubeClient.AppsV1(),
-		recorder, hiveDeployment, expectedDeploymentGen, false)
+	// TODO: it would be nice to be able to log if there were changes or not
+	// for all artifacts we Apply.
+
+	// Encode our modified Deployment back to byte array for applying:
+	buf := bytes.NewBuffer([]byte{})
+	err := s.Encode(hiveDeployment, buf)
+	if err != nil {
+		hLog.WithError(err).Error("error encoding deployment")
+		return err
+	}
+	err = h.Apply(buf.Bytes())
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	hLog.WithField("changed", changed).Info("deployment updated")
+	hLog.Info("deployment applied")
 
-	hLog.Info("Hive components reconciled")
+	hLog.Info("all hive components successfully reconciled")
 	return nil
-
 }

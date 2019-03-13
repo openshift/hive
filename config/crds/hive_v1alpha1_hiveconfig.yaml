@@ -11,6 +11,8 @@ spec:
     kind: HiveConfig
     plural: hiveconfigs
   scope: Cluster
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -29,6 +31,12 @@ spec:
         spec:
           type: object
         status:
+          properties:
+            aggregatorClientCAHash:
+              description: AggregatorClientCAHash keeps an md5 hash of the aggregator
+                client CA configmap data from the openshift-config-managed namespace.
+                When the configmap changes, admission is redeployed.
+              type: string
           type: object
   version: v1alpha1
 status:

@@ -80,6 +80,10 @@ type ClusterDeploymentSpec struct {
 
 	// PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it
 	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
+
+	// Ingress allows defining desired clusteringress/shards to be configured on the cluster.
+	// +optional
+	Ingress []ClusterIngress `json:"ingress,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
@@ -309,6 +313,26 @@ type LibvirtNetwork struct {
 	IfName string `json:"if"`
 	// IPRange is the range of IPs to use.
 	IPRange string `json:"ipRange"`
+}
+
+// ClusterIngress contains the configurable pieces for any ClusterIngress objects
+// that should exist on the cluster.
+type ClusterIngress struct {
+	// Name of the ClusterIngress object to create.
+	Name string `json:"name"`
+
+	// Domain (sometimes refered to as shard) is the full DNS suffix that the resulting
+	// IngressController object will service (eg abcd.mycluster.mydomain.com).
+	Domain string `json:"domain"`
+
+	// NamespaceSelector allows filtering the list of namespaces serviced by the
+	// ingress controller.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+
+	// RouteSelector allows filtering the set of Routes serviced by the ingress controller
+	// +optional
+	RouteSelector *metav1.LabelSelector `json:"routeSelector,omitempty"`
 }
 
 func init() {

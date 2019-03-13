@@ -816,6 +816,32 @@ spec:
                     install.
                   type: string
               type: object
+            ingress:
+              description: Ingress allows defining desired clusteringress/shards to
+                be configured on the cluster.
+              items:
+                properties:
+                  domain:
+                    description: Domain (sometimes refered to as shard) is the full
+                      DNS suffix that the resulting IngressController object will
+                      service (eg abcd.mycluster.mydomain.com).
+                    type: string
+                  name:
+                    description: Name of the ClusterIngress object to create.
+                    type: string
+                  namespaceSelector:
+                    description: NamespaceSelector allows filtering the list of namespaces
+                      serviced by the ingress controller.
+                    type: object
+                  routeSelector:
+                    description: RouteSelector allows filtering the set of Routes
+                      serviced by the ingress controller
+                    type: object
+                required:
+                - name
+                - domain
+                type: object
+              type: array
             networking:
               description: Networking defines the pod network provider in the cluster.
               properties:

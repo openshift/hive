@@ -27,6 +27,17 @@ import (
 	"testing"
 )
 
+func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
+	cd := validClusterDeployment()
+	cd.Spec.Ingress = []hivev1.ClusterIngress{
+		{
+			Name:   "default",
+			Domain: "apps.sameclustername.example.com",
+		},
+	}
+	return cd
+}
+
 func validClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
@@ -210,6 +221,48 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				Resource: "not the right resource",
 			},
 			expectedAllowed: true,
+		},
+
+		{
+			name:            "Test going from previously defined list of ingress to empty ingress list",
+			oldObject:       validClusterDeploymentWithIngress(),
+			newObject:       validClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test new clusterdeployment with ingress list with default defined",
+			newObject:       validClusterDeploymentWithIngress(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "Test new clusterdeployment with ingress list without default defined",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.Ingress[0].Name = "notdefault"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test updating existing empty ingress to populated ingress",
+			oldObject:       validClusterDeployment(),
+			newObject:       validClusterDeploymentWithIngress(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test updating existing ingress to one missing default",
+			oldObject: validClusterDeploymentWithIngress(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.Ingress[0].Name = "notdefault"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
 		},
 	}
 

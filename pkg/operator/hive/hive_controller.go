@@ -116,6 +116,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// for configmaps in that namespace.
 	ns := &corev1.Namespace{}
 	if err = tempClient.Get(context.TODO(), types.NamespacedName{Name: managedConfigNamespace}, ns); err == nil {
+		log.WithField("operator", "hive").Debugf("namespace %s was found, will watch it for configmap changes", managedConfigNamespace)
 		// Create an informer that only listens to events in the OpenShift managed namespace
 		kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(r.(*ReconcileHiveConfig).kubeClient, 10*time.Minute, kubeinformers.WithNamespace(managedConfigNamespace))
 		configMapInformer := kubeInformerFactory.Core().V1().ConfigMaps().Informer()
@@ -127,6 +128,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return err
 		}
 		r.(*ReconcileHiveConfig).syncAggregatorCA = true
+	} else {
+		if errors.IsNotFound(err) {
+			log.WithField("operator", "hive").Debugf("namespace %s was not found, no syncing will occur with the admission pods", managedConfigNamespace)
+		} else {
+			log.WithError(err).Errorf("cannot get namespace %s", managedConfigNamespace)
+			return err
+		}
 	}
 
 	// Watch for changes to HiveConfig:

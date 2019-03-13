@@ -79,6 +79,15 @@ with open('config/hiveadmission/hiveadmission_rbac_role.yaml', 'r') as stream:
             'serviceAccountName': 'hiveadmission',
         })
 
+# Add our hive-frontend role to the CSV:
+with open('config/rbac/hive_frontend_role.yaml', 'r') as stream:
+    hive_frontend_role = yaml.load(stream)
+    csv['spec']['install']['spec']['clusterPermissions'].append(
+        {
+            'rules': hive_frontend_role['rules'],
+            'serviceAccountName': 'hive-frontend',
+        })
+
 # Add our deployment spec for the hive operator:
 with open('config/operator/operator_deployment.yaml', 'r') as stream:
     operator_components = []

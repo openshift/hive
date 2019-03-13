@@ -7,7 +7,9 @@ parameters:
 - name: REGISTRY_IMG
   required: true
 - name: CHANNEL
-  default: alpha
+  default: staging
+- name: IMAGE_TAG
+  default: latest
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -16,7 +18,7 @@ objects:
     name: hive-catalog
   spec:
     sourceType: grpc
-    image: ${REGISTRY_IMG}
+    image: ${REGISTRY_IMG}:${CHANNEL}-${IMAGE_TAG}
     displayName: Hive Test Registry
     publisher: Hive Developer
 

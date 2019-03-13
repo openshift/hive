@@ -27,7 +27,7 @@ GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --
 # Git hash is appended to our version:
 GIT_HASH=`git rev-parse --short HEAD`
 
-USE_CHANNEL=${CHANNEL:-alpha}
+USE_CHANNEL=${CHANNEL:-staging}
 
 # Use a fake replaces version, we will not be using this.
 ./hack/generate-operator-bundle.py bundle/ 0.1.5-4b53b492 $GIT_COMMIT_COUNT $GIT_HASH $DEPLOY_IMG
@@ -43,18 +43,19 @@ yq d -i $CSV_FILE spec.replaces
 cat <<EOF > bundle/hive.package.yaml
 packageName: hive-operator
 channels:
-- name: alpha
+- name: staging
   currentCSV: $CSV_NAME
 EOF
 
 echo "OLM Operator Package written to: bundle/"
 
+REGISTRY_IMG_PATH="${REGISTRY_IMG}:${USE_CHANNEL}-latest"
+
 # Build the registry image:
-sudo buildah bud --file build/olm-registry/Dockerfile --tag "$REGISTRY_IMG" .
+sudo buildah bud --file build/olm-registry/Dockerfile --tag "${REGISTRY_IMG_PATH}" .
 
 # Push the registry image:
-sudo podman push $REGISTRY_IMG
+sudo podman push "${REGISTRY_IMG_PATH}"
 
 # Create the remaining OLM artifacts to subscribe to the operator:
 oc process -f hack/olm-registry/olm-artifacts-template.yaml REGISTRY_IMG=$REGISTRY_IMG CHANNEL=$USE_CHANNEL | kubectl apply -f -
-

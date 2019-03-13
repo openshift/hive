@@ -45,7 +45,7 @@ PREV_VERSION=$(ls $BUNDLE_DIR | sort -t . -k 3 -g | tail -n 1)
     $PREV_VERSION \
     $GIT_COMMIT_COUNT \
     $GIT_HASH \
-    $QUAY_IMAGE
+    $QUAY_IMAGE:$GIT_HASH
 
 # create package yaml
 NEW_VERSION=$(ls $BUNDLE_DIR | sort -t . -k 3 -g | tail -n 1)
@@ -72,7 +72,7 @@ git push origin "$BRANCH_CHANNEL"
 popd
 
 # build the registry image
-REGISTRY_IMG="quay.io/app-sre/hive-registry:${BRANCH_CHANNEL}"
+REGISTRY_IMG="quay.io/app-sre/hive-registry"
 DOCKERFILE_REGISTRY="Dockerfile.olm-registry"
 
 cat <<EOF > $DOCKERFILE_REGISTRY
@@ -84,13 +84,13 @@ RUN initializer
 CMD ["registry-server", "-t", "/tmp/terminate.log"]
 EOF
 
-docker build -f $DOCKERFILE_REGISTRY --tag "$REGISTRY_IMG" .
+docker build -f $DOCKERFILE_REGISTRY --tag "${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" .
 
 # push image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon:${REGISTRY_IMG}" \
-    "docker://${REGISTRY_IMG}"
+    "docker-daemon:${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
+    "docker://${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest"
 
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon:${REGISTRY_IMG}" \
-    "docker://${REGISTRY_IMG}-$GIT_HASH"
+    "docker-daemon::${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
+    "docker://:${REGISTRY_IMG}:${BRANCH_CHANNEL}-${GIT_HASH}"

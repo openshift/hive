@@ -92,5 +92,5 @@ skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
     "docker://${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest"
 
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon::${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
-    "docker://:${REGISTRY_IMG}:${BRANCH_CHANNEL}-${GIT_HASH}"
+    "docker-daemon:${REGISTRY_IMG}:${BRANCH_CHANNEL}-latest" \
+    "docker://${REGISTRY_IMG}:${BRANCH_CHANNEL}-${GIT_HASH}"

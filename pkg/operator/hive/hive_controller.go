@@ -22,6 +22,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/operator/util"
+	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 
@@ -38,8 +40,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	//"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -229,13 +233,22 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, instance, recorder)
+	clientConfig := util.GenerateClientConfigFromRESTConfig("anything", r.restConfig)
+	kubeconfig, err := clientcmd.Write(*clientConfig)
+
+	if err != nil {
+		hLog.WithError(err).Error("error serializing kubeconfig")
+		return reconcile.Result{}, err
+	}
+	h := resource.NewHelper(kubeconfig, hLog)
+
+	err = r.deployHive(hLog, h, instance, recorder)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, instance, recorder)
+	err = r.deployHiveAdmission(hLog, h, instance, recorder)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		return reconcile.Result{}, err

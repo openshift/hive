@@ -32,24 +32,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
-	clientConfig := util.GenerateClientConfigFromRESTConfig("anything", r.restConfig)
-	kubeconfig, err := clientcmd.Write(*clientConfig)
-	if err != nil {
-		haLog.WithError(err).Error("error serializing kubeconfig")
-		return err
-	}
-
-	h := resource.NewHelper(kubeconfig, haLog)
-
+func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	asset := assets.MustAsset("config/hiveadmission/daemonset.yaml")
 	haLog.Debug("reading daemonset")
 	hiveAdmDaemonSet := resourceread.ReadDaemonSetV1OrDie(asset)
 
-	err = util.ApplyAsset(h, "config/hiveadmission/service.yaml", haLog)
+	err := util.ApplyAsset(h, "config/hiveadmission/service.yaml", haLog)
 	if err != nil {
 		return err
 	}

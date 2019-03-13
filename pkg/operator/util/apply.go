@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"io/ioutil"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -24,6 +26,10 @@ import (
 
 	"k8s.io/client-go/rest"
 	configapi "k8s.io/client-go/tools/clientcmd/api"
+)
+
+const (
+	tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 // ApplyAsset loads a path from our bindata assets and applies it to the cluster.
@@ -68,6 +74,15 @@ func GenerateClientConfigFromRESTConfig(name string, restConfig *rest.Config) *c
 		Token:                 restConfig.BearerToken,
 		Username:              restConfig.Username,
 		Password:              restConfig.Password,
+	}
+
+	if restConfig.WrapTransport != nil && len(restConfig.BearerToken) == 0 {
+		token, err := ioutil.ReadFile(tokenFile)
+		if err != nil {
+			log.WithError(err).Warning("empty bearer token and cannot read token file")
+		} else {
+			authInfo.Token = string(token)
+		}
 	}
 
 	context := &configapi.Context{

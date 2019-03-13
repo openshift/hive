@@ -45,7 +45,7 @@ PREV_VERSION=$(ls $BUNDLE_DIR | sort -t . -k 3 -g | tail -n 1)
     $PREV_VERSION \
     $GIT_COMMIT_COUNT \
     $GIT_HASH \
-    $QUAY_IMAGE
+    $QUAY_IMAGE:$GIT_HASH
 
 # create package yaml
 NEW_VERSION=$(ls $BUNDLE_DIR | sort -t . -k 3 -g | tail -n 1)

@@ -1810,6 +1810,8 @@ spec:
     kind: HiveConfig
     plural: hiveconfigs
   scope: Cluster
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -1828,6 +1830,12 @@ spec:
         spec:
           type: object
         status:
+          properties:
+            aggregatedCAHash:
+              description: AggregatedCAHash keeps an md5 hash of the aggregated CA
+                configmap data for the system. When the configmap changes, admission
+                is redeployed.
+              type: string
           type: object
   version: v1alpha1
 status:

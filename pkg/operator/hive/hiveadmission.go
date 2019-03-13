@@ -28,10 +28,16 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
-
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
+)
+
+const (
+	admissionDaemonSetName = "hiveadmission"
 )
 
 func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
@@ -91,5 +97,23 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *reso
 
 	haLog.Info("hiveadmission components reconciled successfully")
 
+	return nil
+}
+
+func (r *ReconcileHiveConfig) redeployHiveAdmission(haLog log.FieldLogger, instance *hivev1.HiveConfig, recorder events.Recorder) error {
+	daemonSet, err := r.kubeClient.AppsV1().DaemonSets(hiveNamespace).Get(admissionDaemonSetName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		// Daemonset doesn't exist yet, nothing to do
+		return nil
+	}
+	if err != nil {
+		haLog.WithError(err).Error("cannot retrieve admission daemonset")
+		return err
+	}
+	_, _, err = resourceapply.ApplyDaemonSet(r.kubeClient.AppsV1(), recorder, daemonSet, daemonSet.Generation, true)
+	if err != nil {
+		haLog.WithError(err).Error("cannot force daemonset redeploy")
+		return err
+	}
 	return nil
 }

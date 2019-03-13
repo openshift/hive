@@ -26,6 +26,10 @@ type HiveConfigSpec struct {
 
 // HiveConfigStatus defines the observed state of Hive
 type HiveConfigStatus struct {
+	// AggregatedCAHash keeps an md5 hash of the aggregated CA
+	// configmap data for the system. When the configmap changes,
+	// admission is redeployed.
+	AggregatedCAHash string `json:"aggregatedCAHash,omitempty"`
 }
 
 // +genclient:nonNamespaced
@@ -33,6 +37,7 @@ type HiveConfigStatus struct {
 
 // HiveConfig is the Schema for the hives API
 // +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type HiveConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

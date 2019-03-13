@@ -18,6 +18,10 @@ package hive
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -38,10 +42,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	//"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -60,6 +66,9 @@ const (
 	hiveConfigName = "hive"
 
 	hiveOperatorDeploymentName = "hive-operator"
+
+	managedConfigNamespace    = "openshift-config-managed"
+	aggregatorCAConfigMapName = "kube-apiserver-aggregator-client-ca"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -96,6 +105,30 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Regular manager client is not fully initialized here, create our own for some
+	// initialization API communication:
+	tempClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+	if err != nil {
+		return err
+	}
+
+	// Determine if the openshift-config-managed namespace exists (> v4.0). If so, setup a watch
+	// for configmaps in that namespace.
+	ns := &corev1.Namespace{}
+	if err = tempClient.Get(context.TODO(), types.NamespacedName{Name: managedConfigNamespace}, ns); err == nil {
+		// Create an informer that only listens to events in the OpenShift managed namespace
+		kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(r.(*ReconcileHiveConfig).kubeClient, 10*time.Minute, kubeinformers.WithNamespace(managedConfigNamespace))
+		configMapInformer := kubeInformerFactory.Core().V1().ConfigMaps().Informer()
+		mgr.Add(&informerRunnable{informer: configMapInformer})
+
+		// Watch for changes to cm/kube-apiserver-aggregator-client-ca in the OpenShift managed namespace
+		err = c.Watch(&source.Informer{Informer: configMapInformer}, &handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(aggregatorCAConfigMapHandler)})
+		if err != nil {
+			return err
+		}
+		r.(*ReconcileHiveConfig).syncAggregatorCA = true
+	}
+
 	// Watch for changes to HiveConfig:
 	err = c.Watch(&source.Kind{Type: &hivev1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
@@ -125,13 +158,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		IsController: true,
 		OwnerType:    &hivev1.HiveConfig{},
 	})
-	if err != nil {
-		return err
-	}
-
-	// Regular manager client is not fully initialized here, create our own for some
-	// initialization API communication:
-	tempClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
 	if err != nil {
 		return err
 	}
@@ -183,12 +209,13 @@ var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 // ReconcileHiveConfig reconciles a Hive object
 type ReconcileHiveConfig struct {
 	client.Client
-	scheme       *runtime.Scheme
-	kubeClient   kubernetes.Interface
-	apiextClient *apiextclientv1beta1.ApiextensionsV1beta1Client
-	apiregClient *apiregclientv1.ApiregistrationV1Client
-	restConfig   *rest.Config
-	hiveImage    string
+	scheme           *runtime.Scheme
+	kubeClient       kubernetes.Interface
+	apiextClient     *apiextclientv1beta1.ApiextensionsV1beta1Client
+	apiregClient     *apiregclientv1.ApiregistrationV1Client
+	restConfig       *rest.Config
+	hiveImage        string
+	syncAggregatorCA bool
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
@@ -226,6 +253,28 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Name:      request.Name,
 		Namespace: hiveNamespace,
 	})
+
+	if r.syncAggregatorCA {
+		aggregatorCAConfigMap := &corev1.ConfigMap{}
+		err := r.Get(context.TODO(), types.NamespacedName{Name: aggregatorCAConfigMapName, Namespace: managedConfigNamespace}, aggregatorCAConfigMap)
+		// If the configmap is not found, then we should not try to do anything with admission
+		if err != nil && !errors.IsNotFound(err) {
+			hLog.WithError(err).Error("cannot retrieve aggregator CA configmap")
+			return reconcile.Result{}, err
+		}
+		if err == nil {
+			caHash := computeHash(aggregatorCAConfigMap.Data)
+			if instance.Status.AggregatedCAHash != caHash {
+				err := r.redeployHiveAdmission(hLog, instance, recorder)
+				if err != nil {
+					return reconcile.Result{}, err
+				}
+				instance.Status.AggregatedCAHash = caHash
+				err = r.Status().Update(context.TODO(), instance)
+				return reconcile.Result{}, err
+			}
+		}
+	}
 
 	err = r.deleteLegacyComponents(hLog)
 	if err != nil {
@@ -298,4 +347,27 @@ func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error
 		hLog.WithField("Service", legacyService).Info("deleted legacy Service")
 	}
 	return nil
+}
+
+type informerRunnable struct {
+	informer cache.SharedIndexInformer
+}
+
+func (r *informerRunnable) Start(stopch <-chan struct{}) error {
+	r.informer.Run(stopch)
+	cache.WaitForCacheSync(stopch, r.informer.HasSynced)
+	return nil
+}
+
+func aggregatorCAConfigMapHandler(o handler.MapObject) []reconcile.Request {
+	if o.Meta.GetName() == aggregatorCAConfigMapName {
+		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: hiveConfigName}}}
+	}
+	return nil
+}
+
+func computeHash(data map[string]string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%v", data)))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

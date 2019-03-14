@@ -27,8 +27,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 
-	oappsv1 "github.com/openshift/api/apps/v1"
-
 	apiextclientv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apiregclientv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
@@ -52,8 +50,6 @@ import (
 )
 
 const (
-	legacyDeploymentConfig = "hive-controller-manager"
-	legacyService          = "hive-controller-manager-service"
 	// hiveNamespace is the assumed and only supported namespace where Hive will be deployed.
 	hiveNamespace = "hive"
 	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
@@ -227,12 +223,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Namespace: hiveNamespace,
 	})
 
-	err = r.deleteLegacyComponents(hLog)
-	if err != nil {
-		hLog.WithError(err).Error("error deleting legacy components")
-		return reconcile.Result{}, err
-	}
-
 	clientConfig := util.GenerateClientConfigFromRESTConfig("anything", r.restConfig)
 	kubeconfig, err := clientcmd.Write(*clientConfig)
 
@@ -255,47 +245,4 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	return reconcile.Result{}, nil
-}
-
-// deleteLegacyComponents deletes Hive components that once existed but have since
-// been removed or renamed.
-func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error {
-	// Ensure legacy DeploymentConfig is deleted, we switched to a Deployment:
-	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
-	dc := &oappsv1.DeploymentConfig{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDeploymentConfig, Namespace: hiveNamespace}, dc)
-	if err != nil && !errors.IsNotFound(err) {
-		hLog.WithError(err).Error("error looking up legacy DeploymentConfig")
-		return err
-	} else if err != nil {
-		hLog.WithField("DeploymentConfig", legacyDeploymentConfig).Debug("legacy DeploymentConfig does not exist")
-	} else {
-		err = r.Delete(context.Background(), dc)
-		if err != nil {
-			hLog.WithError(err).WithField("DeploymentConfig", legacyDeploymentConfig).Error(
-				"error deleting legacy DeploymentConfig")
-			return err
-		}
-		hLog.WithField("DeploymentConfig", legacyDeploymentConfig).Info("deleted legacy DeploymentConfig")
-	}
-
-	// Ensure legacy Service is deleted, renamed.
-	// TODO: this can be removed once rolled out to opshive, our only persistent environment.
-	oldSvc := &corev1.Service{}
-	err = r.Get(context.Background(), types.NamespacedName{Name: legacyService, Namespace: hiveNamespace}, oldSvc)
-	if err != nil && !errors.IsNotFound(err) {
-		hLog.WithError(err).Error("error looking up legacy Service")
-		return err
-	} else if err != nil {
-		hLog.WithField("Service", legacyService).Debug("legacy Service does not exist")
-	} else {
-		err = r.Delete(context.Background(), oldSvc)
-		if err != nil {
-			hLog.WithError(err).WithField("Service", legacyService).Error(
-				"error deleting legacy Service")
-			return err
-		}
-		hLog.WithField("Service", legacyService).Info("deleted legacy Service")
-	}
-	return nil
 }

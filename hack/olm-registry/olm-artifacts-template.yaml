@@ -7,9 +7,9 @@ parameters:
 - name: REGISTRY_IMG
   required: true
 - name: CHANNEL
-  default: staging
+  value: staging
 - name: IMAGE_TAG
-  default: latest
+  value: latest
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1

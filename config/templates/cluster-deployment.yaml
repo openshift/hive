@@ -54,14 +54,10 @@ parameters:
   displayName: Try Uninstall Only Once
   description: If set, uninstall will only be tried once.
   value: "false"
-- name: CUSTOM_RELEASE_IMAGE
-  displayName: Custom release image in custom ClusterImageSet
-  description: Name of custom release image in custom ClusterImageSet. Defaults to latest in CI.
-  value: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
 - name: CLUSTER_IMAGE_SET
   displayName: ClusterImageSet to use for the cluster deployment
-  description: Specify an alternate ClusterImageSet to reference from the cluster deployment. Default is origin-latest.
-  value: origin-latest
+  description: Specify an alternate ClusterImageSet to reference from the cluster deployment. Default is latest OpenShift 4.0 CI images.
+  value: openshift-v4.0-latest
 
 objects:
 - apiVersion: v1
@@ -88,24 +84,6 @@ objects:
   type: Opaque
   stringData:
     ssh-publickey: "${SSH_KEY}"
-
-- apiVersion: hive.openshift.io/v1alpha1
-  kind: ClusterImageSet
-  metadata:
-    labels:
-      controller-tools.k8s.io: "1.0"
-    name: origin-latest
-  spec:
-    releaseImage: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
-
-- apiVersion: hive.openshift.io/v1alpha1
-  kind: ClusterImageSet
-  metadata:
-    labels:
-      controller-tools.k8s.io: "1.0"
-    name: custom
-  spec:
-    releaseImage: "${CUSTOM_RELEASE_IMAGE}"
 
 - apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment

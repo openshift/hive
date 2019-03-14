@@ -85,6 +85,7 @@ rules:
   - hive.openshift.io
   resources:
   - syncsets
+  - clusterimagesets
   verbs:
   - get
   - create

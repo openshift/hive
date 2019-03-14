@@ -106,7 +106,7 @@ while [ $i -le ${max_tries} ]; do
          AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
          BASE_DOMAIN="${BASE_DOMAIN}" \
          HIVE_IMAGE="${HIVE_IMAGE}" \
-         CUSTOM_RELEASE_IMAGE="${RELEASE_IMAGE}" \
+         RELEASE_IMAGE="${RELEASE_IMAGE}" \
          CLUSTER_IMAGE_SET="custom" \
          TRY_INSTALL_ONCE="true" \
          TRY_UNINSTALL_ONCE="true" \

@@ -24,6 +24,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/operator/assets"
+	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -72,6 +73,19 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		return err
 	}
 	hLog.Info("deployment applied")
+
+	// Deploy the desired ClusterImageSets representing installable releases of OpenShift.
+	// TODO: in future this should be pipelined somehow.
+	applyAssets := []string{
+		"config/clusterimagesets/openshift-4.0-beta2.yaml",
+		"config/clusterimagesets/openshift-4.0-latest.yaml",
+	}
+	for _, a := range applyAssets {
+		err = util.ApplyAsset(h, a, hLog)
+		if err != nil {
+			return err
+		}
+	}
 
 	hLog.Info("all hive components successfully reconciled")
 	return nil

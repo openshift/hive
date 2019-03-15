@@ -48,7 +48,7 @@ const (
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
-	hiveImage string,
+	hiveImage, releaseImage string,
 	serviceAccountName string,
 	sshKey string,
 	pullSecret string) (*batchv1.Job, *corev1.ConfigMap, error) {
@@ -142,11 +142,11 @@ func GenerateInstallerJob(
 			},
 		}...)
 	}
-	if cd.Spec.Images.ReleaseImage != "" {
+	if releaseImage != "" {
 		env = append(env, []corev1.EnvVar{
 			{
 				Name:  "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
-				Value: cd.Spec.Images.ReleaseImage,
+				Value: releaseImage,
 			},
 		}...)
 	}

@@ -178,10 +178,13 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	hiveImage, err := r.getHiveImage(cd, cdLog)
+	imageSet, err := r.getClusterImageSet(cd, cdLog)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
+	hiveImage := r.getHiveImage(cd, imageSet, cdLog)
+	releaseImage := r.getReleaseImage(cd, imageSet, cdLog)
 
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
@@ -271,6 +274,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	job, cfgMap, err := install.GenerateInstallerJob(
 		cd,
 		hiveImage,
+		releaseImage,
 		serviceAccountName,
 		sshKey,
 		pullSecret)
@@ -358,22 +362,45 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 // 2 - referenced in the cluster deployment spec.imageSet
 // 3 - specified via environment variable to the hive controller
 // 4 - fallback default hardcoded image reference
-func (r *ReconcileClusterDeployment) getHiveImage(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (string, error) {
+func (r *ReconcileClusterDeployment) getHiveImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, cdLog log.FieldLogger) string {
 	if cd.Spec.Images.HiveImage != "" {
-		return cd.Spec.Images.HiveImage, nil
+		return cd.Spec.Images.HiveImage
 	}
-	if cd.Spec.ImageSet != nil {
-		imageSet := &hivev1.ClusterImageSet{}
-		err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
-		if err == nil && imageSet.Spec.HiveImage != nil {
-			return *imageSet.Spec.HiveImage, nil
-		}
-		if err != nil && !errors.IsNotFound(err) {
-			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
-			return "", err
-		}
+	if imageSet != nil && imageSet.Spec.HiveImage != nil {
+		return *imageSet.Spec.HiveImage
 	}
-	return images.GetHiveImage(cdLog), nil
+	return images.GetHiveImage(cdLog)
+}
+
+// getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
+// 1 - specified in the cluster deployment spec.images.releaseImage
+// 2 - referenced in the cluster deployment spec.imageSet
+func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, cdLog log.FieldLogger) string {
+	if cd.Spec.Images.ReleaseImage != "" {
+		return cd.Spec.Images.ReleaseImage
+	}
+	if imageSet != nil && imageSet.Spec.ReleaseImage != nil {
+		return *imageSet.Spec.ReleaseImage
+	}
+	return ""
+}
+
+func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
+	if cd.Spec.ImageSet == nil {
+		return nil, nil
+	}
+	imageSet := &hivev1.ClusterImageSet{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
+	switch {
+	case errors.IsNotFound(err):
+		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Warning("clusterdeployment references non-existent clusterimageset")
+		return nil, nil
+	case err != nil:
+		cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
+		return nil, err
+	default:
+		return imageSet, nil
+	}
 }
 
 func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {

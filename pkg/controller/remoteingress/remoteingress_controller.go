@@ -138,11 +138,7 @@ func (r *ReconcileRemoteClusterIngress) syncClusterIngress(cd *hivev1.ClusterDep
 
 	rawList := rawExtensionsFromClusterDeployment(cd)
 
-	if err := r.syncSyncSet(cd, rawList); err != nil {
-		return err
-	}
-
-	return nil
+	return r.syncSyncSet(cd, rawList)
 }
 
 func rawExtensionsFromClusterDeployment(cd *hivev1.ClusterDeployment) []runtime.RawExtension {

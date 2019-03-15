@@ -258,6 +258,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
+						"",
 						"fakeserviceaccount",
 						"sshkey",
 						"pullsecret")
@@ -322,6 +323,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
+						"",
 						"fakeserviceaccount",
 						"sshkey",
 						"pullsecret")
@@ -349,6 +351,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					job, _, _ := install.GenerateInstallerJob(
 						testClusterDeployment(),
 						"fakeserviceaccount",
+						"",
 						"fakeserviceaccount",
 						"sshkey",
 						"pullsecret")
@@ -378,6 +381,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					job, _, _ := install.GenerateInstallerJob(
 						testDeletedClusterDeployment(),
 						"example.com/fake:latest",
+						"",
 						"fakeserviceaccount",
 						"sshkey",
 						"pullsecret")
@@ -454,6 +458,50 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				job := getImageSetJob(c)
 				if job == nil {
 					t.Errorf("did not find expected imageset job")
+				}
+			},
+		},
+		{
+			name: "Ensure release image from clusterimageset is used as override image in install job",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = strPtr("test-installer-image:latest")
+					cd.Spec.Images.InstallerImage = ""
+					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				func() *hivev1.ClusterImageSet {
+					cis := testClusterImageSet()
+					cis.Spec.ReleaseImage = strPtr("test-release-image:latest")
+					return cis
+				}(),
+				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
+				testSecret(pullSecretSecret, pullSecretKey, "{}"),
+				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				job := getInstallJob(c)
+				if job == nil {
+					t.Errorf("did not get expected job")
+					return
+				}
+				env := job.Spec.Template.Spec.Containers[0].Env
+				variable := corev1.EnvVar{}
+				found := false
+				for _, e := range env {
+					if e.Name == "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" {
+						variable = e
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("did not find expected override environment variable in job")
+					return
+				}
+				if variable.Value != "test-release-image:latest" {
+					t.Errorf("environment variable did not have the expected value. actual: %s", variable.Value)
 				}
 			},
 		},

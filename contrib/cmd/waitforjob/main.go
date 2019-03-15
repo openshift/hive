@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	defaultJobExistenceTimeout = 3 * time.Minute
-	defaultJobExecutionTimeout = 45 * time.Minute
+	defaultJobExistenceTimeout = 5 * time.Minute
+	defaultJobExecutionTimeout = 90 * time.Minute
 )
 
 const (

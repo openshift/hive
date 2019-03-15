@@ -17,21 +17,25 @@ limitations under the License.
 package dnszone
 
 import (
+	"context"
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/mock/gomock"
+	"github.com/openshift/hive/pkg/awsclient/mock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 // TestNewZoneReconciler tests that a new ZoneReconciler object can be created.
@@ -44,11 +48,11 @@ func TestNewZoneReconciler(t *testing.T) {
 	}{
 		{
 			name:    "Successfully create new zone",
-			dnsZone: validDNSZone,
+			dnsZone: validDNSZone(),
 		},
 		{
-			name:              "Fail to create new zone because desiredState not set",
-			expectedErrString: "ZoneReconciler requires desiredState to be set",
+			name:              "Fail to create new zone because dnsZone not set",
+			expectedErrString: "ZoneReconciler requires dnsZone to be set",
 		},
 	}
 
@@ -57,15 +61,15 @@ func TestNewZoneReconciler(t *testing.T) {
 			// Arrange
 			mocks := setupDefaultMocks(t)
 			expectedZoneReconciler := &ZoneReconciler{
-				desiredState: tc.dnsZone,
-				kubeClient:   mocks.fakeKubeClient,
-				logger:       log.WithField("controller", controllerName),
-				awsClient:    mocks.mockAWSClient,
+				dnsZone:    tc.dnsZone,
+				kubeClient: mocks.fakeKubeClient,
+				logger:     log.WithField("controller", controllerName),
+				awsClient:  mocks.mockAWSClient,
 			}
 
 			// Act
 			zr, err := NewZoneReconciler(
-				expectedZoneReconciler.desiredState,
+				expectedZoneReconciler.dnsZone,
 				expectedZoneReconciler.kubeClient,
 				expectedZoneReconciler.logger,
 				expectedZoneReconciler.awsClient,
@@ -83,94 +87,111 @@ func TestNewZoneReconciler(t *testing.T) {
 
 // TestReconcile tests that ZoneReconciler.Reconcile reacts properly under different reconciliation states.
 func TestReconcile(t *testing.T) {
+
+	log.SetLevel(log.DebugLevel)
+
 	cases := []struct {
-		name                       string
-		expectedErrString          string
-		dnsZone                    *hivev1.DNSZone
-		expectHostedZoneCreation   bool
-		expectHostedZoneDeletion   bool
-		listHostedZonesOutput      *route53.ListHostedZonesOutput
-		listHostedZonesError       error
-		createHostedZonesError     error
-		deleteHostedZonesError     error
-		expectedLastSyncGeneration int64
-		LastSyncTimestampCheck     func(timeToCheck *metav1.Time, start, end time.Time) bool
+		name          string
+		dnsZone       *hivev1.DNSZone
+		setupAWSMock  func(*mock.MockClientMockRecorder)
+		validateZone  func(*testing.T, *hivev1.DNSZone)
+		errorExpected bool
 	}{
 		{
-			name: "DNSZone found, No corresponding route53 hostedzone",
-			expectHostedZoneCreation: true,
-			dnsZone:                  validDNSZone.DeepCopy(),
-			listHostedZonesOutput: &route53.ListHostedZonesOutput{
-				HostedZones: []*route53.HostedZone{
-					{
-						Name: aws.String("not.the.right.zone."),
-					},
-				},
+			name:    "DNSZone without finalizer",
+			dnsZone: validDNSZoneWithoutFinalizer(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneExists(expect, validDNSZoneWithoutFinalizer())
+				mockExistingTags(expect)
 			},
-			expectedLastSyncGeneration: 6,
-			LastSyncTimestampCheck:     inTimeSpan,
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.True(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
 		},
 		{
-			name:    "DNSZone found, corresponding route53 hostedzone exists",
-			dnsZone: validDNSZone.DeepCopy(),
-			listHostedZonesOutput: &route53.ListHostedZonesOutput{
-				HostedZones: []*route53.HostedZone{
-					validRoute53HostedZone,
-				},
+			name:    "Create Hosted Zone, No ID Set",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneDoesntExist(expect, validDNSZoneWithoutID())
+				mockCreateZone(expect)
+				mockNoExistingTags(expect)
+				mockSyncTags(expect)
+				mockGetNSRecord(expect)
 			},
-			expectedLastSyncGeneration: 6,
-			LastSyncTimestampCheck:     inTimeSpan,
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.NotNil(t, zone.Status.AWS)
+				assert.NotNil(t, zone.Status.AWS.ZoneID)
+				assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
+			},
 		},
 		{
-			name:                     "DNSZone found, in deleting state",
-			dnsZone:                  validDNSZoneBeingDeleted.DeepCopy(),
-			expectHostedZoneDeletion: true,
-			listHostedZonesOutput: &route53.ListHostedZonesOutput{
-				HostedZones: []*route53.HostedZone{
-					validRoute53HostedZone,
-				},
+			name:    "Adopt existing zone, No ID Set",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneExists(expect, validDNSZoneWithoutID())
+				mockExistingTags(expect)
+				mockGetNSRecord(expect)
 			},
-			expectedLastSyncGeneration: 6,
-			LastSyncTimestampCheck:     inTimeSpan,
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.NotNil(t, zone.Status.AWS)
+				assert.NotNil(t, zone.Status.AWS.ZoneID)
+				assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
+			},
 		},
 		{
-			name:    "DNSZone found, aws.ListHostedZone errors",
-			dnsZone: validDNSZone.DeepCopy(),
-			listHostedZonesOutput: &route53.ListHostedZonesOutput{
-				HostedZones: []*route53.HostedZone{
-					validRoute53HostedZone,
-				},
+			name:    "Adopt existing zone, No ID Set, No Tags Set",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneDoesntExist(expect, validDNSZoneWithoutID())
+				mockCreateZoneDuplicateFailure(expect)
+				mockListZonesByNameFound(expect, validDNSZoneWithoutID())
+				mockNoExistingTags(expect)
+				mockSyncTags(expect)
+				mockGetNSRecord(expect)
 			},
-			listHostedZonesError:       errors.NewBadRequest("shame on you"),
-			expectedErrString:          "shame on you",
-			expectedLastSyncGeneration: 0, // LastSyncGeneration not updated since the sync failed.
-			LastSyncTimestampCheck:     func(timeToCheck *metav1.Time, start, end time.Time) bool { return timeToCheck == nil },
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.NotNil(t, zone.Status.AWS)
+				assert.NotNil(t, zone.Status.AWS.ZoneID)
+				assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
+			},
 		},
 		{
-			name:    "DNSZone found, aws.CreateHostedZone errors",
-			dnsZone: validDNSZone.DeepCopy(),
-			listHostedZonesOutput: &route53.ListHostedZonesOutput{
-				HostedZones: []*route53.HostedZone{},
+			name:    "Existing zone, sync tags",
+			dnsZone: validDNSZoneWithAdditionalTags(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingTags(expect)
+				mockSyncTags(expect)
+				mockGetNSRecord(expect)
 			},
-			expectHostedZoneCreation:   true,
-			createHostedZonesError:     errors.NewBadRequest("shame on you"),
-			expectedErrString:          "shame on you",
-			expectedLastSyncGeneration: 0, // LastSyncGeneration not updated since the sync failed.
-			LastSyncTimestampCheck:     func(timeToCheck *metav1.Time, start, end time.Time) bool { return timeToCheck == nil },
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.Equal(t, zone.Status.LastSyncGeneration, int64(6))
+			},
 		},
 		{
-			name:    "DNSZone found, aws.DeleteHostedZone errors",
-			dnsZone: validDNSZoneBeingDeleted.DeepCopy(),
-			listHostedZonesOutput: &route53.ListHostedZonesOutput{
-				HostedZones: []*route53.HostedZone{
-					validRoute53HostedZone,
-				},
+			name:    "Delete hosted zone",
+			dnsZone: validDNSZoneBeingDeleted(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingTags(expect)
+				mockDeleteZone(expect)
 			},
-			expectHostedZoneDeletion:   true,
-			deleteHostedZonesError:     errors.NewBadRequest("shame on you"),
-			expectedErrString:          "shame on you",
-			expectedLastSyncGeneration: 0, // LastSyncGeneration not updated since the sync failed.
-			LastSyncTimestampCheck:     func(timeToCheck *metav1.Time, start, end time.Time) bool { return timeToCheck == nil },
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
+		},
+		{
+			name:    "Delete non-existent hosted zone",
+			dnsZone: validDNSZoneBeingDeleted(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneDoesntExist(expect, validDNSZoneBeingDeleted())
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
 		},
 	}
 
@@ -191,36 +212,139 @@ func TestReconcile(t *testing.T) {
 
 			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
-			listHostedZonesMock := mocks.mockAWSClient.EXPECT().
-				ListHostedZones(gomock.Any()).
-				Return(tc.listHostedZonesOutput, tc.listHostedZonesError).
-				Times(1)
-
-			if tc.expectHostedZoneCreation {
-				mocks.mockAWSClient.EXPECT().
-					CreateHostedZone(gomock.Any()).
-					Return(nil, tc.createHostedZonesError).
-					Times(1).
-					After(listHostedZonesMock)
-			}
-
-			if tc.expectHostedZoneDeletion {
-				mocks.mockAWSClient.EXPECT().
-					DeleteHostedZone(gomock.Any()).
-					Return(nil, tc.deleteHostedZonesError).
-					Times(1).
-					After(listHostedZonesMock)
+			if tc.setupAWSMock != nil {
+				tc.setupAWSMock(mocks.mockAWSClient.EXPECT())
 			}
 
 			// Act
 			err := zr.Reconcile()
 
 			// Assert
-			assertErrorNilOrMessage(t, err, tc.expectedErrString)
+			if tc.errorExpected {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
-			// Ensure the sync generation and timeStamp are being set properly given each test case circumstance.
-			assert.Equal(t, tc.expectedLastSyncGeneration, zr.desiredState.Status.LastSyncGeneration)
-			assert.True(t, tc.LastSyncTimestampCheck(zr.desiredState.Status.LastSyncTimestamp, time.Now().Add(-5*time.Minute), time.Now().Add(5*time.Minute)))
+			// Validate
+			zone := &hivev1.DNSZone{}
+			err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name}, zone)
+			if err != nil {
+				t.Fatalf("unexpected: %v", err)
+			}
+			if tc.validateZone != nil {
+				tc.validateZone(t, zone)
+			}
 		})
 	}
+}
+
+func mockZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+
+	if zone.Status.AWS == nil || aws.StringValue(zone.Status.AWS.ZoneID) == "" {
+		expect.GetResourcesPages(gomock.Any(), gomock.Any()).
+			Do(func(input *resourcegroupstaggingapi.GetResourcesInput, f func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) {
+				f(&resourcegroupstaggingapi.GetResourcesOutput{
+					ResourceTagMappingList: []*resourcegroupstaggingapi.ResourceTagMapping{
+						{
+							ResourceARN: aws.String("arn:aws:route53:::hostedzone/1234"),
+						},
+					},
+				}, true)
+			}).Return(nil).Times(1)
+	}
+	expect.GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
+		HostedZone: &route53.HostedZone{
+			Id:   aws.String("1234"),
+			Name: aws.String("blah.example.com"),
+		},
+	}, nil).Times(1)
+}
+
+func mockZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+	if zone.Status.AWS != nil && aws.StringValue(zone.Status.AWS.ZoneID) != "" {
+		expect.GetHostedZone(gomock.Any()).
+			Return(nil, awserr.New(route53.ErrCodeNoSuchHostedZone, "doesnt exist", fmt.Errorf("doesnt exist"))).Times(1)
+		return
+	}
+	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+}
+
+func mockCreateZone(expect *mock.MockClientMockRecorder) {
+	expect.CreateHostedZone(gomock.Any()).Return(&route53.CreateHostedZoneOutput{
+		HostedZone: &route53.HostedZone{
+			Id:   aws.String("1234"),
+			Name: aws.String("blah.example.com"),
+		},
+	}, nil).Times(1)
+}
+
+func mockCreateZoneDuplicateFailure(expect *mock.MockClientMockRecorder) {
+	expect.CreateHostedZone(gomock.Any()).Return(nil, awserr.New(route53.ErrCodeHostedZoneAlreadyExists, "already exists", fmt.Errorf("already exists"))).Times(1)
+}
+
+func mockNoExistingTags(expect *mock.MockClientMockRecorder) {
+	expect.ListTagsForResource(gomock.Any()).Return(&route53.ListTagsForResourceOutput{
+		ResourceTagSet: &route53.ResourceTagSet{
+			ResourceId: aws.String("1234"),
+			Tags:       []*route53.Tag{},
+		},
+	}, nil).Times(1)
+}
+
+func mockExistingTags(expect *mock.MockClientMockRecorder) {
+	expect.ListTagsForResource(gomock.Any()).Return(&route53.ListTagsForResourceOutput{
+		ResourceTagSet: &route53.ResourceTagSet{
+			ResourceId: aws.String("1234"),
+			Tags: []*route53.Tag{
+				{
+					Key:   aws.String(hiveDNSZoneTag),
+					Value: aws.String("ns/dnszoneobject"),
+				},
+				{
+					Key:   aws.String("foo"),
+					Value: aws.String("bar"),
+				},
+			},
+		},
+	}, nil).Times(1)
+}
+
+func mockSyncTags(expect *mock.MockClientMockRecorder) {
+	expect.ChangeTagsForResource(gomock.Any()).Return(&route53.ChangeTagsForResourceOutput{}, nil).AnyTimes()
+}
+
+func mockGetNSRecord(expect *mock.MockClientMockRecorder) {
+	expect.ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+		ResourceRecordSets: []*route53.ResourceRecordSet{
+			{
+				Type: aws.String("NS"),
+				Name: aws.String("blah.example.com."),
+				ResourceRecords: []*route53.ResourceRecord{
+					{
+						Value: aws.String("ns1.example.com"),
+					},
+					{
+						Value: aws.String("ns2.example.com"),
+					},
+				},
+			},
+		},
+	}, nil)
+}
+
+func mockListZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+	expect.ListHostedZonesByName(gomock.Any()).Return(&route53.ListHostedZonesByNameOutput{
+		HostedZones: []*route53.HostedZone{
+			{
+				Id:              aws.String("1234"),
+				Name:            aws.String("blah.example.com"),
+				CallerReference: aws.String(string(zone.UID)),
+			},
+		},
+	}, nil).Times(1)
+}
+
+func mockDeleteZone(expect *mock.MockClientMockRecorder) {
+	expect.DeleteHostedZone(gomock.Any()).Return(nil, nil).Times(1)
 }

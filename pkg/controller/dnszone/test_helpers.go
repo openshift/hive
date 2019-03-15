@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakekubeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -41,46 +42,88 @@ var (
 		return &t
 	}()
 
-	validDNSZone = &hivev1.DNSZone{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "dnszoneobject",
-			Namespace:  "ns",
-			Generation: 6,
-		},
-		Spec: hivev1.DNSZoneSpec{
-			Zone: "blah.example.com",
-			AWS: &hivev1.AWSDNSZoneSpec{
-				AccountSecret: corev1.LocalObjectReference{
-					Name: "some secret",
-				},
-				Region: "us-east-1",
+	validDNSZone = func() *hivev1.DNSZone {
+		return &hivev1.DNSZone{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "dnszoneobject",
+				Namespace:  "ns",
+				Generation: 6,
+				Finalizers: []string{hivev1.FinalizerDNSZone},
+				UID:        types.UID("abcdef"),
 			},
-		},
+			Spec: hivev1.DNSZoneSpec{
+				Zone: "blah.example.com",
+				AWS: &hivev1.AWSDNSZoneSpec{
+					AccountSecret: corev1.LocalObjectReference{
+						Name: "some secret",
+					},
+					Region: "us-east-1",
+					AdditionalTags: []hivev1.AWSResourceTag{
+						{
+							Key:   "foo",
+							Value: "bar",
+						},
+					},
+				},
+			},
+			Status: hivev1.DNSZoneStatus{
+				AWS: &hivev1.AWSDNSZoneStatus{
+					ZoneID: aws.String("1234"),
+				},
+			},
+		}
+	}
+
+	validDNSZoneWithoutFinalizer = func() *hivev1.DNSZone {
+		zone := validDNSZone()
+		zone.Finalizers = []string{}
+		return zone
+	}
+
+	validDNSZoneWithoutID = func() *hivev1.DNSZone {
+		zone := validDNSZone()
+		zone.Status.AWS = nil
+		return zone
+	}
+
+	validDNSZoneWithAdditionalTags = func() *hivev1.DNSZone {
+		zone := validDNSZone()
+		zone.Spec.AWS.AdditionalTags = append(zone.Spec.AWS.AdditionalTags, []hivev1.AWSResourceTag{
+			{
+				Key:   "foo1",
+				Value: "bar1",
+			},
+			{
+				Key:   "foo2",
+				Value: "bar2",
+			},
+		}...)
+		return zone
 	}
 
 	validDNSZoneBeingDeleted = func() *hivev1.DNSZone {
 		// Take a copy of the default validDNSZone object
-		zone := validDNSZone.DeepCopy()
+		zone := validDNSZone()
 
 		// And make the 1 change needed to signal the object is being deleted.
 		zone.DeletionTimestamp = kubeTimeNow
 		return zone
-	}()
+	}
 
 	validDNSZoneGensDontMatch = func() *hivev1.DNSZone {
 		// Take a copy of the default validDNSZone object
-		zone := validDNSZone.DeepCopy()
+		zone := validDNSZone()
 
 		// And make the 1 change needed to signal the object has not been sync'd
 		zone.Status.LastSyncGeneration = 5
 		tmpTime := metav1.Now() // LastSyncTimestamp needs to be set so that the generation difference is meaningful in the "shouldSync" check.
 		zone.Status.LastSyncTimestamp = &tmpTime
 		return zone
-	}()
+	}
 
 	validDNSZoneGenTimestampSyncNotNeeded = func() *hivev1.DNSZone {
 		// Take a copy of the default validDNSZone object
-		zone := validDNSZone.DeepCopy()
+		zone := validDNSZone()
 
 		// And make the 1 change needed to signal the object has not been sync'd
 		zone.Status.LastSyncGeneration = 6
@@ -88,11 +131,11 @@ var (
 		zone.Status.LastSyncTimestamp = &tmpTime
 
 		return zone
-	}()
+	}
 
 	validDNSZoneGenTimestampSyncNeeded = func() *hivev1.DNSZone {
 		// Take a copy of the default validDNSZone object
-		zone := validDNSZone.DeepCopy()
+		zone := validDNSZone()
 
 		// And make the 1 change needed to signal the object has not been sync'd
 		zone.Status.LastSyncGeneration = 6
@@ -100,10 +143,12 @@ var (
 		zone.Status.LastSyncTimestamp = &tmpTime
 
 		return zone
-	}()
+	}
 
-	validRoute53HostedZone = &route53.HostedZone{
-		Name: aws.String(validDNSZone.Spec.Zone + "."), // hosted zones always come back with a period on the end.
+	validRoute53HostedZone = func() *route53.HostedZone {
+		return &route53.HostedZone{
+			Name: aws.String(validDNSZone().Spec.Zone + "."), // hosted zones always come back with a period on the end.
+		}
 	}
 )
 

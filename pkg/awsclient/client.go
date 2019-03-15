@@ -34,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
+	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/route53/route53iface"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -83,8 +84,16 @@ type Client interface {
 
 	//Route53
 	CreateHostedZone(input *route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error)
+	GetHostedZone(*route53.GetHostedZoneInput) (*route53.GetHostedZoneOutput, error)
+	ListTagsForResource(*route53.ListTagsForResourceInput) (*route53.ListTagsForResourceOutput, error)
+	ChangeTagsForResource(input *route53.ChangeTagsForResourceInput) (*route53.ChangeTagsForResourceOutput, error)
 	DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error)
 	ListHostedZones(input *route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error)
+	ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error)
+	ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error)
+
+	// ResourceTagging
+	GetResourcesPages(input *resourcegroupstaggingapi.GetResourcesInput, fn func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) error
 }
 
 type awsClient struct {
@@ -93,6 +102,7 @@ type awsClient struct {
 	iamClient     iamiface.IAMAPI
 	route53Client route53iface.Route53API
 	s3Client      s3iface.S3API
+	tagClient     *resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 }
 
 func (c *awsClient) DescribeAvailabilityZones(input *ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error) {
@@ -185,13 +195,36 @@ func (c *awsClient) GetS3API() s3iface.S3API {
 func (c *awsClient) ListHostedZones(input *route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error) {
 	return c.route53Client.ListHostedZones(input)
 }
+func (c *awsClient) ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error) {
+	return c.route53Client.ListHostedZonesByName(input)
+}
 
 func (c *awsClient) CreateHostedZone(input *route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error) {
 	return c.route53Client.CreateHostedZone(input)
 }
 
+func (c *awsClient) GetHostedZone(input *route53.GetHostedZoneInput) (*route53.GetHostedZoneOutput, error) {
+	return c.route53Client.GetHostedZone(input)
+}
+
+func (c *awsClient) ListTagsForResource(input *route53.ListTagsForResourceInput) (*route53.ListTagsForResourceOutput, error) {
+	return c.route53Client.ListTagsForResource(input)
+}
+
+func (c *awsClient) ChangeTagsForResource(input *route53.ChangeTagsForResourceInput) (*route53.ChangeTagsForResourceOutput, error) {
+	return c.route53Client.ChangeTagsForResource(input)
+}
+
 func (c *awsClient) DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error) {
 	return c.route53Client.DeleteHostedZone(input)
+}
+
+func (c *awsClient) GetResourcesPages(input *resourcegroupstaggingapi.GetResourcesInput, fn func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) error {
+	return c.tagClient.GetResourcesPages(input, fn)
+}
+
+func (c *awsClient) ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error) {
+	return c.route53Client.ListResourceRecordSets(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
@@ -239,5 +272,6 @@ func NewClient(kubeClient client.Client, secretName, namespace, region string) (
 		iamClient:     iam.New(s),
 		s3Client:      s3.New(s),
 		route53Client: route53.New(s),
+		tagClient:     resourcegroupstaggingapi.New(s),
 	}, nil
 }

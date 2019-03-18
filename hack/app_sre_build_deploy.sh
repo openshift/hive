@@ -25,7 +25,7 @@ skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
     "docker://${QUAY_IMAGE}:${GIT_HASH}"
 
 # create and push staging image catalog
-$CURRENT_DIR/app_sre_create_image_catalog.sh "$QUAY_IMAGE"
+$CURRENT_DIR/app_sre_create_image_catalog.sh staging "$QUAY_IMAGE"
 
 # create and push production image catalog
-REMOVE_UNDEPLOYED=true $CURRENT_DIR/app_sre_create_image_catalog.sh "$QUAY_IMAGE"
+REMOVE_UNDEPLOYED=true $CURRENT_DIR/app_sre_create_image_catalog.sh production "$QUAY_IMAGE"

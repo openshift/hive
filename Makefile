@@ -121,7 +121,7 @@ vet:
 
 # Run verification tests
 .PHONY: verify
-verify: verify-imports verify-gofmt verify-lint verify-go-vet
+verify: verify-generated verify-imports verify-gofmt verify-lint verify-go-vet
 
 # Check import naming
 .PHONY: verify-imports
@@ -154,6 +154,10 @@ verify-gofmt:
 verify-go-vet: generate
 	@echo Verifying go vet
 	@go vet ./cmd/... ./contrib/... $(go list ./pkg/... | grep -v _generated)
+
+.PHONY: verify-generated
+verify-generated:
+	hack/verify-generated.sh
 
 # Generate code
 .PHONY: generate

@@ -12,7 +12,6 @@ GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --
 SAAS_OPERATOR_DIR="saas-hive-operator-bundle"
 BUNDLE_DIR="$SAAS_OPERATOR_DIR/hive/"
 
-trap "rm -f $SAAS_OPERATOR_DIR" EXIT TERM INT
 rm -rf "$SAAS_OPERATOR_DIR"
 
 git clone \
@@ -22,14 +21,13 @@ git clone \
 
 # remove any versions more recent than deployed hash
 REMOVED_VERSIONS=""
-
 if [[ "$REMOVE_UNDEPLOYED" == true ]]; then
     DEPLOYED_HASH=$(curl -s 'https://raw.githubusercontent.com/app-sre/saas-hive/master/hive-services/hive.yaml' | yq -r '.services[]|select(.name="hive").hash')
 
     delete=false
     for version in `ls $BUNDLE_DIR | sort -t . -k 3 -g`; do
         # skip if not directory
-        [[ -d "$version "]] || continue
+        [ -d "$BUNDLE_DIR/$version" ] || continue
 
         if [[ "$delete" == false ]]; then
             short_hash=$(echo $version | cut -d- -f2)

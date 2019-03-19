@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	//"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -59,6 +58,7 @@ const (
 
 	// legacyDaemonsetName is the old daemonset we will clean up if present.
 	legacyDaemonsetName = "hiveadmission"
+	kubeSystemNamespace = "kube-system"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -76,6 +76,11 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("hive-controller", mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return err
+	}
+
+	r.(*ReconcileHiveConfig).globalClient, err = getClient(mgr.GetScheme())
 	if err != nil {
 		return err
 	}
@@ -188,6 +193,9 @@ type ReconcileHiveConfig struct {
 	apiregClient *apiregclientv1.ApiregistrationV1Client
 	restConfig   *rest.Config
 	hiveImage    string
+
+	// globalClient is a standard dynamic client, but not restricted to the hive namespace.
+	globalClient client.Client
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
@@ -276,4 +284,20 @@ func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error
 		hLog.WithField("Daemonset", legacyDaemonsetName).Info("deleted legacy Daemonset")
 	}
 	return nil
+}
+
+func getClient(scheme *runtime.Scheme) (client.Client, error) {
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+	cfg, err := kubeconfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamicClient, nil
 }

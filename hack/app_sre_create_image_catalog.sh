@@ -52,8 +52,14 @@ PREV_VERSION=$(ls $BUNDLE_DIR | sort -t . -k 3 -g | tail -n 1)
     $GIT_HASH \
     $QUAY_IMAGE:$GIT_HASH
 
-# create package yaml
 NEW_VERSION=$(ls $BUNDLE_DIR | sort -t . -k 3 -g | tail -n 1)
+
+if [ "$NEW_VERSION" = "$PREV_VERSION" ]; then
+    # stopping script as that version was already built, so no need to rebuild it
+    exit 0
+fi
+
+# create package yaml
 cat <<EOF > $BUNDLE_DIR/hive.package.yaml
 packageName: hive-operator
 channels:

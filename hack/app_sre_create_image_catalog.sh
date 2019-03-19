@@ -22,7 +22,10 @@ git clone \
 # remove any versions more recent than deployed hash
 REMOVED_VERSIONS=""
 if [[ "$REMOVE_UNDEPLOYED" == true ]]; then
-    DEPLOYED_HASH=$(curl -s 'https://raw.githubusercontent.com/app-sre/saas-hive/master/hive-services/hive.yaml' | yq -r '.services[]|select(.name="hive").hash')
+    DEPLOYED_HASH=$(
+        curl -s 'https://raw.githubusercontent.com/app-sre/saas-hive/master/hive-services/hive.yaml' | \
+            docker run --rm -i evns/yq -r '.services[]|select(.name="hive").hash'
+    )
 
     delete=false
     for version in `ls $BUNDLE_DIR | sort -t . -k 3 -g`; do

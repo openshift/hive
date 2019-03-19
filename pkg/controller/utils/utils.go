@@ -18,6 +18,7 @@ package utils
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -91,4 +92,21 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	finalizers := sets.NewString(object.GetFinalizers()...)
 	finalizers.Delete(finalizer)
 	object.SetFinalizers(finalizers.List())
+}
+
+// GetKubeClient creates a new Kubernetes dynamic client.
+func GetKubeClient(scheme *runtime.Scheme) (client.Client, error) {
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+	cfg, err := kubeconfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicClient, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamicClient, nil
 }

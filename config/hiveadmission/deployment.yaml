@@ -1,7 +1,7 @@
 ---
 # to create the namespace-reservation-server
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   namespace: hive
   name: hiveadmission
@@ -9,6 +9,7 @@ metadata:
     app: hiveadmission
     hiveadmission: "true"
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: hiveadmission

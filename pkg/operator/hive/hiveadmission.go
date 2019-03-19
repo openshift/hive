@@ -35,9 +35,9 @@ import (
 )
 
 func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
-	asset := assets.MustAsset("config/hiveadmission/daemonset.yaml")
-	haLog.Debug("reading daemonset")
-	hiveAdmDaemonSet := resourceread.ReadDaemonSetV1OrDie(asset)
+	asset := assets.MustAsset("config/hiveadmission/deployment.yaml")
+	haLog.Debug("reading deployment")
+	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 
 	err := util.ApplyAsset(h, "config/hiveadmission/service.yaml", haLog)
 	if err != nil {
@@ -50,24 +50,24 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *reso
 	}
 
 	if r.hiveImage != "" {
-		hiveAdmDaemonSet.Spec.Template.Spec.Containers[0].Image = r.hiveImage
+		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 	}
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme)
 
 	buf := bytes.NewBuffer([]byte{})
-	err = s.Encode(hiveAdmDaemonSet, buf)
+	err = s.Encode(hiveAdmDeployment, buf)
 	if err != nil {
-		haLog.WithError(err).Error("error encoding daemonset")
+		haLog.WithError(err).Error("error encoding deployment")
 		return err
 	}
 	err = h.Apply(buf.Bytes())
 	if err != nil {
-		haLog.WithError(err).Error("error applying daemonset")
+		haLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	haLog.Info("daemonset applied")
+	haLog.Info("deployment applied")
 
 	err = util.ApplyAsset(h, "config/hiveadmission/apiservice.yaml", haLog)
 	if err != nil {

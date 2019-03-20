@@ -43,13 +43,13 @@ type ClusterImageSetSpec struct {
 // ClusterImageSetStatus defines the observed state of ClusterImageSet
 type ClusterImageSetStatus struct{}
 
+// +genclient:nonNamespaced
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterImageSet is the Schema for the clusterimagesets API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +genclient:nonNamespaced
 // +kubebuilder:printcolumn:name="Hive",type="string",JSONPath=".spec.hiveImage"
 // +kubebuilder:printcolumn:name="Installer",type="string",JSONPath=".status.installerImage"
 // +kubebuilder:printcolumn:name="Release",type="string",JSONPath=".spec.releaseImage"

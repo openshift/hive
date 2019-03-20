@@ -34,17 +34,17 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	asset := assets.MustAsset("config/hiveadmission/deployment.yaml")
-	haLog.Debug("reading deployment")
+	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 
-	err := util.ApplyAsset(h, "config/hiveadmission/service.yaml", haLog)
+	err := util.ApplyAsset(h, "config/hiveadmission/service.yaml", hLog)
 	if err != nil {
 		return err
 	}
 
-	err = util.ApplyAsset(h, "config/hiveadmission/service-account.yaml", haLog)
+	err = util.ApplyAsset(h, "config/hiveadmission/service-account.yaml", hLog)
 	if err != nil {
 		return err
 	}
@@ -59,37 +59,30 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(haLog log.FieldLogger, h *reso
 	buf := bytes.NewBuffer([]byte{})
 	err = s.Encode(hiveAdmDeployment, buf)
 	if err != nil {
-		haLog.WithError(err).Error("error encoding deployment")
+		hLog.WithError(err).Error("error encoding deployment")
 		return err
 	}
 	err = h.Apply(buf.Bytes())
 	if err != nil {
-		haLog.WithError(err).Error("error applying deployment")
+		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	haLog.Info("deployment applied")
+	hLog.Info("deployment applied")
 
-	err = util.ApplyAsset(h, "config/hiveadmission/apiservice.yaml", haLog)
-	if err != nil {
-		return err
+	applyAssets := []string{
+		"config/hiveadmission/apiservice.yaml",
+		"config/hiveadmission/clusterdeployment-webhook.yaml",
+		"config/hiveadmission/clusterimageset-webhook.yaml",
+		"config/hiveadmission/dnszones-webhook.yaml",
+	}
+	for _, a := range applyAssets {
+		err = util.ApplyAsset(h, a, hLog)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = util.ApplyAsset(h, "config/hiveadmission/clusterdeployment-webhook.yaml", haLog)
-	if err != nil {
-		return err
-	}
-
-	err = util.ApplyAsset(h, "config/hiveadmission/clusterimageset-webhook.yaml", haLog)
-	if err != nil {
-		return err
-	}
-
-	err = util.ApplyAsset(h, "config/hiveadmission/dnszones-webhook.yaml", haLog)
-	if err != nil {
-		return err
-	}
-
-	haLog.Info("hiveadmission components reconciled successfully")
+	hLog.Info("hiveadmission components reconciled successfully")
 
 	return nil
 }

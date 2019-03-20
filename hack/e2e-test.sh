@@ -98,7 +98,7 @@ while [ $i -le ${max_tries} ]; do
   fi
 
   echo "Generating ClusterDeployment File ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
-  if oc process -f config/templates/cluster-deployment.yaml \
+  if oc process -f config/templates/cluster-deployment-customimageset.yaml \
          CLUSTER_NAME="${CLUSTER_NAME}" \
          SSH_KEY="${SSH_PUB_KEY}" \
          PULL_SECRET="${PULL_SECRET}" \
@@ -106,8 +106,7 @@ while [ $i -le ${max_tries} ]; do
          AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
          BASE_DOMAIN="${BASE_DOMAIN}" \
          HIVE_IMAGE="${HIVE_IMAGE}" \
-         CUSTOM_RELEASE_IMAGE="${RELEASE_IMAGE}" \
-         CLUSTER_IMAGE_SET="custom" \
+         RELEASE_IMAGE="${RELEASE_IMAGE}" \
          TRY_INSTALL_ONCE="true" \
          TRY_UNINSTALL_ONCE="true" \
       > ${CLUSTER_DEPLOYMENT_FILE} ; then

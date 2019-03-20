@@ -19,5 +19,5 @@ go build -o ./bin/go-bindata ./vendor/github.com/jteeuwen/go-bindata/go-bindata
         -o "${OUTPUT_FILE}" \
         -ignore "OWNERS" \
         -ignore ".*\.sw.?" \
-        ./config/hiveadmission/... ./config/crds/... ./config/manager/... && \
+        ./config/hiveadmission/... ./config/manager/... ./config/clusterimagesets/... && \
 gofmt -s -w "${OUTPUT_FILE}"

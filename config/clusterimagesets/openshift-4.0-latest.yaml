@@ -1,0 +1,9 @@
+apiVersion: hive.openshift.io/v1alpha1
+kind: ClusterImageSet
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: openshift-v4.0-latest
+spec:
+  releaseImage: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
+  hiveImage: "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"

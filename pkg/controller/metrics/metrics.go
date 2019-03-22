@@ -29,6 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/openshift/hive/pkg/install"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -41,11 +43,21 @@ var (
 		Name: "hive_cluster_deployments_installed_total",
 		Help: "Total number of cluster deployments that are successfully installed.",
 	})
+	metricInstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_install_jobs_running_total",
+		Help: "Total number of install jobs running in Hive.",
+	})
+	metricUninstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_uninstall_jobs_running_total",
+		Help: "Total number of uninstall jobs running in Hive.",
+	})
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalledTotal)
+	metrics.Registry.MustRegister(metricInstallJobsRunningTotal)
+	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -87,18 +99,42 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		err := mc.Client.List(context.Background(), &client.ListOptions{}, clusterDeployments)
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
-		}
-		mcLog.WithField("totalClusterDeployments", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
-		total := 0
-		installedTotal := 0
-		for _, cd := range clusterDeployments.Items {
-			total = total + 1
-			if cd.Status.Installed {
-				installedTotal = installedTotal + 1
+		} else {
+			mcLog.WithField("totalClusterDeployments", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
+			total := 0
+			installedTotal := 0
+			for _, cd := range clusterDeployments.Items {
+				total = total + 1
+				if cd.Status.Installed {
+					installedTotal = installedTotal + 1
+				}
 			}
+			metricClusterDeploymentsTotal.Set(float64(total))
+			metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
 		}
-		metricClusterDeploymentsTotal.Set(float64(total))
-		metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
+		mcLog.Debug("calculating jobs metrics")
+		// install job metrics
+		installJobs := &batchv1.JobList{}
+		installJobLabelSelector := map[string]string{install.InstallJobLabel: "true"}
+		err = mc.Client.List(context.Background(), client.MatchingLabels(installJobLabelSelector), installJobs)
+		if err != nil {
+			log.WithError(err).Error("error listing install jobs")
+		} else {
+			installJobsTotal := len(installJobs.Items)
+			mcLog.WithField("totalRunningInstallJobs", installJobsTotal).Debug("loaded running install jobs")
+			metricInstallJobsRunningTotal.Set(float64(installJobsTotal))
+		}
+		// uninstall job metrics
+		uninstallJobs := &batchv1.JobList{}
+		uninstallJobLabelSelector := map[string]string{install.UninstallJobLabel: "true"}
+		err = mc.Client.List(context.Background(), client.MatchingLabels(uninstallJobLabelSelector), uninstallJobs)
+		if err != nil {
+			log.WithError(err).Error("error listing uninstall jobs")
+		} else {
+			uninstallJobsTotal := len(uninstallJobs.Items)
+			mcLog.WithField("totalRunningUninstallJobs", uninstallJobsTotal).Debug("loaded running uninstall jobs")
+			metricUninstallJobsRunningTotal.Set(float64(uninstallJobsTotal))
+		}
 	}, mc.Interval, stopCh)
 
 	return nil

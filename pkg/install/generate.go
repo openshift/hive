@@ -351,6 +351,8 @@ func GenerateUninstallerJob(
 				"--region",
 				cd.Spec.AWS.Region,
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Status.InfraID),
+				// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
+				fmt.Sprintf("openshiftClusterID=%s", cd.Status.ClusterID),
 			},
 		},
 	}

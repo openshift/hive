@@ -138,11 +138,11 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, webhooks []*admregv1.ValidatingWebhookConfiguration, hLog log.FieldLogger) error {
 
-	// Locate the kube CA by looking up secrets in kube-system namespace, finding one of
+	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debug("listing secrets in hive namespace")
 	secrets := &corev1.SecretList{}
-	err := r.globalClient.List(context.Background(), &client.ListOptions{Namespace: hiveNamespace}, secrets)
+	err := r.Client.List(context.Background(), &client.ListOptions{Namespace: hiveNamespace}, secrets)
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
 		return err
@@ -165,15 +165,9 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	hLog.Debugf("found kube CA: %s", string(kubeCA))
 
 	// Load the service CA:
-	svcCertSignerSecret := &corev1.Secret{}
-	err = r.globalClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-service-cert-signer", Name: "service-serving-cert-signer-signing-key"}, svcCertSignerSecret)
-	if err != nil {
-		hLog.WithError(err).Error("error loading secret service-serving-cert-signer-signing-key")
-		return err
-	}
-	serviceCA, ok := svcCertSignerSecret.Data["tls.crt"]
+	serviceCA, ok := firstSATokenSecret.Data["service-ca.crt"]
 	if !ok {
-		return fmt.Errorf("secret %s did not contain key tls.crt", svcCertSignerSecret.Name)
+		return fmt.Errorf("secret %s did not contain key service-ca.crt", firstSATokenSecret.Name)
 	}
 	hLog.Debugf("found service CA: %s", string(serviceCA))
 

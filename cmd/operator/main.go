@@ -31,6 +31,7 @@ import (
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -83,6 +84,10 @@ func newRootCommand() *cobra.Command {
 			}
 
 			if err := apiregistrationv1.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := apiextv1beta1.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

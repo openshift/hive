@@ -2,9 +2,9 @@
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: clusterdeployments.admission.hive.openshift.io
+  name: clusterimagesets.admission.hive.openshift.io
 webhooks:
-- name: clusterdeployments.admission.hive.openshift.io
+- name: clusterimagesets.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API

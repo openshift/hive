@@ -19,6 +19,8 @@ package resource
 import (
 	"bytes"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	kcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
@@ -52,6 +54,20 @@ func (r *Helper) Apply(obj []byte) error {
 		r.logger.WithError(err).
 			WithField("stdout", ioStreams.Out.(*bytes.Buffer).String()).
 			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Error("running the apply command failed")
+		return err
+	}
+	return nil
+}
+
+// ApplyRuntimeObject serializes an object and applies it to the target cluster specified by the kubeconfig.
+func (r *Helper) ApplyRuntimeObject(obj runtime.Object, s *json.Serializer) error {
+	buf := bytes.NewBuffer([]byte{})
+	err := s.Encode(obj, buf)
+	if err != nil {
+		return err
+	}
+	err = r.Apply(buf.Bytes())
+	if err != nil {
 		return err
 	}
 	return nil

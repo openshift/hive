@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	//"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"

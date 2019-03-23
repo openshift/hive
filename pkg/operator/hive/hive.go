@@ -17,8 +17,6 @@ limitations under the License.
 package hive
 
 import (
-	"bytes"
-
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -60,14 +58,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	// TODO: it would be nice to be able to log if there were changes or not
 	// for all artifacts we Apply.
 
-	// Encode our modified Deployment back to byte array for applying:
-	buf := bytes.NewBuffer([]byte{})
-	err := s.Encode(hiveDeployment, buf)
-	if err != nil {
-		hLog.WithError(err).Error("error encoding deployment")
-		return err
-	}
-	err = h.Apply(buf.Bytes())
+	err := h.ApplyRuntimeObject(hiveDeployment, s)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err

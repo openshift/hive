@@ -45,6 +45,8 @@ const (
 	controllerName = "remoteingress"
 
 	remoteClusterIngressNamespace = "openshift-ingress-operator"
+
+	remoteIngressKind = "IngressController"
 )
 
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
@@ -216,6 +218,10 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(cd *hivev1.ClusterDeployment
 
 func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.ClusterIngress) *ingresscontroller.IngressController {
 	newIngress := ingresscontroller.IngressController{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       remoteIngressKind,
+			APIVersion: ingresscontroller.GroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ingress.Name,
 			Namespace: remoteClusterIngressNamespace,

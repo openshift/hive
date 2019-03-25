@@ -18,6 +18,7 @@ package remoteingress
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -231,6 +232,13 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				if err := fakeClient.Get(context.TODO(), ssNamespacedName, ss); err != nil {
 					t.Errorf("failed fetching SyncSet to check whether it was properly created/updated: %v", err)
 				}
+
+				// validate that we're setting type meta info
+				ic := ingresscontroller.IngressController{}
+				assert.NoError(t, json.Unmarshal(ss.Spec.Resources[0].Raw, &ic), "json marshaling to IngressController should not fail")
+				assert.Equal(t, "IngressController", ic.Kind, "unexpected Object Kind")
+				assert.Equal(t, "operator.openshift.io/v1", ic.APIVersion, "unexpected Object APIVersion")
+
 				ingressControllers := rawToIngressControllers(ss.Spec.Resources)
 
 				// We should have the expected number of ingress objects

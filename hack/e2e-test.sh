@@ -53,7 +53,7 @@ CLUSTER_DEPLOYMENT_FILE="/tmp/cluster-deployment.json"
 # Create a new cluster deployment
 # TODO: Determine which domain to use to create Hive clusters
 export BASE_DOMAIN="hive-ci.openshift.com"
-export CLUSTER_NAME="$(uuidgen | cut -b-18)"
+export CLUSTER_NAME="hive-$(uuidgen)"
 export SSH_PUB_KEY="$(cat ${CLOUD_CREDS_DIR}/ssh-publickey)"
 export PULL_SECRET="$(cat ${CLOUD_CREDS_DIR}/pull-secret)"
 export AWS_ACCESS_KEY_ID="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_access_key_id/ { print $3; exit; }')"

@@ -139,3 +139,47 @@ rules:
   - patch
   - list
   - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - syncidentityproviders
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - selectorsyncidentityproviders
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - syncsets
+  verbs:
+  - get
+  - create
+  - update
+  - delete
+  - patch
+  - list
+  - watch

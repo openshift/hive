@@ -46,6 +46,10 @@ const (
 	clusterVersionCRDName = "clusterversions.config.openshift.io"
 )
 
+const (
+	aggregatorClientCAHashAnnotation = "hive.openshift.io/ca-hash"
+)
+
 func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 	asset := assets.MustAsset("config/hiveadmission/deployment.yaml")
 	hLog.Debug("reading deployment")
@@ -64,6 +68,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	if r.hiveImage != "" {
 		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 	}
+	if hiveAdmDeployment.Annotations == nil {
+		hiveAdmDeployment.Annotations = map[string]string{}
+	}
+	if hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations == nil {
+		hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+	}
+	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
+	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme)

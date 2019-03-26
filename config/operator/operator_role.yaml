@@ -23,6 +23,15 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - apiregistration.k8s.io
   resources:
   - apiservices
@@ -67,6 +76,7 @@ rules:
   resources:
   - hiveconfigs
   - hiveconfigs/finalizers
+  - hiveconfigs/status
   verbs:
   - get
   - list

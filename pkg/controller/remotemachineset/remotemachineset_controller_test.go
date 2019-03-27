@@ -60,8 +60,6 @@ const (
 	adminPasswordSecretKey   = "password"
 	sshKeySecret             = "foo-ssh-key"
 	sshKeySecretKey          = "ssh-publickey"
-	pullSecretSecret         = "foo-pull-secret"
-	pullSecretSecretKey      = ".dockerconfigjson"
 	testUUID                 = "fakeUUID"
 	testAMI                  = "ami-totallyfake"
 )
@@ -111,7 +109,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
@@ -137,7 +134,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
@@ -163,7 +159,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
@@ -188,7 +183,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
@@ -216,7 +210,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 0),
@@ -241,7 +234,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 4, 0),
@@ -266,7 +258,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
@@ -295,7 +286,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
-				testSecret(pullSecretSecret, pullSecretSecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
@@ -493,9 +483,6 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			ClusterName:  testName,
 			ControlPlane: hivev1.MachinePool{},
 			Compute:      computePools,
-			PullSecret: corev1.LocalObjectReference{
-				Name: pullSecretSecret,
-			},
 			Platform: hivev1.Platform{
 				AWS: &hivev1.AWSPlatform{
 					Region: "us-east-1",

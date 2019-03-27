@@ -12,6 +12,7 @@
 // config/manager/deployment.yaml
 // config/clusterimagesets/openshift-4.0-beta2.yaml
 // config/clusterimagesets/openshift-4.0-latest.yaml
+// config/clusterimagesets/openshift-4.0.0-0.8.yaml
 // DO NOT EDIT!
 
 package assets
@@ -590,6 +591,34 @@ func configClusterimagesetsOpenshift40LatestYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configClusterimagesetsOpenshift40008Yaml = []byte(`apiVersion: hive.openshift.io/v1alpha1
+kind: ClusterImageSet
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: openshift-v4.0.0-0.8
+spec:
+  releaseImage: "quay.io/openshift-release-dev/ocp-release:4.0.0-0.8"
+  # TODO: what hive image should we use here? it should be verified working
+  # with the release image. could switch to using appsre images we run in stage/prod.
+  hiveImage: "quay.io/twiest/hive-controller:20190327"
+`)
+
+func configClusterimagesetsOpenshift40008YamlBytes() ([]byte, error) {
+	return _configClusterimagesetsOpenshift40008Yaml, nil
+}
+
+func configClusterimagesetsOpenshift40008Yaml() (*asset, error) {
+	bytes, err := configClusterimagesetsOpenshift40008YamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/clusterimagesets/openshift-4.0.0-0.8.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -654,6 +683,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
 	"config/clusterimagesets/openshift-4.0-beta2.yaml":          configClusterimagesetsOpenshift40Beta2Yaml,
 	"config/clusterimagesets/openshift-4.0-latest.yaml":         configClusterimagesetsOpenshift40LatestYaml,
+	"config/clusterimagesets/openshift-4.0.0-0.8.yaml":          configClusterimagesetsOpenshift40008Yaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -701,6 +731,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"clusterimagesets": {nil, map[string]*bintree{
 			"openshift-4.0-beta2.yaml":  {configClusterimagesetsOpenshift40Beta2Yaml, map[string]*bintree{}},
 			"openshift-4.0-latest.yaml": {configClusterimagesetsOpenshift40LatestYaml, map[string]*bintree{}},
+			"openshift-4.0.0-0.8.yaml":  {configClusterimagesetsOpenshift40008Yaml, map[string]*bintree{}},
 		}},
 		"hiveadmission": {nil, map[string]*bintree{
 			"apiservice.yaml":                      {configHiveadmissionApiserviceYaml, map[string]*bintree{}},

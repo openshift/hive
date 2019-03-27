@@ -112,7 +112,7 @@ func TestReconcileNewClusterDeployment(t *testing.T) {
 	err = c.Create(context.TODO(), testSecret("ssh-key", "ssh-publickey", "1234"))
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
-	err = c.Create(context.TODO(), testSecret("pull-secret", ".dockercfg", "1234"))
+	err = c.Create(context.TODO(), testSecret("pull-secret", ".dockerconfigjson", "1234"))
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 
 	recFn, requests := SetupTestReconcile(clusterdeployment.NewReconciler(mgr))

@@ -29,7 +29,7 @@ parameters:
 - name: HIVE_IMAGE
   displayName: Hive image URL
   description: Hive image URL
-  value: "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+  value: ""
 - name: HIVE_IMAGE_PULL_POLICY
   displayName: Hive image pull policy
   description: Hive image pull policy
@@ -73,9 +73,9 @@ objects:
   kind: Secret
   metadata:
     name: ${CLUSTER_NAME}-pull-secret
-  type: kubernetes.io/dockercfg
+  type: kubernetes.io/dockerconfigjson
   stringData:
-    ".dockercfg": "${PULL_SECRET}"
+    ".dockerconfigjson": "${PULL_SECRET}"
 
 - apiVersion: v1
   kind: Secret

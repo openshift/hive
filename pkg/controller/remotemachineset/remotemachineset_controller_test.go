@@ -61,7 +61,7 @@ const (
 	sshKeySecret             = "foo-ssh-key"
 	sshKeySecretKey          = "ssh-publickey"
 	pullSecretSecret         = "foo-pull-secret"
-	pullSecretSecretKey      = ".dockercfg"
+	pullSecretSecretKey      = ".dockerconfigjson"
 	testUUID                 = "fakeUUID"
 	testAMI                  = "ami-totallyfake"
 )

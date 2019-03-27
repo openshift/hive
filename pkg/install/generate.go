@@ -103,7 +103,7 @@ func GenerateInstallerJob(
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: cd.Spec.PullSecret,
-					Key:                  ".dockercfg",
+					Key:                  corev1.DockerConfigJsonKey,
 				},
 			},
 		},
@@ -254,6 +254,9 @@ func GenerateInstallerJob(
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			cd.Spec.PullSecret,
+		},
 	}
 
 	completions := int32(1)

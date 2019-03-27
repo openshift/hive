@@ -52,6 +52,8 @@ import (
 )
 
 const (
+	controllerName = "clusterDeployment"
+
 	// serviceAccountName will be a service account that can run the installer and then
 	// upload artifacts to the cluster's namespace.
 	serviceAccountName = "cluster-installer"
@@ -61,7 +63,7 @@ const (
 	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
 	deleteAfterAnnotation       = "hive.openshift.io/delete-after"
 	adminCredsSecretPasswordKey = "password"
-	pullSecretKey               = ".dockercfg"
+	pullSecretKey               = ".dockerconfigjson"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	adminKubeconfigKey          = "kubeconfig"
 	clusterVersionObjectName    = "version"
@@ -154,6 +156,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
+		"controller":        controllerName,
 	})
 	cdLog.Info("reconciling cluster deployment")
 	origCD := cd
@@ -294,8 +297,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	cdLog = cdLog.WithField("job", job.Name)
 
-	cdLog.Debug("checking if install-config.yaml config map exists")
 	// Check if the ConfigMap already exists for this ClusterDeployment:
+	cdLog.Debug("checking if install-config.yaml config map exists")
 	existingCfgMap := &kapi.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
 	if err != nil && errors.IsNotFound(err) {
@@ -312,7 +315,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	// Check if the Job already exists for this ClusterDeployment:
 	existingJob := &batchv1.Job{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
+	installJobName := install.GetInstallJobName(cd)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: installJobName, Namespace: cd.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		// If the ClusterDeployment is already installed, we do not need to create a new job:
 		if cd.Status.Installed {

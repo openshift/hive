@@ -63,7 +63,7 @@ const (
 
 	adminKubeConfigKey          = "kubeconfig"
 	adminCredsSecretPasswordKey = "password"
-	pullSecretKey               = ".dockercfg"
+	pullSecretKey               = ".dockerconfigjson"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	hiveDefaultAMIAnnotation    = "hive.openshift.io/default-AMI"
 )

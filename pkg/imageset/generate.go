@@ -40,7 +40,7 @@ const (
 	extractImageScript = `#/bin/bash
 echo "About to run oc adm release info"
 if oc adm release info --image-for="installer" --registry-config "${PULL_SECRET}" "${RELEASE_IMAGE}" > /common/installer-image.txt 2> /common/error.log; then
-  echo "The command succeeded"  
+  echo "The command succeeded"
   echo "1" > /common/success
 else
   echo "The command failed"
@@ -66,7 +66,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterI
 		},
 		{
 			Name:  "PULL_SECRET",
-			Value: "/run/release-pull-secret/" + corev1.DockerConfigKey,
+			Value: "/run/release-pull-secret/" + corev1.DockerConfigJsonKey,
 		},
 	}
 

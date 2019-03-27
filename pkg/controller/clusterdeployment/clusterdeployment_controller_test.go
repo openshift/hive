@@ -56,7 +56,6 @@ const (
 	imageSetJobName       = "foo-lqmsh-imageset"
 	testNamespace         = "default"
 	metadataName          = "foo-lqmsh-metadata"
-	adminPasswordSecret   = "admin-password"
 	sshKeySecret          = "ssh-key"
 	pullSecretSecret      = "pull-secret"
 	testUUID              = "fakeUUID"
@@ -123,9 +122,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Add finalizer",
 			existing: []runtime.Object{
 				testClusterDeploymentWithoutFinalizer(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -138,9 +136,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Create install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				job := getInstallJob(c)
@@ -153,9 +150,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Lookup default AMI",
 			existing: []runtime.Object{
 				testNoDefaultAMIClusterDeployment(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -169,9 +165,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testInstallJob(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -194,10 +189,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testInstallJob(),
-				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testMetadataConfigMap(),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -212,10 +206,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testClusterDeployment(),
 				testCompletedInstallJob(),
 				testMetadataConfigMap(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -223,6 +216,22 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					t.Errorf("did not get a clusterdeployment with a status of Installed")
 					return
 				}
+			},
+		},
+		{
+			name: "Legacy dockercfg pull secret causes no errors once installed",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testCompletedInstallJob(),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 		},
 		{
@@ -235,10 +244,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testMetadataConfigMap(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -251,9 +259,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Delete cluster deployment",
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
@@ -281,9 +288,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "No-op deleted cluster without finalizer",
 			existing: []runtime.Object{
 				testDeletedClusterDeploymentWithoutFinalizer(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				uninstallJob := getUninstallJob(c)
@@ -296,9 +302,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Delete expired cluster deployment",
 			existing: []runtime.Object{
 				testExpiredClusterDeployment(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -316,9 +321,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.PreserveOnDelete = true
 					return cd
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
@@ -343,10 +347,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.Installed = false
 					return cd
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _, _ := install.GenerateInstallerJob(
 						testClusterDeployment(),
@@ -374,9 +377,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.Installed = false
 					return cd
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _, _ := install.GenerateInstallerJob(
 						testDeletedClusterDeployment(),
@@ -402,9 +404,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.Images.InstallerImage = "test-installer-image:latest"
 					return cd
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -428,9 +429,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cis.Spec.InstallerImage = strPtr("test-cis-installer-image:latest")
 					return cis
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -450,9 +450,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testClusterImageSet(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				job := getImageSetJob(c)
@@ -476,9 +475,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cis.Spec.ReleaseImage = strPtr("test-release-image:latest")
 					return cis
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				job := getInstallJob(c)
@@ -520,9 +518,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cis.Spec.HiveImage = &testHiveImage
 					return cis
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				uninstallJob := getUninstallJob(c)
@@ -544,9 +541,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
-				testSecret(adminPasswordSecret, adminCredsSecretPasswordKey, "password"),
-				testSecret(pullSecretSecret, pullSecretKey, "{}"),
-				testSecret(sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				uninstallJob := getUninstallJob(c)
@@ -711,8 +707,9 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 	return cm
 }
 
-func testSecret(name, key, value string) *corev1.Secret {
+func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.Secret {
 	s := &corev1.Secret{
+		Type: secretType,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: testNamespace,

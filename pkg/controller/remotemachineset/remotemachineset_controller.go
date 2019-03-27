@@ -63,7 +63,6 @@ const (
 
 	adminKubeConfigKey          = "kubeconfig"
 	adminCredsSecretPasswordKey = "password"
-	pullSecretKey               = ".dockercfg"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	hiveDefaultAMIAnnotation    = "hive.openshift.io/default-AMI"
 )
@@ -398,14 +397,9 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 		return nil, err
 	}
 
-	cdLog.Debug("loading pull secret secret")
-	pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, pullSecretKey)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to load pull secret from secret")
-		return nil, err
-	}
-
-	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret, false)
+	// Using a fake pull secret here, we don't need the pull secret given our use of
+	// this install config, all we're after are the machine pools.
+	ic, err := install.GenerateInstallConfig(cd, sshKey, "{}", false)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to generate install config")
 		return nil, err

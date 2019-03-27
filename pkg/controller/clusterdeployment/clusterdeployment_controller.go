@@ -52,6 +52,8 @@ import (
 )
 
 const (
+	controllerName = "clusterDeployment"
+
 	// serviceAccountName will be a service account that can run the installer and then
 	// upload artifacts to the cluster's namespace.
 	serviceAccountName = "cluster-installer"
@@ -61,7 +63,6 @@ const (
 	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
 	deleteAfterAnnotation       = "hive.openshift.io/delete-after"
 	adminCredsSecretPasswordKey = "password"
-	pullSecretKey               = ".dockercfg"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	adminKubeconfigKey          = "kubeconfig"
 	clusterVersionObjectName    = "version"
@@ -154,6 +155,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
+		"controller":        controllerName,
 	})
 	cdLog.Info("reconciling cluster deployment")
 	origCD := cd
@@ -260,77 +262,83 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	cdLog.Debug("loading pull secret secret")
-	pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, pullSecretKey)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to load pull secret from secret")
-		return reconcile.Result{}, err
-	}
-
 	if cd.Status.InstallerImage == nil {
 		return reconcile.Result{}, r.resolveInstallerImage(cd, hiveImage, cdLog)
 	}
 
-	job, cfgMap, err := install.GenerateInstallerJob(
-		cd,
-		hiveImage,
-		releaseImage,
-		serviceAccountName,
-		sshKey,
-		pullSecret)
-	if err != nil {
-		cdLog.WithError(err).Error("error generating install job")
-		return reconcile.Result{}, err
-	}
-
-	if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
-		cdLog.WithError(err).Error("error setting controller reference on job")
-		return reconcile.Result{}, err
-	}
-	if err = controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
-		cdLog.WithError(err).Error("error setting controller reference on config map")
-		return reconcile.Result{}, err
-	}
-
-	cdLog = cdLog.WithField("job", job.Name)
-
-	cdLog.Debug("checking if install-config.yaml config map exists")
-	// Check if the ConfigMap already exists for this ClusterDeployment:
-	existingCfgMap := &kapi.ConfigMap{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
+	// Check if an install job already exists:
+	existingJob := &batchv1.Job{}
+	installJobName := install.GetInstallJobName(cd)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: installJobName, Namespace: cd.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
-		cdLog.WithField("configMap", cfgMap.Name).Infof("creating config map")
-		err = r.Create(context.TODO(), cfgMap)
+		cdLog.Debug("no install job exists")
+		existingJob = nil
+	} else if err != nil {
+		cdLog.WithError(err).Error("error looking for install job")
+		return reconcile.Result{}, err
+	}
+
+	if cd.Status.Installed {
+		cdLog.Debug("cluster is already installed, no processing of install job needed")
+	} else {
+		cdLog.Debug("loading pull secret secret")
+		pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, corev1.DockerConfigJsonKey)
 		if err != nil {
-			cdLog.Errorf("error creating config map: %v", err)
+			cdLog.WithError(err).Error("unable to load pull secret from secret")
 			return reconcile.Result{}, err
 		}
-	} else if err != nil {
-		cdLog.Errorf("error getting config map: %v", err)
-		return reconcile.Result{}, err
-	}
 
-	// Check if the Job already exists for this ClusterDeployment:
-	existingJob := &batchv1.Job{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, existingJob)
-	if err != nil && errors.IsNotFound(err) {
-		// If the ClusterDeployment is already installed, we do not need to create a new job:
-		if cd.Status.Installed {
-			cdLog.Debug("cluster is already installed, no job needed")
-		} else {
+		job, cfgMap, err := install.GenerateInstallerJob(
+			cd,
+			hiveImage,
+			releaseImage,
+			serviceAccountName,
+			sshKey,
+			pullSecret)
+		if err != nil {
+			cdLog.WithError(err).Error("error generating install job")
+			return reconcile.Result{}, err
+		}
+
+		if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+			cdLog.WithError(err).Error("error setting controller reference on job")
+			return reconcile.Result{}, err
+		}
+		if err = controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
+			cdLog.WithError(err).Error("error setting controller reference on config map")
+			return reconcile.Result{}, err
+		}
+
+		cdLog = cdLog.WithField("job", job.Name)
+
+		// Check if the ConfigMap already exists for this ClusterDeployment:
+		cdLog.Debug("checking if install-config.yaml config map exists")
+		existingCfgMap := &kapi.ConfigMap{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
+		if err != nil && errors.IsNotFound(err) {
+			cdLog.WithField("configMap", cfgMap.Name).Infof("creating config map")
+			err = r.Create(context.TODO(), cfgMap)
+			if err != nil {
+				cdLog.Errorf("error creating config map: %v", err)
+				return reconcile.Result{}, err
+			}
+		} else if err != nil {
+			cdLog.Errorf("error getting config map: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		if existingJob == nil {
 			cdLog.Infof("creating install job")
 			err = r.Create(context.TODO(), job)
 			if err != nil {
 				cdLog.Errorf("error creating job: %v", err)
 				return reconcile.Result{}, err
 			}
-		}
-	} else if err != nil {
-		cdLog.Errorf("error getting job: %v", err)
-		return reconcile.Result{}, err
-	} else {
-		cdLog.Infof("cluster job exists, cluster deployment status: %v", cd.Status.Installed)
-		if !cd.Status.Installed {
+		} else if err != nil {
+			cdLog.Errorf("error getting job: %v", err)
+			return reconcile.Result{}, err
+		} else {
+			cdLog.Infof("cluster job exists, cluster deployment status: %v", cd.Status.Installed)
 			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
 				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
 				if err != nil {

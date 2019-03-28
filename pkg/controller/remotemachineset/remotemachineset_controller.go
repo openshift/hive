@@ -203,18 +203,31 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 				objectModified := false
 				objectMetaModified := resourcemerge.BoolPtr(false)
 				resourcemerge.EnsureObjectMeta(objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
+				msLog := cdLog.WithField("machineset", rMS.Name)
 
 				if *rMS.Spec.Replicas != *ms.Spec.Replicas {
+					msLog.WithFields(log.Fields{
+						"desired":  *ms.Spec.Replicas,
+						"observed": *rMS.Spec.Replicas,
+					}).Info("replicas out of sync")
 					rMS.Spec.Replicas = ms.Spec.Replicas
 					objectModified = true
 				}
 
 				if !reflect.DeepEqual(rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels) {
+					msLog.WithFields(log.Fields{
+						"desired":  ms.Spec.Template.Spec.Labels,
+						"observed": rMS.Spec.Template.Spec.Labels,
+					}).Info("labels out of sync")
 					rMS.Spec.Template.Spec.Labels = ms.Spec.Template.Spec.Labels
 					objectModified = true
 				}
 
 				if !reflect.DeepEqual(rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints) {
+					msLog.WithFields(log.Fields{
+						"desired":  ms.Spec.Template.Spec.Taints,
+						"observed": rMS.Spec.Template.Spec.Taints,
+					}).Info("taints out of sync")
 					rMS.Spec.Template.Spec.Taints = ms.Spec.Template.Spec.Taints
 					objectModified = true
 				}
@@ -257,7 +270,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(cd *hivev1.ClusterDeployment
 	}
 
 	for _, ms := range machineSetsToUpdate {
-		cdLog.WithField("machineset", ms.Name).Info("updating machineset: ", ms)
+		cdLog.WithField("machineset", ms.Name).Info("updating machineset")
 		err = remoteClusterAPIClient.Update(context.Background(), ms)
 		if err != nil {
 			cdLog.WithError(err).Error("unable to update machine set")

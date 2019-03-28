@@ -106,6 +106,11 @@ func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient cli
 // Automatically generate RBAC rules to allow the Controller to read and write DNSZones
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=dnszones,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	dnsLog := r.logger.WithFields(log.Fields{
+		"controller": controllerName,
+		"object":     request.NamespacedName,
+	})
+
 	// Fetch the DNSZone object
 	desiredState := &hivev1.DNSZone{}
 	err := r.Get(context.TODO(), request.NamespacedName, desiredState)
@@ -116,29 +121,17 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		r.logger.Debugf("error fetching dnszone object %v: %v", request.NamespacedName, err)
+		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
-	dnsLog := r.logger.WithFields(log.Fields{
-		"controller": controllerName,
-		"name":       desiredState.Name,
-		"namespace":  desiredState.Namespace,
-	})
 
-	dnsLog.Debugf("reconciling dnszone")
-
-	awsClient, err := r.getAWSClient(desiredState)
-	if err != nil {
-		dnsLog.Errorf("error creating aws client: %v", err)
-		return reconcile.Result{}, err
-	}
+	dnsLog.Debugf("Reconciling DNSZone")
 
 	// See if we need to sync. This is what rate limits our AWS API usage, but allows for immediate syncing
 	// on spec changes and deletes.
 	shouldSync, delta := shouldSync(desiredState)
 	if !shouldSync {
-		r.logger.WithFields(log.Fields{
-			"object":               desiredState.Name,
+		dnsLog.WithFields(log.Fields{
 			"delta":                delta,
 			"currentGeneration":    desiredState.Generation,
 			"lastSyncedGeneration": desiredState.Status.LastSyncGeneration,
@@ -147,26 +140,31 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
+	awsClient, err := r.getAWSClient(desiredState, dnsLog)
+	if err != nil {
+		dnsLog.WithError(err).Error("Error creating aws client")
+		return reconcile.Result{}, err
+	}
+
 	zr, err := NewZoneReconciler(
 		desiredState,
 		r.Client,
-		r.logger,
+		dnsLog,
 		awsClient,
 	)
 	if err != nil {
-		dnsLog.Errorf("error creating zone reconciler: %v", err)
+		dnsLog.WithError(err).Error("Error creating zone reconciler")
 		return reconcile.Result{}, err
 	}
 
 	// Actually reconcile desired state with current state
-	r.logger.WithFields(log.Fields{
-		"object":             desiredState.Name,
+	dnsLog.WithFields(log.Fields{
 		"delta":              delta,
 		"currentGeneration":  desiredState.Generation,
 		"lastSyncGeneration": desiredState.Status.LastSyncGeneration,
-	}).Infof("Syncing DNS Zone: %v", desiredState.Spec.Zone)
+	}).Info("Syncing DNS Zone")
 	if err := zr.Reconcile(); err != nil {
-		r.logger.Errorf("encountered error while attempting to reconcile: %v", err)
+		dnsLog.WithError(err).Error("Encountered error while attempting to reconcile")
 		return reconcile.Result{}, err
 	}
 
@@ -197,7 +195,7 @@ func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
 }
 
 // getAWSClient generates an awsclient
-func (r *ReconcileDNSZone) getAWSClient(dnsZone *hivev1.DNSZone) (awsclient.Client, error) {
+func (r *ReconcileDNSZone) getAWSClient(dnsZone *hivev1.DNSZone, dnsLog log.FieldLogger) (awsclient.Client, error) {
 	// This allows for using host profiles for AWS auth.
 	var secretName, regionName string
 
@@ -208,7 +206,7 @@ func (r *ReconcileDNSZone) getAWSClient(dnsZone *hivev1.DNSZone) (awsclient.Clie
 
 	awsClient, err := r.awsClientBuilder(r.Client, secretName, dnsZone.Namespace, regionName)
 	if err != nil {
-		r.logger.Errorf("Error creating AWSClient: %v", err)
+		dnsLog.WithError(err).Error("Error creating AWSClient")
 		return nil, err
 	}
 

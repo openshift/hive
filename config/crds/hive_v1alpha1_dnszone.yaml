@@ -11,6 +11,8 @@ spec:
     kind: DNSZone
     plural: dnszones
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       properties:
@@ -35,6 +37,24 @@ spec:
                   description: AccountSecret contains a reference to a secret that
                     contains AWS credentials for CRUD operations
                   type: object
+                additionalTags:
+                  description: AdditionalTags is a set of additional tags to set on
+                    the DNS hosted zone. In addition to these tags,the DNS Zone controller
+                    will set a hive.openhsift.io/hostedzone tag identifying the HostedZone
+                    record that it belongs to.
+                  items:
+                    properties:
+                      key:
+                        description: Key is the key for the tag
+                        type: string
+                      value:
+                        description: Value is the value for the tag
+                        type: string
+                    required:
+                    - key
+                    - value
+                    type: object
+                  type: array
                 region:
                   description: Region specifies the region-specific API endpoint to
                     use
@@ -44,13 +64,21 @@ spec:
               - region
               type: object
             zone:
-              description: Zone is the DNS zoneto host
+              description: Zone is the DNS zone to host
               type: string
           required:
           - zone
           type: object
         status:
           properties:
+            aws:
+              description: AWSDNSZoneStatus contains status information specific to
+                AWS
+              properties:
+                zoneID:
+                  description: ZoneID is the ID of the zone in AWS
+                  type: string
+              type: object
             lastSyncGeneration:
               description: LastSyncGeneration is the generation of the zone resource
                 that was last sync'd. This is used to know if the Object has changed
@@ -61,6 +89,11 @@ spec:
               description: LastSyncTimestamp is the time that the zone was last sync'd.
               format: date-time
               type: string
+            nameServers:
+              description: NameServers is a list of nameservers for this DNS zone
+              items:
+                type: string
+              type: array
           required:
           - lastSyncGeneration
           type: object

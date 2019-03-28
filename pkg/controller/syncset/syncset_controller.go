@@ -53,6 +53,7 @@ const (
 	unknownObjectNotFoundReason = "UnknownObjectNotFound"
 	applySucceededReason        = "ApplySucceeded"
 	applyFailedReason           = "ApplyFailed"
+	reapplyInterval             = 2 * time.Hour
 )
 
 // Applier knows how to Apply, Patch and return Info for []byte arrays describing objects and patches.
@@ -70,12 +71,14 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileSyncSet{
+	r := &ReconcileSyncSet{
 		Client:         mgr.GetClient(),
 		scheme:         mgr.GetScheme(),
 		logger:         log.WithField("controller", controllerName),
 		applierBuilder: applierBuilderFunc,
 	}
+	r.hash = r.resourceHash
+	return r
 }
 
 // applierBuilderFunc returns an Applier which implements Info, Apply and Patch
@@ -170,6 +173,7 @@ type ReconcileSyncSet struct {
 
 	logger         log.FieldLogger
 	applierBuilder func([]byte, log.FieldLogger) Applier
+	hash           func([]byte) string
 }
 
 // Reconcile lists SyncSets and SelectorSyncSets which apply to a ClusterDeployment object and applies resources and patches
@@ -283,14 +287,15 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 	syncSetStatus.Conditions = r.setUnknownObjectSyncCondition(syncSetStatus.Conditions, nil, 0)
 
 	for i, resource := range ssResources {
-		resourceHash := md5.Sum(resource.Raw)
 		resourceSyncStatus := hivev1.SyncStatus{
 			APIVersion: infos[i].APIVersion,
 			Kind:       infos[i].Kind,
 			Name:       infos[i].Name,
 			Namespace:  infos[i].Namespace,
-			Hash:       fmt.Sprintf("%x", resourceHash),
+			Hash:       r.hash(resource.Raw),
 		}
+
+		resourceSyncConditions := []hivev1.SyncCondition{}
 
 		// determine if resource is found, different or should be reapplied based on last probe time
 		found := false
@@ -298,17 +303,28 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 		shouldReApply := false
 		for _, rss := range syncSetStatus.Resources {
 			if rss.Name == resourceSyncStatus.Name && rss.Namespace == resourceSyncStatus.Namespace {
+				resourceSyncConditions = rss.Conditions
 				found = true
 				if rss.Hash != resourceSyncStatus.Hash {
+					ssLog.Debugf("Resource %s/%s (%s) has changed, will re-apply", infos[i].Namespace, infos[i].Name, infos[i].Kind)
 					different = true
 					break
 				}
 
+				// re-apply if failure occurred
+				if failureCondition := controllerutils.FindSyncCondition(rss.Conditions, hivev1.ApplyFailureSyncCondition); failureCondition != nil {
+					if failureCondition.Status == corev1.ConditionTrue {
+						ssLog.Debugf("Resource %s/%s (%s) failed last time, will re-apply", infos[i].Namespace, infos[i].Name, infos[i].Kind)
+						shouldReApply = true
+						break
+					}
+				}
+
 				// re-apply if two hours have passed since LastProbeTime
-				applySuccessCondition := controllerutils.FindSyncCondition(rss.Conditions, hivev1.ApplySuccessSyncCondition)
-				if applySuccessCondition != nil {
-					now := metav1.Now()
-					if now.Add(-2 * time.Hour).After(applySuccessCondition.LastProbeTime.Time) {
+				if applySuccessCondition := controllerutils.FindSyncCondition(rss.Conditions, hivev1.ApplySuccessSyncCondition); applySuccessCondition != nil {
+					since := time.Since(applySuccessCondition.LastProbeTime.Time)
+					if since > reapplyInterval {
+						ssLog.Debugf("It has been %v since resource %s/%s (%s) was last applied, will re-apply", since, infos[i].Namespace, infos[i].Name, infos[i].Kind)
 						shouldReApply = true
 					}
 				}
@@ -317,9 +333,9 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 		}
 
 		if !found || different || shouldReApply {
-			ssLog.Debugf("applying resource: %v", infos[i].Name)
+			ssLog.Debugf("applying resource: %s/%s (%s)", infos[i].Namespace, infos[i].Name, infos[i].Kind)
 			err := h.Apply(resource.Raw)
-			resourceSyncStatus.Conditions = r.setApplySuccessSyncCondition(resourceSyncStatus.Conditions, err)
+			resourceSyncStatus.Conditions = r.setApplySyncConditions(resourceSyncConditions, err)
 			syncSetStatus.Resources = appendOrUpdateSyncStatus(syncSetStatus.Resources, resourceSyncStatus)
 			if err != nil {
 				return err
@@ -331,44 +347,32 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 }
 
 func appendOrUpdateSyncSetObjectStatus(statusList []hivev1.SyncSetObjectStatus, syncSetObjectStatus hivev1.SyncSetObjectStatus) []hivev1.SyncSetObjectStatus {
-	found := false
-	for _, ssos := range statusList {
+	for i, ssos := range statusList {
 		if ssos.Name == syncSetObjectStatus.Name {
-			found = true
-			ssos = syncSetObjectStatus
-			break
+			statusList[i] = syncSetObjectStatus
+			return statusList
 		}
 	}
-	if !found {
-		statusList = append(statusList, syncSetObjectStatus)
-	}
-	return statusList
+	return append(statusList, syncSetObjectStatus)
 }
 
 func appendOrUpdateSyncStatus(statusList []hivev1.SyncStatus, syncStatus hivev1.SyncStatus) []hivev1.SyncStatus {
-	found := false
 	for i, ss := range statusList {
 		if ss.Name == syncStatus.Name && ss.Namespace == syncStatus.Namespace && ss.Kind == syncStatus.Kind {
-			found = true
 			statusList[i] = syncStatus
-			break
+			return statusList
 		}
 	}
-	if !found {
-		statusList = append(statusList, syncStatus)
-	}
-	return statusList
+	return append(statusList, syncStatus)
 }
 
 func findSyncSetStatus(name string, statusList []hivev1.SyncSetObjectStatus) hivev1.SyncSetObjectStatus {
-	syncSetStatus := hivev1.SyncSetObjectStatus{Name: name}
 	for _, ssos := range statusList {
 		if name == ssos.Name {
-			syncSetStatus = ssos
-			break
+			return ssos
 		}
 	}
-	return syncSetStatus
+	return hivev1.SyncSetObjectStatus{Name: name}
 }
 
 func (r *ReconcileSyncSet) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, origCD *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
@@ -403,19 +407,31 @@ func (r *ReconcileSyncSet) setUnknownObjectSyncCondition(syncSetConditions []hiv
 	return syncSetConditions
 }
 
-func (r *ReconcileSyncSet) setApplySuccessSyncCondition(resourceSyncConditions []hivev1.SyncCondition, err error) []hivev1.SyncCondition {
-	status := corev1.ConditionTrue
-	reason := applySucceededReason
-	message := fmt.Sprintf("Apply successful")
-	if err != nil {
-		status = corev1.ConditionFalse
+func (r *ReconcileSyncSet) setApplySyncConditions(resourceSyncConditions []hivev1.SyncCondition, err error) []hivev1.SyncCondition {
+	var reason, message string
+	var successStatus, failureStatus corev1.ConditionStatus
+	if err == nil {
+		reason = applySucceededReason
+		message = "Apply successful"
+		successStatus = corev1.ConditionTrue
+		failureStatus = corev1.ConditionFalse
+	} else {
 		reason = applyFailedReason
 		message = fmt.Sprintf("Apply failed: %v", err)
+		successStatus = corev1.ConditionFalse
+		failureStatus = corev1.ConditionTrue
 	}
 	resourceSyncConditions = controllerutils.SetSyncCondition(
 		resourceSyncConditions,
 		hivev1.ApplySuccessSyncCondition,
-		status,
+		successStatus,
+		reason,
+		message,
+		controllerutils.UpdateConditionAlways)
+	resourceSyncConditions = controllerutils.SetSyncCondition(
+		resourceSyncConditions,
+		hivev1.ApplyFailureSyncCondition,
+		failureStatus,
 		reason,
 		message,
 		controllerutils.UpdateConditionAlways)
@@ -477,4 +493,8 @@ func (r *ReconcileSyncSet) loadSecretData(secretName, namespace, dataKey string)
 		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
 	}
 	return string(retStr), nil
+}
+
+func (r *ReconcileSyncSet) resourceHash(data []byte) string {
+	return fmt.Sprintf("%x", md5.Sum(data))
 }

@@ -266,6 +266,9 @@ func GenerateInstallerJob(
 			ActiveDeadlineSeconds: &deadline,
 			BackoffLimit:          &backoffLimit,
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
 				Spec: podSpec,
 			},
 		},

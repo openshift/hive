@@ -151,7 +151,7 @@ type SyncStatus struct {
 	Namespace string `json:"namespace"`
 
 	// Hash is the unique md5 hash of the resource or patch.
-	Hash []byte `json:"hash"`
+	Hash string `json:"hash"`
 
 	// Conditions is the list of conditions indicating success or failure of object
 	// create, update and delete as well as patch application.

@@ -936,7 +936,6 @@ spec:
                         hash:
                           description: Hash is the unique md5 hash of the resource
                             or patch.
-                          format: byte
                           type: string
                         kind:
                           description: Kind is the Kind of the object that was synced
@@ -1006,7 +1005,6 @@ spec:
                         hash:
                           description: Hash is the unique md5 hash of the resource
                             or patch.
-                          format: byte
                           type: string
                         kind:
                           description: Kind is the Kind of the object that was synced
@@ -1123,7 +1121,6 @@ spec:
                         hash:
                           description: Hash is the unique md5 hash of the resource
                             or patch.
-                          format: byte
                           type: string
                         kind:
                           description: Kind is the Kind of the object that was synced
@@ -1193,7 +1190,6 @@ spec:
                         hash:
                           description: Hash is the unique md5 hash of the resource
                             or patch.
-                          format: byte
                           type: string
                         kind:
                           description: Kind is the Kind of the object that was synced

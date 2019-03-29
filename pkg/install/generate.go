@@ -42,6 +42,11 @@ const (
 	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
 	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
+	// InstallJobLabel is the label used for counting the number of install jobs in Hive
+	InstallJobLabel = "hive.openshift.io/install"
+
+	// UninstallJobLabel is the label used for counting the number of uninstall jobs in Hive
+	UninstallJobLabel = "hive.openshift.io/uninstall"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -266,11 +271,13 @@ func GenerateInstallerJob(
 		backoffLimit = int32(0)
 	}
 
+	labels := map[string]string{InstallJobLabel: "true"}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        GetInstallJobName(cd),
 			Namespace:   cd.Namespace,
 			Annotations: annotations,
+			Labels:      labels,
 		},
 		Spec: batchv1.JobSpec{
 			Completions:           &completions,
@@ -374,10 +381,12 @@ func GenerateUninstallerJob(
 	completions := int32(1)
 	deadline := int64((24 * time.Hour).Seconds())
 	backoffLimit := int32(123456) // effectively limitless
+	labels := map[string]string{UninstallJobLabel: "true"}
 
 	job := &batchv1.Job{}
 	job.Name = fmt.Sprintf("%s-uninstall", cd.Name)
 	job.Namespace = cd.Namespace
+	job.ObjectMeta.Labels = labels
 	job.Spec = batchv1.JobSpec{
 		Completions:           &completions,
 		ActiveDeadlineSeconds: &deadline,

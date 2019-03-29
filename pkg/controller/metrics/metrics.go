@@ -31,6 +31,7 @@ import (
 
 	"github.com/openshift/hive/pkg/install"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -51,6 +52,10 @@ var (
 		Name: "hive_uninstall_jobs_running_total",
 		Help: "Total number of uninstall jobs running in Hive.",
 	})
+	metricInstallerPodsRestartsAverage = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_installer_pods_restarts_average",
+		Help: "Average number of installer pods restarts in Hive.",
+	})
 )
 
 func init() {
@@ -58,6 +63,7 @@ func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalledTotal)
 	metrics.Registry.MustRegister(metricInstallJobsRunningTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
+	metrics.Registry.MustRegister(metricInstallerPodsRestartsAverage)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -134,6 +140,24 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			uninstallJobsTotal := len(uninstallJobs.Items)
 			mcLog.WithField("totalRunningUninstallJobs", uninstallJobsTotal).Debug("loaded running uninstall jobs")
 			metricUninstallJobsRunningTotal.Set(float64(uninstallJobsTotal))
+		}
+		// pod metrics
+		mcLog.Debug("calculating installer pods metrics")
+		pods := &corev1.PodList{}
+		err = mc.Client.List(context.Background(), client.MatchingLabels(installJobLabelSelector), pods)
+		if err != nil {
+			log.WithError(err).Error("error listing pods")
+		} else {
+			podRestarts := 0
+			finalAverage := 0.0
+			for _, pod := range pods.Items {
+				for _, cs := range pod.Status.ContainerStatuses {
+					podRestarts = podRestarts + int(cs.RestartCount)
+				}
+			}
+			finalAverage = float64(podRestarts) / float64(len(pods.Items))
+			mcLog.WithField("averageNumberOfPodInstallerRestarts", finalAverage).Debug("installer pod restarts")
+			metricUninstallJobsRunningTotal.Set(float64(finalAverage))
 		}
 	}, mc.Interval, stopCh)
 

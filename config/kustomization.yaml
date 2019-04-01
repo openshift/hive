@@ -33,3 +33,5 @@ resources:
 - ./operator/operator_role.yaml
 - ./operator/operator_role_binding.yaml
 - ./operator/operator_deployment.yaml
+- ./external-dns/rbac_role.yaml
+- ./external-dns/rbac_role_binding.yaml

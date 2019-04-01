@@ -17,12 +17,14 @@ limitations under the License.
 package hive
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	webhooks "github.com/openshift/hive/pkg/apis/hive/v1alpha1/validating-webhooks"
 
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
@@ -43,7 +45,8 @@ import (
 )
 
 const (
-	clusterVersionCRDName = "clusterversions.config.openshift.io"
+	clusterVersionCRDName       = "clusterversions.config.openshift.io"
+	managedDomainsConfigMapName = "managed-domains"
 )
 
 const (
@@ -79,6 +82,32 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
 		scheme.Scheme)
+
+	if len(instance.Spec.ManagedDomains) > 0 {
+		configMap := managedDomainsConfigMap(hiveAdmDeployment.Namespace, instance.Spec.ManagedDomains)
+		err = h.ApplyRuntimeObject(configMap, s)
+		if err != nil {
+			hLog.WithError(err).Error("error applying managed domains configmap")
+		}
+		volume := corev1.Volume{}
+		volume.Name = "managed-domains"
+		volume.ConfigMap = &corev1.ConfigMapVolumeSource{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: managedDomainsConfigMapName,
+			},
+		}
+		volumeMount := corev1.VolumeMount{
+			Name:      "managed-domains",
+			MountPath: "/data/config",
+		}
+		envVar := corev1.EnvVar{
+			Name:  webhooks.ManagedDomainsFileEnvVar,
+			Value: "/data/config/domains",
+		}
+		hiveAdmDeployment.Spec.Template.Spec.Volumes = append(hiveAdmDeployment.Spec.Template.Spec.Volumes, volume)
+		hiveAdmDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(hiveAdmDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
+		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env, envVar)
+	}
 
 	err = h.ApplyRuntimeObject(hiveAdmDeployment, s)
 	if err != nil {
@@ -209,4 +238,18 @@ func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 		return false, err
 	}
 	return false, nil
+}
+
+func managedDomainsConfigMap(namespace string, domains []string) *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{}
+	cm.Kind = "ConfigMap"
+	cm.APIVersion = "v1"
+	cm.Name = managedDomainsConfigMapName
+	cm.Namespace = namespace
+	domainsData := &bytes.Buffer{}
+	for _, domain := range domains {
+		fmt.Fprintf(domainsData, "%s\n", domain)
+	}
+	cm.Data = map[string]string{"domains": domainsData.String()}
+	return cm
 }

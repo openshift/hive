@@ -29,6 +29,37 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            externalDNS:
+              description: ExternalDNS specifies configuration for external-dns if
+                it is to be deployed by Hive. If absent, external-dns will not be
+                deployed.
+              properties:
+                aws:
+                  description: AWS contains AWS-specific settings for external DNS
+                  properties:
+                    credentials:
+                      description: Credentials references a secret that will be used
+                        to authenticate with AWS Route53. It will need permission
+                        to manage entries in each of the managed domains for this
+                        cluster.
+                      type: object
+                  type: object
+                image:
+                  description: Image is a reference to the image that will run the
+                    external-dns controller. If not specified, a default image will
+                    be used.
+                  type: string
+              type: object
+            managedDomains:
+              description: 'ManagedDomains is the list of DNS domains that are managed
+                by the Hive cluster When specifying ''managedDNS: true'' in a ClusterDeployment,
+                the ClusterDeployment''s baseDomain should be a direct child of one
+                of these domains, otherwise the ClusterDeployment creation will result
+                in a validation error.'
+              items:
+                type: string
+              type: array
           type: object
         status:
           properties:

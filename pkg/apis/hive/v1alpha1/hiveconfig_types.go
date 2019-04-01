@@ -17,11 +17,23 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
+	// ManagedDomains is the list of DNS domains that are managed by the Hive cluster
+	// When specifying 'managedDNS: true' in a ClusterDeployment, the ClusterDeployment's
+	// baseDomain should be a direct child of one of these domains, otherwise the
+	// ClusterDeployment creation will result in a validation error.
+	// +optional
+	ManagedDomains []string `json:"managedDomains,omitempty"`
+
+	// ExternalDNS specifies configuration for external-dns if it is to be deployed by
+	// Hive. If absent, external-dns will not be deployed.
+	// +optional
+	ExternalDNS *ExternalDNSConfig `json:"externalDNS,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
@@ -30,6 +42,32 @@ type HiveConfigStatus struct {
 	// configmap data from the openshift-config-managed namespace. When the configmap changes,
 	// admission is redeployed.
 	AggregatorClientCAHash string `json:"aggregatorClientCAHash,omitempty"`
+}
+
+// ExternalDNSConfig contains settings for running external-dns in a Hive
+// environment.
+type ExternalDNSConfig struct {
+
+	// Image is a reference to the image that will run the external-dns controller.
+	// If not specified, a default image will be used.
+	Image string `json:"image,omitempty"`
+
+	// AWS contains AWS-specific settings for external DNS
+	// +optional
+	AWS *ExternalDNSAWSConfig `json:"aws,omitempty"`
+
+	// As other cloud providers are supported, additional fields will be
+	// added for each of those cloud providers. Only a single cloud provider
+	// may be configured at a time.
+}
+
+// ExternalDNSAWSConfig contains AWS-specific settings for external DNS
+type ExternalDNSAWSConfig struct {
+	// Credentials references a secret that will be used to authenticate with
+	// AWS Route53. It will need permission to manage entries in each of the
+	// managed domains for this cluster.
+	// +optional
+	Credentials corev1.LocalObjectReference `json:"credentials,omitempty"`
 }
 
 // +genclient:nonNamespaced

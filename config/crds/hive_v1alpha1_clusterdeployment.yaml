@@ -429,6 +429,10 @@ spec:
                 - domain
                 type: object
               type: array
+            manageDNS:
+              description: ManageDNS specifies whether a DNSZone should be created
+                and managed automatically for this ClusterDeployment
+              type: boolean
             networking:
               description: Networking defines the pod network provider in the cluster.
               properties:

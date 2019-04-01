@@ -63,6 +63,10 @@ spec:
               - accountSecret
               - region
               type: object
+            linkToParentDomain:
+              description: LinkToParentDomain specifies whether DNS records should
+                be automatically created to link this DNSZone with a parent domain.
+              type: boolean
             zone:
               description: Zone is the DNS zone to host
               type: string

@@ -147,20 +147,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Lookup default AMI",
-			existing: []runtime.Object{
-				testNoDefaultAMIClusterDeployment(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if cd == nil || cd.Annotations[hiveDefaultAMIAnnotation] != testAMI {
-					t.Errorf("did not get expected default AMI")
-				}
-			},
-		},
-		{
 			name: "No-op Running install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
@@ -563,9 +549,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
-				amiLookupFunc: func(cd *hivev1.ClusterDeployment) (string, error) {
-					return testAMI, nil
-				},
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
@@ -593,13 +576,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       testName,
-			Namespace:  testNamespace,
-			Finalizers: []string{hivev1.FinalizerDeprovision},
-			UID:        types.UID("1234"),
-			Annotations: map[string]string{
-				hiveDefaultAMIAnnotation: testAMI,
-			},
+			Name:        testName,
+			Namespace:   testNamespace,
+			Finalizers:  []string{hivev1.FinalizerDeprovision},
+			UID:         types.UID("1234"),
+			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
@@ -662,12 +643,6 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(-60 * time.Minute)}
 	cd.Annotations[deleteAfterAnnotation] = "5m"
-	return cd
-}
-
-func testNoDefaultAMIClusterDeployment() *hivev1.ClusterDeployment {
-	cd := testClusterDeployment()
-	cd.Annotations[hiveDefaultAMIAnnotation] = ""
 	return cd
 }
 

@@ -39,6 +39,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 )
 
 const (
@@ -97,6 +98,10 @@ func newRootCommand() *cobra.Command {
 			}
 
 			if err := fedv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := awsprovider.SchemeBuilder.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

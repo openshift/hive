@@ -82,9 +82,8 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
-		Client:                        mgr.GetClient(),
-		scheme:                        mgr.GetScheme(),
-		amiLookupFunc:                 lookupAMI,
+		Client: mgr.GetClient(),
+		scheme: mgr.GetScheme(),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
 }
@@ -120,8 +119,7 @@ var _ reconcile.Reconciler = &ReconcileClusterDeployment{}
 // ReconcileClusterDeployment reconciles a ClusterDeployment object
 type ReconcileClusterDeployment struct {
 	client.Client
-	scheme        *runtime.Scheme
-	amiLookupFunc func(cd *hivev1.ClusterDeployment) (string, error)
+	scheme *runtime.Scheme
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
@@ -224,30 +222,6 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment finalizer")
 		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
-	}
-
-	if cd.Spec.Platform.AWS != nil {
-		if !isDefaultAMISet(cd) {
-			// Ensure we have an AMI set, if not lookup the latest:
-			// TODO: this will be obsolete by the design for OS image lifecycle, we will no
-			// longer need to lookup, pin, and set on machine sets. In cluster components will do
-			// this for us.
-			cdLog.Debugf("looking up a default AMI for cluster")
-			ami, err := r.amiLookupFunc(cd)
-			if err != nil {
-				cdLog.WithError(err).Error("error looking up default AMI for cluster")
-				return reconcile.Result{}, err
-			}
-			setDefaultAMI(cd, ami)
-			cdLog.WithField("AMI", ami).Infof("set default machine platform AMI")
-			controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
-			err = r.Update(context.TODO(), cd)
-			if err != nil {
-				cdLog.WithError(err).Error("error updating default machine annotation")
-			}
-			return reconcile.Result{}, err
-		}
-		cdLog.Debug("default AMI already set")
 	}
 
 	cdLog.Debug("loading SSH key secret")

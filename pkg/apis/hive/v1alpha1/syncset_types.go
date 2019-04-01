@@ -81,9 +81,12 @@ type SyncObjectPatch struct {
 type SyncConditionType string
 
 const (
-	// ApplySuccessSyncCondition indicates whether the resource or patch has been
-	// applied or not. If not, it should include a reason and message for the failure.
+	// ApplySuccessSyncCondition indicates whether the resource or patch has been applied.
 	ApplySuccessSyncCondition SyncConditionType = "ApplySuccess"
+
+	// ApplyFailureSyncCondition indicates that a resource or patch has failed to apply.
+	// It should include a reason and message for the failure.
+	ApplyFailureSyncCondition SyncConditionType = "ApplyFailure"
 
 	// DeletionFailedSyncCondition indicates that resource deletion has failed.
 	// It should include a reason and message for the failure.

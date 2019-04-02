@@ -18,14 +18,27 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
+
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
+
+var validTestManagedDomains = []string{
+	"aaa.com",
+	"foo.aaa.com",
+	"bbb.com",
+	"ccc.com",
+}
 
 func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
 	cd := validClusterDeployment()
@@ -35,6 +48,13 @@ func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
 			Domain: "apps.sameclustername.example.com",
 		},
 	}
+	return cd
+}
+
+func clusterDeploymentWithManagedDomain(domain string) *hivev1.ClusterDeployment {
+	cd := validClusterDeployment()
+	cd.Spec.ManageDNS = true
+	cd.Spec.BaseDomain = domain
 	return cd
 }
 
@@ -264,12 +284,26 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
+		{
+			name:            "Test valid managed domain",
+			newObject:       clusterDeploymentWithManagedDomain("bar.foo.aaa.com"),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test invalid managed domain",
+			newObject:       clusterDeploymentWithManagedDomain("baz.foo.bbb.com"),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			data := ClusterDeploymentValidatingAdmissionHook{}
+			data := ClusterDeploymentValidatingAdmissionHook{
+				validManagedDomains: validTestManagedDomains,
+			}
 
 			if tc.gvr == nil {
 				tc.gvr = &metav1.GroupVersionResource{
@@ -305,4 +339,27 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			assert.Equal(t, tc.expectedAllowed, response.Allowed)
 		})
 	}
+}
+
+func TestNewClusterDeploymentValidatingAdmissionHook(t *testing.T) {
+	tempFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	domains := []string{
+		"first.domain.com",
+		"second.domain.com",
+		"third.domain.com",
+	}
+	for _, domain := range domains {
+		fmt.Fprintf(tempFile, "     %s     \n", domain)
+		fmt.Fprintf(tempFile, "     \n")
+	}
+	err = tempFile.Close()
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	os.Setenv(ManagedDomainsFileEnvVar, tempFile.Name())
+	webhook := NewClusterDeploymentValidatingAdmissionHook()
+	assert.Equal(t, webhook.validManagedDomains, domains, "valid domains must match expected")
 }

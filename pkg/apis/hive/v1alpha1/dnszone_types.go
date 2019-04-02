@@ -32,6 +32,12 @@ type DNSZoneSpec struct {
 	// Zone is the DNS zone to host
 	Zone string `json:"zone"`
 
+	// LinkToParentDomain specifies whether DNS records should
+	// be automatically created to link this DNSZone with a
+	// parent domain.
+	// +optional
+	LinkToParentDomain bool `json:"linkToParentDomain,omitempty"`
+
 	// AWS specifies AWS-specific cloud configuration
 	// +optional
 	AWS *AWSDNSZoneSpec `json:"aws,omitempty"`

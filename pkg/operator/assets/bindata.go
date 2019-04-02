@@ -13,6 +13,10 @@
 // config/clusterimagesets/openshift-4.0-beta2.yaml
 // config/clusterimagesets/openshift-4.0-latest.yaml
 // config/clusterimagesets/openshift-4.0.0-0.8.yaml
+// config/external-dns/deployment.yaml
+// config/external-dns/rbac_role.yaml
+// config/external-dns/rbac_role_binding.yaml
+// config/external-dns/service_account.yaml
 // DO NOT EDIT!
 
 package assets
@@ -619,6 +623,144 @@ func configClusterimagesetsOpenshift40008Yaml() (*asset, error) {
 	return a, nil
 }
 
+var _configExternalDnsDeploymentYaml = []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: hive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: external-dns
+  template:
+    metadata:
+      labels:
+        name: external-dns
+    spec:
+      strategy:
+        type: Recreate
+      serviceAccountName: external-dns
+      containers:
+      - name: external-dns
+        image: registry.svc.ci.openshift.org/openshift/hive-v4.0:external-dns
+        args:
+        - --source=crd
+        - --crd-source-apiversion=hive.openshift.io/v1alpha1
+        - --crd-source-kind=DNSEndpoint
+        - --registry=noop
+        - --policy=upsert-only
+`)
+
+func configExternalDnsDeploymentYamlBytes() ([]byte, error) {
+	return _configExternalDnsDeploymentYaml, nil
+}
+
+func configExternalDnsDeploymentYaml() (*asset, error) {
+	bytes, err := configExternalDnsDeploymentYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/external-dns/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configExternalDnsRbac_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - watch
+  - list
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - dnsendpoints
+  - dnsendpoints/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+`)
+
+func configExternalDnsRbac_roleYamlBytes() ([]byte, error) {
+	return _configExternalDnsRbac_roleYaml, nil
+}
+
+func configExternalDnsRbac_roleYaml() (*asset, error) {
+	bytes, err := configExternalDnsRbac_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/external-dns/rbac_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configExternalDnsRbac_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: external-dns
+  namespace: hive
+`)
+
+func configExternalDnsRbac_role_bindingYamlBytes() ([]byte, error) {
+	return _configExternalDnsRbac_role_bindingYaml, nil
+}
+
+func configExternalDnsRbac_role_bindingYaml() (*asset, error) {
+	bytes, err := configExternalDnsRbac_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/external-dns/rbac_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configExternalDnsService_accountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: hive
+`)
+
+func configExternalDnsService_accountYamlBytes() ([]byte, error) {
+	return _configExternalDnsService_accountYaml, nil
+}
+
+func configExternalDnsService_accountYaml() (*asset, error) {
+	bytes, err := configExternalDnsService_accountYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/external-dns/service_account.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -684,6 +826,10 @@ var _bindata = map[string]func() (*asset, error){
 	"config/clusterimagesets/openshift-4.0-beta2.yaml":          configClusterimagesetsOpenshift40Beta2Yaml,
 	"config/clusterimagesets/openshift-4.0-latest.yaml":         configClusterimagesetsOpenshift40LatestYaml,
 	"config/clusterimagesets/openshift-4.0.0-0.8.yaml":          configClusterimagesetsOpenshift40008Yaml,
+	"config/external-dns/deployment.yaml":                       configExternalDnsDeploymentYaml,
+	"config/external-dns/rbac_role.yaml":                        configExternalDnsRbac_roleYaml,
+	"config/external-dns/rbac_role_binding.yaml":                configExternalDnsRbac_role_bindingYaml,
+	"config/external-dns/service_account.yaml":                  configExternalDnsService_accountYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -732,6 +878,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"openshift-4.0-beta2.yaml":  {configClusterimagesetsOpenshift40Beta2Yaml, map[string]*bintree{}},
 			"openshift-4.0-latest.yaml": {configClusterimagesetsOpenshift40LatestYaml, map[string]*bintree{}},
 			"openshift-4.0.0-0.8.yaml":  {configClusterimagesetsOpenshift40008Yaml, map[string]*bintree{}},
+		}},
+		"external-dns": {nil, map[string]*bintree{
+			"deployment.yaml":        {configExternalDnsDeploymentYaml, map[string]*bintree{}},
+			"rbac_role.yaml":         {configExternalDnsRbac_roleYaml, map[string]*bintree{}},
+			"rbac_role_binding.yaml": {configExternalDnsRbac_role_bindingYaml, map[string]*bintree{}},
+			"service_account.yaml":   {configExternalDnsService_accountYaml, map[string]*bintree{}},
 		}},
 		"hiveadmission": {nil, map[string]*bintree{
 			"apiservice.yaml":                      {configHiveadmissionApiserviceYaml, map[string]*bintree{}},

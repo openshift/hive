@@ -320,6 +320,12 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	err = r.deployExternalDNS(hLog, h, instance, recorder)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying ExternalDNS")
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 

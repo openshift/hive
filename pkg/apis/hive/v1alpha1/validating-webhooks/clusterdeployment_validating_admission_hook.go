@@ -17,16 +17,22 @@ limitations under the License.
 package validatingwebhooks
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
+
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"reflect"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
 const (
@@ -37,6 +43,12 @@ const (
 	clusterDeploymentAdmissionGroup    = "admission.hive.openshift.io"
 	clusterDeploymentAdmissionVersion  = "v1alpha1"
 	clusterDeploymentAdmissionResource = "clusterdeployments"
+
+	// ManagedDomainsFileEnvVar if present, points to a simple text
+	// file that includes a valid managed domain per line. Cluster deployments
+	// requesting that their domains be managed must have a base domain
+	// that is a direct child of one of the valid domains.
+	ManagedDomainsFileEnvVar = "MANAGED_DOMAINS_FILE"
 )
 
 var (
@@ -44,7 +56,28 @@ var (
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-type ClusterDeploymentValidatingAdmissionHook struct{}
+type ClusterDeploymentValidatingAdmissionHook struct {
+	validManagedDomains []string
+}
+
+// NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
+func NewClusterDeploymentValidatingAdmissionHook() *ClusterDeploymentValidatingAdmissionHook {
+	managedDomainsFile := os.Getenv(ManagedDomainsFileEnvVar)
+	logger := log.WithField("validating_webhook", "clusterdeployment")
+	webhook := &ClusterDeploymentValidatingAdmissionHook{}
+	if len(managedDomainsFile) == 0 {
+		logger.Debug("No managed domains file specified")
+		return webhook
+	}
+	logger.WithField("file", managedDomainsFile).Debug("Managed domains file specified")
+	var err error
+	webhook.validManagedDomains, err = readManagedDomainsFile(managedDomainsFile)
+	if err != nil {
+		logger.WithError(err).WithField("file", managedDomainsFile).Fatal("Unable to read managedDomains file")
+	}
+
+	return webhook
+}
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
@@ -182,6 +215,19 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
 				Message: message,
 			},
+		}
+	}
+
+	if newObject.Spec.ManageDNS {
+		if !validateDomain(newObject.Spec.BaseDomain, a.validManagedDomains) {
+			message := "The base domain must be a child of one of the managed domains for ClusterDeployments with manageDNS set to true"
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+					Message: message,
+				},
+			}
 		}
 	}
 
@@ -345,4 +391,35 @@ func validateIngressList(newObject *hivev1.ClusterDeploymentSpec) bool {
 	}
 
 	return true
+}
+
+func readManagedDomainsFile(fileName string) ([]string, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	result := []string{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		s := scanner.Text()
+		s = strings.TrimSpace(s)
+		if len(s) > 0 {
+			result = append(result, s)
+		}
+	}
+	return result, nil
+}
+
+func validateDomain(domain string, validDomains []string) bool {
+	for _, validDomain := range validDomains {
+		if strings.HasSuffix(domain, "."+validDomain) {
+			childPart := strings.TrimSuffix(domain, "."+validDomain)
+			if !strings.Contains(childPart, ".") {
+				return true
+			}
+		}
+	}
+	return false
 }

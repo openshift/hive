@@ -92,6 +92,11 @@ type ClusterDeploymentSpec struct {
 	// CertificateBundles is a list of certificate bundles associated with this cluster
 	// +optional
 	CertificateBundles []CertificateBundleSpec `json:"certificateBundles,omitempty"`
+
+	// ManageDNS specifies whether a DNSZone should be created and managed automatically
+	// for this ClusterDeployment
+	// +optional
+	ManageDNS bool `json:"manageDNS,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.

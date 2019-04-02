@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: hive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: external-dns
+  template:
+    metadata:
+      labels:
+        name: external-dns
+    spec:
+      strategy:
+        type: Recreate
+      serviceAccountName: external-dns
+      containers:
+      - name: external-dns
+        image: registry.svc.ci.openshift.org/openshift/hive-v4.0:external-dns
+        args:
+        - --source=crd
+        - --crd-source-apiversion=hive.openshift.io/v1alpha1
+        - --crd-source-kind=DNSEndpoint
+        - --registry=noop
+        - --policy=upsert-only

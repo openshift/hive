@@ -45,6 +45,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 )
 
 const (
@@ -71,6 +72,7 @@ func init() {
 func TestRemoteMachineSetReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
+	awsprovider.SchemeBuilder.AddToScheme(scheme.Scheme)
 
 	// Utility function to list test MachineSets from the fake client
 	getRMSL := func(rc client.Client) (*machineapi.MachineSetList, error) {
@@ -260,19 +262,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
+				testMachineSetWithAMI("foo-12345-alpha-us-east-1a", "alpha", "ami2", true, 1, 0),
+				testMachineSetWithAMI("foo-12345-alpha-us-east-1b", "alpha", "ami2", true, 1, 0),
+				testMachineSetWithAMI("foo-12345-alpha-us-east-1c", "alpha", "ami2", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
-						*testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
-						*testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
-						*testMachineSet("foo-12345-beta-us-east-1a", "beta", false, 1, 0),
-						*testMachineSet("foo-12345-beta-us-east-1b", "beta", false, 1, 0),
-						*testMachineSet("foo-12345-beta-us-east-1c", "beta", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-alpha-us-east-1a", "alpha", "ami2", true, 1, 0),
+						*testMachineSetWithAMI("foo-12345-alpha-us-east-1b", "alpha", "ami2", true, 1, 0),
+						*testMachineSetWithAMI("foo-12345-alpha-us-east-1c", "alpha", "ami2", true, 1, 0),
+						*testMachineSetWithAMI("foo-12345-beta-us-east-1a", "beta", "ami2", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-beta-us-east-1b", "beta", "ami2", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-beta-us-east-1c", "beta", "ami2", false, 1, 0),
 					},
 				}
 			}(),
@@ -366,6 +368,20 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								if !reflect.DeepEqual(eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints) {
 									t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 								}
+
+								rAWSProviderSpec, err := decodeAWSMachineProviderSpec(
+									rMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
+								log.Debugf("remote AWS: %v", rAWSProviderSpec)
+								assert.NoError(t, err)
+								assert.NotNil(t, rAWSProviderSpec)
+								eAWSProviderSpec, err := decodeAWSMachineProviderSpec(
+									eMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
+								assert.NoError(t, err)
+								assert.NotNil(t, eAWSProviderSpec)
+								log.Debugf("%s", test.name)
+								log.Debugf("expected AWS: %v", eMS.Spec.Template.Spec.ProviderSpec)
+
+								assert.Equal(t, eAWSProviderSpec.AMI, rAWSProviderSpec.AMI)
 							}
 						}
 						if !found {
@@ -422,7 +438,25 @@ func testMachinePool(name string, replicas int, zones []string) hivev1.MachinePo
 }
 
 func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
+	return testMachineSetWithAMI(name, machineType, testAMI, unstompedAnnotation, replicas, generation)
+}
+
+func testMachineSetWithAMI(name, machineType, ami string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
 	msReplicas := int32(replicas)
+	awsProviderSpec := &awsprovider.AWSMachineProviderConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "AWSMachineProviderConfig",
+			APIVersion: awsprovider.SchemeGroupVersion.String(),
+		},
+		AMI: awsprovider.AWSResourceReference{
+			ID: aws.String(ami),
+		},
+	}
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(awsProviderSpec, scheme.Scheme)
+	if err != nil {
+		log.WithError(err).Fatal("error encoding AWS machine provider spec")
+	}
+
 	ms := machineapi.MachineSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -445,6 +479,10 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 							"machine.openshift.io/cluster-api-machine-type": machineType,
 						},
 					},
+					ProviderSpec: machineapi.ProviderSpec{
+						Value: rawAWSProviderSpec,
+					},
+
 					Taints: []corev1.Taint{
 						{
 							Key:    "foo",
@@ -472,9 +510,6 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			Namespace:  testNamespace,
 			Finalizers: []string{hivev1.FinalizerDeprovision},
 			UID:        types.UID("1234"),
-			Annotations: map[string]string{
-				hiveDefaultAMIAnnotation: testAMI,
-			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			SSHKey: &corev1.LocalObjectReference{

@@ -147,12 +147,12 @@ func buildBaseExpectedInstallConfig() *installtypes.InstallConfig {
 		PullSecret: pullSecret,
 		Networking: &installtypes.Networking{
 			// TODO: Hardcoded to match installer for now.
-			Type:        "OpenShiftSDN",
-			ServiceCIDR: ipnet.MustParseCIDR("172.30.0.0/16"),
-			ClusterNetworks: []installtypes.ClusterNetworkEntry{
+			NetworkType:    "OpenShiftSDN",
+			ServiceNetwork: []ipnet.IPNet{*ipnet.MustParseCIDR("172.30.0.0/16")},
+			ClusterNetwork: []installtypes.ClusterNetworkEntry{
 				{
-					CIDR:             *ipnet.MustParseCIDR("10.128.0.0/14"),
-					HostSubnetLength: 9,
+					CIDR:       *ipnet.MustParseCIDR("10.128.0.0/14"),
+					HostPrefix: 9,
 				},
 			},
 			MachineCIDR: vpcCIDRBlock,
@@ -260,9 +260,9 @@ func TestConvert(t *testing.T) {
 			}(),
 			expectedInstallConfig: func() *installtypes.InstallConfig {
 				ic := buildBaseExpectedInstallConfig()
-				ic.Networking.ServiceCIDR = &ipnet.IPNet{}
+				ic.Networking.ServiceNetwork = []ipnet.IPNet{{}}
 				ic.Networking.MachineCIDR = &ipnet.IPNet{}
-				ic.Networking.ClusterNetworks = []installtypes.ClusterNetworkEntry{}
+				ic.Networking.ClusterNetwork = []installtypes.ClusterNetworkEntry{}
 				return ic
 			}(),
 			generateConfigForInstall: true,

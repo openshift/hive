@@ -106,7 +106,7 @@ objects:
       machineCIDR: "10.0.0.0/16"
       clusterNetworks:
         - cidr: "10.128.0.0/14"
-          hostSubnetLength: 9
+          hostSubnetLength: 23
     platform:
       aws:
         region: us-east-1

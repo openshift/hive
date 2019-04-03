@@ -82,10 +82,13 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 		SSHKey:     sshKey,
 		BaseDomain: spec.BaseDomain,
 		Networking: &types.Networking{
-			Type:            string(spec.Networking.Type),
-			ServiceCIDR:     parseCIDR(spec.Networking.ServiceCIDR),
-			ClusterNetworks: convertClusterNetworks(spec.Networking.ClusterNetworks),
-			MachineCIDR:     parseCIDR(spec.Networking.MachineCIDR),
+			// TODO: deviation from installer API here
+			NetworkType: string(spec.Networking.Type),
+			// TODO: deviation from installer API here
+			ServiceNetwork: []ipnet.IPNet{*parseCIDR(spec.Networking.ServiceCIDR)},
+			// TODO: deviation from installer API here
+			ClusterNetwork: convertClusterNetworks(spec.Networking.ClusterNetworks),
+			MachineCIDR:    parseCIDR(spec.Networking.MachineCIDR),
 		},
 		PullSecret:   pullSecret,
 		Platform:     platform,
@@ -132,8 +135,9 @@ func convertClusterNetworks(networks []networkv1.ClusterNetwork) []types.Cluster
 	output := make([]types.ClusterNetworkEntry, 0, len(networks))
 	for _, network := range networks {
 		output = append(output, types.ClusterNetworkEntry{
-			CIDR:             *parseCIDR(network.CIDR),
-			HostSubnetLength: int32(network.HostSubnetLength),
+			CIDR: *parseCIDR(network.CIDR),
+			// TODO: deviation from installer API here
+			HostPrefix: int32(network.HostSubnetLength),
 		})
 	}
 	return output

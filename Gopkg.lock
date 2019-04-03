@@ -758,53 +758,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:95f7662a178a208d0566b75515506152896f0a3584f5001b287ff9f368b002e3"
+  digest = "1:93d588a58c545eee7e5b6a8473939a1924abf0ce430e0735bf19866a40530afa"
   name = "github.com/openshift/api"
   packages = [
-    ".",
-    "apps",
     "apps/v1",
-    "authorization",
-    "authorization/v1",
-    "build",
-    "build/v1",
-    "config",
     "config/v1",
-    "image",
-    "image/docker10",
-    "image/dockerpre012",
-    "image/v1",
-    "kubecontrolplane",
-    "kubecontrolplane/v1",
-    "legacyconfig/v1",
-    "network",
-    "network/v1",
-    "oauth",
-    "oauth/v1",
-    "openshiftcontrolplane",
-    "openshiftcontrolplane/v1",
-    "operator",
     "operator/v1",
-    "operator/v1alpha1",
-    "osin",
-    "osin/v1",
-    "pkg/serialization",
-    "project",
-    "project/v1",
-    "quota",
-    "quota/v1",
-    "route",
     "route/v1",
-    "security",
-    "security/v1",
-    "servicecertsigner",
-    "servicecertsigner/v1alpha1",
-    "template",
-    "template/v1",
-    "user",
-    "user/v1",
-    "webconsole",
-    "webconsole/v1",
   ]
   pruneopts = "NUT"
   revision = "853a7faf74b1c63a56e4010d39057559fa13271f"
@@ -854,7 +814,7 @@
   source = "github.com/csrwng/generic-admission-server"
 
 [[projects]]
-  digest = "1:b898453105c406ecec684335a93f19f0502d4b8cf53085215bfa8b426606d695"
+  digest = "1:bcf2ffbfb7e7c83029f6ea2372522bc57ebf34e3c8de1a69fd4edb68b0e0fd6e"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -868,18 +828,18 @@
     "pkg/types/libvirt",
     "pkg/types/none",
     "pkg/types/openstack",
+    "pkg/types/vsphere",
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "c91cdbc819851fb9f813ec0b3e3b76ed86ae43a3"
+  revision = "d28da4a202f23e7a11a26bad1744cd0b58e712ff"
 
 [[projects]]
   branch = "master"
-  digest = "1:8d36c572e3765cd84a664c0c3529e3fbca8cf17bb58649d64cb719647f683cec"
+  digest = "1:f068d5dd906b3b60555ebb6464618e9a1cb8019c484d10540b4a17d4c568784b"
   name = "github.com/openshift/library-go"
   packages = [
     "pkg/operator/events",
-    "pkg/operator/resource/resourceapply",
     "pkg/operator/resource/resourcemerge",
     "pkg/operator/resource/resourceread",
   ]
@@ -2110,6 +2070,8 @@
   input-imports = [
     "github.com/aws/aws-sdk-go",
     "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/arn",
+    "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/ec2",
@@ -2118,6 +2080,7 @@
     "github.com/aws/aws-sdk-go/service/elb/elbiface",
     "github.com/aws/aws-sdk-go/service/iam",
     "github.com/aws/aws-sdk-go/service/iam/iamiface",
+    "github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi",
     "github.com/aws/aws-sdk-go/service/route53",
     "github.com/aws/aws-sdk-go/service/route53/route53iface",
     "github.com/aws/aws-sdk-go/service/s3",
@@ -2146,9 +2109,9 @@
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",
     "github.com/openshift/library-go/pkg/operator/events",
-    "github.com/openshift/library-go/pkg/operator/resource/resourceapply",
     "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
     "github.com/openshift/library-go/pkg/operator/resource/resourceread",
+    "github.com/prometheus/client_golang/prometheus",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
@@ -2167,9 +2130,11 @@
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
+    "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/runtime/serializer",
+    "k8s.io/apimachinery/pkg/runtime/serializer/json",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/rand",
@@ -2180,14 +2145,16 @@
     "k8s.io/cli-runtime/pkg/genericclioptions",
     "k8s.io/cli-runtime/pkg/genericclioptions/printers",
     "k8s.io/client-go/discovery",
+    "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
-    "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1",
+    "k8s.io/client-go/listers/core/v1",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/restmapper",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
@@ -2205,6 +2172,7 @@
     "sigs.k8s.io/controller-runtime/pkg/envtest",
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
+    "sigs.k8s.io/controller-runtime/pkg/metrics",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
     "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",

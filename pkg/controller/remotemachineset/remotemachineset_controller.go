@@ -347,7 +347,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				ms.Spec.Template.Spec.Taints = hivePool.Taints
 
 				// Re-use existing AWS resources for generated MachineSets.
-				updateMachineSetAWSMachineProviderConfig(ms, ic.ObjectMeta.Name)
+				updateMachineSetAWSMachineProviderConfig(ms, cd.Status.InfraID)
 				installerMachineSets = append(installerMachineSets, *ms)
 			}
 		}
@@ -366,19 +366,23 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 // updateMachineSetAWSMachineProviderConfig modifies values in a MachineSet's AWSMachineProviderConfig.
 // Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
 // the values match the worker pool originally created by the installer.
-func updateMachineSetAWSMachineProviderConfig(machineSet *machineapi.MachineSet, clusterName string) {
+func updateMachineSetAWSMachineProviderConfig(machineSet *machineapi.MachineSet, infraID string) {
 	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
-	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: pointer.StringPtr(fmt.Sprintf("%s-worker-profile", clusterName))}
+
+	// TODO: assumptions about pre-existing objects by name here is quite dangerous, it's already
+	// broken on us once via renames in the installer. We need to start querying for what exists
+	// here.
+	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: pointer.StringPtr(fmt.Sprintf("%s-worker-profile", infraID))}
 	providerConfig.Subnet = awsprovider.AWSResourceReference{
 		Filters: []awsprovider.Filter{{
 			Name:   "tag:Name",
-			Values: []string{fmt.Sprintf("%s-worker-%s", clusterName, providerConfig.Placement.AvailabilityZone)},
+			Values: []string{fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone)},
 		}},
 	}
 	providerConfig.SecurityGroups = []awsprovider.AWSResourceReference{{
 		Filters: []awsprovider.Filter{{
 			Name:   "tag:Name",
-			Values: []string{fmt.Sprintf("%s_worker_sg", clusterName)},
+			Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
 		}},
 	}}
 	machineSet.Spec.Template.Spec.ProviderSpec = machineapi.ProviderSpec{

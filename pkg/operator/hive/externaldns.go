@@ -54,7 +54,12 @@ func (r *ReconcileHiveConfig) deployExternalDNS(hLog log.FieldLogger, h *resourc
 	deployment := resourceread.ReadDeploymentV1OrDie(asset)
 
 	// Make AWS-specific changes to external-dns deployment
-	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--provider=aws")
+	args := deployment.Spec.Template.Spec.Containers[0].Args
+	args = append(args, "--provider=aws")
+	for _, domain := range instance.Spec.ManagedDomains {
+		args = append(args, fmt.Sprintf("--domain-filter=%s", domain))
+	}
+	deployment.Spec.Template.Spec.Containers[0].Args = args
 
 	if len(instance.Spec.ExternalDNS.Image) > 0 {
 		deployment.Spec.Template.Spec.Containers[0].Image = instance.Spec.ExternalDNS.Image

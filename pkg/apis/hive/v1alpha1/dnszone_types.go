@@ -83,6 +83,10 @@ type DNSZoneStatus struct {
 	// AWSDNSZoneStatus contains status information specific to AWS
 	// +optional
 	AWS *AWSDNSZoneStatus `json:"aws,omitempty"`
+
+	// Conditions includes more detailed status for the DNSZone
+	// +optional
+	Conditions []DNSZoneCondition `json:"conditions,omitempty"`
 }
 
 // AWSDNSZoneStatus contains status information specific to AWS DNS zones
@@ -91,6 +95,34 @@ type AWSDNSZoneStatus struct {
 	// +optional
 	ZoneID *string `json:"zoneID,omitempty"`
 }
+
+// DNSZoneCondition contains details for the current condition of a DNSZone
+type DNSZoneCondition struct {
+	// Type is the type of the condition.
+	Type DNSZoneConditionType `json:"type"`
+	// Status is the status of the condition.
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// DNSZoneConditionType is a valid value for DNSZoneCondition.Type
+type DNSZoneConditionType string
+
+const (
+	// ZoneAvailableDNSZoneCondition is true if the DNSZone is responding to DNS queries
+	ZoneAvailableDNSZoneCondition DNSZoneConditionType = "ZoneAvailable"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

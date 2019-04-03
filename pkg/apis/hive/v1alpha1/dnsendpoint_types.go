@@ -69,6 +69,7 @@ type Endpoint struct {
 
 // DNSEndpoint is the Schema for the dnsendpoints API
 // +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type DNSEndpoint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

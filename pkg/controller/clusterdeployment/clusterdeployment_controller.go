@@ -19,6 +19,7 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
 	"strconv"
 	"time"
@@ -49,6 +50,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -75,6 +77,20 @@ const (
 	dnsZoneCheckInterval = 30 * time.Second
 )
 
+var (
+	metricClusterDeploymentInstallRetriesTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "hive_cluster_deployment_install_retries_total",
+			Help: "Number of retries for all install jobs, partitioned by cluster.",
+		},
+		[]string{"cluster_deployment", "namespace"},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricClusterDeploymentInstallRetriesTotal)
+}
+
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -84,9 +100,10 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
+		Client:                               mgr.GetClient(),
+		scheme:                               mgr.GetScheme(),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
+		clusterDeplymentInstallRetriesMetric: metricClusterDeploymentInstallRetriesTotal,
 	}
 }
 
@@ -98,6 +115,8 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	reconciler := r.(*ReconcileClusterDeployment)
+
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
@@ -108,6 +127,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
+	})
+
+	// Watch for pods created by a ClusterDeployment:
+	/*err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1.ClusterDeployment{},
+	})*/
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(reconciler.selectorPodWatchHandler),
 	})
 	if err != nil {
 		return err
@@ -134,7 +162,8 @@ type ReconcileClusterDeployment struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string) (client.Client, error)
+	remoteClusterAPIClientBuilder        func(string) (client.Client, error)
+	clusterDeplymentInstallRetriesMetric *prometheus.CounterVec
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -337,6 +366,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			return reconcile.Result{}, err
 		} else {
 			cdLog.Infof("cluster job exists, cluster deployment status: %v", cd.Status.Installed)
+			r.updateInstallRetriesTotalMetric(cd.Name, cd.Namespace, cdLog)
 			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
 				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
 				if err != nil {
@@ -900,6 +930,61 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 
 func dnsZoneName(cdName string) string {
 	return fmt.Sprintf("%s-zone", cdName)
+}
+
+func (r *ReconcileClusterDeployment) selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
+	retval := []reconcile.Request{}
+
+	pod := a.Object.(*corev1.Pod)
+	if pod == nil {
+		// Wasn't a Pod, bail out. This should not happen.
+		log.Errorf("Error converting MapObject.Object to Pod. Value: %+v", a.Object)
+		return retval
+	}
+	if pod.Labels != nil {
+		if cdName, ok := pod.Labels[install.ClusterDeploymentNameLabel]; ok {
+			if cdNamespace, ok := pod.Labels[install.ClusterDeploymentNamespaceLabel]; ok {
+				retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+					Name:      cdName,
+					Namespace: cdNamespace,
+				}})
+			}
+		}
+	}
+	return retval
+}
+
+func (r *ReconcileClusterDeployment) updateInstallRetriesTotalMetric(clusterDeploymentName string, clusterDeploymentNamespace string, cdLog log.FieldLogger) {
+	labels := map[string]string{"cluster_deployment": clusterDeploymentName, "namespace": "true"}
+	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: clusterDeploymentName, install.ClusterDeploymentNamespaceLabel: clusterDeploymentNamespace, install.InstallJobLabel: "true"}
+	currentRetiesMetric, err := metricClusterDeploymentInstallRetriesTotal.GetMetricWith(labels)
+	if err != nil {
+		cdLog.Error("Error getting cluster deployment install retries total metrics.")
+	} else {
+		cdLog.Infof("CURRENT VALUE:%v", currentRetiesMetric)
+		pods := &corev1.PodList{}
+		err = r.Client.List(context.Background(), client.MatchingLabels(installerPodLabels), pods)
+		if err != nil {
+			log.WithError(err).Error("error listing pods")
+		} else {
+			podRestarts := 0
+			cdLog.Infof("pod length:%v", len(pods.Items))
+			for _, pod := range pods.Items {
+				cdLog.Infof("pod name:%v", pod.Name)
+				for _, cs := range pod.Status.ContainerStatuses {
+					if cs.Name == "installer" {
+						cdLog.Infof("Container Status:%v", cs.Name)
+						cdLog.Infof("POD RESTARTS:%v", cs.RestartCount)
+						podRestarts = int(cs.RestartCount)
+					}
+				}
+			}
+			//TODO - Calculates wrong metrics for now, need to figure out how to get metric value
+			metricClusterDeploymentInstallRetriesTotal.WithLabelValues(clusterDeploymentName, clusterDeploymentNamespace).Add(float64(podRestarts))
+			cdLog.Infof("Pod restarts outside: %v", podRestarts)
+		}
+		cdLog.Infof("clusterDeplymentInstallRetriesMetric: %v", r.clusterDeplymentInstallRetriesMetric)
+	}
 }
 
 func strPtr(s string) *string {

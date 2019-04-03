@@ -30,9 +30,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -63,6 +66,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		syncSets          []*hivev1.SyncSet
 		selectorSyncSets  []*hivev1.SelectorSyncSet
 		validate          func(*testing.T, *hivev1.ClusterDeployment)
+		expectDeleted     []deletedItemInfo
 	}{
 		{
 			name:              "Create single resource successfully",
@@ -413,9 +417,34 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetObjectStatus(t, cd.Status.SyncSetStatus, []hivev1.SyncSetObjectStatus{status})
 			},
 		},
+		{
+			name: "resource sync mode, remove resources",
+			clusterDeployment: testClusterDeployment([]hivev1.SyncSetObjectStatus{
+				successfulResourceStatus("aaa", []runtime.Object{
+					testCM("cm1", "key1", "value1"),
+					testCM("cm2", "key2", "value2"),
+					testCM("cm3", "key3", "value3"),
+					testCM("cm4", "key4", "value4"),
+				}),
+			}, nil),
+			syncSets: []*hivev1.SyncSet{
+				func() *hivev1.SyncSet {
+					ss := testSyncSetWithResources("aaa",
+						testCM("cm1", "key1", "value1"),
+						testCM("cm3", "key3", "value3"),
+					)
+					ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
+					return ss
+				}(),
+			},
+			expectDeleted: []deletedItemInfo{
+				deletedCM("cm2"),
+				deletedCM("cm4"),
+			},
+		},
 	}
 
-	for _, test := range tests {
+	for _, test := range tests[len(tests)-1:] {
 		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			runtimeObjs := []runtime.Object{test.clusterDeployment, kubeconfigSecret()}
@@ -426,6 +455,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				runtimeObjs = append(runtimeObjs, s)
 			}
 			fakeClient := fake.NewFakeClient(runtimeObjs...)
+			dynamicClient := &fakeDynamicClient{}
 
 			helper := &fakeHelper{t: t}
 			rcd := &ReconcileSyncSet{
@@ -434,6 +464,9 @@ func TestSyncSetReconcile(t *testing.T) {
 				logger:         log.WithField("controller", "syncset"),
 				applierBuilder: helper.newHelper,
 				hash:           fakeHashFunc(t),
+				dynamicClientBuilder: func(string) (dynamic.Interface, error) {
+					return dynamicClient, nil
+				},
 			}
 			_, err := rcd.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -444,6 +477,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			validateDeletedItems(t, dynamicClient.deletedItems, test.expectDeleted)
 			cd := &hivev1.ClusterDeployment{}
 			err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: testNamespace}, cd)
 			if err != nil {
@@ -453,6 +487,36 @@ func TestSyncSetReconcile(t *testing.T) {
 				test.validate(t, cd)
 			}
 		})
+	}
+}
+
+func sameDeletedItem(a, b deletedItemInfo) bool {
+	return a.name == b.name &&
+		a.namespace == b.namespace &&
+		a.group == b.group &&
+		a.version == b.version &&
+		a.resource == b.resource
+}
+
+func validateDeletedItems(t *testing.T, actual, expected []deletedItemInfo) {
+	if len(actual) != len(expected) {
+		t.Errorf("unexpected number of deleted items, actual: %d, expected: %d", len(actual), len(expected))
+		return
+	}
+	for _, item := range actual {
+		index := -1
+		for i, expectedItem := range expected {
+			if sameDeletedItem(item, expectedItem) {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			t.Errorf("unexpected deleted item: %#v", item)
+			return
+		}
+		// remove the item from the expected array
+		expected = append(expected[0:index], expected[index+1:]...)
 	}
 }
 
@@ -627,6 +691,16 @@ func testCM(name, key, value string) runtime.Object {
 	}
 }
 
+func deletedCM(name string) deletedItemInfo {
+	return deletedItemInfo{
+		name:      name,
+		namespace: testNamespace,
+		group:     "",
+		version:   "v1",
+		resource:  "ConfigMap",
+	}
+}
+
 func testCMs(prefix string, count int) []runtime.Object {
 	result := []runtime.Object{}
 	for i := 0; i < count; i++ {
@@ -660,6 +734,7 @@ func failedResourceStatus(name string, resources []runtime.Object) hivev1.SyncSe
 		status.Resources = append(status.Resources, hivev1.SyncStatus{
 			APIVersion: r.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 			Kind:       r.GetObjectKind().GroupVersionKind().Kind,
+			Resource:   r.GetObjectKind().GroupVersionKind().Kind,
 			Name:       obj.GetName(),
 			Namespace:  obj.GetNamespace(),
 			Hash:       objectHash(obj),
@@ -714,6 +789,7 @@ func successfulResourceStatusWithTime(name string, resources []runtime.Object, c
 		status.Resources = append(status.Resources, hivev1.SyncStatus{
 			APIVersion: r.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 			Kind:       r.GetObjectKind().GroupVersionKind().Kind,
+			Resource:   r.GetObjectKind().GroupVersionKind().Kind,
 			Name:       obj.GetName(),
 			Namespace:  obj.GetNamespace(),
 			Hash:       objectHash(obj),
@@ -780,11 +856,13 @@ func (f *fakeHelper) Info(data []byte) (*resource.Info, error) {
 	if obj.GetName() == "info-error" {
 		return nil, fmt.Errorf("cannot determine info")
 	}
+
 	return &resource.Info{
 		Name:       obj.GetName(),
 		Namespace:  obj.GetNamespace(),
 		Kind:       r.GetObjectKind().GroupVersionKind().Kind,
 		APIVersion: r.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+		Resource:   r.GetObjectKind().GroupVersionKind().Kind,
 	}, nil
 }
 
@@ -944,4 +1022,84 @@ func objectHash(obj metav1.Object) string {
 		}
 	}
 	return fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetName())
+}
+
+type deletedItemInfo struct {
+	name      string
+	namespace string
+	resource  string
+	group     string
+	version   string
+}
+
+type fakeDynamicClient struct {
+	deletedItems []deletedItemInfo
+}
+
+type fakeNamespaceableClient struct {
+	client    *fakeDynamicClient
+	resource  schema.GroupVersionResource
+	namespace string
+}
+
+func (c *fakeDynamicClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	return &fakeNamespaceableClient{
+		client:   c,
+		resource: resource,
+	}
+}
+
+func (c *fakeNamespaceableClient) Namespace(ns string) dynamic.ResourceInterface {
+	return &fakeNamespaceableClient{
+		client:    c.client,
+		resource:  c.resource,
+		namespace: ns,
+	}
+}
+
+func (c *fakeNamespaceableClient) Create(obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (c *fakeNamespaceableClient) Update(obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (c *fakeNamespaceableClient) UpdateStatus(obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (c *fakeNamespaceableClient) Delete(name string, options *metav1.DeleteOptions, subresources ...string) error {
+	if name == "delete-error" {
+		return fmt.Errorf("cannot delete resource")
+	}
+
+	c.client.deletedItems = append(c.client.deletedItems, deletedItemInfo{
+		name:      name,
+		namespace: c.namespace,
+		resource:  c.resource.Resource,
+		group:     c.resource.Group,
+		version:   c.resource.Version,
+	})
+	return nil
+}
+
+func (c *fakeNamespaceableClient) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	return nil
+}
+
+func (c *fakeNamespaceableClient) Get(name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (c *fakeNamespaceableClient) List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	return nil, nil
+}
+
+func (c *fakeNamespaceableClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return nil, nil
+}
+
+func (c *fakeNamespaceableClient) Patch(name string, pt types.PatchType, data []byte, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return nil, nil
 }

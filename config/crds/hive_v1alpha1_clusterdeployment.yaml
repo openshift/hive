@@ -953,6 +953,11 @@ spec:
                           description: Namespace is the Namespace of the object that
                             was synced or patched.
                           type: string
+                        resource:
+                          description: Resource is the resource name for the object
+                            that was synced. This will be populated for resources,
+                            but not patches
+                          type: string
                       required:
                       - apiVersion
                       - kind
@@ -1021,6 +1026,11 @@ spec:
                         namespace:
                           description: Namespace is the Namespace of the object that
                             was synced or patched.
+                          type: string
+                        resource:
+                          description: Resource is the resource name for the object
+                            that was synced. This will be populated for resources,
+                            but not patches
                           type: string
                       required:
                       - apiVersion
@@ -1138,6 +1148,11 @@ spec:
                           description: Namespace is the Namespace of the object that
                             was synced or patched.
                           type: string
+                        resource:
+                          description: Resource is the resource name for the object
+                            that was synced. This will be populated for resources,
+                            but not patches
+                          type: string
                       required:
                       - apiVersion
                       - kind
@@ -1206,6 +1221,11 @@ spec:
                         namespace:
                           description: Namespace is the Namespace of the object that
                             was synced or patched.
+                          type: string
+                        resource:
+                          description: Resource is the resource name for the object
+                            that was synced. This will be populated for resources,
+                            but not patches
                           type: string
                       required:
                       - apiVersion

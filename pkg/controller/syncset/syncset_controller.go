@@ -240,7 +240,14 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		syncSetStatus := findSyncSetStatus(syncSet.Name, cd.Status.SyncSetStatus)
 		err = r.applySyncSetResources(syncSet.Spec.Resources, kubeConfig, &syncSetStatus, ssLog)
 		if err != nil {
-			ssLog.WithError(err).Error("unable to apply sync set")
+			ssLog.WithError(err).Error("unable to apply sync set resources")
+			// skip applying sync set patches when resources could not be applied
+			cd.Status.SyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SyncSetStatus, syncSetStatus)
+			continue
+		}
+		err = r.applySyncSetPatches(syncSet.Spec.Patches, kubeConfig, &syncSetStatus, ssLog)
+		if err != nil {
+			ssLog.WithError(err).Error("unable to apply sync set patches")
 		}
 		cd.Status.SyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SyncSetStatus, syncSetStatus)
 	}
@@ -252,7 +259,14 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		syncSetStatus := findSyncSetStatus(selectorSyncSet.Name, cd.Status.SelectorSyncSetStatus)
 		err = r.applySyncSetResources(selectorSyncSet.Spec.Resources, kubeConfig, &syncSetStatus, ssLog)
 		if err != nil {
-			ssLog.WithError(err).Error("unable to apply selector sync set")
+			ssLog.WithError(err).Error("unable to apply selector sync set resources")
+			// skip applying selector sync set patches when resources could not be applied
+			cd.Status.SelectorSyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, syncSetStatus)
+			continue
+		}
+		err = r.applySyncSetPatches(selectorSyncSet.Spec.Patches, kubeConfig, &syncSetStatus, ssLog)
+		if err != nil {
+			ssLog.WithError(err).Error("unable to apply selector sync set patches")
 		}
 		cd.Status.SelectorSyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, syncSetStatus)
 	}
@@ -337,6 +351,76 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 			err := h.Apply(resource.Raw)
 			resourceSyncStatus.Conditions = r.setApplySyncConditions(resourceSyncConditions, err)
 			syncSetStatus.Resources = appendOrUpdateSyncStatus(syncSetStatus.Resources, resourceSyncStatus)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// applySyncSetPatches applies patches to cluster identified by kubeConfig
+func (r *ReconcileSyncSet) applySyncSetPatches(ssPatches []hivev1.SyncObjectPatch, kubeConfig []byte, syncSetStatus *hivev1.SyncSetObjectStatus, ssLog log.FieldLogger) error {
+	h := r.applierBuilder(kubeConfig, r.logger)
+
+	for _, ssPatch := range ssPatches {
+		patchSyncStatus := hivev1.SyncStatus{
+			APIVersion: ssPatch.APIVersion,
+			Kind:       ssPatch.Kind,
+			Name:       ssPatch.Name,
+			Namespace:  ssPatch.Namespace,
+			Hash:       r.hash(ssPatch.Patch),
+		}
+
+		patchSyncConditions := []hivev1.SyncCondition{}
+
+		// determine if patch is found, different or should be reapplied based on patch apply mode
+		found := false
+		different := false
+		shouldReApply := false
+		for _, pss := range syncSetStatus.Patches {
+			if pss.Name == patchSyncStatus.Name && pss.Namespace == patchSyncStatus.Namespace && pss.Kind == patchSyncStatus.Kind {
+				patchSyncConditions = pss.Conditions
+				found = true
+				if pss.Hash != patchSyncStatus.Hash {
+					ssLog.Debugf("Patch %s/%s (%s) has changed, will re-apply", ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
+					different = true
+					break
+				}
+
+				// re-apply if failure occurred
+				if failureCondition := controllerutils.FindSyncCondition(pss.Conditions, hivev1.ApplyFailureSyncCondition); failureCondition != nil {
+					if failureCondition.Status == corev1.ConditionTrue {
+						ssLog.Debugf("Patch %s/%s (%s) failed last time, will re-apply", ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
+						shouldReApply = true
+						break
+					}
+				}
+
+				// re-apply if two hours have passed since LastProbeTime and patch apply mode is not apply once
+				if ssPatch.ApplyMode != hivev1.ApplyOncePatchApplyMode {
+					if applySuccessCondition := controllerutils.FindSyncCondition(pss.Conditions, hivev1.ApplySuccessSyncCondition); applySuccessCondition != nil {
+						since := time.Since(applySuccessCondition.LastProbeTime.Time)
+						if since > reapplyInterval {
+							ssLog.Debugf("It has been %v since resource %s/%s (%s) was last applied, will re-apply", since, ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
+							shouldReApply = true
+						}
+					}
+				}
+				break
+			}
+		}
+
+		if !found || different || shouldReApply {
+			ssLog.Debugf("applying patch: %s/%s (%s)", ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
+			namespacedName := types.NamespacedName{
+				Name:      ssPatch.Name,
+				Namespace: ssPatch.Namespace,
+			}
+			err := h.Patch(namespacedName, ssPatch.Kind, ssPatch.APIVersion, ssPatch.Patch, ssPatch.PatchType)
+			patchSyncStatus.Conditions = r.setApplySyncConditions(patchSyncConditions, err)
+			syncSetStatus.Patches = appendOrUpdateSyncStatus(syncSetStatus.Patches, patchSyncStatus)
 			if err != nil {
 				return err
 			}

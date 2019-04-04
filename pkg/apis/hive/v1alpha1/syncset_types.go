@@ -153,6 +153,11 @@ type SyncStatus struct {
 	// Kind is the Kind of the object that was synced or patched.
 	Kind string `json:"kind"`
 
+	// Resource is the resource name for the object that was synced.
+	// This will be populated for resources, but not patches
+	// +optional
+	Resource string `json:"resource,omitempty"`
+
 	// Name is the name of the object that was synced or patched.
 	Name string `json:"name"`
 

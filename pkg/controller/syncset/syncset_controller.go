@@ -32,7 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -53,6 +55,7 @@ const (
 	unknownObjectNotFoundReason = "UnknownObjectNotFound"
 	applySucceededReason        = "ApplySucceeded"
 	applyFailedReason           = "ApplyFailed"
+	deletionFailedReason        = "DeletionFailed"
 	reapplyInterval             = 2 * time.Hour
 )
 
@@ -72,10 +75,11 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileSyncSet{
-		Client:         mgr.GetClient(),
-		scheme:         mgr.GetScheme(),
-		logger:         log.WithField("controller", controllerName),
-		applierBuilder: applierBuilderFunc,
+		Client:               mgr.GetClient(),
+		scheme:               mgr.GetScheme(),
+		logger:               log.WithField("controller", controllerName),
+		applierBuilder:       applierBuilderFunc,
+		dynamicClientBuilder: controllerutils.BuildDynamicClientFromKubeconfig,
 	}
 	r.hash = r.resourceHash
 	return r
@@ -171,9 +175,10 @@ type ReconcileSyncSet struct {
 	client.Client
 	scheme *runtime.Scheme
 
-	logger         log.FieldLogger
-	applierBuilder func([]byte, log.FieldLogger) Applier
-	hash           func([]byte) string
+	logger               log.FieldLogger
+	applierBuilder       func([]byte, log.FieldLogger) Applier
+	hash                 func([]byte) string
+	dynamicClientBuilder func(string) (dynamic.Interface, error)
 }
 
 // Reconcile lists SyncSets and SelectorSyncSets which apply to a ClusterDeployment object and applies resources and patches
@@ -232,13 +237,19 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	kubeConfig := []byte(secretData)
+	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig))
+	if err != nil {
+		cdLog.WithError(err).Error("unable to build dynamic client")
+		return reconcile.Result{}, err
+	}
 
 	for _, syncSet := range syncSets {
 		ssLog := cdLog.WithFields(log.Fields{"syncSet": syncSet.Name})
 		ssLog.Debug("applying sync set")
 
 		syncSetStatus := findSyncSetStatus(syncSet.Name, cd.Status.SyncSetStatus)
-		err = r.applySyncSetResources(syncSet.Spec.Resources, kubeConfig, &syncSetStatus, ssLog)
+		applier := r.applierBuilder(kubeConfig, cdLog)
+		err = r.applySyncSetResources(syncSet.Spec.ResourceApplyMode, syncSet.Spec.Resources, dynamicClient, applier, &syncSetStatus, ssLog)
 		if err != nil {
 			ssLog.WithError(err).Error("unable to apply sync set resources")
 			// skip applying sync set patches when resources could not be applied
@@ -257,7 +268,8 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		ssLog.Debug("applying selector sync set")
 
 		syncSetStatus := findSyncSetStatus(selectorSyncSet.Name, cd.Status.SelectorSyncSetStatus)
-		err = r.applySyncSetResources(selectorSyncSet.Spec.Resources, kubeConfig, &syncSetStatus, ssLog)
+		applier := r.applierBuilder(kubeConfig, cdLog)
+		err = r.applySyncSetResources(selectorSyncSet.Spec.ResourceApplyMode, selectorSyncSet.Spec.Resources, dynamicClient, applier, &syncSetStatus, ssLog)
 		if err != nil {
 			ssLog.WithError(err).Error("unable to apply selector sync set resources")
 			// skip applying selector sync set patches when resources could not be applied
@@ -283,9 +295,7 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 }
 
 // applySyncSetResources evaluates resource objects from RawExtension and applies them to the cluster identified by kubeConfig
-func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtension, kubeConfig []byte, syncSetStatus *hivev1.SyncSetObjectStatus, ssLog log.FieldLogger) error {
-	h := r.applierBuilder(kubeConfig, r.logger)
-
+func (r *ReconcileSyncSet) applySyncSetResources(applyMode hivev1.SyncSetResourceApplyMode, ssResources []runtime.RawExtension, dynamicClient dynamic.Interface, h Applier, syncSetStatus *hivev1.SyncSetObjectStatus, ssLog log.FieldLogger) error {
 	// determine if we can gather info for all resources
 	infos := []resource.Info{}
 	for i, resource := range ssResources {
@@ -299,24 +309,30 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 	}
 
 	syncSetStatus.Conditions = r.setUnknownObjectSyncCondition(syncSetStatus.Conditions, nil, 0)
+	syncStatusList := []hivev1.SyncStatus{}
 
+	var err error
 	for i, resource := range ssResources {
 		resourceSyncStatus := hivev1.SyncStatus{
 			APIVersion: infos[i].APIVersion,
 			Kind:       infos[i].Kind,
+			Resource:   infos[i].Resource,
 			Name:       infos[i].Name,
 			Namespace:  infos[i].Namespace,
 			Hash:       r.hash(resource.Raw),
 		}
 
-		resourceSyncConditions := []hivev1.SyncCondition{}
+		var resourceSyncConditions []hivev1.SyncCondition
 
 		// determine if resource is found, different or should be reapplied based on last probe time
 		found := false
 		different := false
 		shouldReApply := false
 		for _, rss := range syncSetStatus.Resources {
-			if rss.Name == resourceSyncStatus.Name && rss.Namespace == resourceSyncStatus.Namespace {
+			if rss.Name == resourceSyncStatus.Name &&
+				rss.Namespace == resourceSyncStatus.Namespace &&
+				rss.APIVersion == resourceSyncStatus.APIVersion &&
+				rss.Kind == resourceSyncStatus.Kind {
 				resourceSyncConditions = rss.Conditions
 				found = true
 				if rss.Hash != resourceSyncStatus.Hash {
@@ -348,13 +364,28 @@ func (r *ReconcileSyncSet) applySyncSetResources(ssResources []runtime.RawExtens
 
 		if !found || different || shouldReApply {
 			ssLog.Debugf("applying resource: %s/%s (%s)", infos[i].Namespace, infos[i].Name, infos[i].Kind)
-			err := h.Apply(resource.Raw)
+			err = h.Apply(resource.Raw)
 			resourceSyncStatus.Conditions = r.setApplySyncConditions(resourceSyncConditions, err)
-			syncSetStatus.Resources = appendOrUpdateSyncStatus(syncSetStatus.Resources, resourceSyncStatus)
 			if err != nil {
-				return err
+				ssLog.WithError(err).Errorf("error applying resource %s/%s (%s)", infos[i].Namespace, infos[i].Name, infos[i].Kind)
 			}
+		} else {
+			ssLog.Debugf("resource %s/%s (%s) has not changed, will not apply", infos[i].Namespace, infos[i].Name, infos[i].Kind)
+			resourceSyncStatus.Conditions = resourceSyncConditions
 		}
+
+		syncStatusList = append(syncStatusList, resourceSyncStatus)
+
+		// If an error applying occurred, stop processing right here
+		if err != nil {
+			break
+		}
+	}
+
+	syncSetStatus.Resources, err = r.reconcileSyncSetResources(applyMode, dynamicClient, syncSetStatus.Resources, syncStatusList, err, ssLog)
+	if err != nil {
+		ssLog.WithError(err).Error("error reconciling syncset resources")
+		return err
 	}
 
 	return nil
@@ -426,18 +457,66 @@ func (r *ReconcileSyncSet) applySyncSetPatches(ssPatches []hivev1.SyncObjectPatc
 			}
 		}
 	}
-
 	return nil
 }
 
-func appendOrUpdateSyncSetObjectStatus(statusList []hivev1.SyncSetObjectStatus, syncSetObjectStatus hivev1.SyncSetObjectStatus) []hivev1.SyncSetObjectStatus {
-	for i, ssos := range statusList {
-		if ssos.Name == syncSetObjectStatus.Name {
-			statusList[i] = syncSetObjectStatus
-			return statusList
+func (r *ReconcileSyncSet) reconcileSyncSetResources(applyMode hivev1.SyncSetResourceApplyMode, dynamicClient dynamic.Interface, existingStatusList, newStatusList []hivev1.SyncStatus, err error, ssLog log.FieldLogger) ([]hivev1.SyncStatus, error) {
+	ssLog.Debugf("reconciling syncset resources, existing: %d, actual: %d", len(existingStatusList), len(newStatusList))
+	if applyMode == "" || applyMode == hivev1.UpsertResourceApplyMode {
+		ssLog.Debugf("apply mode is upsert, syncset status will be updated")
+		return newStatusList, nil
+	}
+	deletedStatusList := []hivev1.SyncStatus{}
+	deletedStatusIndices := []int{}
+	for i, existingStatus := range existingStatusList {
+		found := false
+		for _, newStatus := range newStatusList {
+			if existingStatus.Name == newStatus.Name &&
+				existingStatus.Namespace == newStatus.Namespace &&
+				existingStatus.APIVersion == newStatus.APIVersion &&
+				existingStatus.Kind == newStatus.Kind {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ssLog.WithField("resource", fmt.Sprintf("%s/%s", existingStatus.Namespace, existingStatus.Name)).
+				WithField("apiversion", existingStatus.APIVersion).
+				WithField("kind", existingStatus.Kind).Debug("resource not found in updated status, will queue up for deletion")
+			deletedStatusList = append(deletedStatusList, existingStatus)
+			deletedStatusIndices = append(deletedStatusIndices, i)
 		}
 	}
-	return append(statusList, syncSetObjectStatus)
+
+	// If an error occurred applying resources, do not delete yet
+	if err != nil {
+		ssLog.Debugf("an error occurred applying resources, will preserve all syncset status items")
+		return append(newStatusList, deletedStatusList...), nil
+	}
+
+	for i, deletedStatus := range deletedStatusList {
+		itemLog := ssLog.WithField("resource", fmt.Sprintf("%s/%s", deletedStatus.Namespace, deletedStatus.Name)).
+			WithField("apiversion", deletedStatus.APIVersion).
+			WithField("kind", deletedStatus.Kind)
+		gv, err := schema.ParseGroupVersion(deletedStatus.APIVersion)
+		if err != nil {
+			return nil, err
+		}
+		gvr := gv.WithResource(deletedStatus.Resource)
+		itemLog.Debug("deleting resource")
+		err = dynamicClient.Resource(gvr).Namespace(deletedStatus.Namespace).Delete(deletedStatus.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				itemLog.WithError(err).Error("error deleting resource")
+				index := deletedStatusIndices[i]
+				existingStatusList[index].Conditions = r.setDeletionFailedSyncCondition(existingStatusList[index].Conditions, err)
+			} else {
+				itemLog.Debug("resource not found, nothing to do")
+			}
+		}
+	}
+
+	return newStatusList, nil
 }
 
 func appendOrUpdateSyncStatus(statusList []hivev1.SyncStatus, syncStatus hivev1.SyncStatus) []hivev1.SyncStatus {
@@ -448,6 +527,16 @@ func appendOrUpdateSyncStatus(statusList []hivev1.SyncStatus, syncStatus hivev1.
 		}
 	}
 	return append(statusList, syncStatus)
+}
+
+func appendOrUpdateSyncSetObjectStatus(statusList []hivev1.SyncSetObjectStatus, syncSetObjectStatus hivev1.SyncSetObjectStatus) []hivev1.SyncSetObjectStatus {
+	for i, ssos := range statusList {
+		if ssos.Name == syncSetObjectStatus.Name {
+			statusList[i] = syncSetObjectStatus
+			return statusList
+		}
+	}
+	return append(statusList, syncSetObjectStatus)
 }
 
 func findSyncSetStatus(name string, statusList []hivev1.SyncSetObjectStatus) hivev1.SyncSetObjectStatus {
@@ -519,7 +608,31 @@ func (r *ReconcileSyncSet) setApplySyncConditions(resourceSyncConditions []hivev
 		reason,
 		message,
 		controllerutils.UpdateConditionAlways)
+
+	// If we are reporting that apply succeeded or failed, it means we no longer
+	// want to delete this resource. Set that failure condition to false in case
+	// it was previously set to true.
+	resourceSyncConditions = controllerutils.SetSyncCondition(
+		resourceSyncConditions,
+		hivev1.DeletionFailedSyncCondition,
+		corev1.ConditionFalse,
+		reason,
+		message,
+		controllerutils.UpdateConditionAlways)
 	return resourceSyncConditions
+}
+
+func (r *ReconcileSyncSet) setDeletionFailedSyncCondition(resourceSyncConditions []hivev1.SyncCondition, err error) []hivev1.SyncCondition {
+	if err == nil {
+		return resourceSyncConditions
+	}
+	return controllerutils.SetSyncCondition(
+		resourceSyncConditions,
+		hivev1.DeletionFailedSyncCondition,
+		corev1.ConditionTrue,
+		deletionFailedReason,
+		fmt.Sprintf("Failed to delete resource: %v", err),
+		controllerutils.UpdateConditionAlways)
 }
 
 func (r *ReconcileSyncSet) getRelatedSelectorSyncSets(cd *hivev1.ClusterDeployment) ([]hivev1.SelectorSyncSet, error) {

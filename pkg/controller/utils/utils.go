@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
@@ -29,7 +30,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 )
 
-// BuildClusterAPIClientFromKubeconfig will return a kubeclient usin the provided kubeconfig
+// BuildClusterAPIClientFromKubeconfig will return a kubeclient using the provided kubeconfig
 func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, error) {
 	config, err := clientcmd.Load([]byte(kubeconfigData))
 	if err != nil {
@@ -57,6 +58,26 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	return client.New(cfg, client.Options{
 		Scheme: scheme,
 	})
+}
+
+// BuildDynamicClientFromKubeconfig returns a dynamic client using the provided kubeconfig
+func BuildDynamicClientFromKubeconfig(kubeconfigData string) (dynamic.Interface, error) {
+	config, err := clientcmd.Load([]byte(kubeconfigData))
+	if err != nil {
+		return nil, err
+	}
+	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
+	cfg, err := kubeConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
 
 // FixupEmptyClusterVersionFields will un-'nil' fields that would fail validation in the ClusterVersion.Status

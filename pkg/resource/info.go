@@ -29,6 +29,7 @@ type Info struct {
 	Namespace  string
 	APIVersion string
 	Kind       string
+	Resource   string
 }
 
 // Info determines the name/namespace and type of the passed in resource bytes
@@ -62,5 +63,6 @@ func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
 		Namespace:  infos[0].Namespace,
 		Kind:       infos[0].ResourceMapping().GroupVersionKind.Kind,
 		APIVersion: infos[0].ResourceMapping().GroupVersionKind.GroupVersion().String(),
+		Resource:   infos[0].ResourceMapping().Resource.Resource,
 	}, nil
 }

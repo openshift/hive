@@ -78,8 +78,8 @@ const (
 )
 
 var (
-	metricClusterDeploymentInstallRetriesTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	metricClusterDeploymentInstallRetriesTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Name: "hive_cluster_deployment_install_retries_total",
 			Help: "Number of retries for all install jobs, partitioned by cluster.",
 		},
@@ -100,10 +100,17 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
+<<<<<<< HEAD
 		Client:                               mgr.GetClient(),
 		scheme:                               mgr.GetScheme(),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 		clusterDeplymentInstallRetriesMetric: metricClusterDeploymentInstallRetriesTotal,
+=======
+		Client:                        mgr.GetClient(),
+		scheme:                        mgr.GetScheme(),
+		amiLookupFunc:                 lookupAMI,
+		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
+>>>>>>> final changes for metric
 	}
 }
 
@@ -114,8 +121,6 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	reconciler := r.(*ReconcileClusterDeployment)
 
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
@@ -129,13 +134,9 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 
-	// Watch for pods created by a ClusterDeployment:
-	/*err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})*/
+	// Watch for pods created by an install job:
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(reconciler.selectorPodWatchHandler),
+		ToRequests: handler.ToRequestsFunc(selectorPodWatchHandler),
 	})
 	if err != nil {
 		return err
@@ -162,8 +163,7 @@ type ReconcileClusterDeployment struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder        func(string) (client.Client, error)
-	clusterDeplymentInstallRetriesMetric *prometheus.CounterVec
+	remoteClusterAPIClientBuilder func(string) (client.Client, error)
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -871,6 +871,7 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 	return currentSA, nil
 }
 
+<<<<<<< HEAD
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
 	// for now we only support AWS
 	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
@@ -933,6 +934,9 @@ func dnsZoneName(cdName string) string {
 }
 
 func (r *ReconcileClusterDeployment) selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
+=======
+func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
+>>>>>>> final changes for metric
 	retval := []reconcile.Request{}
 
 	pod := a.Object.(*corev1.Pod)
@@ -943,47 +947,42 @@ func (r *ReconcileClusterDeployment) selectorPodWatchHandler(a handler.MapObject
 	}
 	if pod.Labels != nil {
 		if cdName, ok := pod.Labels[install.ClusterDeploymentNameLabel]; ok {
-			if cdNamespace, ok := pod.Labels[install.ClusterDeploymentNamespaceLabel]; ok {
-				retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
-					Name:      cdName,
-					Namespace: cdNamespace,
-				}})
-			}
+			retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+				Name:      cdName,
+				Namespace: pod.Namespace,
+			}})
 		}
 	}
 	return retval
 }
 
+// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRetriesTotal
 func (r *ReconcileClusterDeployment) updateInstallRetriesTotalMetric(clusterDeploymentName string, clusterDeploymentNamespace string, cdLog log.FieldLogger) {
-	labels := map[string]string{"cluster_deployment": clusterDeploymentName, "namespace": "true"}
-	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: clusterDeploymentName, install.ClusterDeploymentNamespaceLabel: clusterDeploymentNamespace, install.InstallJobLabel: "true"}
-	currentRetiesMetric, err := metricClusterDeploymentInstallRetriesTotal.GetMetricWith(labels)
+	labels := map[string]string{"cluster_deployment": clusterDeploymentName, "namespace": clusterDeploymentNamespace}
+	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: clusterDeploymentName, install.InstallJobLabel: "true"}
+	currentRetriesMetric, err := metricClusterDeploymentInstallRetriesTotal.GetMetricWith(labels)
 	if err != nil {
 		cdLog.Error("Error getting cluster deployment install retries total metrics.")
 	} else {
-		cdLog.Infof("CURRENT VALUE:%v", currentRetiesMetric)
+		cdLog.Infof("currentRetriesMetric:%v", currentRetriesMetric)
 		pods := &corev1.PodList{}
 		err = r.Client.List(context.Background(), client.MatchingLabels(installerPodLabels), pods)
 		if err != nil {
 			log.WithError(err).Error("error listing pods")
 		} else {
 			podRestarts := 0
-			cdLog.Infof("pod length:%v", len(pods.Items))
 			for _, pod := range pods.Items {
 				cdLog.Infof("pod name:%v", pod.Name)
 				for _, cs := range pod.Status.ContainerStatuses {
-					if cs.Name == "installer" {
-						cdLog.Infof("Container Status:%v", cs.Name)
-						cdLog.Infof("POD RESTARTS:%v", cs.RestartCount)
-						podRestarts = int(cs.RestartCount)
-					}
+					cdLog.Infof("Container Name:%v", cs.Name)
+					cdLog.Infof("Pod Restarts:%v", cs.RestartCount)
+					podRestarts = podRestarts + int(cs.RestartCount)
 				}
 			}
-			//TODO - Calculates wrong metrics for now, need to figure out how to get metric value
-			metricClusterDeploymentInstallRetriesTotal.WithLabelValues(clusterDeploymentName, clusterDeploymentNamespace).Add(float64(podRestarts))
-			cdLog.Infof("Pod restarts outside: %v", podRestarts)
+			// Sets the value of the metricClusterDeploymentInstallRetriesTotal
+			metricClusterDeploymentInstallRetriesTotal.WithLabelValues(clusterDeploymentName, clusterDeploymentNamespace).Set(float64(podRestarts))
 		}
-		cdLog.Infof("clusterDeplymentInstallRetriesMetric: %v", r.clusterDeplymentInstallRetriesMetric)
+		cdLog.Infof("Cluster restart metrics: %v", metricClusterDeploymentInstallRetriesTotal)
 	}
 }
 

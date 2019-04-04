@@ -50,9 +50,6 @@ const (
 
 	// ClusterDeploymentNameLabel is the label (along with ClusterDeploymentNamespaceLabel) that is used to identify the installer pod of a particular cluster deployment
 	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
-
-	// ClusterDeploymentNamespaceLabel is the label (along with ClusterDeploymentNameLabel) that is used to identify the installer pod of a particular cluster deployment
-	ClusterDeploymentNamespaceLabel = "hive.openshift.io/cluster-deployment-namespace"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -260,7 +257,8 @@ func GenerateInstallerJob(
 	}
 
 	labels := map[string]string{InstallJobLabel: "true"}
-	installerPodLabels := map[string]string{ClusterDeploymentNameLabel: cd.Name, ClusterDeploymentNamespaceLabel: cd.Namespace, InstallJobLabel: "true"}
+	// installerPodLabels are the labels that are used by metricClusterDeploymentInstallRetriesTotal
+	installerPodLabels := map[string]string{ClusterDeploymentNameLabel: cd.Name, InstallJobLabel: "true"}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        GetInstallJobName(cd),

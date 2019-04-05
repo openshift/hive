@@ -224,6 +224,11 @@ const (
 	// InstallerImageResolutionFailedCondition is a condition that indicates whether the job
 	// to determine the installer image based on a release image was successful.
 	InstallerImageResolutionFailedCondition ClusterDeploymentConditionType = "InstallerImageResolutionFailed"
+
+	// ControlPlaneCertificateNotFoundCondition is set when a control plane certificate bundle
+	// is not available, preventing the target cluster's control plane from being configured with
+	// certificates.
+	ControlPlaneCertificateNotFoundCondition ClusterDeploymentConditionType = "ControlPlaneCertificateNotFound"
 )
 
 // +genclient

@@ -390,7 +390,7 @@ func (zr *ZoneReconciler) findZoneByCallerReference(domain, callerRef string) (*
 	logger := zr.logger.WithField("domain", domain).WithField("callerRef", callerRef)
 	logger.Debug("Searching for zone by domain and callerRef")
 	var nextZoneID *string
-	var nextName *string = aws.String(domain)
+	var nextName = aws.String(domain)
 	for {
 		logger.Debug("listing hosted zones by name")
 		resp, err := zr.awsClient.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{

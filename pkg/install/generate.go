@@ -76,6 +76,8 @@ func GenerateInstallerJob(
 		tryOnce = exists && value == "true"
 	}
 
+	// TODO: drop all generation of install config here ASAP. We generate this on the fly now
+	// in the install manager. This is only being kept for beta2 and beta3 ClusterImageSet compatability.
 	d, err := yaml.Marshal(ic)
 	if err != nil {
 		return nil, nil, err
@@ -96,15 +98,7 @@ func GenerateInstallerJob(
 
 	env := []corev1.EnvVar{
 		{
-			Name:  "OPENSHIFT_INSTALL_BASE_DOMAIN",
-			Value: cd.Spec.BaseDomain,
-		},
-		{
-			Name:  "OPENSHIFT_INSTALL_CLUSTER_NAME",
-			Value: cd.Name,
-		},
-		{
-			Name: "OPENSHIFT_INSTALL_PULL_SECRET",
+			Name: "PULL_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: cd.Spec.PullSecret,
@@ -112,18 +106,6 @@ func GenerateInstallerJob(
 				},
 			},
 		},
-	}
-	if cd.Spec.AWS != nil {
-		env = append(env, []corev1.EnvVar{
-			{
-				Name:  "OPENSHIFT_INSTALL_AWS_REGION",
-				Value: cd.Spec.AWS.Region,
-			},
-			{
-				Name:  "OPENSHIFT_INSTALL_PLATFORM",
-				Value: "aws",
-			},
-		}...)
 	}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
 		env = append(env, []corev1.EnvVar{
@@ -158,7 +140,7 @@ func GenerateInstallerJob(
 
 	if cd.Spec.SSHKey != nil {
 		env = append(env, corev1.EnvVar{
-			Name: "OPENSHIFT_INSTALL_SSH_PUB_KEY",
+			Name: "SSH_PUB_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: *cd.Spec.SSHKey,

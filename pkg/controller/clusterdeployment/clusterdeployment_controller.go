@@ -229,7 +229,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		cdLog.Error("cluster has no ssh key set, unable to launch install")
 		return reconcile.Result{}, fmt.Errorf("cluster has no ssh key set, unable to launch install")
 	}
-	sshKey, err := r.loadSecretData(cd.Spec.SSHKey.Name,
+	sshKey, err := controllerutils.LoadSecretData(r.Client, cd.Spec.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -256,7 +256,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		cdLog.Debug("cluster is already installed, no processing of install job needed")
 	} else {
 		cdLog.Debug("loading pull secret secret")
-		pullSecret, err := r.loadSecretData(cd.Spec.PullSecret.Name, cd.Namespace, corev1.DockerConfigJsonKey)
+		pullSecret, err := controllerutils.LoadSecretData(r.Client, cd.Spec.PullSecret.Name, cd.Namespace, corev1.DockerConfigJsonKey)
 		if err != nil {
 			cdLog.WithError(err).Error("unable to load pull secret from secret")
 			return reconcile.Result{}, err
@@ -528,19 +528,6 @@ func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration i
 		}
 	}
 	return didGenerationChange, err
-}
-
-func (r *ReconcileClusterDeployment) loadSecretData(secretName, namespace, dataKey string) (string, error) {
-	s := &kapi.Secret{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
-	if err != nil {
-		return "", err
-	}
-	retStr, ok := s.Data[dataKey]
-	if !ok {
-		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
-	}
-	return string(retStr), nil
 }
 
 func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, origCD *hivev1.ClusterDeployment, job *batchv1.Job, cdLog log.FieldLogger) error {

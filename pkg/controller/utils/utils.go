@@ -17,8 +17,13 @@ limitations under the License.
 package utils
 
 import (
+	"context"
+	"fmt"
+
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
@@ -130,4 +135,18 @@ func GetKubeClient(scheme *runtime.Scheme) (client.Client, error) {
 	}
 
 	return dynamicClient, nil
+}
+
+// LoadSecretData loads a given secret key and returns it's data as a string.
+func LoadSecretData(c client.Client, secretName, namespace, dataKey string) (string, error) {
+	s := &kapi.Secret{}
+	err := c.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
+	if err != nil {
+		return "", err
+	}
+	retStr, ok := s.Data[dataKey]
+	if !ok {
+		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
+	}
+	return string(retStr), nil
 }

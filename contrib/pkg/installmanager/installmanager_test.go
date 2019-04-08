@@ -40,8 +40,10 @@ import (
 )
 
 const (
-	testClusterName = "test-cluster"
-	testNamespace   = "test-namespace"
+	testClusterName      = "test-cluster"
+	testNamespace        = "test-namespace"
+	sshKeySecretName     = "ssh-key"
+	pullSecretSecretName = "pull-secret"
 	// testClusterID matches the json blob below:
 	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
 	// testInfraID matches the json blob below:
@@ -109,10 +111,14 @@ func TestInstallManager(t *testing.T) {
 				t.Fail()
 			}
 			defer os.RemoveAll(tempDir)
-			testLog := log.WithField("test", test.name)
-			testLog.WithField("dir", tempDir).Infof("################## using temporary directory")
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			sshKeySecret := testSecret(corev1.SecretTypeOpaque, sshKeySecretName, adminSSHKeySecretKey, "fakesshkey")
+			pullSecret := testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecretName, corev1.DockerConfigJsonKey, "{}")
+			existing := test.existing
+			existing = append(existing, sshKeySecret)
+			existing = append(existing, pullSecret)
+
+			fakeClient := fake.NewFakeClient(existing...)
 
 			im := InstallManager{
 				LogLevel:              "debug",
@@ -335,4 +341,18 @@ func testPreexistingConfigMap() *corev1.ConfigMap {
 		},
 		Data: map[string]string{}, // empty test data
 	}
+}
+
+func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.Secret {
+	s := &corev1.Secret{
+		Type: secretType,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			key: []byte(value),
+		},
+	}
+	return s
 }

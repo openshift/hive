@@ -14,12 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/install"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +49,7 @@ const (
 	metadataConfigmapStringTemplate     = "%s-metadata"
 	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"
 	adminPasswordSecretStringTemplate   = "%s-admin-password"
+	adminSSHKeySecretKey                = "ssh-publickey"
 	sleepBetweenRetries                 = time.Second * 5
 )
 
@@ -175,12 +178,25 @@ func (m *InstallManager) Run() error {
 
 	m.waitForInstallerBinaries()
 
-	dstInstallConfig := filepath.Join(m.WorkDir, "install-config.yaml")
-	m.log.Debugf("copying %s to %s", m.InstallConfig, dstInstallConfig)
-	err = m.copyFile(m.InstallConfig, dstInstallConfig)
+	// Generate an install-config.yaml:
+	sshKey := os.Getenv("SSH_PUB_KEY")
+	pullSecret := os.Getenv("PULL_SECRET")
+	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret, true)
 	if err != nil {
-		m.log.WithError(err).Fatalf("error copying install config from %s to %s",
-			m.InstallConfig, dstInstallConfig)
+		m.log.WithError(err).Error("error generating install-config")
+		return err
+	}
+	d, err := yaml.Marshal(ic)
+	if err != nil {
+		m.log.WithError(err).Error("error marshalling install-config.yaml")
+		return err
+	}
+	installConfig := string(d)
+	m.log.Debugf("install config: %s", installConfig)
+	err = ioutil.WriteFile(filepath.Join(m.WorkDir, "install-config.yaml"), d, 0644)
+	if err != nil {
+		m.log.WithError(err).Error("error writing install-config.yaml to disk")
+		return err
 	}
 
 	// If the cluster deployment has a clusterID set, this implies we failed an install
@@ -573,26 +589,6 @@ func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfig
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return m.DynamicClient.Status().Update(context.Background(), cd)
-}
-
-func (m *InstallManager) copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return out.Sync()
 }
 
 func (m *InstallManager) cleanupMetadataConfigmap() error {

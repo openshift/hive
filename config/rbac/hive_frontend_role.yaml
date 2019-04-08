@@ -59,6 +59,7 @@ rules:
   - hive.openshift.io
   resources:
   - clusterimagesets
+  - hiveconfigs
   verbs:
   - get
   - list

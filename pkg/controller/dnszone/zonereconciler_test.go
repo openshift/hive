@@ -38,9 +38,12 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
+func init() {
+	apis.AddToScheme(scheme.Scheme)
+}
+
 // TestNewZoneReconciler tests that a new ZoneReconciler object can be created.
 func TestNewZoneReconciler(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	cases := []struct {
 		name              string
 		expectedErrString string
@@ -65,6 +68,7 @@ func TestNewZoneReconciler(t *testing.T) {
 				kubeClient: mocks.fakeKubeClient,
 				logger:     log.WithField("controller", controllerName),
 				awsClient:  mocks.mockAWSClient,
+				scheme:     scheme.Scheme,
 			}
 
 			// Act
@@ -73,7 +77,13 @@ func TestNewZoneReconciler(t *testing.T) {
 				expectedZoneReconciler.kubeClient,
 				expectedZoneReconciler.logger,
 				expectedZoneReconciler.awsClient,
+				expectedZoneReconciler.scheme,
 			)
+			// Function equality cannot be tested by assert.Equal
+			// therefore it is set to nil for comparison
+			if zr != nil {
+				zr.soaLookup = nil
+			}
 
 			// Assert
 			assertErrorNilOrMessage(t, err, tc.expectedErrString)
@@ -91,11 +101,14 @@ func TestReconcile(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cases := []struct {
-		name          string
-		dnsZone       *hivev1.DNSZone
-		setupAWSMock  func(*mock.MockClientMockRecorder)
-		validateZone  func(*testing.T, *hivev1.DNSZone)
-		errorExpected bool
+		name                string
+		dnsZone             *hivev1.DNSZone
+		dnsEndpoint         *hivev1.DNSEndpoint
+		setupAWSMock        func(*mock.MockClientMockRecorder)
+		validateZone        func(*testing.T, *hivev1.DNSZone)
+		validateDNSEndpoint func(*testing.T, *hivev1.DNSEndpoint)
+		errorExpected       bool
+		soaLookupResult     bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -193,6 +206,33 @@ func TestReconcile(t *testing.T) {
 				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
 			},
 		},
+		{
+			name:    "Existing zone, link to parent, create DNSEndpoint",
+			dnsZone: validDNSZoneWithLinkToParent(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingTags(expect)
+				mockGetNSRecord(expect)
+			},
+			validateDNSEndpoint: func(t *testing.T, endpoint *hivev1.DNSEndpoint) {
+				assert.NotNil(t, endpoint, "endpoint record should exist")
+			},
+		},
+		{
+			name:            "Existing zone, link to parent, reachable SOA",
+			dnsZone:         validDNSZoneWithLinkToParent(),
+			dnsEndpoint:     validDNSEndpoint(),
+			soaLookupResult: true,
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingTags(expect)
+				mockGetNSRecord(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -205,19 +245,26 @@ func TestReconcile(t *testing.T) {
 				mocks.fakeKubeClient,
 				log.WithField("controller", controllerName),
 				mocks.mockAWSClient,
+				scheme.Scheme,
 			)
+			zr.soaLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.soaLookupResult, nil
+			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
 			defer mocks.mockCtrl.Finish()
 
 			setFakeDNSZoneInKube(mocks, tc.dnsZone)
+			if tc.dnsEndpoint != nil {
+				setFakeDNSEndpointInKube(mocks, tc.dnsEndpoint)
+			}
 
 			if tc.setupAWSMock != nil {
 				tc.setupAWSMock(mocks.mockAWSClient.EXPECT())
 			}
 
 			// Act
-			err := zr.Reconcile()
+			_, err := zr.Reconcile()
 
 			// Assert
 			if tc.errorExpected {
@@ -234,6 +281,14 @@ func TestReconcile(t *testing.T) {
 			}
 			if tc.validateZone != nil {
 				tc.validateZone(t, zone)
+			}
+			if tc.validateDNSEndpoint != nil {
+				endpoint := &hivev1.DNSEndpoint{}
+				err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name + "-ns"}, endpoint)
+				if err != nil {
+					endpoint = nil
+				}
+				tc.validateDNSEndpoint(t, endpoint)
 			}
 		})
 	}

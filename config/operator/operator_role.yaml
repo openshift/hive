@@ -14,6 +14,7 @@ rules:
   - services
   - services/finalizers
   - events
+  - configmaps
   verbs:
   - get
   - list
@@ -26,7 +27,6 @@ rules:
   - ""
   resources:
   - namespaces
-  - configmaps
   verbs:
   - get
   - list

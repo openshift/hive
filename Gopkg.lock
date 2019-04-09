@@ -656,6 +656,14 @@
   revision = "9520e82c474b0a04dd04f8a40959027271bab992"
 
 [[projects]]
+  digest = "1:e624132565a00fcc120432b96f71c71e8a049a4c22905c63220712f1f108acc9"
+  name = "github.com/miekg/dns"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "73601d4aed9d844322611759d7f3619110b7c88e"
+  version = "v1.1.8"
+
+[[projects]]
   digest = "1:9f63926f52745d1f9d6053f8fbbb3bd3983c2c97c0565957e682b8d2f7aad3af"
   name = "github.com/mitchellh/go-wordwrap"
   packages = ["."]
@@ -1052,9 +1060,10 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:172f91a78eb0474888d17c378cdc14ca276463099390c7efd180120b35cfe25d"
+  digest = "1:dc8c680bed88df29c516a9ec48dd56b6f8f86c7122365ffb381a2fa442128e66"
   name = "golang.org/x/net"
   packages = [
+    "bpf",
     "context",
     "context/ctxhttp",
     "html",
@@ -1064,7 +1073,11 @@
     "http2",
     "http2/hpack",
     "idna",
+    "internal/iana",
+    "internal/socket",
     "internal/timeseries",
+    "ipv4",
+    "ipv6",
     "trace",
     "websocket",
   ]
@@ -2093,6 +2106,7 @@
     "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1",
     "github.com/kubernetes-sigs/federation-v2/pkg/controller/util",
     "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2",
+    "github.com/miekg/dns",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",

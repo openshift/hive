@@ -71,6 +71,8 @@ const (
 	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
 	clusterImageSetNotFoundReason         = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason            = "ClusterImageSetFound"
+
+	dnsZoneCheckInterval = 30 * time.Second
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -104,6 +106,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for jobs created by a ClusterDeployment:
 	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1.ClusterDeployment{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Watch for dnszones created by a ClusterDeployment:
+	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
@@ -238,6 +249,19 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	if cd.Status.InstallerImage == nil {
 		return reconcile.Result{}, r.resolveInstallerImage(cd, hiveImage, cdLog)
+	}
+
+	if cd.Spec.ManageDNS {
+		managedDNSZoneAvailable, err := r.ensureManagedDNSZone(cd, cdLog)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !managedDNSZoneAvailable {
+			// The clusterdeployment will be queued when the owned DNSZone's status
+			// is updated to available.
+			cdLog.Debug("DNSZone is not yet available. Waiting for zone to become available.")
+			return reconcile.Result{}, nil
+		}
 	}
 
 	// Check if an install job already exists:
@@ -815,6 +839,67 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 	}
 
 	return currentSA, nil
+}
+
+func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
+	// for now we only support AWS
+	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
+		cdLog.Error("cluster deployment platform is not AWS, cannot manage DNS zone")
+		return false, fmt.Errorf("only AWS managed DNS is supported")
+	}
+	dnsZone := &hivev1.DNSZone{}
+	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
+	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
+
+	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
+	if err == nil {
+		availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+		return availableCondition != nil && availableCondition.Status == corev1.ConditionTrue, nil
+	}
+	if errors.IsNotFound(err) {
+		logger.Debug("creating new DNSZone for cluster deployment")
+		return false, r.createManagedDNSZone(cd, logger)
+	}
+	logger.WithError(err).Error("failed to fetch DNS zone")
+	return false, err
+}
+
+func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	dnsZone := &hivev1.DNSZone{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dnsZoneName(cd.Name),
+			Namespace: cd.Namespace,
+		},
+		Spec: hivev1.DNSZoneSpec{
+			Zone:               cd.Spec.BaseDomain,
+			LinkToParentDomain: true,
+			AWS: &hivev1.AWSDNSZoneSpec{
+				AccountSecret: cd.Spec.PlatformSecrets.AWS.Credentials,
+				Region:        cd.Spec.AWS.Region,
+			},
+		},
+	}
+
+	for k, v := range cd.Spec.AWS.UserTags {
+		dnsZone.Spec.AWS.AdditionalTags = append(dnsZone.Spec.AWS.AdditionalTags, hivev1.AWSResourceTag{Key: k, Value: v})
+	}
+
+	if err := controllerutil.SetControllerReference(cd, dnsZone, r.scheme); err != nil {
+		logger.WithError(err).Error("error setting controller reference on dnszone")
+		return err
+	}
+
+	err := r.Create(context.TODO(), dnsZone)
+	if err != nil {
+		logger.WithError(err).Error("cannot create DNS zone")
+		return err
+	}
+	logger.Debug("dns zone created")
+	return nil
+}
+
+func dnsZoneName(cdName string) string {
+	return fmt.Sprintf("%s-zone", cdName)
 }
 
 func strPtr(s string) *string {

@@ -94,6 +94,15 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		return nil
 	}
 
+	getDNSZone := func(c client.Client) *hivev1.DNSZone {
+		zone := &hivev1.DNSZone{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: testName + "-zone", Namespace: testNamespace}, zone)
+		if err == nil {
+			return zone
+		}
+		return nil
+	}
+
 	getJob := func(c client.Client, name string) *batchv1.Job {
 		job := &batchv1.Job{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: testNamespace}, job)
@@ -490,6 +499,56 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Create DNSZone when manageDNS is true",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				zone := getDNSZone(c)
+				assert.NotNil(t, zone, "dns zone should exist")
+			},
+		},
+		{
+			name: "Wait when DNSZone is not available yet",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getInstallJob(c)
+				assert.Nil(t, installJob, "install job should not exist")
+			},
+		},
+		{
+			name: "Create install job when DNSZone is ready",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testAvailableDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getInstallJob(c)
+				assert.NotNil(t, installJob, "install job should exist")
+			},
+		},
+		{
 			name: "Delete cluster deployment with image from clusterimageset",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -736,4 +795,22 @@ func testClusterImageSet() *hivev1.ClusterImageSet {
 	cis.Name = testClusterImageSetName
 	cis.Spec.ReleaseImage = strPtr("test-release-image:latest")
 	return cis
+}
+
+func testDNSZone() *hivev1.DNSZone {
+	zone := &hivev1.DNSZone{}
+	zone.Name = testName + "-zone"
+	zone.Namespace = testNamespace
+	return zone
+}
+
+func testAvailableDNSZone() *hivev1.DNSZone {
+	zone := testDNSZone()
+	zone.Status.Conditions = []hivev1.DNSZoneCondition{
+		{
+			Type:   hivev1.ZoneAvailableDNSZoneCondition,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	return zone
 }

@@ -19,7 +19,12 @@ package dnszone
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
+	"time"
+
+	"github.com/miekg/dns"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -27,17 +32,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/route53"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-
-	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	hiveDNSZoneTag = "hive.openshift.io/dnszone"
+	hiveDNSZoneTag                  = "hive.openshift.io/dnszone"
+	domainAvailabilityCheckInterval = 30 * time.Second
+	defaultNSRecordTTL              = hivev1.TTL(60)
+	dnsClientTimeout                = 30 * time.Second
+	resolverConfigFile              = "/etc/resolv.conf"
 )
 
 // ZoneReconciler manages getting the desired state, getting the current state and reconciling the two.
@@ -45,6 +59,7 @@ type ZoneReconciler struct {
 	// dnsZone is the kube object that represents the desired state
 	dnsZone *hivev1.DNSZone
 
+	// logger is the logger used for this controller
 	logger log.FieldLogger
 
 	// kubeClient is a kubernetes client to access general cluster / project related objects.
@@ -52,6 +67,12 @@ type ZoneReconciler struct {
 
 	// awsClient is a utility for making it easy for controllers to interface with AWS
 	awsClient awsclient.Client
+
+	// scheme is the controller manager's scheme
+	scheme *runtime.Scheme
+
+	// soaLookup is a function that looks up a zone's SOA record
+	soaLookup func(string, log.FieldLogger) (bool, error)
 }
 
 // NewZoneReconciler creates a new ZoneReconciler object. A new ZoneReconciler is expected to be created for each controller sync.
@@ -60,6 +81,7 @@ func NewZoneReconciler(
 	kubeClient client.Client,
 	logger log.FieldLogger,
 	awsClient awsclient.Client,
+	scheme *runtime.Scheme,
 ) (*ZoneReconciler, error) {
 	if dnsZone == nil {
 		return nil, fmt.Errorf("ZoneReconciler requires dnsZone to be set")
@@ -69,18 +91,20 @@ func NewZoneReconciler(
 		kubeClient: kubeClient,
 		logger:     logger,
 		awsClient:  awsClient,
+		soaLookup:  lookupSOARecord,
+		scheme:     scheme,
 	}
 
 	return zoneReconciler, nil
 }
 
 // Reconcile attempts to make the current state reflect the desired state. It does this idempotently.
-func (zr *ZoneReconciler) Reconcile() error {
+func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 	zr.logger.Debug("Retrieving current state")
 	hostedZone, tags, err := zr.getCurrentState()
 	if err != nil {
 		zr.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
-		return err
+		return reconcile.Result{}, err
 	}
 	if zr.dnsZone.DeletionTimestamp != nil {
 		if hostedZone != nil {
@@ -88,7 +112,7 @@ func (zr *ZoneReconciler) Reconcile() error {
 			err = zr.deleteRoute53HostedZone(hostedZone)
 			if err != nil {
 				zr.logger.WithError(err).Error("Failed to delete hosted zone")
-				return err
+				return reconcile.Result{}, err
 			}
 		}
 		// Remove the finalizer from the DNSZone. It will be persisted when we persist status
@@ -98,7 +122,7 @@ func (zr *ZoneReconciler) Reconcile() error {
 		if err != nil {
 			zr.logger.WithError(err).Error("Failed to remove DNSZone finalizer")
 		}
-		return err
+		return reconcile.Result{}, err
 	}
 	if !controllerutils.HasFinalizer(zr.dnsZone, hivev1.FinalizerDNSZone) {
 		zr.logger.Debug("DNSZone does not have a finalizer. Adding one.")
@@ -107,14 +131,14 @@ func (zr *ZoneReconciler) Reconcile() error {
 		if err != nil {
 			zr.logger.WithError(err).Error("Failed to add finalizer to DNSZone")
 		}
-		return err
+		return reconcile.Result{}, err
 	}
 	if hostedZone == nil {
 		zr.logger.Debug("No corresponding hosted zone found on cloud provider, creating one")
 		hostedZone, err = zr.createRoute53HostedZone()
 		if err != nil {
 			zr.logger.WithError(err).Error("Failed to create hosted zone")
-			return err
+			return reconcile.Result{}, err
 		}
 	} else {
 		zr.logger.Debug("Existing hosted zone found. Syncing with DNSZone resource")
@@ -122,15 +146,103 @@ func (zr *ZoneReconciler) Reconcile() error {
 		err = zr.syncTags(hostedZone.Id, tags)
 		if err != nil {
 			zr.logger.WithError(err).Error("failed to sync tags for hosted zone")
-			return err
+			return reconcile.Result{}, err
 		}
 	}
+
 	nameServers, err := zr.getHostedZoneNSRecord(*hostedZone.Id)
 	if err != nil {
 		zr.logger.WithError(err).Error("Failed to get hosted zone name servers")
+		return reconcile.Result{}, err
+	}
+
+	if zr.dnsZone.Spec.LinkToParentDomain {
+		err = zr.syncParentDomainLink(nameServers)
+		if err != nil {
+			zr.logger.WithError(err).Error("failed syncing parent domain link")
+			return reconcile.Result{}, err
+		}
+	}
+
+	isZoneSOAAvailable, err := zr.soaLookup(zr.dnsZone.Spec.Zone, zr.logger)
+	if err != nil {
+		zr.logger.WithError(err).Error("error looking up SOA record for zone")
+	}
+
+	reconcileResult := reconcile.Result{}
+	if !isZoneSOAAvailable {
+		reconcileResult.Requeue = true
+		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
+	}
+
+	return reconcileResult, zr.updateStatus(hostedZone, nameServers, isZoneSOAAvailable)
+}
+
+func (zr *ZoneReconciler) syncParentDomainLink(nameServers []string) error {
+	existingLinkRecord := &hivev1.DNSEndpoint{}
+	existingLinkRecordName := types.NamespacedName{
+		Namespace: zr.dnsZone.Namespace,
+		Name:      parentLinkRecordName(zr.dnsZone.Name),
+	}
+	err := zr.kubeClient.Get(context.TODO(), existingLinkRecordName, existingLinkRecord)
+	if err != nil && !errors.IsNotFound(err) {
+		zr.logger.WithError(err).Error("failed retrieving existing DNSEndpoint")
 		return err
 	}
-	return zr.updateStatus(hostedZone, nameServers)
+	dnsEndpointNotFound := err != nil
+
+	linkRecord, err := zr.parentLinkRecord(nameServers)
+	if err != nil {
+		zr.logger.WithError(err).Error("failed to create parent link DNSEndpoint")
+		return err
+	}
+
+	if dnsEndpointNotFound {
+		if err = zr.kubeClient.Create(context.TODO(), linkRecord); err != nil {
+			zr.logger.WithError(err).Error("failed creating DNSEndpoint")
+			return err
+		}
+		return nil
+	}
+
+	if !reflect.DeepEqual(existingLinkRecord.Spec, linkRecord.Spec) {
+		existingLinkRecord.Spec = linkRecord.Spec
+		if err = zr.kubeClient.Update(context.TODO(), existingLinkRecord); err != nil {
+			zr.logger.WithError(err).Error("failed to update existing DNSEndpoint")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (zr *ZoneReconciler) parentLinkRecord(nameServers []string) (*hivev1.DNSEndpoint, error) {
+	targets := hivev1.Targets{}
+	for _, nameServer := range nameServers {
+		// external-dns will compare the NS record values without the
+		// dot at the end. If a dot is present, an update happens every sync.
+		targets = append(targets, strings.TrimSuffix(nameServer, "."))
+	}
+	endpoint := &hivev1.DNSEndpoint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      parentLinkRecordName(zr.dnsZone.Name),
+			Namespace: zr.dnsZone.Namespace,
+		},
+		Spec: hivev1.DNSEndpointSpec{
+			Endpoints: []*hivev1.Endpoint{
+				{
+					DNSName:    zr.dnsZone.Spec.Zone,
+					Targets:    targets,
+					RecordType: "NS",
+					RecordTTL:  defaultNSRecordTTL,
+				},
+			},
+		},
+	}
+	if err := controllerutil.SetControllerReference(zr.dnsZone, endpoint, zr.scheme); err != nil {
+		return nil, err
+	}
+	return endpoint, nil
 }
 
 // syncTags determines if there are changes that need to happen to match tags in the spec
@@ -434,13 +546,31 @@ func (zr *ZoneReconciler) deleteRoute53HostedZone(hostedZone *route53.HostedZone
 	return err
 }
 
-func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServers []string) error {
+func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServers []string, isSOAAvailable bool) error {
 	zr.logger.Debug("Updating DNSZone status")
 
 	zr.dnsZone.Status.NameServers = nameServers
 	zr.dnsZone.Status.AWS = &hivev1.AWSDNSZoneStatus{
 		ZoneID: hostedZone.Id,
 	}
+	var availableStatus corev1.ConditionStatus
+	var availableReason, availableMessage string
+	if isSOAAvailable {
+		availableStatus = corev1.ConditionTrue
+		availableReason = "ZoneAvailable"
+		availableMessage = "DNS SOA record for zone is reachable"
+	} else {
+		availableStatus = corev1.ConditionFalse
+		availableReason = "ZoneUnavailable"
+		availableMessage = "DNS SOA record for zone is not reachable"
+	}
+	zr.dnsZone.Status.Conditions = controllerutils.SetDNSZoneCondition(
+		zr.dnsZone.Status.Conditions,
+		hivev1.ZoneAvailableDNSZoneCondition,
+		availableStatus,
+		availableReason,
+		availableMessage,
+		controllerutils.UpdateConditionNever)
 	zr.addRateLimitingStatusEntries()
 	err := zr.kubeClient.Status().Update(context.TODO(), zr.dnsZone)
 	if err != nil {
@@ -493,6 +623,58 @@ func (zr *ZoneReconciler) addRateLimitingStatusEntries() {
 	zr.dnsZone.Status.LastSyncGeneration = zr.dnsZone.ObjectMeta.Generation
 	tmpTime := metav1.Now()
 	zr.dnsZone.Status.LastSyncTimestamp = &tmpTime
+}
+
+func parentLinkRecordName(dnsZoneName string) string {
+	return fmt.Sprintf("%s-ns", dnsZoneName)
+}
+
+func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
+	// TODO: determine if there's a better way to obtain resolver endpoints
+	clientConfig, _ := dns.ClientConfigFromFile(resolverConfigFile)
+	client := dns.Client{Timeout: dnsClientTimeout}
+
+	dnsServers := []string{}
+	for _, s := range clientConfig.Servers {
+		dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
+	}
+	logger.WithField("servers", dnsServers).Debug("looking up domain SOA record")
+
+	m := &dns.Msg{}
+	m.SetQuestion(zone+".", dns.TypeSOA)
+	for _, s := range dnsServers {
+		in, rtt, err := client.Exchange(m, s)
+		if err != nil {
+			logger.WithError(err).WithField("server", s).Debug("query for SOA record failed")
+			continue
+		}
+		log.WithField("server", s).Debugf("SOA query duration: %v", rtt)
+		if len(in.Answer) > 0 {
+			for _, rr := range in.Answer {
+				soa, ok := rr.(*dns.SOA)
+				if !ok {
+					logger.Debugf("Record returned is not an SOA record: %#v", rr)
+					continue
+				}
+				if soa.Hdr.Name != appendPeriod(zone) {
+					logger.WithField("zone", soa.Hdr.Name).Debug("SOA record returned but it does not match the lookup zone")
+					return false, nil
+				}
+				logger.WithField("zone", soa.Hdr.Name).Debug("SOA record returned, zone is reachable")
+				return true, nil
+			}
+		}
+		logger.WithField("server", s).Debug("no answer for SOA record returned")
+		return false, nil
+	}
+	return false, nil
+}
+
+func appendPeriod(name string) string {
+	if !strings.HasSuffix(name, ".") {
+		return name + "."
+	}
+	return name
 }
 
 func tagEquals(a, b *route53.Tag) bool {

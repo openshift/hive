@@ -24,6 +24,8 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -104,7 +106,7 @@ func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient cli
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
 // and what is in the DNSZone.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write DNSZones
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=dnszones,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=hive.openshift.io,resources=dnszones;dnszones/status;dnszones/finalizers;dnsendpoints,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	dnsLog := r.logger.WithFields(log.Fields{
 		"controller": controllerName,
@@ -151,6 +153,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		r.Client,
 		dnsLog,
 		awsClient,
+		r.scheme,
 	)
 	if err != nil {
 		dnsLog.WithError(err).Error("Error creating zone reconciler")
@@ -163,12 +166,11 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		"currentGeneration":  desiredState.Generation,
 		"lastSyncGeneration": desiredState.Status.LastSyncGeneration,
 	}).Info("Syncing DNS Zone")
-	if err := zr.Reconcile(); err != nil {
+	result, err := zr.Reconcile()
+	if err != nil {
 		dnsLog.WithError(err).Error("Encountered error while attempting to reconcile")
-		return reconcile.Result{}, err
 	}
-
-	return reconcile.Result{}, nil
+	return result, err
 }
 
 func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
@@ -182,6 +184,13 @@ func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
 
 	if desiredState.Status.LastSyncGeneration != desiredState.Generation {
 		return true, 0 // Spec has changed since last sync, sync now.
+	}
+
+	if desiredState.Spec.LinkToParentDomain {
+		availableCondition := controllerutils.FindDNSZoneCondition(desiredState.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+		if availableCondition == nil || availableCondition.Status == corev1.ConditionFalse {
+			return true, 0
+		} // If waiting to link to parent, sync now to check domain
 	}
 
 	delta := time.Now().Sub(desiredState.Status.LastSyncTimestamp.Time)

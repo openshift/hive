@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	klabels "k8s.io/apimachinery/pkg/labels"
 	"reflect"
 	"strconv"
 	"time"
@@ -78,9 +79,9 @@ const (
 )
 
 var (
-	metricClusterDeploymentInstallRetriesTotal = prometheus.NewGaugeVec(
+	metricClusterDeploymentInstallRetries = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "hive_cluster_deployment_install_retries_total",
+			Name: "hive_cluster_deployment_install_retries",
 			Help: "Number of retries for all install jobs, partitioned by cluster.",
 		},
 		[]string{"cluster_deployment", "namespace"},
@@ -88,7 +89,7 @@ var (
 )
 
 func init() {
-	metrics.Registry.MustRegister(metricClusterDeploymentInstallRetriesTotal)
+	metrics.Registry.MustRegister(metricClusterDeploymentInstallRetries)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -956,33 +957,33 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 	return retval
 }
 
-// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRetriesTotal
+// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRetries
 func (r *ReconcileClusterDeployment) updateInstallRetriesTotalMetric(clusterDeploymentName string, clusterDeploymentNamespace string, cdLog log.FieldLogger) {
 	labels := map[string]string{"cluster_deployment": clusterDeploymentName, "namespace": clusterDeploymentNamespace}
 	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: clusterDeploymentName, install.InstallJobLabel: "true"}
-	currentRetriesMetric, err := metricClusterDeploymentInstallRetriesTotal.GetMetricWith(labels)
+	_, err := metricClusterDeploymentInstallRetries.GetMetricWith(labels)
 	if err != nil {
 		cdLog.Error("Error getting cluster deployment install retries total metrics.")
 	} else {
-		cdLog.Infof("currentRetriesMetric:%v", currentRetriesMetric)
+		var parsedLabels klabels.Selector
+		parsedLabels, err = klabels.Parse(klabels.Set(installerPodLabels).String())
 		pods := &corev1.PodList{}
-		err = r.Client.List(context.Background(), client.MatchingLabels(installerPodLabels), pods)
+		err = r.Client.List(context.Background(), &client.ListOptions{Namespace: clusterDeploymentNamespace, LabelSelector: parsedLabels}, pods)
 		if err != nil {
 			log.WithError(err).Error("error listing pods")
 		} else {
 			podRestarts := 0
 			for _, pod := range pods.Items {
-				cdLog.Infof("pod name:%v", pod.Name)
 				for _, cs := range pod.Status.ContainerStatuses {
-					cdLog.Infof("Container Name:%v", cs.Name)
-					cdLog.Infof("Pod Restarts:%v", cs.RestartCount)
 					podRestarts = podRestarts + int(cs.RestartCount)
 				}
 			}
-			// Sets the value of the metricClusterDeploymentInstallRetriesTotal
-			metricClusterDeploymentInstallRetriesTotal.WithLabelValues(clusterDeploymentName, clusterDeploymentNamespace).Set(float64(podRestarts))
+			if podRestarts > 0 {
+				cdLog.WithField("Installer Pod Restarts:", podRestarts).Warn("installer pod restarts > 1")
+			}
+			// Sets the value of the metricClusterDeploymentInstallRetries
+			metricClusterDeploymentInstallRetries.WithLabelValues(clusterDeploymentName, clusterDeploymentNamespace).Set(float64(podRestarts))
 		}
-		cdLog.Infof("Cluster restart metrics: %v", metricClusterDeploymentInstallRetriesTotal)
 	}
 }
 

@@ -257,7 +257,7 @@ func GenerateInstallerJob(
 	}
 
 	labels := map[string]string{InstallJobLabel: "true"}
-	// installerPodLabels are the labels that are used by metricClusterDeploymentInstallRetriesTotal
+	// installerPodLabels are the labels that are used by metricClusterDeploymentInstallRetries
 	installerPodLabels := map[string]string{ClusterDeploymentNameLabel: cd.Name, InstallJobLabel: "true"}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

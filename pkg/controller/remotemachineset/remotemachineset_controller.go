@@ -190,7 +190,6 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 	// we extract installer image refs.
 	var amiID string
 	for _, ms := range remoteMachineSets.Items {
-		cdLog.Debugf("spec %v", ms.Spec.Template.Spec.ProviderSpec)
 		awsProviderSpec, err := decodeAWSMachineProviderSpec(ms.Spec.Template.Spec.ProviderSpec.Value, r.scheme)
 		if err != nil {
 			cdLog.WithError(err).Error("error decoding AWSMachineProviderConfig")

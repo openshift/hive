@@ -101,17 +101,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
-<<<<<<< HEAD
-		Client:                               mgr.GetClient(),
-		scheme:                               mgr.GetScheme(),
-		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
-		clusterDeplymentInstallRetriesMetric: metricClusterDeploymentInstallRetriesTotal,
-=======
 		Client:                        mgr.GetClient(),
 		scheme:                        mgr.GetScheme(),
-		amiLookupFunc:                 lookupAMI,
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
->>>>>>> final changes for metric
 	}
 }
 
@@ -872,7 +864,6 @@ func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace
 	return currentSA, nil
 }
 
-<<<<<<< HEAD
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
 	// for now we only support AWS
 	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
@@ -934,10 +925,7 @@ func dnsZoneName(cdName string) string {
 	return fmt.Sprintf("%s-zone", cdName)
 }
 
-func (r *ReconcileClusterDeployment) selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
-=======
 func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
->>>>>>> final changes for metric
 	retval := []reconcile.Request{}
 
 	pod := a.Object.(*corev1.Pod)
@@ -979,7 +967,7 @@ func (r *ReconcileClusterDeployment) updateInstallRetriesTotalMetric(clusterDepl
 				}
 			}
 			if podRestarts > 0 {
-				cdLog.WithField("Installer Pod Restarts:", podRestarts).Warn("installer pod restarts > 1")
+				cdLog.WithField("Installer Pod Restarts newest:", podRestarts).Warn("installer pod restarts > 1")
 			}
 			// Sets the value of the metricClusterDeploymentInstallRetries
 			metricClusterDeploymentInstallRetries.WithLabelValues(clusterDeploymentName, clusterDeploymentNamespace).Set(float64(podRestarts))

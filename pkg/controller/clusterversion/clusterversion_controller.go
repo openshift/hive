@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -45,10 +44,6 @@ const (
 	clusterVersionObjectName = "version"
 	clusterVersionUnknown    = "undef"
 	adminKubeconfigKey       = "kubeconfig"
-)
-
-var (
-	clusterVersionUpdateInterval = 30 * time.Second
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -150,7 +145,7 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	cdLog.Debug("reconcile complete")
-	return reconcile.Result{Requeue: true, RequeueAfter: clusterVersionUpdateInterval}, nil
+	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {

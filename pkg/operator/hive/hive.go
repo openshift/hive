@@ -71,6 +71,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	// Deploy the desired ClusterImageSets representing installable releases of OpenShift.
 	// TODO: in future this should be pipelined somehow.
 	applyAssets := []string{
+		"config/manager/service.yaml",
 		"config/clusterimagesets/openshift-4.0-latest.yaml",
 		"config/clusterimagesets/openshift-4.0-beta3.yaml",
 		"config/rbac/hive_admin_role.yaml",

@@ -10,7 +10,6 @@
 // config/hiveadmission/service-account.yaml
 // config/hiveadmission/service.yaml
 // config/manager/deployment.yaml
-// config/clusterimagesets/openshift-4.0-beta2.yaml
 // config/clusterimagesets/openshift-4.0-beta3.yaml
 // config/clusterimagesets/openshift-4.0-latest.yaml
 // config/external-dns/deployment.yaml
@@ -541,34 +540,6 @@ func configManagerDeploymentYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configClusterimagesetsOpenshift40Beta2Yaml = []byte(`apiVersion: hive.openshift.io/v1alpha1
-kind: ClusterImageSet
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: openshift-v4.0-beta2
-spec:
-  releaseImage: "quay.io/openshift-release-dev/ocp-release:4.0.0-0.7"
-  # TODO: what hive image should we use here? it should be verified working
-  # with the release image. could switch to using appsre images we run in stage/prod.
-  hiveImage: "quay.io/twiest/hive-controller:20190314"
-`)
-
-func configClusterimagesetsOpenshift40Beta2YamlBytes() ([]byte, error) {
-	return _configClusterimagesetsOpenshift40Beta2Yaml, nil
-}
-
-func configClusterimagesetsOpenshift40Beta2Yaml() (*asset, error) {
-	bytes, err := configClusterimagesetsOpenshift40Beta2YamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/clusterimagesets/openshift-4.0-beta2.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _configClusterimagesetsOpenshift40Beta3Yaml = []byte(`apiVersion: hive.openshift.io/v1alpha1
 kind: ClusterImageSet
 metadata:
@@ -821,7 +792,6 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
 	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
 	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
-	"config/clusterimagesets/openshift-4.0-beta2.yaml":          configClusterimagesetsOpenshift40Beta2Yaml,
 	"config/clusterimagesets/openshift-4.0-beta3.yaml":          configClusterimagesetsOpenshift40Beta3Yaml,
 	"config/clusterimagesets/openshift-4.0-latest.yaml":         configClusterimagesetsOpenshift40LatestYaml,
 	"config/external-dns/deployment.yaml":                       configExternalDnsDeploymentYaml,
@@ -873,7 +843,6 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
 		"clusterimagesets": {nil, map[string]*bintree{
-			"openshift-4.0-beta2.yaml":  {configClusterimagesetsOpenshift40Beta2Yaml, map[string]*bintree{}},
 			"openshift-4.0-beta3.yaml":  {configClusterimagesetsOpenshift40Beta3Yaml, map[string]*bintree{}},
 			"openshift-4.0-latest.yaml": {configClusterimagesetsOpenshift40LatestYaml, map[string]*bintree{}},
 		}},

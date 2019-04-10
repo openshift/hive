@@ -17,6 +17,8 @@ limitations under the License.
 package hive
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -29,8 +31,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	corev1 "k8s.io/api/core/v1"
-
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -69,7 +72,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	// TODO: in future this should be pipelined somehow.
 	applyAssets := []string{
 		"config/clusterimagesets/openshift-4.0-latest.yaml",
-		"config/clusterimagesets/openshift-4.0-beta2.yaml",
 		"config/clusterimagesets/openshift-4.0-beta3.yaml",
 	}
 	for _, a := range applyAssets {
@@ -77,6 +79,31 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		if err != nil {
 			return err
 		}
+	}
+
+	// Remove legacy ClusterImageSets we do not want installable anymore.
+	removeImageSets := []string{
+		"openshift-v4.0-beta2",
+		"openshift-v4.0.0-0.8",
+	}
+	for _, isName := range removeImageSets {
+		clusterImageSet := &hivev1.ClusterImageSet{}
+		err := r.Get(context.Background(), types.NamespacedName{Name: isName}, clusterImageSet)
+		if err != nil && !errors.IsNotFound(err) {
+			hLog.WithError(err).Error("error looking for obsolete ClusterImageSet")
+			return err
+		} else if err != nil {
+			hLog.WithField("clusterImageSet", isName).Debug("legacy ClusterImageSet does not exist")
+		} else {
+			err = r.Delete(context.Background(), clusterImageSet)
+			if err != nil {
+				hLog.WithError(err).WithField("clusterImageSet", clusterImageSet).Error(
+					"error deleting outdated ClusterImageSet")
+				return err
+			}
+			hLog.WithField("clusterImageSet", isName).Info("deleted outdated ClusterImageSet")
+		}
+
 	}
 
 	hLog.Info("all hive components successfully reconciled")

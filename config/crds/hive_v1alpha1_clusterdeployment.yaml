@@ -7,12 +7,18 @@ metadata:
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
+  - JSONPath: .spec.clusterName
+    name: ClusterName
+    type: string
   - JSONPath: .spec.baseDomain
     name: BaseDomain
     type: string
   - JSONPath: .status.installed
     name: Installed
     type: boolean
+  - JSONPath: .status.infraID
+    name: InfraID
+    type: string
   - JSONPath: .metadata.creationTimestamp
     name: Age
     type: date

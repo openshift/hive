@@ -103,7 +103,9 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 
 	// Run forever, sleep at the end:
 	wait.Until(func() {
+		start := time.Now()
 		mcLog := log.WithField("controller", "metrics")
+		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
 		clusterDeployments := &hivev1.ClusterDeploymentList{}
 		err := mc.Client.List(context.Background(), &client.ListOptions{}, clusterDeployments)
@@ -122,7 +124,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			metricClusterDeploymentsTotal.Set(float64(total))
 			metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
 		}
-		mcLog.Debug("calculating jobs metrics")
+		mcLog.Info("calculating metrics across all install jobs")
 
 		// install job metrics
 		installJobs := &batchv1.JobList{}
@@ -138,6 +140,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			metricInstallJobsFailedTotal.Set(float64(failedTotal))
 		}
 
+		mcLog.Info("calculating metrics across all uninstall jobs")
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
 		uninstallJobLabelSelector := map[string]string{install.UninstallJobLabel: "true"}
@@ -151,6 +154,9 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			metricUninstallJobsRunningTotal.Set(float64(runningTotal))
 			metricUninstallJobsFailedTotal.Set(float64(failedTotal))
 		}
+
+		elapsed := time.Since(start)
+		mcLog.WithField("elapsed", elapsed).Info("metrics calculation complete")
 	}, mc.Interval, stopCh)
 
 	return nil

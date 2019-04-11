@@ -79,7 +79,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, "default-secret")
+				validateAppliedSyncSet(t, applied, defaultCert("default-secret"))
 			},
 		},
 		{
@@ -111,7 +111,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, "secret0", additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
+				validateAppliedSyncSet(t, applied, defaultCert("secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
 		{
@@ -322,8 +322,12 @@ type additionalCertSpec struct {
 func additionalCert(domain, secret string) additionalCertSpec {
 	return additionalCertSpec{
 		domain: domain,
-		secret: secret,
+		secret: fakeName + "-" + secret,
 	}
+}
+
+func defaultCert(secret string) string {
+	return fakeName + "-" + secret
 }
 
 func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret string, additional ...additionalCertSpec) {

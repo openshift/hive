@@ -81,7 +81,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 	if len(instance.Spec.ManagedDomains) > 0 {
 		configMap := managedDomainsConfigMap(hiveAdmDeployment.Namespace, instance.Spec.ManagedDomains)
-		err = h.ApplyRuntimeObject(configMap, scheme.Scheme)
+		_, err = h.ApplyRuntimeObject(configMap, scheme.Scheme)
 		if err != nil {
 			hLog.WithError(err).Error("error applying managed domains configmap")
 		}
@@ -105,12 +105,12 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env, envVar)
 	}
 
-	err = h.ApplyRuntimeObject(hiveAdmDeployment, scheme.Scheme)
+	result, err := h.ApplyRuntimeObject(hiveAdmDeployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	hLog.Info("deployment applied")
+	hLog.Infof("deployment applied (%s)", result)
 
 	hLog.Debug("reading apiservice")
 	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
@@ -140,33 +140,33 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		}
 	}
 
-	err = h.ApplyRuntimeObject(apiService, scheme.Scheme)
+	result, err = h.ApplyRuntimeObject(apiService, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
 		return err
 	}
-	hLog.Info("apiservice applied")
+	hLog.Infof("apiservice applied (%s)", result)
 
-	err = h.ApplyRuntimeObject(cdWebhook, scheme.Scheme)
+	result, err = h.ApplyRuntimeObject(cdWebhook, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying cluster deployment webhook")
 		return err
 	}
-	hLog.Info("cluster deployment webhook applied")
+	hLog.Infof("cluster deployment webhook applied (%s)", result)
 
-	err = h.ApplyRuntimeObject(cisWebhook, scheme.Scheme)
+	result, err = h.ApplyRuntimeObject(cisWebhook, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying cluster image set webhook")
 		return err
 	}
-	hLog.Info("cluster image set webhook applied")
+	hLog.Infof("cluster image set webhook applied (%s)", result)
 
-	err = h.ApplyRuntimeObject(dnsZonesWebhook, scheme.Scheme)
+	result, err = h.ApplyRuntimeObject(dnsZonesWebhook, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying dns zones webhook")
 		return err
 	}
-	hLog.Info("dns zones webhook applied")
+	hLog.Infof("dns zones webhook applied (%s)", result)
 
 	hLog.Info("hiveadmission components reconciled successfully")
 

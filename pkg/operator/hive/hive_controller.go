@@ -301,12 +301,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		hLog.WithError(err).Error("error serializing kubeconfig")
 		return reconcile.Result{}, err
 	}
-	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
-	if err != nil {
-		hLog.WithError(err).Error("error creating resource helper")
-		return reconcile.Result{}, err
-	}
-
+	h := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
 	err = r.deployHive(hLog, h, instance, recorder)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")

@@ -54,15 +54,12 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
 	}
 
-	// TODO: it would be nice to be able to log if there were changes or not
-	// for all artifacts we Apply.
-
-	err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
+	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	hLog.Info("deployment applied")
+	hLog.Info("deployment applied (%s)", result)
 
 	// Deploy the desired ClusterImageSets representing installable releases of OpenShift.
 	// TODO: in future this should be pipelined somehow.

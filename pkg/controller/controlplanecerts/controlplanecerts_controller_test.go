@@ -39,6 +39,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/resource"
 )
 
 const (
@@ -240,9 +241,9 @@ type fakeApplier struct {
 	appliedObjects []runtime.Object
 }
 
-func (a *fakeApplier) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) error {
+func (a *fakeApplier) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
 	a.appliedObjects = append(a.appliedObjects, obj)
-	return nil
+	return "", nil
 }
 
 type fakeClusterDeploymentWrapper struct {

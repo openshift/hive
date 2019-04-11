@@ -43,7 +43,7 @@ func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 		Out:    &bytes.Buffer{},
 		ErrOut: &bytes.Buffer{},
 	}
-	factory, err := r.getFactory(r.kubeconfig, name.Namespace)
+	factory, err := r.getFactory(name.Namespace)
 	if err != nil {
 		return err
 	}

@@ -842,12 +842,12 @@ func (f *fakeHelper) newHelper(kubeconfig []byte, logger log.FieldLogger) Applie
 	return f
 }
 
-func (f *fakeHelper) Apply(data []byte) error {
+func (f *fakeHelper) Apply(data []byte) (resource.ApplyResult, error) {
 	info, _ := f.Info(data)
 	if info.Name == "apply-error" {
-		return fmt.Errorf("cannot apply resource")
+		return "", fmt.Errorf("cannot apply resource")
 	}
-	return nil
+	return resource.UnknownApplyResult, nil
 }
 
 func (f *fakeHelper) Info(data []byte) (*resource.Info, error) {

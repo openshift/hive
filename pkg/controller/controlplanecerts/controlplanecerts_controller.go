@@ -60,7 +60,7 @@ var (
 )
 
 type applier interface {
-	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) error
+	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error)
 }
 
 // Add creates a new ControlPlaneCerts Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -72,10 +72,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
-	helper, err := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
-	if err != nil {
-		logger.WithError(err).Fatalf("cannot create resource helper for reconciler")
-	}
+	helper := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
 	return &ReconcileControlPlaneCerts{
 		Client:  mgr.GetClient(),
 		scheme:  mgr.GetScheme(),
@@ -177,7 +174,7 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	if err = r.applier.ApplyRuntimeObject(desiredSyncSet, r.scheme); err != nil {
+	if _, err = r.applier.ApplyRuntimeObject(desiredSyncSet, r.scheme); err != nil {
 		cdLog.WithError(err).Error("failed to apply control plane certificates syncset")
 		return reconcile.Result{}, err
 	}

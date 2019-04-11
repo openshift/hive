@@ -145,30 +145,29 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 	if !secretsAvailable {
 		cdLog.Debug("cert secrets are not available yet, setting condition on clusterdeployment")
 		updated, err := r.setCertsNotFoundCondition(cd, true, cdLog)
-		if updated {
-			if err != nil {
-				cdLog.WithError(err).Error("cannot update cluster deployment secrets not found condition")
-			}
+		if err != nil {
+			cdLog.WithError(err).Error("cannot update cluster deployment secrets not found condition")
 			return reconcile.Result{}, err
+		}
+		if updated {
+			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{Requeue: true, RequeueAfter: secretCheckInterval}, nil
 	}
 
 	// clear condition if certs were found
 	updated, err := r.setCertsNotFoundCondition(cd, false, cdLog)
-	if updated {
-		if err != nil {
-			cdLog.WithError(err).Error("cannot update cluster deployment secrets not found condition")
-		}
+	if err != nil {
+		cdLog.WithError(err).Error("cannot update cluster deployment secrets not found condition")
 		return reconcile.Result{}, err
 	}
+	if updated {
+		return reconcile.Result{}, nil
+	}
 
-	if len(secrets) == 0 {
-		if existingSyncSet == nil {
-			cdLog.Debug("no control plane certs needed, and no syncset exists, nothing to do")
-			// If no syncset has been created, then there is no need to create one
-			return reconcile.Result{}, nil
-		}
+	if len(secrets) == 0 && existingSyncSet == nil {
+		cdLog.Debug("no control plane certs needed, and no syncset exists, nothing to do")
+		return reconcile.Result{}, nil
 	}
 
 	desiredSyncSet, err := r.generateControlPlaneCertsSyncSet(cd, secrets, cdLog)

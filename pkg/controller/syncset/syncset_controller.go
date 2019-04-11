@@ -401,7 +401,7 @@ func (r *ReconcileSyncSet) applySyncSetPatches(ssPatches []hivev1.SyncObjectPatc
 			Kind:       ssPatch.Kind,
 			Name:       ssPatch.Name,
 			Namespace:  ssPatch.Namespace,
-			Hash:       r.hash(ssPatch.Patch),
+			Hash:       r.hash([]byte(ssPatch.Patch)),
 		}
 
 		patchSyncConditions := []hivev1.SyncCondition{}
@@ -449,7 +449,7 @@ func (r *ReconcileSyncSet) applySyncSetPatches(ssPatches []hivev1.SyncObjectPatc
 				Name:      ssPatch.Name,
 				Namespace: ssPatch.Namespace,
 			}
-			err := h.Patch(namespacedName, ssPatch.Kind, ssPatch.APIVersion, ssPatch.Patch, ssPatch.PatchType)
+			err := h.Patch(namespacedName, ssPatch.Kind, ssPatch.APIVersion, []byte(ssPatch.Patch), ssPatch.PatchType)
 			patchSyncStatus.Conditions = r.setApplySyncConditions(patchSyncConditions, err)
 			syncSetStatus.Patches = appendOrUpdateSyncStatus(syncSetStatus.Patches, patchSyncStatus)
 			if err != nil {

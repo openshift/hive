@@ -19,6 +19,9 @@ package syncidentityprovider
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"testing"
+
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -29,12 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
 )
 
 const (
@@ -518,7 +519,7 @@ func areSyncSetSpecsEqual(t *testing.T, expected, actual *hivev1.SyncSetList) bo
 	return true
 }
 
-func generatePatch(identityProviders []openshiftapiv1.IdentityProvider) []byte {
+func generatePatch(identityProviders []openshiftapiv1.IdentityProvider) string {
 	idpp := identityProviderPatch{
 		Spec: identityProviderPatchSpec{
 			IdentityProviders: identityProviders,
@@ -528,6 +529,5 @@ func generatePatch(identityProviders []openshiftapiv1.IdentityProvider) []byte {
 	// We're swallowing the error because it should never error since we're controlling the input.
 	idppRaw, _ := json.Marshal(idpp)
 
-	return idppRaw
-
+	return string(idppRaw)
 }

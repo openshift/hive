@@ -47,9 +47,17 @@ var (
 		Name: "hive_install_jobs_running_total",
 		Help: "Total number of install jobs running in Hive.",
 	})
+	metricInstallJobsFailedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_install_jobs_failed_total",
+		Help: "Total number of install jobs failed in Hive.",
+	})
 	metricUninstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "hive_uninstall_jobs_running_total",
 		Help: "Total number of uninstall jobs running in Hive.",
+	})
+	metricUninstallJobsFailedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_uninstall_jobs_failed_total",
+		Help: "Total number of uninstall jobs failed in Hive.",
 	})
 )
 
@@ -57,7 +65,9 @@ func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalledTotal)
 	metrics.Registry.MustRegister(metricInstallJobsRunningTotal)
+	metrics.Registry.MustRegister(metricInstallJobsFailedTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
+	metrics.Registry.MustRegister(metricUninstallJobsFailedTotal)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -113,6 +123,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
 		}
 		mcLog.Debug("calculating jobs metrics")
+
 		// install job metrics
 		installJobs := &batchv1.JobList{}
 		installJobLabelSelector := map[string]string{install.InstallJobLabel: "true"}
@@ -120,10 +131,13 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing install jobs")
 		} else {
-			installJobsTotal := len(installJobs.Items)
-			mcLog.WithField("totalRunningInstallJobs", installJobsTotal).Debug("loaded running install jobs")
-			metricInstallJobsRunningTotal.Set(float64(installJobsTotal))
+			runningTotal, failedTotal := processJobs(installJobs.Items)
+			mcLog.WithField("runningInstalls", runningTotal).Debug("calculating running install jobs metric")
+			mcLog.WithField("failedInstalls", failedTotal).Debug("calculated failed install jobs metric")
+			metricInstallJobsRunningTotal.Set(float64(runningTotal))
+			metricInstallJobsFailedTotal.Set(float64(failedTotal))
 		}
+
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
 		uninstallJobLabelSelector := map[string]string{install.UninstallJobLabel: "true"}
@@ -131,11 +145,28 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing uninstall jobs")
 		} else {
-			uninstallJobsTotal := len(uninstallJobs.Items)
-			mcLog.WithField("totalRunningUninstallJobs", uninstallJobsTotal).Debug("loaded running uninstall jobs")
-			metricUninstallJobsRunningTotal.Set(float64(uninstallJobsTotal))
+			runningTotal, failedTotal := processJobs(uninstallJobs.Items)
+			mcLog.WithField("runningUninstalls", runningTotal).Debug("calculated running uninstall jobs metric")
+			mcLog.WithField("failedUninstalls", failedTotal).Debug("calculated failed uninstall jobs metric")
+			metricUninstallJobsRunningTotal.Set(float64(runningTotal))
+			metricUninstallJobsFailedTotal.Set(float64(failedTotal))
 		}
 	}, mc.Interval, stopCh)
 
 	return nil
+}
+
+func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal int) {
+	var running int
+	var failed int
+	for _, job := range jobs {
+		if job.Status.CompletionTime == nil {
+			if job.Status.Failed > 0 {
+				failed += 1
+			} else {
+				running += 1
+			}
+		}
+	}
+	return running, failed
 }

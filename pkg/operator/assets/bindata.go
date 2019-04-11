@@ -1085,6 +1085,8 @@ rules:
   - clusterdeployments
   verbs:
   - get
+  - watch
+  - update
 - apiGroups:
   - hive.openshift.io
   resources:

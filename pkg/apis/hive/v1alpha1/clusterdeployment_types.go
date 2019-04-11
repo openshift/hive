@@ -232,6 +232,10 @@ const (
 	// is not available, preventing the target cluster's control plane from being configured with
 	// certificates.
 	ControlPlaneCertificateNotFoundCondition ClusterDeploymentConditionType = "ControlPlaneCertificateNotFound"
+
+	// IngressCertificateNotFoundCondition is a condition indicating that one of the CertificateBundle
+	// secrets required by an Ingress is not available.
+	IngressCertificateNotFoundCondition ClusterDeploymentConditionType = "IngressCertificateNotFound"
 )
 
 // +genclient

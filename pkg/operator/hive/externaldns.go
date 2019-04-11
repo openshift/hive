@@ -29,7 +29,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -95,8 +94,7 @@ func (r *ReconcileHiveConfig) deployExternalDNS(hLog log.FieldLogger, h *resourc
 	}
 
 	// Apply deployment
-	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme)
-	err = h.ApplyRuntimeObject(deployment, s)
+	err = h.ApplyRuntimeObject(deployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying external-dns deployment")
 		return err

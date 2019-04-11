@@ -32,7 +32,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -55,13 +54,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
 	}
 
-	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
-		scheme.Scheme)
-
 	// TODO: it would be nice to be able to log if there were changes or not
 	// for all artifacts we Apply.
 
-	err := h.ApplyRuntimeObject(hiveDeployment, s)
+	err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err

@@ -26,7 +26,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -299,14 +297,15 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
-	clientConfig := util.GenerateClientConfigFromRESTConfig("anything", r.restConfig)
-	kubeconfig, err := clientcmd.Write(*clientConfig)
-
 	if err != nil {
 		hLog.WithError(err).Error("error serializing kubeconfig")
 		return reconcile.Result{}, err
 	}
-	h := resource.NewHelper(kubeconfig, hLog)
+	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
+	if err != nil {
+		hLog.WithError(err).Error("error creating resource helper")
+		return reconcile.Result{}, err
+	}
 
 	err = r.deployHive(hLog, h, instance, recorder)
 	if err != nil {

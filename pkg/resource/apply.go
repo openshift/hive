@@ -60,7 +60,8 @@ func (r *Helper) Apply(obj []byte) error {
 }
 
 // ApplyRuntimeObject serializes an object and applies it to the target cluster specified by the kubeconfig.
-func (r *Helper) ApplyRuntimeObject(obj runtime.Object, s *json.Serializer) error {
+func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) error {
+	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme)
 	buf := bytes.NewBuffer([]byte{})
 	err := s.Encode(obj, buf)
 	if err != nil {

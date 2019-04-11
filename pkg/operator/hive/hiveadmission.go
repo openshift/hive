@@ -37,7 +37,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -80,12 +79,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 
-	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
-		scheme.Scheme)
-
 	if len(instance.Spec.ManagedDomains) > 0 {
 		configMap := managedDomainsConfigMap(hiveAdmDeployment.Namespace, instance.Spec.ManagedDomains)
-		err = h.ApplyRuntimeObject(configMap, s)
+		err = h.ApplyRuntimeObject(configMap, scheme.Scheme)
 		if err != nil {
 			hLog.WithError(err).Error("error applying managed domains configmap")
 		}
@@ -109,7 +105,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env, envVar)
 	}
 
-	err = h.ApplyRuntimeObject(hiveAdmDeployment, s)
+	err = h.ApplyRuntimeObject(hiveAdmDeployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -144,28 +140,28 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		}
 	}
 
-	err = h.ApplyRuntimeObject(apiService, s)
+	err = h.ApplyRuntimeObject(apiService, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
 		return err
 	}
 	hLog.Info("apiservice applied")
 
-	err = h.ApplyRuntimeObject(cdWebhook, s)
+	err = h.ApplyRuntimeObject(cdWebhook, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying cluster deployment webhook")
 		return err
 	}
 	hLog.Info("cluster deployment webhook applied")
 
-	err = h.ApplyRuntimeObject(cisWebhook, s)
+	err = h.ApplyRuntimeObject(cisWebhook, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying cluster image set webhook")
 		return err
 	}
 	hLog.Info("cluster image set webhook applied")
 
-	err = h.ApplyRuntimeObject(dnsZonesWebhook, s)
+	err = h.ApplyRuntimeObject(dnsZonesWebhook, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying dns zones webhook")
 		return err

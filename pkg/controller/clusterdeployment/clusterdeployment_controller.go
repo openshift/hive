@@ -19,6 +19,7 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"reflect"
 	"strconv"
 	"time"
@@ -31,6 +32,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
@@ -49,6 +51,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -74,6 +77,20 @@ const (
 
 	dnsZoneCheckInterval = 30 * time.Second
 )
+
+var (
+	metricClusterDeploymentInstallRetries = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_install_retries",
+			Help: "Number of retries for all install jobs, partitioned by cluster.",
+		},
+		[]string{"cluster_deployment", "namespace"},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricClusterDeploymentInstallRetries)
+}
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -108,6 +125,11 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
+	})
+
+	// Watch for pods created by an install job:
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
+		ToRequests: handler.ToRequestsFunc(selectorPodWatchHandler),
 	})
 	if err != nil {
 		return err
@@ -144,6 +166,7 @@ type ReconcileClusterDeployment struct {
 //
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments;clusterdeployments/status;clusterdeployments/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets,verbs=get;list;watch;create;update;patch;delete
@@ -336,7 +359,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			cdLog.Errorf("error getting job: %v", err)
 			return reconcile.Result{}, err
 		} else {
-			cdLog.Infof("cluster job exists, cluster deployment status: %v", cd.Status.Installed)
+			cdLog.Debug("provision job exists")
+			r.checkInstallPodRetries(cd, cdLog)
 			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
 				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
 				if err != nil {
@@ -900,6 +924,64 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 
 func dnsZoneName(cdName string) string {
 	return fmt.Sprintf("%s-zone", cdName)
+}
+
+func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
+	retval := []reconcile.Request{}
+
+	pod := a.Object.(*corev1.Pod)
+	if pod == nil {
+		// Wasn't a Pod, bail out. This should not happen.
+		log.Errorf("Error converting MapObject.Object to Pod. Value: %+v", a.Object)
+		return retval
+	}
+	if pod.Labels == nil {
+		return retval
+	}
+	cdName, ok := pod.Labels[install.ClusterDeploymentNameLabel]
+	if !ok {
+		return retval
+	}
+	retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+		Name:      cdName,
+		Namespace: pod.Namespace,
+	}})
+	return retval
+}
+
+// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRetries
+func (r *ReconcileClusterDeployment) checkInstallPodRetries(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
+	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: cd.Name, install.InstallJobLabel: "true"}
+	parsedLabels := labels.SelectorFromSet(installerPodLabels)
+	pods := &corev1.PodList{}
+	err := r.Client.List(context.Background(), &client.ListOptions{Namespace: cd.Namespace, LabelSelector: parsedLabels}, pods)
+	if err != nil {
+		// Metrics calculation should not shut down reconciliation, logging and moving on.
+		log.WithError(err).Warn("error listing pods, unable to calculate pod restarts but continuing")
+		return
+	}
+
+	if len(pods.Items) > 1 {
+		log.Warnf("found %d install pods for cluster", len(pods.Items))
+	}
+
+	// Calculate restarts across all containers in the pod:
+	podRestarts := 0
+	for _, pod := range pods.Items {
+		for _, cs := range pod.Status.ContainerStatuses {
+			podRestarts += int(cs.RestartCount)
+		}
+	}
+	if podRestarts > 0 {
+		cdLog.WithFields(log.Fields{
+			"restarts": podRestarts,
+		}).Warn("install pod has restarted")
+	}
+	// Sets the value of the metricClusterDeploymentInstallRetries
+	metricClusterDeploymentInstallRetries.WithLabelValues(cd.Name, cd.Namespace).Set(float64(podRestarts))
+
+	// Store the restart count on the cluster deployment status as well.
+	cd.Status.InstallRestarts = podRestarts
 }
 
 func strPtr(s string) *string {

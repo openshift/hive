@@ -47,6 +47,9 @@ const (
 
 	// UninstallJobLabel is the label used for counting the number of uninstall jobs in Hive
 	UninstallJobLabel = "hive.openshift.io/uninstall"
+
+	// ClusterDeploymentNameLabel is the label (along with ClusterDeploymentNamespaceLabel) that is used to identify the installer pod of a particular cluster deployment
+	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -254,6 +257,8 @@ func GenerateInstallerJob(
 	}
 
 	labels := map[string]string{InstallJobLabel: "true"}
+	// installerPodLabels are the labels that are used by metricClusterDeploymentInstallRetries
+	installerPodLabels := map[string]string{ClusterDeploymentNameLabel: cd.Name, InstallJobLabel: "true"}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        GetInstallJobName(cd),
@@ -266,6 +271,9 @@ func GenerateInstallerJob(
 			ActiveDeadlineSeconds: &deadline,
 			BackoffLimit:          &backoffLimit,
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: installerPodLabels,
+				},
 				Spec: podSpec,
 			},
 		},

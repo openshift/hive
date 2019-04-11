@@ -848,6 +848,11 @@ spec:
               description: InfraID is an identifier for this cluster generated during
                 installation and used for tagging/naming resources in cloud providers.
               type: string
+            installRestarts:
+              description: InstallRestarts is the total count of container restarts
+                on the clusters install job.
+              format: int64
+              type: integer
             installed:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.

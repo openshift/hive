@@ -1,0 +1,11 @@
+apiVersion: authorization.openshift.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hive-admin
+roleRef:
+  name: hive-admin
+groupNames:
+- hive-admins
+subjects:
+- kind: Group
+  name: hive-admins

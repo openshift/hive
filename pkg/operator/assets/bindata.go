@@ -10,6 +10,7 @@
 // config/hiveadmission/service-account.yaml
 // config/hiveadmission/service.yaml
 // config/manager/deployment.yaml
+// config/manager/service.yaml
 // config/clusterimagesets/openshift-4.0-beta3.yaml
 // config/clusterimagesets/openshift-4.0-latest.yaml
 // config/external-dns/deployment.yaml
@@ -542,6 +543,37 @@ func configManagerDeploymentYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/manager/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configManagerServiceYaml = []byte(`apiVersion: v1
+kind: Service
+metadata:
+  name: hive-controllers
+  namespace: hive
+  labels:
+    control-plane: controller-manager
+    controller-tools.k8s.io: "1.0"
+spec:
+  selector:
+    control-plane: controller-manager
+    controller-tools.k8s.io: "1.0"
+  ports:
+  - port: 2112
+`)
+
+func configManagerServiceYamlBytes() ([]byte, error) {
+	return _configManagerServiceYaml, nil
+}
+
+func configManagerServiceYaml() (*asset, error) {
+	bytes, err := configManagerServiceYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/manager/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1264,6 +1296,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
 	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
 	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
+	"config/manager/service.yaml":                               configManagerServiceYaml,
 	"config/clusterimagesets/openshift-4.0-beta3.yaml":          configClusterimagesetsOpenshift40Beta3Yaml,
 	"config/clusterimagesets/openshift-4.0-latest.yaml":         configClusterimagesetsOpenshift40LatestYaml,
 	"config/external-dns/deployment.yaml":                       configExternalDnsDeploymentYaml,
@@ -1343,6 +1376,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		}},
 		"manager": {nil, map[string]*bintree{
 			"deployment.yaml": {configManagerDeploymentYaml, map[string]*bintree{}},
+			"service.yaml":    {configManagerServiceYaml, map[string]*bintree{}},
 		}},
 		"rbac": {nil, map[string]*bintree{
 			"hive_admin_role.yaml":            {configRbacHive_admin_roleYaml, map[string]*bintree{}},

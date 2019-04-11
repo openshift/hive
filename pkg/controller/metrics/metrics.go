@@ -43,6 +43,12 @@ var (
 		Name: "hive_cluster_deployments_installed_total",
 		Help: "Total number of cluster deployments that are successfully installed.",
 	})
+	metricClusterDeploymentsUninstalledTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_cluster_deployments_uninstalled_total",
+		Help: "Total number of cluster deployments that are not yet installed.",
+	},
+		[]string{"duration"},
+	)
 	metricInstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "hive_install_jobs_running_total",
 		Help: "Total number of install jobs running in Hive.",
@@ -64,6 +70,7 @@ var (
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalledTotal)
+	metrics.Registry.MustRegister(metricClusterDeploymentsUninstalledTotal)
 	metrics.Registry.MustRegister(metricInstallJobsRunningTotal)
 	metrics.Registry.MustRegister(metricInstallJobsFailedTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
@@ -113,16 +120,21 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
 			mcLog.WithField("totalClusterDeployments", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
-			total := 0
-			installedTotal := 0
-			for _, cd := range clusterDeployments.Items {
-				total = total + 1
-				if cd.Status.Installed {
-					installedTotal = installedTotal + 1
-				}
-			}
+			total,
+				installedTotal,
+				uninstalledUnder1h,
+				uninstalledOver1h,
+				uninstalledOver2h,
+				uninstalledOver8h,
+				uninstalledOver24h := processClusters(clusterDeployments.Items, mcLog)
+
 			metricClusterDeploymentsTotal.Set(float64(total))
 			metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
+			metricClusterDeploymentsUninstalledTotal.WithLabelValues("under1h").Set(float64(uninstalledUnder1h))
+			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over1h").Set(float64(uninstalledOver1h))
+			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over2h").Set(float64(uninstalledOver2h))
+			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over8h").Set(float64(uninstalledOver8h))
+			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over24h").Set(float64(uninstalledOver24h))
 		}
 		mcLog.Info("calculating metrics across all install jobs")
 
@@ -168,11 +180,60 @@ func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal int) {
 	for _, job := range jobs {
 		if job.Status.CompletionTime == nil {
 			if job.Status.Failed > 0 {
-				failed += 1
+				failed++
 			} else {
-				running += 1
+				running++
 			}
 		}
 	}
 	return running, failed
+}
+
+func processClusters(clusters []hivev1.ClusterDeployment, mcLog log.FieldLogger) (
+	total,
+	installedTotal,
+	uninstalledUnder1h,
+	uninstalledOver1h,
+	uninstalledOver2h,
+	uninstalledOver8h,
+	uninstalledOver24h int) {
+
+	for _, cd := range clusters {
+		total = total + 1
+		if cd.Status.Installed {
+			installedTotal = installedTotal + 1
+		} else {
+
+			// Sort uninstall clusters into buckets based on how long since
+			// they were created. The larger the bucket the more serious the problem.
+
+			uninstalledDur := time.Since(cd.CreationTimestamp.Time)
+
+			if uninstalledDur > 1*time.Hour {
+				uninstalledOver1h++
+
+				// Anything over 2 hours we start to consider an issue:
+				if uninstalledDur > 2*time.Hour {
+					mcLog.WithFields(log.Fields{
+						"clusterDeployment": cd.Name,
+						"created":           cd.CreationTimestamp.Time,
+						"uninstalledFor":    uninstalledDur,
+					}).Warn("cluster has failed to install in expected timeframe")
+
+					uninstalledOver2h++
+				}
+				// Increment additional counters for other thresholds of awful:
+				if uninstalledDur > 8*time.Hour {
+					uninstalledOver8h++
+				}
+				if uninstalledDur > 24*time.Hour {
+					uninstalledOver24h++
+				}
+			} else {
+				uninstalledUnder1h++
+			}
+
+		}
+	}
+	return total, installedTotal, uninstalledUnder1h, uninstalledOver1h, uninstalledOver2h, uninstalledOver8h, uninstalledOver24h
 }

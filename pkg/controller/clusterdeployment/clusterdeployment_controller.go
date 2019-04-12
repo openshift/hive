@@ -79,17 +79,17 @@ const (
 )
 
 var (
-	metricClusterDeploymentInstallRetries = prometheus.NewGaugeVec(
+	metricClusterDeploymentInstallRestarts = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "hive_cluster_deployment_install_retries",
-			Help: "Number of retries for all install jobs, partitioned by cluster.",
+			Name: "hive_cluster_deployment_install_restarts",
+			Help: "Number of container restarts for all install jobs, partitioned by cluster. Excludes those with no restarts.",
 		},
 		[]string{"cluster_deployment", "namespace"},
 	)
 )
 
 func init() {
-	metrics.Registry.MustRegister(metricClusterDeploymentInstallRetries)
+	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -360,7 +360,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 			return reconcile.Result{}, err
 		} else {
 			cdLog.Debug("provision job exists")
-			r.checkInstallPodRetries(cd, cdLog)
+			r.checkInstallPodRestarts(cd, cdLog)
 			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
 				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
 				if err != nil {
@@ -949,8 +949,8 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 	return retval
 }
 
-// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRetries
-func (r *ReconcileClusterDeployment) checkInstallPodRetries(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
+// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRestarts
+func (r *ReconcileClusterDeployment) checkInstallPodRestarts(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
 	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: cd.Name, install.InstallJobLabel: "true"}
 	parsedLabels := labels.SelectorFromSet(installerPodLabels)
 	pods := &corev1.PodList{}
@@ -966,22 +966,24 @@ func (r *ReconcileClusterDeployment) checkInstallPodRetries(cd *hivev1.ClusterDe
 	}
 
 	// Calculate restarts across all containers in the pod:
-	podRestarts := 0
+	containerRestarts := 0
 	for _, pod := range pods.Items {
 		for _, cs := range pod.Status.ContainerStatuses {
-			podRestarts += int(cs.RestartCount)
+			containerRestarts += int(cs.RestartCount)
 		}
 	}
-	if podRestarts > 0 {
+	if containerRestarts > 0 {
 		cdLog.WithFields(log.Fields{
-			"restarts": podRestarts,
+			"restarts": containerRestarts,
 		}).Warn("install pod has restarted")
+
+		// Sets the value of the metricClusterDeploymentInstallRestarts. We only report this metric *if*
+		// there are restarts to limit cardinality and exclude normally functioning cluster installs.
+		metricClusterDeploymentInstallRestarts.WithLabelValues(cd.Name, cd.Namespace).Set(float64(containerRestarts))
 	}
-	// Sets the value of the metricClusterDeploymentInstallRetries
-	metricClusterDeploymentInstallRetries.WithLabelValues(cd.Name, cd.Namespace).Set(float64(podRestarts))
 
 	// Store the restart count on the cluster deployment status as well.
-	cd.Status.InstallRestarts = podRestarts
+	cd.Status.InstallRestarts = containerRestarts
 }
 
 func strPtr(s string) *string {

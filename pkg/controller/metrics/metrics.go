@@ -24,13 +24,14 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/install"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	"github.com/openshift/hive/pkg/install"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -49,6 +50,10 @@ var (
 	},
 		[]string{"duration"},
 	)
+	metricClusterDeploymentsWithConditionTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_cluster_deployments_with_condition_total",
+		Help: "Total number of cluster deployments with conditions.",
+	}, []string{"condition"})
 	metricInstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "hive_install_jobs_running_total",
 		Help: "Total number of install jobs running in Hive.",
@@ -71,6 +76,7 @@ func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalledTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsUninstalledTotal)
+	metrics.Registry.MustRegister(metricClusterDeploymentsWithConditionTotal)
 	metrics.Registry.MustRegister(metricInstallJobsRunningTotal)
 	metrics.Registry.MustRegister(metricInstallJobsFailedTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
@@ -120,13 +126,15 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
 			mcLog.WithField("totalClusterDeployments", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
+
 			total,
 				installedTotal,
 				uninstalledUnder1h,
 				uninstalledOver1h,
 				uninstalledOver2h,
 				uninstalledOver8h,
-				uninstalledOver24h := processClusters(clusterDeployments.Items, mcLog)
+				uninstalledOver24h,
+				conditionTotals := processClusters(clusterDeployments.Items, mcLog)
 
 			metricClusterDeploymentsTotal.Set(float64(total))
 			metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
@@ -135,6 +143,10 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over2h").Set(float64(uninstalledOver2h))
 			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over8h").Set(float64(uninstalledOver8h))
 			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over24h").Set(float64(uninstalledOver24h))
+
+			for k, v := range conditionTotals {
+				metricClusterDeploymentsWithConditionTotal.WithLabelValues(string(k)).Set(float64(v))
+			}
 		}
 		mcLog.Info("calculating metrics across all install jobs")
 
@@ -196,7 +208,13 @@ func processClusters(clusters []hivev1.ClusterDeployment, mcLog log.FieldLogger)
 	uninstalledOver1h,
 	uninstalledOver2h,
 	uninstalledOver8h,
-	uninstalledOver24h int) {
+	uninstalledOver24h int,
+	conditionTotals map[hivev1.ClusterDeploymentConditionType]int) {
+
+	conditionTotals = map[hivev1.ClusterDeploymentConditionType]int{}
+	for _, cdct := range hivev1.AllClusterDeploymentConditions {
+		conditionTotals[cdct] = 0
+	}
 
 	for _, cd := range clusters {
 		total = total + 1
@@ -232,8 +250,14 @@ func processClusters(clusters []hivev1.ClusterDeployment, mcLog log.FieldLogger)
 			} else {
 				uninstalledUnder1h++
 			}
+		}
 
+		// Process conditions regardless if installed or not:
+		for _, cond := range cd.Status.Conditions {
+			if cond.Status == corev1.ConditionTrue {
+				conditionTotals[cond.Type]++
+			}
 		}
 	}
-	return total, installedTotal, uninstalledUnder1h, uninstalledOver1h, uninstalledOver2h, uninstalledOver8h, uninstalledOver24h
+	return total, installedTotal, uninstalledUnder1h, uninstalledOver1h, uninstalledOver2h, uninstalledOver8h, uninstalledOver24h, conditionTotals
 }

@@ -8,8 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,15 +30,25 @@ func TestClusterDeployments(t *testing.T) {
 		testClusterDeployment("i4", threeHoursAgo, true),
 
 		// Expect three clusters still installing within normal timeframe:
-		testClusterDeployment("a", fiveMinsAgo, false),
-		testClusterDeployment("b", fiveMinsAgo, false),
+		testClusterDeploymentWithConditions("a", fiveMinsAgo, false,
+			[]hivev1.ClusterDeploymentConditionType{
+				hivev1.ClusterImageSetNotFoundCondition,
+			}),
+		testClusterDeploymentWithConditions("b", fiveMinsAgo, false,
+			[]hivev1.ClusterDeploymentConditionType{
+				hivev1.ClusterImageSetNotFoundCondition,
+				hivev1.ControlPlaneCertificateNotFoundCondition,
+			}),
 		testClusterDeployment("c", tenMinsAgo, false),
 
 		// One cluster installing between 1h and 2h:
 		testClusterDeployment("c1", ninetyMinsAgo, false),
 
 		// Expect two clusters still installing over 2h:
-		testClusterDeployment("d", threeHoursAgo, false),
+		testClusterDeploymentWithConditions("d", threeHoursAgo, false,
+			[]hivev1.ClusterDeploymentConditionType{
+				hivev1.IngressCertificateNotFoundCondition,
+			}),
 		testClusterDeployment("e", threeHoursAgo, false),
 
 		// Expect one cluster also installing over 8h:
@@ -45,7 +57,15 @@ func TestClusterDeployments(t *testing.T) {
 		// Expect one cluster also installing over 48h:
 		testClusterDeployment("g", threeDaysAgo, false),
 	}
-	total, installed, uninstalledunder1h, uninstalledover1h, uninstalledover2h, uninstalledover8h, uninstalledover24h := processClusters(clusters, log.WithField("test", "TestClusterDeployments"))
+	total,
+		installed,
+		uninstalledunder1h,
+		uninstalledover1h,
+		uninstalledover2h,
+		uninstalledover8h,
+		uninstalledover24h,
+		conditionTotals := processClusters(clusters, log.WithField("test", "TestClusterDeployments"))
+
 	assert.Equal(t, 12, total)
 	assert.Equal(t, 4, installed)
 	assert.Equal(t, 3, uninstalledunder1h)
@@ -53,6 +73,10 @@ func TestClusterDeployments(t *testing.T) {
 	assert.Equal(t, 4, uninstalledover2h)
 	assert.Equal(t, 2, uninstalledover8h)
 	assert.Equal(t, 1, uninstalledover24h)
+
+	assert.Equal(t, 2, conditionTotals[hivev1.ClusterImageSetNotFoundCondition])
+	assert.Equal(t, 1, conditionTotals[hivev1.ControlPlaneCertificateNotFoundCondition])
+	assert.Equal(t, 1, conditionTotals[hivev1.IngressCertificateNotFoundCondition])
 }
 
 func TestInstallJobs(t *testing.T) {
@@ -100,4 +124,21 @@ func testClusterDeployment(name string, created metav1.Time, installed bool) hiv
 			Installed: installed,
 		},
 	}
+}
+
+func testClusterDeploymentWithConditions(name string, created metav1.Time, installed bool,
+	conditions []hivev1.ClusterDeploymentConditionType) hivev1.ClusterDeployment {
+
+	cd := testClusterDeployment(name, created, installed)
+	for _, c := range conditions {
+		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+			cd.Status.Conditions,
+			c,
+			corev1.ConditionTrue,
+			"NobodyCares",
+			"Really.",
+			controllerutils.UpdateConditionNever)
+	}
+	return cd
+
 }

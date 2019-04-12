@@ -238,6 +238,15 @@ const (
 	IngressCertificateNotFoundCondition ClusterDeploymentConditionType = "IngressCertificateNotFound"
 )
 
+// AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
+// cluster deployment conditions dynamically.
+var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
+	ClusterImageSetNotFoundCondition,
+	InstallerImageResolutionFailedCondition,
+	ControlPlaneCertificateNotFoundCondition,
+	IngressCertificateNotFoundCondition,
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

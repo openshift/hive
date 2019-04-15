@@ -17,10 +17,18 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/openshift/hive/pkg/controller/federation"
+	// TODO: Remove this blank import when re-enabling federation. For now, we need it here so
+	// that the federation controller still compiles with the rest of the controllers and it
+	// doesn't bit rot.
+	_ "github.com/openshift/hive/pkg/controller/federation"
 )
 
 func init() {
 	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
-	AddToManagerFuncs = append(AddToManagerFuncs, federation.Add)
+
+	// TODO: Use a better method for determining whether federation is installed before re-enabling
+	// federation. The federation CRDs may be installed but federation may be limited to only certain
+	// namespaces of the cluster. We may need to introduce a configuration setting either in the
+	// operator config or per cluster deployment.
+	// AddToManagerFuncs = append(AddToManagerFuncs, federation.Add)
 }

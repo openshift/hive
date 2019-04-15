@@ -786,7 +786,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - jobs
   - pods
   - pods/log
   verbs:

@@ -403,7 +403,7 @@ func (r *ReconcileSyncSet) applySyncSetPatches(ssPatches []hivev1.SyncObjectPatc
 			Kind:       ssPatch.Kind,
 			Name:       ssPatch.Name,
 			Namespace:  ssPatch.Namespace,
-			Hash:       r.hash(ssPatch.Patch),
+			Hash:       r.hash([]byte(ssPatch.Patch)),
 		}
 
 		patchSyncConditions := []hivev1.SyncCondition{}
@@ -451,7 +451,7 @@ func (r *ReconcileSyncSet) applySyncSetPatches(ssPatches []hivev1.SyncObjectPatc
 				Name:      ssPatch.Name,
 				Namespace: ssPatch.Namespace,
 			}
-			err := h.Patch(namespacedName, ssPatch.Kind, ssPatch.APIVersion, ssPatch.Patch, ssPatch.PatchType)
+			err := h.Patch(namespacedName, ssPatch.Kind, ssPatch.APIVersion, []byte(ssPatch.Patch), ssPatch.PatchType)
 			patchSyncStatus.Conditions = r.setApplySyncConditions(patchSyncConditions, err)
 			syncSetStatus.Patches = appendOrUpdateSyncStatus(syncSetStatus.Patches, patchSyncStatus)
 			if err != nil {
@@ -585,16 +585,19 @@ func (r *ReconcileSyncSet) setUnknownObjectSyncCondition(syncSetConditions []hiv
 func (r *ReconcileSyncSet) setApplySyncConditions(resourceSyncConditions []hivev1.SyncCondition, err error) []hivev1.SyncCondition {
 	var reason, message string
 	var successStatus, failureStatus corev1.ConditionStatus
+	var updateCondition controllerutils.UpdateConditionCheck
 	if err == nil {
 		reason = applySucceededReason
 		message = "Apply successful"
 		successStatus = corev1.ConditionTrue
 		failureStatus = corev1.ConditionFalse
+		updateCondition = controllerutils.UpdateConditionAlways
 	} else {
 		reason = applyFailedReason
 		message = fmt.Sprintf("Apply failed: %v", err)
 		successStatus = corev1.ConditionFalse
 		failureStatus = corev1.ConditionTrue
+		updateCondition = controllerutils.UpdateConditionIfReasonOrMessageChange
 	}
 	resourceSyncConditions = controllerutils.SetSyncCondition(
 		resourceSyncConditions,
@@ -602,14 +605,14 @@ func (r *ReconcileSyncSet) setApplySyncConditions(resourceSyncConditions []hivev
 		successStatus,
 		reason,
 		message,
-		controllerutils.UpdateConditionAlways)
+		updateCondition)
 	resourceSyncConditions = controllerutils.SetSyncCondition(
 		resourceSyncConditions,
 		hivev1.ApplyFailureSyncCondition,
 		failureStatus,
 		reason,
 		message,
-		controllerutils.UpdateConditionAlways)
+		updateCondition)
 
 	// If we are reporting that apply succeeded or failed, it means we no longer
 	// want to delete this resource. Set that failure condition to false in case
@@ -620,7 +623,7 @@ func (r *ReconcileSyncSet) setApplySyncConditions(resourceSyncConditions []hivev
 		corev1.ConditionFalse,
 		reason,
 		message,
-		controllerutils.UpdateConditionAlways)
+		updateCondition)
 	return resourceSyncConditions
 }
 

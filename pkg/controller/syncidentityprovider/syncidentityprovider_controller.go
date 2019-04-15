@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	log "github.com/sirupsen/logrus"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -224,7 +225,7 @@ func (r *ReconcileSyncIdentityProviders) createSyncSetSpec(cd *hivev1.ClusterDep
 					Kind:       oauthKind,
 					Name:       oauthObjectName,
 					PatchType:  types.MergePatchType,
-					Patch:      patch,
+					Patch:      string(patch),
 				},
 			},
 		},

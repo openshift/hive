@@ -75,7 +75,7 @@ type SyncObjectPatch struct {
 	ApplyMode SyncSetPatchApplyMode `json:"applyMode,omitempty"`
 
 	// Patch is the patch to apply.
-	Patch []byte `json:"patch"`
+	Patch string `json:"patch"`
 
 	// PatchType indicates the PatchType as "json" (default), "merge"
 	// or "strategic".

@@ -616,7 +616,7 @@ func testSyncObjectPatch(name, namespace, kind, apiVersion string, applyMode hiv
 		Kind:       kind,
 		APIVersion: apiVersion,
 		ApplyMode:  applyMode,
-		Patch:      []byte(patch),
+		Patch:      patch,
 	}
 }
 
@@ -762,7 +762,7 @@ func failedPatchStatus(name string, patches []hivev1.SyncObjectPatch) hivev1.Syn
 			Kind:       p.Kind,
 			Name:       p.Name,
 			Namespace:  p.Namespace,
-			Hash:       fmt.Sprintf("%x", md5.Sum(p.Patch)),
+			Hash:       fmt.Sprintf("%x", md5.Sum([]byte(p.Patch))),
 			Conditions: []hivev1.SyncCondition{
 				{
 					Type:               hivev1.ApplyFailureSyncCondition,
@@ -820,7 +820,7 @@ func successfulPatchStatusWithTime(name string, patches []hivev1.SyncObjectPatch
 			Kind:       p.Kind,
 			Name:       p.Name,
 			Namespace:  p.Namespace,
-			Hash:       fmt.Sprintf("%x", md5.Sum(p.Patch)),
+			Hash:       fmt.Sprintf("%x", md5.Sum([]byte(p.Patch))),
 			Conditions: []hivev1.SyncCondition{
 				{
 					Type:               hivev1.ApplySuccessSyncCondition,

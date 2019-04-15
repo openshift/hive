@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/hive/contrib/pkg/createcluster"
 	"github.com/openshift/hive/contrib/pkg/installmanager"
 	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
@@ -56,6 +57,7 @@ func newCOUtilityCommand() *cobra.Command {
 	cmd.AddCommand(installmanager.NewInstallManagerCommand())
 	cmd.AddCommand(imageset.NewUpdateInstallerImageCommand())
 	cmd.AddCommand(testresource.NewTestResourceCommand())
+	cmd.AddCommand(createcluster.NewCreateClusterCommand())
 
 	return cmd
 }

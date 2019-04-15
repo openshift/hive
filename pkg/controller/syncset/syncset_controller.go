@@ -61,7 +61,7 @@ const (
 
 // Applier knows how to Apply, Patch and return Info for []byte arrays describing objects and patches.
 type Applier interface {
-	Apply(obj []byte) error
+	Apply(obj []byte) (resource.ApplyResult, error)
 	Info(obj []byte) (*resource.Info, error)
 	Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType types.PatchType) error
 }
@@ -364,10 +364,12 @@ func (r *ReconcileSyncSet) applySyncSetResources(applyMode hivev1.SyncSetResourc
 
 		if !found || different || shouldReApply {
 			ssLog.Debugf("applying resource: %s/%s (%s)", infos[i].Namespace, infos[i].Name, infos[i].Kind)
-			err = h.Apply(resource.Raw)
+			result, err := h.Apply(resource.Raw)
 			resourceSyncStatus.Conditions = r.setApplySyncConditions(resourceSyncConditions, err)
 			if err != nil {
 				ssLog.WithError(err).Errorf("error applying resource %s/%s (%s)", infos[i].Namespace, infos[i].Name, infos[i].Kind)
+			} else {
+				ssLog.Debug("resource %s/%s (%s): %s", infos[i].Namespace, infos[i].Name, infos[i].Kind, result)
 			}
 		} else {
 			ssLog.Debugf("resource %s/%s (%s) has not changed, will not apply", infos[i].Namespace, infos[i].Name, infos[i].Kind)

@@ -34,7 +34,7 @@ type Info struct {
 
 // Info determines the name/namespace and type of the passed in resource bytes
 func (r *Helper) Info(obj []byte) (*Info, error) {
-	factory, err := r.getFactory(r.kubeconfig, "")
+	factory, err := r.getFactory("")
 	if err != nil {
 		return nil, err
 	}

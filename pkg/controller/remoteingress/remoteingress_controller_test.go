@@ -38,6 +38,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/resource"
 )
 
 const (
@@ -620,7 +621,7 @@ type fakeKubeCLI struct {
 	createdSyncSet createdSyncSetInfo
 }
 
-func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) error {
+func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
 	ss := obj.(*hivev1.SyncSet)
 	created := createdSyncSetInfo{
 		name:      ss.Name,
@@ -659,7 +660,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 
 	f.createdSyncSet = created
 
-	return nil
+	return "", nil
 }
 
 func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedSecrets []string, expectedIngressControllers []SyncSetIngressEntry) {

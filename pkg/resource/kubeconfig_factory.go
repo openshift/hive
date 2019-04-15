@@ -17,11 +17,6 @@ limitations under the License.
 package resource
 
 import (
-	"path/filepath"
-	"regexp"
-	"strings"
-	"time"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -30,9 +25,9 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func (r *Helper) getKubeconfigFactory(kubeconfig []byte, namespace string) (cmdutil.Factory, error) {
+func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error) {
 	r.logger.Debug("loading kubeconfig from byte array")
-	config, err := clientcmd.Load(kubeconfig)
+	config, err := clientcmd.Load(r.kubeconfig)
 	if err != nil {
 		r.logger.WithError(err).Error("an error occurred loading the kubeconfig")
 		return nil, err
@@ -46,34 +41,31 @@ func (r *Helper) getKubeconfigFactory(kubeconfig []byte, namespace string) (cmdu
 	clientConfig := clientcmd.NewNonInteractiveClientConfig(*config, "", overrides, nil)
 
 	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from client config and cache directory")
-	f := cmdutil.NewFactory(&remoteRESTClientGetter{clientConfig: clientConfig, cacheDir: r.cacheDir})
+	f := cmdutil.NewFactory(&kubeconfigClientGetter{clientConfig: clientConfig, cacheDir: r.cacheDir})
 	return f, nil
 }
 
-type remoteRESTClientGetter struct {
+type kubeconfigClientGetter struct {
 	clientConfig clientcmd.ClientConfig
 	cacheDir     string
 }
 
 // ToRESTConfig returns restconfig
-func (r *remoteRESTClientGetter) ToRESTConfig() (*rest.Config, error) {
+func (r *kubeconfigClientGetter) ToRESTConfig() (*rest.Config, error) {
 	return r.ToRawKubeConfigLoader().ClientConfig()
 }
 
 // ToDiscoveryClient returns discovery client
-func (r *remoteRESTClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+func (r *kubeconfigClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	config, err := r.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
-	config.Burst = 100
-	httpCacheDir := filepath.Join(r.cacheDir, ".kube", "http-cache")
-	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(r.cacheDir, ".kube", "cache", "discovery"), config.Host)
-	return discovery.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
+	return getDiscoveryClient(config, r.cacheDir)
 }
 
 // ToRESTMapper returns a restmapper
-func (r *remoteRESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+func (r *kubeconfigClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	discoveryClient, err := r.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
@@ -85,18 +77,6 @@ func (r *remoteRESTClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 }
 
 // ToRawKubeConfigLoader return kubeconfig loader as-is
-func (r *remoteRESTClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
+func (r *kubeconfigClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return r.clientConfig
-}
-
-// overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
-var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
-
-// computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
-func computeDiscoverCacheDir(parentDir, host string) string {
-	// strip the optional scheme from host if its there:
-	schemelessHost := strings.Replace(strings.Replace(host, "https://", "", 1), "http://", "", 1)
-	// now do a simple collapse of non-AZ09 characters.  Collisions are possible but unlikely.  Even if we do collide the problem is short lived
-	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
-	return filepath.Join(parentDir, safeHost)
 }

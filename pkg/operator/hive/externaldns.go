@@ -94,12 +94,12 @@ func (r *ReconcileHiveConfig) deployExternalDNS(hLog log.FieldLogger, h *resourc
 	}
 
 	// Apply deployment
-	err = h.ApplyRuntimeObject(deployment, scheme.Scheme)
+	result, err := h.ApplyRuntimeObject(deployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying external-dns deployment")
 		return err
 	}
-	hLog.Info("external-dns deployment applied")
+	hLog.Infof("external-dns deployment applied (%s)", result)
 
 	return nil
 }

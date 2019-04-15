@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"bytes"
 	"context"
 	"reflect"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -21,14 +19,16 @@ import (
 
 func TestApply(t *testing.T) {
 	tests := []struct {
-		name     string
-		existing []runtime.Object
-		apply    runtime.Object
-		validate func(t *testing.T, info *resource.Info, ns string)
+		name           string
+		existing       []runtime.Object
+		expectedResult resource.ApplyResult
+		apply          runtime.Object
+		validate       func(t *testing.T, info *resource.Info, ns string)
 	}{
 		{
-			name:  "create resource",
-			apply: testConfigMap(),
+			name:           "create resource",
+			apply:          testConfigMap(),
+			expectedResult: resource.CreatedApplyResult,
 			validate: func(t *testing.T, info *resource.Info, ns string) {
 				if info.Name != testConfigMap().Name {
 					t.Errorf("unexpected info name: %s", info.Name)
@@ -52,8 +52,9 @@ func TestApply(t *testing.T) {
 			},
 		},
 		{
-			name:     "update resource",
-			existing: []runtime.Object{testConfigMap()},
+			name:           "update resource",
+			existing:       []runtime.Object{testConfigMap()},
+			expectedResult: resource.ConfiguredApplyResult,
 			apply: func() runtime.Object {
 				cm := testConfigMap()
 				cm.Data["foo"] = "baz"
@@ -72,61 +73,83 @@ func TestApply(t *testing.T) {
 			},
 		},
 		{
-			name:  "create crd instance",
-			apply: testClusterImageSet(),
+			name:           "unchanged resource",
+			existing:       []runtime.Object{testConfigMap()},
+			expectedResult: resource.UnchangedApplyResult,
+			apply:          testConfigMap(),
 			validate: func(t *testing.T, info *resource.Info, ns string) {
-				cis := &hivev1.ClusterImageSet{}
-				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name}, cis)
+				cm := &corev1.ConfigMap{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, cm)
 				if err != nil {
-					t.Errorf("unexpected error retrieving cluster image set: %v", err)
+					t.Errorf("unexpected error retrieving configmap: %v", err)
 					return
 				}
-				if cis.Spec.InstallerImage == nil || *cis.Spec.InstallerImage != "installer-image:v1" {
-					t.Errorf("unexpected installer image value: %v", cis.Spec.InstallerImage)
+			},
+		},
+		{
+			name:           "create crd instance",
+			apply:          testDNSZone(),
+			expectedResult: resource.CreatedApplyResult,
+			validate: func(t *testing.T, info *resource.Info, ns string) {
+				zone := &hivev1.DNSZone{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, zone)
+				if err != nil {
+					t.Errorf("unexpected error retrieving dns zone: %v", err)
+					return
+				}
+				if zone.Spec.Zone != "foo.example.com" {
+					t.Errorf("unexpected zone: %s", zone.Spec.Zone)
 				}
 			},
 		},
 	}
 
-	printer := printers.NewTypeSetter(scheme.Scheme).ToPrinter(&printers.YAMLPrinter{})
+	configs := []string{"restconfig", "kubeconfig"}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			logger := log.WithField("test", test.name)
-			namespace := &corev1.Namespace{}
-			namespace.GenerateName = "apply-test-"
-			err := c.Create(context.TODO(), namespace)
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			accessor := meta.NewAccessor()
-			for _, obj := range test.existing {
-				o := obj
-				accessor.SetNamespace(o, namespace.Name)
-				err := c.Create(context.TODO(), o)
+		for _, clientConfig := range configs {
+			t.Run(test.name, func(t *testing.T) {
+				logger := log.WithField("test", test.name)
+				namespace := &corev1.Namespace{}
+				namespace.GenerateName = "apply-test-"
+				err := c.Create(context.TODO(), namespace)
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-			}
-			accessor.SetNamespace(test.apply, namespace.Name)
-			buf := &bytes.Buffer{}
-			if err = printer.PrintObj(test.apply, buf); err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			t.Logf("The serialized resource:\n%s\n", buf.String())
-			h := resource.NewHelper(kubeconfig, logger)
-			info, err := h.Info(buf.Bytes())
-			if err != nil {
-				t.Errorf("unexpected error calling info: %v", err)
-				return
-			}
-			err = h.Apply(buf.Bytes())
-			if err != nil {
-				t.Errorf("unexpected error calling apply: %v", err)
-				return
-			}
-			test.validate(t, info, namespace.Name)
-		})
+				var h *resource.Helper
+				if clientConfig == "kubeconfig" {
+					h = resource.NewHelper(kubeconfig, logger)
+				} else {
+					h = resource.NewHelperFromRESTConfig(cfg, logger)
+				}
+				accessor := meta.NewAccessor()
+				for _, obj := range test.existing {
+					o := obj.DeepCopyObject()
+					accessor.SetNamespace(o, namespace.Name)
+					_, err := h.ApplyRuntimeObject(o, scheme.Scheme)
+					if err != nil {
+						t.Fatalf("unexpected err: %v", err)
+					}
+				}
+				accessor.SetNamespace(test.apply, namespace.Name)
+				data, err := h.Serialize(test.apply, scheme.Scheme)
+				t.Logf("The serialized resource:\n%s\n", string(data))
+				info, err := h.Info(data)
+				if err != nil {
+					t.Errorf("unexpected error calling info: %v", err)
+					return
+				}
+				applyResult, err := h.Apply(data)
+				if err != nil {
+					t.Errorf("unexpected error calling apply: %v", err)
+					return
+				}
+				if applyResult != test.expectedResult {
+					t.Errorf("unexpected apply result: %v", applyResult)
+				}
+				test.validate(t, info, namespace.Name)
+			})
+		}
 	}
 }
 
@@ -141,9 +164,9 @@ func strptr(s string) *string {
 	return &s
 }
 
-func testClusterImageSet() *hivev1.ClusterImageSet {
-	cis := &hivev1.ClusterImageSet{}
-	cis.Name = "test-cluster-image-set"
-	cis.Spec.InstallerImage = strptr("installer-image:v1")
-	return cis
+func testDNSZone() *hivev1.DNSZone {
+	z := &hivev1.DNSZone{}
+	z.Name = "test-dns-zone"
+	z.Spec.Zone = "foo.example.com"
+	return z
 }

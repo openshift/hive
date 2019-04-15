@@ -65,7 +65,7 @@ const (
 
 // kubeCLIApplier knows how to ApplyRuntimeObject.
 type kubeCLIApplier interface {
-	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) error
+	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error)
 }
 
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
@@ -77,10 +77,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
-	helper, err := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
-	if err != nil {
-		logger.WithError(err).Fatalf("cannot create resource helper for reconciler")
-	}
+	helper := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
 	return &ReconcileRemoteClusterIngress{
 		Client:  mgr.GetClient(),
 		scheme:  mgr.GetScheme(),
@@ -261,7 +258,7 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 		return err
 	}
 
-	if err := r.kubeCLI.ApplyRuntimeObject(syncSet, r.scheme); err != nil {
+	if _, err := r.kubeCLI.ApplyRuntimeObject(syncSet, r.scheme); err != nil {
 		rContext.logger.WithError(err).Error("failed to apply syncset")
 		return err
 	}

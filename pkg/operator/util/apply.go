@@ -33,11 +33,11 @@ func ApplyAsset(h *resource.Helper, assetPath string, hLog log.FieldLogger) erro
 	assetLog.Debug("reading asset")
 	asset := assets.MustAsset(assetPath)
 	assetLog.Debug("applying asset")
-	err := h.Apply(asset)
+	result, err := h.Apply(asset)
 	if err != nil {
 		assetLog.WithError(err).Error("error applying asset")
 		return err
 	}
-	assetLog.Info("asset applied successfully")
+	assetLog.Info("asset applied successfully: %v", result)
 	return nil
 }

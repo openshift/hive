@@ -14,7 +14,7 @@ type Etcd struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	// +required
-	Spec   EtcdSpec   `json:"spec"`
+	Spec EtcdSpec `json:"spec"`
 	// +optional
 	Status EtcdStatus `json:"status"`
 }

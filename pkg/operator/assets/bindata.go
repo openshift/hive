@@ -21,8 +21,8 @@
 // config/rbac/hive_admin_role_binding.yaml
 // config/rbac/hive_frontend_role.yaml
 // config/rbac/hive_frontend_role_binding.yaml
-// config/rbac/rbac_role.yaml
-// config/rbac/rbac_role_binding.yaml
+// config/rbac/manager_role.yaml
+// config/rbac/manager_role_binding.yaml
 // DO NOT EDIT!
 
 package assets
@@ -976,7 +976,7 @@ func configRbacHive_frontend_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configRbacRbac_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+var _configRbacManager_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
@@ -1188,22 +1188,22 @@ rules:
   - watch
 `)
 
-func configRbacRbac_roleYamlBytes() ([]byte, error) {
-	return _configRbacRbac_roleYaml, nil
+func configRbacManager_roleYamlBytes() ([]byte, error) {
+	return _configRbacManager_roleYaml, nil
 }
 
-func configRbacRbac_roleYaml() (*asset, error) {
-	bytes, err := configRbacRbac_roleYamlBytes()
+func configRbacManager_roleYaml() (*asset, error) {
+	bytes, err := configRbacManager_roleYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/rbac/rbac_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/rbac/manager_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configRbacRbac_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+var _configRbacManager_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   creationTimestamp: null
@@ -1218,17 +1218,17 @@ subjects:
   namespace: system
 `)
 
-func configRbacRbac_role_bindingYamlBytes() ([]byte, error) {
-	return _configRbacRbac_role_bindingYaml, nil
+func configRbacManager_role_bindingYamlBytes() ([]byte, error) {
+	return _configRbacManager_role_bindingYaml, nil
 }
 
-func configRbacRbac_role_bindingYaml() (*asset, error) {
-	bytes, err := configRbacRbac_role_bindingYamlBytes()
+func configRbacManager_role_bindingYaml() (*asset, error) {
+	bytes, err := configRbacManager_role_bindingYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/rbac/rbac_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/rbac/manager_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1306,8 +1306,8 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
 	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
 	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
-	"config/rbac/rbac_role.yaml":                                configRbacRbac_roleYaml,
-	"config/rbac/rbac_role_binding.yaml":                        configRbacRbac_role_bindingYaml,
+	"config/rbac/manager_role.yaml":                             configRbacManager_roleYaml,
+	"config/rbac/manager_role_binding.yaml":                     configRbacManager_role_bindingYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -1382,8 +1382,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_admin_role_binding.yaml":    {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
 			"hive_frontend_role.yaml":         {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
 			"hive_frontend_role_binding.yaml": {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
-			"rbac_role.yaml":                  {configRbacRbac_roleYaml, map[string]*bintree{}},
-			"rbac_role_binding.yaml":          {configRbacRbac_role_bindingYaml, map[string]*bintree{}},
+			"manager_role.yaml":               {configRbacManager_roleYaml, map[string]*bintree{}},
+			"manager_role_binding.yaml":       {configRbacManager_role_bindingYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

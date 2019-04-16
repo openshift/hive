@@ -38,6 +38,7 @@ import (
 type Generator struct {
 	RootPath          string
 	OutputDir         string
+	Repo              string
 	Domain            string
 	Namespace         string
 	SkipMapValidation bool
@@ -48,6 +49,10 @@ type Generator struct {
 	// apisPkg is the absolute Go pkg name for current project's 'pkg/apis' pkg.
 	// This is needed to determine if a Type belongs to the project or it is a referred Type.
 	apisPkg string
+
+	// APIsPath and APIsPkg allow customized generation for Go types existing under directories other than pkg/apis
+	APIsPath string
+	APIsPkg  string
 }
 
 // ValidateAndInitFields validate and init generator fields.
@@ -66,27 +71,20 @@ func (c *Generator) ValidateAndInitFields() error {
 		}
 	}
 
-	// Validate root path is under go src path
-	if !crdutil.IsUnderGoSrcPath(c.RootPath) {
-		return fmt.Errorf("command must be run from path under $GOPATH/src/<package>")
+	// Validate PROJECT file
+	if !crdutil.PathHasProjectFile(c.RootPath) {
+		return fmt.Errorf("PROJECT file missing in dir %s", c.RootPath)
 	}
+
+	c.Repo = crdutil.GetRepoFromProject(c.RootPath)
 
 	// If Domain is not explicitly specified,
 	// try to search for PROJECT file as a basis.
 	if len(c.Domain) == 0 {
-		if !crdutil.PathHasProjectFile(c.RootPath) {
-			return fmt.Errorf("PROJECT file missing in dir %s", c.RootPath)
-		}
 		c.Domain = crdutil.GetDomainFromProject(c.RootPath)
 	}
 
-	// Validate apis directory exists under working path
-	apisPath := path.Join(c.RootPath, "pkg/apis")
-	if _, err := os.Stat(apisPath); err != nil {
-		return fmt.Errorf("error validating apis path %s: %v", apisPath, err)
-	}
-
-	c.apisPkg, err = crdutil.DirToGoPkg(apisPath)
+	err = c.setAPIsPkg()
 	if err != nil {
 		return err
 	}
@@ -108,13 +106,23 @@ func (c *Generator) Do() error {
 	}
 
 	// Switch working directory to root path.
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
 	if err := os.Chdir(c.RootPath); err != nil {
 		return fmt.Errorf("failed switching working dir: %v", err)
 	}
+	defer func() {
+		if err := os.Chdir(wd); err != nil {
+			log.Fatalf("Failed to switch back to original working dir: %v", err)
+		}
+	}()
 
-	if err := b.AddDirRecursive("./pkg/apis"); err != nil {
+	if err := b.AddDirRecursive(fmt.Sprintf("%s/%s", c.Repo, c.APIsPath)); err != nil {
 		return fmt.Errorf("failed making a parser: %v", err)
 	}
+
 	ctx, err := parse.NewContext(b)
 	if err != nil {
 		return fmt.Errorf("failed making a context: %v", err)
@@ -184,4 +192,22 @@ func (c *Generator) getCrds(p *parse.APIs) map[string][]byte {
 // current project.
 func (c *Generator) belongsToAPIsPkg(t *types.Type) bool {
 	return strings.HasPrefix(t.Name.Package, c.apisPkg)
+}
+
+func (c *Generator) setAPIsPkg() error {
+	if c.APIsPath == "" {
+		c.APIsPath = "pkg/apis"
+	}
+
+	c.apisPkg = c.APIsPkg
+	if c.apisPkg == "" {
+		// Validate apis directory exists under working path
+		apisPath := path.Join(c.RootPath, c.APIsPath)
+		if _, err := os.Stat(apisPath); err != nil {
+			return fmt.Errorf("error validating apis path %s: %v", apisPath, err)
+		}
+
+		c.apisPkg = path.Join(c.Repo, c.APIsPath)
+	}
+	return nil
 }

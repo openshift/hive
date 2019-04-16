@@ -766,7 +766,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:93d588a58c545eee7e5b6a8473939a1924abf0ce430e0735bf19866a40530afa"
+  digest = "1:73ce2048c7d9e14c3b84da39b5e3a45411ce552922e07c730fc92768595d7107"
   name = "github.com/openshift/api"
   packages = [
     "apps/v1",
@@ -775,7 +775,7 @@
     "route/v1",
   ]
   pruneopts = "NUT"
-  revision = "853a7faf74b1c63a56e4010d39057559fa13271f"
+  revision = "0f522af5ff8bb3aa7a7181e163a7b9294b55cc4d"
 
 [[projects]]
   branch = "master"
@@ -822,14 +822,13 @@
   source = "github.com/csrwng/generic-admission-server"
 
 [[projects]]
-  digest = "1:bcf2ffbfb7e7c83029f6ea2372522bc57ebf34e3c8de1a69fd4edb68b0e0fd6e"
+  digest = "1:057a14b24c13ba33d18fd0c589de50160382b55502ad4462352cd407015a4957"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
     "pkg/asset/machines/aws",
     "pkg/destroy/aws",
     "pkg/ipnet",
-    "pkg/rhcos",
     "pkg/types",
     "pkg/types/aws",
     "pkg/types/aws/validation",
@@ -1992,7 +1991,7 @@
   source = "github.com/openshift/cluster-api-provider-aws"
 
 [[projects]]
-  digest = "1:36077c0cea27b307856ee69511e950c5ab07684008b778494298bdbf24fd0be7"
+  digest = "1:81d6e6a65b01e29608fc3c5c927bb3c14152e1221b26db46c19694744d2a32a4"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -2023,13 +2022,8 @@
     "pkg/runtime/signals",
     "pkg/source",
     "pkg/source/internal",
-    "pkg/webhook",
     "pkg/webhook/admission",
     "pkg/webhook/admission/types",
-    "pkg/webhook/internal/cert",
-    "pkg/webhook/internal/cert/generator",
-    "pkg/webhook/internal/cert/writer",
-    "pkg/webhook/internal/cert/writer/atomic",
     "pkg/webhook/internal/metrics",
     "pkg/webhook/types",
   ]
@@ -2039,7 +2033,7 @@
 
 [[projects]]
   branch = "add_optional_comment_tag_support_v0.1.8"
-  digest = "1:ee619d029ebf100a74b2bc72587c02d1b7c945cc372e8baff59c60239db93d3d"
+  digest = "1:5d9916fbba0c97bbd1df2e840d85a82b9d391faec4a6ddf659cfe38097e241e5"
   name = "sigs.k8s.io/controller-tools"
   packages = [
     "cmd/controller-gen",
@@ -2051,10 +2045,9 @@
     "pkg/rbac",
     "pkg/util",
     "pkg/webhook",
-    "pkg/webhook/internal",
   ]
   pruneopts = "NUT"
-  revision = "533484c3ea1c76560817b5aa67cb8919ff57d8a1"
+  revision = "06f5aaf7a5df68b315e4a9e45f0db9819d8781d2"
   source = "github.com/twiest/controller-tools"
 
 [[projects]]
@@ -2102,11 +2095,13 @@
     "github.com/ghodss/yaml",
     "github.com/golang/glog",
     "github.com/golang/mock/gomock",
+    "github.com/json-iterator/go",
     "github.com/jteeuwen/go-bindata",
     "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1",
     "github.com/kubernetes-sigs/federation-v2/pkg/controller/util",
     "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2",
     "github.com/miekg/dns",
+    "github.com/modern-go/reflect2",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",
@@ -2119,7 +2114,6 @@
     "github.com/openshift/installer/pkg/asset/machines/aws",
     "github.com/openshift/installer/pkg/destroy/aws",
     "github.com/openshift/installer/pkg/ipnet",
-    "github.com/openshift/installer/pkg/rhcos",
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",
     "github.com/openshift/library-go/pkg/operator/events",
@@ -2144,6 +2138,7 @@
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
+    "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
     "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
@@ -2155,10 +2150,12 @@
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
+    "k8s.io/apimachinery/pkg/watch",
     "k8s.io/apiserver/pkg/util/logs",
     "k8s.io/cli-runtime/pkg/genericclioptions",
     "k8s.io/cli-runtime/pkg/genericclioptions/printers",
     "k8s.io/client-go/discovery",
+    "k8s.io/client-go/dynamic",
     "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",

@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
@@ -50,7 +51,6 @@ const (
 	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"
 	adminPasswordSecretStringTemplate   = "%s-admin-password"
 	adminSSHKeySecretKey                = "ssh-publickey"
-	sleepBetweenRetries                 = time.Second * 5
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 )
@@ -547,7 +547,7 @@ func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 		return err
 	}
 
-	return uploadConfigmapWithRetries(kubeConfigmap, m)
+	return uploadConfigMapWithRetries(kubeConfigmap, m)
 }
 
 func uploadAdminKubeconfig(cd *hivev1.ClusterDeployment, m *InstallManager) (*corev1.Secret, error) {
@@ -620,29 +620,25 @@ func uploadAdminPassword(cd *hivev1.ClusterDeployment, m *InstallManager) (*core
 	return s, uploadSecretWithRetries(s, m)
 }
 
-func uploadConfigmapWithRetries(c *corev1.ConfigMap, m *InstallManager) error {
-	uploaded := false
-	var err error
+func uploadConfigMapWithRetries(c *corev1.ConfigMap, m *InstallManager) error {
+	backoff := retry.DefaultBackoff
+	backoff.Steps = 10
+	backoff.Duration = time.Second
 
-	// try 10 times
-	for i := 1; i < 11; i++ {
-		err = m.DynamicClient.Delete(context.Background(), c)
-		if err != nil && !errors.IsNotFound(err) {
-			m.log.WithError(err).WithField("configmap", c.Name).Warningf("error deleting existing configmap")
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		if err := m.DynamicClient.Delete(context.Background(), c); err != nil && !errors.IsNotFound(err) {
+			m.log.WithError(err).WithField("configmap", c.Name).Warning("error deleting existing configmap")
+			return false, nil
 		}
 
-		err = m.DynamicClient.Create(context.Background(), c)
-		if err != nil {
-			m.log.WithError(err).WithField("configmap", c.Name).Warningf("error creating configmap (attempt %d)", i)
-			time.Sleep(sleepBetweenRetries)
-			continue
+		if err := m.DynamicClient.Create(context.Background(), c); err != nil {
+			m.log.WithError(err).WithField("configmap", c.Name).Warning("error creating configmap")
+			return false, nil
 		}
 		m.log.WithField("configmap", c.Name).Info("uploaded configmap")
-		uploaded = true
-		break
-	}
-
-	if !uploaded {
+		return true, nil
+	})
+	if err != nil {
 		m.log.WithError(err).WithField("configmap", c.Name).Error("failed to save configmap")
 		return err
 	}
@@ -651,23 +647,20 @@ func uploadConfigmapWithRetries(c *corev1.ConfigMap, m *InstallManager) error {
 }
 
 func uploadSecretWithRetries(s *corev1.Secret, m *InstallManager) error {
+	backoff := retry.DefaultBackoff
+	backoff.Steps = 10
+	backoff.Duration = time.Second
 
-	secretUploaded := false
-	var err error
-	// try 10 times to save the admin kubeconfig with some sleeps between attempts
-	for i := 1; i < 11; i++ {
-		err = m.DynamicClient.Create(context.Background(), s)
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		err := m.DynamicClient.Create(context.Background(), s)
 		if err != nil {
-			m.log.WithError(err).WithField("secretName", s.Name).Warningf("error creating secret (attempt %d)", i)
-			time.Sleep(sleepBetweenRetries)
-			continue
+			m.log.WithError(err).WithField("secretName", s.Name).Warning("error creating secret")
+			return false, nil
 		}
 		m.log.WithField("secretName", s.Name).Info("uploaded secret")
-		secretUploaded = true
-		break
-	}
-
-	if !secretUploaded {
+		return true, nil
+	})
+	if err != nil {
 		m.log.WithError(err).WithField("secretName", s.Name).Error("failed to save secret")
 		return err
 	}

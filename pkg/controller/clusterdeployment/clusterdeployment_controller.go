@@ -93,11 +93,19 @@ var (
 			Buckets: []float64{60, 3600, 7200},
 		},
 	)
+	provisionJobsDurationHistogram = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "provision_jobs_duration_seconds",
+			Help:    "Provision Jobs duration distribution",
+			Buckets: []float64{1, 10, 30, 60},
+		},
+	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
 	metrics.Registry.MustRegister(deprovisionJobsDurationHistogram)
+	metrics.Registry.MustRegister(provisionJobsDurationHistogram)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -295,6 +303,8 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		}
 	}
 
+	// reportDurationMetricsFlag is the flag that is used for reporting the provision job duration metric
+	reportDurationMetricsFlag := false
 	// Check if an install job already exists:
 	existingJob := &batchv1.Job{}
 	installJobName := install.GetInstallJobName(cd)
@@ -305,6 +315,11 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	} else if err != nil {
 		cdLog.WithError(err).Error("error looking for install job")
 		return reconcile.Result{}, err
+	} else {
+		// setting the flag so that we can report the metric after cd is installed
+		if existingJob.Status.Succeeded > 0 && !cd.Status.Installed {
+			reportDurationMetricsFlag = true
+		}
 	}
 
 	if cd.Status.Installed {
@@ -384,6 +399,13 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	if err != nil {
 		cdLog.WithError(err).Errorf("error updating cluster deployment status")
 		return reconcile.Result{}, err
+	}
+	// Report the cluster metrics if we need to
+	if reportDurationMetricsFlag {
+		// jobDuration calculates the time elapsed since the install job started
+		jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
+		cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
+		provisionJobsDurationHistogram.Observe(float64(jobDuration.Seconds()))
 	}
 
 	cdLog.Debugf("reconcile complete")
@@ -629,7 +651,6 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	} else {
 		cdLog.Infof("cluster deployment status unchanged")
 	}
-
 	return nil
 }
 

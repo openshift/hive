@@ -86,10 +86,18 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace"},
 	)
+	deprovisionJobsDurationHistogram = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "deprovision_jobs_duration_seconds",
+			Help:    "Deprovision Jobs duration distribution",
+			Buckets: []float64{60, 3600, 7200},
+		},
+	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
+	metrics.Registry.MustRegister(deprovisionJobsDurationHistogram)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -741,6 +749,10 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		// Uninstall job exists, check it's status and if successful, remove the finalizer:
 		if controllerutils.IsSuccessful(existingJob) {
 			cdLog.Infof("uninstall job successful, removing finalizer")
+			// jobDuration calculates the time elapsed since the uninstall job started for deprovision job
+			jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
+			cdLog.WithField("duration", jobDuration.Seconds()).Debug("uninstall job completed")
+			deprovisionJobsDurationHistogram.Observe(float64(jobDuration.Seconds()))
 			err = r.removeClusterDeploymentFinalizer(cd)
 			if err != nil {
 				cdLog.WithError(err).Error("error removing finalizer")

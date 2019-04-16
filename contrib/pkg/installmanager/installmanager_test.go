@@ -58,6 +58,7 @@ echo '{"clusterName":"test-cluster","infraID":"test-cluster-fe9531","clusterID":
 mkdir -p $WORKDIR/auth/
 echo "fakekubeconfig" > $WORKDIR/auth/kubeconfig
 echo "fakepassword" > $WORKDIR/auth/kubeadmin-password
+echo "some fake installer log output" >  /tmp/openshift-install-console.log
 `
 )
 
@@ -68,12 +69,13 @@ func init() {
 func TestInstallManager(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
-		name                    string
-		existing                []runtime.Object
-		failedMetadataSave      bool
-		failedKubeconfigSave    bool
-		failedStatusUpdate      bool
-		failedAdminPasswordSave bool
+		name                     string
+		existing                 []runtime.Object
+		failedMetadataSave       bool
+		failedKubeconfigSave     bool
+		failedStatusUpdate       bool
+		failedAdminPasswordSave  bool
+		failedUploadInstallerLog bool
 	}{
 		{
 			name:     "successful install",
@@ -103,6 +105,11 @@ func TestInstallManager(t *testing.T) {
 			existing:                []runtime.Object{testClusterDeployment()},
 			failedAdminPasswordSave: true,
 		},
+		{
+			name:                     "failed saving of installer log", // non-fatal
+			existing:                 []runtime.Object{testClusterDeployment()},
+			failedUploadInstallerLog: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -111,6 +118,7 @@ func TestInstallManager(t *testing.T) {
 				t.Fail()
 			}
 			defer os.RemoveAll(tempDir)
+			defer os.Remove(installerConsoleLogFilePath)
 
 			sshKeySecret := testSecret(corev1.SecretTypeOpaque, sshKeySecretName, adminSSHKeySecretKey, "fakesshkey")
 			pullSecret := testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecretName, corev1.DockerConfigJsonKey, "{}")
@@ -161,6 +169,12 @@ func TestInstallManager(t *testing.T) {
 			if test.failedAdminPasswordSave {
 				im.uploadAdminPassword = func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error) {
 					return nil, fmt.Errorf("failed to save admin password")
+				}
+			}
+
+			if test.failedUploadInstallerLog {
+				im.uploadInstallerLog = func(*hivev1.ClusterDeployment, *InstallManager) error {
+					return fmt.Errorf("faiiled to save install log")
 				}
 			}
 
@@ -266,6 +280,18 @@ func TestInstallManager(t *testing.T) {
 					}
 					assert.Equal(t, adminPassword.Name, cd.Status.AdminPasswordSecret.Name)
 				}
+			}
+
+			// Install log saving checks
+			cm := &corev1.ConfigMap{}
+			installLogConfigMapKey := types.NamespacedName{Namespace: testNamespace, Name: fmt.Sprintf("%s-install-log", testClusterName)}
+			cmErr := fakeClient.Get(context.Background(), installLogConfigMapKey, cm)
+			if !test.failedUploadInstallerLog && !test.failedMetadataSave {
+				// Ensure we saved the install output to a configmap
+				assert.NoError(t, cmErr, "unexpected error fetching install log configmap")
+				assert.Contains(t, cm.Data["log"], "some fake installer log", "did not find expected log contents in configmap")
+			} else if test.failedUploadInstallerLog {
+				assert.Error(t, cmErr, "expected error when fetching non-existent configmap")
 			}
 
 		})

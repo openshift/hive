@@ -1,7 +1,6 @@
 package installmanager
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -51,6 +51,8 @@ const (
 	adminPasswordSecretStringTemplate   = "%s-admin-password"
 	adminSSHKeySecretKey                = "ssh-publickey"
 	sleepBetweenRetries                 = time.Second * 5
+	installerFullLogFile                = ".openshift_install.log"
+	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 )
 
 // InstallManager coordinates executing the openshift-install binary, modifying
@@ -71,6 +73,7 @@ type InstallManager struct {
 	updateClusterDeploymentStatus func(*hivev1.ClusterDeployment, string, string, *InstallManager) error
 	uploadAdminKubeconfig         func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword           func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
+	uploadInstallerLog            func(*hivev1.ClusterDeployment, *InstallManager) error
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -125,6 +128,7 @@ func (m *InstallManager) Complete(args []string) error {
 	m.updateClusterDeploymentStatus = updateClusterDeploymentStatus
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
 	m.uploadAdminPassword = uploadAdminPassword
+	m.uploadInstallerLog = uploadInstallerLog
 	m.runUninstaller = runUninstaller
 
 	// Set log level
@@ -208,6 +212,9 @@ func (m *InstallManager) Run() error {
 
 	// Generate installer assets we need to modify or upload.
 	if err := m.generateAssets(cd); err != nil {
+		if upErr := m.uploadInstallerLog(cd, m); upErr != nil {
+			m.log.WithError(err).Error("error saving asset generation log")
+		}
 		return err
 	}
 
@@ -221,6 +228,10 @@ func (m *InstallManager) Run() error {
 	installErr := m.provisionCluster(cd)
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install")
+	}
+
+	if err := m.uploadInstallerLog(cd, m); err != nil {
+		m.log.WithError(err).Error("error saving installer log")
 	}
 
 	adminKubeconfigSecret, err := m.uploadAdminKubeconfig(cd, m)
@@ -251,14 +262,11 @@ func (m *InstallManager) Run() error {
 	return nil
 }
 
-func (m *InstallManager) waitForInstallerBinaries() {
-	waitForFiles := []string{
-		filepath.Join(m.WorkDir, "openshift-install"),
-	}
-	m.log.Infof("waiting for install binaries to be available: %v", waitForFiles)
+func (m *InstallManager) waitForFiles(files []string) {
+	m.log.Infof("waiting for files to be available: %v", files)
 
 	// Infinitely wait, we'll let the job terminate if we run over deadline:
-	for _, p := range waitForFiles {
+	for _, p := range files {
 		found := false
 		for !found {
 			if _, err := os.Stat(p); !os.IsNotExist(err) {
@@ -269,7 +277,14 @@ func (m *InstallManager) waitForInstallerBinaries() {
 		}
 		m.log.WithField("path", p).Info("found file")
 	}
-	m.log.Infof("all install binaries found, ready to proceed with install")
+	m.log.Infof("all files found, ready to proceed")
+}
+
+func (m *InstallManager) waitForInstallerBinaries() {
+	fileList := []string{
+		filepath.Join(m.WorkDir, "openshift-install"),
+	}
+	m.waitForFiles(fileList)
 }
 
 // cleanupBeforeInstall allows recovering from an installation error and allows retries
@@ -294,14 +309,14 @@ func (m *InstallManager) cleanupBeforeInstall(cd *hivev1.ClusterDeployment) erro
 		if err := m.runUninstaller(m.ClusterName, m.Region, cd.Status.InfraID, m.log); err != nil {
 			return err
 		}
-		// Cleanup successful, we must now clear the clusterID and infraID from status:
-		cd.Status.ClusterID = ""
-		cd.Status.InfraID = ""
-		if err := m.DynamicClient.Status().Update(context.Background(), cd); err != nil {
-			// This will cause a job re-try, which is fine as we'll just try to cleanup and
-			// find nothing.
-			m.log.WithError(err).Error("error clearing cluster ID in status")
-			return err
+
+		m.log.Info("clear out clusterID and infraID from clusterdeployment")
+		err := updateClusterDeploymentStatusWithRetries(m, func(cd *hivev1.ClusterDeployment) {
+			cd.Status.ClusterID = ""
+			cd.Status.InfraID = ""
+		})
+		if err != nil {
+			m.log.WithError(err).Error("error trying to update clusterdeployment status")
 		}
 
 	} else {
@@ -353,7 +368,7 @@ func runUninstaller(clusterName, region, infraID string, logger log.FieldLogger)
 // upload or modify prior to provisioning resources in the cloud.
 func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 	m.log.Info("running openshift-install create ignition-configs")
-	err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir, "--log-level", "debug"})
+	err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir})
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
@@ -366,7 +381,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 func (m *InstallManager) provisionCluster(cd *hivev1.ClusterDeployment) error {
 
 	m.log.Info("running openshift-install create cluster")
-	err := m.runOpenShiftInstallCommand([]string{"create", "cluster", "--dir", m.WorkDir, "--log-level", "debug"})
+	err := m.runOpenShiftInstallCommand([]string{"create", "cluster", "--dir", m.WorkDir})
 	if err != nil {
 		m.log.WithError(err).Errorf("error provisioning cluster")
 		return err
@@ -377,37 +392,52 @@ func (m *InstallManager) provisionCluster(cd *hivev1.ClusterDeployment) error {
 func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
 	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), args...)
 
-	// Copy all stdout/stderr output from the child process:
-	var stdoutBuf, stderrBuf bytes.Buffer
-	var errStdout, errStderr error
-	childStdout, _ := cmd.StdoutPipe()
-	childStderr, _ := cmd.StderrPipe()
-	stdout := io.MultiWriter(os.Stdout, &stdoutBuf)
-	stderr := io.MultiWriter(os.Stderr, &stderrBuf)
-	err := cmd.Start()
+	// save the commands' stdout/stderr to a file
+	stdOutAndErrOutput, err := os.Create(installerConsoleLogFilePath)
 	if err != nil {
-		log.WithError(err).Fatal("command start failed")
+		m.log.WithError(err).Error("error creating/truncating installer console log file")
+		return err
+	}
+	defer stdOutAndErrOutput.Close()
+	cmd.Stdout = stdOutAndErrOutput
+	cmd.Stderr = stdOutAndErrOutput
+
+	err = cmd.Start()
+	if err != nil {
+		m.log.WithError(err).Error("error starting installer")
+		return err
 	}
 
+	// 'tail -f' on the installer log file so this binary's output
+	// becomes the full log of the installer
 	go func() {
-		_, errStdout = io.Copy(stdout, childStdout)
-	}()
+		logfileName := filepath.Join(m.WorkDir, installerFullLogFile)
+		m.waitForFiles([]string{logfileName})
 
-	go func() {
-		_, errStderr = io.Copy(stderr, childStderr)
+		logfile, err := os.Open(logfileName)
+		defer logfile.Close()
+		if err != nil {
+			// FIXME what is a better response to being unable to open the file
+			m.log.WithError(err).Fatalf("unalble to open installer log file to display to stdout")
+			panic("unable to open log file")
+		}
+		for {
+			if _, errStdout := io.Copy(os.Stdout, logfile); errStdout != nil {
+				m.log.WithError(errStdout).Error("error copying debug log file to stdout")
+			}
+			time.Sleep(time.Millisecond * 5)
+		}
 	}()
 
 	err = cmd.Wait()
-	// Log errors capturing output but do not treat them as fatal.
-	if errStdout != nil {
-		log.WithError(errStdout).Error("error capturing openshift-install stdout")
-	}
-	if errStderr != nil {
-		log.WithError(errStderr).Error("error capturing openshift-install stderr")
+	// give goroutine above a chance to read through whole buffer
+	time.Sleep(time.Second)
+	if err != nil {
+		m.log.WithError(err).Error("error after waiting for command completion")
+		return err
 	}
 
-	// Return any error from the command itself:
-	return err
+	return nil
 }
 
 func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) error {
@@ -432,18 +462,21 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 		m.log.WithError(err).Error("error unmarshalling cluster metadata")
 		return err
 	}
-
-	cd.Status.ClusterID = md.ClusterID
-	cd.Status.InfraID = md.InfraID
-	if cd.Status.InfraID == "" {
+	if md.InfraID == "" {
 		m.log.Error("cluster metadata did not contain infraID")
 		return fmt.Errorf("cluster metadata did not contain infraID")
 	}
 
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
-	err = m.DynamicClient.Status().Update(context.Background(), cd)
+	// Set the clusterID and infraID
+	m.log.Info("setting clusterID and infraID on clusterdeployment")
+	err = updateClusterDeploymentStatusWithRetries(m, func(cd *hivev1.ClusterDeployment) {
+		cd.Status.ClusterID = md.ClusterID
+		cd.Status.InfraID = md.InfraID
+
+		controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	})
 	if err != nil {
-		m.log.WithError(err).Error("error updating cluster ID in status")
+		m.log.WithError(err).Error("error trying to update clusterdeployment status")
 		return err
 	}
 
@@ -481,6 +514,40 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 		return nil, err
 	}
 	return cd, nil
+}
+
+func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager) error {
+	m.log.Infoln("uploading installer output")
+
+	if _, err := os.Stat(installerConsoleLogFilePath); os.IsNotExist(err) {
+		m.log.WithField("path", installerConsoleLogFilePath).Error("installer log file does not exist")
+		return err
+	}
+
+	logBytes, err := ioutil.ReadFile(installerConsoleLogFilePath)
+	if err != nil {
+		m.log.WithError(err).WithField("path", installerConsoleLogFilePath).Error("error reading log file")
+		return err
+	}
+
+	m.log.Debugf("installer console log: %v", string(logBytes))
+
+	kubeConfigmap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-install-log", m.ClusterDeploymentName),
+			Namespace: m.Namespace,
+		},
+		Data: map[string]string{
+			"log": string(logBytes),
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cd, kubeConfigmap, scheme.Scheme); err != nil {
+		m.log.WithError(err).Error("error setting controller reference on configmap")
+		return err
+	}
+
+	return uploadConfigmapWithRetries(kubeConfigmap, m)
 }
 
 func uploadAdminKubeconfig(cd *hivev1.ClusterDeployment, m *InstallManager) (*corev1.Secret, error) {
@@ -553,6 +620,36 @@ func uploadAdminPassword(cd *hivev1.ClusterDeployment, m *InstallManager) (*core
 	return s, uploadSecretWithRetries(s, m)
 }
 
+func uploadConfigmapWithRetries(c *corev1.ConfigMap, m *InstallManager) error {
+	uploaded := false
+	var err error
+
+	// try 10 times
+	for i := 1; i < 11; i++ {
+		err = m.DynamicClient.Delete(context.Background(), c)
+		if err != nil && !errors.IsNotFound(err) {
+			m.log.WithError(err).WithField("configmap", c.Name).Warningf("error deleting existing configmap")
+		}
+
+		err = m.DynamicClient.Create(context.Background(), c)
+		if err != nil {
+			m.log.WithError(err).WithField("configmap", c.Name).Warningf("error creating configmap (attempt %d)", i)
+			time.Sleep(sleepBetweenRetries)
+			continue
+		}
+		m.log.WithField("configmap", c.Name).Info("uploaded configmap")
+		uploaded = true
+		break
+	}
+
+	if !uploaded {
+		m.log.WithError(err).WithField("configmap", c.Name).Error("failed to save configmap")
+		return err
+	}
+
+	return nil
+}
+
 func uploadSecretWithRetries(s *corev1.Secret, m *InstallManager) error {
 
 	secretUploaded := false
@@ -581,14 +678,20 @@ func uploadSecretWithRetries(s *corev1.Secret, m *InstallManager) error {
 func updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecretName, adminPasswordSecretName string, m *InstallManager) error {
 	// Update the cluster deployment status with a reference to the admin kubeconfig secret:
 	m.log.Info("updating cluster deployment status")
-	if adminKubeconfigSecretName != "" {
-		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
+	err := updateClusterDeploymentStatusWithRetries(m, func(cd *hivev1.ClusterDeployment) {
+		if adminKubeconfigSecretName != "" {
+			cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecretName}
+		}
+		if adminPasswordSecretName != "" {
+			cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: adminPasswordSecretName}
+		}
+		controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	})
+	if err != nil {
+		m.log.WithError(err).Warn("error updating clusterdeployment status")
 	}
-	if adminPasswordSecretName != "" {
-		cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: adminPasswordSecretName}
-	}
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
-	return m.DynamicClient.Status().Update(context.Background(), cd)
+
+	return err
 }
 
 func (m *InstallManager) cleanupMetadataConfigmap() error {
@@ -693,4 +796,31 @@ func getClient() (client.Client, error) {
 	}
 
 	return dynamicClient, nil
+}
+
+type clusterDeploymentEditorFunc func(*hivev1.ClusterDeployment)
+
+func updateClusterDeploymentStatusWithRetries(m *InstallManager, f clusterDeploymentEditorFunc) error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		// read in a fresh clusterDeployment
+		cd, err := m.loadClusterDeployment()
+		if err != nil {
+			m.log.WithError(err).Warn("error reading in fresh clusterdeployment")
+			return err
+		}
+
+		// make the needed modifications to the clusterDeployment
+		f(cd)
+
+		if err := m.DynamicClient.Status().Update(context.Background(), cd); err != nil {
+			m.log.WithError(err).Warn("error updating clusterdeployment status")
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		m.log.WithError(err).Error("error trying to update clusterdeployment status")
+	}
+	return err
 }

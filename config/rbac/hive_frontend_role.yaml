@@ -43,10 +43,10 @@ rules:
   resources:
   - clusterdeployments
   - dnszones
-  - selectorsyncidentityprovider
-  - syncidentityprovider
-  - selectorsyncset
-  - syncset
+  - selectorsyncidentityproviders
+  - syncidentityproviders
+  - selectorsyncsets
+  - syncsets
   verbs:
   - get
   - list

@@ -1,9 +1,8 @@
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // MyOperatorResource is an example operator configuration type
@@ -46,7 +45,7 @@ var (
 // inside of the Spec struct for your particular operator.
 type OperatorSpec struct {
 	// managementState indicates whether and how the operator should manage the component
-	// +kubebuilder:validation:Pattern=^Managed|Unmanaged|Force|Removed$
+	// +kubebuilder:validation:Pattern=^(Managed|Unmanaged|Force|Removed)$
 	ManagementState ManagementState `json:"managementState"`
 
 	// logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a
@@ -54,9 +53,10 @@ type OperatorSpec struct {
 	// +optional
 	LogLevel LogLevel `json:"logLevel"`
 
-	// operandSpecs provide customization for functional units within the component
+	// operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a
+	// simple way to manage coarse grained logging choices that operators have to interpret for themselves.
 	// +optional
-	OperandSpecs []OperandSpec `json:"operandSpecs,omitempty"`
+	OperatorLogLevel LogLevel `json:"operatorLogLevel"`
 
 	// unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override
 	// it will end up overlaying in the following order:
@@ -91,54 +91,25 @@ var (
 	TraceAll LogLevel = "TraceAll"
 )
 
-// ResourcePatch is a way to represent the patch you would issue to `kubectl patch` in the API
-type ResourcePatch struct {
-	// type is the type of patch to apply: jsonmerge, strategicmerge
-	Type string `json:"type"`
-	// patch the patch itself
-	Patch string `json:"patch"`
-}
-
-// OperandSpec holds information for customization of a particular functional unit - logically maps to a workload
-type OperandSpec struct {
-	// name is the name of this unit.  The operator must be aware of it.
-	Name string `json:"name"`
-
-	// operandContainerSpecs are per-container options
-	// +optional
-	OperandContainerSpecs []OperandContainerSpec `json:"operandContainerSpecs,omitempty"`
-
-	// unsupportedResourcePatches are applied to the workload resource for this unit. This is an unsupported
-	// workaround if anything needs to be modified on the workload that is not otherwise configurable.
-	// TODO Decide: alternatively, we could simply include a RawExtension which is used in place of the "normal" default manifest
-	// +optional
-	UnsupportedResourcePatches []ResourcePatch `json:"unsupportedResourcePatches,omitempty"`
-}
-
-type OperandContainerSpec struct {
-	// name is the name of the container to modify
-	Name string `json:"name"`
-
-	// resources are the requests and limits to place in the container.  Nil means to accept the defaults.
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-}
-
 type OperatorStatus struct {
 	// observedGeneration is the last generation change you've dealt with
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// conditions is a list of conditions and their status
+	// +optional
 	Conditions []OperatorCondition `json:"conditions,omitempty"`
 
 	// version is the level this availability applies to
-	Version string `json:"version"`
+	// +optional
+	Version string `json:"version,omitempty"`
 
 	// readyReplicas indicates how many replicas are ready and at the desired state
 	ReadyReplicas int32 `json:"readyReplicas"`
 
 	// generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
-	Generations []GenerationStatus `json:"generations"`
+	// +optional
+	Generations []GenerationStatus `json:"generations,omitempty"`
 }
 
 // GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
@@ -192,6 +163,11 @@ const (
 type StaticPodOperatorSpec struct {
 	OperatorSpec `json:",inline"`
 
+	// forceRedeploymentReason can be used to force the redeployment of the operand by providing a unique string.
+	// This provides a mechanism to kick a previously failed deployment and provide a reason why you think it will work
+	// this time instead of failing again on the same config.
+	ForceRedeploymentReason string `json:"forceRedeploymentReason"`
+
 	// failedRevisionLimit is the number of failed static pod installer revisions to keep on disk and in the api
 	// -1 = unlimited, 0 or unset = 5 (default)
 	FailedRevisionLimit int32 `json:"failedRevisionLimit,omitempty"`
@@ -206,9 +182,11 @@ type StaticPodOperatorStatus struct {
 	OperatorStatus `json:",inline"`
 
 	// latestAvailableRevision is the deploymentID of the most recent deployment
-	LatestAvailableRevision int32 `json:"latestAvailableRevision"`
+	// +optional
+	LatestAvailableRevision int32 `json:"latestAvailableRevision,omitEmpty"`
 
 	// nodeStatuses track the deployment values and errors across individual nodes
+	// +optional
 	NodeStatuses []NodeStatus `json:"nodeStatuses,omitempty"`
 }
 

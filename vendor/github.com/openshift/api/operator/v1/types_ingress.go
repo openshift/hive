@@ -67,8 +67,10 @@ type IngressControllerSpec struct {
 	// If unset, the default is based on
 	// infrastructure.config.openshift.io/cluster .status.platform:
 	//
-	//   AWS: LoadBalancerService
-	//   All other platform types: Private
+	//   AWS:      LoadBalancerService
+	//   Libvirt:  HostNetwork
+	//
+	// Any other platform types (including None) default to HostNetwork.
 	//
 	// endpointPublishingStrategy cannot be updated.
 	//
@@ -135,6 +137,16 @@ type NodePlacement struct {
 	//
 	// +optional
 	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
+
+	// tolerations is a list of tolerations applied to ingress controller
+	// deployments.
+	//
+	// The default is an empty list.
+	//
+	// See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+	//
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // EndpointPublishingStrategyType is a way to publish ingress controller endpoints.

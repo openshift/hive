@@ -145,10 +145,8 @@ var (
 
 	githubIdentityProvider = func(name string) openshiftapiv1.IdentityProvider {
 		return openshiftapiv1.IdentityProvider{
-			Name:            name,
-			UseAsChallenger: false,
-			UseAsLogin:      true,
-			MappingMethod:   "claim",
+			Name:          name,
+			MappingMethod: "claim",
 			IdentityProviderConfig: openshiftapiv1.IdentityProviderConfig{
 				Type: openshiftapiv1.IdentityProviderTypeGitHub,
 				GitHub: &openshiftapiv1.GitHubIdentityProvider{

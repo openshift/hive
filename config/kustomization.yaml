@@ -24,8 +24,8 @@ namespace: hive
 # here. These are deployed via a "make install" dependency.
 resources:
 - ./namespace.yaml
-- ./rbac/rbac_role.yaml
-- ./rbac/rbac_role_binding.yaml
+- ./rbac/manager_role.yaml
+- ./rbac/manager_role_binding.yaml
 - ./rbac/hive_frontend_role.yaml
 - ./rbac/hive_frontend_role_binding.yaml
 - ./hiveadmission/hiveadmission_rbac_role.yaml

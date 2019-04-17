@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -149,4 +151,17 @@ func LoadSecretData(c client.Client, secretName, namespace, dataKey string) (str
 		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
 	}
 	return string(retStr), nil
+}
+
+// GetClusterDeploymentType returns the value of the hive.openshift.io/cluster-type label if set,
+// otherwise a default value.
+func GetClusterDeploymentType(cd *hivev1.ClusterDeployment) string {
+	if cd.Labels == nil {
+		return hivev1.DefaultClusterType
+	}
+	typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
+	if !ok {
+		return hivev1.DefaultClusterType
+	}
+	return typeStr
 }

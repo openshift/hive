@@ -36,24 +36,24 @@ import (
 )
 
 var (
-	metricClusterDeploymentsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+	metricClusterDeploymentsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments_total",
 		Help: "Total number of cluster deployments that exist in Hive.",
-	})
-	metricClusterDeploymentsInstalledTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+	}, []string{"cluster_type"})
+	metricClusterDeploymentsInstalledTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments_installed_total",
 		Help: "Total number of cluster deployments that are successfully installed.",
-	})
+	}, []string{"cluster_type"})
 	metricClusterDeploymentsUninstalledTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_cluster_deployments_uninstalled_total",
+		Name: "hive_cluster_deployments_uninstalled_hours_total",
 		Help: "Total number of cluster deployments that are not yet installed.",
 	},
-		[]string{"duration"},
+		[]string{"cluster_type", "gt"},
 	)
 	metricClusterDeploymentsWithConditionTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments_with_condition_total",
 		Help: "Total number of cluster deployments with conditions.",
-	}, []string{"condition"})
+	}, []string{"cluster_type", "condition"})
 	metricInstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "hive_install_jobs_running_total",
 		Help: "Total number of install jobs running in Hive.",
@@ -127,26 +127,20 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		} else {
 			mcLog.WithField("totalClusterDeployments", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
 
-			total,
-				installedTotal,
-				uninstalledUnder1h,
-				uninstalledOver1h,
-				uninstalledOver2h,
-				uninstalledOver8h,
-				uninstalledOver24h,
-				conditionTotals := processClusters(clusterDeployments.Items, mcLog)
-
-			metricClusterDeploymentsTotal.Set(float64(total))
-			metricClusterDeploymentsInstalledTotal.Set(float64(installedTotal))
-			metricClusterDeploymentsUninstalledTotal.WithLabelValues("under1h").Set(float64(uninstalledUnder1h))
-			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over1h").Set(float64(uninstalledOver1h))
-			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over2h").Set(float64(uninstalledOver2h))
-			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over8h").Set(float64(uninstalledOver8h))
-			metricClusterDeploymentsUninstalledTotal.WithLabelValues("over24h").Set(float64(uninstalledOver24h))
-
-			for k, v := range conditionTotals {
-				metricClusterDeploymentsWithConditionTotal.WithLabelValues(string(k)).Set(float64(v))
+			accumulator, err := newClusterAccumulator(nil, "0h", "1h", "2h", "8h", "24h", "72h")
+			if err != nil {
+				mcLog.WithError(err).Error("unable to calculate metrics")
+				return
 			}
+			for _, cd := range clusterDeployments.Items {
+				accumulator.processCluster(&cd)
+			}
+
+			accumulator.setMetrics(metricClusterDeploymentsTotal,
+				metricClusterDeploymentsInstalledTotal,
+				metricClusterDeploymentsUninstalledTotal,
+				metricClusterDeploymentsWithConditionTotal,
+				mcLog)
 		}
 		mcLog.Info("calculating metrics across all install jobs")
 
@@ -201,63 +195,159 @@ func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal int) {
 	return running, failed
 }
 
-func processClusters(clusters []hivev1.ClusterDeployment, mcLog log.FieldLogger) (
-	total,
-	installedTotal,
-	uninstalledUnder1h,
-	uninstalledOver1h,
-	uninstalledOver2h,
-	uninstalledOver8h,
-	uninstalledOver24h int,
-	conditionTotals map[hivev1.ClusterDeploymentConditionType]int) {
+type clusterAccumulator struct {
+	// clusterCreationTimeFilter can optionally be specified to skip processing clusters older
+	// than some period of time.
+	clusterCreationTimeFilter *time.Duration
 
-	conditionTotals = map[hivev1.ClusterDeploymentConditionType]int{}
+	// total maps cluster type to counter.
+	total map[string]int
+
+	// installed maps cluster type to counter.
+	installed map[string]int
+
+	// uninstalled maps a "greater than" duration string (i.e. 8h) to
+	// cluster type to counter. Specify 0h if you want a bucket for the smallest duration.
+	uninstalled map[string]map[string]int
+
+	// conditions maps conditions to cluster type to counter.
+	conditions map[hivev1.ClusterDeploymentConditionType]map[string]int
+}
+
+func newClusterAccumulator(clusterCreationTimeFilter *time.Duration, uninstalledDurationBuckets ...string) (*clusterAccumulator, error) {
+	ca := &clusterAccumulator{
+		clusterCreationTimeFilter: clusterCreationTimeFilter,
+		total:       map[string]int{},
+		installed:   map[string]int{},
+		uninstalled: map[string]map[string]int{},
+		conditions:  map[hivev1.ClusterDeploymentConditionType]map[string]int{},
+	}
+
+	for _, durStr := range uninstalledDurationBuckets {
+		// Make sure all the strings parse as durations, we ignore errors below.
+		_, err := time.ParseDuration(durStr)
+		if err != nil {
+			return nil, err
+		}
+		ca.uninstalled[durStr] = map[string]int{}
+	}
+
 	for _, cdct := range hivev1.AllClusterDeploymentConditions {
-		conditionTotals[cdct] = 0
+		ca.conditions[cdct] = map[string]int{}
+	}
+	return ca, nil
+}
+
+func (ca *clusterAccumulator) ensureClusterTypeBuckets(clusterType string) {
+	// Make sure an entry exists for this cluster type in all relevant maps:
+
+	_, ok := ca.total[clusterType]
+	if !ok {
+		ca.total[clusterType] = 0
 	}
 
-	for _, cd := range clusters {
-		total = total + 1
-		if cd.Status.Installed {
-			installedTotal = installedTotal + 1
-		} else {
+	_, ok = ca.installed[clusterType]
+	if !ok {
+		ca.installed[clusterType] = 0
+	}
 
-			// Sort uninstall clusters into buckets based on how long since
-			// they were created. The larger the bucket the more serious the problem.
-
-			uninstalledDur := time.Since(cd.CreationTimestamp.Time)
-
-			if uninstalledDur > 1*time.Hour {
-				uninstalledOver1h++
-
-				// Anything over 2 hours we start to consider an issue:
-				if uninstalledDur > 2*time.Hour {
-					mcLog.WithFields(log.Fields{
-						"clusterDeployment": cd.Name,
-						"created":           cd.CreationTimestamp.Time,
-						"uninstalledFor":    uninstalledDur,
-					}).Warn("cluster has failed to install in expected timeframe")
-
-					uninstalledOver2h++
-				}
-				// Increment additional counters for other thresholds of awful:
-				if uninstalledDur > 8*time.Hour {
-					uninstalledOver8h++
-				}
-				if uninstalledDur > 24*time.Hour {
-					uninstalledOver24h++
-				}
-			} else {
-				uninstalledUnder1h++
-			}
+	for k, v := range ca.uninstalled {
+		_, ok := v[clusterType]
+		if !ok {
+			ca.uninstalled[k][clusterType] = 0
 		}
+	}
+	for k, v := range ca.conditions {
+		_, ok := v[clusterType]
+		if !ok {
+			ca.conditions[k][clusterType] = 0
+		}
+	}
+}
 
-		// Process conditions regardless if installed or not:
-		for _, cond := range cd.Status.Conditions {
-			if cond.Status == corev1.ConditionTrue {
-				conditionTotals[cond.Type]++
+func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
+	if ca.clusterCreationTimeFilter != nil {
+		if time.Since(cd.CreationTimestamp.Time) > *ca.clusterCreationTimeFilter {
+			return
+		}
+	}
+
+	clusterType := GetClusterDeploymentType(cd)
+	ca.ensureClusterTypeBuckets(clusterType)
+
+	ca.total[clusterType]++
+
+	if cd.Status.Installed {
+		ca.installed[clusterType]++
+	} else {
+		// Sort uninstall clusters into buckets based on how long since
+		// they were created. The larger the bucket the more serious the problem.
+		uninstalledDur := time.Since(cd.CreationTimestamp.Time)
+
+		for k := range ca.uninstalled {
+			// We already error checked that these parse in constructor func:
+			gtDurBucket, _ := time.ParseDuration(k)
+			if uninstalledDur > gtDurBucket {
+				ca.uninstalled[k][clusterType]++
 			}
 		}
 	}
-	return total, installedTotal, uninstalledUnder1h, uninstalledOver1h, uninstalledOver2h, uninstalledOver8h, uninstalledOver24h, conditionTotals
+
+	// Process conditions regardless if installed or not:
+	for _, cond := range cd.Status.Conditions {
+		if cond.Status == corev1.ConditionTrue {
+			ca.conditions[cond.Type][clusterType]++
+		}
+	}
+}
+
+func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, conditions *prometheus.GaugeVec, mcLog log.FieldLogger) {
+
+	for k, v := range ca.total {
+		total.WithLabelValues(k).Set(float64(v))
+		mcLog.WithFields(log.Fields{
+			"clusterType": k,
+			"total":       v,
+		}).Debug("calculated total cluster deployments metric")
+	}
+	for k, v := range ca.installed {
+		installed.WithLabelValues(k).Set(float64(v))
+		mcLog.WithFields(log.Fields{
+			"clusterType": k,
+			"total":       v,
+		}).Debug("calculated total cluster deployments installed metric")
+	}
+	for k, v := range ca.uninstalled {
+		for k1, v1 := range v {
+			uninstalled.WithLabelValues(k1, k).Set(float64(v1))
+			mcLog.WithFields(log.Fields{
+				"clusterType": k1,
+				"gt":          k,
+				"total":       v1,
+			}).Debug("calculated total cluster deployments uninstalled metric")
+		}
+	}
+	for k, v := range ca.conditions {
+		for k1, v1 := range v {
+			conditions.WithLabelValues(k1, string(k)).Set(float64(v1))
+			mcLog.WithFields(log.Fields{
+				"clusterType": k1,
+				"condition":   string(k),
+				"total":       v1,
+			}).Debug("calculated total cluster deployments with condition metric")
+		}
+	}
+}
+
+// GetClusterDeploymentType returns the value of the hive.openshift.io/cluster-type label if set,
+// otherwise a default value.
+func GetClusterDeploymentType(cd *hivev1.ClusterDeployment) string {
+	if cd.Labels == nil {
+		return hivev1.DefaultClusterType
+	}
+	typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
+	if !ok {
+		return hivev1.DefaultClusterType
+	}
+	return typeStr
 }

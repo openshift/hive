@@ -798,10 +798,10 @@ rules:
   - clusterdeployments
   - dnszones
   - dnsendpoints
-  - selectorsyncidentityprovider
-  - selectorsyncset
-  - syncidentityprovider
-  - syncset
+  - selectorsyncidentityproviders
+  - selectorsyncsets
+  - syncidentityproviders
+  - syncsets
   verbs:
   - get
   - list
@@ -908,10 +908,10 @@ rules:
   resources:
   - clusterdeployments
   - dnszones
-  - selectorsyncidentityprovider
-  - syncidentityprovider
-  - selectorsyncset
-  - syncset
+  - selectorsyncidentityproviders
+  - syncidentityproviders
+  - selectorsyncsets
+  - syncsets
   verbs:
   - get
   - list

@@ -28,10 +28,10 @@ rules:
   - clusterdeployments
   - dnszones
   - dnsendpoints
-  - selectorsyncidentityprovider
-  - selectorsyncset
-  - syncidentityprovider
-  - syncset
+  - selectorsyncidentityproviders
+  - selectorsyncsets
+  - syncidentityproviders
+  - syncsets
   verbs:
   - get
   - list

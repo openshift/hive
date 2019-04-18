@@ -263,9 +263,11 @@ func GenerateInstallerJob(
 		InstallJobLabel:            "true",
 		ClusterDeploymentNameLabel: cd.Name,
 	}
-	typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
-	if ok {
-		labels[hivev1.HiveClusterTypeLabel] = typeStr
+	if cd.Labels != nil {
+		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
+		if ok {
+			labels[hivev1.HiveClusterTypeLabel] = typeStr
+		}
 	}
 
 	job := &batchv1.Job{

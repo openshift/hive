@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	//log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -138,8 +137,8 @@ func TestInstallJobs(t *testing.T) {
 		},
 	}
 	running, failed := processJobs(jobs)
-	assert.Equal(t, 2, running)
-	assert.Equal(t, 1, failed)
+	assert.Equal(t, 2, running[hivev1.DefaultClusterType])
+	assert.Equal(t, 1, failed[hivev1.DefaultClusterType])
 }
 
 func testClusterDeployment(name, clusterType string, created metav1.Time, installed bool) hivev1.ClusterDeployment {

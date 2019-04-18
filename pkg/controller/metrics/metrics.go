@@ -55,22 +55,22 @@ var (
 		Help: "Total number of cluster deployments by type with conditions.",
 	}, []string{"cluster_type", "age_lt", "condition"})
 
-	metricInstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "hive_install_jobs_running_total",
-		Help: "Total number of install jobs running in Hive.",
-	})
-	metricInstallJobsFailedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "hive_install_jobs_failed_total",
-		Help: "Total number of install jobs failed in Hive.",
-	})
-	metricUninstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "hive_uninstall_jobs_running_total",
-		Help: "Total number of uninstall jobs running in Hive.",
-	})
-	metricUninstallJobsFailedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "hive_uninstall_jobs_failed_total",
-		Help: "Total number of uninstall jobs failed in Hive.",
-	})
+	metricInstallJobsRunningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_install_jobs_running",
+		Help: "Total number of install jobs running by cluster type.",
+	}, []string{"cluster_type"})
+	metricInstallJobsFailedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_install_jobs_failed",
+		Help: "Total number of install jobs failed by cluster type.",
+	}, []string{"cluster_type"})
+	metricUninstallJobsRunningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_uninstall_jobs_running",
+		Help: "Total number of uninstall jobs running by cluster type..",
+	}, []string{"cluster_type"})
+	metricUninstallJobsFailedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_uninstall_jobs_failed",
+		Help: "Total number of uninstall jobs failed by cluster type.",
+	}, []string{"cluster_type"})
 )
 
 func init() {
@@ -169,10 +169,20 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			log.WithError(err).Error("error listing install jobs")
 		} else {
 			runningTotal, failedTotal := processJobs(installJobs.Items)
-			mcLog.WithField("runningInstalls", runningTotal).Debug("calculating running install jobs metric")
-			mcLog.WithField("failedInstalls", failedTotal).Debug("calculated failed install jobs metric")
-			metricInstallJobsRunningTotal.Set(float64(runningTotal))
-			metricInstallJobsFailedTotal.Set(float64(failedTotal))
+			for k, v := range runningTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated running install jobs total")
+				metricInstallJobsRunningTotal.WithLabelValues(k).Set(float64(v))
+			}
+			for k, v := range failedTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated failed install jobs total")
+				metricInstallJobsFailedTotal.WithLabelValues(k).Set(float64(v))
+			}
 		}
 
 		mcLog.Info("calculating metrics across all uninstall jobs")
@@ -184,10 +194,20 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			log.WithError(err).Error("error listing uninstall jobs")
 		} else {
 			runningTotal, failedTotal := processJobs(uninstallJobs.Items)
-			mcLog.WithField("runningUninstalls", runningTotal).Debug("calculated running uninstall jobs metric")
-			mcLog.WithField("failedUninstalls", failedTotal).Debug("calculated failed uninstall jobs metric")
-			metricUninstallJobsRunningTotal.Set(float64(runningTotal))
-			metricUninstallJobsFailedTotal.Set(float64(failedTotal))
+			for k, v := range runningTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated running uninstall jobs total")
+				metricUninstallJobsRunningTotal.WithLabelValues(k).Set(float64(v))
+			}
+			for k, v := range failedTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated failed uninstall jobs total")
+				metricUninstallJobsFailedTotal.WithLabelValues(k).Set(float64(v))
+			}
 		}
 
 		elapsed := time.Since(start)
@@ -197,15 +217,22 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal int) {
-	var running int
-	var failed int
+func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal map[string]int) {
+	running := map[string]int{}
+	failed := map[string]int{}
 	for _, job := range jobs {
+		clusterType := GetClusterDeploymentTypeForJob(job)
+		if _, ok := running[clusterType]; !ok {
+			running[clusterType] = 0
+		}
+		if _, ok := failed[clusterType]; !ok {
+			failed[clusterType] = 0
+		}
 		if job.Status.CompletionTime == nil {
 			if job.Status.Failed > 0 {
-				failed++
+				failed[clusterType]++
 			} else {
-				running++
+				running[clusterType]++
 			}
 		}
 	}
@@ -382,6 +409,19 @@ func GetClusterDeploymentType(cd *hivev1.ClusterDeployment) string {
 		return hivev1.DefaultClusterType
 	}
 	typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
+	if !ok {
+		return hivev1.DefaultClusterType
+	}
+	return typeStr
+}
+
+// GetClusterDeploymentTypeForJob returns the value of the hive.openshift.io/cluster-type label if set,
+// otherwise a default value.
+func GetClusterDeploymentTypeForJob(job batchv1.Job) string {
+	if job.Labels == nil {
+		return hivev1.DefaultClusterType
+	}
+	typeStr, ok := job.Labels[hivev1.HiveClusterTypeLabel]
 	if !ok {
 		return hivev1.DefaultClusterType
 	}

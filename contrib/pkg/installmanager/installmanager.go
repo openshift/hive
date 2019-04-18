@@ -1,6 +1,7 @@
 package installmanager
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -424,14 +425,42 @@ func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
 		defer logfile.Close()
 		if err != nil {
 			// FIXME what is a better response to being unable to open the file
-			m.log.WithError(err).Fatalf("unalble to open installer log file to display to stdout")
+			m.log.WithError(err).Fatalf("unable to open installer log file to display to stdout")
 			panic("unable to open log file")
 		}
+
+		r := bufio.NewReader(logfile)
+		fullLine := ""
+		fiveMS := time.Millisecond * 5
+
+		// this loop will store up a full line worth of text into fullLine before
+		// passing through regex and then out to stdout
+		//
+		// NOTE: this is *not* going to catch the unlikely case where the log file contains
+		// 'some leading text, pass', which we get no prefix==true, and then later the
+		// file is appended to with 'word: SECRETHERE'
 		for {
-			if _, errStdout := io.Copy(os.Stdout, logfile); errStdout != nil {
-				m.log.WithError(errStdout).Error("error copying debug log file to stdout")
+			line, prefix, err := r.ReadLine()
+			if err != nil && err != io.EOF {
+				m.log.WithError(err).Error("error reading from log file")
 			}
-			time.Sleep(time.Millisecond * 5)
+			// pause for EOF and any other error
+			if err != nil {
+				time.Sleep(fiveMS)
+				continue
+			}
+
+			fullLine = fmt.Sprintf("%v%v", fullLine, string(line))
+
+			if prefix {
+				// need to do another read to get to end-of-line
+				continue
+			}
+
+			cleanLine := cleanupLogOutput(fullLine)
+			fmt.Println(cleanLine)
+			// clear out the line buffer so we can start again
+			fullLine = ""
 		}
 	}()
 

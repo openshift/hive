@@ -37,23 +37,24 @@ import (
 
 var (
 	metricClusterDeploymentsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_cluster_deployments_total",
-		Help: "Total number of cluster deployments that exist in Hive.",
-	}, []string{"cluster_type"})
+		Name: "hive_cluster_deployments",
+		Help: "Total number of cluster deployments.",
+	}, []string{"cluster_type", "age_lt"})
 	metricClusterDeploymentsInstalledTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_cluster_deployments_installed_total",
+		Name: "hive_cluster_deployments_installed",
 		Help: "Total number of cluster deployments that are successfully installed.",
-	}, []string{"cluster_type"})
+	}, []string{"cluster_type", "age_lt"})
 	metricClusterDeploymentsUninstalledTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_cluster_deployments_uninstalled_hours_total",
-		Help: "Total number of cluster deployments that are not yet installed.",
+		Name: "hive_cluster_deployments_uninstalled",
+		Help: "Total number of cluster deployments that are not yet installed by type and bucket for length of time in this state.",
 	},
-		[]string{"cluster_type", "gt"},
+		[]string{"cluster_type", "age_lt", "uninstalled_gt"},
 	)
 	metricClusterDeploymentsWithConditionTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_cluster_deployments_with_condition_total",
-		Help: "Total number of cluster deployments with conditions.",
-	}, []string{"cluster_type", "condition"})
+		Name: "hive_cluster_deployments_conditions",
+		Help: "Total number of cluster deployments by type with conditions.",
+	}, []string{"cluster_type", "age_lt", "condition"})
+
 	metricInstallJobsRunningTotal = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "hive_install_jobs_running_total",
 		Help: "Total number of install jobs running in Hive.",
@@ -125,9 +126,25 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
-			mcLog.WithField("totalClusterDeployments", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
+			mcLog.WithField("total", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
 
-			accumulator, err := newClusterAccumulator(nil, "0h", "1h", "2h", "8h", "24h", "72h")
+			accumulator, err := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
+			if err != nil {
+				mcLog.WithError(err).Error("unable to calculate metrics")
+				return
+			}
+			for _, cd := range clusterDeployments.Items {
+				accumulator.processCluster(&cd)
+			}
+
+			accumulator.setMetrics(metricClusterDeploymentsTotal,
+				metricClusterDeploymentsInstalledTotal,
+				metricClusterDeploymentsUninstalledTotal,
+				metricClusterDeploymentsWithConditionTotal,
+				mcLog)
+
+			// Also add metrics only for clusters created in last 48h
+			accumulator, err = newClusterAccumulator("48h", []string{"0h", "1h", "2h", "8h", "24h"})
 			if err != nil {
 				mcLog.WithError(err).Error("unable to calculate metrics")
 				return
@@ -195,10 +212,14 @@ func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal int) {
 	return running, failed
 }
 
+// clusterAccumulator is an object used to process cluster deployments and sort them so we can
+// increment the appropriate metrics counter based on it's type, installed state, length of time
+// it has been uninstalled, and the conditions it has.
 type clusterAccumulator struct {
-	// clusterCreationTimeFilter can optionally be specified to skip processing clusters older
-	// than some period of time.
-	clusterCreationTimeFilter *time.Duration
+	// ageFilter can optionally be specified to skip processing clusters older than this duration. If this is not desired,
+	// specify "0h" to include all.
+	ageFilter    string
+	ageFilterDur time.Duration
 
 	// total maps cluster type to counter.
 	total map[string]int
@@ -214,13 +235,26 @@ type clusterAccumulator struct {
 	conditions map[hivev1.ClusterDeploymentConditionType]map[string]int
 }
 
-func newClusterAccumulator(clusterCreationTimeFilter *time.Duration, uninstalledDurationBuckets ...string) (*clusterAccumulator, error) {
+const (
+	infinity = "Inf"
+)
+
+// newClusterAccumulator initializes a new cluster accumulator. Use "0h" for the age filter if you want to include
+// all clusters.
+func newClusterAccumulator(ageFilter string, uninstalledDurationBuckets []string) (*clusterAccumulator, error) {
 	ca := &clusterAccumulator{
-		clusterCreationTimeFilter: clusterCreationTimeFilter,
+		ageFilter:   ageFilter,
 		total:       map[string]int{},
 		installed:   map[string]int{},
 		uninstalled: map[string]map[string]int{},
 		conditions:  map[hivev1.ClusterDeploymentConditionType]map[string]int{},
+	}
+	var err error
+	if ageFilter != infinity {
+		ca.ageFilterDur, err = time.ParseDuration(ageFilter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, durStr := range uninstalledDurationBuckets {
@@ -266,10 +300,8 @@ func (ca *clusterAccumulator) ensureClusterTypeBuckets(clusterType string) {
 }
 
 func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
-	if ca.clusterCreationTimeFilter != nil {
-		if time.Since(cd.CreationTimestamp.Time) > *ca.clusterCreationTimeFilter {
-			return
-		}
+	if ca.ageFilter != infinity && time.Since(cd.CreationTimestamp.Time) > ca.ageFilterDur {
+		return
 	}
 
 	clusterType := GetClusterDeploymentType(cd)
@@ -304,34 +336,38 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, conditions *prometheus.GaugeVec, mcLog log.FieldLogger) {
 
 	for k, v := range ca.total {
-		total.WithLabelValues(k).Set(float64(v))
+		total.WithLabelValues(k, ca.ageFilter).Set(float64(v))
 		mcLog.WithFields(log.Fields{
 			"clusterType": k,
+			"age_lt":      ca.ageFilter,
 			"total":       v,
 		}).Debug("calculated total cluster deployments metric")
 	}
 	for k, v := range ca.installed {
-		installed.WithLabelValues(k).Set(float64(v))
+		installed.WithLabelValues(k, ca.ageFilter).Set(float64(v))
 		mcLog.WithFields(log.Fields{
 			"clusterType": k,
+			"age_lt":      ca.ageFilter,
 			"total":       v,
 		}).Debug("calculated total cluster deployments installed metric")
 	}
 	for k, v := range ca.uninstalled {
 		for k1, v1 := range v {
-			uninstalled.WithLabelValues(k1, k).Set(float64(v1))
+			uninstalled.WithLabelValues(k1, ca.ageFilter, k).Set(float64(v1))
 			mcLog.WithFields(log.Fields{
-				"clusterType": k1,
-				"gt":          k,
-				"total":       v1,
+				"clusterType":    k1,
+				"age_lt":         ca.ageFilter,
+				"uninstalled_gt": k,
+				"total":          v1,
 			}).Debug("calculated total cluster deployments uninstalled metric")
 		}
 	}
 	for k, v := range ca.conditions {
 		for k1, v1 := range v {
-			conditions.WithLabelValues(k1, string(k)).Set(float64(v1))
+			conditions.WithLabelValues(k1, ca.ageFilter, string(k)).Set(float64(v1))
 			mcLog.WithFields(log.Fields{
 				"clusterType": k1,
+				"age_lt":      ca.ageFilter,
 				"condition":   string(k),
 				"total":       v1,
 			}).Debug("calculated total cluster deployments with condition metric")

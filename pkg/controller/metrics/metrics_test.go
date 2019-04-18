@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestClusterDeployments(t *testing.T) {
+func TestClusterAccumulator(t *testing.T) {
 	tenDaysAgo := metav1.Time{Time: time.Now().Add(-10 * 24 * time.Hour)}
 	tenHoursAgo := metav1.Time{Time: time.Now().Add(-10 * time.Hour)}
 	threeHoursAgo := metav1.Time{Time: time.Now().Add(-3 * time.Hour)}
@@ -65,7 +65,7 @@ func TestClusterDeployments(t *testing.T) {
 		testClusterDeployment("unmanaged1", "unmanaged", tenDaysAgo, false),
 	}
 
-	accumulator, _ := newClusterAccumulator(nil, "0h", "1h", "2h", "8h", "24h", "72h")
+	accumulator, _ := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
 	for _, cd := range clusters {
 		accumulator.processCluster(&cd)
 	}
@@ -91,6 +91,20 @@ func TestClusterDeployments(t *testing.T) {
 	assert.Equal(t, 2, accumulator.conditions[hivev1.ClusterImageSetNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.ControlPlaneCertificateNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.IngressCertificateNotFoundCondition]["managed"])
+
+	// Also test with a cluster age filter:
+	accumulator, _ = newClusterAccumulator("8h", []string{"0h", "1h", "2h", "8h", "24h", "72h"})
+	for _, cd := range clusters {
+		accumulator.processCluster(&cd)
+	}
+	assert.Equal(t, 8, accumulator.total["managed"])
+	assert.Equal(t, 2, accumulator.installed["managed"])
+	assert.Equal(t, 6, accumulator.uninstalled["0h"]["managed"])
+	assert.Equal(t, 3, accumulator.uninstalled["1h"]["managed"])
+	assert.Equal(t, 2, accumulator.uninstalled["2h"]["managed"])
+	assert.Equal(t, 0, accumulator.uninstalled["8h"]["managed"])
+	assert.Equal(t, 0, accumulator.uninstalled["24h"]["managed"])
+	assert.Equal(t, 0, accumulator.uninstalled["72h"]["managed"])
 }
 
 func TestInstallJobs(t *testing.T) {

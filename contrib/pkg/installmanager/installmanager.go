@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -53,6 +54,11 @@ const (
 	adminSSHKeySecretKey                = "ssh-publickey"
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
+)
+
+var (
+	// multi-line mode regex that allows removing/mutating any line containing 'password' case-insensitive
+	multiLineRedactLinesWithPassword = regexp.MustCompile(`(?mi)^.*password.*$`)
 )
 
 // InstallManager coordinates executing the openshift-install binary, modifying
@@ -530,7 +536,9 @@ func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 		return err
 	}
 
-	m.log.Debugf("installer console log: %v", string(logBytes))
+	logWithoutSensitiveData := cleanupLogOutput(string(logBytes))
+
+	m.log.Debugf("installer console log: %v", logWithoutSensitiveData)
 
 	kubeConfigmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -538,7 +546,7 @@ func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
-			"log": string(logBytes),
+			"log": logWithoutSensitiveData,
 		},
 	}
 
@@ -816,4 +824,12 @@ func updateClusterDeploymentStatusWithRetries(m *InstallManager, f clusterDeploy
 		m.log.WithError(err).Error("error trying to update clusterdeployment status")
 	}
 	return err
+}
+
+func cleanupLogOutput(fullLog string) string {
+	var cleanedString string
+
+	cleanedString = multiLineRedactLinesWithPassword.ReplaceAllString(fullLog, "REDACTED LINE OF OUTPUT")
+
+	return cleanedString
 }

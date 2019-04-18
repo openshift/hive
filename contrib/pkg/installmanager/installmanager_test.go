@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/openshift/hive/pkg/apis"
@@ -381,4 +382,67 @@ func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.S
 		},
 	}
 	return s
+}
+
+func TestCleanupRegex(t *testing.T) {
+	tests := []struct {
+		name           string
+		sourceString   string
+		missingStrings []string
+	}{
+		{
+			name: "install log example",
+			sourceString: `level=info msg="Consuming \"Worker Ignition Config\" from target directory"
+level=info msg="Consuming \"Bootstrap Ignition Config\" from target directory"
+level=info msg="Consuming \"Master Ignition Config\" from target directory"
+level=info msg="Creating infrastructure resources..."
+level=info msg="Waiting up to 30m0s for the Kubernetes API at https://api.test-cluster.example.com:6443..."
+level=info msg="API v1.13.4+af45cda up"
+level=info msg="Waiting up to 30m0s for the bootstrap-complete event..."
+level=info msg="Destroying the bootstrap resources..."
+level=info msg="Waiting up to 30m0s for the cluster at https://api.test-cluster.example.com:6443 to initialize..."
+level=info msg="Waiting up to 10m0s for the openshift-console route to be created..."
+level=info msg="Install complete!"
+level=info msg="To access the cluster as the system:admin user when using 'oc', run 'export KUBECONFIG=/output/auth/kubeconfig'"
+level=info msg="Access the OpenShift web-console here: https://console-openshift-console.apps.test-cluster.example.com"
+level=info msg="Login to the console with user: kubeadmin, password: SomeS-ecret-Passw-ord12-34567"`,
+			missingStrings: []string{
+				"password",
+				"SomeS-ecret-Passw-ord12-34567",
+			},
+		},
+		{
+			name: "password at start of line",
+			sourceString: `some log line
+password at start of line
+more log`,
+			missingStrings: []string{"password"},
+		},
+		{
+			name: "password in first line",
+			sourceString: `first line password more text
+second line no magic string`,
+			missingStrings: []string{"password"},
+		},
+		{
+			name: "password in last line",
+			sourceString: `first line
+last line with password in text`,
+			missingStrings: []string{"password"},
+		},
+		{
+			name:           "case sensitivity test",
+			sourceString:   `abc PaSsWoRd def`,
+			missingStrings: []string{"PaSsWoRd"},
+		},
+	}
+
+	for _, test := range tests {
+		cleanedString := cleanupLogOutput(test.sourceString)
+
+		for _, testString := range test.missingStrings {
+			assert.False(t, strings.Contains(cleanedString, testString), "testing %v: unexpected string found after cleaning", test.name)
+		}
+	}
+
 }

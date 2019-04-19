@@ -10,6 +10,9 @@ spec:
   - JSONPath: .spec.clusterName
     name: ClusterName
     type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
+    name: ClusterType
+    type: string
   - JSONPath: .spec.baseDomain
     name: BaseDomain
     type: string

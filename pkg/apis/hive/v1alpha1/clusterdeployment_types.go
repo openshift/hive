@@ -37,6 +37,15 @@ const (
 	// FinalizerFederation is used on ClusterDeployments to ensure that federation-related artifacts are cleaned up from
 	// the host cluster before a ClusterDeployment is deleted.
 	FinalizerFederation string = "hive.openshift.io/federation"
+
+	// HiveClusterTypeLabel is an optional label that can be applied to ClusterDeployments. It is
+	// shown in short output, usable in searching, and adds metrics vectors which can be used to
+	// alert on cluster types differently.
+	HiveClusterTypeLabel = "hive.openshift.io/cluster-type"
+
+	// DefaultClusterType will be used when the above HiveClusterTypeLabel is unset. This
+	// value will not be added as a label, only used for metrics vectors.
+	DefaultClusterType = "unspecified"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
@@ -254,6 +263,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="ClusterName",type="string",JSONPath=".spec.clusterName"
+// +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels.hive\.openshift\.io/cluster-type"
 // +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
 // +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".status.installed"
 // +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".status.infraID"

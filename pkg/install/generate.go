@@ -69,7 +69,9 @@ func GenerateInstallerJob(
 
 	cdLog.Debug("generating installer job")
 	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret, true)
-	annotations := map[string]string{clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10)}
+	annotations := map[string]string{
+		clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10),
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -257,9 +259,17 @@ func GenerateInstallerJob(
 		backoffLimit = int32(0)
 	}
 
-	labels := map[string]string{InstallJobLabel: "true"}
-	// installerPodLabels are the labels that are used by metricClusterDeploymentInstallRetries
-	installerPodLabels := map[string]string{ClusterDeploymentNameLabel: cd.Name, InstallJobLabel: "true"}
+	labels := map[string]string{
+		InstallJobLabel:            "true",
+		ClusterDeploymentNameLabel: cd.Name,
+	}
+	if cd.Labels != nil {
+		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
+		if ok {
+			labels[hivev1.HiveClusterTypeLabel] = typeStr
+		}
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        GetInstallJobName(cd),
@@ -273,7 +283,7 @@ func GenerateInstallerJob(
 			BackoffLimit:          &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: installerPodLabels,
+					Labels: labels,
 				},
 				Spec: podSpec,
 			},

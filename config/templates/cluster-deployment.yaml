@@ -90,6 +90,7 @@ objects:
   metadata:
     labels:
       controller-tools.k8s.io: "1.0"
+      hive.openshift.io/cluster-type: "unmanaged"
     annotations:
       hive.openshift.io/delete-after: "8h"
       hive.openshift.io/try-install-once: "${TRY_INSTALL_ONCE}"

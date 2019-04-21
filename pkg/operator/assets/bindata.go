@@ -515,10 +515,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 256Mi
+            memory: 1Gi
           requests:
             cpu: 100m
-            memory: 75Mi
+            memory: 512Mi
         command:
           - /opt/services/manager
           - --log-level

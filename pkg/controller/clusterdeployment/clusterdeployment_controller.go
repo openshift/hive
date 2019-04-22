@@ -76,6 +76,8 @@ const (
 	clusterImageSetFoundReason            = "ClusterImageSetFound"
 
 	dnsZoneCheckInterval = 30 * time.Second
+
+	defaultRequeueTime = time.Second
 )
 
 var (
@@ -210,8 +212,12 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		err := r.Status().Update(context.TODO(), cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error updating cluster deployment")
+			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{
+			Requeue:      true,
+			RequeueAfter: defaultRequeueTime,
+		}, nil
 	}
 
 	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
@@ -263,7 +269,14 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment finalizer")
-		return reconcile.Result{}, r.addClusterDeploymentFinalizer(cd)
+		if err := r.addClusterDeploymentFinalizer(cd); err != nil {
+			cdLog.WithError(err).Error("error adding finalizer")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{
+			Requeue:      true,
+			RequeueAfter: defaultRequeueTime,
+		}, nil
 	}
 
 	cdLog.Debug("loading SSH key secret")

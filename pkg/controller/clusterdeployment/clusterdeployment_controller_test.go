@@ -632,7 +632,50 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	}
 }
 
-func testClusterDeployment() *hivev1.ClusterDeployment {
+func TestClusterDeploymentReconcileResults(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name                     string
+		existing                 []runtime.Object
+		exptectedReconcileResult reconcile.Result
+	}{
+		{
+			name: "Requeue after empty clusterversion fields",
+			existing: []runtime.Object{
+				testEmptyClusterDeployment(),
+			},
+			exptectedReconcileResult: reconcile.Result{
+				Requeue:      true,
+				RequeueAfter: defaultRequeueTime,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existing...)
+			rcd := &ReconcileClusterDeployment{
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+			}
+
+			reconcileResult, err := rcd.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      testName,
+					Namespace: testNamespace,
+				},
+			})
+
+			assert.NoError(t, err, "unexpected error")
+
+			assert.Equal(t, test.exptectedReconcileResult, reconcileResult, "unexpected reconcile result")
+		})
+	}
+}
+
+func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 	cd := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testName,
@@ -641,38 +684,46 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
 		},
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: testClusterName,
-			SSHKey: &corev1.LocalObjectReference{
-				Name: sshKeySecret,
-			},
-			ControlPlane: hivev1.MachinePool{},
-			Compute:      []hivev1.MachinePool{},
-			PullSecret: corev1.LocalObjectReference{
-				Name: pullSecretSecret,
-			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1.AWSPlatform{
-					Region: "us-east-1",
-				},
-			},
-			Networking: hivev1.Networking{
-				Type: hivev1.NetworkTypeOpenshiftSDN,
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1.AWSPlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
-						Name: "aws-credentials",
-					},
-				},
+	}
+	return cd
+}
+
+func testClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testEmptyClusterDeployment()
+
+	cd.Spec = hivev1.ClusterDeploymentSpec{
+		ClusterName: testClusterName,
+		SSHKey: &corev1.LocalObjectReference{
+			Name: sshKeySecret,
+		},
+		ControlPlane: hivev1.MachinePool{},
+		Compute:      []hivev1.MachinePool{},
+		PullSecret: corev1.LocalObjectReference{
+			Name: pullSecretSecret,
+		},
+		Platform: hivev1.Platform{
+			AWS: &hivev1.AWSPlatform{
+				Region: "us-east-1",
 			},
 		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterID:      testClusterID,
-			InfraID:        testInfraID,
-			InstallerImage: strPtr("installer-image:latest"),
+		Networking: hivev1.Networking{
+			Type: hivev1.NetworkTypeOpenshiftSDN,
+		},
+		PlatformSecrets: hivev1.PlatformSecrets{
+			AWS: &hivev1.AWSPlatformSecrets{
+				Credentials: corev1.LocalObjectReference{
+					Name: "aws-credentials",
+				},
+			},
 		},
 	}
+
+	cd.Status = hivev1.ClusterDeploymentStatus{
+		ClusterID:      testClusterID,
+		InfraID:        testInfraID,
+		InstallerImage: strPtr("installer-image:latest"),
+	}
+
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return cd
 }

@@ -182,6 +182,7 @@ type ReconcileClusterDeployment struct {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets/status,verbs=get;update;patch
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
@@ -200,6 +201,14 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		"controller":        controllerName,
 	})
 	cdLog.Info("reconciling cluster deployment")
+	res, err := r.reconcile(request, cd, cdLog)
+
+	dur := time.Since(start)
+	cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	return res, err
+}
+
+func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	origCD := cd
 	cd = cd.DeepCopy()
 
@@ -220,7 +229,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		}, nil
 	}
 
-	_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+	_, err := r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("error setting up service account and role")
 		return reconcile.Result{}, err
@@ -399,7 +408,6 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
-	cdLog.Debugf("reconcile complete")
 	// Check for requeueAfter duration
 	if requeueAfter != 0 {
 		cdLog.Debugf("cluster will re-sync due to expiry time in: %v", requeueAfter)

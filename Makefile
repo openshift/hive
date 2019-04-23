@@ -187,3 +187,7 @@ buildah-push: buildah-build
 
 install-federation:
 	./hack/install-federation.sh
+
+.PHONY: clean ## Remove all build artifacts
+clean:
+	rm -rf $(BINDIR)

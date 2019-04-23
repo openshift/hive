@@ -80,10 +80,10 @@ rules:
   - clusterdeployments
   - dnszones
   - dnsendpoints
-  - selectorsyncidentityprovider
-  - selectorsyncset
-  - syncidentityprovider
-  - syncset
+  - selectorsyncidentityproviders
+  - selectorsyncsets
+  - syncidentityproviders
+  - syncsets
   - clusterimagesets
   verbs:
   - get

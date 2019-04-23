@@ -47,7 +47,6 @@ func (r *Helper) Info(obj []byte) (*Info, error) {
 
 func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
 	builder := f.NewBuilder()
-	r.logger.Debug("Obtaining resource info for object")
 	infos, err := builder.Unstructured().Stream(bytes.NewBuffer(obj), "object").Flatten().Do().Infos()
 	if err != nil {
 		r.logger.WithError(err).Error("Failed to obtain resource info")
@@ -57,7 +56,6 @@ func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
 		r.logger.WithError(err).WithField("infos", infos).Errorf("Expected to get 1 resource info, got %d", len(infos))
 		return nil, fmt.Errorf("unexpected number of resources found: %d", len(infos))
 	}
-	r.logger.WithField("info", infos[0]).Debug("obtained resource information")
 	return &Info{
 		Name:       infos[0].Name,
 		Namespace:  infos[0].Namespace,

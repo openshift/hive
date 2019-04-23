@@ -102,12 +102,20 @@ var (
 			Buckets: []float64{1, 10, 30, 60},
 		},
 	)
+	hiveClusterDeploymentInstallDelaySeconds = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_install_delay_seconds",
+			Help:    "Time between cluster deployment creation and install job creation",
+			Buckets: []float64{30, 60, 120, 300, 600, 1200, 1800},
+		},
+	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
 	metrics.Registry.MustRegister(deprovisionJobsDurationHistogram)
 	metrics.Registry.MustRegister(provisionJobsDurationHistogram)
+	metrics.Registry.MustRegister(hiveClusterDeploymentInstallDelaySeconds)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -400,6 +408,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				cdLog.Errorf("error creating job: %v", err)
 				return reconcile.Result{}, err
 			}
+			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
+			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to install job seconds")
+			hiveClusterDeploymentInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
 		} else if err != nil {
 			cdLog.Errorf("error getting job: %v", err)
 			return reconcile.Result{}, err

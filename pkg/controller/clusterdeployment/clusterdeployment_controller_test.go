@@ -606,8 +606,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
@@ -666,8 +666,8 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 

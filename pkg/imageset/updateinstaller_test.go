@@ -37,19 +37,19 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 		validateClusterDeployment func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment)
 	}{
 		{
-			name: "successful execution",
+			name:                      "successful execution",
 			existingClusterDeployment: testClusterDeployment(),
 			setupWorkDir:              setupSuccessfulExecutionWorkDir,
 			validateClusterDeployment: validateSuccessfulExecution,
 		},
 		{
-			name: "failure execution",
+			name:                      "failure execution",
 			existingClusterDeployment: testClusterDeployment(),
 			setupWorkDir:              setupFailureExecutionWorkDir,
 			validateClusterDeployment: validateFailureExecution,
 		},
 		{
-			name: "successful execution after failure",
+			name:                      "successful execution after failure",
 			existingClusterDeployment: testClusterDeploymentWithErrorCondition(),
 			setupWorkDir:              setupSuccessfulExecutionWorkDir,
 			validateClusterDeployment: validateSuccessfulExecutionAfterFailure,

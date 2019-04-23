@@ -118,8 +118,8 @@ func TestClusterVersionReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 			rcd := &ReconcileClusterVersion{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 

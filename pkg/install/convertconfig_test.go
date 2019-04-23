@@ -216,8 +216,8 @@ func TestConvert(t *testing.T) {
 		generateConfigForInstall bool
 	}{
 		{
-			name: "full copy",
-			cd:   buildValidClusterDeployment(),
+			name:                     "full copy",
+			cd:                       buildValidClusterDeployment(),
 			expectedInstallConfig:    buildBaseExpectedInstallConfig(),
 			generateConfigForInstall: true,
 		},

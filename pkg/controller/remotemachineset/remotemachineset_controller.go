@@ -78,9 +78,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileRemoteMachineSet{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
-		logger: log.WithField("controller", controllerName),
+		Client:                        mgr.GetClient(),
+		scheme:                        mgr.GetScheme(),
+		logger:                        log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 		awsClientBuilder:              awsclient.NewClient,
 	}
@@ -202,7 +202,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 		amiID = *awsProviderSpec.AMI.ID
 		cdLog.WithFields(log.Fields{
 			"fromRemoteMachineSet": ms.Name,
-			"ami": amiID,
+			"ami":                  amiID,
 		}).Debug("resolved AMI to use for new machinesets")
 		break
 	}

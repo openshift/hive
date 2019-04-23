@@ -226,13 +226,13 @@ func (r *ReconcileClusterDeploymentFederation) federateTargetCluster(cd *hivev1.
 		targetConfig,
 		federationutil.DefaultFederationSystemNamespace,
 		federationutil.MulticlusterPublicNamespace,
-		"hive", /* hostContext */
+		"hive",                             /* hostContext */
 		cd.Status.FederatedClusterRef.Name, /* clusterName */
 		cd.Status.FederatedClusterRef.Name, /* secretName */
-		true,  /* addToRegistry */
-		false, /* limitedScope */
-		false, /* dryRun */
-		true)  /* idempotent */
+		true,                               /* addToRegistry */
+		false,                              /* limitedScope */
+		false,                              /* dryRun */
+		true)                               /* idempotent */
 
 	if err != nil {
 		cdLog.WithError(err).Error("Federating cluster failed")

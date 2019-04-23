@@ -58,7 +58,7 @@ func TestReconcile(t *testing.T) {
 		joinCluster               func(*hivev1.ClusterDeployment, log.FieldLogger) error
 	}{
 		{
-			name: "federation not installed -> noop",
+			name:                      "federation not installed -> noop",
 			federationNotInstalled:    true,
 			existing:                  []runtime.Object{testClusterDeployment()},
 			validateClusterDeployment: isSameCD(testClusterDeployment()),

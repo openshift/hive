@@ -108,10 +108,19 @@ func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient cli
 // Automatically generate RBAC rules to allow the Controller to read and write DNSZones
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=dnszones;dnszones/status;dnszones/finalizers;dnsendpoints,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
 	dnsLog := r.logger.WithFields(log.Fields{
 		"controller": controllerName,
-		"object":     request.NamespacedName,
+		"dnszone":    request.Name,
+		"namespace":  request.Namespace,
 	})
+
+	// For logging, we need to see when the reconciliation loop starts and ends.
+	dnsLog.Info("reconciling dns zone")
+	defer func() {
+		dur := time.Since(start)
+		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
 
 	// Fetch the DNSZone object
 	desiredState := &hivev1.DNSZone{}
@@ -126,8 +135,6 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
-
-	dnsLog.Debugf("Reconciling DNSZone")
 
 	// See if we need to sync. This is what rate limits our AWS API usage, but allows for immediate syncing
 	// on spec changes and deletes.

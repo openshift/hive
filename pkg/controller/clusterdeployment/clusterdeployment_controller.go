@@ -183,6 +183,19 @@ type ReconcileClusterDeployment struct {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets/status,verbs=get;update;patch
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
+	cdLog := log.WithFields(log.Fields{
+		"clusterDeployment": request.Name,
+		"namespace":         request.Namespace,
+		"controller":        controllerName,
+	})
+
+	// For logging, we need to see when the reconciliation loop starts and ends.
+	cdLog.Info("reconciling cluster deployment")
+	defer func() {
+		dur := time.Since(start)
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
@@ -190,22 +203,15 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
+			cdLog.Info("cluster deployment Not Found")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		cdLog.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog := log.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-		"controller":        controllerName,
-	})
-	cdLog.Info("reconciling cluster deployment")
-	res, err := r.reconcile(request, cd, cdLog)
 
-	dur := time.Since(start)
-	cdLog.WithField("elapsed", dur).Info("reconcile complete")
-	return res, err
+	return r.reconcile(request, cd, cdLog)
 }
 
 func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {

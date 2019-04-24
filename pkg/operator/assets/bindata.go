@@ -514,11 +514,8 @@ spec:
         imagePullPolicy: Always
         name: manager
         resources:
-          limits:
-            cpu: 100m
-            memory: 1Gi
           requests:
-            cpu: 100m
+            cpu: 500m
             memory: 512Mi
         command:
           - /opt/services/manager

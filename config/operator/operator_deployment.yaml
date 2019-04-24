@@ -36,12 +36,9 @@ spec:
         imagePullPolicy: Always
         name: hive-operator
         resources:
-          limits:
-            cpu: 100m
-            memory: 256Mi
           requests:
             cpu: 100m
-            memory: 75Mi
+            memory: 256Mi
         command:
           - /opt/services/hive-operator
           - --log-level

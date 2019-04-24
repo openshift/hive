@@ -1,10 +1,33 @@
+- [OpenShift Hive](#openshift-hive)
+  - [Prerequisites](#prerequisites)
+  - [Deployment Options](#deployment-options)
+    - [Deploy Hive Operator Using Latest Master Images](#deploy-hive-operator-using-latest-master-images)
+    - [Deploy Hive Operator Using Custom Images](#deploy-hive-operator-using-custom-images)
+    - [Deploy Hive via OLM](#deploy-hive-via-olm)
+    - [Run Hive Operator From Source](#run-hive-operator-from-source)
+    - [Run Hive From Source](#run-hive-from-source)
+  - [Using Hive](#using-hive)
+    - [Create a ClusterDeployment using the latest OpenShift release and installer image](#create-a-clusterdeployment-using-the-latest-openshift-release-and-installer-image)
+    - [Create a ClusterDeployment using latest pinned and known stable container images](#create-a-clusterdeployment-using-latest-pinned-and-known-stable-container-images)
+    - [Delete your ClusterDeployment](#delete-your-clusterdeployment)
+  - [Tips](#tips)
+    - [Using the Admin Kubeconfig](#using-the-admin-kubeconfig)
+    - [Troubleshooting Deprovision](#troubleshooting-deprovision)
+    - [Troubleshooting HiveAdmission](#troubleshooting-hiveadmission)
+    - [Installing Federation](#installing-federation)
+    - [Federation Example](#federation-example)
+    - [Deploy using Minishift](#deploy-using-minishift)
+
 # OpenShift Hive
 API driven OpenShift cluster provisioning and management
 
 ## Prerequisites
 
- * Install mockgen:
+ * mockgen:
    * `$ go get github.com/golang/mock/gomock; go install github.com/golang/mock/mockgen`
+* [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
+* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+* [oc](https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/)
 
 ## Deployment Options
 
@@ -23,7 +46,7 @@ You should now see hive-operator, hive-controllers, and hiveadmission pods runni
 ### Deploy Hive Operator Using Custom Images
 
  1. Build and publish a custom Hive image from your current working dir: `$ IMG=quay.io/dgoodwin/hive:latest make buildah-push`
- 1. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/dgoodwin/hive:latest make deploy`
+ 2. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/dgoodwin/hive:latest make deploy`
 
 ### Deploy Hive via OLM
 
@@ -69,7 +92,7 @@ oc process -f config/templates/cluster-deployment.yaml \
    | oc apply -f -
 ```
 
-### Create a ClusterDeployment using latest pinned and known stable container images:
+### Create a ClusterDeployment using latest pinned and known stable container images
 
 ```bash
 export CLUSTER_NAME="${USER}"
@@ -96,7 +119,7 @@ oc process -f config/templates/cluster-deployment.yaml \
 ```
 
 
-### Delete your ClusterDeployment:
+### Delete your ClusterDeployment
 
 ```bash
 $ oc delete clusterdeployment $USER
@@ -108,8 +131,8 @@ $ oc delete clusterdeployment $USER
 Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:
 
 ```bash
-kubectl get secret ${USER}-admin-kubeconfig -o json | jq ".data.kubeconfig" -r | base64 -d > ${USER}.kubeconfig
-export KUBECONFIG=${USER}.kubeconfig
+kubectl get secret ${CLUSTER_NAME}-admin-kubeconfig -o json | jq ".data.kubeconfig" -r | base64 -d > ${CLUSTER_NAME}.kubeconfig
+export KUBECONFIG=${CLUSTER_NAME}.kubeconfig
 kubectl get nodes
 ```
 
@@ -167,3 +190,26 @@ the appropriate label:
 ```
 kubectl label federatedcluster/CLUSTER_NAME -n federation-system etcdoperator=yes
 ```
+
+### Deploy using Minishift
+
+The Hive controller and the operator can run on top of the OpenShift(version 3.11) provided by [Minishift](https://github.com/minishift/minishift).
+
+Steps:
+
+  - Start minishift
+    ```
+    $ minishift start
+    ```
+  - Login to the cluster as admin
+
+    ```
+    $ oc login -u system:admin
+    ```
+
+  - Give cluster-admin role to `admin` and `developer` user
+    ```
+    $ oc adm policy add-cluster-role-to-user cluster-admin system:admin
+    $ oc adm policy add-cluster-role-to-user cluster-admin developer
+    ```
+  - Follow steps in [deployment Options](#deployment-options)

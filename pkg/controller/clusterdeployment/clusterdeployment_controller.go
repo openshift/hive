@@ -656,12 +656,13 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 
 // setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
 func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecret *corev1.Secret, cdLog log.FieldLogger) error {
-	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
-	if err != nil {
-		cdLog.WithError(err).Error("error building remote cluster-api client connection")
-		return err
-	}
 	if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
+		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
+		if err != nil {
+			cdLog.WithError(err).Error("error building remote cluster-api client connection")
+			return err
+		}
+
 		// Parse the admin kubeconfig for the server URL:
 		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
 		if err != nil {

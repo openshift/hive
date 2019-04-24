@@ -221,7 +221,7 @@ func (o *Options) Run() error {
 	for _, obj := range objs {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			log.Error("Cannot create accessor for object of type %T", obj)
+			log.Errorf("Cannot create accessor for object of type %T", obj)
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)

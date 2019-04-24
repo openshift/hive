@@ -38,6 +38,6 @@ func ApplyAsset(h *resource.Helper, assetPath string, hLog log.FieldLogger) erro
 		assetLog.WithError(err).Error("error applying asset")
 		return err
 	}
-	assetLog.Info("asset applied successfully: %v", result)
+	assetLog.Infof("asset applied successfully: %v", result)
 	return nil
 }

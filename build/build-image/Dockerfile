@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM openshift/origin-release:golang-1.10
+FROM openshift/origin-release:golang-1.11
 
 # Install the golint, use this to check our source for niceness
 RUN go get -u golang.org/x/lint/golint

@@ -67,6 +67,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		selectorSyncSets  []*hivev1.SelectorSyncSet
 		validate          func(*testing.T, *hivev1.ClusterDeployment)
 		expectDeleted     []deletedItemInfo
+		expectErr         bool
 	}{
 		{
 			name:              "Create single resource successfully",
@@ -187,6 +188,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				validateUnknownObjectCondition(t, cd.Status.SyncSetStatus[0])
 			},
+			expectErr: true,
 		},
 		{
 			name:              "Check for failed info call, set condition and process other syncsets",
@@ -206,6 +208,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					}
 				}
 			},
+			expectErr: true,
 		},
 		{
 			name:              "Stop applying resources when error occurs",
@@ -228,6 +231,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				}).Resources...)
 				validateSyncSetObjectStatus(t, cd.Status.SyncSetStatus, []hivev1.SyncSetObjectStatus{status})
 			},
+			expectErr: true,
 		},
 		{
 			name:              "selectorsyncset: apply single resource",
@@ -353,6 +357,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				}).Patches...)
 				validateSyncSetObjectStatus(t, cd.Status.SyncSetStatus, []hivev1.SyncSetObjectStatus{status})
 			},
+			expectErr: true,
 		},
 		{
 			name:              "selectorsyncset: apply single resource",
@@ -416,6 +421,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				}).Resources...)
 				validateSyncSetObjectStatus(t, cd.Status.SyncSetStatus, []hivev1.SyncSetObjectStatus{status})
 			},
+			expectErr: true,
 		},
 		{
 			name: "resource sync mode, remove resources",
@@ -444,7 +450,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests[len(tests)-1:] {
+	for _, test := range tests {
 		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			runtimeObjs := []runtime.Object{test.clusterDeployment, kubeconfigSecret()}
@@ -474,8 +480,10 @@ func TestSyncSetReconcile(t *testing.T) {
 					Namespace: testNamespace,
 				},
 			})
-			if err != nil {
+			if !test.expectErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			} else if test.expectErr && err == nil {
+				t.Fatal("expected error not returned")
 			}
 			validateDeletedItems(t, dynamicClient.deletedItems, test.expectDeleted)
 			cd := &hivev1.ClusterDeployment{}

@@ -90,14 +90,14 @@ var (
 	)
 	deprovisionJobsDurationHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "deprovision_jobs_duration_seconds",
+			Name:    "hive_deprovision_jobs_duration_seconds",
 			Help:    "Deprovision Jobs duration distribution",
 			Buckets: []float64{60, 3600, 7200},
 		},
 	)
 	provisionJobsDurationHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "provision_jobs_duration_seconds",
+			Name:    "hive_provision_jobs_duration_seconds",
 			Help:    "Provision Jobs duration distribution",
 			Buckets: []float64{1, 10, 30, 60},
 		},
@@ -109,6 +109,20 @@ var (
 			Buckets: []float64{30, 60, 120, 300, 600, 1200, 1800},
 		},
 	)
+	imagesetJobsDurationHistogram = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_imageset_jobs_duration_seconds",
+			Help:    "Imageset Jobs duration distribution",
+			Buckets: []float64{30, 60, 120, 300, 600, 1200},
+		},
+	)
+	hiveClusterDeploymentImagesetJobDelaySeconds = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_imageset_job_delay_seconds",
+			Help:    "Time between cluster deployment creation and imageset job creation",
+			Buckets: []float64{10, 30, 60, 300, 600},
+		},
+	)
 )
 
 func init() {
@@ -116,6 +130,8 @@ func init() {
 	metrics.Registry.MustRegister(deprovisionJobsDurationHistogram)
 	metrics.Registry.MustRegister(provisionJobsDurationHistogram)
 	metrics.Registry.MustRegister(hiveClusterDeploymentInstallDelaySeconds)
+	metrics.Registry.MustRegister(imagesetJobsDurationHistogram)
+	metrics.Registry.MustRegister(hiveClusterDeploymentImagesetJobDelaySeconds)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -316,8 +332,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
+	reportImagesetJobDurationMetricFlag := false
+	imagesetJobDuration := time.Duration(0)
 	if cd.Status.InstallerImage == nil {
-		return reconcile.Result{}, r.resolveInstallerImage(cd, hiveImage, cdLog)
+		imagesetJobDuration, reportImagesetJobDurationMetricFlag, err = r.resolveInstallerImage(cd, hiveImage, cdLog)
+		return reconcile.Result{}, err
 	}
 
 	if cd.Spec.ManageDNS {
@@ -441,6 +460,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		provisionJobsDurationHistogram.Observe(float64(jobDuration.Seconds()))
 	}
 
+	// Report the imageset job duration metrics if we need to
+	if reportImagesetJobDurationMetricFlag {
+		cdLog.Infof("SETTING IMAGESET METRIC")
+		cdLog.WithField("duration", imagesetJobDuration.Seconds()).Debug("imageset job completed")
+		provisionJobsDurationHistogram.Observe(float64(imagesetJobDuration.Seconds()))
+	}
+
 	// Check for requeueAfter duration
 	if requeueAfter != 0 {
 		cdLog.Debugf("cluster will re-sync due to expiry time in: %v", requeueAfter)
@@ -503,51 +529,54 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 	return err
 }
 
-func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) (time.Duration, bool, error) {
+	// reportDurationMetricsFlag is the flag that is used for reporting the imageset job duration metric
+	reportDurationMetricsFlag := false
+	jobDuration := time.Duration(0)
 	if len(cd.Spec.Images.InstallerImage) > 0 {
 		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
 			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
 		cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
-		return r.statusUpdate(cd, cdLog)
+		return jobDuration, reportDurationMetricsFlag, r.statusUpdate(cd, cdLog)
 	}
 	if cd.Spec.ImageSet == nil {
 		// In the future, not having an ImageSet or an override installer image set should not
 		// be allowed. For now, we'll set a default one.
 		cdLog.Warn("no imageset reference or override installer image found on cluster deployment. Using default")
 		cd.Status.InstallerImage = strPtr(install.DefaultInstallerImage)
-		return r.statusUpdate(cd, cdLog)
+		return jobDuration, reportDurationMetricsFlag, r.statusUpdate(cd, cdLog)
 	}
 	imageSet := &hivev1.ClusterImageSet{}
 	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
 	if errors.IsNotFound(err) {
 		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Debug("clusterimageset not found, setting a condition to indicate the error")
 		_, err := r.setImageSetNotFoundCondition(cd, true, cdLog)
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	}
 	if err != nil {
 		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("cannot get clusterimageset")
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	}
 	modified, err := r.setImageSetNotFoundCondition(cd, false, cdLog)
 	if modified {
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	}
 	if imageSet.Spec.InstallerImage != nil {
 		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
 		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
-		return r.statusUpdate(cd, cdLog)
+		return jobDuration, reportDurationMetricsFlag, r.statusUpdate(cd, cdLog)
 	}
 	if imageSet.Spec.ReleaseImage == nil {
 		// This is not expected to happen, but will be logged just in case.
 		cdLog.WithField("imageset", imageSet.Name).Error("invalid ClusterImageSet: no releaseImage specified")
 		// No need to requeue right away
-		return nil
+		return jobDuration, reportDurationMetricsFlag, nil
 	}
 	cliImage := images.GetCLIImage(cdLog)
 	job := imageset.GenerateImageSetJob(cd, imageSet, serviceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
 	if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on job")
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	}
 
 	jobName := types.NamespacedName{Name: job.Name, Namespace: job.Namespace}
@@ -565,21 +594,31 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		if err != nil {
 			jobLog.WithError(err).Error("cannot delete job")
 		}
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	case errors.IsNotFound(err):
 		jobLog.Info("creating imageset job")
 		err = r.Create(context.TODO(), job)
 		if err != nil {
 			jobLog.WithError(err).Error("error creating job")
+		} else {
+			// kickstartDuration calculates the delay between creation of cd and start of imageset job
+			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
+			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
+			hiveClusterDeploymentImagesetJobDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
 		}
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	case err != nil:
 		jobLog.WithError(err).Error("cannot get job")
-		return err
+		return jobDuration, reportDurationMetricsFlag, err
 	default:
+		// setting the flag so that we can report the metric after cd is installed
+		if existingJob.Status.Succeeded > 0 && !cd.Status.Installed {
+			reportDurationMetricsFlag = true
+			jobDuration = existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
+		}
 		jobLog.Debug("job exists and is in progress")
 	}
-	return nil
+	return jobDuration, reportDurationMetricsFlag, nil
 }
 
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) (modified bool, err error) {

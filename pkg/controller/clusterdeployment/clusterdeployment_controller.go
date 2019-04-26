@@ -127,8 +127,8 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
-		Client: mgr.GetClient(),
-		scheme: mgr.GetScheme(),
+		Client:                        mgr.GetClient(),
+		scheme:                        mgr.GetScheme(),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
 }

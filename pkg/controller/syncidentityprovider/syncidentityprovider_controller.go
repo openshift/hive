@@ -25,6 +25,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -72,7 +73,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;list;watch
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(controllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 100})
+	c, err := controller.New(controllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
 	}

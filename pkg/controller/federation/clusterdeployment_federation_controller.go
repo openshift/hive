@@ -82,7 +82,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("clusterdeployment-federation-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("clusterdeployment-federation-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
 	}

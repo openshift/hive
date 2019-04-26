@@ -558,7 +558,8 @@ spec:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
   ports:
-  - port: 2112
+  - name: metrics
+    port: 2112
 `)
 
 func configManagerServiceYamlBytes() ([]byte, error) {

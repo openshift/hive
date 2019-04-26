@@ -22,8 +22,15 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
+.PHONY: default
+default: all
 
+.PHONY: all
 all: fmt vet test build
+
+.PHONY: vendor
+vendor:
+	dep ensure -v
 
 # Run tests
 .PHONY: test
@@ -40,7 +47,7 @@ test-e2e:
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: manager hiveutil hiveadmission operator
+build: $(GOPATH)/bin/mockgen manager hiveutil hiveadmission operator
 
 
 # Build manager binary
@@ -161,7 +168,7 @@ verify-generated:
 
 # Generate code
 .PHONY: generate
-generate:
+generate: $(GOPATH)/bin/mockgen
 	go generate ./pkg/... ./cmd/...
 	hack/update-bindata.sh
 
@@ -187,6 +194,9 @@ buildah-push: buildah-build
 
 install-federation:
 	./hack/install-federation.sh
+
+$(GOPATH)/bin/mockgen:
+	go get -u github.com/golang/mock/mockgen/...
 
 .PHONY: clean ## Remove all build artifacts
 clean:

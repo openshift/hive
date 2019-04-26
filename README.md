@@ -17,14 +17,13 @@
     - [Installing Federation](#installing-federation)
     - [Federation Example](#federation-example)
     - [Deploy using Minishift](#deploy-using-minishift)
+  - [Documentaion](#documentaion)
 
 # OpenShift Hive
 API driven OpenShift cluster provisioning and management
 
 ## Prerequisites
 
- * mockgen:
-   * `$ go get github.com/golang/mock/gomock; go install github.com/golang/mock/mockgen`
 * [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 * [oc](https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/)
@@ -213,3 +212,7 @@ Steps:
     $ oc adm policy add-cluster-role-to-user cluster-admin developer
     ```
   - Follow steps in [deployment Options](#deployment-options)
+
+## Documentaion
+
+* [Developing Hive](./docs/developing.md)

@@ -115,3 +115,7 @@ version="v1.4.7"
   name = "github.com/jteeuwen/go-bindata"
   revision = "a0ff2567cfb70903282db057e799fd826784d41d"
 
+
+[[constraint]]
+  name = "github.com/golang/mock"
+  version = "1.2.0"

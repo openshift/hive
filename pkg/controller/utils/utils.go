@@ -150,3 +150,14 @@ func LoadSecretData(c client.Client, secretName, namespace, dataKey string) (str
 	}
 	return string(retStr), nil
 }
+
+const (
+	concurrentControllerReconciles = 5
+)
+
+// GetConcurrentReconciles returns the number of goroutines each controller should
+// use for parallel processing of their queue. For now this is a static value of 5.
+// In future this may be read from an env var set by the operator, and driven by HiveConfig.
+func GetConcurrentReconciles() int {
+	return concurrentControllerReconciles
+}

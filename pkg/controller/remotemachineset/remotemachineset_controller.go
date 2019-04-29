@@ -360,7 +360,9 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 			hivePool := findHiveMachinePool(cd, workerPool.Name)
 			for _, ms := range icMachineSets {
 				// Apply hive MachinePool labels to MachineSet MachineSpec.
-				ms.Spec.Template.Spec.ObjectMeta.Labels = map[string]string{}
+				if hivePool.Labels != nil {
+					ms.Spec.Template.Spec.ObjectMeta.Labels = map[string]string{}
+				}
 				for key, value := range hivePool.Labels {
 					ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
 				}

@@ -71,6 +71,7 @@ type ExternalDNSAWSConfig struct {
 }
 
 // +genclient:nonNamespaced
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HiveConfig is the Schema for the hives API

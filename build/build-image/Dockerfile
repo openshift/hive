@@ -17,10 +17,6 @@ FROM openshift/origin-release:golang-1.11
 # Install the golint, use this to check our source for niceness
 RUN go get -u golang.org/x/lint/golint
 
-# Install gomock and mockgen for the mocks used in unit tests
-RUN go get -u github.com/golang/mock/gomock
-RUN go get -u github.com/golang/mock/mockgen
-
 # Basic Debug Tools
 RUN yum -y install strace tcping && yum clean all
 

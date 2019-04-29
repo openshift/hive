@@ -122,7 +122,7 @@ oc process -f config/templates/cluster-deployment.yaml \
 ### Delete your ClusterDeployment
 
 ```bash
-$ oc delete clusterdeployment $USER
+$ oc delete clusterdeployment ${CLUSTER_NAME}
 ```
 ## Tips
 
@@ -142,11 +142,17 @@ After deleting your cluster deployment you will see an uninstall job created. If
 
  1. Delete the uninstall job, it will be recreated and tried again.
  1. Manually delete the uninstall finalizer allowing the cluster deployment to be deleted, but note that this may leave artifacts in your AWS account.
-    * `kubectl edit clusterdeployments.hive.openshift.io YOURCLUSTER`
- 1. You can manually run the uninstall code with hiveutil to delete AWS resources based on their tags.
-    * Get your cluster UUID from the clusterdeployment.Spec.ClusterUUID.
-    * `make hiveutil`
-    * `bin/hiveutil aws-tag-deprovision --loglevel=debug --cluster-name CLUSTER_NAME openshiftClusterID=CLUSTER_UUID kubernetes.io/cluster/CLUSTER_NAME=owned`
+ 1. You can manually run the uninstall code with `hiveutil` to delete AWS resources based on their tags.
+    * Run `make hiveutil`
+    * Get your cluster tag i.e. `infraID` from the following command output.
+      ```bash
+      $ kubectl get cd ${CLUSTER_NAME} -o json | jq -r '.status.infraID'
+      ```
+    * In case your cluster deployment is not available, you can find the tag in AWS console on any object from that cluster.
+    * Run following command to deprovision artifacts in the AWS.
+      ```bash
+      $ bin/hiveutil aws-tag-deprovision --loglevel=debug kubernetes.io/cluster/<infraID>=owned
+      ```
 
 ### Troubleshooting HiveAdmission
 

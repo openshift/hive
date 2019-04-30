@@ -49,7 +49,7 @@ const (
 	// UninstallJobLabel is the label used for counting the number of uninstall jobs in Hive
 	UninstallJobLabel = "hive.openshift.io/uninstall"
 
-	// ClusterDeploymentNameLabel is the label (along with ClusterDeploymentNamespaceLabel) that is used to identify the installer pod of a particular cluster deployment
+	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
 	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 )
 

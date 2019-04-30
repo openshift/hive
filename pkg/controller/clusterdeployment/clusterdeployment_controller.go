@@ -90,14 +90,14 @@ var (
 	)
 	deprovisionJobsDurationHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "deprovision_jobs_duration_seconds",
+			Name:    "hive_deprovision_jobs_duration_seconds",
 			Help:    "Deprovision Jobs duration distribution",
 			Buckets: []float64{60, 3600, 7200},
 		},
 	)
 	provisionJobsDurationHistogram = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "provision_jobs_duration_seconds",
+			Name:    "hive_provision_jobs_duration_seconds",
 			Help:    "Provision Jobs duration distribution",
 			Buckets: []float64{1, 10, 30, 60},
 		},
@@ -109,6 +109,13 @@ var (
 			Buckets: []float64{30, 60, 120, 300, 600, 1200, 1800},
 		},
 	)
+	hiveClusterDeploymentImagesetJobDelaySeconds = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_imageset_job_delay_seconds",
+			Help:    "Time between cluster deployment creation and imageset job creation",
+			Buckets: []float64{10, 30, 60, 300, 600},
+		},
+	)
 )
 
 func init() {
@@ -116,6 +123,7 @@ func init() {
 	metrics.Registry.MustRegister(deprovisionJobsDurationHistogram)
 	metrics.Registry.MustRegister(provisionJobsDurationHistogram)
 	metrics.Registry.MustRegister(hiveClusterDeploymentInstallDelaySeconds)
+	metrics.Registry.MustRegister(hiveClusterDeploymentImagesetJobDelaySeconds)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -323,7 +331,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Status.InstallerImage == nil {
-		return reconcile.Result{}, r.resolveInstallerImage(cd, hiveImage, cdLog)
+		err = r.resolveInstallerImage(cd, hiveImage, cdLog)
+		return reconcile.Result{}, err
 	}
 
 	if cd.Spec.ManageDNS {
@@ -577,6 +586,11 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		err = r.Create(context.TODO(), job)
 		if err != nil {
 			jobLog.WithError(err).Error("error creating job")
+		} else {
+			// kickstartDuration calculates the delay between creation of cd and start of imageset job
+			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
+			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
+			hiveClusterDeploymentImagesetJobDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
 		}
 		return err
 	case err != nil:

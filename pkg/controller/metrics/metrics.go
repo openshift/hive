@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"github.com/openshift/hive/pkg/imageset"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -71,6 +72,15 @@ var (
 		Name: "hive_uninstall_jobs_failed",
 		Help: "Total number of uninstall jobs failed by cluster type.",
 	}, []string{"cluster_type"})
+
+	metricImagesetJobsRunningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_imageset_jobs_running",
+		Help: "Total number of imageset jobs running by cluster type.",
+	}, []string{"cluster_type"})
+	metricImagesetJobsFailedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_imageset_jobs_failed",
+		Help: "Total number of imageset jobs failed by cluster type.",
+	}, []string{"cluster_type"})
 )
 
 func init() {
@@ -82,6 +92,8 @@ func init() {
 	metrics.Registry.MustRegister(metricInstallJobsFailedTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsFailedTotal)
+	metrics.Registry.MustRegister(metricImagesetJobsRunningTotal)
+	metrics.Registry.MustRegister(metricImagesetJobsFailedTotal)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -207,6 +219,31 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 					"total":       v,
 				}).Debug("calculated failed uninstall jobs total")
 				metricUninstallJobsFailedTotal.WithLabelValues(k).Set(float64(v))
+			}
+		}
+
+		mcLog.Info("calculating metrics across all imageset jobs")
+		// imageset job metrics
+		imagesetJobs := &batchv1.JobList{}
+		imagesetJobLabelSelector := map[string]string{imageset.ImagesetJobLabel: "true"}
+		err = mc.Client.List(context.Background(), client.MatchingLabels(imagesetJobLabelSelector), imagesetJobs)
+		if err != nil {
+			log.WithError(err).Error("error listing imageset jobs")
+		} else {
+			runningTotal, failedTotal := processJobs(imagesetJobs.Items)
+			for k, v := range runningTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated running imageset jobs total")
+				metricImagesetJobsRunningTotal.WithLabelValues(k).Set(float64(v))
+			}
+			for k, v := range failedTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated failed imageset jobs total")
+				metricImagesetJobsFailedTotal.WithLabelValues(k).Set(float64(v))
 			}
 		}
 

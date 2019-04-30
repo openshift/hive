@@ -203,6 +203,11 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 		return reconcile.Result{}, err
 	}
 
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+
 	contextLogger = addClusterDeploymentLoggerFields(contextLogger, cd)
 
 	return reconcile.Result{}, r.syncIdentityProviders(cd)

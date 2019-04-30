@@ -84,46 +84,64 @@ var (
 	metricClusterDeploymentInstallRestarts = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "hive_cluster_deployment_install_restarts",
-			Help: "Number of container restarts for all install jobs, partitioned by cluster. Excludes those with no restarts.",
+			// Will clear once hive restarts.
+			Help: "Number of container restarts for install jobs, labeled by cluster and namespace. No longer reported after cluster is installed.",
 		},
 		[]string{"cluster_deployment", "namespace"},
 	)
-	deprovisionJobsDurationHistogram = prometheus.NewHistogram(
+	metricClusterDeploymentSucceeded = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_install_succeeded_bool",
+			// Will clear once hive restarts.
+			Help: "0 if uninstalled, 1 if installed, labeled by cluster and namespace. No longer reported after cluster is installed.",
+		},
+		[]string{"cluster_deployment", "namespace"},
+	)
+	metricCompletedInstallJobRestarts = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "hive_deprovision_jobs_duration_seconds",
-			Help:    "Deprovision Jobs duration distribution",
-			Buckets: []float64{60, 3600, 7200},
+			Name:    "hive_cluster_deployment_completed_install_restart",
+			Help:    "Distribution of the number of restarts for all completed cluster installations.",
+			Buckets: []float64{0, 2, 10, 20, 50},
 		},
 	)
-	provisionJobsDurationHistogram = prometheus.NewHistogram(
+	metricUninstallJobDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "hive_provision_jobs_duration_seconds",
-			Help:    "Provision Jobs duration distribution",
-			Buckets: []float64{1, 10, 30, 60},
+			Name:    "hive_cluster_deployment_uninstall_job_duration_seconds",
+			Help:    "Distribution of the runtime of completed uninstall jobs.",
+			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
 		},
 	)
-	hiveClusterDeploymentInstallDelaySeconds = prometheus.NewHistogram(
+	metricInstallJobDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_install_delay_seconds",
-			Help:    "Time between cluster deployment creation and install job creation",
+			Name:    "hive_cluster_deployment_install_job_duration_seconds",
+			Help:    "Distribution of the runtime of completed install jobs.",
+			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
+		},
+	)
+	metricInstallDelaySeconds = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_install_job_delay_seconds",
+			Help:    "Time between cluster deployment creation and creation of the job to install/provision the cluster.",
 			Buckets: []float64{30, 60, 120, 300, 600, 1200, 1800},
 		},
 	)
-	hiveClusterDeploymentImagesetJobDelaySeconds = prometheus.NewHistogram(
+	metricImageSetDelaySeconds = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_imageset_job_delay_seconds",
-			Help:    "Time between cluster deployment creation and imageset job creation",
-			Buckets: []float64{10, 30, 60, 300, 600},
+			Help:    "Time between cluster deployment creation and creation of the job which resolves the installer image to use for a ClusterImageSet.",
+			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
 		},
 	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
-	metrics.Registry.MustRegister(deprovisionJobsDurationHistogram)
-	metrics.Registry.MustRegister(provisionJobsDurationHistogram)
-	metrics.Registry.MustRegister(hiveClusterDeploymentInstallDelaySeconds)
-	metrics.Registry.MustRegister(hiveClusterDeploymentImagesetJobDelaySeconds)
+	metrics.Registry.MustRegister(metricClusterDeploymentSucceeded)
+	metrics.Registry.MustRegister(metricUninstallJobDuration)
+	metrics.Registry.MustRegister(metricInstallJobDuration)
+	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)
+	metrics.Registry.MustRegister(metricInstallDelaySeconds)
+	metrics.Registry.MustRegister(metricImageSetDelaySeconds)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -348,8 +366,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 	}
 
-	// reportDurationMetricsFlag is the flag that is used for reporting the provision job duration metric
-	reportDurationMetricsFlag := false
+	// firstInstalledObserve is the flag that is used for reporting the provision job duration metric
+	firstInstalledObserve := false
+	containerRestarts := 0
 	// Check if an install job already exists:
 	existingJob := &batchv1.Job{}
 	installJobName := install.GetInstallJobName(cd)
@@ -363,13 +382,16 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	} else {
 		// setting the flag so that we can report the metric after cd is installed
 		if existingJob.Status.Succeeded > 0 && !cd.Status.Installed {
-			reportDurationMetricsFlag = true
+			firstInstalledObserve = true
 		}
 	}
 
 	if cd.Status.Installed {
 		cdLog.Debug("cluster is already installed, no processing of install job needed")
 	} else {
+		// Indicate that the cluster is still installing:
+		metricClusterDeploymentSucceeded.WithLabelValues(cd.Name, cd.Namespace).Set(float64(0))
+
 		cdLog.Debug("loading pull secret secret")
 		pullSecret, err := controllerutils.LoadSecretData(r.Client, cd.Spec.PullSecret.Name, cd.Namespace, corev1.DockerConfigJsonKey)
 		if err != nil {
@@ -425,13 +447,30 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			}
 			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
 			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to install job seconds")
-			hiveClusterDeploymentInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+			metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
 		} else if err != nil {
 			cdLog.Errorf("error getting job: %v", err)
 			return reconcile.Result{}, err
 		} else {
 			cdLog.Debug("provision job exists")
-			r.checkInstallPodRestarts(cd, cdLog)
+			containerRestarts, err = r.calcInstallPodRestarts(cd, cdLog)
+			if err != nil {
+				// Metrics calculation should not shut down reconciliation, logging and moving on.
+				log.WithError(err).Warn("error listing pods, unable to calculate pod restarts but continuing")
+			} else {
+				if containerRestarts > 0 {
+					cdLog.WithFields(log.Fields{
+						"restarts": containerRestarts,
+					}).Warn("install pod has restarted")
+				}
+
+				// Set metric for the number of install restarts for this cluster.
+				metricClusterDeploymentInstallRestarts.WithLabelValues(cd.Name, cd.Namespace).Set(float64(containerRestarts))
+
+				// Store the restart count on the cluster deployment status as well.
+				cd.Status.InstallRestarts = containerRestarts
+			}
+
 			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
 				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
 				if err != nil {
@@ -448,12 +487,20 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cdLog.WithError(err).Errorf("error updating cluster deployment status")
 		return reconcile.Result{}, err
 	}
-	// Report the cluster metrics if we need to
-	if reportDurationMetricsFlag {
+
+	// firstInstalledObserve will be true if this is the first time we've noticed the install job completed.
+	// If true, we know we can report the metrics associated with a completed job.
+	if firstInstalledObserve {
 		// jobDuration calculates the time elapsed since the install job started
 		jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
 		cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
-		provisionJobsDurationHistogram.Observe(float64(jobDuration.Seconds()))
+		metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
+
+		// Indicate successful install. We do not want to report this metric forever to limit cardinality.
+		metricClusterDeploymentSucceeded.WithLabelValues(cd.Name, cd.Namespace).Set(float64(1))
+
+		// Report a metric for the total number of container restarts:
+		metricCompletedInstallJobRestarts.Observe(float64(containerRestarts))
 	}
 
 	// Check for requeueAfter duration
@@ -590,7 +637,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			// kickstartDuration calculates the delay between creation of cd and start of imageset job
 			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
 			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
-			hiveClusterDeploymentImagesetJobDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+			metricImageSetDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
 		}
 		return err
 	case err != nil:
@@ -826,7 +873,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			// jobDuration calculates the time elapsed since the uninstall job started for deprovision job
 			jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
 			cdLog.WithField("duration", jobDuration.Seconds()).Debug("uninstall job completed")
-			deprovisionJobsDurationHistogram.Observe(float64(jobDuration.Seconds()))
+			metricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
 			err = r.removeClusterDeploymentFinalizer(cd)
 			if err != nil {
 				cdLog.WithError(err).Error("error removing finalizer")
@@ -1035,16 +1082,13 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 	return retval
 }
 
-// Calculates the restart count for both hive and installer container for a cd and sets it to metricClusterDeploymentInstallRestarts
-func (r *ReconcileClusterDeployment) checkInstallPodRestarts(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
+func (r *ReconcileClusterDeployment) calcInstallPodRestarts(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (int, error) {
 	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: cd.Name, install.InstallJobLabel: "true"}
 	parsedLabels := labels.SelectorFromSet(installerPodLabels)
 	pods := &corev1.PodList{}
 	err := r.Client.List(context.Background(), &client.ListOptions{Namespace: cd.Namespace, LabelSelector: parsedLabels}, pods)
 	if err != nil {
-		// Metrics calculation should not shut down reconciliation, logging and moving on.
-		log.WithError(err).Warn("error listing pods, unable to calculate pod restarts but continuing")
-		return
+		return 0, err
 	}
 
 	if len(pods.Items) > 1 {
@@ -1058,18 +1102,7 @@ func (r *ReconcileClusterDeployment) checkInstallPodRestarts(cd *hivev1.ClusterD
 			containerRestarts += int(cs.RestartCount)
 		}
 	}
-	if containerRestarts > 0 {
-		cdLog.WithFields(log.Fields{
-			"restarts": containerRestarts,
-		}).Warn("install pod has restarted")
-
-		// Sets the value of the metricClusterDeploymentInstallRestarts. We only report this metric *if*
-		// there are restarts to limit cardinality and exclude normally functioning cluster installs.
-		metricClusterDeploymentInstallRestarts.WithLabelValues(cd.Name, cd.Namespace).Set(float64(containerRestarts))
-	}
-
-	// Store the restart count on the cluster deployment status as well.
-	cd.Status.InstallRestarts = containerRestarts
+	return containerRestarts, nil
 }
 
 func strPtr(s string) *string {

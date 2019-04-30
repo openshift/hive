@@ -141,6 +141,10 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
 	})
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
 
 	if !cd.Status.Installed {
 		// Cluster isn't installed yet, return

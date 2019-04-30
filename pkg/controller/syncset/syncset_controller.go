@@ -199,6 +199,11 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+
 	cdLog := r.logger.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,

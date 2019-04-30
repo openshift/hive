@@ -104,17 +104,17 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
 		"controller":        "clusterversion",
 	})
 	cdLog.Info("reconciling cluster version")
-
-	// If the clusterdeployment is deleted, do not reconcile.
-	if cd.DeletionTimestamp != nil {
-		return reconcile.Result{}, nil
-	}
 
 	if len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
 		return reconcile.Result{}, nil

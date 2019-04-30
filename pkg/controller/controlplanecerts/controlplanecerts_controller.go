@@ -118,11 +118,15 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 		}
 		return reconcile.Result{}, err
 	}
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": request.NamespacedName.String(),
 		"controller":        controllerName,
 	})
-
 	cdLog.Info("reconciling cluster deployment")
 	existingSyncSet := &hivev1.SyncSet{}
 	existingSyncSetNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controlPlaneCertsSyncSetName(cd.Name)}

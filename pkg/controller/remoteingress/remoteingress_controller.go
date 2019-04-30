@@ -142,6 +142,11 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 	}
 	rContext.clusterDeployment = cd
 
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
+	}
+
 	cdLog := r.logger.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,

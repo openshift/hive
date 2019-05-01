@@ -341,6 +341,21 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
+	// Check that existing machinepools aren't modifying the labels and/or taints fields
+	hasChangedImmutableMachinePoolFields, computePoolName := hasChangedImmutableMachinePoolFields(&oldObject.Spec, &newObject.Spec)
+	if hasChangedImmutableMachinePoolFields {
+		message := fmt.Sprintf("Detected attempt to change Labels or Taints on existing Compute object: %s", computePoolName)
+		contextLogger.Infof("Failed validation: %v", message)
+
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
@@ -392,6 +407,41 @@ func hasChangedImmutableControlPlaneConfigFields(origObject, newObject *hivev1.C
 	}
 
 	return false
+}
+
+func hasChangedImmutableMachinePoolFields(oldObject, newObject *hivev1.ClusterDeploymentSpec) (bool, string) {
+	// any pre-existing compute machinepool should not mutate the Labels or Taints fields
+
+	for _, newMP := range newObject.Compute {
+		origMP := getOriginalMachinePool(oldObject.Compute, newMP.Name)
+		if origMP == nil {
+			// no mutate checks needed for new compute machinepool
+			continue
+		}
+
+		// Check if labels are being changed
+		if !reflect.DeepEqual(origMP.Labels, newMP.Labels) {
+			return true, newMP.Name
+		}
+
+		// Check if taints are being changed
+		if !reflect.DeepEqual(origMP.Taints, newMP.Taints) {
+			return true, newMP.Name
+		}
+	}
+
+	return false, ""
+}
+
+func getOriginalMachinePool(origMachinePools []hivev1.MachinePool, name string) *hivev1.MachinePool {
+	var origMP *hivev1.MachinePool
+
+	for _, mp := range origMachinePools {
+		if mp.Name == name {
+			origMP = &mp
+		}
+	}
+	return origMP
 }
 
 func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {

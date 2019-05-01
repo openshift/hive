@@ -219,6 +219,8 @@ Steps:
     ```
   - Follow steps in [deployment Options](#deployment-options)
 
-## Documentaion
+## Documentation
 
 * [Developing Hive](./docs/developing.md)
+* [SyncSet](./docs/syncset.md)
+* [SyncIdentityProvider](./docs/syncidentityprovider.md)

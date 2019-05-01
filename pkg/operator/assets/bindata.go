@@ -841,6 +841,7 @@ rules:
   - watch
   - create
   - update
+  - patch
   - delete
 `)
 

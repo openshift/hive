@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -295,6 +296,41 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject:       clusterDeploymentWithManagedDomain("baz.foo.bbb.com"),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
+		},
+		{
+			name:      "Test allow modifying controlPlaneConfig",
+			oldObject: validClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.ControlPlaneConfig = hivev1.ControlPlaneConfigSpec{
+					ServingCertificates: hivev1.ControlPlaneServingCertificateSpec{
+						Default: "someNonExistentCertificateBundle",
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test allow modifying certificateBundles",
+			oldObject: validClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+					{
+						Name:     "testCertificateBundle",
+						Generate: false,
+						SecretRef: corev1.LocalObjectReference{
+							Name: "testCertBundle-Secret",
+						},
+					},
+				}
+
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
 		},
 	}
 

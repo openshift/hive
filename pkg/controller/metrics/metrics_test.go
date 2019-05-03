@@ -62,6 +62,9 @@ func TestClusterAccumulator(t *testing.T) {
 		testClusterDeployment("unmanaged1", "unmanaged", fiveMinsAgo, false),
 		testClusterDeployment("unmanaged1", "unmanaged", threeHoursAgo, false),
 		testClusterDeployment("unmanaged1", "unmanaged", tenDaysAgo, false),
+
+		// One cluster being deleted:
+		testDeletedClusterDeployment("unmanaged1", "unmanaged", tenDaysAgo, threeHoursAgo, true),
 	}
 
 	accumulator, _ := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
@@ -78,14 +81,22 @@ func TestClusterAccumulator(t *testing.T) {
 	assert.Equal(t, 1, accumulator.uninstalled["24h"]["managed"])
 	assert.Equal(t, 1, accumulator.uninstalled["72h"]["managed"])
 
-	assert.Equal(t, 4, accumulator.total["unmanaged"])
-	assert.Equal(t, 1, accumulator.installed["unmanaged"])
+	assert.Equal(t, 5, accumulator.total["unmanaged"])
+	assert.Equal(t, 2, accumulator.installed["unmanaged"])
 	assert.Equal(t, 3, accumulator.uninstalled["0h"]["unmanaged"])
 	assert.Equal(t, 2, accumulator.uninstalled["1h"]["unmanaged"])
 	assert.Equal(t, 2, accumulator.uninstalled["2h"]["unmanaged"])
 	assert.Equal(t, 1, accumulator.uninstalled["8h"]["unmanaged"])
 	assert.Equal(t, 1, accumulator.uninstalled["24h"]["unmanaged"])
 	assert.Equal(t, 1, accumulator.uninstalled["72h"]["unmanaged"])
+
+	assert.Equal(t, 1, accumulator.deprovisioning["0h"]["unmanaged"])
+	assert.Equal(t, 1, accumulator.deprovisioning["1h"]["unmanaged"])
+	assert.Equal(t, 1, accumulator.deprovisioning["2h"]["unmanaged"])
+	assert.Equal(t, 0, accumulator.deprovisioning["8h"]["unmanaged"])
+	// Code should clear the metric for any known type, even if there
+	// are no deprovisioning clusters of that type right now:
+	assert.Equal(t, 0, accumulator.deprovisioning["0h"]["managed"])
 
 	assert.Equal(t, 2, accumulator.conditions[hivev1.ClusterImageSetNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.ControlPlaneCertificateNotFoundCondition]["managed"])
@@ -114,6 +125,7 @@ func TestInstallJobs(t *testing.T) {
 			Status: batchv1.JobStatus{
 				StartTime:      oneHourAgo,
 				CompletionTime: fiveMinsAgo,
+				Succeeded:      1,
 			},
 		},
 		{
@@ -131,13 +143,15 @@ func TestInstallJobs(t *testing.T) {
 		{
 			// Job that has failed:
 			Status: batchv1.JobStatus{
-				StartTime: oneHourAgo,
-				Failed:    1,
+				StartTime:      oneHourAgo,
+				CompletionTime: fiveMinsAgo,
+				Failed:         1,
 			},
 		},
 	}
-	running, failed := processJobs(jobs)
+	running, succeeded, failed := processJobs(jobs)
 	assert.Equal(t, 2, running[hivev1.DefaultClusterType])
+	assert.Equal(t, 1, succeeded[hivev1.DefaultClusterType])
 	assert.Equal(t, 1, failed[hivev1.DefaultClusterType])
 }
 
@@ -152,6 +166,12 @@ func testClusterDeployment(name, clusterType string, created metav1.Time, instal
 			Installed: installed,
 		},
 	}
+}
+
+func testDeletedClusterDeployment(name, clusterType string, created metav1.Time, deleted metav1.Time, installed bool) hivev1.ClusterDeployment {
+	cd := testClusterDeployment(name, clusterType, created, installed)
+	cd.ObjectMeta.DeletionTimestamp = &deleted
+	return cd
 }
 
 func testClusterDeploymentWithConditions(name, clusterType string, created metav1.Time, installed bool,

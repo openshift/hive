@@ -18,8 +18,9 @@ package metrics
 
 import (
 	"context"
-	"github.com/openshift/hive/pkg/imageset"
 	"time"
+
+	"github.com/openshift/hive/pkg/imageset"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -51,49 +52,37 @@ var (
 	},
 		[]string{"cluster_type", "age_lt", "uninstalled_gt"},
 	)
+	metricClusterDeploymentsDeprovisioningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_cluster_deployments_deprovisioning",
+		Help: "Total number of cluster deployments in process of being deprovisioned.",
+	}, []string{"cluster_type", "age_lt", "deprovisioning_gt"})
 	metricClusterDeploymentsWithConditionTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments_conditions",
 		Help: "Total number of cluster deployments by type with conditions.",
 	}, []string{"cluster_type", "age_lt", "condition"})
-
-	metricInstallJobsRunningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_install_jobs_running",
-		Help: "Total number of install jobs running by cluster type.",
-	}, []string{"cluster_type"})
-	metricInstallJobsFailedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_install_jobs_failed",
-		Help: "Total number of install jobs failed by cluster type.",
-	}, []string{"cluster_type"})
-	metricUninstallJobsRunningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_uninstall_jobs_running",
-		Help: "Total number of uninstall jobs running by cluster type..",
-	}, []string{"cluster_type"})
-	metricUninstallJobsFailedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_uninstall_jobs_failed",
-		Help: "Total number of uninstall jobs failed by cluster type.",
-	}, []string{"cluster_type"})
-
-	metricImagesetJobsRunningTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_imageset_jobs_running",
-		Help: "Total number of imageset jobs running by cluster type.",
-	}, []string{"cluster_type"})
-	metricImagesetJobsFailedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_imageset_jobs_failed",
-		Help: "Total number of imageset jobs failed by cluster type.",
-	}, []string{"cluster_type"})
+	metricInstallJobsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_install_jobs",
+		Help: "Total number of install jobs running by cluster type and state.",
+	}, []string{"cluster_type", "state"})
+	metricUninstallJobsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_uninstall_jobs",
+		Help: "Total number of uninstall jobs running by cluster type and state.",
+	}, []string{"cluster_type", "state"})
+	metricImagesetJobsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_imageset_jobs",
+		Help: "Total number of imageset jobs running by cluster type and state.",
+	}, []string{"cluster_type", "state"})
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalledTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsUninstalledTotal)
+	metrics.Registry.MustRegister(metricClusterDeploymentsDeprovisioningTotal)
 	metrics.Registry.MustRegister(metricClusterDeploymentsWithConditionTotal)
-	metrics.Registry.MustRegister(metricInstallJobsRunningTotal)
-	metrics.Registry.MustRegister(metricInstallJobsFailedTotal)
-	metrics.Registry.MustRegister(metricUninstallJobsRunningTotal)
-	metrics.Registry.MustRegister(metricUninstallJobsFailedTotal)
-	metrics.Registry.MustRegister(metricImagesetJobsRunningTotal)
-	metrics.Registry.MustRegister(metricImagesetJobsFailedTotal)
+	metrics.Registry.MustRegister(metricInstallJobsTotal)
+	metrics.Registry.MustRegister(metricUninstallJobsTotal)
+	metrics.Registry.MustRegister(metricImagesetJobsTotal)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -152,6 +141,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			accumulator.setMetrics(metricClusterDeploymentsTotal,
 				metricClusterDeploymentsInstalledTotal,
 				metricClusterDeploymentsUninstalledTotal,
+				metricClusterDeploymentsDeprovisioningTotal,
 				metricClusterDeploymentsWithConditionTotal,
 				mcLog)
 
@@ -168,6 +158,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			accumulator.setMetrics(metricClusterDeploymentsTotal,
 				metricClusterDeploymentsInstalledTotal,
 				metricClusterDeploymentsUninstalledTotal,
+				metricClusterDeploymentsDeprovisioningTotal,
 				metricClusterDeploymentsWithConditionTotal,
 				mcLog)
 		}
@@ -180,20 +171,27 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing install jobs")
 		} else {
-			runningTotal, failedTotal := processJobs(installJobs.Items)
+			runningTotal, succeededTotal, failedTotal := processJobs(installJobs.Items)
 			for k, v := range runningTotal {
 				mcLog.WithFields(log.Fields{
 					"clusterType": k,
 					"total":       v,
 				}).Debug("calculated running install jobs total")
-				metricInstallJobsRunningTotal.WithLabelValues(k).Set(float64(v))
+				metricInstallJobsTotal.WithLabelValues(k, stateRunning).Set(float64(v))
+			}
+			for k, v := range succeededTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated succeeded install jobs total")
+				metricInstallJobsTotal.WithLabelValues(k, stateSucceeded).Set(float64(v))
 			}
 			for k, v := range failedTotal {
 				mcLog.WithFields(log.Fields{
 					"clusterType": k,
 					"total":       v,
 				}).Debug("calculated failed install jobs total")
-				metricInstallJobsFailedTotal.WithLabelValues(k).Set(float64(v))
+				metricInstallJobsTotal.WithLabelValues(k, stateFailed).Set(float64(v))
 			}
 		}
 
@@ -205,20 +203,27 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing uninstall jobs")
 		} else {
-			runningTotal, failedTotal := processJobs(uninstallJobs.Items)
+			runningTotal, succeededTotal, failedTotal := processJobs(uninstallJobs.Items)
 			for k, v := range runningTotal {
 				mcLog.WithFields(log.Fields{
 					"clusterType": k,
 					"total":       v,
 				}).Debug("calculated running uninstall jobs total")
-				metricUninstallJobsRunningTotal.WithLabelValues(k).Set(float64(v))
+				metricUninstallJobsTotal.WithLabelValues(k, stateRunning).Set(float64(v))
+			}
+			for k, v := range succeededTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated succeeded uninstall jobs total")
+				metricUninstallJobsTotal.WithLabelValues(k, stateSucceeded).Set(float64(v))
 			}
 			for k, v := range failedTotal {
 				mcLog.WithFields(log.Fields{
 					"clusterType": k,
 					"total":       v,
 				}).Debug("calculated failed uninstall jobs total")
-				metricUninstallJobsFailedTotal.WithLabelValues(k).Set(float64(v))
+				metricUninstallJobsTotal.WithLabelValues(k, stateFailed).Set(float64(v))
 			}
 		}
 
@@ -230,20 +235,27 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing imageset jobs")
 		} else {
-			runningTotal, failedTotal := processJobs(imagesetJobs.Items)
+			runningTotal, succeededTotal, failedTotal := processJobs(imagesetJobs.Items)
 			for k, v := range runningTotal {
 				mcLog.WithFields(log.Fields{
 					"clusterType": k,
 					"total":       v,
 				}).Debug("calculated running imageset jobs total")
-				metricImagesetJobsRunningTotal.WithLabelValues(k).Set(float64(v))
+				metricImagesetJobsTotal.WithLabelValues(k, stateRunning).Set(float64(v))
+			}
+			for k, v := range succeededTotal {
+				mcLog.WithFields(log.Fields{
+					"clusterType": k,
+					"total":       v,
+				}).Debug("calculated succeeded imageset jobs total")
+				metricImagesetJobsTotal.WithLabelValues(k, stateSucceeded).Set(float64(v))
 			}
 			for k, v := range failedTotal {
 				mcLog.WithFields(log.Fields{
 					"clusterType": k,
 					"total":       v,
 				}).Debug("calculated failed imageset jobs total")
-				metricImagesetJobsFailedTotal.WithLabelValues(k).Set(float64(v))
+				metricImagesetJobsTotal.WithLabelValues(k, stateFailed).Set(float64(v))
 			}
 		}
 
@@ -254,9 +266,10 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 	return nil
 }
 
-func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal map[string]int) {
+func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal map[string]int) {
 	running := map[string]int{}
 	failed := map[string]int{}
+	succeeded := map[string]int{}
 	for _, job := range jobs {
 		clusterType := GetClusterDeploymentTypeForJob(job)
 		if _, ok := running[clusterType]; !ok {
@@ -265,15 +278,21 @@ func processJobs(jobs []batchv1.Job) (runningTotal, failedTotal map[string]int) 
 		if _, ok := failed[clusterType]; !ok {
 			failed[clusterType] = 0
 		}
+		if _, ok := succeeded[clusterType]; !ok {
+			succeeded[clusterType] = 0
+		}
 		if job.Status.CompletionTime == nil {
+			running[clusterType]++
+		} else {
 			if job.Status.Failed > 0 {
 				failed[clusterType]++
-			} else {
-				running[clusterType]++
+			}
+			if job.Status.Succeeded > 0 {
+				succeeded[clusterType]++
 			}
 		}
 	}
-	return running, failed
+	return running, succeeded, failed
 }
 
 // clusterAccumulator is an object used to process cluster deployments and sort them so we can
@@ -288,6 +307,10 @@ type clusterAccumulator struct {
 	// total maps cluster type to counter.
 	total map[string]int
 
+	// deprovisioning maps a "greater than" duration string (i.e. 8h) to
+	// cluster type to counter. Specify 0h if you want a bucket for the smallest duration.
+	deprovisioning map[string]map[string]int
+
 	// installed maps cluster type to counter.
 	installed map[string]int
 
@@ -297,21 +320,32 @@ type clusterAccumulator struct {
 
 	// conditions maps conditions to cluster type to counter.
 	conditions map[hivev1.ClusterDeploymentConditionType]map[string]int
+
+	// clusterTypesSet will contain every cluster type we encounter during processing.
+	// Used to zero out some values which may no longer exist when setting the final metrics.
+	// Maps cluster type to a meaningless bool.
+	clusterTypesSet map[string]bool
 }
 
 const (
-	infinity = "Inf"
+	infinity       = "+Inf"
+	stateRunning   = "running"
+	stateSucceeded = "succeeded"
+	stateFailed    = "failed"
 )
 
-// newClusterAccumulator initializes a new cluster accumulator. Use "0h" for the age filter if you want to include
-// all clusters.
-func newClusterAccumulator(ageFilter string, uninstalledDurationBuckets []string) (*clusterAccumulator, error) {
+// newClusterAccumulator initializes a new cluster accumulator.
+// ageFilter can be used to exclude clusters older than a certain duration. Use "0h" to include all clusters.
+// durationBuckets are used to sort uninstalled, or deleted clusters into buckets based on how long they have been in that state.
+func newClusterAccumulator(ageFilter string, durationBuckets []string) (*clusterAccumulator, error) {
 	ca := &clusterAccumulator{
-		ageFilter:   ageFilter,
-		total:       map[string]int{},
-		installed:   map[string]int{},
-		uninstalled: map[string]map[string]int{},
-		conditions:  map[hivev1.ClusterDeploymentConditionType]map[string]int{},
+		ageFilter:       ageFilter,
+		total:           map[string]int{},
+		installed:       map[string]int{},
+		deprovisioning:  map[string]map[string]int{},
+		uninstalled:     map[string]map[string]int{},
+		conditions:      map[hivev1.ClusterDeploymentConditionType]map[string]int{},
+		clusterTypesSet: map[string]bool{},
 	}
 	var err error
 	if ageFilter != infinity {
@@ -321,13 +355,14 @@ func newClusterAccumulator(ageFilter string, uninstalledDurationBuckets []string
 		}
 	}
 
-	for _, durStr := range uninstalledDurationBuckets {
+	for _, durStr := range durationBuckets {
 		// Make sure all the strings parse as durations, we ignore errors below.
 		_, err := time.ParseDuration(durStr)
 		if err != nil {
 			return nil, err
 		}
 		ca.uninstalled[durStr] = map[string]int{}
+		ca.deprovisioning[durStr] = map[string]int{}
 	}
 
 	for _, cdct := range hivev1.AllClusterDeploymentConditions {
@@ -342,6 +377,13 @@ func (ca *clusterAccumulator) ensureClusterTypeBuckets(clusterType string) {
 	_, ok := ca.total[clusterType]
 	if !ok {
 		ca.total[clusterType] = 0
+	}
+
+	for k, v := range ca.deprovisioning {
+		_, ok := v[clusterType]
+		if !ok {
+			ca.deprovisioning[k][clusterType] = 0
+		}
 	}
 
 	_, ok = ca.installed[clusterType]
@@ -370,8 +412,23 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 
 	clusterType := GetClusterDeploymentType(cd)
 	ca.ensureClusterTypeBuckets(clusterType)
+	ca.clusterTypesSet[clusterType] = true
 
 	ca.total[clusterType]++
+
+	if cd.DeletionTimestamp != nil {
+		// Sort deleted clusters into buckets based on how long since
+		// they were deleted. The larger the bucket the more serious the problem.
+		deletedDur := time.Since(cd.DeletionTimestamp.Time)
+
+		for k := range ca.deprovisioning {
+			// We already error checked that these parse in constructor func:
+			gtDurBucket, _ := time.ParseDuration(k)
+			if deletedDur > gtDurBucket {
+				ca.deprovisioning[k][clusterType]++
+			}
+		}
+	}
 
 	if cd.Status.Installed {
 		ca.installed[clusterType]++
@@ -397,7 +454,7 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	}
 }
 
-func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, conditions *prometheus.GaugeVec, mcLog log.FieldLogger) {
+func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovisioning, conditions *prometheus.GaugeVec, mcLog log.FieldLogger) {
 
 	for k, v := range ca.total {
 		total.WithLabelValues(k, ca.ageFilter).Set(float64(v))
@@ -416,14 +473,51 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, conditio
 		}).Debug("calculated total cluster deployments installed metric")
 	}
 	for k, v := range ca.uninstalled {
-		for k1, v1 := range v {
-			uninstalled.WithLabelValues(k1, ca.ageFilter, k).Set(float64(v1))
-			mcLog.WithFields(log.Fields{
-				"clusterType":    k1,
-				"age_lt":         ca.ageFilter,
-				"uninstalled_gt": k,
-				"total":          v1,
-			}).Debug("calculated total cluster deployments uninstalled metric")
+		for clusterType := range ca.clusterTypesSet {
+			if count, ok := v[clusterType]; ok {
+				uninstalled.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(count))
+				mcLog.WithFields(log.Fields{
+					"clusterType":    clusterType,
+					"age_lt":         ca.ageFilter,
+					"uninstalled_gt": k,
+					"total":          count,
+				}).Debug("calculated total cluster deployments uninstalled metric")
+			} else {
+				// We need to potentially clear out old cluster types no longer showing in the list.
+				// This will work so long as there is at least one cluster of that type still remaining
+				// in hive somewhere.
+				uninstalled.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(0))
+				mcLog.WithFields(log.Fields{
+					"clusterType":    clusterType,
+					"age_lt":         ca.ageFilter,
+					"uninstalled_gt": k,
+					"total":          0,
+				}).Debug("calculated total cluster deployments uninstalled metric")
+			}
+		}
+	}
+	for k, v := range ca.deprovisioning {
+		for clusterType := range ca.clusterTypesSet {
+			if count, ok := v[clusterType]; ok {
+				deprovisioning.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(count))
+				mcLog.WithFields(log.Fields{
+					"clusterType":    clusterType,
+					"age_lt":         ca.ageFilter,
+					"uninstalled_gt": k,
+					"total":          count,
+				}).Debug("calculated total cluster deployments uninstalled metric")
+			} else {
+				// We need to potentially clear out old cluster types no longer showing in the list.
+				// This will work so long as there is at least one cluster of that type still remaining
+				// in hive somewhere.
+				deprovisioning.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(0))
+				mcLog.WithFields(log.Fields{
+					"clusterType":    clusterType,
+					"age_lt":         ca.ageFilter,
+					"uninstalled_gt": k,
+					"total":          0,
+				}).Debug("calculated total cluster deployments deprovisioning metric")
+			}
 		}
 	}
 	for k, v := range ca.conditions {

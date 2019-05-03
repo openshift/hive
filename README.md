@@ -9,6 +9,7 @@
   - [Using Hive](#using-hive)
     - [Create a ClusterDeployment using the latest OpenShift release and installer image](#create-a-clusterdeployment-using-the-latest-openshift-release-and-installer-image)
     - [Create a ClusterDeployment using latest pinned and known stable container images](#create-a-clusterdeployment-using-latest-pinned-and-known-stable-container-images)
+    - [Watch the ClusterDeployment](#watch-the-clusterdeployment)
     - [Delete your ClusterDeployment](#delete-your-clusterdeployment)
   - [Tips](#tips)
     - [Using the Admin Kubeconfig](#using-the-admin-kubeconfig)
@@ -17,7 +18,8 @@
     - [Installing Federation](#installing-federation)
     - [Federation Example](#federation-example)
     - [Deploy using Minishift](#deploy-using-minishift)
-  - [Documentaion](#documentaion)
+    - [Access the WebConsole](#access-the-webconsole)
+  - [Documentation](#documentation)
 
 # OpenShift Hive
 API driven OpenShift cluster provisioning and management
@@ -90,6 +92,12 @@ oc process -f config/templates/cluster-deployment.yaml \
    AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
    | oc apply -f -
 ```
+---
+**NOTE**
+
+You must give each cluster an unique name If you are creating more than one cluster.
+
+---
 
 ### Create a ClusterDeployment using latest pinned and known stable container images
 
@@ -117,6 +125,17 @@ oc process -f config/templates/cluster-deployment.yaml \
    | oc apply -f -
 ```
 
+### Watch the ClusterDeployment
+
+* Get the current namespace in which the `oc process` command was executed
+* Get the install pod name
+  ```
+  $ kubectl get pods -o json --selector job-name==${CLUSTER_NAME}-install | jq -r '.items | .[].metadata.name'
+  ```
+* Run following command to watch the cluster deployment
+  ```
+  $ kubectl logs -f <install-pod-name> hive
+  ```
 
 ### Delete your ClusterDeployment
 
@@ -140,8 +159,8 @@ kubectl get nodes
 After deleting your cluster deployment you will see an uninstall job created. If for any reason this job gets stuck you can:
 
  1. Delete the uninstall job, it will be recreated and tried again.
- 1. Manually delete the uninstall finalizer allowing the cluster deployment to be deleted, but note that this may leave artifacts in your AWS account.
- 1. You can manually run the uninstall code with `hiveutil` to delete AWS resources based on their tags.
+ 2. Manually delete the uninstall finalizer allowing the cluster deployment to be deleted, but note that this may leave artifacts in your AWS account.
+ 3. You can manually run the uninstall code with `hiveutil` to delete AWS resources based on their tags.
     * Run `make hiveutil`
     * Get your cluster tag i.e. `infraID` from the following command output.
       ```bash
@@ -218,6 +237,18 @@ Steps:
     $ oc adm policy add-cluster-role-to-user cluster-admin developer
     ```
   - Follow steps in [deployment Options](#deployment-options)
+
+### Access the WebConsole
+
+* Get the webconsole URL
+  ```
+  $ kubectl get cd ${CLUSTER_NAME} -o yaml | grep webConsoleURL
+  ```
+
+* Retrive the password for `kubeadmin` user
+  ```
+  $ kubectl get secret ${CLUSTER_NAME}-admin-password -o json | jq -r ".data.password" | base64 -d
+  ```
 
 ## Documentation
 

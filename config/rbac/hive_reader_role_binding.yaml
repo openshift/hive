@@ -1,0 +1,11 @@
+apiVersion: authorization.openshift.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hive-reader
+roleRef:
+  name: hive-reader
+groupNames:
+- hive-readers
+subjects:
+- kind: Group
+  name: hive-readers

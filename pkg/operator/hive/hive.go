@@ -70,6 +70,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/clusterimagesets/openshift-4.0-beta4.yaml",
 		"config/rbac/hive_admin_role.yaml",
 		"config/rbac/hive_admin_role_binding.yaml",
+		"config/rbac/hive_reader_role.yaml",
+		"config/rbac/hive_reader_role_binding.yaml",
 	}
 	for _, a := range applyAssets {
 		err = util.ApplyAsset(h, a, hLog)

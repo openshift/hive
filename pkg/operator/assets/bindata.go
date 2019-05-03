@@ -22,6 +22,8 @@
 // config/rbac/hive_admin_role_binding.yaml
 // config/rbac/hive_frontend_role.yaml
 // config/rbac/hive_frontend_role_binding.yaml
+// config/rbac/hive_reader_role.yaml
+// config/rbac/hive_reader_role_binding.yaml
 // config/rbac/manager_role.yaml
 // config/rbac/manager_role_binding.yaml
 // DO NOT EDIT!
@@ -1001,6 +1003,98 @@ func configRbacHive_frontend_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configRbacHive_reader_roleYaml = []byte(`# hive-admin is a role intended for hive administrators who need to be able to debug
+# cluster installations, and modify hive configuration.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hive-reader
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  - dnszones
+  - dnsendpoints
+  - selectorsyncidentityproviders
+  - selectorsyncsets
+  - syncidentityproviders
+  - syncsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterimagesets
+  - hiveconfigs
+  verbs:
+  - get
+  - list
+  - watch
+`)
+
+func configRbacHive_reader_roleYamlBytes() ([]byte, error) {
+	return _configRbacHive_reader_roleYaml, nil
+}
+
+func configRbacHive_reader_roleYaml() (*asset, error) {
+	bytes, err := configRbacHive_reader_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_reader_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacHive_reader_role_bindingYaml = []byte(`apiVersion: authorization.openshift.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hive-reader
+roleRef:
+  name: hive-reader
+groupNames:
+- hive-readers
+subjects:
+- kind: Group
+  name: hive-readers
+`)
+
+func configRbacHive_reader_role_bindingYamlBytes() ([]byte, error) {
+	return _configRbacHive_reader_role_bindingYaml, nil
+}
+
+func configRbacHive_reader_role_bindingYaml() (*asset, error) {
+	bytes, err := configRbacHive_reader_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_reader_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configRbacManager_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -1332,6 +1426,8 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
 	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
 	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
+	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
+	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
 	"config/rbac/manager_role.yaml":                             configRbacManager_roleYaml,
 	"config/rbac/manager_role_binding.yaml":                     configRbacManager_role_bindingYaml,
 }
@@ -1409,6 +1505,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_admin_role_binding.yaml":    {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
 			"hive_frontend_role.yaml":         {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
 			"hive_frontend_role_binding.yaml": {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
+			"hive_reader_role.yaml":           {configRbacHive_reader_roleYaml, map[string]*bintree{}},
+			"hive_reader_role_binding.yaml":   {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
 			"manager_role.yaml":               {configRbacManager_roleYaml, map[string]*bintree{}},
 			"manager_role_binding.yaml":       {configRbacManager_role_bindingYaml, map[string]*bintree{}},
 		}},

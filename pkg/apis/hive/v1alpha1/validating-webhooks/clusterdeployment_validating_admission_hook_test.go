@@ -332,6 +332,37 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
+		{
+			name:      "Test unallowed update of existing machinepool labels",
+			oldObject: validClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.Compute[0].Labels = map[string]string{
+					"newlabel": "newvalue",
+				}
+
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test unallowed update of existing machinepool taints",
+			oldObject: validClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.Compute[0].Taints = []corev1.Taint{
+					{
+						Key:   "testTaint",
+						Value: "testTaintVal",
+					},
+				}
+
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {

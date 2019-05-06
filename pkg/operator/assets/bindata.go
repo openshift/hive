@@ -828,6 +828,7 @@ rules:
   - selectorsyncsets
   - syncidentityproviders
   - syncsets
+  - clusterdeprovisionrequests
   verbs:
   - get
   - list
@@ -939,6 +940,7 @@ rules:
   - syncidentityproviders
   - selectorsyncsets
   - syncsets
+  - clusterdeprovisionrequests
   verbs:
   - get
   - list
@@ -1037,6 +1039,7 @@ rules:
   - selectorsyncsets
   - syncidentityproviders
   - syncsets
+  - clusterdeprovisionrequests
   verbs:
   - get
   - list
@@ -1178,6 +1181,26 @@ rules:
   - hive.openshift.io
   resources:
   - clusterimagesets/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeprovisionrequests
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeprovisionrequests/status
   verbs:
   - get
   - update

@@ -42,9 +42,11 @@ echo "About to run oc adm release info"
 if oc adm release info --image-for="installer" --registry-config "${PULL_SECRET}" "${RELEASE_IMAGE}" > /common/installer-image.txt 2> /common/error.log; then
   echo "The command succeeded"
   echo "1" > /common/success
+  exit 0
 else
   echo "The command failed"
   echo "0" > /common/success
+  exit 1
 fi
 `
 	// ImagesetJobLabel is the label used for counting the number of imageset jobs in Hive

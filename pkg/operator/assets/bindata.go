@@ -825,7 +825,6 @@ rules:
   - dnszones
   - dnsendpoints
   - selectorsyncidentityproviders
-  - selectorsyncsets
   - syncidentityproviders
   - syncsets
   verbs:
@@ -837,6 +836,7 @@ rules:
   resources:
   - clusterimagesets
   - hiveconfigs
+  - selectorsyncsets
   verbs:
   - get
   - list

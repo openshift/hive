@@ -63,7 +63,7 @@ var (
 							APIVersion: "config.openshift.io/v1",
 							Kind:       "OAuth",
 							Name:       "cluster",
-							PatchType:  types.MergePatchType,
+							PatchType:  "merge",
 							Patch:      generatePatch([]openshiftapiv1.IdentityProvider{}),
 						},
 					},

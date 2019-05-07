@@ -237,7 +237,7 @@ func (r *ReconcileSyncIdentityProviders) createSyncSetSpec(cd *hivev1.ClusterDep
 					APIVersion: oauthAPIVersion,
 					Kind:       oauthKind,
 					Name:       oauthObjectName,
-					PatchType:  types.MergePatchType,
+					PatchType:  "merge",
 					Patch:      string(patch),
 				},
 			},

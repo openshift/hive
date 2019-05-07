@@ -88,6 +88,26 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterdeprovisionrequests
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeprovisionrequests/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - dnszones
   - dnszones/status
   - dnszones/finalizers

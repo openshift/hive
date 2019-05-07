@@ -85,6 +85,7 @@ rules:
   - syncidentityproviders
   - syncsets
   - clusterimagesets
+  - clusterdeprovisionrequests
   verbs:
   - get
   - list

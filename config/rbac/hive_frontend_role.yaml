@@ -47,6 +47,7 @@ rules:
   - syncidentityproviders
   - selectorsyncsets
   - syncsets
+  - clusterdeprovisionrequests
   verbs:
   - get
   - list

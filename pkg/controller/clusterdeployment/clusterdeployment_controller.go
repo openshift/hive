@@ -49,6 +49,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
@@ -104,13 +105,6 @@ var (
 			Buckets: []float64{0, 2, 10, 20, 50},
 		},
 	)
-	metricUninstallJobDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_uninstall_job_duration_seconds",
-			Help:    "Distribution of the runtime of completed uninstall jobs.",
-			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
-		},
-	)
 	metricInstallJobDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_install_job_duration_seconds",
@@ -137,7 +131,6 @@ var (
 func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
 	metrics.Registry.MustRegister(metricClusterDeploymentSucceeded)
-	metrics.Registry.MustRegister(metricUninstallJobDuration)
 	metrics.Registry.MustRegister(metricInstallJobDuration)
 	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)
 	metrics.Registry.MustRegister(metricInstallDelaySeconds)
@@ -840,7 +833,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		}
 	} else {
 		// Generate an uninstall job:
-		uninstallJob, err := install.GenerateUninstallerJob(cd, hiveImage)
+		uninstallJob, err := install.GenerateUninstallerJobForClusterDeployment(cd, hiveImage)
 		if err != nil {
 			cdLog.Errorf("error generating uninstaller job: %v", err)
 			return reconcile.Result{}, err
@@ -873,7 +866,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			// jobDuration calculates the time elapsed since the uninstall job started for deprovision job
 			jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
 			cdLog.WithField("duration", jobDuration.Seconds()).Debug("uninstall job completed")
-			metricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
+			hivemetrics.MetricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
 			err = r.removeClusterDeploymentFinalizer(cd)
 			if err != nil {
 				cdLog.WithError(err).Error("error removing finalizer")

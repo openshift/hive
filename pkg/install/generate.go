@@ -298,9 +298,9 @@ func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
 	return fmt.Sprintf("%s-install", cd.Name)
 }
 
-// GenerateUninstallerJob creates a job to uninstall an OpenShift cluster
+// GenerateUninstallerJobForClusterDeployment creates a job to uninstall an OpenShift cluster
 // given a ClusterDeployment and an installer image.
-func GenerateUninstallerJob(
+func GenerateUninstallerJobForClusterDeployment(
 	cd *hivev1.ClusterDeployment, hiveImage string) (*batchv1.Job, error) {
 
 	if cd.Spec.PreserveOnDelete {
@@ -319,14 +319,85 @@ func GenerateUninstallerJob(
 		tryOnce = exists && value == "true"
 	}
 
-	env := []corev1.EnvVar{}
+	credentialsSecret := ""
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
+		credentialsSecret = cd.Spec.PlatformSecrets.AWS.Credentials.Name
+	}
+
+	hiveImagePullPolicy := defaultHiveImagePullPolicy
+	if cd.Spec.Images.HiveImagePullPolicy != "" {
+		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
+	}
+
+	infraID := cd.Status.InfraID
+	clusterID := cd.Status.ClusterID
+	name := fmt.Sprintf("%s-uninstall", cd.Name)
+
+	return GenerateUninstallerJob(
+		cd.Namespace,
+		name,
+		tryOnce,
+		cd.Spec.AWS.Region,
+		credentialsSecret,
+		infraID,
+		clusterID,
+		hiveImage,
+		hiveImagePullPolicy), nil
+}
+
+// GenerateUninstallerJobForDeprovisionRequest generates an uninstaller job for a given deprovision request
+func GenerateUninstallerJobForDeprovisionRequest(
+	req *hivev1.ClusterDeprovisionRequest, hiveImage string) (*batchv1.Job, error) {
+
+	if req.Spec.Platform.AWS == nil {
+		return nil, fmt.Errorf("only AWS deprovision requests currently supported")
+	}
+
+	tryOnce := false
+	if req.Annotations != nil {
+		value, exists := req.Annotations[tryUninstallOnceAnnotation]
+		tryOnce = exists && value == "true"
+	}
+
+	credentialsSecret := ""
+	if len(req.Spec.Platform.AWS.Credentials.Name) > 0 {
+		credentialsSecret = req.Spec.Platform.AWS.Credentials.Name
+	}
+
+	name := fmt.Sprintf("%s-uninstall", req.Name)
+
+	return GenerateUninstallerJob(
+		req.Namespace,
+		name,
+		tryOnce,
+		req.Spec.Platform.AWS.Region,
+		credentialsSecret,
+		req.Spec.InfraID,
+		req.Spec.ClusterID,
+		hiveImage,
+		defaultHiveImagePullPolicy), nil
+}
+
+// GenerateUninstallerJob generates a new uninstaller job
+func GenerateUninstallerJob(
+	namespace string,
+	name string,
+	tryOnce bool,
+	region string,
+	credentialsSecret string,
+	infraID string,
+	clusterID string,
+	hiveImage string,
+	hiveImagePullPolicy corev1.PullPolicy) *batchv1.Job {
+
+	env := []corev1.EnvVar{}
+	if len(credentialsSecret) > 0 {
 		env = append(env, []corev1.EnvVar{
 			{
 				Name: "AWS_ACCESS_KEY_ID",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
 						Key:                  "aws_access_key_id",
 					},
 				},
@@ -335,17 +406,12 @@ func GenerateUninstallerJob(
 				Name: "AWS_SECRET_ACCESS_KEY",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
 						Key:                  "aws_secret_access_key",
 					},
 				},
 			},
 		}...)
-	}
-
-	hiveImagePullPolicy := defaultHiveImagePullPolicy
-	if cd.Spec.Images.HiveImagePullPolicy != "" {
-		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
 	}
 
 	containers := []corev1.Container{
@@ -360,12 +426,14 @@ func GenerateUninstallerJob(
 				"--loglevel",
 				"debug",
 				"--region",
-				cd.Spec.AWS.Region,
-				fmt.Sprintf("kubernetes.io/cluster/%s=owned", cd.Status.InfraID),
-				// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
-				fmt.Sprintf("openshiftClusterID=%s", cd.Status.ClusterID),
+				region,
+				fmt.Sprintf("kubernetes.io/cluster/%s=owned", infraID),
 			},
 		},
+	}
+	if len(clusterID) > 0 {
+		// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
+		containers[0].Args = append(containers[0].Args, fmt.Sprintf("openshiftClusterID=%s", clusterID))
 	}
 
 	restartPolicy := corev1.RestartPolicyOnFailure
@@ -385,8 +453,8 @@ func GenerateUninstallerJob(
 	labels := map[string]string{UninstallJobLabel: "true"}
 
 	job := &batchv1.Job{}
-	job.Name = fmt.Sprintf("%s-uninstall", cd.Name)
-	job.Namespace = cd.Namespace
+	job.Name = name
+	job.Namespace = namespace
 	job.ObjectMeta.Labels = labels
 	job.Spec = batchv1.JobSpec{
 		Completions:           &completions,
@@ -397,5 +465,5 @@ func GenerateUninstallerJob(
 		},
 	}
 
-	return job, nil
+	return job
 }

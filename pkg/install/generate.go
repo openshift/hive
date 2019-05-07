@@ -50,6 +50,17 @@ const (
 
 	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
 	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
+
+	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
+	SSHPrivateKeyDir = "/sshkeys"
+
+	// SSHSecretPrivateKeyName is the key name holding the private key in the SSH secret
+	SSHSecretPrivateKeyName = "ssh-privatekey"
+)
+
+var (
+	// SSHPrivateKeyFilePath is the path to the private key contents (from the SSH secret)
+	SSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", SSHPrivateKeyDir, SSHSecretPrivateKeyName)
 )
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -174,6 +185,17 @@ func GenerateInstallerJob(
 		},
 	}
 
+	if cd.Spec.SSHKey != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "sshkeys",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.SSHKey.Name,
+				},
+			},
+		})
+	}
+
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "install",
@@ -183,6 +205,13 @@ func GenerateInstallerJob(
 			Name:      "installconfig",
 			MountPath: "/installconfig",
 		},
+	}
+
+	if cd.Spec.SSHKey != nil {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "sshkeys",
+			MountPath: SSHPrivateKeyDir,
+		})
 	}
 
 	if cd.Status.InstallerImage == nil {
@@ -223,7 +252,8 @@ func GenerateInstallerJob(
 				// a sleep-seconds.txt file. If one is written, we will sleep that number of seconds. This allows exponential backoff
 				// for failing installs.
 				fmt.Sprintf(
-					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --install-config /installconfig/install-config.yaml --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
+					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --install-config /installconfig/install-config.yaml --ssh-priv-keypath %s --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
+					SSHPrivateKeyFilePath,
 					cd.Spec.Platform.AWS.Region,
 					cd.Namespace,
 					cd.Name),

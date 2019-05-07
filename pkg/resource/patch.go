@@ -27,6 +27,14 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+var (
+	patchTypes = map[string]types.PatchType{
+		"json":      types.JSONPatchType,
+		"merge":     types.MergePatchType,
+		"strategic": types.StrategicMergePatchType,
+	}
+)
+
 // Patch invokes the kubectl patch command with the given resource, patch and patch type
 func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error {
 
@@ -71,6 +79,13 @@ func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f c
 
 	o := kcmd.NewPatchOptions(ioStreams)
 	o.Complete(f, cmd, args)
+	if patchType == "" {
+		patchType = "strategic"
+	}
+	_, ok := patchTypes[patchType]
+	if !ok {
+		return nil, fmt.Errorf("Invalid patch type: %s. Valid patch types are 'strategic', 'merge' or 'json'", patchType)
+	}
 	o.PatchType = patchType
 	o.Patch = patch
 

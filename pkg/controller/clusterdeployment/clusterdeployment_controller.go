@@ -270,12 +270,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}, nil
 	}
 
-	_, err := r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
-	if err != nil {
-		cdLog.WithError(err).Error("error setting up service account and role")
-		return reconcile.Result{}, err
-	}
-
 	imageSet, err := r.getClusterImageSet(cd, cdLog)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -432,6 +426,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		if existingJob == nil {
+			_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+			if err != nil {
+				cdLog.WithError(err).Error("error setting up service account and role")
+				return reconcile.Result{}, err
+			}
+
 			cdLog.Infof("creating install job")
 			err = r.Create(context.TODO(), job)
 			if err != nil {
@@ -622,6 +622,12 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		}
 		return err
 	case errors.IsNotFound(err):
+		_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+		if err != nil {
+			cdLog.WithError(err).Error("error setting up service account and role")
+			return err
+		}
+
 		jobLog.Info("creating imageset job")
 		err = r.Create(context.TODO(), job)
 		if err != nil {
@@ -849,6 +855,12 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		existingJob := &batchv1.Job{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 		if err != nil && errors.IsNotFound(err) {
+			_, err := r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+			if err != nil {
+				cdLog.WithError(err).Error("error setting up service account and role")
+				return reconcile.Result{}, err
+			}
+
 			err = r.Create(context.TODO(), uninstallJob)
 			if err != nil {
 				cdLog.Errorf("error creating uninstall job: %v", err)

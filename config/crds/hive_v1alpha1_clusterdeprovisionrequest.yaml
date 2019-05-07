@@ -65,7 +65,7 @@ spec:
                         for deprovisioning the cluster
                       type: object
                     region:
-                      description: Region is the AWS region that this request should
+                      description: Region is the AWS region for this deprovisioning
                         request
                       type: string
                   required:

@@ -48,7 +48,7 @@ type ClusterDeprovisionRequestPlatform struct {
 
 // AWSClusterDeprovisionRequest contains AWS-specific configuration for a ClusterDeprovisionRequest
 type AWSClusterDeprovisionRequest struct {
-	// Region is the AWS region that this request should request
+	// Region is the AWS region for this deprovisioning request
 	Region string `json:"region"`
 
 	// Credentials is the AWS account credentials to use for deprovisioning the cluster

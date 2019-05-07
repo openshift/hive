@@ -160,13 +160,14 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 		// jobDuration calculates the time elapsed since the uninstall job started for deprovision job
 		jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
 		rLog.WithField("duration", jobDuration.Seconds()).Debug("uninstall job completed")
-		hivemetrics.MetricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
 		instance.Status.Completed = true
 		err = r.Status().Update(context.TODO(), instance)
 		if err != nil {
 			rLog.WithError(err).Error("error updating request status")
+			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, err
+		hivemetrics.MetricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
+		return reconcile.Result{}, nil
 	}
 	rLog.Infof("uninstall job not yet successful")
 	return reconcile.Result{}, nil

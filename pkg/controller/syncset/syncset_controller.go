@@ -234,6 +234,18 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
+	// TODO: Remove this code when no longer needed
+	// BEGIN migration code
+	err = r.migrateSyncSetPatchTypes(syncSets, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("failed to migrate existing syncsets")
+	}
+	err = r.migrateSelectorSyncSetPatchTypes(selectorSyncSets, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("failed to migrate existing selector syncsets")
+	}
+	// END migration code
+
 	// get kubeconfig for the cluster
 	secretName := cd.Status.AdminKubeconfigSecret.Name
 	secretData, err := r.loadSecretData(secretName, cd.Namespace, adminKubeConfigKey)
@@ -734,4 +746,58 @@ func (r *ReconcileSyncSet) loadSecretData(secretName, namespace, dataKey string)
 
 func (r *ReconcileSyncSet) resourceHash(data []byte) string {
 	return fmt.Sprintf("%x", md5.Sum(data))
+}
+
+var (
+	oldPatchTypes = map[string]string{
+		string(types.JSONPatchType):           "json",
+		string(types.MergePatchType):          "merge",
+		string(types.StrategicMergePatchType): "strategic",
+	}
+)
+
+func (r *ReconcileSyncSet) migrateSyncSetPatchTypes(items []hivev1.SyncSet, logger log.FieldLogger) error {
+	for i, syncSet := range items {
+		if len(syncSet.Spec.Patches) == 0 {
+			continue
+		}
+		migrated := false
+		for j, patch := range syncSet.Spec.Patches {
+			if newType, isOldType := oldPatchTypes[patch.PatchType]; isOldType {
+				items[i].Spec.Patches[j].PatchType = newType
+				migrated = true
+			}
+		}
+		if migrated {
+			logger.Infof("Migrating syncset %s/%s with outdated patch type", syncSet.Namespace, syncSet.Name)
+			err := r.Update(context.TODO(), &items[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileSyncSet) migrateSelectorSyncSetPatchTypes(items []hivev1.SelectorSyncSet, logger log.FieldLogger) error {
+	for i, selectorSyncSet := range items {
+		if len(selectorSyncSet.Spec.Patches) == 0 {
+			continue
+		}
+		migrated := false
+		for j, patch := range selectorSyncSet.Spec.Patches {
+			if newType, isOldType := oldPatchTypes[patch.PatchType]; isOldType {
+				items[i].Spec.Patches[j].PatchType = newType
+				migrated = true
+			}
+		}
+		if migrated {
+			logger.Infof("Migrating selector syncset %s/%s with outdated patch type", selectorSyncSet.Namespace, selectorSyncSet.Name)
+			err := r.Update(context.TODO(), &items[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

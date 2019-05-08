@@ -272,24 +272,14 @@ func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal 
 	succeeded := map[string]int{}
 	for _, job := range jobs {
 		clusterType := GetClusterDeploymentTypeForJob(job)
-		if _, ok := running[clusterType]; !ok {
-			running[clusterType] = 0
-		}
-		if _, ok := failed[clusterType]; !ok {
-			failed[clusterType] = 0
-		}
-		if _, ok := succeeded[clusterType]; !ok {
-			succeeded[clusterType] = 0
-		}
-		if job.Status.CompletionTime == nil {
-			running[clusterType]++
+
+		// Sort the jobs:
+		if job.Status.Failed > 0 {
+			failed[clusterType]++
+		} else if job.Status.Succeeded > 0 {
+			succeeded[clusterType]++
 		} else {
-			if job.Status.Failed > 0 {
-				failed[clusterType]++
-			}
-			if job.Status.Succeeded > 0 {
-				succeeded[clusterType]++
-			}
+			running[clusterType]++
 		}
 	}
 	return running, succeeded, failed

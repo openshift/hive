@@ -29,7 +29,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -61,8 +60,6 @@ const (
 	// serviceAccountName will be a service account that can run the installer and then
 	// upload artifacts to the cluster's namespace.
 	serviceAccountName = "cluster-installer"
-	roleName           = "cluster-installer"
-	roleBindingName    = "cluster-installer"
 
 	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
 	deleteAfterAnnotation       = "hive.openshift.io/delete-after"
@@ -426,7 +423,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		if existingJob == nil {
-			_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+			_, err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 			if err != nil {
 				cdLog.WithError(err).Error("error setting up service account and role")
 				return reconcile.Result{}, err
@@ -622,7 +619,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		}
 		return err
 	case errors.IsNotFound(err):
-		_, err = r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+		_, err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Error("error setting up service account and role")
 			return err
@@ -855,7 +852,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		existingJob := &batchv1.Job{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 		if err != nil && errors.IsNotFound(err) {
-			_, err := r.setupClusterInstallServiceAccount(cd.Namespace, cdLog)
+			_, err := controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 			if err != nil {
 				cdLog.WithError(err).Error("error setting up service account and role")
 				return reconcile.Result{}, err
@@ -902,105 +899,6 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	cd = cd.DeepCopy()
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cd)
-}
-
-// setupClusterInstallServiceAccount ensures a service account exists which can upload
-// the required artifacts after running the installer in a pod. (metadata, admin kubeconfig)
-func (r *ReconcileClusterDeployment) setupClusterInstallServiceAccount(namespace string, cdLog log.FieldLogger) (*kapi.ServiceAccount, error) {
-	// create new serviceaccount if it doesn't already exist
-	currentSA := &kapi.ServiceAccount{}
-	err := r.Client.Get(context.Background(), client.ObjectKey{Name: serviceAccountName, Namespace: namespace}, currentSA)
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, fmt.Errorf("error checking for existing serviceaccount")
-	}
-
-	if errors.IsNotFound(err) {
-		currentSA = &kapi.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceAccountName,
-				Namespace: namespace,
-			},
-		}
-		err = r.Client.Create(context.Background(), currentSA)
-
-		if err != nil {
-			return nil, fmt.Errorf("error creating serviceaccount: %v", err)
-		}
-		cdLog.WithField("name", serviceAccountName).Info("created service account")
-	} else {
-		cdLog.WithField("name", serviceAccountName).Debug("service account already exists")
-	}
-
-	expectedRole := &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
-			Namespace: namespace,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"secrets", "configmaps"},
-				Verbs:     []string{"create", "delete", "get", "list", "update"},
-			},
-			{
-				APIGroups: []string{"hive.openshift.io"},
-				Resources: []string{"clusterdeployments", "clusterdeployments/finalizers", "clusterdeployments/status"},
-				Verbs:     []string{"create", "delete", "get", "list", "update"},
-			},
-		},
-	}
-	currentRole := &rbacv1.Role{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Name: roleName, Namespace: namespace}, currentRole)
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, fmt.Errorf("error checking for existing role: %v", err)
-	}
-	if errors.IsNotFound(err) {
-		err = r.Client.Create(context.Background(), expectedRole)
-		if err != nil {
-			return nil, fmt.Errorf("error creating role: %v", err)
-		}
-		cdLog.WithField("name", roleName).Info("created role")
-	} else {
-		cdLog.WithField("name", roleName).Debug("role already exists")
-	}
-
-	// create rolebinding for the serviceaccount
-	currentRB := &rbacv1.RoleBinding{}
-	err = r.Client.Get(context.Background(), client.ObjectKey{Name: roleBindingName, Namespace: namespace}, currentRB)
-
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, fmt.Errorf("error checking for existing rolebinding: %v", err)
-	}
-
-	if errors.IsNotFound(err) {
-		rb := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      roleBindingName,
-				Namespace: namespace,
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:      "ServiceAccount",
-					Name:      currentSA.Name,
-					Namespace: namespace,
-				},
-			},
-			RoleRef: rbacv1.RoleRef{
-				Name: roleName,
-				Kind: "Role",
-			},
-		}
-
-		err = r.Client.Create(context.Background(), rb)
-		if err != nil {
-			return nil, fmt.Errorf("error creating rolebinding: %v", err)
-		}
-		cdLog.WithField("name", roleBindingName).Info("created rolebinding")
-	} else {
-		cdLog.WithField("name", roleBindingName).Debug("rolebinding already exists")
-	}
-
-	return currentSA, nil
 }
 
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {

@@ -20,7 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // SyncSetResourceApplyMode is a string representing the mode with which to
@@ -77,10 +76,9 @@ type SyncObjectPatch struct {
 	// Patch is the patch to apply.
 	Patch string `json:"patch"`
 
-	// PatchType indicates the PatchType as "json" (default), "merge"
-	// or "strategic".
+	// PatchType indicates the PatchType as "strategic" (default), "json", or "merge".
 	// +optional
-	PatchType types.PatchType `json:"patchType,omitempty"`
+	PatchType string `json:"patchType,omitempty"`
 }
 
 // SyncConditionType is a valid value for SyncCondition.Type

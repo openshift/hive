@@ -28,15 +28,15 @@ import (
 )
 
 var (
-	patchTypeString = map[types.PatchType]string{
-		types.JSONPatchType:           "json",
-		types.MergePatchType:          "merge",
-		types.StrategicMergePatchType: "strategic",
+	patchTypes = map[string]types.PatchType{
+		"json":      types.JSONPatchType,
+		"merge":     types.MergePatchType,
+		"strategic": types.StrategicMergePatchType,
 	}
 )
 
 // Patch invokes the kubectl patch command with the given resource, patch and patch type
-func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType types.PatchType) error {
+func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error {
 
 	ioStreams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
@@ -62,7 +62,7 @@ func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 	return nil
 }
 
-func (r *Helper) setupPatchCommand(name, kind, apiVersion string, patchType types.PatchType, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmd.PatchOptions, error) {
+func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmd.PatchOptions, error) {
 	r.logger.Debug("setting up patch command")
 
 	cmd := kcmd.NewCmdPatch(f, ioStreams)
@@ -79,7 +79,14 @@ func (r *Helper) setupPatchCommand(name, kind, apiVersion string, patchType type
 
 	o := kcmd.NewPatchOptions(ioStreams)
 	o.Complete(f, cmd, args)
-	o.PatchType = patchTypeString[patchType]
+	if patchType == "" {
+		patchType = "strategic"
+	}
+	_, ok := patchTypes[patchType]
+	if !ok {
+		return nil, fmt.Errorf("Invalid patch type: %s. Valid patch types are 'strategic', 'merge' or 'json'", patchType)
+	}
+	o.PatchType = patchType
 	o.Patch = patch
 
 	return o, nil

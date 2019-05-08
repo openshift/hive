@@ -61,8 +61,8 @@ spec:
                     description: Patch is the patch to apply.
                     type: string
                   patchType:
-                    description: PatchType indicates the PatchType as "json" (default),
-                      "merge" or "strategic".
+                    description: PatchType indicates the PatchType as "strategic"
+                      (default), "json", or "merge".
                     type: string
                 required:
                 - apiVersion

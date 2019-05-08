@@ -63,7 +63,7 @@ const (
 type Applier interface {
 	Apply(obj []byte) (hiveresource.ApplyResult, error)
 	Info(obj []byte) (*hiveresource.Info, error)
-	Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType types.PatchType) error
+	Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error
 }
 
 // Add creates a new SyncSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the

@@ -16,14 +16,14 @@ func TestPatch(t *testing.T) {
 	tests := []struct {
 		name      string
 		patch     string
-		patchType types.PatchType
+		patchType string
 		validate  func(t *testing.T, cm *corev1.ConfigMap)
 	}{
 		// All tests begin with a single configmap with one key { "foo": "bar" }
 		{
 			name:      "json patch",
 			patch:     `[ { "op": "replace", "path": "/data/foo", "value": "baz" } ]`,
-			patchType: types.JSONPatchType,
+			patchType: "json",
 			validate: func(t *testing.T, cm *corev1.ConfigMap) {
 				if cm.Data["foo"] != "baz" {
 					t.Errorf("unexpected value in data: %v", cm.Data)
@@ -33,7 +33,7 @@ func TestPatch(t *testing.T) {
 		{
 			name:      "merge patch",
 			patch:     `{ "data": { "foo": null, "baz": "bar" } }`,
-			patchType: types.MergePatchType,
+			patchType: "merge",
 			validate: func(t *testing.T, cm *corev1.ConfigMap) {
 				if len(cm.Data) != 1 {
 					t.Errorf("unexpected length of data: %v", cm.Data)
@@ -46,7 +46,7 @@ func TestPatch(t *testing.T) {
 		{
 			name:      "strategic patch",
 			patch:     `{ "data": { "test": "baz" } }`,
-			patchType: types.StrategicMergePatchType,
+			patchType: "strategic",
 			validate: func(t *testing.T, cm *corev1.ConfigMap) {
 				if len(cm.Data) != 2 {
 					t.Errorf("unexpected length of data: %v", cm.Data)

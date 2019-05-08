@@ -625,6 +625,7 @@ func testSyncObjectPatch(name, namespace, kind, apiVersion string, applyMode hiv
 		APIVersion: apiVersion,
 		ApplyMode:  applyMode,
 		Patch:      patch,
+		PatchType:  "merge",
 	}
 }
 
@@ -874,7 +875,7 @@ func (f *fakeHelper) Info(data []byte) (*resource.Info, error) {
 	}, nil
 }
 
-func (f *fakeHelper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType types.PatchType) error {
+func (f *fakeHelper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error {
 	p := string(patch)
 	if strings.Contains(p, "patch-error") {
 		return fmt.Errorf("cannot apply patch")

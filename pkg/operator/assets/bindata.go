@@ -1189,6 +1189,7 @@ rules:
   - hive.openshift.io
   resources:
   - clusterdeprovisionrequests
+  - clusterdeprovisionrequests/finalizers
   verbs:
   - get
   - list

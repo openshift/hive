@@ -89,7 +89,7 @@ type ReconcileClusterDeprovisionRequest struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeprovisionRequest object and makes changes based on the state read
 // and what is in the ClusterDeprovisionRequest.Spec
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeprovisionrequests,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeprovisionrequests;clusterdeprovisionrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeprovisionrequests/status,verbs=get;update;patch
 func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	rLog := log.WithFields(log.Fields{
@@ -141,15 +141,20 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
+		_, err := controllerutils.SetupClusterInstallServiceAccount(r, instance.Namespace, rLog)
+		if err != nil {
+			rLog.WithError(err).Error("error setting up service account and role")
+			return reconcile.Result{}, err
+		}
 		rLog.Debug("uninstall job does not exist, creating it")
 		err = r.Create(context.TODO(), uninstallJob)
 		if err != nil {
-			rLog.Errorf("error creating uninstall job: %v", err)
+			rLog.WithError(err).Errorf("error creating uninstall job")
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
 	} else if err != nil {
-		rLog.Errorf("error getting uninstall job: %v", err)
+		rLog.WithError(err).Errorf("error getting uninstall job")
 		return reconcile.Result{}, err
 	}
 	rLog.Debug("uninstall job exists, checking its status")

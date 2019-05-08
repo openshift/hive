@@ -87,6 +87,18 @@ func TestSyncSetValidate(t *testing.T) {
 			syncSet:         testInvalidPatchSyncSet(),
 			expectedAllowed: false,
 		},
+		{
+			name:            "Test create with no patches",
+			operation:       admissionv1beta1.Create,
+			syncSet:         testSyncSet(),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test update with no patches",
+			operation:       admissionv1beta1.Update,
+			syncSet:         testSyncSet(),
+			expectedAllowed: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -128,24 +140,29 @@ func testInvalidPatchSyncSet() *hivev1.SyncSet {
 }
 
 func testPatchSyncSet(patchType string) *hivev1.SyncSet {
+	ss := testSyncSet()
+	ss.Spec = hivev1.SyncSetSpec{
+		SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
+			Patches: []hivev1.SyncObjectPatch{
+				{
+					Patch:     "blah",
+					PatchType: "json",
+				},
+				{
+					Patch:     "foo",
+					PatchType: patchType,
+				},
+			},
+		},
+	}
+	return ss
+}
+
+func testSyncSet() *hivev1.SyncSet {
 	return &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-sync-set",
 			Namespace: "test-namespace",
-		},
-		Spec: hivev1.SyncSetSpec{
-			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
-				Patches: []hivev1.SyncObjectPatch{
-					{
-						Patch:     "blah",
-						PatchType: "json",
-					},
-					{
-						Patch:     "foo",
-						PatchType: patchType,
-					},
-				},
-			},
 		},
 	}
 }

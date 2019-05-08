@@ -87,6 +87,18 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 			selectorSyncSet: testInvalidPatchSelectorSyncSet(),
 			expectedAllowed: false,
 		},
+		{
+			name:            "Test create syncset with no patches",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSet(),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test update syncset with no patches",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSet(),
+			expectedAllowed: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -128,24 +140,29 @@ func testInvalidPatchSelectorSyncSet() *hivev1.SelectorSyncSet {
 }
 
 func testPatchSelectorSyncSet(patchType string) *hivev1.SelectorSyncSet {
+	ss := testSelectorSyncSet()
+	ss.Spec = hivev1.SelectorSyncSetSpec{
+		SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
+			Patches: []hivev1.SyncObjectPatch{
+				{
+					Patch:     "blah",
+					PatchType: "json",
+				},
+				{
+					Patch:     "foo",
+					PatchType: patchType,
+				},
+			},
+		},
+	}
+	return ss
+}
+
+func testSelectorSyncSet() *hivev1.SelectorSyncSet {
 	return &hivev1.SelectorSyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-selector-sync-set",
 			Namespace: "test-namespace",
-		},
-		Spec: hivev1.SelectorSyncSetSpec{
-			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
-				Patches: []hivev1.SyncObjectPatch{
-					{
-						Patch:     "blah",
-						PatchType: "json",
-					},
-					{
-						Patch:     "foo",
-						PatchType: patchType,
-					},
-				},
-			},
 		},
 	}
 }

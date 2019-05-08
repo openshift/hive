@@ -892,7 +892,7 @@ func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.S
 	return s
 }
 
-func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error) {
+func testRemoteClusterAPIClientBuilder(cd *hivev1.ClusterDeployment, secretData string) (client.Client, error) {
 	remoteClusterVersion := &openshiftapiv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: remoteClusterVersionObjectName,

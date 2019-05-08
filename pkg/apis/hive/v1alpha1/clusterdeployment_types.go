@@ -250,6 +250,9 @@ const (
 	// IngressCertificateNotFoundCondition is a condition indicating that one of the CertificateBundle
 	// secrets required by an Ingress is not available.
 	IngressCertificateNotFoundCondition ClusterDeploymentConditionType = "IngressCertificateNotFound"
+
+	// UnreachableCondition indicates that are unable to establish an API connection to the remote cluster.
+	UnreachableCondition ClusterDeploymentConditionType = "Unreachable"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -259,6 +262,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	InstallerImageResolutionFailedCondition,
 	ControlPlaneCertificateNotFoundCondition,
 	IngressCertificateNotFoundCondition,
+	UnreachableCondition,
 }
 
 // +genclient

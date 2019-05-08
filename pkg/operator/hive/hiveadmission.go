@@ -125,6 +125,12 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	asset = assets.MustAsset("config/hiveadmission/dnszones-webhook.yaml")
 	dnsZonesWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
 
+	asset = assets.MustAsset("config/hiveadmission/syncset-webhook.yaml")
+	syncSetsWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
+
+	asset = assets.MustAsset("config/hiveadmission/selectorsyncset-webhook.yaml")
+	selectorSyncSetsWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
+
 	// If on 3.11 we need to set the service CA on the apiservice.
 	is311, err := r.is311(hLog)
 	if err != nil {
@@ -133,7 +139,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	}
 	if is311 {
 		hLog.Debug("3.11 cluster detected, modifying objects for CA certs")
-		err = r.injectCerts(apiService, []*admregv1.ValidatingWebhookConfiguration{cdWebhook, cisWebhook, dnsZonesWebhook}, hLog)
+		err = r.injectCerts(apiService, []*admregv1.ValidatingWebhookConfiguration{cdWebhook, cisWebhook, dnsZonesWebhook, syncSetsWebhook, selectorSyncSetsWebhook}, hLog)
 		if err != nil {
 			hLog.WithError(err).Error("error injecting certs")
 			return err
@@ -167,6 +173,20 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		return err
 	}
 	hLog.Infof("dns zones webhook applied (%s)", result)
+
+	result, err = h.ApplyRuntimeObject(syncSetsWebhook, scheme.Scheme)
+	if err != nil {
+		hLog.WithError(err).Error("error applying syncsets webhook")
+		return err
+	}
+	hLog.Infof("syncsets webhook applied (%s)", result)
+
+	result, err = h.ApplyRuntimeObject(selectorSyncSetsWebhook, scheme.Scheme)
+	if err != nil {
+		hLog.WithError(err).Error("error applying selectorsyncsets webhook")
+		return err
+	}
+	hLog.Infof("selectorsyncsets webhook applied (%s)", result)
 
 	hLog.Info("hiveadmission components reconciled successfully")
 

@@ -7,8 +7,10 @@
 // config/hiveadmission/dnszones-webhook.yaml
 // config/hiveadmission/hiveadmission_rbac_role.yaml
 // config/hiveadmission/hiveadmission_rbac_role_binding.yaml
+// config/hiveadmission/selectorsyncset-webhook.yaml
 // config/hiveadmission/service-account.yaml
 // config/hiveadmission/service.yaml
+// config/hiveadmission/syncset-webhook.yaml
 // config/manager/deployment.yaml
 // config/manager/service.yaml
 // config/clusterimagesets/openshift-4.0-beta3.yaml
@@ -430,6 +432,47 @@ func configHiveadmissionHiveadmission_rbac_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configHiveadmissionSelectorsyncsetWebhookYaml = []byte(`---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: selectorsyncsets.admission.hive.openshift.io
+webhooks:
+- name: selectorsyncsets.admission.hive.openshift.io
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/selectorsyncsets
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - selectorsyncsets
+  failurePolicy: Fail
+`)
+
+func configHiveadmissionSelectorsyncsetWebhookYamlBytes() ([]byte, error) {
+	return _configHiveadmissionSelectorsyncsetWebhookYaml, nil
+}
+
+func configHiveadmissionSelectorsyncsetWebhookYaml() (*asset, error) {
+	bytes, err := configHiveadmissionSelectorsyncsetWebhookYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/hiveadmission/selectorsyncset-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configHiveadmissionServiceAccountYaml = []byte(`---
 # to be able to assign powers to the hiveadmission process
 apiVersion: v1
@@ -481,6 +524,47 @@ func configHiveadmissionServiceYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/hiveadmission/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configHiveadmissionSyncsetWebhookYaml = []byte(`---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: syncsets.admission.hive.openshift.io
+webhooks:
+- name: syncsets.admission.hive.openshift.io
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1alpha1/syncsets
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1alpha1
+    resources:
+    - syncsets
+  failurePolicy: Fail
+`)
+
+func configHiveadmissionSyncsetWebhookYamlBytes() ([]byte, error) {
+	return _configHiveadmissionSyncsetWebhookYaml, nil
+}
+
+func configHiveadmissionSyncsetWebhookYaml() (*asset, error) {
+	bytes, err := configHiveadmissionSyncsetWebhookYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/hiveadmission/syncset-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1435,8 +1519,10 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/dnszones-webhook.yaml":                configHiveadmissionDnszonesWebhookYaml,
 	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
 	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
+	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
 	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
 	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
+	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
 	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
 	"config/manager/service.yaml":                               configManagerServiceYaml,
 	"config/clusterimagesets/openshift-4.0-beta3.yaml":          configClusterimagesetsOpenshift40Beta3Yaml,
@@ -1517,8 +1603,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"dnszones-webhook.yaml":                {configHiveadmissionDnszonesWebhookYaml, map[string]*bintree{}},
 			"hiveadmission_rbac_role.yaml":         {configHiveadmissionHiveadmission_rbac_roleYaml, map[string]*bintree{}},
 			"hiveadmission_rbac_role_binding.yaml": {configHiveadmissionHiveadmission_rbac_role_bindingYaml, map[string]*bintree{}},
+			"selectorsyncset-webhook.yaml":         {configHiveadmissionSelectorsyncsetWebhookYaml, map[string]*bintree{}},
 			"service-account.yaml":                 {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},
 			"service.yaml":                         {configHiveadmissionServiceYaml, map[string]*bintree{}},
+			"syncset-webhook.yaml":                 {configHiveadmissionSyncsetWebhookYaml, map[string]*bintree{}},
 		}},
 		"manager": {nil, map[string]*bintree{
 			"deployment.yaml": {configManagerDeploymentYaml, map[string]*bintree{}},

@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	routev1 "github.com/openshift/api/route/v1"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -107,6 +108,18 @@ var (
 			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
 		},
 	)
+	metricClustersCreated = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_created",
+		Help: "Counter incremented every time we observe a new cluster.",
+	})
+	metricClustersInstalled = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_installed",
+		Help: "Counter incremented every time we observe a successful installation.",
+	})
+	metricClustersDeleted = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_deleted",
+		Help: "Counter incremented every time we observe a deleted cluster.",
+	})
 )
 
 func init() {
@@ -114,6 +127,9 @@ func init() {
 	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)
 	metrics.Registry.MustRegister(metricInstallDelaySeconds)
 	metrics.Registry.MustRegister(metricImageSetDelaySeconds)
+	metrics.Registry.MustRegister(metricClustersCreated)
+	metrics.Registry.MustRegister(metricClustersInstalled)
+	metrics.Registry.MustRegister(metricClustersDeleted)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -313,10 +329,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Error("error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{
-			Requeue:      true,
-			RequeueAfter: defaultRequeueTime,
-		}, nil
+		metricClustersCreated.Inc()
+		return reconcile.Result{}, nil
 	}
 
 	cdLog.Debug("loading SSH key secret")
@@ -495,6 +509,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cd.Name,
 			cd.Namespace,
 			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+
+		metricClustersInstalled.Inc()
 	}
 
 	// Check for requeueAfter duration
@@ -823,6 +839,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 				if err != nil {
 					cdLog.WithError(err).Error("error removing finalizer")
 				}
+				metricClustersDeleted.Inc()
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, nil

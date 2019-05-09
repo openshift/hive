@@ -14,6 +14,11 @@
 
 FROM openshift/origin-release:golang-1.11
 
+# setting Git username and email for workaround of
+# https://github.com/jenkinsci/docker/issues/519
+ENV GIT_COMMITTER_NAME hive-team
+ENV GIT_COMMITTER_EMAIL hive-team@redhat.com
+
 # Install the golint, use this to check our source for niceness
 RUN go get -u golang.org/x/lint/golint
 

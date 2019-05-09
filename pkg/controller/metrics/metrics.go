@@ -26,6 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,6 +73,26 @@ var (
 		Name: "hive_imageset_jobs",
 		Help: "Total number of imageset jobs running by cluster type and state.",
 	}, []string{"cluster_type", "state"})
+
+	// MetricClusterDeploymentProvisionUnderwaySeconds is a prometheus metric for the number of seconds
+	// between when a still provisioning cluster was created and now.
+	MetricClusterDeploymentProvisionUnderwaySeconds = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_provision_underway_seconds",
+			Help: "Length of time a cluster has been provisioning. Goes to 0 on succesful install and then will no longer be reported.",
+		},
+		[]string{"cluster_deployment", "namespace", "cluster_type"},
+	)
+	// MetricClusterDeploymentDeprovisioningUnderwaySeconds is a prometheus metric for the number of seconds
+	// between when a still deprovisioning cluster was created and now.
+	MetricClusterDeploymentDeprovisioningUnderwaySeconds = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_deprovision_underway_seconds",
+			// Will clear once hive restarts.
+			Help: "Length of time a cluster has been deprovisioning. Goes to 0 on succesful deprovision and then will no longer be reported.",
+		},
+		[]string{"cluster_deployment", "namespace", "cluster_type"},
+	)
 )
 
 func init() {
@@ -83,6 +104,9 @@ func init() {
 	metrics.Registry.MustRegister(metricInstallJobsTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsTotal)
 	metrics.Registry.MustRegister(metricImagesetJobsTotal)
+
+	metrics.Registry.MustRegister(MetricClusterDeploymentProvisionUnderwaySeconds)
+	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -136,6 +160,33 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			}
 			for _, cd := range clusterDeployments.Items {
 				accumulator.processCluster(&cd)
+
+				if cd.DeletionTimestamp != nil {
+					if controllerutils.HasFinalizer(&cd, hivev1.FinalizerDeprovision) {
+						// Deprovision still underway, report metric for this cluster.
+						// Note that the clusterdeployment_controller is responsible for clearing
+						// this value to 0, as it is the only place where we know we first observe
+						// a deletion completed. (when we clear the finalizer successfully)
+						MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
+							cd.Name,
+							cd.Namespace,
+							GetClusterDeploymentType(&cd)).Set(
+							time.Since(cd.DeletionTimestamp.Time).Seconds())
+					}
+				} else {
+					if !cd.Status.Installed {
+						// Similarly for installing clusters we report the seconds since
+						// cluster was created. clusterdeployment_controller should set to 0
+						// once we know we've first observed install success, and then this
+						// metric should no longer be reported.
+						MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+							cd.Name,
+							cd.Namespace,
+							GetClusterDeploymentType(&cd)).Set(
+							time.Since(cd.CreationTimestamp.Time).Seconds())
+					}
+				}
+
 			}
 
 			accumulator.setMetrics(metricClusterDeploymentsTotal,

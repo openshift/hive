@@ -79,22 +79,6 @@ const (
 )
 
 var (
-	metricClusterDeploymentInstallRestarts = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "hive_cluster_deployment_install_restarts",
-			// Will clear once hive restarts.
-			Help: "Number of container restarts for install jobs, labeled by cluster and namespace. No longer reported after cluster is installed.",
-		},
-		[]string{"cluster_deployment", "namespace"},
-	)
-	metricClusterDeploymentSucceeded = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "hive_cluster_deployment_install_succeeded_bool",
-			// Will clear once hive restarts.
-			Help: "0 if uninstalled, 1 if installed, labeled by cluster and namespace. No longer reported after cluster is installed.",
-		},
-		[]string{"cluster_deployment", "namespace"},
-	)
 	metricCompletedInstallJobRestarts = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_completed_install_restart",
@@ -126,8 +110,6 @@ var (
 )
 
 func init() {
-	metrics.Registry.MustRegister(metricClusterDeploymentInstallRestarts)
-	metrics.Registry.MustRegister(metricClusterDeploymentSucceeded)
 	metrics.Registry.MustRegister(metricInstallJobDuration)
 	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)
 	metrics.Registry.MustRegister(metricInstallDelaySeconds)
@@ -279,6 +261,23 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			return reconcile.Result{}, nil
 		}
+
+		// Deprovision still underway, report metric for this cluster.
+		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(
+			time.Since(cd.DeletionTimestamp.Time).Seconds())
+
+		// If the cluster never made it to installed, make sure we clear the provisioning
+		// underway metric.
+		if !cd.Status.Installed {
+			hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+				cd.Name,
+				cd.Namespace,
+				hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+		}
+
 		return r.syncDeletedClusterDeployment(cd, hiveImage, cdLog)
 	}
 
@@ -374,7 +373,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cdLog.Debug("cluster is already installed, no processing of install job needed")
 	} else {
 		// Indicate that the cluster is still installing:
-		metricClusterDeploymentSucceeded.WithLabelValues(cd.Name, cd.Namespace).Set(float64(0))
+		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(
+			time.Since(cd.CreationTimestamp.Time).Seconds())
 
 		cdLog.Debug("loading pull secret secret")
 		pullSecret, err := controllerutils.LoadSecretData(r.Client, cd.Spec.PullSecret.Name, cd.Namespace, corev1.DockerConfigJsonKey)
@@ -454,10 +457,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 					}).Warn("install pod has restarted")
 				}
 
-				// Set metric for the number of install restarts for this cluster.
-				metricClusterDeploymentInstallRestarts.WithLabelValues(cd.Name, cd.Namespace).Set(float64(containerRestarts))
-
-				// Store the restart count on the cluster deployment status as well.
+				// Store the restart count on the cluster deployment status.
 				cd.Status.InstallRestarts = containerRestarts
 			}
 
@@ -486,11 +486,15 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
 		metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
-		// Indicate successful install. We do not want to report this metric forever to limit cardinality.
-		metricClusterDeploymentSucceeded.WithLabelValues(cd.Name, cd.Namespace).Set(float64(1))
-
 		// Report a metric for the total number of container restarts:
 		metricCompletedInstallJobRestarts.Observe(float64(containerRestarts))
+
+		// Clear the install underway seconds metric. After this no-one should be reporting
+		// this metric for this cluster.
+		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
 	}
 
 	// Check for requeueAfter duration
@@ -898,7 +902,17 @@ func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.Cl
 func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
 	cd = cd.DeepCopy()
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
-	return r.Update(context.TODO(), cd)
+	err := r.Update(context.TODO(), cd)
+
+	// If we've successfully cleared the deprovision finalizer we know this is a good time to
+	// reset the underway metric to 0, after which it will no longer be reported.
+	if err == nil {
+		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+	}
+	return err
 }
 
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {

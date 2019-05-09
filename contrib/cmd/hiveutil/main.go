@@ -25,6 +25,7 @@ import (
 
 	"github.com/openshift/hive/contrib/pkg/createcluster"
 	"github.com/openshift/hive/contrib/pkg/installmanager"
+	"github.com/openshift/hive/contrib/pkg/report"
 	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
 	"github.com/openshift/hive/pkg/imageset"
@@ -58,6 +59,7 @@ func newCOUtilityCommand() *cobra.Command {
 	cmd.AddCommand(imageset.NewUpdateInstallerImageCommand())
 	cmd.AddCommand(testresource.NewTestResourceCommand())
 	cmd.AddCommand(createcluster.NewCreateClusterCommand())
+	cmd.AddCommand(report.NewClusterReportCommand())
 
 	return cmd
 }

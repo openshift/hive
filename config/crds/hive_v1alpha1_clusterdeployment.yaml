@@ -617,6 +617,11 @@ spec:
               description: SSHKey is the reference to the secret that contains a public
                 key to use for access to compute instances.
               type: object
+            state:
+              description: State specifies whether the cluster should be Present or
+                Absent. Once the state is set to Absent, the cluster deployment controller
+                will start deleting the ClusterDeployment. The default state is Present.
+              type: string
           required:
           - clusterName
           - baseDomain

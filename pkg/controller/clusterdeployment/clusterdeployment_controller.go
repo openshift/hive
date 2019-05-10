@@ -182,6 +182,12 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for deprovision requests created by a ClusterDeployment:
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovisionRequest{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1.ClusterDeployment{},
+	})
+
 	// Watch for dnszones created by a ClusterDeployment:
 	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
@@ -302,6 +308,16 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		return r.syncDeletedClusterDeployment(cd, hiveImage, cdLog)
+	}
+
+	if cd.Spec.State == hivev1.ClusterDeploymentStateAbsent {
+		cdLog.Info("Absent state detected on clusterdeployment. Deleting...")
+		err := r.Delete(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Errorf("cannot delete clusterdeployment")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	// requeueAfter will be used to determine if cluster should be requeued after
@@ -838,10 +854,10 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
 	}
 
-	// Skips creation of uninstall job if PreserveOnDelete is true and cluster is installed
+	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed
 	if cd.Spec.PreserveOnDelete {
 		if cd.Status.Installed {
-			cdLog.Warn("skipping creation of uninstall job for installed cluster due to PreserveOnDelete=true")
+			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
 			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 				err = r.removeClusterDeploymentFinalizer(cd)
 				if err != nil {
@@ -854,7 +870,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		}
 		// Overriding PreserveOnDelete because we might have deleted the cluster deployment before it finished
 		// installing, which can cause AWS resources to leak
-		cdLog.Infof("PreserveOnDelete=true but launching uninstall as cluster was never successfully provisioned")
+		cdLog.Infof("PreserveOnDelete=true but creating deprovisioning request as cluster was never successfully provisioned")
 	}
 
 	if cd.Status.InfraID == "" {
@@ -863,57 +879,44 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		if err != nil {
 			cdLog.WithError(err).Error("error removing finalizer")
 		}
-	} else {
-		// Generate an uninstall job:
-		uninstallJob, err := install.GenerateUninstallerJobForClusterDeployment(cd, hiveImage)
-		if err != nil {
-			cdLog.Errorf("error generating uninstaller job: %v", err)
-			return reconcile.Result{}, err
-		}
-
-		err = controllerutil.SetControllerReference(cd, uninstallJob, r.scheme)
-		if err != nil {
-			cdLog.Errorf("error setting controller reference on job: %v", err)
-			return reconcile.Result{}, err
-		}
-
-		// Check if uninstall job already exists:
-		existingJob := &batchv1.Job{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
-		if err != nil && errors.IsNotFound(err) {
-			_, err := controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
-			if err != nil {
-				cdLog.WithError(err).Error("error setting up service account and role")
-				return reconcile.Result{}, err
-			}
-
-			err = r.Create(context.TODO(), uninstallJob)
-			if err != nil {
-				cdLog.Errorf("error creating uninstall job: %v", err)
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, nil
-		} else if err != nil {
-			cdLog.Errorf("error getting uninstall job: %v", err)
-			return reconcile.Result{}, err
-		}
-
-		// Uninstall job exists, check it's status and if successful, remove the finalizer:
-		if controllerutils.IsSuccessful(existingJob) {
-			cdLog.Infof("uninstall job successful, removing finalizer")
-			// jobDuration calculates the time elapsed since the uninstall job started for deprovision job
-			jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
-			cdLog.WithField("duration", jobDuration.Seconds()).Debug("uninstall job completed")
-			hivemetrics.MetricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
-			err = r.removeClusterDeploymentFinalizer(cd)
-			if err != nil {
-				cdLog.WithError(err).Error("error removing finalizer")
-			}
-			return reconcile.Result{}, err
-		}
-
-		cdLog.Infof("uninstall job not yet successful")
+		return reconcile.Result{}, err
 	}
+
+	// Generate a deprovision request
+	request := generateDeprovisionRequest(cd)
+	err = controllerutil.SetControllerReference(cd, request, r.scheme)
+	if err != nil {
+		cdLog.Errorf("error setting controller reference on deprovision request: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	// Check if deprovision request already exists:
+	existingRequest := &hivev1.ClusterDeprovisionRequest{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Name, Namespace: cd.Namespace}, existingRequest)
+	if err != nil && errors.IsNotFound(err) {
+		cdLog.Infof("creating deprovision request for cluster deployment")
+		err = r.Create(context.TODO(), request)
+		if err != nil {
+			cdLog.WithError(err).Errorf("error creating deprovision request")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	} else if err != nil {
+		cdLog.WithError(err).Errorf("error getting deprovision request")
+		return reconcile.Result{}, err
+	}
+
+	// Deprovision request exists, check whether it has completed
+	if existingRequest.Status.Completed {
+		cdLog.Infof("deprovision request completed, removing finalizer")
+		err = r.removeClusterDeploymentFinalizer(cd)
+		if err != nil {
+			cdLog.WithError(err).Error("error removing finalizer")
+		}
+		return reconcile.Result{}, err
+	}
+
+	cdLog.Infof("deprovision request not yet completed")
 
 	return reconcile.Result{}, nil
 }
@@ -1045,6 +1048,32 @@ func (r *ReconcileClusterDeployment) calcInstallPodRestarts(cd *hivev1.ClusterDe
 		}
 	}
 	return containerRestarts, nil
+}
+
+func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) *hivev1.ClusterDeprovisionRequest {
+	req := &hivev1.ClusterDeprovisionRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cd.Name,
+			Namespace: cd.Namespace,
+		},
+		Spec: hivev1.ClusterDeprovisionRequestSpec{
+			InfraID:   cd.Status.InfraID,
+			ClusterID: cd.Status.ClusterID,
+			Platform: hivev1.ClusterDeprovisionRequestPlatform{
+				AWS: &hivev1.AWSClusterDeprovisionRequest{},
+			},
+		},
+	}
+
+	if cd.Spec.Platform.AWS != nil {
+		req.Spec.Platform.AWS.Region = cd.Spec.Platform.AWS.Region
+	}
+
+	if cd.Spec.PlatformSecrets.AWS != nil {
+		req.Spec.Platform.AWS.Credentials = &cd.Spec.PlatformSecrets.AWS.Credentials
+	}
+
+	return req
 }
 
 func strPtr(s string) *string {

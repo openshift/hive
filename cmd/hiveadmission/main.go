@@ -20,6 +20,7 @@ import (
 	admissionCmd "github.com/openshift/generic-admission-server/pkg/cmd"
 	log "github.com/sirupsen/logrus"
 
+	hivemutatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1alpha1/mutating-webhooks"
 	hivevalidatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1alpha1/validating-webhooks"
 )
 
@@ -35,5 +36,6 @@ func main() {
 		&hivevalidatingwebhooks.ClusterImageSetValidatingAdmissionHook{},
 		&hivevalidatingwebhooks.SyncSetValidatingAdmissionHook{},
 		&hivevalidatingwebhooks.SelectorSyncSetValidatingAdmissionHook{},
+		&hivemutatingwebhooks.ClusterDeploymentMutatingAdmissionHook{},
 	)
 }

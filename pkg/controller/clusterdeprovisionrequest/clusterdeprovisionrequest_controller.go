@@ -19,6 +19,7 @@ package clusterdeprovisionrequest
 import (
 	"context"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -31,12 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -44,6 +45,20 @@ import (
 const (
 	controllerName = "clusterDeprovisionRequest"
 )
+
+var (
+	metricUninstallJobDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_uninstall_job_duration_seconds",
+			Help:    "Distribution of the runtime of completed uninstall jobs.",
+			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
+		},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricUninstallJobDuration)
+}
 
 // Add creates a new ClusterDeprovisionRequest Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -171,7 +186,7 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 			rLog.WithError(err).Error("error updating request status")
 			return reconcile.Result{}, err
 		}
-		hivemetrics.MetricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
+		metricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
 		return reconcile.Result{}, nil
 	}
 	rLog.Infof("uninstall job not yet successful")

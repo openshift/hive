@@ -18,7 +18,6 @@ package install
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
@@ -253,7 +252,6 @@ func GenerateInstallerJob(
 	}
 
 	completions := int32(1)
-	deadline := int64((24 * time.Hour).Seconds())
 	backoffLimit := int32(123456) // effectively limitless
 	if tryOnce {
 		backoffLimit = int32(0)
@@ -278,9 +276,8 @@ func GenerateInstallerJob(
 			Labels:      labels,
 		},
 		Spec: batchv1.JobSpec{
-			Completions:           &completions,
-			ActiveDeadlineSeconds: &deadline,
-			BackoffLimit:          &backoffLimit,
+			Completions:  &completions,
+			BackoffLimit: &backoffLimit,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -448,7 +445,6 @@ func GenerateUninstallerJob(
 	}
 
 	completions := int32(1)
-	deadline := int64((24 * time.Hour).Seconds())
 	backoffLimit := int32(123456) // effectively limitless
 	labels := map[string]string{UninstallJobLabel: "true"}
 
@@ -457,9 +453,8 @@ func GenerateUninstallerJob(
 	job.Namespace = namespace
 	job.ObjectMeta.Labels = labels
 	job.Spec = batchv1.JobSpec{
-		Completions:           &completions,
-		ActiveDeadlineSeconds: &deadline,
-		BackoffLimit:          &backoffLimit,
+		Completions:  &completions,
+		BackoffLimit: &backoffLimit,
 		Template: corev1.PodTemplateSpec{
 			Spec: podSpec,
 		},

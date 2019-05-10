@@ -41,7 +41,6 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -114,8 +113,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	getInstallJob := func(c client.Client) *batchv1.Job {
 		return getJob(c, installJobName)
 	}
-	getUninstallJob := func(c client.Client) *batchv1.Job {
-		return getJob(c, uninstallJobName)
+	getDeprovisionRequest := func(c client.Client) *hivev1.ClusterDeprovisionRequest {
+		req := &hivev1.ClusterDeprovisionRequest{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, req)
+		if err == nil {
+			return req
+		}
+		return nil
 	}
 	getImageSetJob := func(c client.Client) *batchv1.Job {
 		return getJob(c, imageSetJobName)
@@ -268,9 +272,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				uninstallJob := getUninstallJob(c)
-				if uninstallJob == nil {
-					t.Errorf("did not find expected uninstall job")
+				deprovision := getDeprovisionRequest(c)
+				if deprovision == nil {
+					t.Errorf("did not find expected deprovision request")
 				}
 
 				instJob := getInstallJob(c)
@@ -287,9 +291,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				uninstallJob := getUninstallJob(c)
-				if uninstallJob != nil {
-					t.Errorf("got unexpected uninstall job")
+				deprovision := getDeprovisionRequest(c)
+				if deprovision != nil {
+					t.Errorf("got unexpected deprovision request")
 				}
 			},
 		},
@@ -330,8 +334,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				uninstallJob := getUninstallJob(c)
-				assert.Nil(t, uninstallJob)
+				deprovision := getDeprovisionRequest(c)
+				assert.Nil(t, deprovision)
 			},
 		},
 		{
@@ -386,8 +390,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				uninstallJob := getUninstallJob(c)
-				assert.NotNil(t, uninstallJob)
+				deprovision := getDeprovisionRequest(c)
+				assert.NotNil(t, deprovision)
 			},
 		},
 		{
@@ -567,13 +571,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				uninstallJob := getUninstallJob(c)
-				if uninstallJob == nil {
-					t.Errorf("did not find expected uninstall job")
-				}
-				// expect to get default hive image when missing clusterimageset
-				if jobImage := uninstallJob.Spec.Template.Spec.Containers[0].Image; jobImage != "hive-image-from-image-set:latest" {
-					t.Errorf("unexpected hive image in uninstall job: %s", jobImage)
+				deprovision := getDeprovisionRequest(c)
+				if deprovision == nil {
+					t.Errorf("did not find expected deprovision request")
 				}
 			},
 		},
@@ -590,13 +590,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				uninstallJob := getUninstallJob(c)
-				if uninstallJob == nil {
-					t.Errorf("did not find expected uninstall job")
-				}
-				// expect to get default hive image when missing clusterimageset
-				if jobImage := uninstallJob.Spec.Template.Spec.Containers[0].Image; jobImage != images.DefaultHiveImage {
-					t.Errorf("unexpected hive image in uninstall job: %s", jobImage)
+				deprovision := getDeprovisionRequest(c)
+				if deprovision == nil {
+					t.Errorf("did not find expected deprovision request")
 				}
 			},
 		},

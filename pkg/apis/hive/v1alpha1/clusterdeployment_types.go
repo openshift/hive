@@ -106,6 +106,11 @@ type ClusterDeploymentSpec struct {
 	// for this ClusterDeployment
 	// +optional
 	ManageDNS bool `json:"manageDNS,omitempty"`
+
+	// State specifies whether the cluster should be Present or Absent. Once the state is set
+	// to Absent, the cluster deployment controller will start deleting the ClusterDeployment.
+	// The default state is Present.
+	State ClusterDeploymentState `json:"state,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
@@ -255,6 +260,21 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ControlPlaneCertificateNotFoundCondition,
 	IngressCertificateNotFoundCondition,
 }
+
+// ClusterDeploymentState represents the desired state of a cluster deployment. On creation,
+// the state is Present by default.
+type ClusterDeploymentState string
+
+const (
+	// ClusterDeploymentStatePresent is the default state of a ClusterDeployment. It means the
+	// ClusterDeployment will result in an installed Cluster.
+	ClusterDeploymentStatePresent ClusterDeploymentState = "Present"
+
+	// ClusterDeploymentStateAbsent represents the state of a ClusterDeployment to be deleted.
+	// Once the state is changed to Absent, the ClusterDeployment controller will ensure
+	// the ClusterDeployment is deleted.
+	ClusterDeploymentStateAbsent ClusterDeploymentState = "Absent"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

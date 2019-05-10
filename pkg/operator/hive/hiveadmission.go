@@ -119,6 +119,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	asset = assets.MustAsset("config/hiveadmission/clusterdeployment-webhook.yaml")
 	cdWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
 
+	asset = assets.MustAsset("config/hiveadmission/clusterdeployment-mutating-webhook.yaml")
+	cdMutatingWebhook := util.ReadMutatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
+
 	asset = assets.MustAsset("config/hiveadmission/clusterimageset-webhook.yaml")
 	cisWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
 
@@ -139,7 +142,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	}
 	if is311 {
 		hLog.Debug("3.11 cluster detected, modifying objects for CA certs")
-		err = r.injectCerts(apiService, []*admregv1.ValidatingWebhookConfiguration{cdWebhook, cisWebhook, dnsZonesWebhook, syncSetsWebhook, selectorSyncSetsWebhook}, hLog)
+		err = r.injectCerts(apiService,
+			[]*admregv1.ValidatingWebhookConfiguration{cdWebhook, cisWebhook, dnsZonesWebhook, syncSetsWebhook, selectorSyncSetsWebhook},
+			[]*admregv1.MutatingWebhookConfiguration{cdMutatingWebhook},
+			hLog)
 		if err != nil {
 			hLog.WithError(err).Error("error injecting certs")
 			return err
@@ -155,10 +161,17 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 	result, err = h.ApplyRuntimeObject(cdWebhook, scheme.Scheme)
 	if err != nil {
-		hLog.WithError(err).Error("error applying cluster deployment webhook")
+		hLog.WithError(err).Error("error applying cluster deployment validating webhook")
 		return err
 	}
-	hLog.Infof("cluster deployment webhook applied (%s)", result)
+	hLog.Infof("cluster deployment validating webhook applied (%s)", result)
+
+	result, err = h.ApplyRuntimeObject(cdMutatingWebhook, scheme.Scheme)
+	if err != nil {
+		hLog.WithError(err).Error("error applying cluster deployment mutating webhook")
+		return err
+	}
+	hLog.Infof("cluster deployment mutating webhook applied (%s)", result)
 
 	result, err = h.ApplyRuntimeObject(cisWebhook, scheme.Scheme)
 	if err != nil {
@@ -193,7 +206,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	return nil
 }
 
-func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, webhooks []*admregv1.ValidatingWebhookConfiguration, hLog log.FieldLogger) error {
+func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hLog log.FieldLogger) error {
 
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
@@ -231,10 +244,17 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	// Add the service CA to the aggregated API service:
 	apiService.Spec.CABundle = serviceCA
 
-	// Add the kube CA to each webhook:
-	for whi := range webhooks {
-		for whwhi := range webhooks[whi].Webhooks {
-			webhooks[whi].Webhooks[whwhi].ClientConfig.CABundle = kubeCA
+	// Add the kube CA to each validating webhook:
+	for whi := range validatingWebhooks {
+		for whwhi := range validatingWebhooks[whi].Webhooks {
+			validatingWebhooks[whi].Webhooks[whwhi].ClientConfig.CABundle = kubeCA
+		}
+	}
+
+	// Add the kube CA to each mutating webhook:
+	for whi := range mutatingWebhooks {
+		for whwhi := range mutatingWebhooks[whi].Webhooks {
+			mutatingWebhooks[whi].Webhooks[whwhi].ClientConfig.CABundle = kubeCA
 		}
 	}
 

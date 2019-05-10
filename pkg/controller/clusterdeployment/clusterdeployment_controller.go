@@ -80,12 +80,13 @@ const (
 )
 
 var (
-	metricCompletedInstallJobRestarts = prometheus.NewHistogram(
+	metricCompletedInstallJobRestarts = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_completed_install_restart",
 			Help:    "Distribution of the number of restarts for all completed cluster installations.",
 			Buckets: []float64{0, 2, 10, 20, 50},
 		},
+		[]string{"cluster_type"},
 	)
 	metricInstallJobDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
@@ -108,18 +109,24 @@ var (
 			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
 		},
 	)
-	metricClustersCreated = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_created",
+	metricClustersCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_created_total",
 		Help: "Counter incremented every time we observe a new cluster.",
-	})
-	metricClustersInstalled = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_installed",
+	},
+		[]string{"cluster_type"},
+	)
+	metricClustersInstalled = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_installed_total",
 		Help: "Counter incremented every time we observe a successful installation.",
-	})
-	metricClustersDeleted = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_deleted",
+	},
+		[]string{"cluster_type"},
+	)
+	metricClustersDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_deleted_total",
 		Help: "Counter incremented every time we observe a deleted cluster.",
-	})
+	},
+		[]string{"cluster_type"},
+	)
 )
 
 func init() {
@@ -329,7 +336,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Error("error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		metricClustersCreated.Inc()
+		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 		return reconcile.Result{}, nil
 	}
 
@@ -501,7 +508,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
 		// Report a metric for the total number of container restarts:
-		metricCompletedInstallJobRestarts.Observe(float64(containerRestarts))
+		metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
+			Observe(float64(containerRestarts))
 
 		// Clear the install underway seconds metric. After this no-one should be reporting
 		// this metric for this cluster.
@@ -510,7 +518,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cd.Namespace,
 			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
 
-		metricClustersInstalled.Inc()
+		metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 	}
 
 	// Check for requeueAfter duration
@@ -839,7 +847,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 				if err != nil {
 					cdLog.WithError(err).Error("error removing finalizer")
 				}
-				metricClustersDeleted.Inc()
+				metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, nil

@@ -655,10 +655,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeploymentWithoutFinalizer(),
 			},
-			exptectedReconcileResult: reconcile.Result{
-				Requeue:      true,
-				RequeueAfter: defaultRequeueTime,
-			},
+			exptectedReconcileResult: reconcile.Result{},
 		},
 	}
 

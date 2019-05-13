@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,39 +32,69 @@ import (
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 )
 
+var (
+	metricRemoteClients = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_remote_cluster_clients_created_total",
+		Help: "Counter incremented every time we create a client to connect to a remote cluster.",
+	},
+		[]string{"result"},
+	)
+)
+
+const (
+	clientResultError   = "error"
+	clientResultSuccess = "success"
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricRemoteClients)
+}
+
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient using the provided kubeconfig
 func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, error) {
 	config, err := clientcmd.Load([]byte(kubeconfigData))
 	if err != nil {
+		metricRemoteClients.WithLabelValues(clientResultError).Inc()
 		return nil, err
 	}
 	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
 	cfg, err := kubeConfig.ClientConfig()
 	if err != nil {
+		metricRemoteClients.WithLabelValues(clientResultError).Inc()
 		return nil, err
 	}
 
 	scheme, err := machineapi.SchemeBuilder.Build()
 	if err != nil {
+		metricRemoteClients.WithLabelValues(clientResultError).Inc()
 		return nil, err
 	}
 
 	if err := openshiftapiv1.Install(scheme); err != nil {
+		metricRemoteClients.WithLabelValues(clientResultError).Inc()
 		return nil, err
 	}
 
 	if err := routev1.Install(scheme); err != nil {
+		metricRemoteClients.WithLabelValues(clientResultError).Inc()
 		return nil, err
 	}
 
-	return client.New(cfg, client.Options{
+	c, err := client.New(cfg, client.Options{
 		Scheme: scheme,
 	})
+	if err != nil {
+		metricRemoteClients.WithLabelValues(clientResultError).Inc()
+	} else {
+		metricRemoteClients.WithLabelValues(clientResultSuccess).Inc()
+	}
+	return c, err
 }
 
 // BuildDynamicClientFromKubeconfig returns a dynamic client using the provided kubeconfig

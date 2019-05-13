@@ -355,16 +355,17 @@ func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"ssh-public-key": sshKey,
+			"ssh-publickey":  sshKey,
+			"ssh-privatekey": "",
 		},
 	}, nil
 }
 
 func (o *Options) getAWSCreds() (string, string, error) {
-	accessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	keyID := os.Getenv("AWS_ACCESS_KEY_ID")
-	if len(accessKey) > 0 && len(keyID) > 0 {
-		return accessKey, keyID, nil
+	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+	if len(secretAccessKey) > 0 && len(accessKeyID) > 0 {
+		return accessKeyID, secretAccessKey, nil
 	}
 	if len(o.AWSCredsFile) > 0 {
 		credFile, err := ini.Load(o.AWSCredsFile)
@@ -377,20 +378,20 @@ func (o *Options) getAWSCreds() (string, string, error) {
 			log.Error("Cannot get default section from AWS credentials file")
 			return "", "", err
 		}
-		kAccessKey := defaultSection.Key("aws_access_key_id")
-		kSecretKey := defaultSection.Key("aws_secret_access_key")
-		if kAccessKey == nil || kSecretKey == nil {
+		accessKeyIDValue := defaultSection.Key("aws_access_key_id")
+		secretAccessKeyValue := defaultSection.Key("aws_secret_access_key")
+		if accessKeyIDValue == nil || secretAccessKeyValue == nil {
 			log.Error("AWS credentials file missing keys in default section")
 		}
-		accessKey, keyID = kAccessKey.String(), kSecretKey.String()
-		return accessKey, keyID, nil
+		accessKeyID, secretAccessKey = accessKeyIDValue.String(), secretAccessKeyValue.String()
+		return accessKeyID, secretAccessKey, nil
 	}
 	log.Error("Could not find AWS credentials")
 	return "", "", fmt.Errorf("No AWS credentials")
 }
 
 func (o *Options) generateAWSCredsSecret() (*corev1.Secret, error) {
-	accessKey, keyID, err := o.getAWSCreds()
+	accessKeyID, secretAccessKey, err := o.getAWSCreds()
 	if err != nil {
 		return nil, err
 	}
@@ -405,8 +406,8 @@ func (o *Options) generateAWSCredsSecret() (*corev1.Secret, error) {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"aws_access_key_id":     keyID,
-			"aws_secret_access_key": accessKey,
+			"aws_access_key_id":     accessKeyID,
+			"aws_secret_access_key": secretAccessKey,
 		},
 	}, nil
 }

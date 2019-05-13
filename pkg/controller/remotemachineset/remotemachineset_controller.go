@@ -161,6 +161,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(secretData)
 	if err != nil {
+		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err
 	}
 

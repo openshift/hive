@@ -219,7 +219,7 @@ type ReconcileClusterDeployment struct {
 //
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=pods;namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments;clusterdeployments/status;clusterdeployments/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets,verbs=get;list;watch;create;update;patch;delete
@@ -463,13 +463,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		if existingJob == nil {
+			cdLog.Infof("creating install job")
 			_, err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 			if err != nil {
 				cdLog.WithError(err).Error("error setting up service account and role")
 				return reconcile.Result{}, err
 			}
 
-			cdLog.Infof("creating install job")
 			err = r.Create(context.TODO(), job)
 			if err != nil {
 				cdLog.Errorf("error creating job: %v", err)
@@ -663,13 +663,13 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		}
 		return err
 	case errors.IsNotFound(err):
+		jobLog.Info("creating imageset job")
 		_, err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Error("error setting up service account and role")
 			return err
 		}
 
-		jobLog.Info("creating imageset job")
 		err = r.Create(context.TODO(), job)
 		if err != nil {
 			jobLog.WithError(err).Error("error creating job")
@@ -898,6 +898,21 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		err = r.Create(context.TODO(), request)
 		if err != nil {
 			cdLog.WithError(err).Errorf("error creating deprovision request")
+			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
+			// the cluster go away.
+			ns := &corev1.Namespace{}
+			err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, ns)
+			if err != nil {
+				cdLog.WithError(err).Error("error checking for deletionTimestamp on namespace")
+				return reconcile.Result{}, err
+			}
+			if ns.DeletionTimestamp != nil {
+				cdLog.Warn("detected a namespace deleted before deprovision request could be created, giving up on deprovision and removing finalizer")
+				err = r.removeClusterDeploymentFinalizer(cd)
+				if err != nil {
+					cdLog.WithError(err).Error("error removing finalizer")
+				}
+			}
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil

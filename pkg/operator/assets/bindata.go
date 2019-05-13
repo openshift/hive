@@ -1259,6 +1259,7 @@ rules:
   - ""
   resources:
   - pods
+  - namespaces
   verbs:
   - get
   - list

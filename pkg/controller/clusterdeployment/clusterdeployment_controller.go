@@ -863,7 +863,6 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 				if err != nil {
 					cdLog.WithError(err).Error("error removing finalizer")
 				}
-				metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, nil
@@ -947,14 +946,18 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
 	err := r.Update(context.TODO(), cd)
 
-	// If we've successfully cleared the deprovision finalizer we know this is a good time to
-	// reset the underway metric to 0, after which it will no longer be reported.
 	if err == nil {
+		// If we've successfully cleared the deprovision finalizer we know this is a good time to
+		// reset the underway metric to 0, after which it will no longer be reported.
 		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
 			cd.Name,
 			cd.Namespace,
 			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+
+		// Increment the clusters deleted counter:
+		metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 	}
+
 	return err
 }
 

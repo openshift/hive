@@ -52,7 +52,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "Compute", "ControlPlaneConfig", "Ingress", "PreserveOnDelete", "State"}
+	mutableFields = []string{"CertificateBundles", "Compute", "ControlPlaneConfig", "Ingress", "PreserveOnDelete"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -231,28 +231,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if newObject.Spec.State == hivev1.ClusterDeploymentStateAbsent {
-		message := "A state value of 'Absent' is not valid on cluster deployment creation"
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
-	}
-
-	if len(newObject.Spec.State) > 0 && newObject.Spec.State != hivev1.ClusterDeploymentStatePresent {
-		message := fmt.Sprintf("Invalid cluster deployment state: %q", newObject.Spec.State)
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
-	}
-
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
@@ -375,32 +353,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
 				Message: message,
 			},
-		}
-	}
-
-	// Check that we're not making an invalid state change
-	// Present->Absent is allowed. Absent->Present is not allowed.
-	if oldObject.Spec.State != newObject.Spec.State {
-		if oldObject.Spec.State == hivev1.ClusterDeploymentStateAbsent {
-			message := "Cannot change cluster deployment state from the Absent state"
-			contextLogger.Infof("Failed validation: %v", message)
-			return &admissionv1beta1.AdmissionResponse{
-				Allowed: false,
-				Result: &metav1.Status{
-					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-					Message: message,
-				},
-			}
-		} else if newObject.Spec.State != hivev1.ClusterDeploymentStateAbsent && newObject.Spec.State != hivev1.ClusterDeploymentStatePresent {
-			message := fmt.Sprintf("Invalid cluster deployment state: %q", newObject.Spec.State)
-			contextLogger.Infof("Failed validation: %v", message)
-			return &admissionv1beta1.AdmissionResponse{
-				Allowed: false,
-				Result: &metav1.Status{
-					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-					Message: message,
-				},
-			}
 		}
 	}
 

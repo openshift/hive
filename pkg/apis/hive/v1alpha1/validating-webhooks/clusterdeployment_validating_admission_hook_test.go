@@ -363,46 +363,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
-		{
-			name: "Test invalid state on create",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
-				cd.Spec.State = hivev1.ClusterDeploymentStateAbsent
-				return cd
-			}(),
-			operation:       admissionv1beta1.Create,
-			expectedAllowed: false,
-		},
-		{
-			name: "Test allowed state change",
-			oldObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
-				cd.Spec.State = hivev1.ClusterDeploymentStatePresent
-				return cd
-			}(),
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
-				cd.Spec.State = hivev1.ClusterDeploymentStateAbsent
-				return cd
-			}(),
-			operation:       admissionv1beta1.Update,
-			expectedAllowed: true,
-		},
-		{
-			name: "Test forbidden state change",
-			oldObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
-				cd.Spec.State = hivev1.ClusterDeploymentStateAbsent
-				return cd
-			}(),
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
-				cd.Spec.State = hivev1.ClusterDeploymentStatePresent
-				return cd
-			}(),
-			operation:       admissionv1beta1.Update,
-			expectedAllowed: false,
-		},
 	}
 
 	for _, tc := range cases {

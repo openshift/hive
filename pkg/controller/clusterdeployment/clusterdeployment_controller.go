@@ -310,16 +310,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return r.syncDeletedClusterDeployment(cd, hiveImage, cdLog)
 	}
 
-	if cd.Spec.State == hivev1.ClusterDeploymentStateAbsent {
-		cdLog.Info("Absent state detected on clusterdeployment. Deleting...")
-		err := r.Delete(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Errorf("cannot delete clusterdeployment")
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{}, nil
-	}
-
 	// requeueAfter will be used to determine if cluster should be requeued after
 	// reconcile has completed
 	var requeueAfter time.Duration

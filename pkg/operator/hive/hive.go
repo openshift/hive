@@ -18,6 +18,7 @@ package hive
 
 import (
 	"context"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -36,6 +37,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
+const (
+	dnsServersEnvVar = "ZONE_CHECK_DNS_SERVERS"
+)
+
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
 
 	asset := assets.MustAsset("config/manager/deployment.yaml")
@@ -52,6 +57,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		}
 
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
+	}
+
+	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
+		dnsServersEnvVar := corev1.EnvVar{
+			Name:  dnsServersEnvVar,
+			Value: zoneCheckDNSServers,
+		}
+		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, dnsServersEnvVar)
 	}
 
 	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)

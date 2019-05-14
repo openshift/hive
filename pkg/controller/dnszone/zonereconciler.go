@@ -19,6 +19,7 @@ package dnszone
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ const (
 	defaultNSRecordTTL              = hivev1.TTL(60)
 	dnsClientTimeout                = 30 * time.Second
 	resolverConfigFile              = "/etc/resolv.conf"
+	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
 )
 
 // ZoneReconciler manages getting the desired state, getting the current state and reconciling the two.
@@ -635,8 +637,19 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 	client := dns.Client{Timeout: dnsClientTimeout}
 
 	dnsServers := []string{}
-	for _, s := range clientConfig.Servers {
-		dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
+	serversFromEnv := os.Getenv(zoneCheckDNSServersEnvVar)
+	if len(serversFromEnv) > 0 {
+		dnsServers = strings.Split(serversFromEnv, ",")
+		// Add port to servers with unspecified port
+		for i := range dnsServers {
+			if !strings.Contains(dnsServers[i], ":") {
+				dnsServers[i] = dnsServers[i] + ":53"
+			}
+		}
+	} else {
+		for _, s := range clientConfig.Servers {
+			dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
+		}
 	}
 	logger.WithField("servers", dnsServers).Debug("looking up domain SOA record")
 

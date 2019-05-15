@@ -45,6 +45,10 @@ test-integration: generate
 test-e2e:
 	hack/e2e-test.sh
 
+.PHONY: test-e2e-postdeploy
+test-e2e-postdeploy:
+	go test ./test/e2e/postdeploy/...
+
 # Builds all of hive's binaries (including utils).
 .PHONY: build
 build: $(GOPATH)/bin/mockgen manager hiveutil hiveadmission operator

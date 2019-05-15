@@ -61,7 +61,12 @@ export AWS_SECRET_ACCESS_KEY="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_secr
 function teardown() {
 	oc logs -c hive job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_install_job.log" || true
 	echo "************* INSTALL JOB LOG *************"
-	cat "${ARTIFACT_DIR}/hive_install_job.log"
+	if oc get cm/${CLUSTER_NAME}-install-log -o jsonpath='{ .data.log }' &> "${ARTIFACT_DIR}/hive_install_console.log"; then
+		cat "${ARTIFACT_DIR}/hive_install_console.log"
+	else
+		cat "${ARTIFACT_DIR}/hive_install_job.log"
+	fi
+
 	echo ""
 	echo ""
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
@@ -85,8 +90,7 @@ function teardown() {
 }
 trap 'teardown' EXIT
 
-# TODO: Determine how to wait for readiness of the validation webhook
-sleep 120
+make test-e2e-postdeploy
 
 i=1
 while [ $i -le ${max_tries} ]; do

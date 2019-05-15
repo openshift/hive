@@ -17,8 +17,10 @@ limitations under the License.
 package createcluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -84,7 +86,8 @@ a default image is used: %[4]s.
 
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
-used: %[5]s.
+obtained from a the following URL: 
+https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
 
 INSTALLER_IMAGE - Installer image to use to install the cluster. If not specified,
 the --installer-image flag is used. If that's not specified, the image is 
@@ -105,6 +108,7 @@ type Options struct {
 	HiveImage          string
 	InstallerImage     string
 	ReleaseImage       string
+	ReleaseImageSource string
 	UseClusterImageSet bool
 	ManageDNS          bool
 	Output             string
@@ -112,8 +116,7 @@ type Options struct {
 }
 
 const (
-	defaultHiveImage    = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
-	defaultReleaseImage = "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
+	defaultHiveImage = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 )
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
@@ -130,7 +133,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-cluster CLUSTER_DEPLOYMENT_NAME",
 		Short: "Creates a new Hive cluster deployment",
-		Long:  fmt.Sprintf(longDesc, defaultSSHKeyFile, defaultPullSecretFile, defaultAWSCredsFile, defaultHiveImage, defaultReleaseImage),
+		Long:  fmt.Sprintf(longDesc, defaultSSHKeyFile, defaultPullSecretFile, defaultAWSCredsFile, defaultHiveImage),
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
@@ -155,6 +158,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.StringVar(&opt.HiveImage, "hive-image", "", "Hive image to use for installing/uninstalling this cluster deployment")
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
+	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
 	flags.BoolVar(&opt.ManageDNS, "manage-dns", false, "Manage this cluster's DNS")
 	flags.BoolVar(&opt.UseClusterImageSet, "use-image-set", true, "If true(default), use a cluster image set for this cluster")
 	flags.StringVarP(&opt.Output, "output", "o", "", "Output of this command (nothing will be created on cluster). Valid values: yaml,json")
@@ -513,7 +517,14 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 		o.HiveImage = defaultHiveImage
 	}
 	if o.ReleaseImage == "" {
-		o.ReleaseImage = defaultReleaseImage
+		if o.ReleaseImageSource == "" {
+			return nil, fmt.Errorf("Specify either a release image or a release image source")
+		}
+		var err error
+		o.ReleaseImage, err = determineReleaseImageFromSource(o.ReleaseImageSource)
+		if err != nil {
+			return nil, fmt.Errorf("Cannot determine release image: %v", err)
+		}
 	}
 	if !o.UseClusterImageSet {
 		cd.Spec.Images.InstallerImage = o.InstallerImage
@@ -572,4 +583,26 @@ func strptr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+type releasePayload struct {
+	PullSpec string `json:"pullSpec"`
+}
+
+func determineReleaseImageFromSource(sourceURL string) (string, error) {
+	resp, err := http.Get(sourceURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	payload := &releasePayload{}
+	err = json.Unmarshal(data, payload)
+	if err != nil {
+		return "", err
+	}
+	return payload.PullSpec, nil
 }

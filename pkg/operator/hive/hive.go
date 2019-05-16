@@ -61,10 +61,11 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 	hLog.Info("deployment applied (%s)", result)
 
-	// Deploy the desired ClusterImageSets representing installable releases of OpenShift.
-	// TODO: in future this should be pipelined somehow.
 	applyAssets := []string{
 		"config/manager/service.yaml",
+
+		// Deploy the desired ClusterImageSets representing installable releases of OpenShift.
+		// TODO: in future this should be pipelined somehow.
 		"config/clusterimagesets/openshift-4.0-latest.yaml",
 		"config/clusterimagesets/openshift-4.0-beta3.yaml",
 		"config/clusterimagesets/openshift-4.0-beta4.yaml",
@@ -72,6 +73,19 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role.yaml",
 		"config/rbac/hive_reader_role_binding.yaml",
+
+		// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
+		// the latest in the operator to ensure updates roll out.
+		"config/crds/hive_v1alpha1_clusterdeployment.yaml",
+		"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml",
+		"config/crds/hive_v1alpha1_clusterimageset.yaml",
+		"config/crds/hive_v1alpha1_dnsendpoint.yaml",
+		"config/crds/hive_v1alpha1_dnszone.yaml",
+		"config/crds/hive_v1alpha1_hiveconfig.yaml",
+		"config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml",
+		"config/crds/hive_v1alpha1_selectorsyncset.yaml",
+		"config/crds/hive_v1alpha1_syncidentityprovider.yaml",
+		"config/crds/hive_v1alpha1_syncset.yaml",
 	}
 	for _, a := range applyAssets {
 		err = util.ApplyAsset(h, a, hLog)

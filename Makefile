@@ -184,7 +184,7 @@ docker-push:
 
 # Build the image with buildah
 .PHONY: buildah-build
-buildah-build: 
+buildah-build:
 	$(SUDO_CMD) buildah bud --tag ${IMG} .
 
 # Push the buildah image

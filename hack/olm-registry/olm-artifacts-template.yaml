@@ -12,6 +12,10 @@ parameters:
   value: latest
 - name: EXTERNAL_DNS_IMAGE
   value: quay.io/jdiaz/external-dns:latest
+- name: EXTERNAL_DNS_AWS_CREDS
+  value: external-dns-route53-admin
+- name: EXTERNAL_DNS_MANAGED_DOMAIN
+  value: s1.openshiftapps.com
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -50,7 +54,7 @@ objects:
     externalDNS:
       aws:
         credentials:
-          name: external-dns-route53-admin
+          name: ${EXTERNAL_DNS_AWS_CREDS}
       image: ${EXTERNAL_DNS_IMAGE}
     managedDomains:
-    - s1.openshiftapps.com
+    - ${EXTERNAL_DNS_MANAGED_DOMAIN}

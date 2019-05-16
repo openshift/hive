@@ -96,6 +96,7 @@ rules:
   - patch
   - delete
 # Allow get on CRDs so we can check for 4.x ClusterVersion to determine if running on 3.11 or not.
+# Allow create and update until the OLM CRD update bug is fixed.
 - apiGroups:
   - apiextensions.k8s.io
   resources:
@@ -104,6 +105,10 @@ rules:
   - get
   - list
   - watch
+  - create
+  - update
+  - patch
+  # NOTE: delete not being granted as it should not be necessary and would be destructive
 # Allow creating ClusterRoles and Bindings for the hive-admin role.
 - apiGroups:
   - rbac.authorization.k8s.io

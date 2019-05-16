@@ -67,11 +67,6 @@ spec:
                     description: PatchType indicates the PatchType as "strategic"
                       (default), "json", or "merge".
                     type: string
-                required:
-                - apiVersion
-                - kind
-                - name
-                - patch
                 type: object
               type: array
             resourceApplyMode:
@@ -84,8 +79,6 @@ spec:
               items:
                 type: object
               type: array
-          required:
-          - clusterDeploymentRefs
           type: object
         status:
           type: object

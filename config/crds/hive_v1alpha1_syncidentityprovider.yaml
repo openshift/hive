@@ -59,8 +59,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
@@ -76,8 +74,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -93,14 +89,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    required:
-                    - url
                     type: object
                   github:
                     description: github enables user authentication using GitHub credentials
@@ -121,8 +113,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -138,8 +128,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
@@ -159,9 +147,6 @@ spec:
                         items:
                           type: string
                         type: array
-                    required:
-                    - clientID
-                    - clientSecret
                     type: object
                   gitlab:
                     description: gitlab enables user authentication using GitLab credentials
@@ -181,8 +166,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -198,16 +181,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the oauth server base URL
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
-                    - url
                     type: object
                   google:
                     description: google enables user authentication using Google credentials
@@ -226,16 +203,11 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
                           (e.g. "mycompany.com") to restrict logins to
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
                     type: object
                   htpasswd:
                     description: htpasswd enables user authentication using an HTPasswd
@@ -254,11 +226,7 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
-                    required:
-                    - fileData
                     type: object
                   keystone:
                     description: keystone enables user authentication using keystone
@@ -279,8 +247,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       domainName:
                         description: domainName is required for keystone v3
@@ -299,8 +265,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -316,15 +280,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    required:
-                    - url
-                    - domainName
                     type: object
                   ldap:
                     description: ldap enables user authentication using LDAP credentials
@@ -363,8 +322,6 @@ spec:
                             items:
                               type: string
                             type: array
-                        required:
-                        - id
                         type: object
                       bindDN:
                         description: bindDN is an optional DN to bind with during
@@ -382,8 +339,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       ca:
                         description: ca is an optional reference to a config map by
@@ -400,8 +355,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
@@ -416,10 +369,6 @@ spec:
                         description: 'url is an RFC 2255 URL which specifies the LDAP
                           search parameters to use. The syntax of the URL is: ldap://host:port/basedn?attribute?scope?filter'
                         type: string
-                    required:
-                    - url
-                    - insecure
-                    - attributes
                     type: object
                   mappingMethod:
                     description: mappingMethod determines how identities from this
@@ -450,8 +399,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       claims:
                         description: claims mappings
@@ -493,8 +440,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       extraAuthorizeParameters:
                         description: extraAuthorizeParameters are any custom parameters
@@ -511,11 +456,6 @@ spec:
                           as its Issuer Identifier. It must use the https scheme with
                           no query or fragment component.
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
-                    - issuer
-                    - claims
                     type: object
                   requestHeader:
                     description: requestHeader enables user authentication using request
@@ -537,8 +477,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
@@ -589,27 +527,13 @@ spec:
                         items:
                           type: string
                         type: array
-                    required:
-                    - loginURL
-                    - challengeURL
-                    - ca
-                    - headers
-                    - preferredUsernameHeaders
-                    - nameHeaders
-                    - emailHeaders
                     type: object
                   type:
                     description: type identifies the identity provider type for this
                       entry.
                     type: string
-                required:
-                - name
-                - type
                 type: object
               type: array
-          required:
-          - identityProviders
-          - clusterDeploymentRefs
           type: object
         status:
           type: object

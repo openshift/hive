@@ -68,12 +68,8 @@ spec:
                       description: Region is the AWS region for this deprovisioning
                         request
                       type: string
-                  required:
-                  - region
                   type: object
               type: object
-          required:
-          - infraID
           type: object
         status:
           properties:

@@ -76,9 +76,6 @@ spec:
                       it is expected that the secret should exist in the same namespace
                       as the ClusterDeployment
                     type: object
-                required:
-                - name
-                - secretRef
                 type: object
               type: array
             clusterName:
@@ -123,10 +120,6 @@ spec:
                               type:
                                 description: Type defines the type of the instance.
                                 type: string
-                            required:
-                            - iops
-                            - size
-                            - type
                             type: object
                           type:
                             description: InstanceType defines the ec2 instance type.
@@ -138,9 +131,6 @@ spec:
                             items:
                               type: string
                             type: array
-                        required:
-                        - type
-                        - rootVolume
                         type: object
                       libvirt:
                         description: Libvirt is the configuration used when installing
@@ -158,8 +148,6 @@ spec:
                             description: ImageVolume is the name of the libvirt storage
                               volume containing the OS image.
                             type: string
-                        required:
-                        - image
                         type: object
                       openstack:
                         description: OpenStack is the configuration used when installing
@@ -180,18 +168,11 @@ spec:
                               type:
                                 description: Type defines the type of the instance.
                                 type: string
-                            required:
-                            - iops
-                            - size
-                            - type
                             type: object
                           type:
                             description: FlavorName defines the OpenStack Nova flavor.
                               eg. m1.large
                             type: string
-                        required:
-                        - type
-                        - rootVolume
                         type: object
                     type: object
                   replicas:
@@ -206,10 +187,6 @@ spec:
                     items:
                       type: object
                     type: array
-                required:
-                - name
-                - replicas
-                - platform
                 type: object
               type: array
             controlPlane:
@@ -246,10 +223,6 @@ spec:
                             type:
                               description: Type defines the type of the instance.
                               type: string
-                          required:
-                          - iops
-                          - size
-                          - type
                           type: object
                         type:
                           description: InstanceType defines the ec2 instance type.
@@ -261,9 +234,6 @@ spec:
                           items:
                             type: string
                           type: array
-                      required:
-                      - type
-                      - rootVolume
                       type: object
                     libvirt:
                       description: Libvirt is the configuration used when installing
@@ -281,8 +251,6 @@ spec:
                           description: ImageVolume is the name of the libvirt storage
                             volume containing the OS image.
                           type: string
-                      required:
-                      - image
                       type: object
                     openstack:
                       description: OpenStack is the configuration used when installing
@@ -303,18 +271,11 @@ spec:
                             type:
                               description: Type defines the type of the instance.
                               type: string
-                          required:
-                          - iops
-                          - size
-                          - type
                           type: object
                         type:
                           description: FlavorName defines the OpenStack Nova flavor.
                             eg. m1.large
                           type: string
-                      required:
-                      - type
-                      - rootVolume
                       type: object
                   type: object
                 replicas:
@@ -329,10 +290,6 @@ spec:
                   items:
                     type: object
                   type: array
-              required:
-              - name
-              - replicas
-              - platform
               type: object
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
@@ -357,9 +314,6 @@ spec:
                               ClusterDeployment.Spec that should be used for this
                               additional certificate.
                             type: string
-                        required:
-                        - name
-                        - domain
                         type: object
                       type: array
                     default:
@@ -378,8 +332,6 @@ spec:
                   description: Name is the name of the ClusterImageSet that this refers
                     to
                   type: string
-              required:
-              - name
               type: object
             images:
               description: Images allows overriding the default images used to provision
@@ -433,9 +385,6 @@ spec:
                     description: ServingCertificate references a CertificateBundle
                       in the ClusterDeployment.Spec that should be used for this Ingress
                     type: string
-                required:
-                - name
-                - domain
                 type: object
               type: array
             manageDNS:
@@ -455,9 +404,6 @@ spec:
                       hostSubnetLength:
                         format: int32
                         type: integer
-                    required:
-                    - cidr
-                    - hostSubnetLength
                     type: object
                   type: array
                 machineCIDR:
@@ -471,10 +417,6 @@ spec:
                 type:
                   description: Type is the network type to install
                   type: string
-              required:
-              - machineCIDR
-              - type
-              - serviceCIDR
               type: object
             platform:
               description: Platform is the configuration for the specific platform
@@ -502,10 +444,6 @@ spec:
                             type:
                               description: Type defines the type of the instance.
                               type: string
-                          required:
-                          - iops
-                          - size
-                          - type
                           type: object
                         type:
                           description: InstanceType defines the ec2 instance type.
@@ -517,9 +455,6 @@ spec:
                           items:
                             type: string
                           type: array
-                      required:
-                      - type
-                      - rootVolume
                       type: object
                     region:
                       description: Region specifies the AWS region where the cluster
@@ -529,8 +464,6 @@ spec:
                       description: UserTags specifies additional tags for AWS resources
                         created for the cluster.
                       type: object
-                  required:
-                  - region
                   type: object
                 libvirt:
                   description: Libvirt is the configuration used when installing on
@@ -559,8 +492,6 @@ spec:
                           description: ImageVolume is the name of the libvirt storage
                             volume containing the OS image.
                           type: string
-                      required:
-                      - image
                       type: object
                     masterIPs:
                       description: MasterIPs
@@ -580,15 +511,7 @@ spec:
                         name:
                           description: Name is the name of the nework.
                           type: string
-                      required:
-                      - name
-                      - if
-                      - ipRange
                       type: object
-                  required:
-                  - URI
-                  - network
-                  - masterIPs
                   type: object
               type: object
             platformSecrets:
@@ -601,8 +524,6 @@ spec:
                       description: Credentials refers to a secret that contains the
                         AWS account access credentials.
                       type: object
-                  required:
-                  - credentials
                   type: object
               type: object
             preserveOnDelete:
@@ -617,15 +538,6 @@ spec:
               description: SSHKey is the reference to the secret that contains a public
                 key to use for access to compute instances.
               type: object
-          required:
-          - clusterName
-          - baseDomain
-          - networking
-          - controlPlane
-          - compute
-          - platform
-          - pullSecret
-          - platformSecrets
           type: object
         status:
           properties:
@@ -652,9 +564,6 @@ spec:
                   name:
                     description: Name of the certificate bundle
                     type: string
-                required:
-                - name
-                - generated
                 type: object
               type: array
             clusterID:
@@ -670,7 +579,7 @@ spec:
                   description: availableUpdates contains the list of updates that
                     are appropriate for this cluster. This list may be empty if no
                     updates are recommended, if the update service is unavailable,
-                    or if an invalid channel has been specified. +nullable
+                    or if an invalid channel has been specified.
                   items:
                     properties:
                       image:
@@ -685,6 +594,7 @@ spec:
                           is optional if image is specified.
                         type: string
                     type: object
+                  nullable: true
                   type: array
                 conditions:
                   description: conditions provides information about the cluster version.
@@ -717,10 +627,6 @@ spec:
                         description: type specifies the state of the operator's reconciliation
                           functionality.
                         type: string
-                    required:
-                    - type
-                    - status
-                    - lastTransitionTime
                     type: object
                   type: array
                 desired:
@@ -756,8 +662,9 @@ spec:
                           fully applied. The update that is currently being applied
                           will have a null completion time. Completion time will always
                           be set for entries that are not the current update (usually
-                          to the started time of the next update). +nullable
+                          to the started time of the next update).
                         format: date-time
+                        nullable: true
                         type: string
                       image:
                         description: image is a container image location that contains
@@ -781,11 +688,6 @@ spec:
                           a version, or if a failure occurs retrieving the image,
                           this value may be empty.
                         type: string
-                    required:
-                    - state
-                    - startedTime
-                    - completionTime
-                    - image
                     type: object
                   type: array
                 observedGeneration:
@@ -800,11 +702,6 @@ spec:
                     cluster will be updated with. It is used by the operator to avoid
                     unnecessary work and is for internal use only.
                   type: string
-              required:
-              - desired
-              - observedGeneration
-              - versionHash
-              - availableUpdates
               type: object
             conditions:
               description: Conditions includes more detailed status for the cluster
@@ -834,9 +731,6 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
-                required:
-                - type
-                - status
                 type: object
               type: array
             federated:
@@ -899,9 +793,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      required:
-                      - type
-                      - status
                       type: object
                     type: array
                   name:
@@ -946,9 +837,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -972,13 +860,6 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
                   resources:
@@ -1020,9 +901,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -1046,17 +924,8 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
-                required:
-                - name
                 type: object
               type: array
             syncSetStatus:
@@ -1094,9 +963,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      required:
-                      - type
-                      - status
                       type: object
                     type: array
                   name:
@@ -1141,9 +1007,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -1167,13 +1030,6 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
                   resources:
@@ -1215,9 +1071,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -1241,25 +1094,14 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
-                required:
-                - name
                 type: object
               type: array
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.
               type: string
-          required:
-          - installed
           type: object
   version: v1alpha1
 status:

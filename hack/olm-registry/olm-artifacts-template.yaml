@@ -10,6 +10,8 @@ parameters:
   value: staging
 - name: IMAGE_TAG
   value: latest
+- name: EXTERNAL_DNS_IMAGE
+  value: quay.io/jdiaz/external-dns:latest
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -39,3 +41,16 @@ objects:
     name: hive-operator
     source: hive-catalog
     sourceNamespace: hive
+
+- apiVersion: hive.openshift.io/v1alpha1
+  kind: HiveConfig
+  metadata:
+    name: hive
+  spec:
+    externalDNS:
+      aws:
+        credentials:
+          name: external-dns-route53-admin
+      image: ${EXTERNAL_DNS_IMAGE}
+    managedDomains:
+    - s1.openshiftapps.com

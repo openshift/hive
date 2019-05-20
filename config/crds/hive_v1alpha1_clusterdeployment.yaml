@@ -76,6 +76,8 @@ spec:
                       it is expected that the secret should exist in the same namespace
                       as the ClusterDeployment
                     type: object
+                required:
+                - name
                 type: object
               type: array
             clusterName:
@@ -385,6 +387,9 @@ spec:
                     description: ServingCertificate references a CertificateBundle
                       in the ClusterDeployment.Spec that should be used for this Ingress
                     type: string
+                required:
+                - name
+                - domain
                 type: object
               type: array
             manageDNS:
@@ -538,6 +543,15 @@ spec:
               description: SSHKey is the reference to the secret that contains a public
                 key to use for access to compute instances.
               type: object
+          required:
+          - clusterName
+          - baseDomain
+          - networking
+          - controlPlane
+          - compute
+          - platform
+          - pullSecret
+          - platformSecrets
           type: object
         status:
           properties:

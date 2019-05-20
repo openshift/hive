@@ -192,9 +192,6 @@ buildah-build:
 buildah-push: buildah-build
 	$(SUDO_CMD) buildah push ${IMG}
 
-install-federation:
-	./hack/install-federation.sh
-
 $(GOPATH)/bin/mockgen:
 	go get -u github.com/golang/mock/mockgen/...
 

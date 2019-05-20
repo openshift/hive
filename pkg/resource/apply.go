@@ -23,7 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	kcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
+	kcmdapply "k8s.io/kubernetes/pkg/kubectl/cmd/apply"
+
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -88,9 +89,9 @@ func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) 
 	return r.Apply(data)
 }
 
-func (r *Helper) setupApplyCommand(f cmdutil.Factory, fileName string, ioStreams genericclioptions.IOStreams) (*kcmd.ApplyOptions, *changeTracker, error) {
+func (r *Helper) setupApplyCommand(f cmdutil.Factory, fileName string, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
 	r.logger.Debug("setting up apply command")
-	o := kcmd.NewApplyOptions(ioStreams)
+	o := kcmdapply.NewApplyOptions(ioStreams)
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain dynamic client from factory")

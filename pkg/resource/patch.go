@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	kcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
+	kcmdpatch "k8s.io/kubernetes/pkg/kubectl/cmd/patch"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -62,10 +62,10 @@ func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 	return nil
 }
 
-func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmd.PatchOptions, error) {
+func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmdpatch.PatchOptions, error) {
 	r.logger.Debug("setting up patch command")
 
-	cmd := kcmd.NewCmdPatch(f, ioStreams)
+	cmd := kcmdpatch.NewCmdPatch(f, ioStreams)
 	cmd.Flags().Parse([]string{})
 
 	gv, err := schema.ParseGroupVersion(apiVersion)
@@ -77,7 +77,7 @@ func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f c
 
 	r.logger.WithField("arg", args[0]).Debugf("resource argument")
 
-	o := kcmd.NewPatchOptions(ioStreams)
+	o := kcmdpatch.NewPatchOptions(ioStreams)
 	o.Complete(f, cmd, args)
 	if patchType == "" {
 		patchType = "strategic"

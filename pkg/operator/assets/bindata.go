@@ -1280,38 +1280,6 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - clusterregistry.k8s.io
-  resources:
-  - clusters
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - core.federation.k8s.io
-  resources:
-  - federatedclusters
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
   - hive.openshift.io
   resources:
   - clusterdeployments
@@ -1514,7 +1482,6 @@ spec:
                     type: object
                 required:
                 - name
-                - secretRef
                 type: object
               type: array
             clusterName:
@@ -1559,10 +1526,6 @@ spec:
                               type:
                                 description: Type defines the type of the instance.
                                 type: string
-                            required:
-                            - iops
-                            - size
-                            - type
                             type: object
                           type:
                             description: InstanceType defines the ec2 instance type.
@@ -1574,9 +1537,6 @@ spec:
                             items:
                               type: string
                             type: array
-                        required:
-                        - type
-                        - rootVolume
                         type: object
                       libvirt:
                         description: Libvirt is the configuration used when installing
@@ -1594,8 +1554,6 @@ spec:
                             description: ImageVolume is the name of the libvirt storage
                               volume containing the OS image.
                             type: string
-                        required:
-                        - image
                         type: object
                       openstack:
                         description: OpenStack is the configuration used when installing
@@ -1616,18 +1574,11 @@ spec:
                               type:
                                 description: Type defines the type of the instance.
                                 type: string
-                            required:
-                            - iops
-                            - size
-                            - type
                             type: object
                           type:
                             description: FlavorName defines the OpenStack Nova flavor.
                               eg. m1.large
                             type: string
-                        required:
-                        - type
-                        - rootVolume
                         type: object
                     type: object
                   replicas:
@@ -1642,10 +1593,6 @@ spec:
                     items:
                       type: object
                     type: array
-                required:
-                - name
-                - replicas
-                - platform
                 type: object
               type: array
             controlPlane:
@@ -1682,10 +1629,6 @@ spec:
                             type:
                               description: Type defines the type of the instance.
                               type: string
-                          required:
-                          - iops
-                          - size
-                          - type
                           type: object
                         type:
                           description: InstanceType defines the ec2 instance type.
@@ -1697,9 +1640,6 @@ spec:
                           items:
                             type: string
                           type: array
-                      required:
-                      - type
-                      - rootVolume
                       type: object
                     libvirt:
                       description: Libvirt is the configuration used when installing
@@ -1717,8 +1657,6 @@ spec:
                           description: ImageVolume is the name of the libvirt storage
                             volume containing the OS image.
                           type: string
-                      required:
-                      - image
                       type: object
                     openstack:
                       description: OpenStack is the configuration used when installing
@@ -1739,18 +1677,11 @@ spec:
                             type:
                               description: Type defines the type of the instance.
                               type: string
-                          required:
-                          - iops
-                          - size
-                          - type
                           type: object
                         type:
                           description: FlavorName defines the OpenStack Nova flavor.
                             eg. m1.large
                           type: string
-                      required:
-                      - type
-                      - rootVolume
                       type: object
                   type: object
                 replicas:
@@ -1765,10 +1696,6 @@ spec:
                   items:
                     type: object
                   type: array
-              required:
-              - name
-              - replicas
-              - platform
               type: object
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
@@ -1793,9 +1720,6 @@ spec:
                               ClusterDeployment.Spec that should be used for this
                               additional certificate.
                             type: string
-                        required:
-                        - name
-                        - domain
                         type: object
                       type: array
                     default:
@@ -1814,8 +1738,6 @@ spec:
                   description: Name is the name of the ClusterImageSet that this refers
                     to
                   type: string
-              required:
-              - name
               type: object
             images:
               description: Images allows overriding the default images used to provision
@@ -1891,9 +1813,6 @@ spec:
                       hostSubnetLength:
                         format: int32
                         type: integer
-                    required:
-                    - cidr
-                    - hostSubnetLength
                     type: object
                   type: array
                 machineCIDR:
@@ -1907,10 +1826,6 @@ spec:
                 type:
                   description: Type is the network type to install
                   type: string
-              required:
-              - machineCIDR
-              - type
-              - serviceCIDR
               type: object
             platform:
               description: Platform is the configuration for the specific platform
@@ -1938,10 +1853,6 @@ spec:
                             type:
                               description: Type defines the type of the instance.
                               type: string
-                          required:
-                          - iops
-                          - size
-                          - type
                           type: object
                         type:
                           description: InstanceType defines the ec2 instance type.
@@ -1953,9 +1864,6 @@ spec:
                           items:
                             type: string
                           type: array
-                      required:
-                      - type
-                      - rootVolume
                       type: object
                     region:
                       description: Region specifies the AWS region where the cluster
@@ -1965,8 +1873,6 @@ spec:
                       description: UserTags specifies additional tags for AWS resources
                         created for the cluster.
                       type: object
-                  required:
-                  - region
                   type: object
                 libvirt:
                   description: Libvirt is the configuration used when installing on
@@ -1995,8 +1901,6 @@ spec:
                           description: ImageVolume is the name of the libvirt storage
                             volume containing the OS image.
                           type: string
-                      required:
-                      - image
                       type: object
                     masterIPs:
                       description: MasterIPs
@@ -2016,15 +1920,7 @@ spec:
                         name:
                           description: Name is the name of the nework.
                           type: string
-                      required:
-                      - name
-                      - if
-                      - ipRange
                       type: object
-                  required:
-                  - URI
-                  - network
-                  - masterIPs
                   type: object
               type: object
             platformSecrets:
@@ -2037,8 +1933,6 @@ spec:
                       description: Credentials refers to a secret that contains the
                         AWS account access credentials.
                       type: object
-                  required:
-                  - credentials
                   type: object
               type: object
             preserveOnDelete:
@@ -2088,9 +1982,6 @@ spec:
                   name:
                     description: Name of the certificate bundle
                     type: string
-                required:
-                - name
-                - generated
                 type: object
               type: array
             clusterID:
@@ -2106,7 +1997,7 @@ spec:
                   description: availableUpdates contains the list of updates that
                     are appropriate for this cluster. This list may be empty if no
                     updates are recommended, if the update service is unavailable,
-                    or if an invalid channel has been specified. +nullable
+                    or if an invalid channel has been specified.
                   items:
                     properties:
                       image:
@@ -2121,6 +2012,7 @@ spec:
                           is optional if image is specified.
                         type: string
                     type: object
+                  nullable: true
                   type: array
                 conditions:
                   description: conditions provides information about the cluster version.
@@ -2153,10 +2045,6 @@ spec:
                         description: type specifies the state of the operator's reconciliation
                           functionality.
                         type: string
-                    required:
-                    - type
-                    - status
-                    - lastTransitionTime
                     type: object
                   type: array
                 desired:
@@ -2192,8 +2080,9 @@ spec:
                           fully applied. The update that is currently being applied
                           will have a null completion time. Completion time will always
                           be set for entries that are not the current update (usually
-                          to the started time of the next update). +nullable
+                          to the started time of the next update).
                         format: date-time
+                        nullable: true
                         type: string
                       image:
                         description: image is a container image location that contains
@@ -2217,11 +2106,6 @@ spec:
                           a version, or if a failure occurs retrieving the image,
                           this value may be empty.
                         type: string
-                    required:
-                    - state
-                    - startedTime
-                    - completionTime
-                    - image
                     type: object
                   type: array
                 observedGeneration:
@@ -2236,11 +2120,6 @@ spec:
                     cluster will be updated with. It is used by the operator to avoid
                     unnecessary work and is for internal use only.
                   type: string
-              required:
-              - desired
-              - observedGeneration
-              - versionHash
-              - availableUpdates
               type: object
             conditions:
               description: Conditions includes more detailed status for the cluster
@@ -2270,9 +2149,6 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
-                required:
-                - type
-                - status
                 type: object
               type: array
             federated:
@@ -2335,9 +2211,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      required:
-                      - type
-                      - status
                       type: object
                     type: array
                   name:
@@ -2382,9 +2255,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -2408,13 +2278,6 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
                   resources:
@@ -2456,9 +2319,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -2482,17 +2342,8 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
-                required:
-                - name
                 type: object
               type: array
             syncSetStatus:
@@ -2530,9 +2381,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      required:
-                      - type
-                      - status
                       type: object
                     type: array
                   name:
@@ -2577,9 +2425,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -2603,13 +2448,6 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
                   resources:
@@ -2651,9 +2489,6 @@ spec:
                               type:
                                 description: Type is the type of the condition.
                                 type: string
-                            required:
-                            - type
-                            - status
                             type: object
                           type: array
                         hash:
@@ -2677,25 +2512,14 @@ spec:
                             that was synced. This will be populated for resources,
                             but not patches
                           type: string
-                      required:
-                      - apiVersion
-                      - kind
-                      - name
-                      - namespace
-                      - hash
-                      - conditions
                       type: object
                     type: array
-                required:
-                - name
                 type: object
               type: array
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.
               type: string
-          required:
-          - installed
           type: object
   version: v1alpha1
 status:
@@ -2791,12 +2615,8 @@ spec:
                       description: Region is the AWS region for this deprovisioning
                         request
                       type: string
-                  required:
-                  - region
                   type: object
               type: object
-          required:
-          - infraID
           type: object
         status:
           properties:
@@ -3059,18 +2879,12 @@ spec:
                       value:
                         description: Value is the value for the tag
                         type: string
-                    required:
-                    - key
-                    - value
                     type: object
                   type: array
                 region:
                   description: Region specifies the region-specific API endpoint to
                     use
                   type: string
-              required:
-              - accountSecret
-              - region
               type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
@@ -3079,8 +2893,6 @@ spec:
             zone:
               description: Zone is the DNS zone to host
               type: string
-          required:
-          - zone
           type: object
         status:
           properties:
@@ -3119,9 +2931,6 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
-                required:
-                - type
-                - status
                 type: object
               type: array
             lastSyncGeneration:
@@ -3139,8 +2948,6 @@ spec:
               items:
                 type: string
               type: array
-          required:
-          - lastSyncGeneration
           type: object
   version: v1alpha1
 status:
@@ -3328,8 +3135,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
@@ -3345,8 +3150,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -3362,14 +3165,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    required:
-                    - url
                     type: object
                   github:
                     description: github enables user authentication using GitHub credentials
@@ -3390,8 +3189,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -3407,8 +3204,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
@@ -3428,9 +3223,6 @@ spec:
                         items:
                           type: string
                         type: array
-                    required:
-                    - clientID
-                    - clientSecret
                     type: object
                   gitlab:
                     description: gitlab enables user authentication using GitLab credentials
@@ -3450,8 +3242,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -3467,16 +3257,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the oauth server base URL
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
-                    - url
                     type: object
                   google:
                     description: google enables user authentication using Google credentials
@@ -3495,16 +3279,11 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
                           (e.g. "mycompany.com") to restrict logins to
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
                     type: object
                   htpasswd:
                     description: htpasswd enables user authentication using an HTPasswd
@@ -3523,11 +3302,7 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
-                    required:
-                    - fileData
                     type: object
                   keystone:
                     description: keystone enables user authentication using keystone
@@ -3548,8 +3323,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       domainName:
                         description: domainName is required for keystone v3
@@ -3568,8 +3341,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -3585,15 +3356,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    required:
-                    - url
-                    - domainName
                     type: object
                   ldap:
                     description: ldap enables user authentication using LDAP credentials
@@ -3632,8 +3398,6 @@ spec:
                             items:
                               type: string
                             type: array
-                        required:
-                        - id
                         type: object
                       bindDN:
                         description: bindDN is an optional DN to bind with during
@@ -3651,8 +3415,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       ca:
                         description: ca is an optional reference to a config map by
@@ -3669,8 +3431,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
@@ -3685,10 +3445,6 @@ spec:
                         description: 'url is an RFC 2255 URL which specifies the LDAP
                           search parameters to use. The syntax of the URL is: ldap://host:port/basedn?attribute?scope?filter'
                         type: string
-                    required:
-                    - url
-                    - insecure
-                    - attributes
                     type: object
                   mappingMethod:
                     description: mappingMethod determines how identities from this
@@ -3719,8 +3475,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       claims:
                         description: claims mappings
@@ -3762,8 +3516,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       extraAuthorizeParameters:
                         description: extraAuthorizeParameters are any custom parameters
@@ -3780,11 +3532,6 @@ spec:
                           as its Issuer Identifier. It must use the https scheme with
                           no query or fragment component.
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
-                    - issuer
-                    - claims
                     type: object
                   requestHeader:
                     description: requestHeader enables user authentication using request
@@ -3806,8 +3553,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
@@ -3858,22 +3603,11 @@ spec:
                         items:
                           type: string
                         type: array
-                    required:
-                    - loginURL
-                    - challengeURL
-                    - ca
-                    - headers
-                    - preferredUsernameHeaders
-                    - nameHeaders
-                    - emailHeaders
                     type: object
                   type:
                     description: type identifies the identity provider type for this
                       entry.
                     type: string
-                required:
-                - name
-                - type
                 type: object
               type: array
           required:
@@ -3971,11 +3705,6 @@ spec:
                     description: PatchType indicates the PatchType as "strategic"
                       (default), "json", or "merge".
                     type: string
-                required:
-                - apiVersion
-                - kind
-                - name
-                - patch
                 type: object
               type: array
             resourceApplyMode:
@@ -4076,8 +3805,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
@@ -4093,8 +3820,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -4110,14 +3835,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    required:
-                    - url
                     type: object
                   github:
                     description: github enables user authentication using GitHub credentials
@@ -4138,8 +3859,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -4155,8 +3874,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
@@ -4176,9 +3893,6 @@ spec:
                         items:
                           type: string
                         type: array
-                    required:
-                    - clientID
-                    - clientSecret
                     type: object
                   gitlab:
                     description: gitlab enables user authentication using GitLab credentials
@@ -4198,8 +3912,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -4215,16 +3927,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the oauth server base URL
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
-                    - url
                     type: object
                   google:
                     description: google enables user authentication using Google credentials
@@ -4243,16 +3949,11 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
                           (e.g. "mycompany.com") to restrict logins to
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
                     type: object
                   htpasswd:
                     description: htpasswd enables user authentication using an HTPasswd
@@ -4271,11 +3972,7 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
-                    required:
-                    - fileData
                     type: object
                   keystone:
                     description: keystone enables user authentication using keystone
@@ -4296,8 +3993,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       domainName:
                         description: domainName is required for keystone v3
@@ -4316,8 +4011,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -4333,15 +4026,10 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    required:
-                    - url
-                    - domainName
                     type: object
                   ldap:
                     description: ldap enables user authentication using LDAP credentials
@@ -4380,8 +4068,6 @@ spec:
                             items:
                               type: string
                             type: array
-                        required:
-                        - id
                         type: object
                       bindDN:
                         description: bindDN is an optional DN to bind with during
@@ -4399,8 +4085,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       ca:
                         description: ca is an optional reference to a config map by
@@ -4417,8 +4101,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
@@ -4433,10 +4115,6 @@ spec:
                         description: 'url is an RFC 2255 URL which specifies the LDAP
                           search parameters to use. The syntax of the URL is: ldap://host:port/basedn?attribute?scope?filter'
                         type: string
-                    required:
-                    - url
-                    - insecure
-                    - attributes
                     type: object
                   mappingMethod:
                     description: mappingMethod determines how identities from this
@@ -4467,8 +4145,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       claims:
                         description: claims mappings
@@ -4510,8 +4186,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        required:
-                        - name
                         type: object
                       extraAuthorizeParameters:
                         description: extraAuthorizeParameters are any custom parameters
@@ -4528,11 +4202,6 @@ spec:
                           as its Issuer Identifier. It must use the https scheme with
                           no query or fragment component.
                         type: string
-                    required:
-                    - clientID
-                    - clientSecret
-                    - issuer
-                    - claims
                     type: object
                   requestHeader:
                     description: requestHeader enables user authentication using request
@@ -4554,8 +4223,6 @@ spec:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        required:
-                        - name
                         type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
@@ -4606,22 +4273,11 @@ spec:
                         items:
                           type: string
                         type: array
-                    required:
-                    - loginURL
-                    - challengeURL
-                    - ca
-                    - headers
-                    - preferredUsernameHeaders
-                    - nameHeaders
-                    - emailHeaders
                     type: object
                   type:
                     description: type identifies the identity provider type for this
                       entry.
                     type: string
-                required:
-                - name
-                - type
                 type: object
               type: array
           required:
@@ -4723,11 +4379,6 @@ spec:
                     description: PatchType indicates the PatchType as "strategic"
                       (default), "json", or "merge".
                     type: string
-                required:
-                - apiVersion
-                - kind
-                - name
-                - patch
                 type: object
               type: array
             resourceApplyMode:

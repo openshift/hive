@@ -531,6 +531,8 @@ spec:
                     type: string
                 type: object
               type: array
+          required:
+          - identityProviders
           type: object
         status:
           type: object

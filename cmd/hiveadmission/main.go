@@ -26,7 +26,7 @@ import (
 func main() {
 	log.Info("Starting CRD Validation Webhooks.")
 
-	// TODO: figure out a way to combine logrus and glog logging levels. The team has decided that hardcoding this is ok for now.
+	// TODO: figure out a way to combine logrus and klog logging levels. The team has decided that hardcoding this is ok for now.
 	log.SetLevel(log.InfoLevel)
 
 	admissionCmd.RunAdmissionServer(

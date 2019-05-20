@@ -15,8 +15,6 @@
     - [Using the Admin Kubeconfig](#using-the-admin-kubeconfig)
     - [Troubleshooting Deprovision](#troubleshooting-deprovision)
     - [Troubleshooting HiveAdmission](#troubleshooting-hiveadmission)
-    - [Installing Federation](#installing-federation)
-    - [Federation Example](#federation-example)
     - [Deploy using Minishift](#deploy-using-minishift)
     - [Access the WebConsole](#access-the-webconsole)
   - [Documentation](#documentation)
@@ -150,40 +148,6 @@ To diagnose a hiveadmission failure, try running the operation directly against 
 For instance, try this:
 ```sh
 # kubectl create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
-```
-
-### Installing Federation
-
-Ensure that you have the kubefed2 command installed:
-
-```
-go get -u github.com/kubernetes-sigs/federation-v2/cmd/kubefed2
-```
-
-Install federation components:
-
-```
-make install-federation
-```
-
-### Federation Example
-
-An example etcd operator deployment is included in `contrib/federation_example`.
-
-To deploy the example, run:
-
-```
-kubectl apply -f ./contrib/federation_example
-```
-
-The example artifacts install etcd-operator on a cluster with the label `etcdoperator: yes`
-
-In order to automatically install the operator on a cluster  you create with Hive,
-first create the cluster, then label its corresponding `federatedcluster` resource with
-the appropriate label:
-
-```
-kubectl label federatedcluster/CLUSTER_NAME -n federation-system etcdoperator=yes
 ```
 
 ### Deploy using Minishift

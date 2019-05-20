@@ -25,6 +25,7 @@ import (
 // SyncIdentityProviderCommonSpec defines the identity providers to sync
 type SyncIdentityProviderCommonSpec struct {
 	//IdentityProviders is an ordered list of ways for a user to identify themselves
+	// +required
 	IdentityProviders []openshiftapiv1.IdentityProvider `json:"identityProviders"`
 }
 
@@ -48,6 +49,7 @@ type SyncIdentityProviderSpec struct {
 
 	// ClusterDeploymentRefs is the list of LocalObjectReference indicating which clusters the
 	// SyncSet applies to in the SyncSet's namespace.
+	// +required
 	ClusterDeploymentRefs []corev1.LocalObjectReference `json:"clusterDeploymentRefs"`
 }
 

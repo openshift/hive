@@ -21,10 +21,10 @@ import (
 	golog "log"
 	"time"
 
-	"github.com/golang/glog"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/klog"
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/operator"
@@ -109,32 +109,32 @@ func newRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
-	initializeGlog(cmd.PersistentFlags())
+	initializeKlog(cmd.PersistentFlags())
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
 }
 
-func initializeGlog(flags *pflag.FlagSet) {
-	golog.SetOutput(glogWriter{}) // Redirect all regular go log output to glog
+func initializeKlog(flags *pflag.FlagSet) {
+	golog.SetOutput(klogWriter{}) // Redirect all regular go log output to klog
 	golog.SetFlags(0)
 
-	go wait.Forever(glog.Flush, 5*time.Second) // Periodically flush logs
+	go wait.Forever(klog.Flush, 5*time.Second) // Periodically flush logs
 	f := flags.Lookup("logtostderr")           // Default to logging to stderr
 	if f != nil {
 		f.Value.Set("true")
 	}
 }
 
-type glogWriter struct{}
+type klogWriter struct{}
 
-func (writer glogWriter) Write(data []byte) (n int, err error) {
-	glog.Info(string(data))
+func (writer klogWriter) Write(data []byte) (n int, err error) {
+	klog.Info(string(data))
 	return len(data), nil
 }
 
 func main() {
-	defer glog.Flush()
+	defer klog.Flush()
 	cmd := newRootCommand()
 	err := cmd.Execute()
 	if err != nil {

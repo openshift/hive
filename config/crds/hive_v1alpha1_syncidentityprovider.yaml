@@ -534,6 +534,9 @@ spec:
                     type: string
                 type: object
               type: array
+          required:
+          - identityProviders
+          - clusterDeploymentRefs
           type: object
         status:
           type: object

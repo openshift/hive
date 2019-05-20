@@ -270,12 +270,21 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 			Name: "cluster",
 		},
 	}
+	additionalCerts := cd.Spec.ControlPlaneConfig.ServingCertificates.Additional
 	if cd.Spec.ControlPlaneConfig.ServingCertificates.Default != "" {
 		cdLog.Debug("setting default serving certificate for control plane")
+		cpCert := hivev1.ControlPlaneAdditionalCertificate{
+			Name:   cd.Spec.ControlPlaneConfig.ServingCertificates.Default,
+			Domain: defaultControlPlaneDomain(cd),
+		}
+		additionalCerts = append([]hivev1.ControlPlaneAdditionalCertificate{cpCert}, additionalCerts...)
+
+		/* TODO: Change to using DefaultServingCertificate when bug in 4.1 is fixed
 		bundle := certificateBundle(cd, cd.Spec.ControlPlaneConfig.ServingCertificates.Default)
 		apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name = remoteSecretName(bundle.SecretRef.Name, cd)
+		*/
 	}
-	for _, additional := range cd.Spec.ControlPlaneConfig.ServingCertificates.Additional {
+	for _, additional := range additionalCerts {
 		cdLog.WithField("name", additional.Name).Debug("adding named certificate to control plane config")
 		bundle := certificateBundle(cd, additional.Name)
 		apiServerConfig.Spec.ServingCerts.NamedCertificates = append(apiServerConfig.Spec.ServingCerts.NamedCertificates, configv1.APIServerNamedServingCert{
@@ -366,4 +375,8 @@ func certificateBundle(cd *hivev1.ClusterDeployment, name string) *hivev1.Certif
 
 func controlPlaneCertsSyncSetName(name string) string {
 	return fmt.Sprintf("%s-cp-certs", name)
+}
+
+func defaultControlPlaneDomain(cd *hivev1.ClusterDeployment) string {
+	return fmt.Sprintf("api.%s.%s", cd.Spec.ClusterName, cd.Spec.BaseDomain)
 }

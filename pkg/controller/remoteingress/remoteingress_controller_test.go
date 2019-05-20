@@ -691,3 +691,38 @@ func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedS
 	}
 	return
 }
+
+func TestSecretHash(t *testing.T) {
+	secret1 := &corev1.Secret{
+		Data: map[string][]byte{
+			"abc": []byte("12345"),
+			"xyz": []byte("67890"),
+		},
+	}
+
+	secret2 := &corev1.Secret{
+		Data: map[string][]byte{
+			"xyz": []byte("67890"),
+			"abc": []byte("12345"),
+		},
+	}
+
+	hash1 := secretHash(secret1)
+	t.Logf("hash of secret1 is %s\n", hash1)
+	hash2 := secretHash(secret2)
+	t.Logf("hash of secret2 is %s\n", hash2)
+	hash3 := secretHash(nil)
+	t.Logf("hash of nil is %s\n", hash3)
+
+	if len(hash1) == 0 || len(hash2) == 0 {
+		t.Errorf("hash not expected to be empty string")
+	}
+
+	if len(hash3) != 0 {
+		t.Errorf("hash expected to be empty string")
+	}
+
+	if hash1 != hash2 {
+		t.Errorf("hashes expected to be equal")
+	}
+}

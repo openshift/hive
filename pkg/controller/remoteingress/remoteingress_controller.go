@@ -17,9 +17,12 @@ limitations under the License.
 package remoteingress
 
 import (
+	"bytes"
 	"context"
+	"crypto/md5"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -57,6 +60,8 @@ const (
 
 	ingressCertificateNotFoundReason = "IngressCertificateNotFound"
 	ingressCertificateFoundReason    = "IngressCertificateFound"
+
+	ingressSecretTolerationKey = "hive.openshift.io/ingress"
 
 	// requeueAfter2 is just a static 2 minute delay for when to requeue
 	// for the case when a necessary secret is missing
@@ -217,7 +222,7 @@ func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.Ra
 
 	// then the ingressControllers
 	for _, ingress := range rContext.clusterDeployment.Spec.Ingress {
-		ingressObj := createIngressController(rContext.clusterDeployment, ingress)
+		ingressObj := createIngressController(rContext.clusterDeployment, ingress, rContext.certBundleSecrets)
 		raw := runtime.RawExtension{Object: ingressObj}
 		rawList = append(rawList, raw)
 	}
@@ -290,7 +295,7 @@ func createSecret(rContext *reconcileContext, cbSecret *corev1.Secret) *corev1.S
 
 // createIngressController will return an ingressController based on a clusterDeployment's
 // spec.Ingress object
-func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.ClusterIngress) *ingresscontroller.IngressController {
+func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.ClusterIngress, secrets []*corev1.Secret) *ingresscontroller.IngressController {
 	newIngress := ingresscontroller.IngressController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "IngressController",
@@ -310,13 +315,30 @@ func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.Cluste
 	// if the ingress entry references a certBundle, make sure to put the appropriate looking
 	// entry in the ingressController object
 	if ingress.ServingCertificate != "" {
+		var secretName string
 		for _, cb := range cd.Spec.CertificateBundles {
 			// assume we're going to find the certBundle as we would've errored earlier
 			if cb.Name == ingress.ServingCertificate {
+				secretName = cb.SecretRef.Name
 				newIngress.Spec.DefaultCertificate = &corev1.LocalObjectReference{
 					Name: remoteSecretNameForCertificateBundleSecret(cb.SecretRef.Name, cd),
 				}
 				break
+			}
+		}
+
+		// NOTE: This toleration is added to cause a reload of the
+		// IngressController when the certificate secrets are updated.
+		// In the future, this should not be necessary.
+		if len(secretName) != 0 {
+			newIngress.Spec.NodePlacement = &ingresscontroller.NodePlacement{
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      ingressSecretTolerationKey,
+						Operator: corev1.TolerationOpEqual,
+						Value:    secretHash(findSecret(secretName, secrets)),
+					},
+				},
 			}
 		}
 	}
@@ -407,4 +429,34 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 // the original certificateBundle's secret name pre-pended with the clusterDeployment.Name
 func remoteSecretNameForCertificateBundleSecret(secretName string, cd *hivev1.ClusterDeployment) string {
 	return fmt.Sprintf("%s-%s", cd.Name, secretName)
+}
+
+func findSecret(secretName string, secrets []*corev1.Secret) *corev1.Secret {
+	for i, s := range secrets {
+		if s.Name == secretName {
+			return secrets[i]
+		}
+	}
+	return nil
+}
+
+func secretHash(secret *corev1.Secret) string {
+	if secret == nil {
+		return ""
+	}
+
+	b := &bytes.Buffer{}
+	// Write out map in sorted key order so we
+	// can get repeatable hashes
+	keys := []string{}
+	for k := range secret.Data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		b.Write([]byte(k + ":"))
+		b.Write(secret.Data[k])
+		b.Write([]byte("\n"))
+	}
+	return fmt.Sprintf("%x", md5.Sum(b.Bytes()))
 }

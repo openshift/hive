@@ -30,6 +30,15 @@ spec:
           type: object
         spec:
           properties:
+            additionalCertificateAuthorities:
+              description: AdditionalCertificateAuthorities is a list of references
+                to secrets in the 'hive' namespace that contain an additional Certificate
+                Authority to use when communicating with target clusters. These certificate
+                authorities will be used in addition to any self-signed CA generated
+                by each cluster on installation.
+              items:
+                type: object
+              type: array
             externalDNS:
               description: ExternalDNS specifies configuration for external-dns if
                 it is to be deployed by Hive. If absent, external-dns will not be

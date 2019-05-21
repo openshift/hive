@@ -29,6 +29,7 @@ import (
 	fedv1alpha1 "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1"
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/controller"
+	"github.com/openshift/hive/pkg/controller/utils"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -79,6 +80,10 @@ func newRootCommand() *cobra.Command {
 			}
 
 			log.Printf("Registering Components.")
+
+			if err := utils.SetupAdditionalCA(); err != nil {
+				log.Fatal(err)
+			}
 
 			// Setup Scheme for all resources
 			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {

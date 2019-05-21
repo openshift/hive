@@ -254,6 +254,11 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 	kubeConfig := []byte(secretData)
+	kubeConfig, err = controllerutils.FixupKubeconfig(kubeConfig)
+	if err != nil {
+		cdLog.WithError(err).Error("unable to fixup cluster client")
+		return reconcile.Result{}, err
+	}
 	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig))
 	if err != nil {
 		cdLog.WithError(err).Error("unable to build dynamic client")

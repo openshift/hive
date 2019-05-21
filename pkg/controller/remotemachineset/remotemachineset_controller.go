@@ -159,7 +159,13 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(secretData)
+	kubeConfig, err := controllerutils.FixupKubeconfig([]byte(secretData))
+	if err != nil {
+		cdLog.WithError(err).Error("unable to fixup admin kubeconfig")
+		return reconcile.Result{}, err
+	}
+
+	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig))
 	if err != nil {
 		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

@@ -204,9 +204,15 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 
 func (r *ReconcileClusterDeploymentFederation) federateTargetCluster(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	// Obtain cluster's kubeconfig secret
-	kubeconfig, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
+	kubeconfigString, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
 	if err != nil {
 		cdLog.WithError(err).Error("error retrieving kubeconfig for cluster")
+		return err
+	}
+
+	kubeconfig, err := controllerutils.FixupKubeconfig([]byte(kubeconfigString))
+	if err != nil {
+		cdLog.WithError(err).Error("cannot fixup kubeconfig for cluster")
 		return err
 	}
 
@@ -216,7 +222,7 @@ func (r *ReconcileClusterDeploymentFederation) federateTargetCluster(cd *hivev1.
 		return err
 	}
 
-	targetConfig, err := clientcmd.RESTConfigFromKubeConfig([]byte(kubeconfig))
+	targetConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
 	if err != nil {
 		cdLog.WithError(err).Error("cannot create target cluster client config")
 		return err

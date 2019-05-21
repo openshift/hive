@@ -126,7 +126,12 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		cdLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", cd.Status.AdminKubeconfigSecret.Name, cd.Namespace)).Error("cannot read secret")
 		return reconcile.Result{}, err
 	}
-	remoteClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
+	kubeConfig, err := controllerutils.FixupKubeconfig(adminKubeconfigSecret.Data[adminKubeconfigKey])
+	if err != nil {
+		cdLog.WithError(err).Error("cannot fixup kubeconfig for remote cluster")
+		return reconcile.Result{}, err
+	}
+	remoteClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig))
 	if err != nil {
 		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

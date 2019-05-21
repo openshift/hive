@@ -17,7 +17,9 @@ limitations under the License.
 package hive
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -31,14 +33,21 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
 	dnsServersEnvVar = "ZONE_CHECK_DNS_SERVERS"
+
+	// hiveAdditionalCASecret is the name of the secret in the hive namespace
+	// that will contain the aggregate of all AdditionalCertificateAuthorities
+	// secrets specified in HiveConfig
+	hiveAdditionalCASecret = "hive-additional-ca"
 )
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
@@ -67,12 +76,16 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, dnsServersEnvVar)
 	}
 
+	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {
+		return err
+	}
+
 	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	hLog.Info("deployment applied (%s)", result)
+	hLog.Infof("deployment applied (%s)", result)
 
 	applyAssets := []string{
 		"config/manager/service.yaml",
@@ -131,5 +144,74 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 
 	hLog.Info("all hive components successfully reconciled")
+	return nil
+}
+
+func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) error {
+	additionalCA := &bytes.Buffer{}
+	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthorities {
+		caSecret := &corev1.Secret{}
+		err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNamespace, Name: clientCARef.Name}, caSecret)
+		if err != nil {
+			hLog.WithError(err).WithField("secret", clientCARef.Name).Errorf("Cannot read client CA secret")
+			continue
+		}
+		crt, ok := caSecret.Data["ca.crt"]
+		if !ok {
+			hLog.WithField("secret", clientCARef.Name).Warning("Secret does not contain expected key (ca.crt)")
+		}
+		fmt.Fprintf(additionalCA, "%s\n", crt)
+	}
+
+	if additionalCA.Len() == 0 {
+		caSecret := &corev1.Secret{}
+		err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNamespace, Name: hiveAdditionalCASecret}, caSecret)
+		if err == nil {
+			err = r.Delete(context.TODO(), caSecret)
+			if err != nil {
+				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", hiveNamespace, hiveAdditionalCASecret)).
+					Error("cannot delete hive additional ca secret")
+				return err
+			}
+		}
+		return nil
+	}
+
+	caSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: hiveNamespace,
+			Name:      hiveAdditionalCASecret,
+		},
+		Data: map[string][]byte{
+			"ca.crt": additionalCA.Bytes(),
+		},
+	}
+	result, err := h.ApplyRuntimeObject(caSecret, scheme.Scheme)
+	if err != nil {
+		hLog.WithError(err).Error("error applying additional cert secret")
+		return err
+	}
+	hLog.Infof("additional cert secret applied (%s)", result)
+
+	hiveDeployment.Spec.Template.Spec.Volumes = append(hiveDeployment.Spec.Template.Spec.Volumes, corev1.Volume{
+		Name: "additionalca",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: hiveAdditionalCASecret,
+			},
+		},
+	})
+
+	hiveDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(hiveDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+		Name:      "additionalca",
+		MountPath: "/additional/ca",
+		ReadOnly:  true,
+	})
+
+	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+		Name:  "ADDITIONAL_CA",
+		Value: "/additional/ca/ca.crt",
+	})
+
 	return nil
 }

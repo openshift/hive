@@ -1119,6 +1119,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		*out = new(ExternalDNSConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AdditionalCertificateAuthorities != nil {
+		in, out := &in.AdditionalCertificateAuthorities, &out.AdditionalCertificateAuthorities
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -45,6 +45,7 @@ import (
 const (
 	fakeName      = "fake-cluster"
 	fakeNamespace = "fake-namespace"
+	fakeDomain    = "example.com"
 )
 
 func init() {
@@ -80,7 +81,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, defaultCert("default-secret"))
+				validateAppliedSyncSet(t, applied, "", additionalCert(defaultControlPlaneDomain(cd), "default-secret"))
 			},
 		},
 		{
@@ -112,7 +113,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, defaultCert("secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
+				validateAppliedSyncSet(t, applied, "", additionalCert(defaultControlPlaneDomain(cd), "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
 		{
@@ -256,7 +257,10 @@ func fakeClusterDeployment() *fakeClusterDeploymentWrapper {
 			Name:      fakeName,
 			Namespace: fakeNamespace,
 		},
-		Spec: hivev1.ClusterDeploymentSpec{},
+		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterName: fakeName,
+			BaseDomain:  fakeDomain,
+		},
 	}
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return &fakeClusterDeploymentWrapper{cd: cd}

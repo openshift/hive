@@ -13,8 +13,6 @@
 // config/hiveadmission/syncset-webhook.yaml
 // config/manager/deployment.yaml
 // config/manager/service.yaml
-// config/clusterimagesets/openshift-4.0-beta3.yaml
-// config/clusterimagesets/openshift-4.0-beta4.yaml
 // config/clusterimagesets/openshift-4.0-latest.yaml
 // config/external-dns/deployment.yaml
 // config/external-dns/rbac_role.yaml
@@ -669,57 +667,6 @@ func configManagerServiceYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/manager/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configClusterimagesetsOpenshift40Beta3Yaml = []byte(`apiVersion: hive.openshift.io/v1alpha1
-kind: ClusterImageSet
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: openshift-v4.0-beta3
-spec:
-  releaseImage: "quay.io/openshift-release-dev/ocp-release:4.0.0-0.9"
-  hiveImage: "quay.io/twiest/hive-controller:20190403"
-`)
-
-func configClusterimagesetsOpenshift40Beta3YamlBytes() ([]byte, error) {
-	return _configClusterimagesetsOpenshift40Beta3Yaml, nil
-}
-
-func configClusterimagesetsOpenshift40Beta3Yaml() (*asset, error) {
-	bytes, err := configClusterimagesetsOpenshift40Beta3YamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/clusterimagesets/openshift-4.0-beta3.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configClusterimagesetsOpenshift40Beta4Yaml = []byte(`apiVersion: hive.openshift.io/v1alpha1
-kind: ClusterImageSet
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: openshift-v4.0-beta4
-spec:
-  releaseImage: "quay.io/openshift-release-dev/ocp-release:4.1.0-rc.0"
-  hiveImage: "quay.io/twiest/hive-controller:20190423"`)
-
-func configClusterimagesetsOpenshift40Beta4YamlBytes() ([]byte, error) {
-	return _configClusterimagesetsOpenshift40Beta4Yaml, nil
-}
-
-func configClusterimagesetsOpenshift40Beta4Yaml() (*asset, error) {
-	bytes, err := configClusterimagesetsOpenshift40Beta4YamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/clusterimagesets/openshift-4.0-beta4.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4878,8 +4825,6 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/syncset-webhook.yaml":                   configHiveadmissionSyncsetWebhookYaml,
 	"config/manager/deployment.yaml":                              configManagerDeploymentYaml,
 	"config/manager/service.yaml":                                 configManagerServiceYaml,
-	"config/clusterimagesets/openshift-4.0-beta3.yaml":            configClusterimagesetsOpenshift40Beta3Yaml,
-	"config/clusterimagesets/openshift-4.0-beta4.yaml":            configClusterimagesetsOpenshift40Beta4Yaml,
 	"config/clusterimagesets/openshift-4.0-latest.yaml":           configClusterimagesetsOpenshift40LatestYaml,
 	"config/external-dns/deployment.yaml":                         configExternalDnsDeploymentYaml,
 	"config/external-dns/rbac_role.yaml":                          configExternalDnsRbac_roleYaml,
@@ -4948,8 +4893,6 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
 		"clusterimagesets": {nil, map[string]*bintree{
-			"openshift-4.0-beta3.yaml":  {configClusterimagesetsOpenshift40Beta3Yaml, map[string]*bintree{}},
-			"openshift-4.0-beta4.yaml":  {configClusterimagesetsOpenshift40Beta4Yaml, map[string]*bintree{}},
 			"openshift-4.0-latest.yaml": {configClusterimagesetsOpenshift40LatestYaml, map[string]*bintree{}},
 		}},
 		"crds": {nil, map[string]*bintree{

@@ -51,6 +51,8 @@ objects:
   metadata:
     name: hive
   spec:
+    additionalCertificateAuthorities:
+    - name: ${ADDITIONAL_CERTIFICATE_AUTHORITY}
     externalDNS:
       aws:
         credentials:

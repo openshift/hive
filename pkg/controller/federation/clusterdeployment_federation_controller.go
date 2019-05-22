@@ -203,14 +203,14 @@ func (r *ReconcileClusterDeploymentFederation) Reconcile(request reconcile.Reque
 }
 
 func (r *ReconcileClusterDeploymentFederation) federateTargetCluster(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	// Obtain cluster's kubeconfig secret
-	kubeconfigString, err := r.loadSecretData(cd.Status.AdminKubeconfigSecret.Name, cd.Namespace, adminKubeconfigKey)
+	adminKubeconfigSecret := &corev1.Secret{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {
 		cdLog.WithError(err).Error("error retrieving kubeconfig for cluster")
 		return err
 	}
 
-	kubeconfig, err := controllerutils.FixupKubeconfig([]byte(kubeconfigString))
+	kubeconfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
 	if err != nil {
 		cdLog.WithError(err).Error("cannot fixup kubeconfig for cluster")
 		return err
@@ -244,19 +244,6 @@ func (r *ReconcileClusterDeploymentFederation) federateTargetCluster(cd *hivev1.
 		cdLog.WithError(err).Error("Federating cluster failed")
 	}
 	return err
-}
-
-func (r *ReconcileClusterDeploymentFederation) loadSecretData(secretName, namespace, dataKey string) (string, error) {
-	s := &corev1.Secret{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
-	if err != nil {
-		return "", err
-	}
-	retStr, ok := s.Data[dataKey]
-	if !ok {
-		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
-	}
-	return string(retStr), nil
 }
 
 func (r *ReconcileClusterDeploymentFederation) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {

@@ -67,6 +67,7 @@ const (
 	adminCredsSecretPasswordKey = "password"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	adminKubeconfigKey          = "kubeconfig"
+	rawAdminKubeconfigKey       = "raw-kubeconfig"
 	clusterVersionObjectName    = "version"
 	clusterVersionUnknown       = "undef"
 
@@ -760,6 +761,10 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 				return err
 			}
 		} else {
+			err = r.fixupAdminKubeconfigSecret(adminKubeconfigSecret, cdLog)
+			if err != nil {
+				return err
+			}
 			err = r.setAdminKubeconfigStatus(cd, adminKubeconfigSecret, cdLog)
 			if err != nil {
 				return err
@@ -780,6 +785,36 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	} else {
 		cdLog.Infof("cluster deployment status unchanged")
 	}
+	return nil
+}
+
+func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.Secret, cdLog log.FieldLogger) error {
+	originalSecret := secret.DeepCopy()
+
+	rawData, hasRawData := secret.Data[rawAdminKubeconfigKey]
+	if !hasRawData {
+		secret.Data[rawAdminKubeconfigKey] = secret.Data[adminKubeconfigKey]
+		rawData = secret.Data[adminKubeconfigKey]
+	}
+
+	var err error
+	secret.Data[adminKubeconfigKey], err = controllerutils.FixupKubeconfig(rawData)
+	if err != nil {
+		cdLog.WithError(err).Errorf("cannot fixup kubeconfig to generate new one")
+		return err
+	}
+
+	if reflect.DeepEqual(originalSecret.Data, secret.Data) {
+		cdLog.Debug("secret data has not changed, no need to update")
+		return nil
+	}
+
+	err = r.Update(context.TODO(), secret)
+	if err != nil {
+		cdLog.WithError(err).Error("error updated admin kubeconfig secret")
+		return err
+	}
+
 	return nil
 }
 

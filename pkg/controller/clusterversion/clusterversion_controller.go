@@ -43,7 +43,6 @@ import (
 const (
 	clusterVersionObjectName = "version"
 	clusterVersionUnknown    = "undef"
-	adminKubeconfigKey       = "kubeconfig"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -126,7 +125,7 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		cdLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", cd.Status.AdminKubeconfigSecret.Name, cd.Namespace)).Error("cannot read secret")
 		return reconcile.Result{}, err
 	}
-	kubeConfig, err := controllerutils.FixupKubeconfig(adminKubeconfigSecret.Data[adminKubeconfigKey])
+	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
 	if err != nil {
 		cdLog.WithError(err).Error("cannot fixup kubeconfig for remote cluster")
 		return reconcile.Result{}, err

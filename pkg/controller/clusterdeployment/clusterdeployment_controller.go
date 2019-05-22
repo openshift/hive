@@ -819,11 +819,43 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 	return nil
 }
 
+// ensureManagedDNSZoneDeleted is a safety check to ensure that the child managed DNSZone
+// linked to the parent cluster deployment gets a deletionTimestamp when the parent is deleted.
+// Normally we expect Kube garbage collection to do this for us, but in rare cases we've seen it
+// not working as intended.
+func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	if !cd.Spec.ManageDNS {
+		return nil
+	}
+	dnsZone := &hivev1.DNSZone{}
+	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
+	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
+	if err != nil && !errors.IsNotFound(err) {
+		cdLog.WithError(err).Error("error looking up managed dnszone")
+		return err
+	}
+	if err == nil && dnsZone.DeletionTimestamp == nil {
+		cdLog.Warn("managed dnszone did not get a deletionTimestamp when parent cluster deployment was deleted, deleting manually")
+		err = r.Delete(context.TODO(), dnsZone,
+			client.PropagationPolicy(metav1.DeletePropagationForeground))
+		if err != nil {
+			cdLog.WithError(err).Error("error deleting managed dnszone")
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
+
+	err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// Delete the install job in case it's still running:
 	installJob := &batchv1.Job{}
-	err := r.Get(context.Background(),
+	err = r.Get(context.Background(),
 		types.NamespacedName{
 			Name:      install.GetInstallJobName(cd),
 			Namespace: cd.Namespace,
@@ -932,6 +964,7 @@ func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.Cl
 }
 
 func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
+
 	cd = cd.DeepCopy()
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
 	err := r.Update(context.TODO(), cd)

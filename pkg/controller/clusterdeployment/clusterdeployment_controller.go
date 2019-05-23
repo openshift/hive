@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -127,6 +128,10 @@ var (
 	},
 		[]string{"cluster_type"},
 	)
+
+	// regex to find/replace wildcard ingress entries
+	// case-insensitive leading literal '*' followed by a literal '.'
+	wildcardDomain = regexp.MustCompile(`(?i)^\*\.`)
 )
 
 func init() {
@@ -276,6 +281,19 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			Requeue:      true,
 			RequeueAfter: defaultRequeueTime,
 		}, nil
+	}
+
+	// We previously allowed clusterdeployment.spec.ingress[] entries to have ingress domains with a leading '*'.
+	// Migrate the clusterdeployment to the new format if we find a wildcard ingress domain.
+	// TODO: we can one day remove this once all clusterdeployment are known to have non-wildcard data
+	if migrateWildcardIngress(cd) {
+		cdLog.Info("migrating wildcard ingress entries")
+		err := r.Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Error("failed to update cluster deployment")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	imageSet, err := r.getClusterImageSet(cd, cdLog)
@@ -1082,6 +1100,18 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) *hivev1.ClusterDep
 	}
 
 	return req
+}
+
+func migrateWildcardIngress(cd *hivev1.ClusterDeployment) bool {
+	migrated := false
+	for i, ingress := range cd.Spec.Ingress {
+		newIngress := wildcardDomain.ReplaceAllString(ingress.Domain, "")
+		if newIngress != ingress.Domain {
+			cd.Spec.Ingress[i].Domain = newIngress
+			migrated = true
+		}
+	}
+	return migrated
 }
 
 func strPtr(s string) *string {

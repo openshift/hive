@@ -79,51 +79,21 @@ NOTE: assumes you have previously deployed using one of the above methods.
 
 ### Create a ClusterDeployment using the latest OpenShift release and installer image
 
-```bash
-export CLUSTER_NAME="${USER}"
-export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
-export PULL_SECRET="$(cat ${HOME}/config.json)"
-
-oc process -f config/templates/cluster-deployment.yaml \
-   CLUSTER_NAME="${CLUSTER_NAME}" \
-   SSH_KEY="${SSH_PUB_KEY}" \
-   PULL_SECRET="${PULL_SECRET}" \
-   AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-   AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-   | oc apply -f -
-```
----
-**NOTE**
-
-You must give each cluster an unique name If you are creating more than one cluster.
-
----
-
-### Create a ClusterDeployment using latest pinned and known stable container images
+Hiveutil offers a create-cluster subcommand which simplifies creating the API custom resources for a Hive ClusterDeployment.
 
 ```bash
-export CLUSTER_NAME="${USER}"
-export SSH_PUB_KEY="$(ssh-keygen -y -f ~/.ssh/libra.pem)"
-export PULL_SECRET="$(cat ${HOME}/config.json)"
-export HIVE_IMAGE="quay.io/twiest/hive-controller:20190128"
-export HIVE_IMAGE_PULL_POLICY="Always"
-export INSTALLER_IMAGE="quay.io/twiest/installer:20190128"
-export INSTALLER_IMAGE_PULL_POLICY="Always"
-export RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.0.0-0.1"
-
-oc process -f config/templates/cluster-deployment.yaml \
-   CLUSTER_NAME="${CLUSTER_NAME}" \
-   SSH_KEY="${SSH_PUB_KEY}" \
-   PULL_SECRET="${PULL_SECRET}" \
-   AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-   AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-   HIVE_IMAGE="${HIVE_IMAGE}" \
-   HIVE_IMAGE_PULL_POLICY="${HIVE_IMAGE_PULL_POLICY}" \
-   INSTALLER_IMAGE="${INSTALLER_IMAGE}" \
-   INSTALLER_IMAGE_PULL_POLICY="${INSTALLER_IMAGE_PULL_POLICY}" \
-   RELEASE_IMAGE="${RELEASE_IMAGE}" \
-   | oc apply -f -
+make hiveutil
 ```
+
+To view what create-cluster generates, *without* submitting it to the API server:
+
+```bash
+bin/hiveutil create-cluster --base-domain=mycluster.new-installer.openshift.com --pull-secret-file ~/.pull-secret --ssh-key-file ~/.ssh/id_rsa.pub mycluster
+```
+
+Add `-o yaml` to the above command if you wish to see the API objects that would be sent to the server, without actually submitting. If you need to make any changes not supported by create-cluster options, the output can be saved, edited, and then submitted with `kubectl apply`.
+
+By default this command assumes the latest Hive master CI build, and the latest OpenShift stable release. `--hive-image` can be specified to use a specific Hive image to run the install, and `--release-image` can be specified to control which OpenShift release image to install in the cluster.
 
 ### Watch the ClusterDeployment
 

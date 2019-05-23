@@ -549,6 +549,7 @@ func (zr *ZoneReconciler) deleteRoute53HostedZone(hostedZone *route53.HostedZone
 }
 
 func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServers []string, isSOAAvailable bool) error {
+	orig := zr.dnsZone.DeepCopy()
 	zr.logger.Debug("Updating DNSZone status")
 
 	zr.dnsZone.Status.NameServers = nameServers
@@ -558,6 +559,10 @@ func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServe
 	var availableStatus corev1.ConditionStatus
 	var availableReason, availableMessage string
 	if isSOAAvailable {
+		// We need to keep track of the last time we synced to rate limit our AWS calls.
+		tmpTime := metav1.Now()
+		zr.dnsZone.Status.LastSyncTimestamp = &tmpTime
+
 		availableStatus = corev1.ConditionTrue
 		availableReason = "ZoneAvailable"
 		availableMessage = "DNS SOA record for zone is reachable"
@@ -566,6 +571,7 @@ func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServe
 		availableReason = "ZoneUnavailable"
 		availableMessage = "DNS SOA record for zone is not reachable"
 	}
+	zr.dnsZone.Status.LastSyncGeneration = zr.dnsZone.ObjectMeta.Generation
 	zr.dnsZone.Status.Conditions = controllerutils.SetDNSZoneCondition(
 		zr.dnsZone.Status.Conditions,
 		hivev1.ZoneAvailableDNSZoneCondition,
@@ -573,12 +579,15 @@ func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServe
 		availableReason,
 		availableMessage,
 		controllerutils.UpdateConditionNever)
-	zr.addRateLimitingStatusEntries()
-	err := zr.kubeClient.Status().Update(context.TODO(), zr.dnsZone)
-	if err != nil {
-		zr.logger.WithError(err).Error("Cannot update DNSZone status")
+
+	if !reflect.DeepEqual(orig.Status, zr.dnsZone.Status) {
+		err := zr.kubeClient.Status().Update(context.TODO(), zr.dnsZone)
+		if err != nil {
+			zr.logger.WithError(err).Error("Cannot update DNSZone status")
+		}
+		return err
 	}
-	return err
+	return nil
 }
 
 func (zr *ZoneReconciler) getHostedZoneNSRecord(zoneID string) ([]string, error) {
@@ -615,16 +624,6 @@ func (zr *ZoneReconciler) getHostedZoneNSRecord(zoneID string) ([]string, error)
 	}
 	logger.WithField("nameservers", strings.Join(result, ",")).Debug("found hosted zone name servers")
 	return result, nil
-}
-
-// addRateLimitingStatusEntries adds the status entries specific to the AWS rate limiting that we do to abuse the AWS API.
-func (zr *ZoneReconciler) addRateLimitingStatusEntries() {
-	zr.logger.Debug("Adding rate limiting status entries to DNSZone")
-	// We need to keep track of the last object generation and time we sync'd on.
-	// This is used to rate limit our calls to AWS.
-	zr.dnsZone.Status.LastSyncGeneration = zr.dnsZone.ObjectMeta.Generation
-	tmpTime := metav1.Now()
-	zr.dnsZone.Status.LastSyncTimestamp = &tmpTime
 }
 
 func parentLinkRecordName(dnsZoneName string) string {

@@ -23,11 +23,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +72,7 @@ const (
 	adminSSHKeySecretKey                = "ssh-publickey"
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
+	sleepSecondsFilename                = "sleep-seconds.txt"
 )
 
 var (
@@ -217,8 +220,6 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error marshalling install-config.yaml")
 		return err
 	}
-	installConfig := string(d)
-	m.log.Debugf("install config: %s", installConfig)
 	err = ioutil.WriteFile(filepath.Join(m.WorkDir, "install-config.yaml"), d, 0644)
 	if err != nil {
 		m.log.WithError(err).Error("error writing install-config.yaml to disk")
@@ -227,7 +228,7 @@ func (m *InstallManager) Run() error {
 
 	// If the cluster deployment has a clusterID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
-	if err := m.cleanupBeforeInstall(cd); err != nil {
+	if err := m.cleanupFailedInstall(cd); err != nil {
 		m.log.WithError(err).Error("error while trying to preemptively clean up")
 		return err
 	}
@@ -249,7 +250,21 @@ func (m *InstallManager) Run() error {
 
 	installErr := m.provisionCluster(cd)
 	if installErr != nil {
-		m.log.WithError(installErr).Error("error running openshift-install")
+		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
+		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
+		if err := m.cleanupFailedInstall(cd); err != nil {
+			// Log the error but continue. It is possible we were not able to clear the infraID
+			// here, but we will attempt this again anyhow when the next job retries. The
+			// goal here is just to minimize running resources in the event of a long wait
+			// until the next retry.
+			m.log.WithError(err).Error("error while trying to deprovision after failed install")
+		}
+
+		// If we failed to install, write a sleep-seconds.txt file that will be watched for and read
+		// by a separate script which will do the sleep. This is done to slow down kube restarts
+		// and consume as little memory as possible while doing so.
+		m.log.Info("writing retries sleep seconds file")
+		m.writeSleepSecondsFile()
 	}
 
 	if err := m.uploadInstallerLog(cd, m); err != nil {
@@ -302,6 +317,33 @@ func (m *InstallManager) waitForFiles(files []string) {
 	m.log.Infof("all files found, ready to proceed")
 }
 
+// writeSleepSecondsFile writes a file with a number of seconds to sleep using backoff
+// and the current retry count on the cluster deployment status.
+func (m *InstallManager) writeSleepSecondsFile() {
+	// Refresh the cluster deployment to get accurate restart count, which can lag a little if
+	// this pod restarted before the controller updated the value. Used when we write sleep seconds below.
+	cd, err := m.loadClusterDeployment()
+	currentRetries := cd.Status.InstallRestarts
+	if err != nil {
+		m.log.WithError(err).Error("ignoring error looking up cluster deployment for restart count")
+		return
+	}
+	sleepSeconds := calcSleepSeconds(currentRetries)
+	m.log.WithField("seconds", sleepSeconds).Info("calculated seconds to sleep for")
+	d := []byte(strconv.Itoa(sleepSeconds))
+	err = ioutil.WriteFile(filepath.Join(m.WorkDir, sleepSecondsFilename), d, 0644)
+	if err != nil {
+		m.log.WithError(err).Error("ignoring error writing sleep-seconds.txt")
+	}
+}
+
+func calcSleepSeconds(currentRetries int) int {
+	// (2^currentRetries) * 60 seconds up to a max of 24 hours.
+	// In theory this could int overflow with absurd numbers of retries, but this
+	// should not be a problem in the real world.
+	return int(math.Min(math.Exp2(float64(currentRetries))*60, float64(60*60*24))) // max sleep of 24 hours
+}
+
 func (m *InstallManager) waitForInstallerBinaries() {
 	fileList := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
@@ -309,8 +351,8 @@ func (m *InstallManager) waitForInstallerBinaries() {
 	m.waitForFiles(fileList)
 }
 
-// cleanupBeforeInstall allows recovering from an installation error and allows retries
-func (m *InstallManager) cleanupBeforeInstall(cd *hivev1.ClusterDeployment) error {
+// cleanupFailedInstall allows recovering from an installation error and allows retries
+func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment) error {
 	if err := m.cleanupMetadataConfigmap(); err != nil {
 		return err
 	}
@@ -328,6 +370,7 @@ func (m *InstallManager) cleanupBeforeInstall(cd *hivev1.ClusterDeployment) erro
 	}
 
 	if cd.Status.InfraID != "" {
+		m.log.Info("InfraID set from failed install, running deprovison")
 		if err := m.runUninstaller(m.ClusterName, m.Region, cd.Status.InfraID, m.log); err != nil {
 			return err
 		}
@@ -395,6 +438,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
 	}
+	m.log.Info("assets generated successfully")
 	return nil
 }
 
@@ -487,6 +531,7 @@ func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
 		return err
 	}
 
+	m.log.Info("command completed successfully")
 	return nil
 }
 

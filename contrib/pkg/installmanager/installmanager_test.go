@@ -67,6 +67,14 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+func TestCalcSleepSeconds(t *testing.T) {
+	assert.Equal(t, 60, calcSleepSeconds(0))
+	assert.Equal(t, 120, calcSleepSeconds(1))
+	assert.Equal(t, 240, calcSleepSeconds(2))
+	assert.Equal(t, 480, calcSleepSeconds(3))
+	assert.Equal(t, 86400, calcSleepSeconds(5000493985937))
+}
+
 func TestInstallManager(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {

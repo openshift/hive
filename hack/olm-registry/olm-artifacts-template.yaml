@@ -16,6 +16,8 @@ parameters:
   value: external-dns-route53-admin
 - name: EXTERNAL_DNS_MANAGED_DOMAIN
   value: s1.openshiftapps.com
+- name: ADDITIONAL_CERTIFICATE_AUTHORITY
+  value: letsencrypt-ca
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1

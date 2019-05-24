@@ -58,7 +58,7 @@ fi
 
 // GenerateImageSetJob creates a job to determine the installer image for a ClusterImageSet
 // given a release image
-func GenerateImageSetJob(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, serviceAccountName string, cli, hive ImageSpec) *batchv1.Job {
+func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName string, cli, hive ImageSpec) *batchv1.Job {
 
 	logger := log.WithFields(log.Fields{
 		"clusterdeployment": types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(),
@@ -69,7 +69,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterI
 	env := []corev1.EnvVar{
 		{
 			Name:  "RELEASE_IMAGE",
-			Value: *imageSet.Spec.ReleaseImage,
+			Value: releaseImage,
 		},
 		{
 			Name:  "PULL_SECRET",

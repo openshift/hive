@@ -458,6 +458,47 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if job == nil {
 					t.Errorf("did not find expected imageset job")
 				}
+				// Ensure that the release image from the imageset is used in the job
+				envVars := job.Spec.Template.Spec.Containers[0].Env
+				for _, e := range envVars {
+					if e.Name == "RELEASE_IMAGE" {
+						if e.Value != *testClusterImageSet().Spec.ReleaseImage {
+							t.Errorf("unexpected release image used in job: %s", e.Value)
+						}
+						break
+					}
+				}
+			},
+		},
+		{
+			name: "Ensure release image from clusterdeployment (when present) is used to generate imageset job",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Images.InstallerImage = ""
+					cd.Spec.Images.ReleaseImage = "embedded-release-image:latest"
+					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				job := getImageSetJob(c)
+				if job == nil {
+					t.Errorf("did not find expected imageset job")
+				}
+				envVars := job.Spec.Template.Spec.Containers[0].Env
+				for _, e := range envVars {
+					if e.Name == "RELEASE_IMAGE" {
+						if e.Value != "embedded-release-image:latest" {
+							t.Errorf("unexpected release image used in job: %s", e.Value)
+						}
+						break
+					}
+				}
 			},
 		},
 		{

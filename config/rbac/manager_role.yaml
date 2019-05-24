@@ -123,6 +123,20 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  - secrets
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - hive.openshift.io
   resources:
   - clusterdeployments

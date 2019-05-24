@@ -111,6 +111,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/crds/hive_v1alpha1_selectorsyncset.yaml",
 		"config/crds/hive_v1alpha1_syncidentityprovider.yaml",
 		"config/crds/hive_v1alpha1_syncset.yaml",
+
+		"config/configmaps/install-log-regexes-configmap.yaml",
 	}
 	for _, a := range applyAssets {
 		err = util.ApplyAsset(h, a, hLog)

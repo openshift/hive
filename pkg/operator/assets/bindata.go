@@ -36,6 +36,7 @@
 // config/crds/hive_v1alpha1_selectorsyncset.yaml
 // config/crds/hive_v1alpha1_syncidentityprovider.yaml
 // config/crds/hive_v1alpha1_syncset.yaml
+// config/configmaps/install-log-regexes-configmap.yaml
 // DO NOT EDIT!
 
 package assets
@@ -1271,6 +1272,20 @@ rules:
   - dnszones/status
   - dnszones/finalizers
   - dnsendpoints
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  - secrets
+  - configmaps
   verbs:
   - get
   - list
@@ -4420,6 +4435,39 @@ func configCrdsHive_v1alpha1_syncsetYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configConfigmapsInstallLogRegexesConfigmapYaml = []byte(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: install-log-regexes
+  namespace: hive
+data:
+  DNSAlreadyExists: |
+    searchRegexStrings:
+    - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
+    installFailingReason: DNSAlreadyExists
+    installFailingMessage: DNS record already exists
+  PendingVerification: |
+    searchRegexStrings:
+    - "PendingVerification: Your request for accessing resources in this region is being validated"
+    installFailingReason: PendingVerification
+    installFailingMessage: Account pending verification for region
+`)
+
+func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {
+	return _configConfigmapsInstallLogRegexesConfigmapYaml, nil
+}
+
+func configConfigmapsInstallLogRegexesConfigmapYaml() (*asset, error) {
+	bytes, err := configConfigmapsInstallLogRegexesConfigmapYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/configmaps/install-log-regexes-configmap.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -4508,6 +4556,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive_v1alpha1_selectorsyncset.yaml":              configCrdsHive_v1alpha1_selectorsyncsetYaml,
 	"config/crds/hive_v1alpha1_syncidentityprovider.yaml":         configCrdsHive_v1alpha1_syncidentityproviderYaml,
 	"config/crds/hive_v1alpha1_syncset.yaml":                      configCrdsHive_v1alpha1_syncsetYaml,
+	"config/configmaps/install-log-regexes-configmap.yaml":        configConfigmapsInstallLogRegexesConfigmapYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -4554,6 +4603,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
 		"clusterimagesets": {nil, map[string]*bintree{
 			"openshift-4.0-latest.yaml": {configClusterimagesetsOpenshift40LatestYaml, map[string]*bintree{}},
+		}},
+		"configmaps": {nil, map[string]*bintree{
+			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},
 		"crds": {nil, map[string]*bintree{
 			"hive_v1alpha1_clusterdeployment.yaml":            {configCrdsHive_v1alpha1_clusterdeploymentYaml, map[string]*bintree{}},

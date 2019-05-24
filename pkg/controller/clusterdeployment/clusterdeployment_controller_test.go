@@ -913,6 +913,7 @@ func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
 		name              string
 		existing          *hivev1.ClusterDeployment
 		migrationExpected bool
+		expectedDomains   []string // must be same length as the number of ingress entries for the test clusterDeployment
 	}{
 		{
 			name:              "No ingress, no migration",
@@ -923,6 +924,7 @@ func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
 			name:              "No wildcards, no migration",
 			existing:          testClusterDeploymentWithIngress(),
 			migrationExpected: false,
+			expectedDomains:   []string{fmt.Sprintf("apps.%s.example.com", testClusterName)},
 		},
 		{
 			name: "Migrate wildcard domain",
@@ -933,6 +935,7 @@ func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
 				return cd
 			}(),
 			migrationExpected: true,
+			expectedDomains:   []string{fmt.Sprintf("apps.%s.example.com", testClusterName)},
 		},
 		{
 			name: "Migrate when only one of two is wildcard",
@@ -946,6 +949,10 @@ func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
 				return cd
 			}(),
 			migrationExpected: true,
+			expectedDomains: []string{
+				fmt.Sprintf("apps.%s.example.com", testClusterName),
+				fmt.Sprintf("moreingress.%s.example.com", testClusterName),
+			},
 		},
 	}
 
@@ -955,6 +962,10 @@ func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
 			result := migrateWildcardIngress(test.existing)
 
 			assert.Equal(t, test.migrationExpected, result)
+
+			for i, domain := range test.expectedDomains {
+				assert.Equal(t, domain, test.existing.Spec.Ingress[i].Domain)
+			}
 		})
 	}
 }

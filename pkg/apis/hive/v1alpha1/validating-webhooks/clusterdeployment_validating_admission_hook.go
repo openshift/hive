@@ -443,7 +443,8 @@ func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.Clus
 
 func validateIngressDomainsShareClusterDomain(newObject *hivev1.ClusterDeploymentSpec) bool {
 	// ingress entries must share the same domain as the cluster
-	regexString := fmt.Sprintf("(?i).*%s.%s$", newObject.ClusterName, newObject.BaseDomain)
+	// so watch for an ingress domain ending in: .<clusterName>.<baseDomain>
+	regexString := fmt.Sprintf(`(?i).*\.%s.%s$`, newObject.ClusterName, newObject.BaseDomain)
 	sharedSubdomain := regexp.MustCompile(regexString)
 
 	for _, ingress := range newObject.Ingress {

@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -207,15 +208,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 
 	// TODO: Put Create Validation Here (or in openAPIV3Schema validation section of crd)
 
-	if !validateIngressList(&newObject.Spec) {
-		message := "If defining the Ingress list, it must include a default ingress entry"
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
+	// validate the ingress
+	if ingressValidationResult := validateIngress(newObject, contextLogger); ingressValidationResult != nil {
+		return ingressValidationResult
 	}
 
 	if newObject.Spec.ManageDNS {
@@ -298,18 +293,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
-	// First check whether the newlist is valid at all
-	if !validateIngressList(&newObject.Spec) {
-		message := fmt.Sprintf("Ingress list must include a default entry")
-		contextLogger.Infof("Failed validation: %v", message)
-
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
+	// validate the newly incoming ingress
+	if ingressValidationResult := validateIngress(newObject, contextLogger); ingressValidationResult != nil {
+		return ingressValidationResult
 	}
 
 	// Now catch the case where there was a previously defined list and now it's being emptied
@@ -455,6 +441,32 @@ func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.Clus
 	return false
 }
 
+func validateIngressDomainsShareClusterDomain(newObject *hivev1.ClusterDeploymentSpec) bool {
+	// ingress entries must share the same domain as the cluster
+	// so watch for an ingress domain ending in: .<clusterName>.<baseDomain>
+	regexString := fmt.Sprintf(`(?i).*\.%s.%s$`, newObject.ClusterName, newObject.BaseDomain)
+	sharedSubdomain := regexp.MustCompile(regexString)
+
+	for _, ingress := range newObject.Ingress {
+		if !sharedSubdomain.Match([]byte(ingress.Domain)) {
+			return false
+		}
+	}
+	return true
+}
+func validateIngressDomainsNotWildcard(newObject *hivev1.ClusterDeploymentSpec) bool {
+	// check for domains with leading '*'
+	// the * is unecessary as the ingress controller assumes a wildcard
+	for _, ingress := range newObject.Ingress {
+		if ingress.Domain[0] == '*' {
+			return false
+		}
+	}
+	return true
+}
+
+// empty ingress is allowed (for create), but if it's non-zero
+// it must include an entry for 'default'
 func validateIngressList(newObject *hivev1.ClusterDeploymentSpec) bool {
 	if len(newObject.Ingress) == 0 {
 		return true
@@ -502,4 +514,46 @@ func validateDomain(domain string, validDomains []string) bool {
 		}
 	}
 	return false
+}
+
+func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+	if !validateIngressList(&newObject.Spec) {
+		message := fmt.Sprintf("Ingress list must include a default entry")
+		contextLogger.Infof("Failed validation: %v", message)
+
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
+	if !validateIngressDomainsNotWildcard(&newObject.Spec) {
+		message := "Ingress domains must not lead with *"
+		contextLogger.Infof("Failed validation: %v", message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
+	if !validateIngressDomainsShareClusterDomain(&newObject.Spec) {
+		message := "Ingress domains must share the same domain as the cluster"
+		contextLogger.Infof("Failed validation: %v", message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
+	// everything passed
+	return nil
 }

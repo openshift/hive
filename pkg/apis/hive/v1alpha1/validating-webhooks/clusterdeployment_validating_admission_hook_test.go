@@ -62,6 +62,7 @@ func clusterDeploymentWithManagedDomain(domain string) *hivev1.ClusterDeployment
 func validClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
+			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",
 			Compute: []hivev1.MachinePool{
 				{
@@ -74,16 +75,7 @@ func validClusterDeployment() *hivev1.ClusterDeployment {
 
 // Meant to be used to compare new and old as the same values.
 func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: "SameClusterName",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
-		},
-	}
+	return validClusterDeployment()
 }
 
 func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
@@ -100,16 +92,13 @@ func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
 }
 
 func validClusterDeploymentDifferentMutableValue() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: "SameClusterName",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "DifferentMachinePoolName",
-				},
-			},
+	cd := validClusterDeployment()
+	cd.Spec.Compute = []hivev1.MachinePool{
+		{
+			Name: "DifferentMachinePoolName",
 		},
 	}
+	return cd
 }
 
 func TestClusterDeploymentValidatingResource(t *testing.T) {
@@ -361,6 +350,26 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "Test invalid wildcard ingress domain",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.Ingress[0].Domain = "*.apps.sameclustername.example.com"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Test invalid domain on ingress domain",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.Ingress[0].Domain = "apps.sameclustername.NOTexample.com"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
 		},
 	}

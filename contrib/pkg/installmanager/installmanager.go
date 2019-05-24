@@ -376,6 +376,8 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment) erro
 		}
 
 		m.log.Info("clear out clusterID and infraID from clusterdeployment")
+		cd.Status.ClusterID = ""
+		cd.Status.InfraID = ""
 		err := updateClusterDeploymentStatusWithRetries(m, func(cd *hivev1.ClusterDeployment) {
 			cd.Status.ClusterID = ""
 			cd.Status.InfraID = ""
@@ -564,6 +566,8 @@ func uploadClusterMetadata(cd *hivev1.ClusterDeployment, m *InstallManager) erro
 
 	// Set the clusterID and infraID
 	m.log.Info("setting clusterID and infraID on clusterdeployment")
+	cd.Status.ClusterID = md.ClusterID
+	cd.Status.InfraID = md.InfraID
 	err = updateClusterDeploymentStatusWithRetries(m, func(cd *hivev1.ClusterDeployment) {
 		cd.Status.ClusterID = md.ClusterID
 		cd.Status.InfraID = md.InfraID

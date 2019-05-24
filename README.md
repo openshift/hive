@@ -72,9 +72,8 @@ NOTE: assumes you have previously deployed using one of the above methods.
 
 ## Using Hive
 
-1. Obtain a pull secret from try.openshift.com and place in a known location like `$HOME/config.json`.
-1. **WARNING:** The template parameter BASE_DOMAIN (which defaults to "new-installer.openshift.com") **must** be different than the DNS base domain for the Hive cluster itself. For example, if the Hive cluster's DNS base domain is "foo.example.com", then BASE_DOMAIN **must** be set to something other than "foo.example.com". This will soon be fixed in the installer and no longer a requirement.
-1. Ensure your AWS credentials are set in the normal environment variables: AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY
+1. Obtain a pull secret from try.openshift.com and place in your home directory at `$HOME/.pull-secret`.
+1. Ensure that you are logged in to AWS via the AWS CLI or that your AWS credentials are set in environment variables: AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY
 1. Note the use of an SSH key below to access the instances if necessary. (this should typically not be required)
 
 ### Create a ClusterDeployment using the latest OpenShift release and installer image
@@ -85,14 +84,12 @@ Hiveutil offers a create-cluster subcommand which simplifies creating the API cu
 make hiveutil
 ```
 
-To view what create-cluster generates, *without* submitting it to the API server:
 
 ```bash
-bin/hiveutil create-cluster --base-domain=mycluster.new-installer.openshift.com --pull-secret-file ~/.pull-secret --ssh-key-file ~/.ssh/id_rsa.pub mycluster
+bin/hiveutil create-cluster --base-domain=mydomain.example.com mycluster
 ```
 
-Add `-o yaml` to the above command if you wish to see the API objects that would be sent to the server, without actually submitting. If you need to make any changes not supported by create-cluster options, the output can be saved, edited, and then submitted with `kubectl apply`.
-
+To view what create-cluster generates, *without* submitting it to the API server, add `-o yaml` to the above command. If you need to make any changes not supported by create-cluster options, the output can be saved, edited, and then submitted with `kubectl apply`.  
 By default this command assumes the latest Hive master CI build, and the latest OpenShift stable release. `--hive-image` can be specified to use a specific Hive image to run the install, and `--release-image` can be specified to control which OpenShift release image to install in the cluster.
 
 ### Watch the ClusterDeployment
@@ -104,13 +101,17 @@ By default this command assumes the latest Hive master CI build, and the latest 
   ```
 * Run following command to watch the cluster deployment
   ```
-  $ kubectl logs -f <install-pod-name> hive
+  $ kubectl logs -f <install-pod-name> -c hive
+  ```
+  Alternatively, you can watch the summarized output of the installer using
+  ```
+  $ kubectl exec -c hive <install-pod-name> -- tail -f /tmp/openshift-install-console.log
   ```
 
 ### Delete your ClusterDeployment
 
 ```bash
-$ oc delete clusterdeployment ${CLUSTER_NAME}
+$ oc delete clusterdeployment ${CLUSTER_NAME} --wait=false
 ```
 ## Tips
 
@@ -119,7 +120,7 @@ $ oc delete clusterdeployment ${CLUSTER_NAME}
 Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:
 
 ```bash
-kubectl get secret ${CLUSTER_NAME}-admin-kubeconfig -o json | jq ".data.kubeconfig" -r | base64 -d > ${CLUSTER_NAME}.kubeconfig
+kubectl get secret ${CLUSTER_NAME}-admin-kubeconfig -o jsonpath='{ .data.kubeconfig }' | base64 -d > ${CLUSTER_NAME}.kubeconfig
 export KUBECONFIG=${CLUSTER_NAME}.kubeconfig
 kubectl get nodes
 ```
@@ -134,7 +135,7 @@ After deleting your cluster deployment you will see an uninstall job created. If
     * Run `make hiveutil`
     * Get your cluster tag i.e. `infraID` from the following command output.
       ```bash
-      $ kubectl get cd ${CLUSTER_NAME} -o json | jq -r '.status.infraID'
+      $ kubectl get cd ${CLUSTER_NAME} -o jsonpath='{ .status.infraID }'
       ```
     * In case your cluster deployment is not available, you can find the tag in AWS console on any object from that cluster.
     * Run following command to deprovision artifacts in the AWS.
@@ -203,7 +204,6 @@ Steps:
 
   - Give cluster-admin role to `admin` and `developer` user
     ```
-    $ oc adm policy add-cluster-role-to-user cluster-admin system:admin
     $ oc adm policy add-cluster-role-to-user cluster-admin developer
     ```
   - Follow steps in [deployment Options](#deployment-options)
@@ -212,12 +212,12 @@ Steps:
 
 * Get the webconsole URL
   ```
-  $ kubectl get cd ${CLUSTER_NAME} -o yaml | grep webConsoleURL
+  $ kubectl get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
   ```
 
 * Retrive the password for `kubeadmin` user
   ```
-  $ kubectl get secret ${CLUSTER_NAME}-admin-password -o json | jq -r ".data.password" | base64 -d
+  $ kubectl get secret ${CLUSTER_NAME}-admin-password -o jsonpath='{ .data.password }' | base64 -d
   ```
 
 ## Documentation

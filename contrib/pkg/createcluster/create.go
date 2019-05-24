@@ -125,8 +125,8 @@ func NewCreateClusterCommand() *cobra.Command {
 	if u, err := user.Current(); err == nil {
 		homeDir = u.HomeDir
 	}
-	defaultSSHKeyFile := filepath.Join(homeDir, ".ssh", "libra.pub")
-	defaultPullSecretFile := filepath.Join(homeDir, "pull-secret.txt")
+	defaultSSHKeyFile := filepath.Join(homeDir, ".ssh", "id_rsa.pub")
+	defaultPullSecretFile := filepath.Join(homeDir, ".pull-secret")
 	defaultAWSCredsFile := filepath.Join(homeDir, ".aws", "credentials")
 
 	opt := &Options{}

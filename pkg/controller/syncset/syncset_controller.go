@@ -25,8 +25,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	kapi "k8s.io/api/core/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +48,6 @@ import (
 
 const (
 	controllerName              = "syncset"
-	adminKubeConfigKey          = "kubeconfig"
 	unknownObjectFoundReason    = "UnknownObjectFound"
 	unknownObjectNotFoundReason = "UnknownObjectNotFound"
 	applySucceededReason        = "ApplySucceeded"
@@ -247,14 +244,13 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 	// END migration code
 
 	// get kubeconfig for the cluster
-	secretName := cd.Status.AdminKubeconfigSecret.Name
-	secretData, err := r.loadSecretData(secretName, cd.Namespace, adminKubeConfigKey)
+	adminKubeconfigSecret := &corev1.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {
-		cdLog.WithError(err).Error("unable to load admin kubeconfig")
+		cdLog.WithError(err).Error("unable to load admin kubeconfig secret")
 		return reconcile.Result{}, err
 	}
-	kubeConfig := []byte(secretData)
-	kubeConfig, err = controllerutils.FixupKubeconfig(kubeConfig)
+	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to fixup cluster client")
 		return reconcile.Result{}, err
@@ -734,19 +730,6 @@ func (r *ReconcileSyncSet) getRelatedSyncSets(cd *hivev1.ClusterDeployment) ([]h
 	}
 
 	return syncSets, err
-}
-
-func (r *ReconcileSyncSet) loadSecretData(secretName, namespace, dataKey string) (string, error) {
-	s := &kapi.Secret{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
-	if err != nil {
-		return "", err
-	}
-	retStr, ok := s.Data[dataKey]
-	if !ok {
-		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
-	}
-	return string(retStr), nil
 }
 
 func (r *ReconcileSyncSet) resourceHash(data []byte) string {

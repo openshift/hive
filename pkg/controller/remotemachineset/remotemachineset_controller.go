@@ -64,7 +64,6 @@ const (
 	// MachineSets
 	remoteMachineAPINamespace = "openshift-machine-api"
 
-	adminKubeConfigKey          = "kubeconfig"
 	adminCredsSecretPasswordKey = "password"
 	adminSSHKeySecretKey        = "ssh-publickey"
 )
@@ -152,14 +151,13 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
-	secretName := cd.Status.AdminKubeconfigSecret.Name
-	secretData, err := r.loadSecretData(secretName, cd.Namespace, adminKubeConfigKey)
+	adminKubeconfigSecret := &kapi.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {
-		cdLog.WithError(err).Error("unable to load admin kubeconfig")
+		cdLog.WithError(err).Error("unable to fetch admin kubeconfig secret")
 		return reconcile.Result{}, err
 	}
-
-	kubeConfig, err := controllerutils.FixupKubeconfig([]byte(secretData))
+	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to fixup admin kubeconfig")
 		return reconcile.Result{}, err
@@ -442,7 +440,7 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 	cd = cd.DeepCopy()
 
 	cdLog.Debug("loading SSH key secret")
-	sshKey, err := r.loadSecretData(cd.Spec.SSHKey.Name,
+	sshKey, err := controllerutils.LoadSecretData(r, cd.Spec.SSHKey.Name,
 		cd.Namespace, adminSSHKeySecretKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load ssh key from secret")
@@ -458,19 +456,6 @@ func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(c
 	}
 
 	return ic, nil
-}
-
-func (r *ReconcileRemoteMachineSet) loadSecretData(secretName, namespace, dataKey string) (string, error) {
-	s := &kapi.Secret{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
-	if err != nil {
-		return "", err
-	}
-	retStr, ok := s.Data[dataKey]
-	if !ok {
-		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
-	}
-	return string(retStr), nil
 }
 
 // getAWSClient generates an awsclient

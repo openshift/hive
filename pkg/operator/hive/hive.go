@@ -19,6 +19,7 @@ package hive
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"fmt"
 	"os"
 
@@ -193,8 +194,14 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 	}
 	hLog.Infof("additional cert secret applied (%s)", result)
 
+	// Generating a volume name with a hash based on the contents of the additional CA
+	// secret will ensure that when there are changes to the secret, the hive controller
+	// will be re-deployed.
+	hash := fmt.Sprintf("%x", md5.Sum(additionalCA.Bytes()))
+	volumeName := fmt.Sprintf("additionalca-%s", hash[:20])
+
 	hiveDeployment.Spec.Template.Spec.Volumes = append(hiveDeployment.Spec.Template.Spec.Volumes, corev1.Volume{
-		Name: "additionalca",
+		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: hiveAdditionalCASecret,
@@ -203,7 +210,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 	})
 
 	hiveDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(hiveDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-		Name:      "additionalca",
+		Name:      volumeName,
 		MountPath: "/additional/ca",
 		ReadOnly:  true,
 	})

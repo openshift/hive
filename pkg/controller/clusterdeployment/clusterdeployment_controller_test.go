@@ -553,6 +553,23 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Ensure managed DNSZone is deleted with cluster deployment",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				dnsZone := getDNSZone(c)
+				assert.Nil(t, dnsZone, "dnsZone should not exist")
+			},
+		},
+		{
 			name: "Delete cluster deployment with image from clusterimageset",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {

@@ -8,7 +8,6 @@ required = [
     "golang.org/x/net/context",
     "github.com/jteeuwen/go-bindata",
     "github.com/openshift/installer/pkg/types",
-    "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apiserver/pkg/util/logs",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
@@ -37,15 +36,15 @@ required = [
   name="sigs.k8s.io/controller-runtime"
   version="v0.1.8"
 
+# Remove when we're no longer using the master team's controller-tools repo (https://github.com/openshift/kubernetes-sigs-controller-tools).
 [[constraint]]
   name="sigs.k8s.io/controller-tools"
-  #version="v0.1.8" # TODO: go back to using upstream when this issue is resolved: https://github.com/kubernetes-sigs/controller-tools/issues/137
-  source = "github.com/twiest/controller-tools"
-  branch = "add_optional_comment_tag_support_v0.1.8"
+  source = "github.com/openshift/kubernetes-sigs-controller-tools"
+  branch = "origin-4.1-kubernetes-1.13.4"
 
 [[override]]
   name="k8s.io/api"
-  version="kubernetes-1.12.3"
+  version="kubernetes-1.13.4"
 
 [[override]]
   name="github.com/russross/blackfriday"
@@ -53,15 +52,15 @@ required = [
 
 [[override]]
   name="k8s.io/kubernetes"
-  version="=v1.12.3"
+  version="=v1.13.4"
 
 [[override]]
   name="k8s.io/metrics"
-  version="kubernetes-1.12.3"
+  version="kubernetes-1.13.4"
 
 [[override]]
   name="k8s.io/apimachinery"
-  version="kubernetes-1.12.3"
+  version="kubernetes-1.13.4"
 
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
@@ -75,7 +74,7 @@ version="v1.4.7"
 
 [[override]]
   name = "k8s.io/client-go"
-  version="kubernetes-1.12.3"
+  version="kubernetes-1.13.4"
 
 [[constraint]]
   name = "github.com/openshift/installer"
@@ -83,13 +82,16 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"
-  # version = "v.1.11.0"
-  branch = "update_to_112"
-  source = "github.com/csrwng/generic-admission-server"
+  #version = "v1.13.2"
+  branch = "release-1.13" # TODO: Can't use "version" for v1.13.2 as that release is broken. Go back to using version when fixed.
 
 [[override]]
   name = "k8s.io/apiserver"
-  version="kubernetes-1.12.3"
+  version="kubernetes-1.13.4"
+
+[[override]]
+  name = "github.com/evanphx/json-patch"
+  version = "v4.2.0"
 
 [[constraint]]
   branch = "master"
@@ -101,20 +103,17 @@ version="v1.4.7"
   revision = "15fe4b4ea5636f8516c238490fc6a85d44161181"
 
 [[override]]
-  name = "github.com/kubernetes-sigs/federation-v2"
-  ## TODO: Revert to upstream when idempotent join is available
-  source = "github.com/csrwng/federation-v2"
-  branch = "idempotent_join"
-
-[[override]]
   name = "github.com/docker/docker"
   revision = "a9fbbdc8dd8794b20af358382ab780559bca589d"
-
 
 [[override]]
   name = "github.com/jteeuwen/go-bindata"
   revision = "a0ff2567cfb70903282db057e799fd826784d41d"
 
+[[override]]
+  name="k8s.io/apiextensions-apiserver"
+  branch="origin-4.1-kubernetes-1.13.4"
+  source="github.com/openshift/kubernetes-apiextensions-apiserver"
 
 [[constraint]]
   name = "github.com/golang/mock"

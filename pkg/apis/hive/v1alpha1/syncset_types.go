@@ -207,6 +207,7 @@ type SyncSetSpec struct {
 
 	// ClusterDeploymentRefs is the list of LocalObjectReference indicating which clusters the
 	// SyncSet applies to in the SyncSet's namespace.
+	// +required
 	ClusterDeploymentRefs []corev1.LocalObjectReference `json:"clusterDeploymentRefs"`
 }
 

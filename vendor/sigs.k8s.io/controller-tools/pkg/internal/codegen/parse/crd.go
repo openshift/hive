@@ -267,6 +267,9 @@ var primitiveTemplate = template.Must(template.New("map-template").Parse(
     {{ if .MinLength -}}
     MinLength: getInt({{ .MinLength }}),
     {{ end -}}
+	{{ if .Nullable -}}
+	Nullable: true,
+	{{ end -}}
 }`))
 
 // parsePrimitiveValidation returns a JSONSchemaProps object and its
@@ -319,6 +322,7 @@ func (b *APIs) parsePrimitiveValidation(t *types.Type, found sets.String, commen
 type mapTempateArgs struct {
 	Result            string
 	SkipMapValidation bool
+	Nullable          bool
 }
 
 var mapTemplate = template.Must(template.New("map-template").Parse(
@@ -328,12 +332,15 @@ var mapTemplate = template.Must(template.New("map-template").Parse(
         Allows: true,
         Schema: &{{.Result}},
     },{{end}}
+	{{ if .Nullable -}}
+	Nullable: true,
+	{{ end -}}
 }`))
 
 // parseMapValidation returns a JSONSchemaProps object and its serialization in
 // Go that describe the validations for the given map type.
 func (b *APIs) parseMapValidation(t *types.Type, found sets.String, comments []string) (v1beta1.JSONSchemaProps, string) {
-	additionalProps, result := b.typeToJSONSchemaProps(t.Elem, found, comments, false)
+	additionalProps, result := b.typeToJSONSchemaProps(t.Elem, found, nil, false)
 	additionalProps.Description = ""
 	props := v1beta1.JSONSchemaProps{
 		Type:        "object",
@@ -351,7 +358,7 @@ func (b *APIs) parseMapValidation(t *types.Type, found sets.String, comments []s
 	}
 
 	buff := &bytes.Buffer{}
-	if err := mapTemplate.Execute(buff, mapTempateArgs{Result: result, SkipMapValidation: parseOption.SkipMapValidation}); err != nil {
+	if err := mapTemplate.Execute(buff, mapTempateArgs{Result: result, SkipMapValidation: parseOption.SkipMapValidation, Nullable: props.Nullable}); err != nil {
 		log.Fatalf("%v", err)
 	}
 	return props, buff.String()
@@ -377,6 +384,9 @@ var arrayTemplate = template.Must(template.New("array-template").Parse(
         Schema: &{{.ItemsSchema}},
     },
     {{ end -}}
+	{{ if .Nullable -}}
+	Nullable: true,
+	{{ end -}}
 }`))
 
 type arrayTemplateArgs struct {
@@ -387,7 +397,7 @@ type arrayTemplateArgs struct {
 // parseArrayValidation returns a JSONSchemaProps object and its serialization in
 // Go that describe the validations for the given array type.
 func (b *APIs) parseArrayValidation(t *types.Type, found sets.String, comments []string) (v1beta1.JSONSchemaProps, string) {
-	items, result := b.typeToJSONSchemaProps(t.Elem, found, comments, false)
+	items, result := b.typeToJSONSchemaProps(t.Elem, found, nil, false)
 	items.Description = ""
 	props := v1beta1.JSONSchemaProps{
 		Type:        "array",
@@ -439,6 +449,9 @@ var objectTemplate = template.Must(template.New("object-template").Parse(
         "{{ $v }}", 
         {{ end -}}
     },{{ end -}}
+	{{ if .Nullable -}}
+	Nullable: true,
+	{{ end -}}
 }`))
 
 // parseObjectValidation returns a JSONSchemaProps object and its serialization in
@@ -473,6 +486,10 @@ func (b *APIs) parseObjectValidation(t *types.Type, found sets.String, comments 
 // getValidation parses the validation tags from the comment and sets the
 // validation rules on the given JSONSchemaProps.
 func getValidation(comment string, props *v1beta1.JSONSchemaProps) {
+	if strings.TrimSpace(comment) == "+nullable" {
+		props.Nullable = true
+	}
+
 	comment = strings.TrimLeft(comment, " ")
 	if !strings.HasPrefix(comment, "+kubebuilder:validation:") {
 		return
@@ -628,9 +645,7 @@ func (b *APIs) getMembers(t *types.Type, found sets.String) (map[string]v1beta1.
 			m, r := b.typeToJSONSchemaProps(member.Type, found, member.CommentLines, false)
 			members[name] = m
 			result[name] = r
-
-			// A field is only required if it is missing both omitempty -and- the "+optional" comment tag.
-			if !strings.HasSuffix(strat, "omitempty") && !hasOptionalCommentTag(member.CommentLines) {
+			if hasRequired(member) {
 				required = append(required, name)
 			}
 		}
@@ -638,17 +653,4 @@ func (b *APIs) getMembers(t *types.Type, found sets.String) (map[string]v1beta1.
 
 	defer found.Delete(t.Name.String())
 	return members, result, required
-}
-
-// hasOptionalCommentTag loops through a member's CommentLines looking for the "+optional" comment tag.
-func hasOptionalCommentTag(commentLines []string) bool {
-	for _, commentLine := range commentLines {
-		commentLine = strings.TrimLeft(commentLine, " ")
-		if strings.HasPrefix(commentLine, "+optional") {
-			return true
-		}
-	}
-
-	// none of the commentLines had the "+optional" comment tag.
-	return false
 }

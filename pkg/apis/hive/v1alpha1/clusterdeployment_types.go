@@ -34,10 +34,6 @@ const (
 	// job before cleaning up the API object.
 	FinalizerDeprovision string = "hive.openshift.io/deprovision"
 
-	// FinalizerFederation is used on ClusterDeployments to ensure that federation-related artifacts are cleaned up from
-	// the host cluster before a ClusterDeployment is deleted.
-	FinalizerFederation string = "hive.openshift.io/federation"
-
 	// HiveClusterTypeLabel is an optional label that can be applied to ClusterDeployments. It is
 	// shown in short output, usable in searching, and adds metrics vectors which can be used to
 	// alert on cluster types differently.
@@ -54,30 +50,39 @@ type ClusterDeploymentSpec struct {
 	// ClusterName is the friendly name of the cluster. It is used for subdomains,
 	// some resource tagging, and other instances where a friendly name for the
 	// cluster is useful.
+	// +required
 	ClusterName string `json:"clusterName"`
 
 	// SSHKey is the reference to the secret that contains a public key to use for access to compute instances.
 	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
 
 	// BaseDomain is the base domain to which the cluster should belong.
+	// +required
 	BaseDomain string `json:"baseDomain"`
 
 	// Networking defines the pod network provider in the cluster.
+	// +required
 	Networking `json:"networking"`
 
 	// ControlPlane is the MachinePool containing control plane nodes that need to be installed.
+	// +required
 	ControlPlane MachinePool `json:"controlPlane"`
 
 	// Compute is the list of MachinePools containing compute nodes that need to be installed.
+	// +required
 	Compute []MachinePool `json:"compute"`
 
 	// Platform is the configuration for the specific platform upon which to
 	// perform the installation.
+	// +required
 	Platform `json:"platform"`
 
 	// PullSecret is the reference to the secret to use when pulling images.
+	// +required
 	PullSecret corev1.LocalObjectReference `json:"pullSecret"`
+
 	// PlatformSecrets contains credentials and secrets for the cluster infrastructure.
+	// +required
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
 
 	// Images allows overriding the default images used to provision and manage the cluster.
@@ -369,10 +374,12 @@ type LibvirtNetwork struct {
 // that should exist on the cluster.
 type ClusterIngress struct {
 	// Name of the ClusterIngress object to create.
+	// +required
 	Name string `json:"name"`
 
 	// Domain (sometimes refered to as shard) is the full DNS suffix that the resulting
 	// IngressController object will service (eg abcd.mycluster.mydomain.com).
+	// +required
 	Domain string `json:"domain"`
 
 	// NamespaceSelector allows filtering the list of namespaces serviced by the
@@ -426,6 +433,7 @@ type ControlPlaneAdditionalCertificate struct {
 type CertificateBundleSpec struct {
 	// Name is an identifier that must be unique within the bundle and must be referenced by
 	// an ingress or by the control plane serving certs
+	// +required
 	Name string `json:"name"`
 
 	// Generate indicates whether this bundle should have real certificates generated for it.

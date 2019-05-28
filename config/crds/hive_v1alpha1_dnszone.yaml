@@ -50,18 +50,12 @@ spec:
                       value:
                         description: Value is the value for the tag
                         type: string
-                    required:
-                    - key
-                    - value
                     type: object
                   type: array
                 region:
                   description: Region specifies the region-specific API endpoint to
                     use
                   type: string
-              required:
-              - accountSecret
-              - region
               type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
@@ -70,8 +64,6 @@ spec:
             zone:
               description: Zone is the DNS zone to host
               type: string
-          required:
-          - zone
           type: object
         status:
           properties:
@@ -110,9 +102,6 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
-                required:
-                - type
-                - status
                 type: object
               type: array
             lastSyncGeneration:
@@ -130,8 +119,6 @@ spec:
               items:
                 type: string
               type: array
-          required:
-          - lastSyncGeneration
           type: object
   version: v1alpha1
 status:

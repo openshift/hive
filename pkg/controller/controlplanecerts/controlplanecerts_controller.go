@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
@@ -361,7 +362,7 @@ func getCertSecret(secret *corev1.Secret, cd *hivev1.ClusterDeployment) *corev1.
 }
 
 func remoteSecretName(secretName string, cd *hivev1.ClusterDeployment) string {
-	return fmt.Sprintf("%s-%s", cd.Name, secretName)
+	return apihelpers.GetResourceName(cd.Name, secretName)
 }
 
 func certificateBundle(cd *hivev1.ClusterDeployment, name string) *hivev1.CertificateBundleSpec {
@@ -374,7 +375,7 @@ func certificateBundle(cd *hivev1.ClusterDeployment, name string) *hivev1.Certif
 }
 
 func controlPlaneCertsSyncSetName(name string) string {
-	return fmt.Sprintf("%s-cp-certs", name)
+	return apihelpers.GetResourceName(name, "cp-certs")
 }
 
 func defaultControlPlaneDomain(cd *hivev1.ClusterDeployment) string {

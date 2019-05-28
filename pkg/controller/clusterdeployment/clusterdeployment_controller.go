@@ -48,6 +48,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -766,7 +767,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 	// The install manager sets this secret name, but we don't consider it a critical failure and
 	// will attempt to heal it here, as the value is predictable.
 	if cd.Status.Installed && cd.Status.AdminKubeconfigSecret.Name == "" {
-		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", cd.Name)}
+		cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: apihelpers.GetResourceName(cd.Name, "admin-kubeconfig")}
 	}
 
 	if cd.Status.AdminKubeconfigSecret.Name != "" {
@@ -1095,7 +1096,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 }
 
 func dnsZoneName(cdName string) string {
-	return fmt.Sprintf("%s-zone", cdName)
+	return apihelpers.GetResourceName(cdName, "zone")
 }
 
 func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {

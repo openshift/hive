@@ -40,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 )
 
 const (
@@ -267,7 +269,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 		return err
 	}
 
-	ssName := cd.Name + "-idp"
+	ssName := apihelpers.GetResourceName(cd.Name, "idp")
 
 	ss := &hivev1.SyncSet{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: ssName, Namespace: cd.Namespace}, ss)

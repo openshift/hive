@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -627,7 +628,7 @@ func (zr *ZoneReconciler) getHostedZoneNSRecord(zoneID string) ([]string, error)
 }
 
 func parentLinkRecordName(dnsZoneName string) string {
-	return fmt.Sprintf("%s-ns", dnsZoneName)
+	return apihelpers.GetResourceName(dnsZoneName, "ns")
 }
 
 func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {

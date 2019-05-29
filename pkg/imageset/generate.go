@@ -17,7 +17,6 @@ limitations under the License.
 package imageset
 
 import (
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -27,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
@@ -185,7 +185,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 
 // GetImageSetJobName returns the expected name of the imageset job for a ClusterImageSet.
 func GetImageSetJobName(cdName string) string {
-	return fmt.Sprintf("%s-imageset", cdName)
+	return apihelpers.GetResourceName(cdName, "imageset")
 }
 
 // AlwaysPullImage returns an ImageSpec with a PullAlways pull policy

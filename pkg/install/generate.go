@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
@@ -26,8 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"strconv"
-
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
@@ -91,7 +91,7 @@ func GenerateInstallerJob(
 
 	cfgMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        fmt.Sprintf("%s-installconfig", cd.Name),
+			Name:        apihelpers.GetResourceName(cd.Name, "installconfig"),
 			Namespace:   cd.Namespace,
 			Annotations: annotations,
 		},
@@ -289,7 +289,12 @@ func GenerateInstallerJob(
 
 // GetInstallJobName returns the expected name of the install job for a cluster deployment.
 func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
-	return fmt.Sprintf("%s-install", cd.Name)
+	return apihelpers.GetResourceName(cd.Name, "install")
+}
+
+// GetUninstallJobName returns the expected name of the deprovision job for a cluster deployment.
+func GetUninstallJobName(name string) string {
+	return apihelpers.GetResourceName(name, "uninstall")
 }
 
 // GenerateUninstallerJobForClusterDeployment creates a job to uninstall an OpenShift cluster
@@ -325,7 +330,7 @@ func GenerateUninstallerJobForClusterDeployment(
 
 	infraID := cd.Status.InfraID
 	clusterID := cd.Status.ClusterID
-	name := fmt.Sprintf("%s-uninstall", cd.Name)
+	name := GetUninstallJobName(cd.Name)
 
 	return GenerateUninstallerJob(
 		cd.Namespace,
@@ -358,7 +363,7 @@ func GenerateUninstallerJobForDeprovisionRequest(
 		credentialsSecret = req.Spec.Platform.AWS.Credentials.Name
 	}
 
-	name := fmt.Sprintf("%s-uninstall", req.Name)
+	name := GetUninstallJobName(req.Name)
 
 	return GenerateUninstallerJob(
 		req.Namespace,

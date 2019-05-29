@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	ingresscontroller "github.com/openshift/api/operator/v1"
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
@@ -247,7 +248,7 @@ func newSyncSetSpec(cd *hivev1.ClusterDeployment, rawExtensions []runtime.RawExt
 
 // syncSyncSet builds up a syncSet object with the passed-in rawExtensions as the spec.Resources
 func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, rawExtensions []runtime.RawExtension) error {
-	ssName := fmt.Sprintf("%v-clusteringress", rContext.clusterDeployment.Name)
+	ssName := apihelpers.GetResourceName(rContext.clusterDeployment.Name, "clusteringress")
 
 	newSyncSetSpec := newSyncSetSpec(rContext.clusterDeployment, rawExtensions)
 	syncSet := &hivev1.SyncSet{
@@ -428,7 +429,7 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 // remoteSecretNameForCertificateBundleSecret just stitches together a secret name consisting of
 // the original certificateBundle's secret name pre-pended with the clusterDeployment.Name
 func remoteSecretNameForCertificateBundleSecret(secretName string, cd *hivev1.ClusterDeployment) string {
-	return fmt.Sprintf("%s-%s", cd.Name, secretName)
+	return apihelpers.GetResourceName(cd.Name, secretName)
 }
 
 func findSecret(secretName string, secrets []*corev1.Secret) *corev1.Secret {

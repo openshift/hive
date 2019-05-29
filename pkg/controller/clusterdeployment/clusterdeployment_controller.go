@@ -297,8 +297,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
-	imageSet, err := r.getClusterImageSet(cd, cdLog)
-	if err != nil {
+	imageSet, modified, err := r.getClusterImageSet(cd, cdLog)
+	if modified || err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -378,7 +378,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Status.InstallerImage == nil {
-		err = r.resolveInstallerImage(cd, hiveImage, cdLog)
+		err = r.resolveInstallerImage(cd, imageSet, releaseImage, hiveImage, cdLog)
 		return reconcile.Result{}, err
 	}
 
@@ -582,21 +582,22 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 	return ""
 }
 
-func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
-	if cd.Spec.ImageSet == nil {
-		return nil, nil
+func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, bool, error) {
+	if cd.Spec.ImageSet == nil || len(cd.Spec.ImageSet.Name) == 0 {
+		return nil, false, nil
 	}
 	imageSet := &hivev1.ClusterImageSet{}
 	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
 	switch {
 	case errors.IsNotFound(err):
 		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Warning("clusterdeployment references non-existent clusterimageset")
-		return nil, nil
+		modified, err := r.setImageSetNotFoundCondition(cd, false, cdLog)
+		return nil, modified, err
 	case err != nil:
 		cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
-		return nil, err
+		return nil, false, err
 	default:
-		return imageSet, nil
+		return imageSet, false, nil
 	}
 }
 
@@ -608,49 +609,21 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 	return err
 }
 
-func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage, hiveImage string, cdLog log.FieldLogger) error {
 	if len(cd.Spec.Images.InstallerImage) > 0 {
 		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
 			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
 		cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
 		return r.statusUpdate(cd, cdLog)
 	}
-	if cd.Spec.ImageSet == nil {
-		// In the future, not having an ImageSet or an override installer image set should not
-		// be allowed. For now, we'll set a default one.
-		cdLog.Warn("no imageset reference or override installer image found on cluster deployment. Using default")
-		cd.Status.InstallerImage = strPtr(install.DefaultInstallerImage)
-		return r.statusUpdate(cd, cdLog)
-	}
-	imageSet := &hivev1.ClusterImageSet{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
-	if errors.IsNotFound(err) {
-		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Debug("clusterimageset not found, setting a condition to indicate the error")
-		_, err := r.setImageSetNotFoundCondition(cd, true, cdLog)
-		return err
-	}
-	if err != nil {
-		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("cannot get clusterimageset")
-		return err
-	}
-	modified, err := r.setImageSetNotFoundCondition(cd, false, cdLog)
-	if modified {
-		return err
-	}
-	if imageSet.Spec.InstallerImage != nil {
+	if imageSet != nil && imageSet.Spec.InstallerImage != nil {
 		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
 		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
 		return r.statusUpdate(cd, cdLog)
 	}
-	if imageSet.Spec.ReleaseImage == nil {
-		// This is not expected to happen, but will be logged just in case.
-		cdLog.WithField("imageset", imageSet.Name).Error("invalid ClusterImageSet: no releaseImage specified")
-		// No need to requeue right away
-		return nil
-	}
 	cliImage := images.GetCLIImage(cdLog)
-	job := imageset.GenerateImageSetJob(cd, imageSet, serviceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
-	if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+	job := imageset.GenerateImageSetJob(cd, releaseImage, serviceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
+	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on job")
 		return err
 	}
@@ -659,7 +632,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	jobLog := cdLog.WithField("job", jobName)
 
 	existingJob := &batchv1.Job{}
-	err = r.Get(context.TODO(), jobName, existingJob)
+	err := r.Get(context.TODO(), jobName, existingJob)
 	switch {
 	// If job exists and is finished, delete so we can recreate it
 	case err == nil && controllerutils.IsFinished(existingJob):
@@ -672,7 +645,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		}
 		return err
 	case errors.IsNotFound(err):
-		jobLog.Info("creating imageset job")
+		jobLog.WithField("releaseImage", releaseImage).Info("creating imageset job")
 		_, err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Error("error setting up service account and role")

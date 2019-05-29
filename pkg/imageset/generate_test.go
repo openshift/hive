@@ -29,7 +29,7 @@ var (
 )
 
 func TestGenerateImageSetJob(t *testing.T) {
-	job := GenerateImageSetJob(testClusterDeployment(), testImageSet(), "test-service-account", testCLIImageSpec, testHiveImageSpec)
+	job := GenerateImageSetJob(testClusterDeployment(), *testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec, testHiveImageSpec)
 	validateJob(t, job)
 }
 

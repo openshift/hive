@@ -18,6 +18,7 @@ package clusterdeprovisionrequest
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -107,10 +108,17 @@ type ReconcileClusterDeprovisionRequest struct {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeprovisionrequests;clusterdeprovisionrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeprovisionrequests/status,verbs=get;update;patch
 func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
 	rLog := log.WithFields(log.Fields{
 		"name":       request.NamespacedName.String(),
 		"controller": controllerName,
 	})
+	// For logging, we need to see when the reconciliation loop starts and ends.
+	rLog.Info("reconciling cluster deprovision request")
+	defer func() {
+		dur := time.Since(start)
+		rLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
 	// Fetch the ClusterDeprovisionRequest instance
 	instance := &hivev1.ClusterDeprovisionRequest{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)

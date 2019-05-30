@@ -709,6 +709,7 @@ func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration i
 		convertedJobGeneration, _ := strconv.ParseInt(jobGeneration, 10, 64)
 		if convertedJobGeneration < cdGeneration {
 			didGenerationChange = true
+			cdLog.Info("deleting outdated install job due to cluster deployment generation change")
 			err = r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil {
 				cdLog.WithError(err).Errorf("error deleting outdated install job")
@@ -720,6 +721,7 @@ func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration i
 		convertedMapGeneration, _ := strconv.ParseInt(cfgMapGeneration, 10, 64)
 		if convertedMapGeneration < cdGeneration {
 			didGenerationChange = true
+			cdLog.Info("deleting outdated installconfig configmap due to cluster deployment generation change")
 			err = r.Update(context.TODO(), cfgMap)
 			if err != nil {
 				cdLog.WithError(err).Errorf("error deleting outdated config map")

@@ -80,7 +80,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:                        mgr.GetClient(),
 		scheme:                        mgr.GetScheme(),
 		logger:                        log.WithField("controller", controllerName),
-		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
+		remoteClusterAPIClientBuilder: controllerutils.GetClusterAPIClient,
 		awsClientBuilder:              awsclient.NewClient,
 	}
 }
@@ -113,7 +113,7 @@ type ReconcileRemoteMachineSet struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string) (client.Client, error)
+	remoteClusterAPIClientBuilder func(*hivev1.ClusterDeployment, string) (client.Client, error)
 
 	// awsClientBuilder is a function pointer to the function that builds the aws client
 	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
@@ -147,7 +147,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	if !cd.Status.Installed {
 		// Cluster isn't installed yet, return
-		cdLog.Info("cluster installation is not complete")
+		cdLog.Debug("cluster installation is not complete")
 		return reconcile.Result{}, nil
 	}
 
@@ -163,7 +163,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig))
+	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(cd, string(kubeConfig))
 	if err != nil {
 		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

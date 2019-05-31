@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -63,6 +65,20 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	return client.New(cfg, client.Options{
 		Scheme: scheme,
 	})
+}
+
+// GetClusterAPIClient returns kube API client for the cluster deployment only when the cluster condition is reachable
+func GetClusterAPIClient(cd *hivev1.ClusterDeployment, kubeconfigData string) (client.Client, error) {
+
+	condition := FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
+	if condition != nil {
+		//Check condition status is true or not
+		if condition.Status == corev1.ConditionTrue {
+			err := fmt.Errorf(fmt.Sprintf("cluster deployment condition '%s' : %s", hivev1.UnreachableCondition, condition.Status))
+			return nil, err
+		}
+	}
+	return BuildClusterAPIClientFromKubeconfig(kubeconfigData)
 }
 
 // BuildDynamicClientFromKubeconfig returns a dynamic client using the provided kubeconfig

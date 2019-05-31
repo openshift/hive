@@ -8,7 +8,6 @@ component=hive
 HIVE_IMAGE=$(eval "echo $IMAGE_FORMAT")
 RELEASE_IMAGE="registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest"
 
-ln -s $(which oc) $(pwd)/kubectl
 export PATH=$PATH:$(pwd)
 
 # download kustomize so we can use it for deploying

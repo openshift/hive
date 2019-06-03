@@ -31,6 +31,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -207,6 +208,30 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	// TODO: Put Create Validation Here (or in openAPIV3Schema validation section of crd)
+
+	if len(newObject.Name) > validation.DNS1123LabelMaxLength {
+		message := fmt.Sprintf("Invalid cluster deployment name (.meta.name): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
+		contextLogger.Error(message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
+	if len(newObject.Spec.ClusterName) > validation.DNS1123LabelMaxLength {
+		message := fmt.Sprintf("Invalid cluster name (.spec.clusterName): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
+		contextLogger.Error(message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
 
 	// validate the ingress
 	if ingressValidationResult := validateIngress(newObject, contextLogger); ingressValidationResult != nil {

@@ -372,6 +372,26 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
 		},
+		{
+			name: "Cluster deployment name is too long",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Name = "this-is-a-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-name"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Cluster name is too long",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.ClusterName = "this-is-a-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-name"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {

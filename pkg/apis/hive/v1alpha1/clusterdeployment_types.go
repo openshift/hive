@@ -42,6 +42,13 @@ const (
 	// DefaultClusterType will be used when the above HiveClusterTypeLabel is unset. This
 	// value will not be added as a label, only used for metrics vectors.
 	DefaultClusterType = "unspecified"
+
+	// HiveClusterDeploymentNameLabel is used on various objects created by Hive to link to their associated
+	// ClusterDeployment
+	HiveClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
+
+	// HiveInstallLogLabel is used on ConfigMaps uploaded by the install manager which contain an install log.
+	HiveInstallLogLabel = "hive.openshift.io/install-log"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
@@ -253,6 +260,10 @@ const (
 
 	// UnreachableCondition indicates that are unable to establish an API connection to the remote cluster.
 	UnreachableCondition ClusterDeploymentConditionType = "Unreachable"
+
+	// InstallFailingCondition indicates that a failure has been detected and we will attempt to offer some
+	// information as to why in the reason.
+	InstallFailingCondition ClusterDeploymentConditionType = "InstallFailing"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -263,6 +274,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ControlPlaneCertificateNotFoundCondition,
 	IngressCertificateNotFoundCondition,
 	UnreachableCondition,
+	InstallFailingCondition,
 }
 
 // +genclient

@@ -98,7 +98,7 @@ type InstallManager struct {
 	updateClusterDeploymentStatus func(*hivev1.ClusterDeployment, string, string, *InstallManager) error
 	uploadAdminKubeconfig         func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword           func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
-	uploadInstallerLog            func(*hivev1.ClusterDeployment, *InstallManager) error
+	uploadInstallerLog            func(*hivev1.ClusterDeployment, *InstallManager, error) error
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -235,7 +235,7 @@ func (m *InstallManager) Run() error {
 
 	// Generate installer assets we need to modify or upload.
 	if err := m.generateAssets(cd); err != nil {
-		if upErr := m.uploadInstallerLog(cd, m); upErr != nil {
+		if upErr := m.uploadInstallerLog(cd, m, err); upErr != nil {
 			m.log.WithError(err).Error("error saving asset generation log")
 		}
 		return err
@@ -267,7 +267,7 @@ func (m *InstallManager) Run() error {
 		m.writeSleepSecondsFile()
 	}
 
-	if err := m.uploadInstallerLog(cd, m); err != nil {
+	if err := m.uploadInstallerLog(cd, m, installErr); err != nil {
 		m.log.WithError(err).Error("error saving installer log")
 	}
 
@@ -615,7 +615,7 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 	return cd, nil
 }
 
-func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager) error {
+func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager, installErr error) error {
 	m.log.Infoln("uploading installer output")
 
 	if _, err := os.Stat(installerConsoleLogFilePath); os.IsNotExist(err) {
@@ -632,14 +632,23 @@ func uploadInstallerLog(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 	logWithoutSensitiveData := cleanupLogOutput(string(logBytes))
 
 	m.log.Debugf("installer console log: %v", logWithoutSensitiveData)
+	success := "false"
+	if installErr == nil {
+		success = "true"
+	}
 
 	kubeConfigmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-install-log", m.ClusterDeploymentName),
 			Namespace: m.Namespace,
+			Labels: map[string]string{
+				hivev1.HiveClusterDeploymentNameLabel: m.ClusterDeploymentName,
+				hivev1.HiveInstallLogLabel:            "true",
+			},
 		},
 		Data: map[string]string{
-			"log": logWithoutSensitiveData,
+			"log":     logWithoutSensitiveData,
+			"success": success,
 		},
 	}
 

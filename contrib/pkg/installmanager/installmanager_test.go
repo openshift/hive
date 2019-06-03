@@ -182,7 +182,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.failedUploadInstallerLog {
-				im.uploadInstallerLog = func(*hivev1.ClusterDeployment, *InstallManager) error {
+				im.uploadInstallerLog = func(*hivev1.ClusterDeployment, *InstallManager, error) error {
 					return fmt.Errorf("faiiled to save install log")
 				}
 			}

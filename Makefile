@@ -78,7 +78,7 @@ run-operator: generate fmt vet
 # Install CRDs into a cluster
 .PHONY: install
 install: crd
-	kubectl apply -f config/crds
+	oc apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
@@ -92,7 +92,7 @@ deploy: manifests install generate
 	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	fi
 	echo $(DEPLOY_IMAGE)
-	kustomize build overlays/deploy | kubectl apply -f -
+	kustomize build overlays/deploy | oc apply -f -
 	rm -rf overlays/deploy
 
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
@@ -103,8 +103,8 @@ manifests: crd rbac
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
 deploy-sd-dev: crd rbac
-	kubectl apply -f config/crds
-	kustomize build overlays/sd-dev | kubectl apply -f -
+	oc apply -f config/crds
+	kustomize build overlays/sd-dev | oc apply -f -
 
 # Generate CRD yaml from our api types:
 .PHONY: crd

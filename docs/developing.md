@@ -73,7 +73,7 @@ $ dep ensure -v
 We use a hiveutil subcommand for the install-manager, in pods and thus in an image to wrap the openshift-install process and upload artifacts to Hive. Developing this is tricky because it requires a published image and ClusterImageSet. Instead, you can hack together an environment as follows:
 
  1. Create a ClusterDeployment, allow it to resolve the installer image, but before it can complete:
-   1. Scale down the hive-controllers so they are no longer running: `kubectl scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
+   1. Scale down the hive-controllers so they are no longer running: `oc scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
    1. Delete the install job: `k delete job dgoodwin1-install`
  1. Make a temporary working directory in your hive checkout: `mkdir temp`
  1. Compile your hiveutil changes: `make hiveutil`

@@ -25,7 +25,6 @@ API driven OpenShift cluster provisioning and management
 ## Prerequisites
 
 * [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
-* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 * [oc](https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/)
 
 ## Deployment Options
@@ -58,14 +57,14 @@ We do not currently publish an official OLM operator package, but you can run or
 
 NOTE: assumes you have previously deployed using one of the above methods.
 
- 1. `$ kubectl scale -n hive deployment.v1.apps/hive-operator --replicas=0`
+ 1. `$ oc scale -n hive deployment.v1.apps/hive-operator --replicas=0`
  1. `$ make run-operator`
 
 ### Run Hive From Source
 
 NOTE: assumes you have previously deployed using one of the above methods.
 
- 1. `$ kubectl scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
+ 1. `$ oc scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
  1. `$ make run`
 
 ## Using Hive
@@ -87,7 +86,7 @@ make hiveutil
 bin/hiveutil create-cluster --base-domain=mydomain.example.com mycluster
 ```
 
-To view what create-cluster generates, *without* submitting it to the API server, add `-o yaml` to the above command. If you need to make any changes not supported by create-cluster options, the output can be saved, edited, and then submitted with `kubectl apply`.  
+To view what create-cluster generates, *without* submitting it to the API server, add `-o yaml` to the above command. If you need to make any changes not supported by create-cluster options, the output can be saved, edited, and then submitted with `oc apply`.
 By default this command assumes the latest Hive master CI build, and the latest OpenShift stable release. `--hive-image` can be specified to use a specific Hive image to run the install, and `--release-image` can be specified to control which OpenShift release image to install in the cluster.
 
 ### Watch the ClusterDeployment
@@ -95,15 +94,15 @@ By default this command assumes the latest Hive master CI build, and the latest 
 * Get the current namespace in which the `oc process` command was executed
 * Get the install pod name
   ```
-  $ kubectl get pods -o json --selector job-name==${CLUSTER_NAME}-install | jq -r '.items | .[].metadata.name'
+  $ oc get pods -o json --selector job-name==${CLUSTER_NAME}-install | jq -r '.items | .[].metadata.name'
   ```
 * Run following command to watch the cluster deployment
   ```
-  $ kubectl logs -f <install-pod-name> -c hive
+  $ oc logs -f <install-pod-name> -c hive
   ```
   Alternatively, you can watch the summarized output of the installer using
   ```
-  $ kubectl exec -c hive <install-pod-name> -- tail -f /tmp/openshift-install-console.log
+  $ oc exec -c hive <install-pod-name> -- tail -f /tmp/openshift-install-console.log
   ```
 
 ### Delete your ClusterDeployment
@@ -118,9 +117,9 @@ $ oc delete clusterdeployment ${CLUSTER_NAME} --wait=false
 Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:
 
 ```bash
-kubectl get secret ${CLUSTER_NAME}-admin-kubeconfig -o jsonpath='{ .data.kubeconfig }' | base64 -d > ${CLUSTER_NAME}.kubeconfig
+oc get secret ${CLUSTER_NAME}-admin-kubeconfig -o jsonpath='{ .data.kubeconfig }' | base64 -d > ${CLUSTER_NAME}.kubeconfig
 export KUBECONFIG=${CLUSTER_NAME}.kubeconfig
-kubectl get nodes
+oc get nodes
 ```
 
 ### Troubleshooting Deprovision
@@ -133,7 +132,7 @@ After deleting your cluster deployment you will see an uninstall job created. If
     * Run `make hiveutil`
     * Get your cluster tag i.e. `infraID` from the following command output.
       ```bash
-      $ kubectl get cd ${CLUSTER_NAME} -o jsonpath='{ .status.infraID }'
+      $ oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.infraID }'
       ```
     * In case your cluster deployment is not available, you can find the tag in AWS console on any object from that cluster.
     * Run following command to deprovision artifacts in the AWS.
@@ -147,7 +146,7 @@ To diagnose a hiveadmission failure, try running the operation directly against 
 
 For instance, try this:
 ```sh
-# kubectl create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
+# oc create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
 ```
 
 ### Deploy using Minishift
@@ -176,12 +175,12 @@ Steps:
 
 * Get the webconsole URL
   ```
-  $ kubectl get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
+  $ oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
   ```
 
 * Retrive the password for `kubeadmin` user
   ```
-  $ kubectl get secret ${CLUSTER_NAME}-admin-password -o jsonpath='{ .data.password }' | base64 -d
+  $ oc get secret ${CLUSTER_NAME}-admin-password -o jsonpath='{ .data.password }' | base64 -d
   ```
 
 ## Documentation

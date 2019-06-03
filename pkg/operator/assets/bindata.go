@@ -2295,6 +2295,12 @@ spec:
                           type: string
                       type: object
                     type: array
+                  resourceApplyMode:
+                    description: ResourceApplyMode indicates if the resource apply
+                      mode is "upsert" (default) or "sync". ApplyMode "upsert" indicates
+                      create and update. ApplyMode "sync" indicates create, update
+                      and delete.
+                    type: string
                   resources:
                     description: Resources is the list of SyncStatus for objects that
                       have been synced.
@@ -2465,6 +2471,12 @@ spec:
                           type: string
                       type: object
                     type: array
+                  resourceApplyMode:
+                    description: ResourceApplyMode indicates if the resource apply
+                      mode is "upsert" (default) or "sync". ApplyMode "upsert" indicates
+                      create and update. ApplyMode "sync" indicates create, update
+                      and delete.
+                    type: string
                   resources:
                     description: Resources is the list of SyncStatus for objects that
                       have been synced.

@@ -318,6 +318,58 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		cd.Status.SelectorSyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, syncSetStatus)
 	}
 
+	deletedSyncSets := []hivev1.SyncSetObjectStatus{}
+	for _, ssos := range cd.Status.SyncSetStatus {
+		found := false
+		for _, syncSet := range syncSets {
+			if ssos.Name == syncSet.Name {
+				found = true
+			}
+		}
+		if !found {
+			deletedSyncSets = append(deletedSyncSets, ssos)
+		}
+	}
+
+	deletedSelectorSyncSets := []hivev1.SyncSetObjectStatus{}
+	for _, ssos := range cd.Status.SelectorSyncSetStatus {
+		found := false
+		for _, selectorSyncSet := range selectorSyncSets {
+			if ssos.Name == selectorSyncSet.Name {
+				found = true
+			}
+		}
+		if !found {
+			deletedSelectorSyncSets = append(deletedSelectorSyncSets, ssos)
+		}
+	}
+
+	for _, ssos := range deletedSyncSets {
+		ssLog := cdLog.WithFields(log.Fields{"syncSet": ssos.Name})
+		if ssos.ResourceApplyMode == hivev1.SyncResourceApplyMode {
+			syncSetStatus, err := r.deleteSyncSetResources(ssos, dynamicClient, ssLog)
+			if err != nil {
+				cd.Status.SyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SyncSetStatus, syncSetStatus)
+				continue
+			}
+		}
+		// remove SyncSet status from ClusterDeployment
+		cd.Status.SyncSetStatus = removeSyncSetObjectStatus(cd.Status.SyncSetStatus, ssos.Name)
+	}
+
+	for _, ssos := range deletedSelectorSyncSets {
+		ssLog := cdLog.WithFields(log.Fields{"selectorSyncSet": ssos.Name})
+		if ssos.ResourceApplyMode == hivev1.SyncResourceApplyMode {
+			selectorSyncSetStatus, err := r.deleteSyncSetResources(ssos, dynamicClient, ssLog)
+			if err != nil {
+				cd.Status.SyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SyncSetStatus, selectorSyncSetStatus)
+				continue
+			}
+		}
+		// remove SyncSet status from ClusterDeployment
+		cd.Status.SelectorSyncSetStatus = removeSyncSetObjectStatus(cd.Status.SyncSetStatus, ssos.Name)
+	}
+
 	err = r.updateClusterDeploymentStatus(cd, origCD, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Errorf("error updating cluster deployment status")
@@ -330,6 +382,10 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 
 // applySyncSetResources evaluates resource objects from RawExtension and applies them to the cluster identified by kubeConfig
 func (r *ReconcileSyncSet) applySyncSetResources(applyMode hivev1.SyncSetResourceApplyMode, ssResources []runtime.RawExtension, dynamicClient dynamic.Interface, h Applier, syncSetStatus *hivev1.SyncSetObjectStatus, ssLog log.FieldLogger) error {
+	// set resourceApplyMode within syncSetStatus
+	// this will be used to determine if resources should be cleaned up after syncSet deletion when resourceApplyMode == "sync"
+	syncSetStatus.ResourceApplyMode = applyMode
+
 	// determine if we can gather info for all resources
 	infos := []hiveresource.Info{}
 	for i, resource := range ssResources {
@@ -566,6 +622,31 @@ func (r *ReconcileSyncSet) reconcileDeletedSyncSetResources(applyMode hivev1.Syn
 	return newStatusList, nil
 }
 
+func (r *ReconcileSyncSet) deleteSyncSetResources(syncSetStatus hivev1.SyncSetObjectStatus, dynamicClient dynamic.Interface, ssLog log.FieldLogger) (hivev1.SyncSetObjectStatus, error) {
+	for index, resourceStatus := range syncSetStatus.Resources {
+		itemLog := ssLog.WithField("resource", fmt.Sprintf("%s/%s", resourceStatus.Namespace, resourceStatus.Name)).
+			WithField("apiversion", resourceStatus.APIVersion).
+			WithField("kind", resourceStatus.Kind)
+		gv, err := schema.ParseGroupVersion(resourceStatus.APIVersion)
+		if err != nil {
+			syncSetStatus.Resources[index].Conditions = r.setDeletionFailedSyncCondition(syncSetStatus.Resources[index].Conditions, fmt.Errorf("failed to parse groupversion: %v", err))
+			return syncSetStatus, err
+		}
+		gvr := gv.WithResource(resourceStatus.Resource)
+		itemLog.Debug("deleting resource")
+		err = dynamicClient.Resource(gvr).Namespace(resourceStatus.Namespace).Delete(resourceStatus.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				itemLog.WithError(err).Error("error deleting resource")
+				syncSetStatus.Resources[index].Conditions = r.setDeletionFailedSyncCondition(syncSetStatus.Resources[index].Conditions, fmt.Errorf("failed to delete resource: %v", err))
+				return syncSetStatus, err
+			}
+			itemLog.Debug("resource not found, nothing to do")
+		}
+	}
+	return syncSetStatus, nil
+}
+
 func appendOrUpdateSyncStatus(statusList []hivev1.SyncStatus, syncStatus hivev1.SyncStatus) []hivev1.SyncStatus {
 	for i, ss := range statusList {
 		if ss.Name == syncStatus.Name && ss.Namespace == syncStatus.Namespace && ss.Kind == syncStatus.Kind {
@@ -593,6 +674,16 @@ func findSyncSetStatus(name string, statusList []hivev1.SyncSetObjectStatus) hiv
 		}
 	}
 	return hivev1.SyncSetObjectStatus{Name: name}
+}
+
+func removeSyncSetObjectStatus(statusList []hivev1.SyncSetObjectStatus, syncSetName string) []hivev1.SyncSetObjectStatus {
+	for i := 0; i < len(statusList); i++ {
+		if statusList[i].Name == syncSetName {
+			statusList = append(statusList[:i], statusList[i+1:]...)
+			break
+		}
+	}
+	return statusList
 }
 
 func (r *ReconcileSyncSet) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, origCD *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {

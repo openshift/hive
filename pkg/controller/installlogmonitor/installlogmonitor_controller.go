@@ -67,7 +67,7 @@ func init() {
 	metrics.Registry.MustRegister(metricInstallErrors)
 }
 
-// Add creates a new InstallLogMonitro Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// Add creates a new InstallLogMonitor Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -125,8 +125,16 @@ func (r *ReconcileInstallLog) migrateInstallLog(cm *corev1.ConfigMap) error {
 
 	cm.Labels[hivev1.HiveInstallLogLabel] = "true"
 
-	// We must guess at the cluster deployment name:
-	clusterDeploymentName := cm.Name[:len(cm.Name)-len("-install-log")]
+	// Use the owner ref to determine cluster deployment name.
+	var clusterDeploymentName string
+	for _, ownerRef := range cm.OwnerReferences {
+		if ownerRef.Kind == "ClusterDeployment" {
+			clusterDeploymentName = ownerRef.Name
+		}
+	}
+	if clusterDeploymentName == "" {
+		return fmt.Errorf("unable to find a ClusterDeployment owner reference on configmap %s", cm.Name)
+	}
 	cm.Labels[hivev1.HiveClusterDeploymentNameLabel] = clusterDeploymentName
 
 	return r.Client.Update(context.Background(), cm)
@@ -185,7 +193,11 @@ func (r *ReconcileInstallLog) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	if needsMigration {
-		return reconcile.Result{}, r.migrateInstallLog(cm)
+		err := r.migrateInstallLog(cm)
+		if err != nil {
+			iLog.WithError(err).Error("error migrating install-log configmap")
+		}
+		return reconcile.Result{}, err
 	}
 
 	cd := &hivev1.ClusterDeployment{}
@@ -259,7 +271,7 @@ func (r *ReconcileInstallLog) Reconcile(request reconcile.Request) (reconcile.Re
 	// we will still report InstallFailed condition with reason unknown. Note that older install manager pods will not
 	// set success, so for these we will just assume success and no condition will be set.
 	if !foundError && successKeyReported && success == "false" {
-		iLog.Info("install failed but no errors strings found, reporting unknown error")
+		iLog.Info("install failed but no error strings found, reporting unknown error")
 		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions, hivev1.InstallFailingCondition,
 			corev1.ConditionTrue, unknownReason, unknownMessage, controllerutils.UpdateConditionAlways)
 		metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd), unknownReason).Inc()

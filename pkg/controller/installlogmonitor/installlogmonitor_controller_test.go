@@ -82,7 +82,7 @@ func TestIsHiveInstallLogAndMigration(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient()
+			fakeClient := fake.NewFakeClient(test.configMap)
 			r := &ReconcileInstallLog{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
@@ -92,7 +92,8 @@ func TestIsHiveInstallLogAndMigration(t *testing.T) {
 			assert.Equal(t, test.needsMigration, needsMigration)
 			if needsMigration {
 				cm := test.configMap.DeepCopy()
-				r.migrateInstallLog(cm)
+				err := r.migrateInstallLog(cm)
+				assert.NoError(t, err)
 				assert.Equal(t, test.expectedClusterDeploymentName, cm.Labels[hivev1.HiveClusterDeploymentNameLabel])
 				assert.Equal(t, "true", cm.Labels[hivev1.HiveInstallLogLabel])
 			}
@@ -221,6 +222,12 @@ func buildInstallLogConfigMap(name, key, contents, successStr string) *corev1.Co
 			Labels: map[string]string{
 				hivev1.HiveInstallLogLabel:            "true",
 				hivev1.HiveClusterDeploymentNameLabel: testCDName,
+			},
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind: "ClusterDeployment",
+					Name: testCDName,
+				},
 			},
 		},
 		Data: map[string]string{

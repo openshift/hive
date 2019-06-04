@@ -252,8 +252,7 @@ func GenerateInstallerJob(
 				// a sleep-seconds.txt file. If one is written, we will sleep that number of seconds. This allows exponential backoff
 				// for failing installs.
 				fmt.Sprintf(
-					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --install-config /installconfig/install-config.yaml --ssh-priv-key-path %s --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
-					SSHPrivateKeyFilePath,
+					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --install-config /installconfig/install-config.yaml --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
 					cd.Spec.Platform.AWS.Region,
 					cd.Namespace,
 					cd.Name),

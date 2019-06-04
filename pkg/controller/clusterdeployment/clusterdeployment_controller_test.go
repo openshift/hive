@@ -703,6 +703,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Nil(t, installJob, "install job should not exist")
 			},
 		},
+		{
+			name: "Ignore old install job hash difference if cluster already installed",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job := testInstallJob()
+					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getInstallJob(c)
+				assert.NotNil(t, installJob, "install job should not be touched after the clusterdeployment is installed")
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1107,7 +1130,7 @@ func TestClusterDeploymentJobHashing(t *testing.T) {
 			}
 			tLogger := log.New()
 
-			result, err := rcd.jobHashChangeDetected(test.existingJob, test.generatedJob, tLogger)
+			result, err := rcd.deleteJobOnHashChange(test.existingJob, test.generatedJob, tLogger)
 
 			if test.expectedError {
 				assert.Error(t, err, "expected error during test case")

@@ -454,6 +454,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Error("failed to calulcate hash for generated install job")
 			return reconcile.Result{}, err
 		}
+		if job.Annotations == nil {
+			job.Annotations = map[string]string{}
+		}
 		job.Annotations[jobHashAnnotation] = jobHash
 
 		if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
@@ -528,12 +531,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				}
 			}
 
-			jobHashChanged, err := r.jobHashChangeDetected(existingJob, job, cdLog)
+			jobDeleted, err := r.deleteJobOnHashChange(existingJob, job, cdLog)
 			if err != nil {
 				cdLog.WithError(err).Error("failed while checking whether job hash has changed")
 				return reconcile.Result{}, err
 			}
-			if jobHashChanged {
+			if jobDeleted {
 				return reconcile.Result{Requeue: true}, nil
 			}
 		}
@@ -1140,7 +1143,7 @@ func (r *ReconcileClusterDeployment) calcInstallPodRestarts(cd *hivev1.ClusterDe
 	return containerRestarts, nil
 }
 
-func (r *ReconcileClusterDeployment) jobHashChangeDetected(existingJob, generatedJob *batchv1.Job, cdLog log.FieldLogger) (bool, error) {
+func (r *ReconcileClusterDeployment) deleteJobOnHashChange(existingJob, generatedJob *batchv1.Job, cdLog log.FieldLogger) (bool, error) {
 	newJobNeeded := false
 	if _, ok := existingJob.Annotations[jobHashAnnotation]; !ok {
 		// this job predates tracking the job hash, so assume we need a new job

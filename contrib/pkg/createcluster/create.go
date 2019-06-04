@@ -67,8 +67,8 @@ ENVIRONMENT VARIABLES
 The command will use the following environment variables for its output:
 
 PUBLIC_SSH_KEY - If present, it is used as the new cluster's public SSH key.
-It overrides the public ssh key flags. If not, --ssh-key will be used. 
-If that is not specified, then --ssh-key-file is used. 
+It overrides the public ssh key flags. If not, --ssh-public-key will be used. 
+If that is not specified, then --ssh-public-key-file is used. 
 That file's default value is %[1]s.
 
 PULL_SECRET - If present, it is used as the cluster deployment's pull 
@@ -98,8 +98,9 @@ derived from the release image at runtime.
 type Options struct {
 	Name               string
 	Namespace          string
-	SSHKeyFile         string
-	SSHKey             string
+	SSHPublicKeyFile   string
+	SSHPublicKey       string
+	SSHPrivateKeyFile  string
 	BaseDomain         string
 	PullSecret         string
 	PullSecretFile     string
@@ -125,7 +126,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	if u, err := user.Current(); err == nil {
 		homeDir = u.HomeDir
 	}
-	defaultSSHKeyFile := filepath.Join(homeDir, ".ssh", "id_rsa.pub")
+	defaultSSHPublicKeyFile := filepath.Join(homeDir, ".ssh", "id_rsa.pub")
 	defaultPullSecretFile := filepath.Join(homeDir, ".pull-secret")
 	defaultAWSCredsFile := filepath.Join(homeDir, ".aws", "credentials")
 
@@ -133,7 +134,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-cluster CLUSTER_DEPLOYMENT_NAME",
 		Short: "Creates a new Hive cluster deployment",
-		Long:  fmt.Sprintf(longDesc, defaultSSHKeyFile, defaultPullSecretFile, defaultAWSCredsFile, defaultHiveImage),
+		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile, defaultAWSCredsFile, defaultHiveImage),
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
@@ -148,8 +149,9 @@ func NewCreateClusterCommand() *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.StringVarP(&opt.Namespace, "namespace", "p", "", "Namespace to create cluster deployment in")
-	flags.StringVar(&opt.SSHKeyFile, "ssh-key-file", defaultSSHKeyFile, "file name of SSH public key for cluster")
-	flags.StringVar(&opt.SSHKey, "ssh-key", "", "SSH public key for cluster")
+	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
+	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
+	flags.StringVar(&opt.SSHPublicKey, "ssh-public-key", "", "SSH public key for cluster")
 	flags.StringVar(&opt.BaseDomain, "base-domain", "new-installer.openshift.com", "Base domain for the cluster")
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
@@ -322,32 +324,53 @@ func (o *Options) generatePullSecret() (*corev1.Secret, error) {
 	}, nil
 }
 
-func (o *Options) getSSHKey() (string, error) {
-	sshKey := os.Getenv("SSH_KEY")
-	if len(sshKey) > 0 {
-		return sshKey, nil
+func (o *Options) getSSHPublicKey() (string, error) {
+	sshPublicKey := os.Getenv("PUBLIC_SSH_KEY")
+	if len(sshPublicKey) > 0 {
+		return sshPublicKey, nil
 	}
-	if len(o.SSHKey) > 0 {
-		return o.SSHKey, nil
+	if len(o.SSHPublicKey) > 0 {
+		return o.SSHPublicKey, nil
 	}
-	if len(o.SSHKeyFile) > 0 {
-		data, err := ioutil.ReadFile(o.SSHKeyFile)
+	if len(o.SSHPublicKeyFile) > 0 {
+		data, err := ioutil.ReadFile(o.SSHPublicKeyFile)
 		if err != nil {
 			log.Error("Cannot read SSH public key file")
 			return "", err
 		}
-		sshKey = strings.TrimSpace(string(data))
-		return sshKey, nil
+		sshPublicKey = strings.TrimSpace(string(data))
+		return sshPublicKey, nil
 	}
+
 	log.Error("Cannot determine SSH key to use")
 	return "", fmt.Errorf("no ssh key")
 }
 
+func (o *Options) getSSHPrivateKey() (string, error) {
+	if len(o.SSHPrivateKeyFile) > 0 {
+		data, err := ioutil.ReadFile(o.SSHPrivateKeyFile)
+		if err != nil {
+			log.Error("Cannot read SSH private key file")
+			return "", err
+		}
+		sshPrivateKey := strings.TrimSpace(string(data))
+		return sshPrivateKey, nil
+	}
+	log.Debug("No private SSH key file provided")
+	return "", nil
+}
+
 func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
-	sshKey, err := o.getSSHKey()
+	sshPublicKey, err := o.getSSHPublicKey()
 	if err != nil {
 		return nil, err
 	}
+
+	sshPrivateKey, err := o.getSSHPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -359,8 +382,8 @@ func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"ssh-publickey":  sshKey,
-			"ssh-privatekey": "",
+			"ssh-publickey":  sshPublicKey,
+			"ssh-privatekey": sshPrivateKey,
 		},
 	}, nil
 }

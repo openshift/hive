@@ -61,6 +61,29 @@ echo "fakekubeconfig" > $WORKDIR/auth/kubeconfig
 echo "fakepassword" > $WORKDIR/auth/kubeadmin-password
 echo "some fake installer log output" >  /tmp/openshift-install-console.log
 `
+
+	fakeSSHAddBinary = `#!/bin/bash
+KEY_FILE_PATH=${1}
+
+if [[ ${KEY_FILE_PATH} != "%s" ]]; then
+		echo "Parameter not what expected"
+		exit 1
+fi
+
+exit 0
+`
+	fakeSSHAgentSockPath = "/path/to/agent/sockfile"
+	fakeSSHAgentPID      = "12345"
+
+	alwaysErrorBinary = `#!/bin/sh
+exit 1`
+)
+
+var (
+	fakeSSHAgentBinary = `#!/bin/sh
+echo "SSH_AUTH_SOCK=%s; export SSH_AUTH_SOCK;"
+echo "SSH_AGENT_PID=%s; export SSH_AGENT_PID;"
+echo "echo Agent pid %s;"`
 )
 
 func init() {
@@ -453,4 +476,270 @@ last line with password in text`,
 		}
 	}
 
+}
+
+func TestGatherLogs(t *testing.T) {
+	fakeBootstrapIP := "1.2.3.4"
+
+	tests := []struct {
+		name            string
+		scriptTemplate  string
+		expectedLogData string
+		expectedError   bool
+	}{
+		{
+			name:           "cannot execute script",
+			scriptTemplate: "not a bash script %s %s",
+			expectedError:  true,
+		},
+		{
+			name: "successfully run script file",
+			scriptTemplate: `#!/bin/bash
+		echo "fake log output %s %s" > log-bundle.tar.gz`,
+			expectedLogData: fmt.Sprintf("fake log output %s %s\n", fakeBootstrapIP, fakeBootstrapIP),
+		},
+		{
+			name: "error running script",
+			scriptTemplate: `#!/bin/bash
+exit 2`,
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		im := InstallManager{
+			LogLevel: "debug",
+		}
+		assert.NoError(t, im.Complete([]string{}))
+		result, err := runGatherScript(fakeBootstrapIP, test.scriptTemplate, &im)
+		if test.expectedError {
+			assert.Error(t, err, "expected error for test case %s", test.name)
+		} else {
+			data, err := ioutil.ReadFile(result)
+			assert.NoError(t, err, "error reading returned log file data")
+			assert.Equal(t, test.expectedLogData, string(data))
+
+			// cleanup saved/copied logfile
+			if err := os.RemoveAll(result); err != nil {
+				t.Logf("couldn't delete saved log file: %v", err)
+			}
+		}
+	}
+}
+func TestGetBootstrapIP(t *testing.T) {
+	tests := []struct {
+		name                      string
+		terraformStateFileContent string
+		expectedIP                string
+		expectedError             bool
+	}{
+		{
+			name:          "terraform file doesn't exist",
+			expectedError: true,
+		},
+		{
+			name:                      "get bootstrap IP from terraform file",
+			expectedIP:                "1.1.1.1",
+			terraformStateFileContent: testTerraformStateFile("1.1.1.1"),
+		},
+		{
+			name:                      "bad json terraform",
+			terraformStateFileContent: `{ "notModules": "notResources" }`,
+			expectedError:             true,
+		},
+		{
+			name:                      "bootstrap instance gone from terraform file",
+			terraformStateFileContent: testTerraformStateFileWithInstanceAndIP("notBootstrap", "1.1.1.1"),
+			expectedError:             true,
+		},
+	}
+
+	for _, test := range tests {
+		tempDir, err := ioutil.TempDir("", "installmanagersshtest")
+		assert.NoError(t, err, "Errored while setting up temp dir for test")
+		defer os.RemoveAll(tempDir)
+
+		im := InstallManager{
+			LogLevel: "debug",
+			WorkDir:  tempDir,
+		}
+		assert.NoError(t, im.Complete([]string{}))
+
+		if test.terraformStateFileContent != "" {
+			assert.NoError(t, ioutil.WriteFile(filepath.Join(tempDir, "terraform.tfstate"), []byte(test.terraformStateFileContent), 0644),
+				"errored creating test terraform state file")
+		}
+
+		result, err := getBootstrapIP(&im)
+
+		if test.expectedError {
+			assert.Error(t, err, "expected error for test case")
+		} else {
+			assert.NoError(t, err, "unexpected error for test case")
+
+			assert.Equal(t, test.expectedIP, result, "returned IP not what was expected")
+		}
+
+	}
+}
+
+func testTerraformStateFile(ip string) string {
+	return testTerraformStateFileWithInstanceAndIP("aws_instance.bootstrap", ip)
+}
+
+func testTerraformStateFileWithInstanceAndIP(instanceName, ip string) string {
+	return fmt.Sprintf(`{
+	"modules": [
+		{
+			"path": [
+				"root",
+				"bootstrap"
+			],
+			"resources": {
+				"%s": {
+					"primary": {
+						"attributes": {
+							"public_ip": "%s"
+						}
+					}
+				}
+			}
+		}
+	]
+}`, instanceName, ip)
+}
+
+func TestInstallManagerSSH(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name                    string
+		existingSSHAgentRunning bool
+		expectedEnvVars         map[string]string
+		badSSHAgent             bool
+		badSSHAdd               bool
+		expectedError           bool
+	}{
+		{
+			name:                    "already running SSH agent",
+			existingSSHAgentRunning: true,
+		},
+		{
+			name: "no running SSH agent",
+			expectedEnvVars: map[string]string{
+				"SSH_AUTH_SOCK": fakeSSHAgentSockPath,
+				"SSH_AGENT_PID": fakeSSHAgentPID,
+			},
+		},
+		{
+			name:          "error on launching SSH agent",
+			badSSHAgent:   true,
+			expectedError: true,
+		},
+		{
+			name: "error on running ssh-add",
+			expectedEnvVars: map[string]string{
+				"SSH_AUTH_SOCK": fakeSSHAgentSockPath,
+				"SSH_AGENT_PID": fakeSSHAgentPID,
+			},
+			badSSHAdd:     true,
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// clear out env vars for each test loop
+			if err := os.Unsetenv("SSH_AUTH_SOCK"); err != nil {
+				t.Fatalf("error clearing out existing env var: %v", err)
+			}
+			if err := os.Unsetenv("SSH_AGENT_PID"); err != nil {
+				t.Fatalf("error clearing out existing env var: %v", err)
+			}
+
+			// temp dir to hold fake ssh-add and ssh-agent and ssh keys
+			testDir, err := ioutil.TempDir("", "installmanagersshfake")
+			if err != nil {
+				t.Fatalf("error creating directory hold temp ssh items: %v", err)
+			}
+			defer os.RemoveAll(testDir)
+
+			// create a fake SSH private key file
+			sshKeyFile := filepath.Join(testDir, "tempSSHKey")
+			if err := ioutil.WriteFile(sshKeyFile, []byte("FAKE SSH KEY CONTENT"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake SSH key file: %v", err)
+			}
+
+			// create a fake 'ssh-add' binary
+			sshAddBinFileContent := fmt.Sprintf(fakeSSHAddBinary, sshKeyFile)
+			if test.badSSHAdd {
+				sshAddBinFileContent = alwaysErrorBinary
+			}
+			sshAddBinFile := filepath.Join(testDir, "ssh-add")
+			if err := ioutil.WriteFile(sshAddBinFile, []byte(sshAddBinFileContent), 0555); err != nil {
+				t.Fatalf("error creating fake ssh-add binary: %v", err)
+			}
+
+			// create a fake 'ssh-agent' binary
+			sshAgentBinFileContent := fmt.Sprintf(fakeSSHAgentBinary, fakeSSHAgentSockPath, fakeSSHAgentPID, fakeSSHAgentPID)
+			if test.badSSHAgent {
+				sshAgentBinFileContent = alwaysErrorBinary
+			}
+			sshAgentBinFile := filepath.Join(testDir, "ssh-agent")
+			if err := ioutil.WriteFile(sshAgentBinFile, []byte(sshAgentBinFileContent), 0555); err != nil {
+				t.Fatalf("error creating fake ssh-agent binary: %v", err)
+			}
+
+			// place fake binaries early into path
+			pathEnv := os.Getenv("PATH")
+			pathEnv = fmt.Sprintf("%s:%s", testDir, pathEnv)
+			if err := os.Setenv("PATH", pathEnv); err != nil {
+				t.Fatalf("error setting PATH (for fake binaries): %v", err)
+			}
+
+			tempDir, err := ioutil.TempDir("", "installmanagersshtestresults")
+			if err != nil {
+				t.Fatalf("errored while setting up temp dir for test: %v", err)
+			}
+			defer os.RemoveAll(tempDir)
+
+			im := InstallManager{
+				LogLevel:       "debug",
+				WorkDir:        tempDir,
+				SSHPrivKeyPath: sshKeyFile,
+			}
+
+			if test.existingSSHAgentRunning {
+				if err := os.Setenv("SSH_AUTH_SOCK", fakeSSHAgentSockPath); err != nil {
+					t.Fatalf("errored setting up fake ssh auth sock env: %v", err)
+				}
+			}
+
+			im.Complete([]string{})
+
+			cleanup, err := initSSHAgent(&im)
+			if test.expectedError {
+				assert.Error(t, err, "expected an error while initializing SSH")
+			} else {
+				assert.NoError(t, err, "unexpected error while testing SSH initialization")
+			}
+
+			// check env vars are properly set/cleaned
+			if !test.existingSSHAgentRunning {
+				for k, v := range test.expectedEnvVars {
+					val := os.Getenv(k)
+					assert.Equal(t, v, val, "env var %s not expected value", k)
+				}
+
+				// cleanup
+				cleanup()
+
+				// verify cleanup
+				for _, envVar := range test.expectedEnvVars {
+					assert.Empty(t, os.Getenv(envVar))
+				}
+			}
+
+		})
+	}
 }

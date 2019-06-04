@@ -246,6 +246,7 @@ func (m *InstallManager) Run() error {
 		if upErr := m.uploadInstallerLog(cd, m, err); upErr != nil {
 			m.log.WithError(err).Error("error saving asset generation log")
 		}
+		m.writeSleepSecondsFile()
 		return err
 	}
 

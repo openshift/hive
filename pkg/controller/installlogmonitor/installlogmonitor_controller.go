@@ -131,6 +131,7 @@ func (r *ReconcileInstallLog) Reconcile(request reconcile.Request) (reconcile.Re
 		"configMap":  request.NamespacedName.String(),
 		"controller": controllerName,
 	})
+	iLog.Info("reconciling configmap")
 
 	// Load the regex configmap, if we don't have one, there's not much point proceeding here.
 	regexCM := &corev1.ConfigMap{}

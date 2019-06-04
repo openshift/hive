@@ -80,6 +80,8 @@ const (
 	clusterImageSetFoundReason            = "ClusterImageSetFound"
 
 	dnsZoneCheckInterval = 30 * time.Second
+	dnsNotReadyReason    = "DNSNotReady"
+	dnsReadyReason       = "DNSReady"
 
 	defaultRequeueTime = 10 * time.Second
 
@@ -378,6 +380,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		if err != nil {
 			return reconcile.Result{}, err
 		}
+
+		modified, err := r.setDNSNotReadyCondition(cd, managedDNSZoneAvailable, cdLog)
+		if modified || err != nil {
+			return reconcile.Result{}, err
+		}
+
 		if !managedDNSZoneAvailable {
 			// The clusterdeployment will be queued when the owned DNSZone's status
 			// is updated to available.
@@ -678,6 +686,34 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		jobLog.Debug("job exists and is in progress")
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterDeployment, isReady bool, cdLog log.FieldLogger) (modified bool, err error) {
+	original := cd.DeepCopy()
+	status := corev1.ConditionFalse
+	reason := dnsReadyReason
+	message := "DNS Zone available"
+	if !isReady {
+		status = corev1.ConditionTrue
+		reason = dnsNotReadyReason
+		message = "DNS Zone not yet available"
+	}
+	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+		cd.Status.Conditions,
+		hivev1.DNSNotReadyCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionNever)
+	if !reflect.DeepEqual(original.Status.Conditions, cd.Status.Conditions) {
+		cdLog.Debugf("setting DNSNotReadyCondition to %v", status)
+		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Error("cannot update status conditions")
+		}
+		return true, err
+	}
+	return false, nil
 }
 
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) (modified bool, err error) {

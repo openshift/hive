@@ -73,6 +73,7 @@ type ExternalDNSAWSConfig struct {
 	// Credentials references a secret that will be used to authenticate with
 	// AWS Route53. It will need permission to manage entries in each of the
 	// managed domains for this cluster.
+	// Secret should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
 	// +optional
 	Credentials corev1.LocalObjectReference `json:"credentials,omitempty"`
 }

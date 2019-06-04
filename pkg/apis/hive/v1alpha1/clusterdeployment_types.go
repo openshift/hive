@@ -264,6 +264,10 @@ const (
 	// InstallFailingCondition indicates that a failure has been detected and we will attempt to offer some
 	// information as to why in the reason.
 	InstallFailingCondition ClusterDeploymentConditionType = "InstallFailing"
+
+	// DNSNotReadyCondition indicates that the the DNSZone object created for the clusterDeployment
+	// (ie managedDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
+	DNSNotReadyCondition ClusterDeploymentConditionType = "DNSNotReady"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -275,6 +279,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	IngressCertificateNotFoundCondition,
 	UnreachableCondition,
 	InstallFailingCondition,
+	DNSNotReadyCondition,
 }
 
 // +genclient

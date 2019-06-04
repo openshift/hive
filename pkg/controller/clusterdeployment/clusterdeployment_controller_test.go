@@ -42,6 +42,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -103,17 +104,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		return nil
 	}
 
-	getJob := func(c client.Client, name string) *batchv1.Job {
-		job := &batchv1.Job{}
-		err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: testNamespace}, job)
-		if err == nil {
-			return job
-		}
-		return nil
-	}
-	getInstallJob := func(c client.Client) *batchv1.Job {
-		return getJob(c, installJobName)
-	}
 	getDeprovisionRequest := func(c client.Client) *hivev1.ClusterDeprovisionRequest {
 		req := &hivev1.ClusterDeprovisionRequest{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, req)
@@ -679,6 +669,40 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "Delete old install job when job hash missing",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job := testInstallJob()
+					delete(job.Annotations, jobHashAnnotation)
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getInstallJob(c)
+				assert.Nil(t, installJob, "install job should not exist")
+			},
+		},
+		{
+			name: "Delete old install job when job hash changes",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *batchv1.Job {
+					job := testInstallJob()
+					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
+					return job
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getInstallJob(c)
+				assert.Nil(t, installJob, "install job should not exist")
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -843,14 +867,23 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 }
 
 func testInstallJob() *batchv1.Job {
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      installJobName,
-			Namespace: testNamespace,
-		},
-		Spec: batchv1.JobSpec{},
+	cd := testClusterDeployment()
+	job, _, err := install.GenerateInstallerJob(cd,
+		images.DefaultHiveImage,
+		"",
+		serviceAccountName, "testSSHKey", "testPullSecret")
+	if err != nil {
+		panic("should not error while generating test install job")
 	}
-	controllerutil.SetControllerReference(testClusterDeployment(), job, scheme.Scheme)
+
+	controllerutil.SetControllerReference(cd, job, scheme.Scheme)
+
+	hash, err := calculateJobSpecHash(job)
+	if err != nil {
+		panic("should never get error calculating job spec hash")
+	}
+
+	job.Annotations[jobHashAnnotation] = hash
 	return job
 }
 
@@ -1026,4 +1059,80 @@ func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClusterDeploymentJobHashing(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name           string
+		existingJob    *batchv1.Job
+		generatedJob   *batchv1.Job
+		expectedResult bool
+		expectedError  bool
+	}{
+		{
+			name: "No existing annotation",
+			existingJob: func() *batchv1.Job {
+				job := testInstallJob()
+				delete(job.Annotations, jobHashAnnotation)
+				return job
+			}(),
+			generatedJob:   testInstallJob(),
+			expectedResult: true,
+		},
+		{
+			name: "Different hash",
+			existingJob: func() *batchv1.Job {
+				job := testInstallJob()
+				job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
+				return job
+			}(),
+			generatedJob:   testInstallJob(),
+			expectedResult: true,
+		},
+		{
+			name:           "Same hash",
+			existingJob:    testInstallJob(),
+			generatedJob:   testInstallJob(),
+			expectedResult: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existingJob)
+			rcd := &ReconcileClusterDeployment{
+				Client: fakeClient,
+			}
+			tLogger := log.New()
+
+			result, err := rcd.jobHashChangeDetected(test.existingJob, test.generatedJob, tLogger)
+
+			if test.expectedError {
+				assert.Error(t, err, "expected error during test case")
+			} else {
+				assert.Equal(t, test.expectedResult, result)
+
+				if test.expectedResult { //if job was deleted
+					job := getInstallJob(fakeClient)
+					assert.Nil(t, job, "previous install job should have been deleted")
+				}
+			}
+
+		})
+	}
+}
+
+func getJob(c client.Client, name string) *batchv1.Job {
+	job := &batchv1.Job{}
+	err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: testNamespace}, job)
+	if err == nil {
+		return job
+	}
+	return nil
+}
+
+func getInstallJob(c client.Client) *batchv1.Job {
+	return getJob(c, installJobName)
 }

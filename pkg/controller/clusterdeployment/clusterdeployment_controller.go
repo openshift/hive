@@ -18,6 +18,8 @@ package clusterdeployment
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -80,6 +82,8 @@ const (
 	dnsZoneCheckInterval = 30 * time.Second
 
 	defaultRequeueTime = time.Second
+
+	jobHashAnnotation = "hive.openshift.io/jobhash"
 )
 
 var (
@@ -445,6 +449,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
+		jobHash, err := calculateJobSpecHash(job)
+		if err != nil {
+			cdLog.WithError(err).Error("failed to calulcate hash for generated install job")
+			return reconcile.Result{}, err
+		}
+		job.Annotations[jobHashAnnotation] = jobHash
+
 		if err = controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 			cdLog.WithError(err).Error("error setting controller reference on job")
 			return reconcile.Result{}, err
@@ -515,6 +526,15 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				} else if didGenerationChange {
 					return reconcile.Result{Requeue: true}, nil
 				}
+			}
+
+			jobHashChanged, err := r.jobHashChangeDetected(existingJob, job, cdLog)
+			if err != nil {
+				cdLog.WithError(err).Error("failed while checking whether job hash has changed")
+				return reconcile.Result{}, err
+			}
+			if jobHashChanged {
+				return reconcile.Result{Requeue: true}, nil
 			}
 		}
 	}
@@ -1120,6 +1140,31 @@ func (r *ReconcileClusterDeployment) calcInstallPodRestarts(cd *hivev1.ClusterDe
 	return containerRestarts, nil
 }
 
+func (r *ReconcileClusterDeployment) jobHashChangeDetected(existingJob, generatedJob *batchv1.Job, cdLog log.FieldLogger) (bool, error) {
+	newJobNeeded := false
+	if _, ok := existingJob.Annotations[jobHashAnnotation]; !ok {
+		// this job predates tracking the job hash, so assume we need a new job
+		newJobNeeded = true
+	}
+
+	if existingJob.Annotations[jobHashAnnotation] != generatedJob.Annotations[jobHashAnnotation] {
+		// delete the job so we get a fresh one with the new job spec
+		newJobNeeded = true
+	}
+
+	if newJobNeeded {
+		// delete the existing job
+		cdLog.Debug("deleting existing install job due to updated/missing hash detected")
+		err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+		if err != nil {
+			cdLog.WithError(err).Errorf("error deleting outdated install job")
+			return newJobNeeded, err
+		}
+	}
+
+	return newJobNeeded, nil
+}
+
 func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) *hivev1.ClusterDeprovisionRequest {
 	req := &hivev1.ClusterDeprovisionRequest{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1156,6 +1201,24 @@ func migrateWildcardIngress(cd *hivev1.ClusterDeployment) bool {
 		}
 	}
 	return migrated
+}
+
+func calculateJobSpecHash(job *batchv1.Job) (string, error) {
+
+	hasher := md5.New()
+	jobSpecBytes, err := job.Spec.Marshal()
+	if err != nil {
+		return "", err
+	}
+
+	_, err = hasher.Write(jobSpecBytes)
+	if err != nil {
+		return "", err
+	}
+
+	sum := hex.EncodeToString(hasher.Sum(nil))
+
+	return sum, nil
 }
 
 func strPtr(s string) *string {

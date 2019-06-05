@@ -136,7 +136,7 @@ func NewCreateClusterCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVarP(&opt.Namespace, "namespace", "p", "", "Namespace to create cluster deployment in")
+	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
 	flags.StringVar(&opt.SSHPublicKey, "ssh-public-key", "", "SSH public key for cluster")

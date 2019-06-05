@@ -131,6 +131,12 @@ type SyncSetObjectStatus struct {
 	// +optional
 	Resources []SyncStatus `json:"resources,omitempty"`
 
+	// ResourceApplyMode indicates if the resource apply mode is "upsert" (default) or "sync".
+	// ApplyMode "upsert" indicates create and update.
+	// ApplyMode "sync" indicates create, update and delete.
+	// +optional
+	ResourceApplyMode SyncSetResourceApplyMode `json:"resourceApplyMode,omitempty"`
+
 	// Patches is the list of SyncStatus for patches that have been applied.
 	// +optional
 	Patches []SyncStatus `json:"patches,omitempty"`

@@ -690,13 +690,6 @@ func TestInstallManagerSSH(t *testing.T) {
 				t.Fatalf("error creating fake ssh-agent binary: %v", err)
 			}
 
-			// place fake binaries early into path
-			pathEnv := os.Getenv("PATH")
-			pathEnv = fmt.Sprintf("%s:%s", testDir, pathEnv)
-			if err := os.Setenv("PATH", pathEnv); err != nil {
-				t.Fatalf("error setting PATH (for fake binaries): %v", err)
-			}
-
 			tempDir, err := ioutil.TempDir("", "installmanagersshtestresults")
 			if err != nil {
 				t.Fatalf("errored while setting up temp dir for test: %v", err)
@@ -704,9 +697,8 @@ func TestInstallManagerSSH(t *testing.T) {
 			defer os.RemoveAll(tempDir)
 
 			im := InstallManager{
-				LogLevel:       "debug",
-				WorkDir:        tempDir,
-				SSHPrivKeyPath: sshKeyFile,
+				LogLevel: "debug",
+				WorkDir:  tempDir,
 			}
 
 			if test.existingSSHAgentRunning {
@@ -717,7 +709,20 @@ func TestInstallManagerSSH(t *testing.T) {
 
 			im.Complete([]string{})
 
-			cleanup, err := initSSHAgent(&im)
+			// place fake binaries early into path
+			origPathEnv := os.Getenv("PATH")
+			pathEnv := fmt.Sprintf("%s:%s", testDir, origPathEnv)
+			if err := os.Setenv("PATH", pathEnv); err != nil {
+				t.Fatalf("error setting PATH (for fake binaries): %v", err)
+			}
+
+			cleanup, err := initSSHAgent(sshKeyFile, &im)
+
+			// restore PATH
+			if err := os.Setenv("PATH", origPathEnv); err != nil {
+				t.Fatalf("error restoring PATH after test: %v", err)
+			}
+
 			if test.expectedError {
 				assert.Error(t, err, "expected an error while initializing SSH")
 			} else {

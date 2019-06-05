@@ -376,7 +376,7 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	cdLog.WithError(err).Info("done reconciling sync sets for cluster deployment")
+	cdLog.Info("done reconciling sync sets for cluster deployment")
 	return reconcile.Result{}, firstSyncSetErr
 }
 
@@ -460,7 +460,7 @@ func (r *ReconcileSyncSet) applySyncSetResources(applyMode hivev1.SyncSetResourc
 			if applyErr != nil {
 				ssLog.WithError(applyErr).Errorf("error applying resource %s/%s (%s)", infos[i].Namespace, infos[i].Name, infos[i].Kind)
 			} else {
-				ssLog.Debug("resource %s/%s (%s): %s", infos[i].Namespace, infos[i].Name, infos[i].Kind, result)
+				ssLog.Debugf("resource %s/%s (%s): %s", infos[i].Namespace, infos[i].Name, infos[i].Kind, result)
 			}
 		} else {
 			ssLog.Debugf("resource %s/%s (%s) has not changed, will not apply", infos[i].Namespace, infos[i].Name, infos[i].Kind)

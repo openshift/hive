@@ -49,7 +49,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 
@@ -179,6 +181,9 @@ func (m *InstallManager) Complete(args []string) error {
 		Hooks: make(log.LevelHooks),
 		Level: level,
 	})
+	// Add an installID logger field with a randomly generated string to help with debugging across multiple
+	// install attempts in the namespace.
+	m.log = m.log.WithField("installID", utilrand.String(8))
 
 	absPath, err := filepath.Abs(m.WorkDir)
 	if err != nil {
@@ -218,6 +223,7 @@ func (m *InstallManager) Run() error {
 	// Generate an install-config.yaml:
 	sshKey := os.Getenv("SSH_PUB_KEY")
 	pullSecret := os.Getenv("PULL_SECRET")
+	m.log.Info("generating install config")
 	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret, true)
 	if err != nil {
 		m.log.WithError(err).Error("error generating install-config")
@@ -236,12 +242,14 @@ func (m *InstallManager) Run() error {
 
 	// If the cluster deployment has a clusterID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
+	m.log.Info("cleaning up from past install attempts")
 	if err := m.cleanupFailedInstall(cd); err != nil {
 		m.log.WithError(err).Error("error while trying to preemptively clean up")
 		return err
 	}
 
 	// Generate installer assets we need to modify or upload.
+	m.log.Info("generating assets")
 	if err := m.generateAssets(cd); err != nil {
 		if upErr := m.uploadInstallerLog(cd, m, err); upErr != nil {
 			m.log.WithError(err).Error("error saving asset generation log")
@@ -253,10 +261,12 @@ func (m *InstallManager) Run() error {
 	// We should now have cluster metadata.json we can parse for the clusterID. If we fail
 	// to extract the ID and upload it, this is a critical failure and we should restart.
 	// No cloud resources have been provisioned at this point.
+	m.log.Info("uploading cluster metadata")
 	if err := m.uploadClusterMetadata(cd, m); err != nil {
 		return err
 	}
 
+	m.log.Info("provisioning cluster")
 	installErr := m.provisionCluster(cd)
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
@@ -307,6 +317,8 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(installErr).Error("failed due to install error")
 		return installErr
 	}
+
+	m.log.Info("install completed successfully")
 
 	return nil
 }

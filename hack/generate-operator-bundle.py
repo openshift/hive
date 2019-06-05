@@ -48,13 +48,13 @@ for file_name in crd_files:
         shutil.copy(full_path, os.path.join(version_dir, file_name))
 
 with open('config/templates/hive-csv-template.yaml', 'r') as stream:
-    csv = yaml.load(stream)
+    csv = yaml.load(stream, Loader=yaml.SafeLoader)
 
 csv['spec']['install']['spec']['clusterPermissions'] = []
 
 # Add our operator role to the CSV:
 with open('config/operator/operator_role.yaml', 'r') as stream:
-    operator_role = yaml.load(stream)
+    operator_role = yaml.load(stream, Loader=yaml.SafeLoader)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': operator_role['rules'],
@@ -63,7 +63,7 @@ with open('config/operator/operator_role.yaml', 'r') as stream:
 
 # Add our hive-controllers role to the CSV:
 with open('config/rbac/manager_role.yaml', 'r') as stream:
-    hive_role = yaml.load(stream)
+    hive_role = yaml.load(stream, Loader=yaml.SafeLoader)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': hive_role['rules'],
@@ -72,7 +72,7 @@ with open('config/rbac/manager_role.yaml', 'r') as stream:
 
 # Add our hiveadmission role to the CSV:
 with open('config/hiveadmission/hiveadmission_rbac_role.yaml', 'r') as stream:
-    hiveadmission_role = yaml.load(stream)
+    hiveadmission_role = yaml.load(stream, Loader=yaml.SafeLoader)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': hiveadmission_role['rules'],
@@ -81,7 +81,7 @@ with open('config/hiveadmission/hiveadmission_rbac_role.yaml', 'r') as stream:
 
 # Add the external-dns role to the CSV:
 with open('config/external-dns/rbac_role.yaml', 'r') as stream:
-    externaldns_role = yaml.load(stream)
+    externaldns_role = yaml.load(stream, Loader=yaml.SafeLoader)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': externaldns_role['rules'],
@@ -90,7 +90,7 @@ with open('config/external-dns/rbac_role.yaml', 'r') as stream:
 
 # Add our hive-frontend role to the CSV:
 with open('config/rbac/hive_frontend_role.yaml', 'r') as stream:
-    hive_frontend_role = yaml.load(stream)
+    hive_frontend_role = yaml.load(stream, Loader=yaml.SafeLoader)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {
             'rules': hive_frontend_role['rules'],
@@ -100,7 +100,7 @@ with open('config/rbac/hive_frontend_role.yaml', 'r') as stream:
 # Add our deployment spec for the hive operator:
 with open('config/operator/operator_deployment.yaml', 'r') as stream:
     operator_components = []
-    operator = yaml.load_all(stream)
+    operator = yaml.load_all(stream, Loader=yaml.SafeLoader)
     for doc in operator:
         operator_components.append(doc)
     operator_deployment = operator_components[1]

@@ -312,6 +312,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
+			clearUnderwaySecondsMetrics(cd)
 			return reconcile.Result{}, nil
 		}
 
@@ -1022,12 +1023,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	err := r.Update(context.TODO(), cd)
 
 	if err == nil {
-		// If we've successfully cleared the deprovision finalizer we know this is a good time to
-		// reset the underway metric to 0, after which it will no longer be reported.
-		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
-			cd.Name,
-			cd.Namespace,
-			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+		clearUnderwaySecondsMetrics(cd)
 
 		// Increment the clusters deleted counter:
 		metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
@@ -1226,4 +1222,21 @@ func calculateJobSpecHash(job *batchv1.Job) (string, error) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func clearUnderwaySecondsMetrics(cd *hivev1.ClusterDeployment) {
+	// If we've successfully cleared the deprovision finalizer we know this is a good time to
+	// reset the underway metric to 0, after which it will no longer be reported.
+	hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
+		cd.Name,
+		cd.Namespace,
+		hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+
+	// Clear the install underway seconds metric if this cluster was still installing.
+	if !cd.Status.Installed {
+		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+	}
 }

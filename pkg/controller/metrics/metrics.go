@@ -26,7 +26,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -161,19 +160,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			for _, cd := range clusterDeployments.Items {
 				accumulator.processCluster(&cd)
 
-				if cd.DeletionTimestamp != nil {
-					if controllerutils.HasFinalizer(&cd, hivev1.FinalizerDeprovision) {
-						// Deprovision still underway, report metric for this cluster.
-						// Note that the clusterdeployment_controller is responsible for clearing
-						// this value to 0, as it is the only place where we know we first observe
-						// a deletion completed. (when we clear the finalizer successfully)
-						MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
-							cd.Name,
-							cd.Namespace,
-							GetClusterDeploymentType(&cd)).Set(
-							time.Since(cd.DeletionTimestamp.Time).Seconds())
-					}
-				} else {
+				if cd.DeletionTimestamp == nil {
 					if !cd.Status.Installed {
 						// Similarly for installing clusters we report the seconds since
 						// cluster was created. clusterdeployment_controller should set to 0
@@ -186,7 +173,6 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 							time.Since(cd.CreationTimestamp.Time).Seconds())
 					}
 				}
-
 			}
 
 			accumulator.setMetrics(metricClusterDeploymentsTotal,

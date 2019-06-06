@@ -13,5 +13,7 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/ser
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-operator /opt/services
 
+RUN yum -y install openssh-clients ; yum clean all
+
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

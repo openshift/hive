@@ -81,7 +81,7 @@ const (
 
 	dnsZoneCheckInterval = 30 * time.Second
 
-	defaultRequeueTime = time.Second
+	defaultRequeueTime = 10 * time.Second
 
 	jobHashAnnotation = "hive.openshift.io/jobhash"
 )
@@ -272,23 +272,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	origCD := cd
 	cd = cd.DeepCopy()
 
-	// TODO: We may want to remove this fix in future.
-	// Handle pre-existing clusters with older status version structs that did not have the new
-	// cluster version mandatory fields defined.
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
-	if !reflect.DeepEqual(origCD.Status, cd.Status) {
-		cdLog.Info("correcting empty cluster version fields")
-		err := r.Status().Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Error("error updating cluster deployment")
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{
-			Requeue:      true,
-			RequeueAfter: defaultRequeueTime,
-		}, nil
-	}
-
 	// We previously allowed clusterdeployment.spec.ingress[] entries to have ingress domains with a leading '*'.
 	// Migrate the clusterdeployment to the new format if we find a wildcard ingress domain.
 	// TODO: we can one day remove this once all clusterdeployment are known to have non-wildcard data
@@ -351,8 +334,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.Debugf("cluster expires at: %s", expiry)
 			if time.Now().After(expiry) {
 				cdLog.WithField("expiry", expiry).Info("cluster has expired, issuing delete")
-				r.Delete(context.TODO(), cd)
-				return reconcile.Result{}, nil
+				err := r.Delete(context.TODO(), cd)
+				if err != nil {
+					cdLog.WithError(err).Error("error deleting expired cluster")
+				}
+				return reconcile.Result{}, err
 			}
 
 			// We have an expiry time but we're not expired yet. Set requeueAfter for just after expiry time
@@ -384,8 +370,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Status.InstallerImage == nil {
-		err = r.resolveInstallerImage(cd, imageSet, releaseImage, hiveImage, cdLog)
-		return reconcile.Result{}, err
+		return r.resolveInstallerImage(cd, imageSet, releaseImage, hiveImage, cdLog)
 	}
 
 	if cd.Spec.ManageDNS {
@@ -414,6 +399,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	} else if err != nil {
 		cdLog.WithError(err).Error("error looking for install job")
 		return reconcile.Result{}, err
+	} else if err == nil && !existingJob.DeletionTimestamp.IsZero() {
+		cdLog.WithError(err).Error("install job is being deleted, requeueing to wait for deletion")
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	} else {
 		// setting the flag so that we can report the metric after cd is installed
 		if existingJob.Status.Succeeded > 0 && !cd.Status.Installed {
@@ -503,9 +491,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
 			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to install job seconds")
 			metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
-		} else if err != nil {
-			cdLog.Errorf("error getting job: %v", err)
-			return reconcile.Result{}, err
 		} else {
 			cdLog.Debug("provision job exists")
 			containerRestarts, err = r.calcInstallPodRestarts(cd, cdLog)
@@ -525,20 +510,14 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
 				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
-				if err != nil {
+				if didGenerationChange || err != nil {
 					return reconcile.Result{}, err
-				} else if didGenerationChange {
-					return reconcile.Result{Requeue: true}, nil
 				}
 			}
 
 			jobDeleted, err := r.deleteJobOnHashChange(existingJob, job, cdLog)
-			if err != nil {
-				cdLog.WithError(err).Error("failed while checking whether job hash has changed")
+			if jobDeleted || err != nil {
 				return reconcile.Result{}, err
-			}
-			if jobDeleted {
-				return reconcile.Result{Requeue: true}, nil
 			}
 		}
 	}
@@ -574,7 +553,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	// Check for requeueAfter duration
 	if requeueAfter != 0 {
 		cdLog.Debugf("cluster will re-sync due to expiry time in: %v", requeueAfter)
-		return reconcile.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 	return reconcile.Result{}, nil
 }
@@ -634,23 +613,23 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 	return err
 }
 
-func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage, hiveImage string, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage, hiveImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
 	if len(cd.Spec.Images.InstallerImage) > 0 {
 		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
 			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
 		cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
-		return r.statusUpdate(cd, cdLog)
+		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
 	}
 	if imageSet != nil && imageSet.Spec.InstallerImage != nil {
 		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
 		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
-		return r.statusUpdate(cd, cdLog)
+		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
 	}
 	cliImage := images.GetCLIImage(cdLog)
 	job := imageset.GenerateImageSetJob(cd, releaseImage, serviceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on job")
-		return err
+		return reconcile.Result{}, err
 	}
 
 	jobName := types.NamespacedName{Name: job.Name, Namespace: job.Namespace}
@@ -659,6 +638,11 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	existingJob := &batchv1.Job{}
 	err := r.Get(context.TODO(), jobName, existingJob)
 	switch {
+	// If the job exists but is in the process of getting deleted, requeue and wait for the delete
+	// to complete.
+	case err == nil && !job.DeletionTimestamp.IsZero():
+		jobLog.Debug("imageset job is being deleted. Will recreate once deleted")
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, err
 	// If job exists and is finished, delete so we can recreate it
 	case err == nil && controllerutils.IsFinished(existingJob):
 		jobLog.WithField("successful", controllerutils.IsSuccessful(existingJob)).
@@ -666,15 +650,15 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		err := r.Delete(context.Background(), existingJob,
 			client.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {
-			jobLog.WithError(err).Error("cannot delete job")
+			jobLog.WithError(err).Error("cannot delete imageset job")
 		}
-		return err
+		return reconcile.Result{}, err
 	case errors.IsNotFound(err):
 		jobLog.WithField("releaseImage", releaseImage).Info("creating imageset job")
 		_, err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Error("error setting up service account and role")
-			return err
+			return reconcile.Result{}, err
 		}
 
 		err = r.Create(context.TODO(), job)
@@ -686,14 +670,14 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
 			metricImageSetDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
 		}
-		return err
+		return reconcile.Result{}, err
 	case err != nil:
 		jobLog.WithError(err).Error("cannot get job")
-		return err
+		return reconcile.Result{}, err
 	default:
 		jobLog.Debug("job exists and is in progress")
 	}
-	return nil
+	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) (modified bool, err error) {
@@ -876,32 +860,40 @@ func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.Cluster
 // linked to the parent cluster deployment gets a deletionTimestamp when the parent is deleted.
 // Normally we expect Kube garbage collection to do this for us, but in rare cases we've seen it
 // not working as intended.
-func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {
 	if !cd.Spec.ManageDNS {
-		return nil
+		return nil, nil
 	}
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
 	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
 	if err != nil && !errors.IsNotFound(err) {
 		cdLog.WithError(err).Error("error looking up managed dnszone")
-		return err
+		return &reconcile.Result{}, err
 	}
-	if err == nil && dnsZone.DeletionTimestamp == nil {
-		cdLog.Warn("managed dnszone did not get a deletionTimestamp when parent cluster deployment was deleted, deleting manually")
-		err = r.Delete(context.TODO(), dnsZone,
-			client.PropagationPolicy(metav1.DeletePropagationForeground))
-		if err != nil {
-			cdLog.WithError(err).Error("error deleting managed dnszone")
-			return err
-		}
+	if err != nil {
+		cdLog.Debug("managed zone does not exist, nothing to cleanup")
+		return nil, nil
 	}
-	return nil
+	if err == nil && !dnsZone.DeletionTimestamp.IsZero() {
+		cdLog.Debug("managed zone is being deleted, will wait for its deletion to complete")
+		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	}
+	cdLog.Warn("managed dnszone did not get a deletionTimestamp when parent cluster deployment was deleted, deleting manually")
+	err = r.Delete(context.TODO(), dnsZone,
+		client.PropagationPolicy(metav1.DeletePropagationForeground))
+	if err != nil {
+		cdLog.WithError(err).Error("error deleting managed dnszone")
+	}
+	return &reconcile.Result{}, err
 }
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
 
-	err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
+	result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
+	if result != nil {
+		return *result, err
+	}
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -919,6 +911,9 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	} else if err != nil {
 		cdLog.WithError(err).Errorf("error getting existing install job for deleted cluster deployment")
 		return reconcile.Result{}, err
+	} else if err == nil && !installJob.DeletionTimestamp.IsZero() {
+		cdLog.Debug("install job is being deleted, requeueing to wait for deletion")
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	} else {
 		err = r.Delete(context.Background(), installJob,
 			client.PropagationPolicy(metav1.DeletePropagationForeground))
@@ -927,6 +922,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			return reconcile.Result{}, err
 		}
 		cdLog.WithField("jobName", installJob.Name).Info("install job deleted")
+		return reconcile.Result{}, nil
 	}
 
 	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed

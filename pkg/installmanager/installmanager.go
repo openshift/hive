@@ -100,7 +100,6 @@ type InstallManager struct {
 	Region                        string
 	ClusterDeploymentName         string
 	Namespace                     string
-	SSHPrivKeyPath                string
 	DynamicClient                 client.Client
 	runUninstaller                func(clusterName, region, clusterID string, logger log.FieldLogger) error
 	uploadClusterMetadata         func(*hivev1.ClusterDeployment, *InstallManager) error
@@ -150,7 +149,6 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
-	flags.StringVar(&im.SSHPrivKeyPath, "ssh-priv-key-path", install.SSHPrivateKeyFilePath, "Path to file containing SSH private key")
 	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
 	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yaml", "location of install-config.yaml to copy into work-dir")
 	return cmd
@@ -644,21 +642,27 @@ func gatherLogs(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 	m.log.Info("Gathering logs/tarball")
 
 	m.log.Debug("Checking for SSH private key")
-	fileInfo, err := os.Stat(m.SSHPrivKeyPath)
+	sshPrivKeyPath := os.Getenv("SSH_PRIV_KEY_PATH")
+	if sshPrivKeyPath == "" {
+		m.log.Warn("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
+		return nil
+	}
+	fileInfo, err := os.Stat(sshPrivKeyPath)
 	if err != nil && os.IsNotExist(err) {
 		m.log.Warn("cannot gather logs/tarball as no ssh private key file found")
-		return nil
+		return err
 	} else if err != nil {
 		m.log.WithError(err).Error("error stating file containing private key")
+		return err
 	}
 
 	if fileInfo.Size() == 0 {
 		m.log.Warn("cannot gather logs/tarball as ssh private key file is empty")
-		return nil
+		return err
 	}
 
 	// set up ssh private key, and run the log gathering script
-	cleanup, err := initSSHAgent(m)
+	cleanup, err := initSSHAgent(sshPrivKeyPath, m)
 	defer cleanup()
 	if err != nil {
 		m.log.WithError(err).Error("failed to setup SSH agent")
@@ -792,7 +796,7 @@ func (tfs *terraformState) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-func initSSHAgent(m *InstallManager) (func(), error) {
+func initSSHAgent(privKeyPath string, m *InstallManager) (func(), error) {
 	sshAgentCleanup := func() {}
 
 	sock := os.Getenv("SSH_AUTH_SOCK")
@@ -856,10 +860,11 @@ func initSSHAgent(m *InstallManager) (func(), error) {
 		m.log.WithError(err).Error("failed to find ssh-add binary")
 		return sshAgentCleanup, err
 	}
-	cmd := exec.Command(bin, m.SSHPrivKeyPath)
+
+	cmd := exec.Command(bin, privKeyPath)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		m.log.WithError(err).Errorf("failed to add private key: %v", m.SSHPrivKeyPath)
+		m.log.WithError(err).Errorf("failed to add private key: %v", privKeyPath)
 		return sshAgentCleanup, err
 	}
 

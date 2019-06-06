@@ -212,6 +212,13 @@ func GenerateInstallerJob(
 			Name:      "sshkeys",
 			MountPath: SSHPrivateKeyDir,
 		})
+
+		// ok when the private key isn't in the secret, as the installmanager
+		// will just gracefully handle the file not being present
+		env = append(env, corev1.EnvVar{
+			Name:  "SSH_PRIV_KEY_PATH",
+			Value: SSHPrivateKeyFilePath,
+		})
 	}
 
 	if cd.Status.InstallerImage == nil {

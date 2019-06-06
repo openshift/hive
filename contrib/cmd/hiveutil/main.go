@@ -24,11 +24,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/createcluster"
-	"github.com/openshift/hive/contrib/pkg/installmanager"
 	"github.com/openshift/hive/contrib/pkg/report"
 	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
 	"github.com/openshift/hive/pkg/imageset"
+	"github.com/openshift/hive/pkg/installmanager"
 )
 
 func main() {

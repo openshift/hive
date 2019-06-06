@@ -177,6 +177,9 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		if cond.Status == corev1.ConditionTrue {
 			cdLog.Infof("cluster is reachable now, %s condition will be set to %s", hivev1.UnreachableCondition, corev1.ConditionFalse)
 		}
+	} else {
+		cdLog.Info("Cluster is reachable and unreachable condition does not exist")
+		return reconcile.Result{}, nil
 	}
 
 	// If cluster already has "unreachable" condition set is true, set the "unreachable" condition to false

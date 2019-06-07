@@ -93,6 +93,9 @@ INSTALLER_IMAGE - Installer image to use to install the cluster. If not specifie
 the --installer-image flag is used. If that's not specified, the image is 
 derived from the release image at runtime.
 `
+const (
+	deleteAfterAnnotation = "hive.openshift.io/delete-after"
+)
 
 // Options is the set of options to generate and apply a new cluster deployment
 type Options struct {
@@ -110,6 +113,7 @@ type Options struct {
 	InstallerImage     string
 	ReleaseImage       string
 	ReleaseImageSource string
+	DeleteAfter        string
 	UseClusterImageSet bool
 	ManageDNS          bool
 	Output             string
@@ -154,6 +158,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.StringVar(&opt.SSHPublicKey, "ssh-public-key", "", "SSH public key for cluster")
 	flags.StringVar(&opt.BaseDomain, "base-domain", "new-installer.openshift.com", "Base domain for the cluster")
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
+	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.AWSCredsFile, "aws-creds-file", defaultAWSCredsFile, "AWS credentials file")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
@@ -447,8 +452,9 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 			APIVersion: hivev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      o.Name,
-			Namespace: o.Namespace,
+			Name:        o.Name,
+			Namespace:   o.Namespace,
+			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			SSHKey: &corev1.LocalObjectReference{
@@ -524,6 +530,10 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 	imageSet, err := o.configureImages(cd)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if o.DeleteAfter != "" {
+		cd.ObjectMeta.Annotations[deleteAfterAnnotation] = o.DeleteAfter
 	}
 
 	return cd, imageSet, nil

@@ -7,7 +7,7 @@ RUN go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
 RUN go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
 RUN go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
 
-FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base as hive
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin

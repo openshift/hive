@@ -24,6 +24,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	corev1 "k8s.io/api/core/v1"
 
@@ -52,7 +53,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDNSZone{
-		Client:           mgr.GetClient(),
+		Client:           hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:           mgr.GetScheme(),
 		logger:           log.WithField("controller", controllerName),
 		awsClientBuilder: awsclient.NewClient,

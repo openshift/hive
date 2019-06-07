@@ -61,7 +61,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileInstallLog{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileInstallLog{Client: hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

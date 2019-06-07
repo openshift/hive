@@ -53,6 +53,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -77,7 +78,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileRemoteMachineSet{
-		Client:                        mgr.GetClient(),
+		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
 		logger:                        log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.GetClusterAPIClient,

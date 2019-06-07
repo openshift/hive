@@ -39,6 +39,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/controller/images"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -69,7 +70,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterDeprovisionRequest{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileClusterDeprovisionRequest{Client: hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

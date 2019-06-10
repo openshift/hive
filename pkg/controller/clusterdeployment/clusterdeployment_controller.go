@@ -82,6 +82,7 @@ const (
 	dnsZoneCheckInterval = 30 * time.Second
 	dnsNotReadyReason    = "DNSNotReady"
 	dnsReadyReason       = "DNSReady"
+	dnsReadyAnnotation   = "hive.openshift.io/dnsready"
 
 	defaultRequeueTime = 10 * time.Second
 
@@ -136,6 +137,13 @@ var (
 	},
 		[]string{"cluster_type"},
 	)
+	metricDNSDelaySeconds = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_dns_delay_seconds",
+			Help:    "Time between cluster deployment with spec.manageDNS creation and the DNSZone becoming ready.",
+			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
+		},
+	)
 
 	// regex to find/replace wildcard ingress entries
 	// case-insensitive leading literal '*' followed by a literal '.'
@@ -150,6 +158,7 @@ func init() {
 	metrics.Registry.MustRegister(metricClustersCreated)
 	metrics.Registry.MustRegister(metricClustersInstalled)
 	metrics.Registry.MustRegister(metricClustersDeleted)
+	metrics.Registry.MustRegister(metricDNSDelaySeconds)
 }
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -376,7 +385,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Spec.ManageDNS {
-		managedDNSZoneAvailable, err := r.ensureManagedDNSZone(cd, cdLog)
+		managedDNSZoneAvailable, dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -391,6 +400,10 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			// is updated to available.
 			cdLog.Debug("DNSZone is not yet available. Waiting for zone to become available.")
 			return reconcile.Result{}, nil
+		}
+		updated, err := r.setDNSDelayMetric(cd, dnsZone, cdLog)
+		if updated || err != nil {
+			return reconcile.Result{}, err
 		}
 	}
 
@@ -1064,11 +1077,47 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	return err
 }
 
-func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
+// setDNSDelayMetric will calculate the amount of time elapsed from clusterdeployment creation
+// to when the dnszone became ready, and set a metric to report the delay.
+// Will return a bool indicating whether the clusterdeployment has been modified, and whether any error was encountered.
+func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeployment, dnsZone *hivev1.DNSZone, cdLog log.FieldLogger) (bool, error) {
+	modified := false
+
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
+	}
+
+	if _, ok := cd.Annotations[dnsReadyAnnotation]; ok {
+		// already have recorded the dnsdelay metric
+		return modified, nil
+	}
+
+	readyTimestamp := dnsReadyTransitionTime(dnsZone)
+	if readyTimestamp == nil {
+		msg := "did not find timestamp for when dnszone became ready"
+		cdLog.WithField("dnszone", dnsZone.Name).Error(msg)
+		return modified, fmt.Errorf(msg)
+	}
+
+	dnsDelayDuration := readyTimestamp.Sub(cd.CreationTimestamp.Time)
+	cdLog.WithField("duration", dnsDelayDuration.Seconds()).Info("DNS ready")
+	cd.Annotations[dnsReadyAnnotation] = dnsDelayDuration.String()
+	if err := r.Client.Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Error("failed to save annotation marking DNS becoming ready")
+		return modified, err
+	}
+	modified = true
+
+	metricDNSDelaySeconds.Observe(float64(dnsDelayDuration.Seconds()))
+
+	return modified, nil
+}
+
+func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, *hivev1.DNSZone, error) {
 	// for now we only support AWS
 	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
 		cdLog.Error("cluster deployment platform is not AWS, cannot manage DNS zone")
-		return false, fmt.Errorf("only AWS managed DNS is supported")
+		return false, nil, fmt.Errorf("only AWS managed DNS is supported")
 	}
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
@@ -1077,14 +1126,14 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
 	if err == nil {
 		availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
-		return availableCondition != nil && availableCondition.Status == corev1.ConditionTrue, nil
+		return availableCondition != nil && availableCondition.Status == corev1.ConditionTrue, dnsZone, nil
 	}
 	if errors.IsNotFound(err) {
 		logger.Info("creating new DNSZone for cluster deployment")
-		return false, r.createManagedDNSZone(cd, logger)
+		return false, nil, r.createManagedDNSZone(cd, logger)
 	}
 	logger.WithError(err).Error("failed to fetch DNS zone")
-	return false, err
+	return false, nil, err
 }
 
 func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
@@ -1250,6 +1299,16 @@ func calculateJobSpecHash(job *batchv1.Job) (string, error) {
 	sum := hex.EncodeToString(hasher.Sum(nil))
 
 	return sum, nil
+}
+
+func dnsReadyTransitionTime(dnsZone *hivev1.DNSZone) *time.Time {
+	readyCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+
+	if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
+		return &readyCondition.LastTransitionTime.Time
+	}
+
+	return nil
 }
 
 func strPtr(s string) *string {

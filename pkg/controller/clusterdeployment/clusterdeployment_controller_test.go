@@ -596,6 +596,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Spec.ManageDNS = true
+					cd.Annotations[dnsReadyAnnotation] = "NOW"
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -605,6 +606,24 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				installJob := getInstallJob(c)
 				assert.NotNil(t, installJob, "install job should exist")
+			},
+		},
+		{
+			name: "Set DNS delay metric",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testAvailableDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.NotNil(t, cd.Annotations, "annotations should be set on clusterdeployment")
+				assert.Contains(t, cd.Annotations, dnsReadyAnnotation)
 			},
 		},
 		{
@@ -1016,6 +1035,9 @@ func testAvailableDNSZone() *hivev1.DNSZone {
 		{
 			Type:   hivev1.ZoneAvailableDNSZoneCondition,
 			Status: corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{
+				Time: time.Now(),
+			},
 		},
 	}
 	return zone

@@ -242,7 +242,7 @@ spec:
         - "--audit-log-path=-"
         - "--tls-cert-file=/var/serving-cert/tls.crt"
         - "--tls-private-key-file=/var/serving-cert/tls.key"
-        - "--v=8"
+        - "--v=3"
         ports:
         - containerPort: 9443
         volumeMounts:
@@ -615,7 +615,7 @@ spec:
         command:
           - /opt/services/manager
           - --log-level
-          - debug
+          - info
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl

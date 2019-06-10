@@ -22,6 +22,7 @@
 // config/rbac/hive_admin_role_binding.yaml
 // config/rbac/hive_frontend_role.yaml
 // config/rbac/hive_frontend_role_binding.yaml
+// config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
 // config/rbac/manager_role.yaml
@@ -1051,6 +1052,28 @@ func configRbacHive_frontend_role_bindingYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/rbac/hive_frontend_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacHive_frontend_serviceaccountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hive-frontend
+  namespace: hive
+`)
+
+func configRbacHive_frontend_serviceaccountYamlBytes() ([]byte, error) {
+	return _configRbacHive_frontend_serviceaccountYaml, nil
+}
+
+func configRbacHive_frontend_serviceaccountYaml() (*asset, error) {
+	bytes, err := configRbacHive_frontend_serviceaccountYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_frontend_serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4554,6 +4577,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_admin_role_binding.yaml":                    configRbacHive_admin_role_bindingYaml,
 	"config/rbac/hive_frontend_role.yaml":                         configRbacHive_frontend_roleYaml,
 	"config/rbac/hive_frontend_role_binding.yaml":                 configRbacHive_frontend_role_bindingYaml,
+	"config/rbac/hive_frontend_serviceaccount.yaml":               configRbacHive_frontend_serviceaccountYaml,
 	"config/rbac/hive_reader_role.yaml":                           configRbacHive_reader_roleYaml,
 	"config/rbac/hive_reader_role_binding.yaml":                   configRbacHive_reader_role_bindingYaml,
 	"config/rbac/manager_role.yaml":                               configRbacManager_roleYaml,
@@ -4655,14 +4679,15 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service.yaml":    {configManagerServiceYaml, map[string]*bintree{}},
 		}},
 		"rbac": {nil, map[string]*bintree{
-			"hive_admin_role.yaml":            {configRbacHive_admin_roleYaml, map[string]*bintree{}},
-			"hive_admin_role_binding.yaml":    {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
-			"hive_frontend_role.yaml":         {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
-			"hive_frontend_role_binding.yaml": {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
-			"hive_reader_role.yaml":           {configRbacHive_reader_roleYaml, map[string]*bintree{}},
-			"hive_reader_role_binding.yaml":   {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
-			"manager_role.yaml":               {configRbacManager_roleYaml, map[string]*bintree{}},
-			"manager_role_binding.yaml":       {configRbacManager_role_bindingYaml, map[string]*bintree{}},
+			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},
+			"hive_admin_role_binding.yaml":      {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
+			"hive_frontend_role.yaml":           {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
+			"hive_frontend_role_binding.yaml":   {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
+			"hive_frontend_serviceaccount.yaml": {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},
+			"hive_reader_role.yaml":             {configRbacHive_reader_roleYaml, map[string]*bintree{}},
+			"hive_reader_role_binding.yaml":     {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
+			"manager_role.yaml":                 {configRbacManager_roleYaml, map[string]*bintree{}},
+			"manager_role_binding.yaml":         {configRbacManager_role_bindingYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

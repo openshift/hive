@@ -77,6 +77,8 @@ rules:
   - selectorsyncidentityproviders
   - selectorsyncsets
   - syncidentityproviders
+  - syncsetinstances
+  - syncsetinstances/status
   - syncsets
   - clusterimagesets
   - clusterdeprovisionrequests

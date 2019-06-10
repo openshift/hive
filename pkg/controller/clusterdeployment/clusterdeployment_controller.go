@@ -301,6 +301,19 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
+	// TODO: remove this once clusterdeployments have been migrated. We are no longer storing syncset status
+	// on clusterdeployments, remove it.
+	if len(cd.Status.SyncSetStatus) > 0 || len(cd.Status.SelectorSyncSetStatus) > 0 {
+		cd.Status.SyncSetStatus = nil
+		cd.Status.SelectorSyncSetStatus = nil
+		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Error("failed to migrate cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
 	imageSet, modified, err := r.getClusterImageSet(cd, cdLog)
 	if modified || err != nil {
 		return reconcile.Result{}, err

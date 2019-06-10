@@ -714,7 +714,7 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 		message,
 		controllerutils.UpdateConditionNever)
 	if !reflect.DeepEqual(original.Status.Conditions, cd.Status.Conditions) {
-		cdLog.Debug("setting ClusterImageSetNotFoundCondition to %v", status)
+		cdLog.Info("setting ClusterImageSetNotFoundCondition to %v", status)
 		err := r.Status().Update(context.TODO(), cd)
 		if err != nil {
 			cdLog.WithError(err).Error("cannot update status conditions")
@@ -801,7 +801,7 @@ func (r *ReconcileClusterDeployment) updateClusterDeploymentStatus(cd *hivev1.Cl
 			return err
 		}
 	} else {
-		cdLog.Infof("cluster deployment status unchanged")
+		cdLog.Debug("cluster deployment status unchanged")
 	}
 	return nil
 }
@@ -1005,7 +1005,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 
-	cdLog.Infof("deprovision request not yet completed")
+	cdLog.Debug("deprovision request not yet completed")
 
 	return reconcile.Result{}, nil
 }
@@ -1048,7 +1048,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		return availableCondition != nil && availableCondition.Status == corev1.ConditionTrue, nil
 	}
 	if errors.IsNotFound(err) {
-		logger.Debug("creating new DNSZone for cluster deployment")
+		logger.Info("creating new DNSZone for cluster deployment")
 		return false, r.createManagedDNSZone(cd, logger)
 	}
 	logger.WithError(err).Error("failed to fetch DNS zone")
@@ -1085,7 +1085,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 		logger.WithError(err).Error("cannot create DNS zone")
 		return err
 	}
-	logger.Debug("dns zone created")
+	logger.Info("dns zone created")
 	return nil
 }
 
@@ -1153,7 +1153,7 @@ func (r *ReconcileClusterDeployment) deleteJobOnHashChange(existingJob, generate
 
 	if newJobNeeded {
 		// delete the existing job
-		cdLog.Debug("deleting existing install job due to updated/missing hash detected")
+		cdLog.Info("deleting existing install job due to updated/missing hash detected")
 		err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {
 			cdLog.WithError(err).Errorf("error deleting outdated install job")

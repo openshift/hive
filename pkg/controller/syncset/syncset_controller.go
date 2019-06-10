@@ -637,12 +637,16 @@ func (r *ReconcileSyncSet) deleteSyncSetResources(syncSetStatus hivev1.SyncSetOb
 		itemLog.Debug("deleting resource")
 		err = dynamicClient.Resource(gvr).Namespace(resourceStatus.Namespace).Delete(resourceStatus.Name, &metav1.DeleteOptions{})
 		if err != nil {
-			if !errors.IsNotFound(err) {
+			switch {
+			case errors.IsNotFound(err):
+				itemLog.Debug("resource not found, nothing to do")
+			case errors.IsForbidden(err):
+				itemLog.Debug("resource deletion is forbidden, nothing to do")
+			default:
 				itemLog.WithError(err).Error("error deleting resource")
 				syncSetStatus.Resources[index].Conditions = r.setDeletionFailedSyncCondition(syncSetStatus.Resources[index].Conditions, fmt.Errorf("failed to delete resource: %v", err))
 				return syncSetStatus, err
 			}
-			itemLog.Debug("resource not found, nothing to do")
 		}
 	}
 	return syncSetStatus, nil

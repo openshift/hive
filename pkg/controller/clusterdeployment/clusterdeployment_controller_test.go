@@ -263,11 +263,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovisionRequest(c)
-				if deprovision == nil {
-					t.Errorf("did not find expected deprovision request")
-				}
-
 				instJob := getInstallJob(c)
 				if instJob != nil {
 					t.Errorf("got unexpected install job (expected delete)")
@@ -369,16 +364,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
-						testDeletedClusterDeployment(),
-						"example.com/fake:latest",
-						"",
-						"fakeserviceaccount",
-						"sshkey",
-						"pullsecret")
-					return job
-				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				deprovision := getDeprovisionRequest(c)
@@ -766,16 +751,6 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 		existing                 []runtime.Object
 		exptectedReconcileResult reconcile.Result
 	}{
-		{
-			name: "Requeue after empty clusterversion fields",
-			existing: []runtime.Object{
-				testEmptyClusterDeployment(),
-			},
-			exptectedReconcileResult: reconcile.Result{
-				Requeue:      true,
-				RequeueAfter: defaultRequeueTime,
-			},
-		},
 		{
 			name: "Requeue after adding finalizer",
 			existing: []runtime.Object{

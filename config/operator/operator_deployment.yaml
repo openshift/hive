@@ -42,7 +42,7 @@ spec:
         command:
           - /opt/services/hive-operator
           - --log-level
-          - debug
+          - info
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl

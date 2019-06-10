@@ -35,7 +35,7 @@ spec:
         command:
           - /opt/services/manager
           - --log-level
-          - debug
+          - info
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl

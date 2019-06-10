@@ -363,12 +363,12 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		if ssos.ResourceApplyMode == hivev1.SyncResourceApplyMode {
 			selectorSyncSetStatus, err := r.deleteSyncSetResources(ssos, dynamicClient, ssLog)
 			if err != nil {
-				cd.Status.SyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SyncSetStatus, selectorSyncSetStatus)
+				cd.Status.SelectorSyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, selectorSyncSetStatus)
 				continue
 			}
 		}
 		// remove SyncSet status from ClusterDeployment
-		cd.Status.SelectorSyncSetStatus = removeSyncSetObjectStatus(cd.Status.SyncSetStatus, ssos.Name)
+		cd.Status.SelectorSyncSetStatus = removeSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, ssos.Name)
 	}
 
 	err = r.updateClusterDeploymentStatus(cd, origCD, cdLog)

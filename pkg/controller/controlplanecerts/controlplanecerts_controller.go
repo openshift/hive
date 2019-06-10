@@ -42,6 +42,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -75,7 +76,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
 	helper := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
 	return &ReconcileControlPlaneCerts{
-		Client:  mgr.GetClient(),
+		Client:  hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:  mgr.GetScheme(),
 		applier: helper,
 	}

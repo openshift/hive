@@ -25,6 +25,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileSyncIdentityProviders{
-		Client: mgr.GetClient(),
+		Client: hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme: mgr.GetScheme(),
 		logger: log.WithField("controller", controllerName),
 	}

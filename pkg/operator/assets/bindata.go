@@ -723,8 +723,8 @@ spec:
         - --source=crd
         - --crd-source-apiversion=hive.openshift.io/v1alpha1
         - --crd-source-kind=DNSEndpoint
-        - --registry=noop
-        - --policy=upsert-only
+        - --registry=txt
+        - --policy=sync
 `)
 
 func configExternalDnsDeploymentYamlBytes() ([]byte, error) {

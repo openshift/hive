@@ -90,11 +90,7 @@ deploy: manifests install generate
 	# Deploy the operator manifests:
 	mkdir -p overlays/deploy
 	cp overlays/template/* overlays/deploy
-	if [[ "`uname`" == "Darwin" ]]; then \
-	    sed -i "" -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
-	else \
-	    sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
-	fi
+	sed -i -e "s|IMAGE_REF|$(DEPLOY_IMAGE)|" overlays/deploy/image_patch.yaml; \
 	echo $(DEPLOY_IMAGE)
 	kustomize build overlays/deploy | oc apply -f -
 	rm -rf overlays/deploy

@@ -81,7 +81,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
 		logger:                        log.WithField("controller", controllerName),
-		remoteClusterAPIClientBuilder: controllerutils.GetClusterAPIClient,
+		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 		awsClientBuilder:              awsclient.NewClient,
 	}
 }
@@ -114,7 +114,7 @@ type ReconcileRemoteMachineSet struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(*hivev1.ClusterDeployment, string) (client.Client, error)
+	remoteClusterAPIClientBuilder func(string) (client.Client, error)
 
 	// awsClientBuilder is a function pointer to the function that builds the aws client
 	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
@@ -141,6 +141,11 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
 	})
+	// If the cluster is unreachable, do not reconcile.
+	if controllerutils.HasUnreachableCondition(cd) {
+		cdLog.Debug("skipping cluster with unreachable condition")
+		return reconcile.Result{}, nil
+	}
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil
@@ -164,7 +169,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(cd, string(kubeConfig))
+	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig))
 	if err != nil {
 		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

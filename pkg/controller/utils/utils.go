@@ -67,18 +67,13 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	})
 }
 
-// GetClusterAPIClient returns kube API client for the cluster deployment only when the cluster condition is reachable
-func GetClusterAPIClient(cd *hivev1.ClusterDeployment, kubeconfigData string) (client.Client, error) {
-
+// HasUnreachableCondition returns true if the cluster deployment has the unreachable condition set to true.
+func HasUnreachableCondition(cd *hivev1.ClusterDeployment) bool {
 	condition := FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
 	if condition != nil {
-		//Check condition status is true or not
-		if condition.Status == corev1.ConditionTrue {
-			err := fmt.Errorf(fmt.Sprintf("cluster deployment condition '%s' : %s", hivev1.UnreachableCondition, condition.Status))
-			return nil, err
-		}
+		return condition.Status == corev1.ConditionTrue
 	}
-	return BuildClusterAPIClientFromKubeconfig(kubeconfigData)
+	return false
 }
 
 // BuildDynamicClientFromKubeconfig returns a dynamic client using the provided kubeconfig

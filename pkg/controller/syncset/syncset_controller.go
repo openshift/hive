@@ -206,6 +206,11 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
 	})
+	// If the cluster is unreachable, do not reconcile.
+	if controllerutils.HasUnreachableCondition(cd) {
+		cdLog.Debug("skipping cluster with unreachable condition")
+		return reconcile.Result{}, nil
+	}
 
 	if !cd.Status.Installed {
 		// Cluster isn't installed yet, return

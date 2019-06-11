@@ -330,7 +330,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				Client: fakeClient,
 				scheme: scheme.Scheme,
 				logger: log.WithField("controller", "remotemachineset"),
-				remoteClusterAPIClientBuilder: func(string) (client.Client, error) {
+				remoteClusterAPIClientBuilder: func(string, string) (client.Client, error) {
 					return remoteFakeClient, nil
 				},
 				awsClientBuilder: func(client.Client, string, string, string) (awsclient.Client, error) {

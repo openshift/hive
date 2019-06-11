@@ -149,7 +149,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
-		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
@@ -209,7 +209,7 @@ type ReconcileClusterDeployment struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string) (client.Client, error)
+	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -892,7 +892,7 @@ func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.S
 // setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
 func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecret *corev1.Secret, cdLog log.FieldLogger) error {
 	if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
-		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]))
+		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]), controllerName)
 		if err != nil {
 			cdLog.WithError(err).Error("error building remote cluster-api client connection")
 			return err

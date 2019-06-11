@@ -63,7 +63,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileRemoteMachineSet{
-		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
 		logger:                        log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
@@ -99,7 +99,7 @@ type ReconcileRemoteMachineSet struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string) (client.Client, error)
+	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
 
 	// awsClientBuilder is a function pointer to the function that builds the aws client
 	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
@@ -163,7 +163,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig))
+	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig), controllerName)
 	if err != nil {
 		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

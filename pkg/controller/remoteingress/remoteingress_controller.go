@@ -70,7 +70,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
 	helper := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
 	return &ReconcileRemoteClusterIngress{
-		Client:  hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:  utils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:  mgr.GetScheme(),
 		logger:  log.WithField("controller", controllerName),
 		kubeCLI: helper,

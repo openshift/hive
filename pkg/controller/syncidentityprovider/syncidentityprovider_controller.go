@@ -48,7 +48,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileSyncIdentityProviders{
-		Client: hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme: mgr.GetScheme(),
 		logger: log.WithField("controller", controllerName),
 	}

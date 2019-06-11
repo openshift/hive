@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
@@ -21,8 +22,9 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 )
 
-// BuildClusterAPIClientFromKubeconfig will return a kubeclient using the provided kubeconfig
-func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, error) {
+// BuildClusterAPIClientFromKubeconfig will return a kubeclient with metrics using the provided kubeconfig.
+// Controller name is required for metrics purposes.
+func BuildClusterAPIClientFromKubeconfig(kubeconfigData, controllerName string) (client.Client, error) {
 	config, err := clientcmd.Load([]byte(kubeconfigData))
 	if err != nil {
 		return nil, err
@@ -31,6 +33,13 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	cfg, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return nil, err
+	}
+	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return &ControllerMetricsTripper{
+			RoundTripper: rt,
+			controller:   controllerName,
+			remote:       true, // this is a remote client
+		}
 	}
 
 	scheme, err := machineapi.SchemeBuilder.Build()
@@ -60,8 +69,9 @@ func HasUnreachableCondition(cd *hivev1.ClusterDeployment) bool {
 	return false
 }
 
-// BuildDynamicClientFromKubeconfig returns a dynamic client using the provided kubeconfig
-func BuildDynamicClientFromKubeconfig(kubeconfigData string) (dynamic.Interface, error) {
+// BuildDynamicClientFromKubeconfig returns a dynamic client with metrics, using the provided kubeconfig.
+// Controller name is required for metrics purposes.
+func BuildDynamicClientFromKubeconfig(kubeconfigData, controllerName string) (dynamic.Interface, error) {
 	config, err := clientcmd.Load([]byte(kubeconfigData))
 	if err != nil {
 		return nil, err
@@ -70,6 +80,14 @@ func BuildDynamicClientFromKubeconfig(kubeconfigData string) (dynamic.Interface,
 	cfg, err := kubeConfig.ClientConfig()
 	if err != nil {
 		return nil, err
+	}
+
+	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return &ControllerMetricsTripper{
+			RoundTripper: rt,
+			controller:   controllerName,
+			remote:       true, // this is a remote client
+		}
 	}
 
 	client, err := dynamic.NewForConfig(cfg)

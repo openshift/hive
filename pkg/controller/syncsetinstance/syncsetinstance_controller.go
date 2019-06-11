@@ -43,7 +43,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	hiveresource "github.com/openshift/hive/pkg/resource"
 )
@@ -74,7 +73,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileSyncSetInstance{
-		Client:               hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:               mgr.GetScheme(),
 		logger:               log.WithField("controller", controllerName),
 		applierBuilder:       applierBuilderFunc,
@@ -148,7 +147,7 @@ type ReconcileSyncSetInstance struct {
 	logger               log.FieldLogger
 	applierBuilder       func([]byte, log.FieldLogger) Applier
 	hash                 func([]byte) string
-	dynamicClientBuilder func(string) (dynamic.Interface, error)
+	dynamicClientBuilder func(string, string) (dynamic.Interface, error)
 }
 
 // Reconcile applies SyncSet or SelectorSyncSets associated with SyncSetInstances to the owning cluster.
@@ -232,7 +231,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		ssiLog.WithError(err).Error("unable to fixup cluster client")
 		return reconcile.Result{}, err
 	}
-	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig))
+	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig), controllerName)
 	if err != nil {
 		ssiLog.WithError(err).Error("unable to build dynamic client")
 		return reconcile.Result{}, err
@@ -335,7 +334,7 @@ func (r *ReconcileSyncSetInstance) syncDeletedSyncSetInstance(ssi *hivev1.SyncSe
 		ssiLog.WithError(err).Error("unable to fixup cluster client")
 		return reconcile.Result{}, err
 	}
-	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig))
+	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig), controllerName)
 	if err != nil {
 		ssiLog.WithError(err).Error("unable to build dynamic client")
 		return reconcile.Result{}, err

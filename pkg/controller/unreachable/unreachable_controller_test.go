@@ -312,12 +312,12 @@ func TestIsTimeForConnectivityCheck(t *testing.T) {
 	}
 }
 
-func mockUnreachableClusterAPIClientBuilder(secretData string) (client.Client, error) {
+func mockUnreachableClusterAPIClientBuilder(secretData, controllerName string) (client.Client, error) {
 	err := errors.New("cluster not reachable")
 	return nil, err
 }
 
-func mockReachableClusterAPIClientBuilder(secretData string) (client.Client, error) {
+func mockReachableClusterAPIClientBuilder(secretData, controllerName string) (client.Client, error) {
 
 	remoteClusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{

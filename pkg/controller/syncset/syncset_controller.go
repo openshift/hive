@@ -25,7 +25,6 @@ import (
 
 	"github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -42,7 +41,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileSyncSet{
-		Client:      hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:      controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:      mgr.GetScheme(),
 		logger:      log.WithField("controller", controllerName),
 		computeHash: getHash,

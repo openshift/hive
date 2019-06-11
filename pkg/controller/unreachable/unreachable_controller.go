@@ -61,7 +61,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileRemoteMachineSet{
-		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
 		logger:                        log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
@@ -96,7 +96,7 @@ type ReconcileRemoteMachineSet struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string) (client.Client, error)
+	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
 }
 
 // Reconcile checks if we can establish an API client connection to the remote cluster and maintains the unreachable condition as a result.
@@ -159,7 +159,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	}
 
 	cdLog.Info("checking if cluster is reachable")
-	_, err = r.remoteClusterAPIClientBuilder(secretData)
+	_, err = r.remoteClusterAPIClientBuilder(secretData, controllerName)
 	if err != nil {
 		cdLog.Warn("unable to create remote API client, marking cluster unreachable")
 		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition,

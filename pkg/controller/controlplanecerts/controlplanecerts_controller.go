@@ -60,7 +60,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
 	helper := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
 	return &ReconcileControlPlaneCerts{
-		Client:  hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:  mgr.GetScheme(),
 		applier: helper,
 	}

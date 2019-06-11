@@ -272,6 +272,25 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	origCD := cd
 	cd = cd.DeepCopy()
 
+	// TODO: We may want to remove this fix in future.
+	// Handle pre-existing clusters with older status version structs that did not have the new
+	// cluster version mandatory fields defined.
+	// NOTE: removing this is causing the imageset job to fail. Please leave it in until
+	// we can determine what needs to be fixed.
+	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	if !reflect.DeepEqual(origCD.Status, cd.Status) {
+		cdLog.Info("correcting empty cluster version fields")
+		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Error("error updating cluster deployment")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{
+			Requeue:      true,
+			RequeueAfter: defaultRequeueTime,
+		}, nil
+	}
+
 	// We previously allowed clusterdeployment.spec.ingress[] entries to have ingress domains with a leading '*'.
 	// Migrate the clusterdeployment to the new format if we find a wildcard ingress domain.
 	// TODO: we can one day remove this once all clusterdeployment are known to have non-wildcard data

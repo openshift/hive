@@ -537,7 +537,63 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Set condition when DNSZone is not available yet",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue)
+			},
+		},
+		{
+			name: "Clear condition when DNSZone is available",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.DNSNotReadyCondition,
+						Status: corev1.ConditionTrue,
+					})
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testAvailableDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionFalse)
+			},
+		},
+		{
 			name: "Create install job when DNSZone is ready",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					cd.Annotations[dnsReadyAnnotation] = "NOW"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testAvailableDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getInstallJob(c)
+				assert.NotNil(t, installJob, "install job should exist")
+			},
+		},
+		{
+			name: "Set DNS delay metric",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
@@ -549,8 +605,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testAvailableDNSZone(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				installJob := getInstallJob(c)
-				assert.NotNil(t, installJob, "install job should exist")
+				cd := getCD(c)
+				assert.NotNil(t, cd.Annotations, "annotations should be set on clusterdeployment")
+				assert.Contains(t, cd.Annotations, dnsReadyAnnotation)
 			},
 		},
 		{
@@ -962,6 +1019,9 @@ func testAvailableDNSZone() *hivev1.DNSZone {
 		{
 			Type:   hivev1.ZoneAvailableDNSZoneCondition,
 			Status: corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{
+				Time: time.Now(),
+			},
 		},
 	}
 	return zone
@@ -977,6 +1037,17 @@ func testClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
 	}
 
 	return cd
+}
+
+func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType hivev1.ClusterDeploymentConditionType, status corev1.ConditionStatus) {
+	found := false
+	for _, cond := range cd.Status.Conditions {
+		if cond.Type == condType {
+			found = true
+			assert.Equal(t, status, cond.Status, "condition found with unexpected status")
+		}
+	}
+	assert.True(t, found, "did not find expected condition type: %v", condType)
 }
 
 func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {

@@ -82,6 +82,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role.yaml",
 		"config/rbac/hive_reader_role_binding.yaml",
+		"config/rbac/hive_frontend_role.yaml",
+		"config/rbac/hive_frontend_role_binding.yaml",
+		"config/rbac/hive_frontend_serviceaccount.yaml",
 
 		// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
 		// the latest in the operator to ensure updates roll out.

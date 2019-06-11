@@ -871,13 +871,9 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 		cdLog.WithError(err).Error("error looking up managed dnszone")
 		return &reconcile.Result{}, err
 	}
-	if err != nil {
-		cdLog.Debug("managed zone does not exist, nothing to cleanup")
+	if errors.IsNotFound(err) || !dnsZone.DeletionTimestamp.IsZero() {
+		cdLog.Debug("dnszone has been deleted or is getting deleted")
 		return nil, nil
-	}
-	if err == nil && !dnsZone.DeletionTimestamp.IsZero() {
-		cdLog.Debug("managed zone is being deleted, will wait for its deletion to complete")
-		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	}
 	cdLog.Warn("managed dnszone did not get a deletionTimestamp when parent cluster deployment was deleted, deleting manually")
 	err = r.Delete(context.TODO(), dnsZone,

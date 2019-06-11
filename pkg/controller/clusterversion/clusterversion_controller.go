@@ -58,7 +58,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterVersion{
 		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
-		remoteClusterAPIClientBuilder: controllerutils.GetClusterAPIClient,
+		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
 }
 
@@ -87,7 +87,7 @@ type ReconcileClusterVersion struct {
 	scheme *runtime.Scheme
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(*hivev1.ClusterDeployment, string) (client.Client, error)
+	remoteClusterAPIClientBuilder func(string) (client.Client, error)
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and syncs the remote ClusterVersion status
@@ -115,6 +115,11 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		"namespace":         cd.Namespace,
 		"controller":        controllerName,
 	})
+	// If the cluster is unreachable, do not reconcile.
+	if controllerutils.HasUnreachableCondition(cd) {
+		cdLog.Debug("skipping cluster with unreachable condition")
+		return reconcile.Result{}, nil
+	}
 	cdLog.Info("reconciling cluster version")
 
 	if len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
@@ -132,7 +137,7 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		cdLog.WithError(err).Error("cannot fixup kubeconfig for remote cluster")
 		return reconcile.Result{}, err
 	}
-	remoteClient, err := r.remoteClusterAPIClientBuilder(cd, string(kubeConfig))
+	remoteClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig))
 	if err != nil {
 		cdLog.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

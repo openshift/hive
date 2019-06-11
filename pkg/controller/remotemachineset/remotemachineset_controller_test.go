@@ -45,6 +45,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 )
 
@@ -174,6 +175,26 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 						*testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
 					},
 				}
+			}(),
+		},
+		{
+			name: "Skip create missing machine set when cluster has unreachable condition",
+			localExisting: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment([]hivev1.MachinePool{
+						testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
+					})
+					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions,
+						hivev1.UnreachableCondition, corev1.ConditionTrue, "", "", controllerutils.UpdateConditionAlways)
+					return cd
+				}(),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{},
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{}
 			}(),
 		},
 		{
@@ -325,7 +346,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				Client: fakeClient,
 				scheme: scheme.Scheme,
 				logger: log.WithField("controller", "remotemachineset"),
-				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment, string) (client.Client, error) {
+				remoteClusterAPIClientBuilder: func(string) (client.Client, error) {
 					return remoteFakeClient, nil
 				},
 				awsClientBuilder: func(client.Client, string, string, string) (awsclient.Client, error) {

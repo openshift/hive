@@ -219,7 +219,7 @@ func testSecret(name, key, value string) *corev1.Secret {
 	return s
 }
 
-func testRemoteClusterAPIClientBuilder(cd *hivev1.ClusterDeployment, secretData string) (client.Client, error) {
+func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error) {
 	remoteClusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: remoteClusterVersionObjectName,

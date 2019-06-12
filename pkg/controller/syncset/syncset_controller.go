@@ -352,12 +352,12 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		if ssos.ResourceApplyMode == hivev1.SyncResourceApplyMode {
 			selectorSyncSetStatus, err := r.deleteSyncSetResources(ssos, dynamicClient, ssLog)
 			if err != nil {
-				cd.Status.SyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SyncSetStatus, selectorSyncSetStatus)
+				cd.Status.SelectorSyncSetStatus = appendOrUpdateSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, selectorSyncSetStatus)
 				continue
 			}
 		}
 		// remove SyncSet status from ClusterDeployment
-		cd.Status.SelectorSyncSetStatus = removeSyncSetObjectStatus(cd.Status.SyncSetStatus, ssos.Name)
+		cd.Status.SelectorSyncSetStatus = removeSyncSetObjectStatus(cd.Status.SelectorSyncSetStatus, ssos.Name)
 	}
 
 	err = r.updateClusterDeploymentStatus(cd, origCD, cdLog)
@@ -626,12 +626,16 @@ func (r *ReconcileSyncSet) deleteSyncSetResources(syncSetStatus hivev1.SyncSetOb
 		itemLog.Debug("deleting resource")
 		err = dynamicClient.Resource(gvr).Namespace(resourceStatus.Namespace).Delete(resourceStatus.Name, &metav1.DeleteOptions{})
 		if err != nil {
-			if !errors.IsNotFound(err) {
+			switch {
+			case errors.IsNotFound(err):
+				itemLog.Debug("resource not found, nothing to do")
+			case errors.IsForbidden(err):
+				itemLog.Debug("resource deletion is forbidden, nothing to do")
+			default:
 				itemLog.WithError(err).Error("error deleting resource")
 				syncSetStatus.Resources[index].Conditions = r.setDeletionFailedSyncCondition(syncSetStatus.Resources[index].Conditions, fmt.Errorf("failed to delete resource: %v", err))
 				return syncSetStatus, err
 			}
-			itemLog.Debug("resource not found, nothing to do")
 		}
 	}
 	return syncSetStatus, nil

@@ -477,6 +477,34 @@ func TestSyncSetReconcile(t *testing.T) {
 				deletedCM("cm2"),
 			},
 		},
+		{
+			name: "cleanup deleted selectorsyncset resources",
+			clusterDeployment: testClusterDeployment(nil,
+				[]hivev1.SyncSetObjectStatus{
+					successfulResourceStatus("aaa",
+						[]runtime.Object{
+							testCM("cm1", "key1", "value1"),
+						},
+						hivev1.SyncResourceApplyMode),
+					successfulResourceStatus("bbb",
+						[]runtime.Object{
+							testCM("cm2", "key2", "value2"),
+						},
+						hivev1.SyncResourceApplyMode),
+				}),
+			selectorSyncSets: []*hivev1.SelectorSyncSet{
+				func() *hivev1.SelectorSyncSet {
+					ss := testMatchingSelectorSyncSetWithResources("aaa",
+						testCM("cm1", "key1", "value1"),
+					)
+					ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
+					return ss
+				}(),
+			},
+			expectDeleted: []deletedItemInfo{
+				deletedCM("cm2"),
+			},
+		},
 	}
 
 	for _, test := range tests {

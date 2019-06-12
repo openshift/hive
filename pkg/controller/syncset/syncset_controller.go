@@ -652,13 +652,22 @@ func appendOrUpdateSyncStatus(statusList []hivev1.SyncStatus, syncStatus hivev1.
 }
 
 func appendOrUpdateSyncSetObjectStatus(statusList []hivev1.SyncSetObjectStatus, syncSetObjectStatus hivev1.SyncSetObjectStatus) []hivev1.SyncSetObjectStatus {
+	newList := []hivev1.SyncSetObjectStatus{}
+	added := false
 	for i, ssos := range statusList {
 		if ssos.Name == syncSetObjectStatus.Name {
-			statusList[i] = syncSetObjectStatus
-			return statusList
+			if !added {
+				newList = append(newList, syncSetObjectStatus)
+				added = true
+			}
+			continue
 		}
+		newList = append(newList, statusList[i])
 	}
-	return append(statusList, syncSetObjectStatus)
+	if !added {
+		newList = append(newList, syncSetObjectStatus)
+	}
+	return newList
 }
 
 func findSyncSetStatus(name string, statusList []hivev1.SyncSetObjectStatus) hivev1.SyncSetObjectStatus {

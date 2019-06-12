@@ -132,6 +132,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if job == nil {
 					t.Errorf("did not find expected install job")
 				}
+				cd := getCD(c)
+				if value := cd.Annotations[firstTimeInstallAnnotation]; value != "true" {
+					t.Errorf("did not get a clusterdeployment with firstTimeInstallAnnotation")
+				}
 			},
 		},
 		{

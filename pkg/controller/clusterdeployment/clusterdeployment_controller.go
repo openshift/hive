@@ -70,7 +70,8 @@ const (
 
 	defaultRequeueTime = 10 * time.Second
 
-	jobHashAnnotation = "hive.openshift.io/jobhash"
+	jobHashAnnotation          = "hive.openshift.io/jobhash"
+	firstTimeInstallAnnotation = "hive.openshift.io/first-time-install"
 )
 
 var (
@@ -512,9 +513,18 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				cdLog.Errorf("error creating job: %v", err)
 				return reconcile.Result{}, err
 			}
-			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
-			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to install job seconds")
-			metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+			if _, ok := cd.Annotations[firstTimeInstallAnnotation]; !ok {
+				initializeAnnotations(cd)
+
+				// Add the annotation for first time install
+				cd.Annotations[firstTimeInstallAnnotation] = "true"
+				if err := r.Client.Update(context.TODO(), cd); err != nil {
+					cdLog.WithError(err).Error("failed to save annotation for firstTimeInstall")
+				}
+				kickstartDuration := time.Since(cd.CreationTimestamp.Time)
+				cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to install job seconds")
+				metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+			}
 		} else {
 			cdLog.Debug("provision job exists")
 			containerRestarts, err = r.calcInstallPodRestarts(cd, cdLog)
@@ -1081,10 +1091,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 // Will return a bool indicating whether the clusterdeployment has been modified, and whether any error was encountered.
 func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeployment, dnsZone *hivev1.DNSZone, cdLog log.FieldLogger) (bool, error) {
 	modified := false
-
-	if cd.Annotations == nil {
-		cd.Annotations = map[string]string{}
-	}
+	initializeAnnotations(cd)
 
 	if _, ok := cd.Annotations[dnsReadyAnnotation]; ok {
 		// already have recorded the dnsdelay metric
@@ -1328,5 +1335,12 @@ func clearUnderwaySecondsMetrics(cd *hivev1.ClusterDeployment) {
 			cd.Name,
 			cd.Namespace,
 			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+	}
+}
+
+// initializeAnnotations() initializes the annotations if it is not already
+func initializeAnnotations(cd *hivev1.ClusterDeployment) {
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
 	}
 }

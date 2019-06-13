@@ -20,7 +20,7 @@ var (
 		Name: "hive_kube_client_requests_total",
 		Help: "Counter incremented for each kube client request.",
 	},
-		[]string{"controller", "method", "resource", "remote"},
+		[]string{"controller", "method", "resource", "remote", "status"},
 	)
 )
 
@@ -75,12 +75,13 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	if cmt.Remote {
 		remoteStr = "true"
 	}
-	path, err := parsePath(req.URL.Path)
-	if err == nil {
-		metricKubeClientRequests.WithLabelValues(cmt.Controller, req.Method, path, remoteStr).Inc()
-	}
+	path, pathErr := parsePath(req.URL.Path)
 	// Call the nested RoundTripper.
 	resp, err := cmt.RoundTripper.RoundTrip(req)
+	if err == nil && pathErr == nil {
+		metricKubeClientRequests.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Inc()
+	}
+
 	return resp, err
 }
 

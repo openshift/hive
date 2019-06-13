@@ -38,8 +38,8 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Cli
 	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
 		return &ControllerMetricsTripper{
 			RoundTripper: rt,
-			controller:   ctrlrName,
-			remote:       false, // this is a local client
+			Controller:   ctrlrName,
+			Remote:       false, // this is a local client
 		}
 	}
 
@@ -65,19 +65,19 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Cli
 // ControllerMetricsTripper is a RoundTripper implementation which tracks our metrics for client requests.
 type ControllerMetricsTripper struct {
 	http.RoundTripper
-	controller string
-	remote     bool
+	Controller string
+	Remote     bool
 }
 
 // RoundTrip implements the http RoundTripper interface.
 func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	remoteStr := "false"
-	if cmt.remote {
+	if cmt.Remote {
 		remoteStr = "true"
 	}
 	path, err := parsePath(req.URL.Path)
 	if err == nil {
-		metricKubeClientRequests.WithLabelValues(cmt.controller, req.Method, path, remoteStr).Inc()
+		metricKubeClientRequests.WithLabelValues(cmt.Controller, req.Method, path, remoteStr).Inc()
 	}
 	// Call the nested RoundTripper.
 	resp, err := cmt.RoundTripper.RoundTrip(req)

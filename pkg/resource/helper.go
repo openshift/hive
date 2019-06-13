@@ -18,11 +18,14 @@ const (
 
 // Helper contains configuration for apply and patch operations
 type Helper struct {
-	logger     log.FieldLogger
-	cacheDir   string
-	kubeconfig []byte
-	restConfig *rest.Config
-	getFactory func(namespace string) (cmdutil.Factory, error)
+	logger         log.FieldLogger
+	cacheDir       string
+	metricsEnabled bool
+	controllerName string
+	remote         bool
+	kubeconfig     []byte
+	restConfig     *rest.Config
+	getFactory     func(namespace string) (cmdutil.Factory, error)
 }
 
 // NewHelperFromRESTConfig returns a new object that allows apply and patch operations
@@ -33,6 +36,33 @@ func NewHelperFromRESTConfig(restConfig *rest.Config, logger log.FieldLogger) *H
 		restConfig: restConfig,
 	}
 	r.getFactory = r.getRESTConfigFactory
+	return r
+}
+
+// NewHelperWithMetricsFromRESTConfig returns a new object that allows apply and patch operations, with metrics tracking enabled.
+func NewHelperWithMetricsFromRESTConfig(restConfig *rest.Config, controllerName string, logger log.FieldLogger) *Helper {
+	r := &Helper{
+		logger:         logger,
+		metricsEnabled: true,
+		controllerName: controllerName,
+		cacheDir:       getCacheDir(logger),
+		restConfig:     restConfig,
+	}
+	r.getFactory = r.getRESTConfigFactory
+	return r
+}
+
+// NewHelperWithMetrics returns a new object that allows apply and patch operations, with metrics tracking enabled.
+func NewHelperWithMetrics(kubeconfig []byte, controllerName string, remote bool, logger log.FieldLogger) *Helper {
+	r := &Helper{
+		logger:         logger,
+		controllerName: controllerName,
+		metricsEnabled: true,
+		cacheDir:       getCacheDir(logger),
+		kubeconfig:     kubeconfig,
+		remote:         true,
+	}
+	r.getFactory = r.getKubeconfigFactory
 	return r
 }
 

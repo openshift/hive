@@ -37,8 +37,8 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData, controllerName string) 
 	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
 		return &ControllerMetricsTripper{
 			RoundTripper: rt,
-			controller:   controllerName,
-			remote:       true, // this is a remote client
+			Controller:   controllerName,
+			Remote:       true, // this is a remote client
 		}
 	}
 
@@ -85,8 +85,8 @@ func BuildDynamicClientFromKubeconfig(kubeconfigData, controllerName string) (dy
 	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
 		return &ControllerMetricsTripper{
 			RoundTripper: rt,
-			controller:   controllerName,
-			remote:       true, // this is a remote client
+			Controller:   controllerName,
+			Remote:       true, // this is a remote client
 		}
 	}
 

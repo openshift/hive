@@ -10,7 +10,6 @@ import (
 )
 
 func (r *Helper) getRESTConfigFactory(namespace string) (cmdutil.Factory, error) {
-	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from REST client config and cache directory")
 	f := cmdutil.NewFactory(&restConfigClientGetter{restConfig: r.restConfig, cacheDir: r.cacheDir, namespace: namespace})
 	return f, nil
 }

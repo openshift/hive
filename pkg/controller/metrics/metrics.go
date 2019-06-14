@@ -156,8 +156,6 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
-			mcLog.WithField("total", len(clusterDeployments.Items)).Debug("loaded cluster deployments")
-
 			accumulator, err := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
 			if err != nil {
 				mcLog.WithError(err).Error("unable to calculate metrics")
@@ -205,7 +203,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 				metricClusterDeploymentsWithConditionTotal,
 				mcLog)
 		}
-		mcLog.Info("calculating metrics across all install jobs")
+		mcLog.Debug("calculating metrics across all install jobs")
 
 		// install job metrics
 		installJobs := &batchv1.JobList{}
@@ -216,29 +214,17 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		} else {
 			runningTotal, succeededTotal, failedTotal := processJobs(installJobs.Items)
 			for k, v := range runningTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated running install jobs total")
 				metricInstallJobsTotal.WithLabelValues(k, stateRunning).Set(float64(v))
 			}
 			for k, v := range succeededTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated succeeded install jobs total")
 				metricInstallJobsTotal.WithLabelValues(k, stateSucceeded).Set(float64(v))
 			}
 			for k, v := range failedTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated failed install jobs total")
 				metricInstallJobsTotal.WithLabelValues(k, stateFailed).Set(float64(v))
 			}
 		}
 
-		mcLog.Info("calculating metrics across all uninstall jobs")
+		mcLog.Debug("calculating metrics across all uninstall jobs")
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
 		uninstallJobLabelSelector := map[string]string{install.UninstallJobLabel: "true"}
@@ -248,29 +234,17 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		} else {
 			runningTotal, succeededTotal, failedTotal := processJobs(uninstallJobs.Items)
 			for k, v := range runningTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated running uninstall jobs total")
 				metricUninstallJobsTotal.WithLabelValues(k, stateRunning).Set(float64(v))
 			}
 			for k, v := range succeededTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated succeeded uninstall jobs total")
 				metricUninstallJobsTotal.WithLabelValues(k, stateSucceeded).Set(float64(v))
 			}
 			for k, v := range failedTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated failed uninstall jobs total")
 				metricUninstallJobsTotal.WithLabelValues(k, stateFailed).Set(float64(v))
 			}
 		}
 
-		mcLog.Info("calculating metrics across all imageset jobs")
+		mcLog.Debug("calculating metrics across all imageset jobs")
 		// imageset job metrics
 		imagesetJobs := &batchv1.JobList{}
 		imagesetJobLabelSelector := map[string]string{imageset.ImagesetJobLabel: "true"}
@@ -280,24 +254,12 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		} else {
 			runningTotal, succeededTotal, failedTotal := processJobs(imagesetJobs.Items)
 			for k, v := range runningTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated running imageset jobs total")
 				metricImagesetJobsTotal.WithLabelValues(k, stateRunning).Set(float64(v))
 			}
 			for k, v := range succeededTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated succeeded imageset jobs total")
 				metricImagesetJobsTotal.WithLabelValues(k, stateSucceeded).Set(float64(v))
 			}
 			for k, v := range failedTotal {
-				mcLog.WithFields(log.Fields{
-					"clusterType": k,
-					"total":       v,
-				}).Debug("calculated failed imageset jobs total")
 				metricImagesetJobsTotal.WithLabelValues(k, stateFailed).Set(float64(v))
 			}
 		}
@@ -491,41 +453,19 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 
 	for k, v := range ca.total {
 		total.WithLabelValues(k, ca.ageFilter).Set(float64(v))
-		mcLog.WithFields(log.Fields{
-			"clusterType": k,
-			"age_lt":      ca.ageFilter,
-			"total":       v,
-		}).Debug("calculated total cluster deployments metric")
 	}
 	for k, v := range ca.installed {
 		installed.WithLabelValues(k, ca.ageFilter).Set(float64(v))
-		mcLog.WithFields(log.Fields{
-			"clusterType": k,
-			"age_lt":      ca.ageFilter,
-			"total":       v,
-		}).Debug("calculated total cluster deployments installed metric")
 	}
 	for k, v := range ca.uninstalled {
 		for clusterType := range ca.clusterTypesSet {
 			if count, ok := v[clusterType]; ok {
 				uninstalled.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(count))
-				mcLog.WithFields(log.Fields{
-					"clusterType":    clusterType,
-					"age_lt":         ca.ageFilter,
-					"uninstalled_gt": k,
-					"total":          count,
-				}).Debug("calculated total cluster deployments uninstalled metric")
 			} else {
 				// We need to potentially clear out old cluster types no longer showing in the list.
 				// This will work so long as there is at least one cluster of that type still remaining
 				// in hive somewhere.
 				uninstalled.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(0))
-				mcLog.WithFields(log.Fields{
-					"clusterType":    clusterType,
-					"age_lt":         ca.ageFilter,
-					"uninstalled_gt": k,
-					"total":          0,
-				}).Debug("calculated total cluster deployments uninstalled metric")
 			}
 		}
 	}
@@ -533,35 +473,17 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 		for clusterType := range ca.clusterTypesSet {
 			if count, ok := v[clusterType]; ok {
 				deprovisioning.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(count))
-				mcLog.WithFields(log.Fields{
-					"clusterType":    clusterType,
-					"age_lt":         ca.ageFilter,
-					"uninstalled_gt": k,
-					"total":          count,
-				}).Debug("calculated total cluster deployments uninstalled metric")
 			} else {
 				// We need to potentially clear out old cluster types no longer showing in the list.
 				// This will work so long as there is at least one cluster of that type still remaining
 				// in hive somewhere.
 				deprovisioning.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(0))
-				mcLog.WithFields(log.Fields{
-					"clusterType":    clusterType,
-					"age_lt":         ca.ageFilter,
-					"uninstalled_gt": k,
-					"total":          0,
-				}).Debug("calculated total cluster deployments deprovisioning metric")
 			}
 		}
 	}
 	for k, v := range ca.conditions {
 		for k1, v1 := range v {
 			conditions.WithLabelValues(k1, ca.ageFilter, string(k)).Set(float64(v1))
-			mcLog.WithFields(log.Fields{
-				"clusterType": k1,
-				"age_lt":      ca.ageFilter,
-				"condition":   string(k),
-				"total":       v1,
-			}).Debug("calculated total cluster deployments with condition metric")
 		}
 	}
 }

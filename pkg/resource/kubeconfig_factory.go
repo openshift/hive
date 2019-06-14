@@ -10,7 +10,6 @@ import (
 )
 
 func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error) {
-	r.logger.Debug("loading kubeconfig from byte array")
 	config, err := clientcmd.Load(r.kubeconfig)
 	if err != nil {
 		r.logger.WithError(err).Error("an error occurred loading the kubeconfig")
@@ -18,13 +17,10 @@ func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error)
 	}
 	overrides := &clientcmd.ConfigOverrides{}
 	if len(namespace) > 0 {
-		r.logger.WithField("namespace", namespace).Debug("specifying override namespace on clientconfig")
 		overrides.Context.Namespace = namespace
 	}
-	r.logger.Debug("creating client config from kubeconfig")
 	clientConfig := clientcmd.NewNonInteractiveClientConfig(*config, "", overrides, nil)
 
-	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from client config and cache directory")
 	f := cmdutil.NewFactory(&kubeconfigClientGetter{clientConfig: clientConfig, cacheDir: r.cacheDir})
 	return f, nil
 }

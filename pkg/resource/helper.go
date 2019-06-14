@@ -49,15 +49,12 @@ func NewHelper(kubeconfig []byte, logger log.FieldLogger) *Helper {
 
 func getCacheDir(logger log.FieldLogger) string {
 	if envCacheDir := os.Getenv(cacheDirEnvKey); len(envCacheDir) > 0 {
-		logger.WithField("dir", envCacheDir).WithField("env", cacheDirEnvKey).Debug("using cache directory from environment variable")
 		return envCacheDir
 	}
-	logger.WithField("dir", defaultCacheDir).Debug("using default cache directory")
 	return defaultCacheDir
 }
 
 func (r *Helper) createTempFile(prefix string, content []byte) (string, error) {
-	r.logger.WithField("prefix", prefix).Debug("creating temporary file")
 	f, err := ioutil.TempFile(r.cacheDir, prefix)
 	if err != nil {
 		r.logger.WithError(err).WithField("prefix", prefix).Error("cannot create temporary file")
@@ -68,12 +65,10 @@ func (r *Helper) createTempFile(prefix string, content []byte) (string, error) {
 		r.logger.WithError(err).WithField("file", f.Name()).Error("cannot write to temporary file")
 		return "", fmt.Errorf("cannot write to temporary file: %v", err)
 	}
-	r.logger.WithField("file", f.Name()).Debug("created temporary file")
 	return f.Name(), nil
 }
 
 func (r *Helper) deleteTempFile(name string) error {
-	r.logger.WithField("file", name).Debugf("deleting temporary file")
 	err := os.Remove(name)
 	if err != nil {
 		r.logger.WithError(err).WithField("file", name).Error("cannot delete temp file")

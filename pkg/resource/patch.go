@@ -47,7 +47,6 @@ func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 }
 
 func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmdpatch.PatchOptions, error) {
-	r.logger.Debug("setting up patch command")
 
 	cmd := kcmdpatch.NewCmdPatch(f, ioStreams)
 	cmd.Flags().Parse([]string{})
@@ -58,8 +57,6 @@ func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f c
 		return nil, err
 	}
 	args := []string{fmt.Sprintf("%s.%s.%s/%s", kind, gv.Version, gv.Group, name)}
-
-	r.logger.WithField("arg", args[0]).Debugf("resource argument")
 
 	o := kcmdpatch.NewPatchOptions(ioStreams)
 	o.Complete(f, cmd, args)

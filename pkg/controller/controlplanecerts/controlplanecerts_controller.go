@@ -95,6 +95,20 @@ type ReconcileControlPlaneCerts struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
 func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	cdLog := log.WithFields(log.Fields{
+		"clusterDeployment": request.Name,
+		"namespace":         request.Namespace,
+		"controller":        controllerName,
+	})
+
+	cdLog.Info("reconciling cluster deployment")
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
@@ -109,11 +123,6 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, nil
 	}
 
-	cdLog := log.WithFields(log.Fields{
-		"clusterDeployment": request.NamespacedName.String(),
-		"controller":        controllerName,
-	})
-	cdLog.Info("reconciling cluster deployment")
 	existingSyncSet := &hivev1.SyncSet{}
 	existingSyncSetNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controlPlaneCertsSyncSetName(cd.Name)}
 	err = r.Get(context.TODO(), existingSyncSetNamespacedName, existingSyncSet)

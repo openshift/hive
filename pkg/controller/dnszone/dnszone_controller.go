@@ -105,6 +105,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	dnsLog.Info("reconciling dns zone")
 	defer func() {
 		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

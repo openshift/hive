@@ -21,6 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+const (
+	controllerName = "metrics"
+)
+
 var (
 	metricClusterDeploymentsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments",
@@ -76,6 +80,17 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
+	// MetricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
+	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
+	// extremely strange results. For now, track our own metric.
+	MetricControllerReconcileTime = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_controller_reconcile_seconds",
+			Help:    "Distribution of the length of time each controllers reconcile loop takes.",
+			Buckets: []float64{0.001, 0.01, 0.1, 1, 10, 30, 60, 120},
+		},
+		[]string{"controller"},
+	)
 )
 
 func init() {
@@ -87,6 +102,7 @@ func init() {
 	metrics.Registry.MustRegister(metricInstallJobsTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsTotal)
 	metrics.Registry.MustRegister(metricImagesetJobsTotal)
+	metrics.Registry.MustRegister(MetricControllerReconcileTime)
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentProvisionUnderwaySeconds)
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
@@ -127,6 +143,12 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 	wait.Until(func() {
 		start := time.Now()
 		mcLog := log.WithField("controller", "metrics")
+		defer func() {
+			dur := time.Since(start)
+			MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+			mcLog.WithField("elapsed", dur).Info("reconcile complete")
+		}()
+
 		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
 		clusterDeployments := &hivev1.ClusterDeploymentList{}

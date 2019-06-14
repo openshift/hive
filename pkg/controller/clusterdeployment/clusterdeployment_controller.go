@@ -243,6 +243,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (recon
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -108,6 +109,19 @@ type ReconcileRemoteMachineSet struct {
 // remote cluster MachineSets based on the state read and the worker machines defined in
 // ClusterDeployment.Spec.Config.Machines
 func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	cdLog := r.logger.WithFields(log.Fields{
+		"clusterDeployment": request.Name,
+		"namespace":         request.Namespace,
+	})
+	cdLog.Info("reconciling cluster deployment")
+
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
@@ -121,10 +135,6 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	cdLog := r.logger.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-	})
 	// If the cluster is unreachable, do not reconcile.
 	if controllerutils.HasUnreachableCondition(cd) {
 		cdLog.Debug("skipping cluster with unreachable condition")

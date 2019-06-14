@@ -167,6 +167,19 @@ type ReconcileSyncSet struct {
 // found in each SyncSet object
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=selectorsyncsets,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	cdLog := r.logger.WithFields(log.Fields{
+		"clusterDeployment": request.Name,
+		"namespace":         request.Namespace,
+	})
+	cdLog.Info("reconciling sync sets for cluster deployment")
+
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 
@@ -186,10 +199,6 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
-	cdLog := r.logger.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-	})
 	// If the cluster is unreachable, do not reconcile.
 	if controllerutils.HasUnreachableCondition(cd) {
 		cdLog.Debug("skipping cluster with unreachable condition")
@@ -204,8 +213,6 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	origCD := cd
 	cd = cd.DeepCopy()
-
-	cdLog.Info("reconciling sync sets for cluster deployment")
 
 	// get all sync sets that apply to cd
 	syncSets, err := r.getRelatedSyncSets(cd)

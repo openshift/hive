@@ -117,6 +117,18 @@ type ReconcileRemoteClusterIngress struct {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;watch;update
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=syncsets,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	cdLog := r.logger.WithFields(log.Fields{
+		"clusterDeployment": request.Name,
+		"namespace":         request.Namespace,
+	})
+	cdLog.Info("reconciling cluster deployment")
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	rContext := &reconcileContext{}
 
 	// Fetch the ClusterDeployment instance
@@ -138,10 +150,6 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{}, nil
 	}
 
-	cdLog := r.logger.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-	})
 	rContext.logger = cdLog
 
 	if cd.Spec.Ingress == nil {

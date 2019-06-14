@@ -102,6 +102,7 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 	rLog.Info("reconciling cluster deprovision request")
 	defer func() {
 		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 		rLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 	// Fetch the ClusterDeprovisionRequest instance

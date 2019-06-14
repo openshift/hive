@@ -172,6 +172,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 	contextLogger.Info("reconciling syncidentityproviders and clusterdeployments")
 	defer func() {
 		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 		contextLogger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

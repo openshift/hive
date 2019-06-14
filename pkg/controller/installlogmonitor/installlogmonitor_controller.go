@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -153,11 +154,18 @@ func (r *ReconcileInstallLog) migrateInstallLog(cm *corev1.ConfigMap) error {
 // Reconcile parses install log to monitor for known issues.
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileInstallLog) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
 	iLog := log.WithFields(log.Fields{
 		"configMap":  request.NamespacedName.String(),
 		"controller": controllerName,
 	})
 	iLog.Info("reconciling configmap")
+
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		iLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
 
 	// Load the regex configmap, if we don't have one, there's not much point proceeding here.
 	regexCM := &corev1.ConfigMap{}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -77,6 +78,20 @@ type ReconcileClusterVersion struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and syncs the remote ClusterVersion status
 // if the remote cluster is available.
 func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	cdLog := log.WithFields(log.Fields{
+		"clusterDeployment": request.Name,
+		"namespace":         request.Namespace,
+		"controller":        controllerName,
+	})
+
+	cdLog.Info("reconciling cluster deployment")
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
@@ -94,17 +109,11 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	cdLog := log.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-		"controller":        controllerName,
-	})
 	// If the cluster is unreachable, do not reconcile.
 	if controllerutils.HasUnreachableCondition(cd) {
 		cdLog.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
-	cdLog.Info("reconciling cluster version")
 
 	if len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
 		return reconcile.Result{}, nil

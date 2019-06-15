@@ -44,34 +44,29 @@ import (
 )
 
 const (
-	controllerName = "clusterDeployment"
+	controllerName     = "clusterDeployment"
+	serviceAccountName = "cluster-installer" // service account that can run the installer and upload artifacts to the cluster's namespace.
+	defaultRequeueTime = 10 * time.Second
 
-	// serviceAccountName will be a service account that can run the installer and then
-	// upload artifacts to the cluster's namespace.
-	serviceAccountName = "cluster-installer"
-
-	// deleteAfterAnnotation is the annotation that contains a duration after which the cluster should be cleaned up.
-	deleteAfterAnnotation       = "hive.openshift.io/delete-after"
 	adminCredsSecretPasswordKey = "password"
 	adminSSHKeySecretKey        = "ssh-publickey"
 	adminKubeconfigKey          = "kubeconfig"
 	rawAdminKubeconfigKey       = "raw-kubeconfig"
-	clusterVersionObjectName    = "version"
-	clusterVersionUnknown       = "undef"
 
-	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
-	clusterImageSetNotFoundReason         = "ClusterImageSetNotFound"
-	clusterImageSetFoundReason            = "ClusterImageSetFound"
+	clusterVersionObjectName      = "version"
+	clusterVersionUnknown         = "undef"
+	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
+	clusterImageSetFoundReason    = "ClusterImageSetFound"
 
 	dnsZoneCheckInterval = 30 * time.Second
 	dnsNotReadyReason    = "DNSNotReady"
 	dnsReadyReason       = "DNSReady"
 	dnsReadyAnnotation   = "hive.openshift.io/dnsready"
 
-	defaultRequeueTime = 10 * time.Second
-
-	jobHashAnnotation          = "hive.openshift.io/jobhash"
-	firstTimeInstallAnnotation = "hive.openshift.io/first-time-install"
+	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
+	jobHashAnnotation                     = "hive.openshift.io/jobhash"
+	firstTimeInstallAnnotation            = "hive.openshift.io/first-time-install"
+	deleteAfterAnnotation                 = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
 )
 
 var (
@@ -146,8 +141,7 @@ func init() {
 	metrics.Registry.MustRegister(metricDNSDelaySeconds)
 }
 
-// Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
-// and Start it when the Manager is Started.
+// Add creates a new ClusterDeployment controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	return AddToManager(mgr, NewReconciler(mgr))
 }
@@ -163,7 +157,6 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
@@ -181,7 +174,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 
-	// Watch for pods created by an install job:
+	// Watch for pods created by an install job
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
 		ToRequests: handler.ToRequestsFunc(selectorPodWatchHandler),
 	})
@@ -189,13 +182,13 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for deprovision requests created by a ClusterDeployment:
+	// Watch for deprovision requests created by a ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovisionRequest{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 
-	// Watch for dnszones created by a ClusterDeployment:
+	// Watch for dnszones created by a ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},

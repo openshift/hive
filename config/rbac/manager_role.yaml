@@ -212,3 +212,16 @@ rules:
   - patch
   - list
   - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - syncsetinstances
+  - syncsetinstances/status
+  verbs:
+  - get
+  - create
+  - update
+  - delete
+  - patch
+  - list
+  - watch

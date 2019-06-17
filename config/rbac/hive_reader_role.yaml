@@ -32,6 +32,7 @@ rules:
   - selectorsyncsets
   - syncidentityproviders
   - syncsets
+  - syncsetinstances
   - clusterdeprovisionrequests
   verbs:
   - get

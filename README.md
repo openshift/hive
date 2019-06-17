@@ -8,7 +8,6 @@
     - [Run Hive From Source](#run-hive-from-source)
   - [Using Hive](#using-hive)
     - [Create a ClusterDeployment using the latest OpenShift release and installer image](#create-a-clusterdeployment-using-the-latest-openshift-release-and-installer-image)
-    - [Create a ClusterDeployment using latest pinned and known stable container images](#create-a-clusterdeployment-using-latest-pinned-and-known-stable-container-images)
     - [Watch the ClusterDeployment](#watch-the-clusterdeployment)
     - [Delete your ClusterDeployment](#delete-your-clusterdeployment)
   - [Tips](#tips)
@@ -20,7 +19,20 @@
   - [Documentation](#documentation)
 
 # OpenShift Hive
-API driven OpenShift cluster provisioning and management
+API driven OpenShift 4 cluster provisioning and management.
+
+Hive is an operator which runs as a service on top of Kubernetes/OpenShift.
+The Hive service can be used to provision and manage OpenShift clusters.
+
+* For provisioning OpenShift, Hive uses the [OpenShift installer](https://github.com/openshift/installer).
+* For `day 2` configuration management, Hive provides the [SyncSet and SelectorSyncSet CRDs](./docs/syncset.md) to deliver arbitrary Kubernetes configuration to the cluster.
+
+Supported cloud providers:
+* AWS
+
+In the future Hive will support more cloud providers.
+
+For more information, refer to the [documentation](#documentation).
 
 ## Prerequisites
 
@@ -188,3 +200,4 @@ Steps:
 * [Developing Hive](./docs/developing.md)
 * [SyncSet](./docs/syncset.md)
 * [SyncIdentityProvider](./docs/syncidentityprovider.md)
+* [Frequently Asked Questions](./docs/FAQs.md)

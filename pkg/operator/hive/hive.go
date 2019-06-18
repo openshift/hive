@@ -77,7 +77,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 		// Deploy the desired ClusterImageSets representing installable releases of OpenShift.
 		// TODO: in future this should be pipelined somehow.
-		"config/clusterimagesets/openshift-4.0-latest.yaml",
 		"config/rbac/hive_admin_role.yaml",
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role.yaml",
@@ -112,6 +111,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	removeImageSets := []string{
 		"openshift-v4.0-beta3",
 		"openshift-v4.0-beta4",
+		"openshift-v4.0-latest",
 	}
 	for _, isName := range removeImageSets {
 		clusterImageSet := &hivev1.ClusterImageSet{}

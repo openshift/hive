@@ -1,6 +1,7 @@
 package resource
 
 import (
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -10,6 +11,13 @@ import (
 )
 
 func (r *Helper) getRESTConfigFactory(namespace string) (cmdutil.Factory, error) {
+	if r.metricsEnabled {
+		// Copy the possibly shared restConfig reference and add a metrics wrapper.
+		cfg := rest.CopyConfig(r.restConfig)
+		controllerutils.AddControllerMetricsTransportWrapper(cfg, r.controllerName, false)
+		r.restConfig = cfg
+	}
+	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from REST client config and cache directory")
 	f := cmdutil.NewFactory(&restConfigClientGetter{restConfig: r.restConfig, cacheDir: r.cacheDir, namespace: namespace})
 	return f, nil
 }

@@ -170,6 +170,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			ClusterID: testClusterID,
+			Installed: true,
 			AdminKubeconfigSecret: corev1.LocalObjectReference{
 				Name: "kubeconfig-secret",
 			},
@@ -203,7 +204,7 @@ func testSecret(name, key, value string) *corev1.Secret {
 	return s
 }
 
-func testRemoteClusterAPIClientBuilder(secretData string) (client.Client, error) {
+func testRemoteClusterAPIClientBuilder(secretData string, controllerName string) (client.Client, error) {
 	remoteClusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: remoteClusterVersionObjectName,

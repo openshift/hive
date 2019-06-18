@@ -21,8 +21,9 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 )
 
-// BuildClusterAPIClientFromKubeconfig will return a kubeclient using the provided kubeconfig
-func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, error) {
+// BuildClusterAPIClientFromKubeconfig will return a kubeclient with metrics using the provided kubeconfig.
+// Controller name is required for metrics purposes.
+func BuildClusterAPIClientFromKubeconfig(kubeconfigData, controllerName string) (client.Client, error) {
 	config, err := clientcmd.Load([]byte(kubeconfigData))
 	if err != nil {
 		return nil, err
@@ -32,6 +33,7 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData string) (client.Client, 
 	if err != nil {
 		return nil, err
 	}
+	AddControllerMetricsTransportWrapper(cfg, controllerName, true)
 
 	scheme, err := machineapi.SchemeBuilder.Build()
 	if err != nil {
@@ -60,8 +62,9 @@ func HasUnreachableCondition(cd *hivev1.ClusterDeployment) bool {
 	return false
 }
 
-// BuildDynamicClientFromKubeconfig returns a dynamic client using the provided kubeconfig
-func BuildDynamicClientFromKubeconfig(kubeconfigData string) (dynamic.Interface, error) {
+// BuildDynamicClientFromKubeconfig returns a dynamic client with metrics, using the provided kubeconfig.
+// Controller name is required for metrics purposes.
+func BuildDynamicClientFromKubeconfig(kubeconfigData, controllerName string) (dynamic.Interface, error) {
 	config, err := clientcmd.Load([]byte(kubeconfigData))
 	if err != nil {
 		return nil, err
@@ -71,6 +74,8 @@ func BuildDynamicClientFromKubeconfig(kubeconfigData string) (dynamic.Interface,
 	if err != nil {
 		return nil, err
 	}
+
+	AddControllerMetricsTransportWrapper(cfg, controllerName, true)
 
 	client, err := dynamic.NewForConfig(cfg)
 	if err != nil {

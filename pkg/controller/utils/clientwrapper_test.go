@@ -1,4 +1,4 @@
-package metrics
+package utils
 
 import (
 	"testing"
@@ -8,9 +8,10 @@ import (
 
 func TestPathParse(t *testing.T) {
 	tests := []struct {
-		name     string
-		path     string
-		expected string
+		name        string
+		path        string
+		expected    string
+		expectedErr bool
 	}{
 		{
 			name:     "core pods list",
@@ -67,11 +68,32 @@ func TestPathParse(t *testing.T) {
 			path:     "/apis/hive.openshift.io/v1alpha1/namespaces/hive/clusterdeployments/dgoodwin-del/status",
 			expected: "hive.openshift.io/v1alpha1/clusterdeployments",
 		},
+		// Clients sometimes make calls like this on startup I believe for caching purposes.
+		// We don't want to track these as metrics, returning an error from the parse indicates to skip.
+		{
+			name:        "client caching",
+			path:        "/apis/hive.openshift.io/v1alpha1",
+			expectedErr: true,
+		},
+		{
+			name:        "api",
+			path:        "/api",
+			expectedErr: true,
+		},
+		{
+			name:        "api/v1",
+			path:        "/api/v1",
+			expectedErr: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := parsePath(test.path)
-			assert.Equal(t, test.expected, result)
+			result, err := parsePath(test.path)
+			if test.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.Equal(t, test.expected, result)
+			}
 		})
 	}
 

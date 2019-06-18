@@ -373,7 +373,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				logger:         log.WithField("controller", "syncset"),
 				applierBuilder: helper.newHelper,
 				hash:           fakeHashFunc(t),
-				dynamicClientBuilder: func(string) (dynamic.Interface, error) {
+				dynamicClientBuilder: func(string, string) (dynamic.Interface, error) {
 					return dynamicClient, nil
 				},
 			}

@@ -58,9 +58,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
-	helper := resource.NewHelperFromRESTConfig(mgr.GetConfig(), logger)
+	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), controllerName, logger)
 	return &ReconcileControlPlaneCerts{
-		Client:  hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:  mgr.GetScheme(),
 		applier: helper,
 	}

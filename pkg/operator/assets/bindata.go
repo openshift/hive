@@ -13,7 +13,6 @@
 // config/hiveadmission/syncset-webhook.yaml
 // config/manager/deployment.yaml
 // config/manager/service.yaml
-// config/clusterimagesets/openshift-4.0-latest.yaml
 // config/external-dns/deployment.yaml
 // config/external-dns/rbac_role.yaml
 // config/external-dns/rbac_role_binding.yaml
@@ -670,32 +669,6 @@ func configManagerServiceYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/manager/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configClusterimagesetsOpenshift40LatestYaml = []byte(`apiVersion: hive.openshift.io/v1alpha1
-kind: ClusterImageSet
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: openshift-v4.0-latest
-spec:
-  releaseImage: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
-  hiveImage: "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
-`)
-
-func configClusterimagesetsOpenshift40LatestYamlBytes() ([]byte, error) {
-	return _configClusterimagesetsOpenshift40LatestYaml, nil
-}
-
-func configClusterimagesetsOpenshift40LatestYaml() (*asset, error) {
-	bytes, err := configClusterimagesetsOpenshift40LatestYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/clusterimagesets/openshift-4.0-latest.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4825,7 +4798,6 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/syncset-webhook.yaml":                   configHiveadmissionSyncsetWebhookYaml,
 	"config/manager/deployment.yaml":                              configManagerDeploymentYaml,
 	"config/manager/service.yaml":                                 configManagerServiceYaml,
-	"config/clusterimagesets/openshift-4.0-latest.yaml":           configClusterimagesetsOpenshift40LatestYaml,
 	"config/external-dns/deployment.yaml":                         configExternalDnsDeploymentYaml,
 	"config/external-dns/rbac_role.yaml":                          configExternalDnsRbac_roleYaml,
 	"config/external-dns/rbac_role_binding.yaml":                  configExternalDnsRbac_role_bindingYaml,
@@ -4895,9 +4867,6 @@ type bintree struct {
 
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
-		"clusterimagesets": {nil, map[string]*bintree{
-			"openshift-4.0-latest.yaml": {configClusterimagesetsOpenshift40LatestYaml, map[string]*bintree{}},
-		}},
 		"configmaps": {nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},

@@ -764,6 +764,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
@@ -811,6 +812,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 

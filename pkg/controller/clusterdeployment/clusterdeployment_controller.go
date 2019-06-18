@@ -151,6 +151,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileClusterDeployment{
 		Client:                        hivemetrics.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
+		logger:                        log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
 }
@@ -206,6 +207,7 @@ var _ reconcile.Reconciler = &ReconcileClusterDeployment{}
 type ReconcileClusterDeployment struct {
 	client.Client
 	scheme *runtime.Scheme
+	logger log.FieldLogger
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
@@ -226,10 +228,10 @@ type ReconcileClusterDeployment struct {
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterimagesets/status,verbs=get;update;patch
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	cdLog := log.WithFields(log.Fields{
+	cdLog := r.logger.WithFields(log.Fields{
+		"controller":        controllerName,
 		"clusterDeployment": request.Name,
 		"namespace":         request.Namespace,
-		"controller":        controllerName,
 	})
 
 	// For logging, we need to see when the reconciliation loop starts and ends.

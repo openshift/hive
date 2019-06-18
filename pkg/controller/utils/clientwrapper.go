@@ -35,13 +35,7 @@ func init() {
 func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Client {
 	// Copy the rest config as we want our round trippers to be controller specific.
 	cfg := rest.CopyConfig(mgr.GetConfig())
-	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-		return &ControllerMetricsTripper{
-			RoundTripper: rt,
-			Controller:   ctrlrName,
-			Remote:       false, // this is a local client
-		}
-	}
+	AddControllerMetricsTransportWrapper(cfg, ctrlrName, false)
 
 	options := client.Options{
 		Scheme: mgr.GetScheme(),
@@ -59,6 +53,30 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Cli
 		},
 		Writer:       c,
 		StatusClient: c,
+	}
+}
+
+// AddControllerMetricsTransportWrapper adds a transport wrapper to the given rest config which
+// exposes metrics based on the requests being made.
+func AddControllerMetricsTransportWrapper(cfg *rest.Config, controllerName string, remote bool) {
+	// If the restConfig already has a transport wrapper, wrap it.
+	if cfg.WrapTransport != nil {
+		origFunc := cfg.WrapTransport
+		cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			return &ControllerMetricsTripper{
+				RoundTripper: origFunc(rt),
+				Controller:   controllerName,
+				Remote:       remote,
+			}
+		}
+	}
+
+	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return &ControllerMetricsTripper{
+			RoundTripper: rt,
+			Controller:   controllerName,
+			Remote:       remote,
+		}
 	}
 }
 

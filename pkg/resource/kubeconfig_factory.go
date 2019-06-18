@@ -1,8 +1,6 @@
 package resource
 
 import (
-	"net/http"
-
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
@@ -28,13 +26,7 @@ func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error)
 		return nil, err
 	}
 	if r.metricsEnabled {
-		restConfig.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			return &controllerutils.ControllerMetricsTripper{
-				RoundTripper: rt,
-				Controller:   r.controllerName,
-				Remote:       r.remote,
-			}
-		}
+		controllerutils.AddControllerMetricsTransportWrapper(restConfig, r.controllerName, r.remote)
 	}
 
 	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from client config and cache directory")

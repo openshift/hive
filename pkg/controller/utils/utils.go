@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
@@ -34,13 +33,7 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData, controllerName string) 
 	if err != nil {
 		return nil, err
 	}
-	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-		return &ControllerMetricsTripper{
-			RoundTripper: rt,
-			Controller:   controllerName,
-			Remote:       true, // this is a remote client
-		}
-	}
+	AddControllerMetricsTransportWrapper(cfg, controllerName, true)
 
 	scheme, err := machineapi.SchemeBuilder.Build()
 	if err != nil {
@@ -82,13 +75,7 @@ func BuildDynamicClientFromKubeconfig(kubeconfigData, controllerName string) (dy
 		return nil, err
 	}
 
-	cfg.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-		return &ControllerMetricsTripper{
-			RoundTripper: rt,
-			Controller:   controllerName,
-			Remote:       true, // this is a remote client
-		}
-	}
+	AddControllerMetricsTransportWrapper(cfg, controllerName, true)
 
 	client, err := dynamic.NewForConfig(cfg)
 	if err != nil {

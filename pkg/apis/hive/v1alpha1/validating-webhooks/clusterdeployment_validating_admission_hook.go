@@ -431,9 +431,10 @@ func hasChangedImmutableMachinePoolFields(oldObject, newObject *hivev1.ClusterDe
 func getOriginalMachinePool(origMachinePools []hivev1.MachinePool, name string) *hivev1.MachinePool {
 	var origMP *hivev1.MachinePool
 
-	for _, mp := range origMachinePools {
+	for i, mp := range origMachinePools {
 		if mp.Name == name {
-			origMP = &mp
+			origMP = &origMachinePools[i]
+			break
 		}
 	}
 	return origMP

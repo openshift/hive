@@ -148,3 +148,19 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - admission.hive.openshift.io
+  resources:
+  - clusterdeployments
+  - clusterimagesets
+  - dnszones
+  - selectorsyncsets
+  - rsyncsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

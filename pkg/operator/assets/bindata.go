@@ -865,9 +865,42 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - admission.hive.openshift.io
+  resources:
+  - clusterdeployments
+  - clusterimagesets
+  - dnszones
+  - selectorsyncsets
+  - rsyncsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apiregistration.k8s.io
+  resources:
+  - apiservices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
   verbs:
   - get
   - list

@@ -201,3 +201,12 @@ $(GOPATH)/bin/mockgen:
 .PHONY: clean ## Remove all build artifacts
 clean:
 	rm -rf $(BINDIR)
+
+$(GOPATH)/bin/golangci-lint:
+	GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.17.1
+
+# Run golangci-lint against code
+# TODO replace verify (except verify-generated), vet, fmt targets with lint as it covers all of it
+.PHONY: lint
+lint: $(GOPATH)/bin/golangci-lint
+	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...

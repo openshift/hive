@@ -1,0 +1,29 @@
+run:
+  deadline: 30m
+
+linters:
+  disable-all: true
+  enable:
+  - gofmt
+  - goimports
+  - golint
+  - gosimple
+  - ineffassign
+  - misspell
+  - unused
+  - deadcode
+  - govet
+  - gocyclo
+  - varcheck
+  - structcheck
+  - maligned
+  - errcheck
+  - interfacer
+  - unconvert
+  - goconst
+  - gosec
+  - megacheck
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/openshift/hive

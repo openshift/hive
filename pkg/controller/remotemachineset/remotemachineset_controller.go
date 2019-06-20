@@ -44,14 +44,8 @@ import (
 )
 
 const (
-	controllerName = "remotemachineset"
-
-	// remoteMachineAPINamespace is the namespace in which the remote cluster-api stores
-	// MachineSets
-	remoteMachineAPINamespace = "openshift-machine-api"
-
-	adminCredsSecretPasswordKey = "password"
-	adminSSHKeySecretKey        = "ssh-publickey"
+	controllerName       = "remotemachineset"
+	adminSSHKeySecretKey = "ssh-publickey"
 )
 
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the

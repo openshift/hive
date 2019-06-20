@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -774,50 +773,6 @@ func (r *ReconcileSyncSetInstance) setDeletionFailedSyncCondition(resourceSyncCo
 		deletionFailedReason,
 		fmt.Sprintf("Failed to delete resource: %v", err),
 		controllerutils.UpdateConditionAlways)
-}
-
-func (r *ReconcileSyncSetInstance) getRelatedSelectorSyncSets(cd *hivev1.ClusterDeployment) ([]hivev1.SelectorSyncSet, error) {
-	list := &hivev1.SelectorSyncSetList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{}, list)
-	if err != nil {
-		return nil, err
-	}
-
-	cdLabels := labels.Set(cd.Labels)
-	selectorSyncSets := []hivev1.SelectorSyncSet{}
-	for _, selectorSyncSet := range list.Items {
-		labelSelector, err := metav1.LabelSelectorAsSelector(&selectorSyncSet.Spec.ClusterDeploymentSelector)
-		if err != nil {
-			r.logger.WithError(err).Error("unable to convert selector")
-			continue
-		}
-
-		if labelSelector.Matches(cdLabels) {
-			selectorSyncSets = append(selectorSyncSets, selectorSyncSet)
-		}
-	}
-
-	return selectorSyncSets, err
-}
-
-func (r *ReconcileSyncSetInstance) getRelatedSyncSets(cd *hivev1.ClusterDeployment) ([]hivev1.SyncSet, error) {
-	list := &hivev1.SyncSetList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: cd.Namespace}, list)
-	if err != nil {
-		return nil, err
-	}
-
-	syncSets := []hivev1.SyncSet{}
-	for _, syncSet := range list.Items {
-		for _, cdr := range syncSet.Spec.ClusterDeploymentRefs {
-			if cdr.Name == cd.Name {
-				syncSets = append(syncSets, syncSet)
-				break
-			}
-		}
-	}
-
-	return syncSets, err
 }
 
 func (r *ReconcileSyncSetInstance) resourceHash(data []byte) string {

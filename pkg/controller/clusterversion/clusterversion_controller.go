@@ -28,7 +28,6 @@ import (
 
 const (
 	clusterVersionObjectName = "version"
-	clusterVersionUnknown    = "undef"
 	controllerName           = "clusterversion"
 )
 

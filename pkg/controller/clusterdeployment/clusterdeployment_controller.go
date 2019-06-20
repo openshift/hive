@@ -48,20 +48,16 @@ const (
 	serviceAccountName = "cluster-installer" // service account that can run the installer and upload artifacts to the cluster's namespace.
 	defaultRequeueTime = 10 * time.Second
 
-	adminCredsSecretPasswordKey = "password"
-	adminSSHKeySecretKey        = "ssh-publickey"
-	adminKubeconfigKey          = "kubeconfig"
-	rawAdminKubeconfigKey       = "raw-kubeconfig"
+	adminSSHKeySecretKey  = "ssh-publickey"
+	adminKubeconfigKey    = "kubeconfig"
+	rawAdminKubeconfigKey = "raw-kubeconfig"
 
-	clusterVersionObjectName      = "version"
-	clusterVersionUnknown         = "undef"
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
 
-	dnsZoneCheckInterval = 30 * time.Second
-	dnsNotReadyReason    = "DNSNotReady"
-	dnsReadyReason       = "DNSReady"
-	dnsReadyAnnotation   = "hive.openshift.io/dnsready"
+	dnsNotReadyReason  = "DNSNotReady"
+	dnsReadyReason     = "DNSReady"
+	dnsReadyAnnotation = "hive.openshift.io/dnsready"
 
 	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
 	jobHashAnnotation                     = "hive.openshift.io/jobhash"

@@ -30,9 +30,7 @@ import (
 )
 
 const (
-	controllerName     = "syncidentityprovider"
-	adminKubeConfigKey = "kubeconfig"
-	clusterOAuthName   = "cluster"
+	controllerName = "syncidentityprovider"
 
 	oauthAPIVersion = "config.openshift.io/v1"
 	oauthKind       = "OAuth"

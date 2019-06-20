@@ -7,7 +7,7 @@ sleep_between_tries=10
 component=hive
 HIVE_IMAGE=$(eval "echo $IMAGE_FORMAT")
 RELEASE_IMAGE="registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest"
-
+export CLUSTER_NAMESPACE=cluster-test
 export PATH=$PATH:$(pwd)
 
 # download kustomize so we can use it for deploying
@@ -24,8 +24,8 @@ while [ $i -le ${max_tries} ]; do
     sleep ${sleep_between_tries}
   fi
 
-  echo -n "Creating project cluster-test. Try #${i}/${max_tries}... "
-  if oc new-project cluster-test ; then
+  echo -n "Creating project ${CLUSTER_NAMESPACE}. Try #${i}/${max_tries}... "
+  if oc new-project "${CLUSTER_NAMESPACE}"; then
     echo "Success"
     break
   else
@@ -90,6 +90,7 @@ function teardown() {
 }
 trap 'teardown' EXIT
 
+echo "Running post-deploy tests"
 make test-e2e-postdeploy
 
 i=1
@@ -197,3 +198,6 @@ echo "Waiting for job ${CLUSTER_NAME}-install to start and complete"
 go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}-install"
 
 echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
+
+echo "Running post-install tests"
+make test-e2e-postinstall

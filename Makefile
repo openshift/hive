@@ -49,6 +49,10 @@ test-e2e:
 test-e2e-postdeploy:
 	go test ./test/e2e/postdeploy/...
 
+.PHONY: test-e2e-postinstall
+test-e2e-postinstall:
+	go test ./test/e2e/postinstall/...
+
 # Builds all of hive's binaries (including utils).
 .PHONY: build
 build: $(GOPATH)/bin/mockgen manager hiveutil hiveadmission operator

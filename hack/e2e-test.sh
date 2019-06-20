@@ -93,67 +93,17 @@ trap 'teardown' EXIT
 echo "Running post-deploy tests"
 make test-e2e-postdeploy
 
-i=1
-while [ $i -le ${max_tries} ]; do
-  if [ $i -gt 1 ]; then
-    # Don't sleep on first loop
-    echo "sleeping ${sleep_between_tries} seconds"
-    sleep ${sleep_between_tries}
-  fi
+echo "Creating cluster deployment"
+SRC_ROOT=$(git rev-parse --show-toplevel)
 
-  echo "Generating ClusterDeployment File ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
-  if oc process -f config/templates/cluster-deployment-customimageset.yaml \
-         CLUSTER_NAME="${CLUSTER_NAME}" \
-         SSH_KEY="${SSH_PUB_KEY}" \
-         PULL_SECRET="${PULL_SECRET}" \
-         AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-         AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-         BASE_DOMAIN="${BASE_DOMAIN}" \
-         HIVE_IMAGE="${HIVE_IMAGE}" \
-         RELEASE_IMAGE="${RELEASE_IMAGE}" \
-         TRY_INSTALL_ONCE="true" \
-         TRY_UNINSTALL_ONCE="true" \
-      > ${CLUSTER_DEPLOYMENT_FILE} ; then
-    echo "Success"
-    break
-  else
-    echo -n "Failed, "
-  fi
-
-  i=$((i + 1))
-done
-
-if [ $i -ge ${max_tries} ] ; then
-  # Failed the maximum amount of times.
-  echo "exiting"
-  exit 10
-fi
-
-
-i=1
-while [ $i -le ${max_tries} ]; do
-  if [ $i -gt 1 ]; then
-    # Don't sleep on first loop
-    echo "sleeping ${sleep_between_tries} seconds"
-    sleep ${sleep_between_tries}
-  fi
-
-  echo "Applying ClusterDeployment File ${CLUSTER_NAME}. Try #${i}/${max_tries}:"
-  if oc apply -f ${CLUSTER_DEPLOYMENT_FILE} ; then
-    echo "Success"
-    break
-  else
-    echo -n "Failed, "
-  fi
-
-  i=$((i + 1))
-done
-
-if [ $i -ge ${max_tries} ] ; then
-  # Failed the maximum amount of times.
-  echo "exiting"
-  exit 10
-fi
+go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
+	--ssh-public-key-file="${CLOUD_CREDS_DIR}/ssh-publickey" \
+	--pull-secret-file="${CLOUD_CREDS_DIR}/pull-secret" \
+	--base-domain="${BASE_DOMAIN}" \
+	--hive-image="${HIVE_IMAGE}" \
+	--release-image="${RELEASE_IMAGE}" \
+	--install-once=true \
+	--uninstall-once=true
 
 # Sanity check the cluster deployment printer
 i=1
@@ -183,9 +133,6 @@ if [ $i -ge ${max_tries} ] ; then
   echo "exiting"
   exit 10
 fi
-
-# Wait for the cluster deployment to be installed
-SRC_ROOT=$(git rev-parse --show-toplevel)
 
 sleep 120
 

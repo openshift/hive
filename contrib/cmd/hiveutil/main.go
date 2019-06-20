@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/createcluster"
+	"github.com/openshift/hive/contrib/pkg/deprovision"
 	"github.com/openshift/hive/contrib/pkg/report"
 	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
@@ -37,7 +38,7 @@ func newCOUtilityCommand() *cobra.Command {
 			cmd.Usage()
 		},
 	}
-	cmd.AddCommand(NewDeprovisionAWSWithTagsCommand())
+	cmd.AddCommand(deprovision.NewDeprovisionAWSWithTagsCommand())
 	cmd.AddCommand(verification.NewVerifyImportsCommand())
 	cmd.AddCommand(installmanager.NewInstallManagerCommand())
 	cmd.AddCommand(imageset.NewUpdateInstallerImageCommand())

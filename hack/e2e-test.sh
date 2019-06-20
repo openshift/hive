@@ -105,6 +105,9 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--install-once=true \
 	--uninstall-once=true
 
+# NOTE: This is needed in order for the short form (cd) to work
+oc get clusterdeployment > /dev/null
+
 # Sanity check the cluster deployment printer
 i=1
 while [ $i -le ${max_tries} ]; do
@@ -136,8 +139,13 @@ fi
 
 sleep 120
 
+echo "Deployments in hive namespace"
 oc get deployments -n hive
+echo ""
+echo "Pods in hive namespace"
 oc get pods -n hive
+echo ""
+echo "Events in hive namespace"
 oc get events -n hive
 
 echo "Waiting for job ${CLUSTER_NAME}-install to start and complete"

@@ -78,7 +78,9 @@ the --installer-image flag is used. If that's not specified, the image is
 derived from the release image at runtime.
 `
 const (
-	deleteAfterAnnotation = "hive.openshift.io/delete-after"
+	deleteAfterAnnotation      = "hive.openshift.io/delete-after"
+	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
+	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
 )
 
 // Options is the set of options to generate and apply a new cluster deployment
@@ -102,6 +104,8 @@ type Options struct {
 	ManageDNS          bool
 	Output             string
 	IncludeSecrets     bool
+	InstallOnce        bool
+	UninstallOnce      bool
 }
 
 const (
@@ -154,6 +158,8 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.BoolVar(&opt.UseClusterImageSet, "use-image-set", true, "If true(default), use a cluster image set for this cluster")
 	flags.StringVarP(&opt.Output, "output", "o", "", "Output of this command (nothing will be created on cluster). Valid values: yaml,json")
 	flags.BoolVar(&opt.IncludeSecrets, "include-secrets", true, "Include secrets along with ClusterDeployment")
+	flags.BoolVar(&opt.InstallOnce, "install-once", false, "Run the install only one time and fail if not successful")
+	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
 	return cmd
 }
 
@@ -509,6 +515,13 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 			},
 			ManageDNS: o.ManageDNS,
 		},
+	}
+
+	if o.InstallOnce {
+		cd.Annotations[tryInstallOnceAnnotation] = "true"
+	}
+	if o.UninstallOnce {
+		cd.Annotations[tryUninstallOnceAnnotation] = "true"
 	}
 
 	imageSet, err := o.configureImages(cd)

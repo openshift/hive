@@ -206,6 +206,10 @@ type ClusterDeploymentStatus struct {
 
 	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
 	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
+
+	// Provision is a reference to the last ClusterProvision created for the deployment
+	// +optional
+	Provision *corev1.LocalObjectReference `json:"provision,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment
@@ -259,6 +263,9 @@ const (
 	// DNSNotReadyCondition indicates that the the DNSZone object created for the clusterDeployment
 	// (ie managedDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
 	DNSNotReadyCondition ClusterDeploymentConditionType = "DNSNotReady"
+
+	// ProvisionFailedCondition indicates that a provision failed
+	ProvisionFailedCondition ClusterDeploymentConditionType = "ProvisionFailed"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -271,6 +278,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	UnreachableCondition,
 	InstallFailingCondition,
 	DNSNotReadyCondition,
+	ProvisionFailedCondition,
 }
 
 // +genclient

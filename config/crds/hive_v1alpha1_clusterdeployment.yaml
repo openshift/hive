@@ -810,6 +810,10 @@ spec:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
               type: string
+            provision:
+              description: Provision is a reference to the last ClusterProvision created
+                for the deployment
+              type: object
             selectorSyncSetStatus:
               description: SelectorSyncSetStatus is the list of status for SelectorSyncSets
                 which apply to the cluster deployment.

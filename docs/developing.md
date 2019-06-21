@@ -18,6 +18,25 @@ $ cd $GOPATH/src/openshift
 $ git clone https://github.com/openshift/hive.git
 ```
 
+## Writing/Testing Code
+
+Our typical approach to manually testing code is to deploy Hive into your current cluster as defined by kubeconfig, scale down the relevant component you wish to test, and then run its code locally.
+
+### Run Hive Operator From Source
+
+NOTE: assumes you have [previously deployed Hive](install.md)
+
+ 1. `$ oc scale -n hive deployment.v1.apps/hive-operator --replicas=0`
+ 1. `$ make run-operator`
+
+### Run Hive Controllers From Source
+
+NOTE: assumes you have [previously deployed Hive](install.md)
+
+ 1. `$ oc scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
+ 1. `$ make run`
+
+
 ## Dependency management
 
 ### Installing Dep

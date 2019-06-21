@@ -19,6 +19,7 @@ required = [
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/testing_frameworks/integration", # for integration testing
+    "github.com/heptio/velero/pkg/apis/velero/v1",
 ]
 
 [prune]
@@ -71,6 +72,10 @@ version="v1.4.7"
 [[constraint]]
   name = "github.com/sirupsen/logrus"
   version = "1.0.6"
+
+[[constraint]]
+  name = "github.com/heptio/velero"
+  version = "v1.0.0"
 
 [[override]]
   name = "k8s.io/client-go"

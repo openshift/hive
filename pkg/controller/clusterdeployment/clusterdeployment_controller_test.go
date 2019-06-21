@@ -240,7 +240,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
+					job, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
 						"",
@@ -297,7 +297,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
+					job, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
 						"",
@@ -324,7 +324,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
+					job, _ := install.GenerateInstallerJob(
 						testClusterDeployment(),
 						"fakeserviceaccount",
 						"",
@@ -913,7 +913,7 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 
 func testInstallJob() *batchv1.Job {
 	cd := testClusterDeployment()
-	job, _, err := install.GenerateInstallerJob(cd,
+	job, err := install.GenerateInstallerJob(cd,
 		images.DefaultHiveImage,
 		"",
 		serviceAccountName, "testSSHKey", "testPullSecret")

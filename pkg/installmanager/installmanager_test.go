@@ -147,7 +147,6 @@ func TestInstallManager(t *testing.T) {
 			im := InstallManager{
 				LogLevel:              "debug",
 				WorkDir:               tempDir,
-				InstallConfig:         filepath.Join(tempDir, "tempinstallconfig.yml"),
 				ClusterDeploymentName: testClusterName,
 				Namespace:             testNamespace,
 				DynamicClient:         fakeClient,
@@ -156,11 +155,6 @@ func TestInstallManager(t *testing.T) {
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
 				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
-				t.Fail()
-			}
-
-			// Install config also doesn't get used, we just need a file we can copy:
-			if !assert.NoError(t, writeFakeInstallConfig(im.InstallConfig)) {
 				t.Fail()
 			}
 
@@ -318,12 +312,6 @@ func writeFakeBinary(fileName string, contents string) error {
 	data := []byte(contents)
 	err := ioutil.WriteFile(fileName, data, 0755)
 	return err
-}
-
-func writeFakeInstallConfig(fileName string) error {
-	// nothing needs to read this so for now just an empty file
-	data := []byte("fakefile")
-	return ioutil.WriteFile(fileName, data, 0755)
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -54,7 +53,7 @@ func GenerateInstallerJob(
 	hiveImage, releaseImage string,
 	serviceAccountName string,
 	sshKey string,
-	pullSecret string) (*batchv1.Job, *corev1.ConfigMap, error) {
+	pullSecret string) (*batchv1.Job, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -62,38 +61,11 @@ func GenerateInstallerJob(
 	})
 
 	cdLog.Debug("generating installer job")
-	ic, err := GenerateInstallConfig(cd, sshKey, pullSecret, true)
-	annotations := map[string]string{
-		clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10),
-	}
-	if err != nil {
-		return nil, nil, err
-	}
 
 	tryOnce := false
 	if cd.Annotations != nil {
 		value, exists := cd.Annotations[tryInstallOnceAnnotation]
 		tryOnce = exists && value == "true"
-	}
-
-	// TODO: drop all generation of install config here ASAP. We generate this on the fly now
-	// in the install manager. This is only being kept for beta2 and beta3 ClusterImageSet compatability.
-	d, err := yaml.Marshal(ic)
-	if err != nil {
-		return nil, nil, err
-	}
-	installConfig := string(d)
-
-	cfgMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        apihelpers.GetResourceName(cd.Name, "installconfig"),
-			Namespace:   cd.Namespace,
-			Annotations: annotations,
-		},
-		Data: map[string]string{
-			// Filename should match installer default:
-			"install-config.yaml": installConfig,
-		},
 	}
 
 	env := []corev1.EnvVar{
@@ -157,16 +129,6 @@ func GenerateInstallerJob(
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
-		{
-			Name: "installconfig",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: cfgMap.Name,
-					},
-				},
-			},
-		},
 	}
 
 	if cd.Spec.SSHKey != nil {
@@ -185,10 +147,6 @@ func GenerateInstallerJob(
 			Name:      "install",
 			MountPath: "/output",
 		},
-		{
-			Name:      "installconfig",
-			MountPath: "/installconfig",
-		},
 	}
 
 	if cd.Spec.SSHKey != nil {
@@ -206,7 +164,7 @@ func GenerateInstallerJob(
 	}
 
 	if cd.Status.InstallerImage == nil {
-		return nil, nil, fmt.Errorf("installer image not resolved")
+		return nil, fmt.Errorf("installer image not resolved")
 	}
 	installerImage := *cd.Status.InstallerImage
 
@@ -245,7 +203,7 @@ func GenerateInstallerJob(
 				// a sleep-seconds.txt file. If one is written, we will sleep that number of seconds. This allows exponential backoff
 				// for failing installs.
 				fmt.Sprintf(
-					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --install-config /installconfig/install-config.yaml --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
+					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
 					cd.Spec.Platform.AWS.Region,
 					cd.Namespace,
 					cd.Name),
@@ -287,6 +245,10 @@ func GenerateInstallerJob(
 		}
 	}
 
+	annotations := map[string]string{
+		clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10),
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        GetInstallJobName(cd),
@@ -306,7 +268,7 @@ func GenerateInstallerJob(
 		},
 	}
 
-	return job, cfgMap, nil
+	return job, nil
 }
 
 // GetInstallJobName returns the expected name of the install job for a cluster deployment.

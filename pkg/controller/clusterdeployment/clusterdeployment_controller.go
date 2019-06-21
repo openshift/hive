@@ -156,12 +156,14 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error getting new cluster deployment")
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment")
 		return err
 	}
 
@@ -170,12 +172,17 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
+	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment job")
+		return err
+	}
 
 	// Watch for pods created by an install job
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
 		ToRequests: handler.ToRequestsFunc(selectorPodWatchHandler),
 	})
 	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment pods")
 		return err
 	}
 
@@ -184,6 +191,10 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
+	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching deprovision request created by cluster deployment")
+		return err
+	}
 
 	// Watch for dnszones created by a ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForOwner{
@@ -191,6 +202,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment dnszones")
 		return err
 	}
 
@@ -535,7 +547,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			containerRestarts, err = r.calcInstallPodRestarts(cd, cdLog)
 			if err != nil {
 				// Metrics calculation should not shut down reconciliation, logging and moving on.
-				log.WithError(err).Warn("error listing pods, unable to calculate pod restarts but continuing")
+				cdLog.WithError(err).Warn("error listing pods, unable to calculate pod restarts but continuing")
 			} else {
 				if containerRestarts > 0 {
 					cdLog.WithFields(log.Fields{

@@ -62,12 +62,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("clusterdeprovisionrequest-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error getting new clusterdeprovisionrequest-controller")
 		return err
 	}
 
 	// Watch for changes to ClusterDeprovisionRequest
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovisionRequest{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching changes to clusterdeprovisionrequest")
 		return err
 	}
 
@@ -76,6 +78,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeprovisionRequest{},
 	})
+	if err != nil {
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
+		return err
+	}
 
 	return nil
 }

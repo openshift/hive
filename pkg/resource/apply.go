@@ -84,6 +84,10 @@ func (r *Helper) setupApplyCommand(f cmdutil.Factory, fileName string, ioStreams
 	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
 	o.OpenAPISchema, _ = f.OpenAPISchema()
 	o.Validator, err = f.Validator(false)
+	if err != nil {
+		r.logger.WithError(err).Error("cannot obtain schema to validate objects from factory")
+		return nil, nil, err
+	}
 	o.Builder = f.NewBuilder()
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {

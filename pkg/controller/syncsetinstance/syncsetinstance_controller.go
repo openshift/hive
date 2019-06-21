@@ -98,6 +98,9 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to SyncSetInstance
 	err = c.Watch(&source.Kind{Type: &hivev1.SyncSetInstance{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
 
 	// Watch for changes to ClusterDeployments
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestsFromMapFunc{

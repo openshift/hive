@@ -4749,6 +4749,11 @@ data:
     - "PendingVerification: Your request for accessing resources in this region is being validated"
     installFailingReason: PendingVerification
     installFailingMessage: Account pending verification for region
+  NoMatchingRoute53Zone: |
+    searchRegexStrings:
+    - "data.aws_route53_zone.public: no matching Route53Zone found"
+    installFailingReason: NoMatchingRoute53Zone
+    installFailingMessage: No matching Route53Zone found
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

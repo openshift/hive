@@ -15,7 +15,6 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -456,7 +455,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
-		job, cfgMap, err := install.GenerateInstallerJob(
+		job, err := install.GenerateInstallerJob(
 			cd,
 			hiveImage,
 			releaseImage,
@@ -482,28 +481,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Error("error setting controller reference on job")
 			return reconcile.Result{}, err
 		}
-		if err = controllerutil.SetControllerReference(cd, cfgMap, r.scheme); err != nil {
-			cdLog.WithError(err).Error("error setting controller reference on config map")
-			return reconcile.Result{}, err
-		}
 
 		cdLog = cdLog.WithField("job", job.Name)
-
-		// Check if the ConfigMap already exists for this ClusterDeployment:
-		cdLog.Debug("checking if install-config.yaml config map exists")
-		existingCfgMap := &kapi.ConfigMap{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: cfgMap.Name, Namespace: cfgMap.Namespace}, existingCfgMap)
-		if err != nil && errors.IsNotFound(err) {
-			cdLog.WithField("configMap", cfgMap.Name).Infof("creating config map")
-			err = r.Create(context.TODO(), cfgMap)
-			if err != nil {
-				cdLog.Errorf("error creating config map: %v", err)
-				return reconcile.Result{}, err
-			}
-		} else if err != nil {
-			cdLog.Errorf("error getting config map: %v", err)
-			return reconcile.Result{}, err
-		}
 
 		if existingJob == nil {
 			cdLog.Infof("creating install job")
@@ -547,8 +526,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				cd.Status.InstallRestarts = containerRestarts
 			}
 
-			if existingJob.Annotations != nil && cfgMap.Annotations != nil {
-				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cfgMap, cdLog)
+			if existingJob.Annotations != nil {
+				didGenerationChange, err := r.updateOutdatedConfigurations(cd.Generation, existingJob, cdLog)
 				if didGenerationChange || err != nil {
 					return reconcile.Result{}, err
 				}
@@ -777,7 +756,7 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 
 // Deletes the job if it exists and its generation does not match the cluster deployment's
 // genetation. Updates the config map if it is outdated too
-func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration int64, existingJob *batchv1.Job, cfgMap *corev1.ConfigMap, cdLog log.FieldLogger) (bool, error) {
+func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration int64, existingJob *batchv1.Job, cdLog log.FieldLogger) (bool, error) {
 	var err error
 	var didGenerationChange bool
 	if jobGeneration, ok := existingJob.Annotations[clusterDeploymentGenerationAnnotation]; ok {
@@ -788,18 +767,6 @@ func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration i
 			err = r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil {
 				cdLog.WithError(err).Errorf("error deleting outdated install job")
-				return didGenerationChange, err
-			}
-		}
-	}
-	if cfgMapGeneration, ok := cfgMap.Annotations[clusterDeploymentGenerationAnnotation]; ok {
-		convertedMapGeneration, _ := strconv.ParseInt(cfgMapGeneration, 10, 64)
-		if convertedMapGeneration < cdGeneration {
-			didGenerationChange = true
-			cdLog.Info("deleting outdated installconfig configmap due to cluster deployment generation change")
-			err = r.Update(context.TODO(), cfgMap)
-			if err != nil {
-				cdLog.WithError(err).Errorf("error deleting outdated config map")
 				return didGenerationChange, err
 			}
 		}

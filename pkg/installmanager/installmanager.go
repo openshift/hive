@@ -78,7 +78,6 @@ type InstallManager struct {
 	log                           log.FieldLogger
 	LogLevel                      string
 	WorkDir                       string
-	InstallConfig                 string
 	ClusterID                     string
 	ClusterName                   string
 	Region                        string
@@ -133,8 +132,6 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
-	// This is required due to how we have to share volume and mount in our install config. The installer also deletes the workdir copy.
-	flags.StringVar(&im.InstallConfig, "install-config", "/installconfig/install-config.yaml", "location of install-config.yaml to copy into work-dir")
 	return cmd
 }
 

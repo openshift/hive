@@ -428,6 +428,14 @@
   version = "v0.5.0"
 
 [[projects]]
+  digest = "1:bb437e5e132764faaa01b1911aa5a0e6279ef10ff0ac575a8a6b98e0a75567d5"
+  name = "github.com/heptio/velero"
+  packages = ["pkg/apis/velero/v1"]
+  pruneopts = "NUT"
+  revision = "72f5cadc3a865019ab9dc043d4952c9bfd5f2ecb"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:41933d387bfa3eaa6a82647914ed7044f7b8355764c24fb920892bc8c03ef0c3"
   name = "github.com/hpcloud/tail"
   packages = [
@@ -1791,8 +1799,10 @@
     "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3iface",
     "github.com/emicklei/go-restful",
+    "github.com/evanphx/json-patch",
     "github.com/ghodss/yaml",
     "github.com/golang/mock/gomock",
+    "github.com/heptio/velero/pkg/apis/velero/v1",
     "github.com/json-iterator/go",
     "github.com/jteeuwen/go-bindata",
     "github.com/miekg/dns",
@@ -1835,6 +1845,7 @@
     "k8s.io/apimachinery/pkg/api/meta",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    "k8s.io/apimachinery/pkg/fields",
     "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
@@ -1842,6 +1853,7 @@
     "k8s.io/apimachinery/pkg/runtime/serializer/json",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/errors",
+    "k8s.io/apimachinery/pkg/util/rand",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
@@ -1872,6 +1884,7 @@
     "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     "k8s.io/utils/pointer",
     "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1",
+    "sigs.k8s.io/controller-runtime/pkg/cache",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/apiutil",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
@@ -1879,9 +1892,11 @@
     "sigs.k8s.io/controller-runtime/pkg/controller",
     "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil",
     "sigs.k8s.io/controller-runtime/pkg/envtest",
+    "sigs.k8s.io/controller-runtime/pkg/event",
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
     "sigs.k8s.io/controller-runtime/pkg/metrics",
+    "sigs.k8s.io/controller-runtime/pkg/predicate",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
     "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",

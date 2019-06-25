@@ -856,6 +856,7 @@ rules:
   - clusterimagesets
   - hiveconfigs
   - selectorsyncsets
+  - selectorsyncidentityproviders
   verbs:
   - get
   - list

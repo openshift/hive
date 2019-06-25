@@ -2,8 +2,6 @@ package syncset
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/json"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -44,7 +42,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 		Client:      controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:      mgr.GetScheme(),
 		logger:      log.WithField("controller", controllerName),
-		computeHash: getHash,
+		computeHash: controllerutils.GetChecksumOfObject,
 	}
 	return r
 }
@@ -464,12 +462,4 @@ func syncSetInstanceNameForSyncSet(cd *hivev1.ClusterDeployment, syncSet *hivev1
 func syncSetInstanceNameForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyncSet *hivev1.SelectorSyncSet) string {
 	syncSetPart := helpers.GetName(selectorSyncSet.Name, "selector-syncset", validation.DNS1123SubdomainMaxLength-validation.DNS1123LabelMaxLength)
 	return fmt.Sprintf("%s-%s", cd.Name, syncSetPart)
-}
-
-func getHash(data interface{}) (string, error) {
-	b, err := json.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", md5.Sum(b)), nil
 }

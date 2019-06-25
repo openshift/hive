@@ -1417,6 +1417,20 @@ rules:
   - patch
   - list
   - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - create
 `)
 
 func configRbacManager_roleYamlBytes() ([]byte, error) {

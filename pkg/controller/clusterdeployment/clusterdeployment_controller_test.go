@@ -923,7 +923,7 @@ func testInstallJob() *batchv1.Job {
 
 	controllerutil.SetControllerReference(cd, job, scheme.Scheme)
 
-	hash, err := calculateJobSpecHash(job)
+	hash, err := controllerutils.CalculateJobSpecHash(job)
 	if err != nil {
 		panic("should never get error calculating job spec hash")
 	}

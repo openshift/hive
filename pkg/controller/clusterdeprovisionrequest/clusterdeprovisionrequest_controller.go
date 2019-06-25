@@ -9,6 +9,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -29,7 +30,8 @@ import (
 )
 
 const (
-	controllerName = "clusterDeprovisionRequest"
+	controllerName    = "clusterDeprovisionRequest"
+	jobHashAnnotation = "hive.openshift.io/jobhash"
 )
 
 var (
@@ -146,6 +148,16 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 		return reconcile.Result{}, err
 	}
 
+	jobHash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
+	if err != nil {
+		rLog.WithError(err).Error("failed to calculate hash for generated deprovision job")
+		return reconcile.Result{}, err
+	}
+	if uninstallJob.Annotations == nil {
+		uninstallJob.Annotations = map[string]string{}
+	}
+	uninstallJob.Annotations[jobHashAnnotation] = jobHash
+
 	// Check if uninstall job already exists:
 	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
@@ -183,6 +195,30 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 		metricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
 		return reconcile.Result{}, nil
 	}
+
+	// Check if the job should be regenerated:
+	newJobNeeded := false
+	if existingJob.Annotations == nil {
+		newJobNeeded = true
+	} else if _, ok := existingJob.Annotations[jobHashAnnotation]; !ok {
+		// this job predates tracking the job hash, so assume we need a new job
+		newJobNeeded = true
+	} else if existingJob.Annotations[jobHashAnnotation] != jobHash {
+		// delete the job so we get a fresh one with the new job spec
+		newJobNeeded = true
+	}
+
+	if newJobNeeded {
+		if existingJob.DeletionTimestamp == nil {
+			rLog.Info("deleting existing deprovision job due to updated/missing hash detected")
+			err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+			if err != nil {
+				rLog.WithError(err).Errorf("error deleting outdated deprovision job")
+			}
+		}
+		return reconcile.Result{}, err
+	}
+
 	rLog.Infof("uninstall job not yet successful")
 	return reconcile.Result{}, nil
 }

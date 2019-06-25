@@ -2,8 +2,6 @@ package clusterdeployment
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -468,9 +466,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
-		jobHash, err := calculateJobSpecHash(job)
+		jobHash, err := controllerutils.CalculateJobSpecHash(job)
 		if err != nil {
-			cdLog.WithError(err).Error("failed to calulcate hash for generated install job")
+			cdLog.WithError(err).Error("failed to calculate hash for generated install job")
 			return reconcile.Result{}, err
 		}
 		if job.Annotations == nil {
@@ -1292,24 +1290,6 @@ func migrateWildcardIngress(cd *hivev1.ClusterDeployment) bool {
 		}
 	}
 	return migrated
-}
-
-func calculateJobSpecHash(job *batchv1.Job) (string, error) {
-
-	hasher := md5.New()
-	jobSpecBytes, err := job.Spec.Marshal()
-	if err != nil {
-		return "", err
-	}
-
-	_, err = hasher.Write(jobSpecBytes)
-	if err != nil {
-		return "", err
-	}
-
-	sum := hex.EncodeToString(hasher.Sum(nil))
-
-	return sum, nil
 }
 
 func dnsReadyTransitionTime(dnsZone *hivev1.DNSZone) *time.Time {

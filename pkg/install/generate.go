@@ -476,6 +476,7 @@ func GenerateUninstallerJob(
 	job.Name = name
 	job.Namespace = namespace
 	job.ObjectMeta.Labels = labels
+	job.ObjectMeta.Annotations = map[string]string{}
 	job.Spec = batchv1.JobSpec{
 		Completions:  &completions,
 		BackoffLimit: &backoffLimit,

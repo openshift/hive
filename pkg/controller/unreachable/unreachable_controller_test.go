@@ -361,7 +361,7 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			ControlPlane: hivev1.MachinePool{},
 			Compute:      []hivev1.MachinePool{},
-			PullSecret: corev1.LocalObjectReference{
+			PullSecret: &corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},
 			Platform: hivev1.Platform{

@@ -550,7 +550,6 @@ spec:
           - controlPlane
           - compute
           - platform
-          - pullSecret
           - platformSecrets
           type: object
         status:

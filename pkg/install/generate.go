@@ -12,6 +12,7 @@ import (
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -52,8 +53,7 @@ func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
 	hiveImage, releaseImage string,
 	serviceAccountName string,
-	sshKey string,
-	pullSecret string) (*batchv1.Job, error) {
+	sshKey string) (*batchv1.Job, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
@@ -61,7 +61,6 @@ func GenerateInstallerJob(
 	})
 
 	cdLog.Debug("generating installer job")
-
 	tryOnce := false
 	if cd.Annotations != nil {
 		value, exists := cd.Annotations[tryInstallOnceAnnotation]
@@ -73,7 +72,7 @@ func GenerateInstallerJob(
 			Name: "PULL_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: cd.Spec.PullSecret,
+					LocalObjectReference: corev1.LocalObjectReference{Name: constants.GetMergedPullSecretName(cd)},
 					Key:                  corev1.DockerConfigJsonKey,
 				},
 			},
@@ -223,9 +222,7 @@ func GenerateInstallerJob(
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
-		ImagePullSecrets: []corev1.LocalObjectReference{
-			cd.Spec.PullSecret,
-		},
+		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
 	}
 
 	completions := int32(1)

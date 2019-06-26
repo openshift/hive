@@ -291,7 +291,11 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 		}
 	}
 	in.Platform.DeepCopyInto(&out.Platform)
-	out.PullSecret = in.PullSecret
+	if in.PullSecret != nil {
+		in, out := &in.PullSecret, &out.PullSecret
+		*out = new(v1.LocalObjectReference)
+		**out = **in
+	}
 	in.PlatformSecrets.DeepCopyInto(&out.PlatformSecrets)
 	out.Images = in.Images
 	if in.ImageSet != nil {
@@ -1107,6 +1111,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		in, out := &in.AdditionalCertificateAuthorities, &out.AdditionalCertificateAuthorities
 		*out = make([]v1.LocalObjectReference, len(*in))
 		copy(*out, *in)
+	}
+	if in.GlobalPullSecret != nil {
+		in, out := &in.GlobalPullSecret, &out.GlobalPullSecret
+		*out = new(v1.LocalObjectReference)
+		**out = **in
 	}
 	return
 }

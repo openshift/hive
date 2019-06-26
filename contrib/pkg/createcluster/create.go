@@ -12,7 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"gopkg.in/ini.v1"
+	ini "gopkg.in/ini.v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -480,7 +480,7 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 					},
 				},
 			},
-			PullSecret: corev1.LocalObjectReference{
+			PullSecret: &corev1.LocalObjectReference{
 				Name: fmt.Sprintf("%s-pull-secret", o.Name),
 			},
 			ControlPlane: hivev1.MachinePool{

@@ -12,6 +12,7 @@ import (
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 // ImageSpec specifies an image reference and associated pull policy
@@ -43,7 +44,6 @@ fi
 // GenerateImageSetJob creates a job to determine the installer image for a ClusterImageSet
 // given a release image
 func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName string, cli, hive ImageSpec) *batchv1.Job {
-
 	logger := log.WithFields(log.Fields{
 		"clusterdeployment": types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(),
 	})
@@ -72,7 +72,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			Name: "pullsecret",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.PullSecret.Name,
+					SecretName: constants.GetMergedPullSecretName(cd),
 				},
 			},
 		},

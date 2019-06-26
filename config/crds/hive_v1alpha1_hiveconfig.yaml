@@ -61,6 +61,14 @@ spec:
                     be used.
                   type: string
               type: object
+            globalPullSecret:
+              description: GlobalPullSecret is used to specify a pull secret that
+                will be used globally by all of the cluster deployments. For each
+                cluster deployment, the contents of GlobalPullSecret will be merged
+                with the specific pull secret for a cluster deployment(if specified),
+                with precedence given to the contents of the pull secret for the cluster
+                deployment.
+              type: object
             managedDomains:
               description: 'ManagedDomains is the list of DNS domains that are managed
                 by the Hive cluster When specifying ''managedDNS: true'' in a ClusterDeployment,

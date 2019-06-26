@@ -3,6 +3,7 @@ package clusterdeployment
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -125,6 +127,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -144,6 +147,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testClusterDeployment(),
 				testInstallJob(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -169,6 +173,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallJob(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testMetadataConfigMap(),
 			},
@@ -186,6 +191,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -208,9 +214,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testCompletedInstallJob(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigKey, "{}"),
+				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+		},
+		{
+			name: "clusterdeployment must specify pull secret when there is no global pull secret ",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testCompletedInstallJob(),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectErr: true,
 		},
 		{
 			name: "Completed with install job manually deleted",
@@ -224,6 +246,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -238,6 +261,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _ := install.GenerateInstallerJob(
@@ -245,8 +269,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						"example.com/fake:latest",
 						"",
 						"fakeserviceaccount",
-						"sshkey",
-						"pullsecret")
+						"sshkey")
 					return job
 				}(),
 			},
@@ -262,6 +285,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testDeletedClusterDeploymentWithoutFinalizer(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -276,6 +300,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testExpiredClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -295,6 +320,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _ := install.GenerateInstallerJob(
@@ -302,8 +328,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						"example.com/fake:latest",
 						"",
 						"fakeserviceaccount",
-						"sshkey",
-						"pullsecret")
+						"sshkey")
 					return job
 				}(),
 			},
@@ -322,6 +347,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job, _ := install.GenerateInstallerJob(
@@ -329,8 +355,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						"fakeserviceaccount",
 						"",
 						"fakeserviceaccount",
-						"sshkey",
-						"pullsecret")
+						"sshkey")
 					wrongGeneration := "-1"
 					job.Annotations[clusterDeploymentGenerationAnnotation] = wrongGeneration
 					return job
@@ -351,6 +376,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -368,6 +394,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -393,6 +420,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cis
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -414,6 +442,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testClusterImageSet(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -446,6 +475,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testClusterImageSet(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -480,6 +510,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cis
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -516,6 +547,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -532,6 +564,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testDNSZone(),
 			},
@@ -549,6 +582,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testDNSZone(),
 			},
@@ -570,6 +604,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testAvailableDNSZone(),
 			},
@@ -588,6 +623,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testAvailableDNSZone(),
 			},
@@ -605,6 +641,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testAvailableDNSZone(),
 			},
@@ -623,6 +660,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testDNSZone(),
 			},
@@ -647,6 +685,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cis
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -666,6 +705,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -704,6 +744,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job := testInstallJob()
@@ -721,6 +762,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job := testInstallJob()
@@ -744,6 +786,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
 					job := testInstallJob()
@@ -853,7 +896,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		ControlPlane: hivev1.MachinePool{},
 		Compute:      []hivev1.MachinePool{},
-		PullSecret: corev1.LocalObjectReference{
+		PullSecret: &corev1.LocalObjectReference{
 			Name: pullSecretSecret,
 		},
 		Platform: hivev1.Platform{
@@ -916,7 +959,7 @@ func testInstallJob() *batchv1.Job {
 	job, err := install.GenerateInstallerJob(cd,
 		images.DefaultHiveImage,
 		"",
-		serviceAccountName, "testSSHKey", "testPullSecret")
+		serviceAccountName, "testSSHKey")
 	if err != nil {
 		panic("should not error while generating test install job")
 	}
@@ -1194,4 +1237,236 @@ func getJob(c client.Client, name string) *batchv1.Job {
 
 func getInstallJob(c client.Client) *batchv1.Job {
 	return getJob(c, installJobName)
+}
+
+func TestUpdatePullSecretInfo(t *testing.T) {
+	testPullSecret1 := `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`
+
+	tests := []struct {
+		name       string
+		existingCD []runtime.Object
+		validate   func(*testing.T, *corev1.Secret)
+	}{
+		{
+			name: "update existing merged pull secret with the new pull secret",
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, testPullSecret1),
+				testSecret(corev1.SecretTypeDockercfg, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(t *testing.T, pullSecretObj *corev1.Secret) {
+				pullSecret, ok := pullSecretObj.Data[corev1.DockerConfigJsonKey]
+				if !ok {
+					t.Error("Error getting pull secret")
+				}
+				assert.Equal(t, string(pullSecret), testPullSecret1)
+			},
+		},
+		{
+			name: "Add a new merged pull secret",
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, testPullSecret1),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existingCD...)
+			rcd := &ReconcileClusterDeployment{
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
+				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+			}
+
+			_, err := rcd.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      testName,
+					Namespace: testNamespace,
+				},
+			})
+			assert.NoError(t, err, "unexpected error")
+
+			cd := getCDFromClient(rcd.Client)
+			mergedSecretName := constants.GetMergedPullSecretName(cd)
+			existingPullSecretObj := &corev1.Secret{}
+			err = rcd.Get(context.TODO(), types.NamespacedName{Name: mergedSecretName, Namespace: cd.Namespace}, existingPullSecretObj)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if test.validate != nil {
+				test.validate(t, existingPullSecretObj)
+			}
+		})
+	}
+}
+
+func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
+	cd := testEmptyClusterDeployment()
+
+	cd.Spec = hivev1.ClusterDeploymentSpec{
+		ClusterName: testClusterName,
+		SSHKey: &corev1.LocalObjectReference{
+			Name: sshKeySecret,
+		},
+		ControlPlane: hivev1.MachinePool{},
+		Compute:      []hivev1.MachinePool{},
+		Platform: hivev1.Platform{
+			AWS: &hivev1.AWSPlatform{
+				Region: "us-east-1",
+			},
+		},
+		Networking: hivev1.Networking{
+			Type: hivev1.NetworkTypeOpenshiftSDN,
+		},
+		PlatformSecrets: hivev1.PlatformSecrets{
+			AWS: &hivev1.AWSPlatformSecrets{
+				Credentials: corev1.LocalObjectReference{
+					Name: "aws-credentials",
+				},
+			},
+		},
+	}
+	cd.Status = hivev1.ClusterDeploymentStatus{
+		ClusterID:      testClusterID,
+		InfraID:        testInfraID,
+		InstallerImage: strPtr("installer-image:latest"),
+	}
+	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+
+	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
+	return cd
+}
+
+func getCDFromClient(c client.Client) *hivev1.ClusterDeployment {
+	cd := &hivev1.ClusterDeployment{}
+	err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, cd)
+	if err == nil {
+		return cd
+	}
+	return nil
+}
+
+func TestMergePullSecrets(t *testing.T) {
+
+	tests := []struct {
+		name             string
+		localPullSecret  string
+		globalPullSecret string
+		mergedPullSecret string
+		existingCD       []runtime.Object
+		expectedErr      bool
+		expectedMismatch bool
+	}{
+		{
+			name:             "merged pull secret should be be equal to local secret",
+			localPullSecret:  `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			mergedPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := getCDWithoutPullSecret()
+					cd.Spec.PullSecret = &corev1.LocalObjectReference{
+						Name: pullSecretSecret,
+					}
+					return cd
+				}(),
+			},
+		},
+		{
+			name:             "Test should fail as merged pull secret is not equal to local secret",
+			localPullSecret:  `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			mergedPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "aaaaaaaaaaaaaaa"}}}`,
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := getCDWithoutPullSecret()
+					cd.Spec.PullSecret = &corev1.LocalObjectReference{
+						Name: pullSecretSecret,
+					}
+					return cd
+				}(),
+			},
+			expectedMismatch: true,
+		},
+		{
+			name:             "merged pull secret should be be equal to global pull secret",
+			globalPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			mergedPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					return getCDWithoutPullSecret()
+				}(),
+			},
+		},
+		{
+			name:             "Both local secret and global pull secret available",
+			localPullSecret:  `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			globalPullSecret: `{"auths":{"cloud.okd.com":{"auth":"b34xVjWERckjfUyV1pMQTc=","email":"abc@xyz.com"}}}`,
+			mergedPullSecret: `{"auths":{"cloud.okd.com":{"auth":"b34xVjWERckjfUyV1pMQTc=","email":"abc@xyz.com"},"registry.svc.ci.okd.org":{"auth":"dXNljlfjldsfSDD"}}}`,
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := getCDWithoutPullSecret()
+					cd.Spec.PullSecret = &corev1.LocalObjectReference{
+						Name: pullSecretSecret,
+					}
+					return cd
+				}(),
+			},
+		},
+		{
+			name: "Test should fail as local an global pull secret is not available",
+			existingCD: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					return getCDWithoutPullSecret()
+				}(),
+			},
+			expectedErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existingCD...)
+			rcd := &ReconcileClusterDeployment{
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
+				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+			}
+
+			localSecretObject := testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, test.localPullSecret)
+			err := rcd.Create(context.TODO(), localSecretObject)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			cd := getCDFromClient(rcd.Client)
+			if test.globalPullSecret != "" {
+				os.Setenv("GLOBAL_PULL_SECRET", test.globalPullSecret)
+			}
+			defer os.Unsetenv("GLOBAL_PULL_SECRET")
+			expetedPullSecret, err := rcd.mergePullSecrets(cd, rcd.logger)
+			if test.expectedErr {
+				assert.Error(t, err)
+			} else if test.expectedMismatch {
+				assert.NotEqual(t, test.mergedPullSecret, expetedPullSecret)
+			} else {
+				assert.Equal(t, test.mergedPullSecret, expetedPullSecret)
+			}
+		})
+	}
 }

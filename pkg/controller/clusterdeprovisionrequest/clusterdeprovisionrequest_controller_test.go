@@ -6,6 +6,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -108,6 +110,34 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 				validateCompleted(t, c)
 			},
 		},
+		{
+			name: "regenerate job when hash missing",
+			existing: []runtime.Object{
+				testClusterDeprovisionRequest(),
+				func() *batchv1.Job {
+					job := testUninstallJob()
+					delete(job.Annotations, jobHashAnnotation)
+					return job
+				}(),
+			},
+			validate: func(t *testing.T, c client.Client) {
+				validateNoJobExists(t, c)
+			},
+		},
+		{
+			name: "regenerate job when hash changed",
+			existing: []runtime.Object{
+				testClusterDeprovisionRequest(),
+				func() *batchv1.Job {
+					job := testUninstallJob()
+					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
+					return job
+				}(),
+			},
+			validate: func(t *testing.T, c client.Client) {
+				validateNoJobExists(t, c)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -159,6 +189,12 @@ func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
 
 func testUninstallJob() *batchv1.Job {
 	uninstallJob, _ := install.GenerateUninstallerJobForDeprovisionRequest(testClusterDeprovisionRequest(), "hive:image")
+	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
+	if err != nil {
+		panic("should never get error calculating job spec hash")
+	}
+
+	uninstallJob.Annotations[jobHashAnnotation] = hash
 	return uninstallJob
 }
 

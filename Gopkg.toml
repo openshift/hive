@@ -35,7 +35,11 @@ required = [
 
 [[constraint]]
   name="sigs.k8s.io/controller-runtime"
-  version="v0.1.8"
+  branch="release-0.2"
+
+[[constraint]]
+  name = "github.com/coreos/ignition"
+  version = "v2.0.0"
 
 # Remove when we're no longer using the master team's controller-tools repo (https://github.com/openshift/kubernetes-sigs-controller-tools).
 [[constraint]]
@@ -83,7 +87,7 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "d28da4a202f23e7a11a26bad1744cd0b58e712ff"
+  revision = "2241d21bc6509e6372c28ba29495f024001124cf"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"
@@ -102,10 +106,14 @@ version="v1.4.7"
   branch = "master"
   name = "github.com/openshift/api"
 
-[[override]]
+[[constraint]]
+  name = "github.com/openshift/cluster-api"
+  branch = "openshift-4.2-cluster-api-0.1.0"
+
+[[constraint]]
   name = "sigs.k8s.io/cluster-api-provider-aws"
-  source = "github.com/openshift/cluster-api-provider-aws"
-  revision = "15fe4b4ea5636f8516c238490fc6a85d44161181"
+  source = "https://github.com/openshift/cluster-api-provider-aws.git"
+  branch = "master"
 
 [[override]]
   name = "github.com/docker/docker"

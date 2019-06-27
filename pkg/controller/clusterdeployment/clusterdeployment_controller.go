@@ -434,16 +434,19 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	existingJob := &batchv1.Job{}
 	installJobName := install.GetInstallJobName(cd)
 	err = r.Get(context.TODO(), types.NamespacedName{Name: installJobName, Namespace: cd.Namespace}, existingJob)
-	if err != nil && errors.IsNotFound(err) {
-		cdLog.Debug("no install job exists")
-		existingJob = nil
-	} else if err != nil {
-		cdLog.WithError(err).Error("error looking for install job")
-		return reconcile.Result{}, err
-	} else if err == nil && !existingJob.DeletionTimestamp.IsZero() {
-		cdLog.WithError(err).Error("install job is being deleted, requeueing to wait for deletion")
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	if err != nil {
+		if errors.IsNotFound(err) {
+			cdLog.Debug("no install job exists")
+			existingJob = nil
+		} else {
+			cdLog.WithError(err).Error("error looking for install job")
+			return reconcile.Result{}, err
+		}
 	} else {
+		if !existingJob.DeletionTimestamp.IsZero() {
+			cdLog.WithError(err).Error("install job is being deleted, requeueing to wait for deletion")
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		}
 		// setting the flag so that we can report the metric after cd is installed
 		if existingJob.Status.Succeeded > 0 && !cd.Status.Installed {
 			firstInstalledObserve = true

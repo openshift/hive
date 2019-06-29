@@ -90,7 +90,7 @@ func (r *ReconcileSyncSet) selectorSyncSetHandlerFunc(a handler.MapObject) []rec
 		return []reconcile.Request{}
 	}
 	clusterDeployments := &hivev1.ClusterDeploymentList{}
-	err := r.List(context.TODO(), &client.ListOptions{}, clusterDeployments)
+	err := r.List(context.TODO(), clusterDeployments)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot list cluster deployments for selector syncset")
 		return []reconcile.Request{}
@@ -305,7 +305,7 @@ func (r *ReconcileSyncSet) reconcileSyncSetInstances(cd *hivev1.ClusterDeploymen
 
 func (r *ReconcileSyncSet) getRelatedSelectorSyncSets(cd *hivev1.ClusterDeployment) ([]*hivev1.SelectorSyncSet, error) {
 	list := &hivev1.SelectorSyncSetList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{}, list)
+	err := r.Client.List(context.TODO(), list)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func (r *ReconcileSyncSet) getRelatedSelectorSyncSets(cd *hivev1.ClusterDeployme
 
 func (r *ReconcileSyncSet) getRelatedSyncSets(cd *hivev1.ClusterDeployment) ([]*hivev1.SyncSet, error) {
 	list := &hivev1.SyncSetList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: cd.Namespace}, list)
+	err := r.Client.List(context.TODO(), list, client.InNamespace(cd.Namespace))
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func (r *ReconcileSyncSet) getRelatedSyncSets(cd *hivev1.ClusterDeployment) ([]*
 
 func (r *ReconcileSyncSet) getRelatedSyncSetInstances(cd *hivev1.ClusterDeployment) ([]*hivev1.SyncSetInstance, error) {
 	list := &hivev1.SyncSetInstanceList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: cd.Namespace}, list)
+	err := r.Client.List(context.TODO(), list, client.InNamespace(cd.Namespace))
 	if err != nil {
 		return nil, err
 	}

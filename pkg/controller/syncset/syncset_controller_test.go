@@ -144,7 +144,7 @@ func TestReconcileSyncSet(t *testing.T) {
 
 func validateExpected(t *testing.T, c client.Client, expected []*hivev1.SyncSetInstance) {
 	list := &hivev1.SyncSetInstanceList{}
-	err := c.List(context.TODO(), &client.ListOptions{Namespace: testNamespace}, list)
+	err := c.List(context.TODO(), list, client.InNamespace(testNamespace))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

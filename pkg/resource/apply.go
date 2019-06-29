@@ -6,7 +6,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 	kcmdapply "k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"

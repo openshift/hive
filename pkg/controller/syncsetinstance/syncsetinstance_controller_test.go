@@ -988,7 +988,7 @@ func (c *fakeNamespaceableClient) Watch(opts metav1.ListOptions) (watch.Interfac
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) Patch(name string, pt types.PatchType, data []byte, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *fakeNamespaceableClient) Patch(name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 

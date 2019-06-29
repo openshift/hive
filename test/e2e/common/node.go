@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -27,15 +28,11 @@ func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut 
 		return err
 	}
 	onUpdate := func() {
-		list := informer.GetStore().List()
+		nodes := &corev1.NodeList{}
+		internalCache.List(context.TODO(), nodes)
 		nodeList := []*corev1.Node{}
-		for _, item := range list {
-			node, ok := item.(*corev1.Node)
-			if !ok {
-				log.Fatalf("Item is not of type Node: %#v", item)
-				continue
-			}
-			nodeList = append(nodeList, node)
+		for i := range nodes.Items {
+			nodeList = append(nodeList, &nodes.Items[i])
 		}
 		if testFunc(nodeList) {
 			done <- struct{}{}

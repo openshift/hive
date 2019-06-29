@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -34,15 +35,11 @@ func WaitForMachineSets(cfg *rest.Config, testFunc func([]*machinev1.MachineSet)
 		return err
 	}
 	onUpdate := func() {
-		list := informer.GetStore().List()
+		machineSets := &machinev1.MachineSetList{}
+		internalCache.List(context.TODO(), machineSets)
 		machineSetList := []*machinev1.MachineSet{}
-		for _, item := range list {
-			machineSet, ok := item.(*machinev1.MachineSet)
-			if !ok {
-				log.Fatalf("Item is not of type MachineSet: %#v", item)
-				continue
-			}
-			machineSetList = append(machineSetList, machineSet)
+		for i := range machineSets.Items {
+			machineSetList = append(machineSetList, &machineSets.Items[i])
 		}
 		if testFunc(machineSetList) {
 			done <- struct{}{}

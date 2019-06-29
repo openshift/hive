@@ -119,7 +119,7 @@ func (r *ReconcileSyncIdentityProviders) selectorSyncIdentityProviderWatchHandle
 	contextLogger := addSelectorSyncIdentityProviderLoggerFields(r.logger, ssidp)
 
 	clusterDeployments := &hivev1.ClusterDeploymentList{}
-	r.List(context.TODO(), &client.ListOptions{}, clusterDeployments)
+	r.List(context.TODO(), clusterDeployments)
 
 	labelSelector, err := metav1.LabelSelectorAsSelector(&ssidp.Spec.ClusterDeploymentSelector)
 	if err != nil {
@@ -308,7 +308,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 
 func (r *ReconcileSyncIdentityProviders) getRelatedSelectorSyncIdentityProviders(cd *hivev1.ClusterDeployment) ([]openshiftapiv1.IdentityProvider, error) {
 	list := &hivev1.SelectorSyncIdentityProviderList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{}, list)
+	err := r.Client.List(context.TODO(), list)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (r *ReconcileSyncIdentityProviders) getRelatedSelectorSyncIdentityProviders
 
 func (r *ReconcileSyncIdentityProviders) getRelatedSyncIdentityProviders(cd *hivev1.ClusterDeployment) ([]openshiftapiv1.IdentityProvider, error) {
 	list := &hivev1.SyncIdentityProviderList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: cd.Namespace}, list)
+	err := r.Client.List(context.TODO(), list, client.InNamespace(cd.Namespace))
 	if err != nil {
 		return nil, err
 	}

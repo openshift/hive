@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -467,7 +466,7 @@ func TestReconcile(t *testing.T) {
 			})
 
 			ssList := &hivev1.SyncSetList{}
-			ssListErr := r.Client.List(context.TODO(), &client.ListOptions{}, ssList)
+			ssListErr := r.Client.List(context.TODO(), ssList)
 
 			// Assert
 			assert.Equal(t, test.expectedResult.Requeue, result.Requeue)

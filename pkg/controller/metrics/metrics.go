@@ -152,7 +152,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
 		clusterDeployments := &hivev1.ClusterDeploymentList{}
-		err := mc.Client.List(context.Background(), &client.ListOptions{}, clusterDeployments)
+		err := mc.Client.List(context.Background(), clusterDeployments)
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
@@ -208,7 +208,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		// install job metrics
 		installJobs := &batchv1.JobList{}
 		installJobLabelSelector := map[string]string{install.InstallJobLabel: "true"}
-		err = mc.Client.List(context.Background(), client.MatchingLabels(installJobLabelSelector), installJobs)
+		err = mc.Client.List(context.Background(), installJobs, client.MatchingLabels(installJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing install jobs")
 		} else {
@@ -228,7 +228,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
 		uninstallJobLabelSelector := map[string]string{install.UninstallJobLabel: "true"}
-		err = mc.Client.List(context.Background(), client.MatchingLabels(uninstallJobLabelSelector), uninstallJobs)
+		err = mc.Client.List(context.Background(), uninstallJobs, client.MatchingLabels(uninstallJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing uninstall jobs")
 		} else {
@@ -248,7 +248,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		// imageset job metrics
 		imagesetJobs := &batchv1.JobList{}
 		imagesetJobLabelSelector := map[string]string{imageset.ImagesetJobLabel: "true"}
-		err = mc.Client.List(context.Background(), client.MatchingLabels(imagesetJobLabelSelector), imagesetJobs)
+		err = mc.Client.List(context.Background(), imagesetJobs, client.MatchingLabels(imagesetJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing imageset jobs")
 		} else {

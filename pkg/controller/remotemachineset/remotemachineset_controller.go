@@ -177,9 +177,9 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 	remoteMachineSets := &machineapi.MachineSetList{}
 	tm := metav1.TypeMeta{}
 	tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("MachineSet"))
-	err := remoteClusterAPIClient.List(context.Background(), &client.ListOptions{
+	err := remoteClusterAPIClient.List(context.Background(), remoteMachineSets, client.UseListOptions(&client.ListOptions{
 		Raw: &metav1.ListOptions{TypeMeta: tm},
-	}, remoteMachineSets)
+	}))
 	if err != nil {
 		cdLog.WithError(err).Error("unable to fetch remote machine sets")
 		return err

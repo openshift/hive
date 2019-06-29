@@ -5,6 +5,8 @@ import (
 
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types/aws"
+	"github.com/openshift/installer/pkg/types/azure"
+	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
@@ -15,8 +17,8 @@ import (
 const (
 	// InstallConfigVersion is the version supported by this package.
 	// If you bump this, you must also update the list of convertable values in
-	// pkg/conversion/installconfig.go
-	InstallConfigVersion = "v1beta4"
+	// pkg/types/conversion/installconfig.go
+	InstallConfigVersion = "v1"
 )
 
 var (
@@ -25,7 +27,8 @@ var (
 	// platforms presented to the user in the interactive wizard.
 	PlatformNames = []string{
 		aws.Name,
-		vsphere.Name,
+		azure.Name,
+		gcp.Name,
 	}
 	// HiddenPlatformNames is a slice with all the
 	// hidden-but-supported platform names. This list isn't presented
@@ -33,6 +36,7 @@ var (
 	HiddenPlatformNames = []string{
 		none.Name,
 		openstack.Name,
+		vsphere.Name,
 	}
 )
 
@@ -68,6 +72,11 @@ type InstallConfig struct {
 
 	// PullSecret is the secret to use when pulling images.
 	PullSecret string `json:"pullSecret"`
+
+	// Proxy defines the proxy settings for the cluster.
+	// If unset, the cluster will not be configured to use a proxy.
+	// +optional
+	Proxy *Proxy `json:"proxy,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
@@ -81,6 +90,14 @@ type Platform struct {
 	// AWS is the configuration used when installing on AWS.
 	// +optional
 	AWS *aws.Platform `json:"aws,omitempty"`
+
+	// Azure is the configuration used when installing on Azure.
+	// +optional
+	Azure *azure.Platform `json:"azure,omitempty"`
+
+	// GCP is the configuration used when installing on Google Cloud Platform.
+	// +optional
+	GCP *gcp.Platform `json:"gcp,omitempty"`
 
 	// Libvirt is the configuration used when installing on libvirt.
 	// +optional
@@ -108,6 +125,10 @@ func (p *Platform) Name() string {
 		return ""
 	case p.AWS != nil:
 		return aws.Name
+	case p.Azure != nil:
+		return azure.Name
+	case p.GCP != nil:
+		return gcp.Name
 	case p.Libvirt != nil:
 		return libvirt.Name
 	case p.None != nil:
@@ -173,4 +194,20 @@ type ClusterNetworkEntry struct {
 	// The size of blocks to allocate from the larger pool.
 	// This is the length in bits - so a 9 here will allocate a /23.
 	DeprecatedHostSubnetLength int32 `json:"hostSubnetLength,omitempty"`
+}
+
+// Proxy defines the proxy settings for the cluster.
+// At least one of HTTPProxy or HTTPSProxy is required.
+type Proxy struct {
+	// HTTPProxy is the URL of the proxy for HTTP requests.
+	// +optional
+	HTTPProxy string `json:"httpProxy,omitempty"`
+
+	// HTTPSProxy is the URL of the proxy for HTTPS requests.
+	// +optional
+	HTTPSProxy string `json:"httpsProxy,omitempty"`
+
+	// NoProxy is a comma-separated list of domains and CIDRs for which the proxy should not be used.
+	// +optional
+	NoProxy string `json:"noProxy,omitempty"`
 }

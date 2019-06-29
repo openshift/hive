@@ -22,6 +22,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	awssession "github.com/openshift/installer/pkg/asset/installconfig/aws"
+	"github.com/openshift/installer/pkg/destroy/providers"
+	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/version"
 )
 
@@ -56,6 +59,32 @@ type ClusterUninstaller struct {
 	Logger    logrus.FieldLogger
 	Region    string
 	ClusterID string
+
+	// Session is the AWS session to be used for deletion.  If nil, a
+	// new session will be created based on the usual credential
+	// configuration (AWS_PROFILE, AWS_ACCESS_KEY_ID, etc.).
+	Session *session.Session
+}
+
+// New returns an AWS destroyer from ClusterMetadata.
+func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.Destroyer, error) {
+	filters := make([]Filter, 0, len(metadata.ClusterPlatformMetadata.AWS.Identifier))
+	for _, filter := range metadata.ClusterPlatformMetadata.AWS.Identifier {
+		filters = append(filters, filter)
+	}
+
+	session, err := awssession.GetSession()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ClusterUninstaller{
+		Filters:   filters,
+		Region:    metadata.ClusterPlatformMetadata.AWS.Region,
+		Logger:    logger,
+		ClusterID: metadata.InfraID,
+		Session:   session,
+	}, nil
 }
 
 func (o *ClusterUninstaller) validate() error {
@@ -73,11 +102,15 @@ func (o *ClusterUninstaller) Run() error {
 	}
 
 	awsConfig := &aws.Config{Region: aws.String(o.Region)}
-
-	// Relying on appropriate AWS ENV vars (eg AWS_PROFILE, AWS_ACCESS_KEY_ID, etc)
-	awsSession, err := session.NewSession(awsConfig)
-	if err != nil {
-		return err
+	awsSession := o.Session
+	if awsSession == nil {
+		// Relying on appropriate AWS ENV vars (eg AWS_PROFILE, AWS_ACCESS_KEY_ID, etc)
+		awsSession, err = session.NewSession(awsConfig)
+		if err != nil {
+			return err
+		}
+	} else {
+		awsSession = awsSession.Copy(awsConfig)
 	}
 	awsSession.Handlers.Build.PushBackNamed(request.NamedHandler{
 		Name: "openshiftInstaller.OpenshiftInstallerUserAgentHandler",
@@ -131,16 +164,28 @@ func (o *ClusterUninstaller) Run() error {
 						&resourcegroupstaggingapi.GetResourcesInput{TagFilters: tagFilters},
 						func(results *resourcegroupstaggingapi.GetResourcesOutput, lastPage bool) bool {
 							for _, resource := range results.ResourceTagMappingList {
-								arn := *resource.ResourceARN
-								if _, ok := deleted[arn]; !ok {
+								arnString := *resource.ResourceARN
+								if _, ok := deleted[arnString]; !ok {
+									arnLogger := o.Logger.WithField("arn", arnString)
 									matched = true
-									err := deleteARN(awsSession, arn, filter, o.Logger)
+									parsed, err := arn.Parse(arnString)
 									if err != nil {
-										err = errors.Wrapf(err, "deleting %s", arn)
-										o.Logger.Debug(err)
+										arnLogger.Debug(err)
 										continue
 									}
-									deleted[arn] = exists
+
+									if parsed.Service == "ec2" && strings.HasPrefix(parsed.Resource, "network-interface/") {
+										arnLogger.Debug("skip direct tag deletion, deleting the VPC should catch this")
+										continue
+									}
+
+									err = deleteARN(awsSession, parsed, filter, arnLogger)
+									if err != nil {
+										arnLogger.Debug(err)
+										err = errors.Wrapf(err, "deleting %s", arnString)
+										continue
+									}
+									deleted[arnString] = exists
 								}
 							}
 
@@ -181,16 +226,24 @@ func (o *ClusterUninstaller) Run() error {
 			if len(arns) > 0 {
 				o.Logger.Debug("delete IAM roles and users")
 			}
-			for _, arn := range arns {
-				if _, ok := deleted[arn]; !ok {
-					err = deleteARN(awsSession, arn, nil, o.Logger)
+			for _, arnString := range arns {
+				if _, ok := deleted[arnString]; !ok {
+					arnLogger := o.Logger.WithField("arn", arnString)
+					parsed, err := arn.Parse(arnString)
 					if err != nil {
-						err = errors.Wrapf(err, "deleting %s", arn)
-						o.Logger.Debug(err)
+						arnLogger.Debug(err)
 						loopError = err
 						continue
 					}
-					deleted[arn] = exists
+
+					err = deleteARN(awsSession, parsed, nil, arnLogger)
+					if err != nil {
+						arnLogger.Debug(err)
+						err = errors.Wrapf(err, "deleting %s", arnString)
+						loopError = err
+						continue
+					}
+					deleted[arnString] = exists
 				}
 			}
 
@@ -445,27 +498,20 @@ func findPublicRoute53(client *route53.Route53, dnsName string, logger logrus.Fi
 	return "", nil
 }
 
-func deleteARN(session *session.Session, arnString string, filter Filter, logger logrus.FieldLogger) error {
-	logger = logger.WithField("arn", arnString)
-
-	parsed, err := arn.Parse(arnString)
-	if err != nil {
-		return err
-	}
-
-	switch parsed.Service {
+func deleteARN(session *session.Session, arn arn.ARN, filter Filter, logger logrus.FieldLogger) error {
+	switch arn.Service {
 	case "ec2":
-		return deleteEC2(session, parsed, filter, logger)
+		return deleteEC2(session, arn, filter, logger)
 	case "elasticloadbalancing":
-		return deleteElasticLoadBalancing(session, parsed, logger)
+		return deleteElasticLoadBalancing(session, arn, logger)
 	case "iam":
-		return deleteIAM(session, parsed, logger)
+		return deleteIAM(session, arn, logger)
 	case "route53":
-		return deleteRoute53(session, parsed, logger)
+		return deleteRoute53(session, arn, logger)
 	case "s3":
-		return deleteS3(session, parsed, logger)
+		return deleteS3(session, arn, logger)
 	default:
-		return errors.Errorf("unrecognized ARN service %s (%s)", parsed.Service, arnString)
+		return errors.Errorf("unrecognized ARN service %s (%s)", arn.Service, arn)
 	}
 }
 
@@ -605,7 +651,7 @@ func deleteEC2Instance(ec2Client *ec2.EC2, iamClient *iam.IAM, id string, logger
 					return errors.Wrap(err, "parse ARN for IAM instance profile")
 				}
 
-				err = deleteIAMInstanceProfile(iamClient, parsed, logger.WithField("IAM instance profile", parsed.String()))
+				err = deleteIAMInstanceProfile(iamClient, parsed, logger)
 				if err != nil {
 					return errors.Wrapf(err, "deleting %s", parsed.String())
 				}
@@ -687,11 +733,49 @@ func deleteEC2NATGateway(client *ec2.EC2, id string, logger logrus.FieldLogger) 
 		NatGatewayId: aws.String(id),
 	})
 	if err != nil {
+		if err.(awserr.Error).Code() == "NatGatewayNotFound" {
+			return nil
+		}
 		return err
 	}
 
 	logger.Info("Deleted")
 	return nil
+}
+
+func deleteEC2NATGatewaysByVPC(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error {
+	var lastError error
+	err := client.DescribeNatGatewaysPages(
+		&ec2.DescribeNatGatewaysInput{
+			Filter: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{&vpc},
+				},
+			},
+		},
+		func(results *ec2.DescribeNatGatewaysOutput, lastPage bool) bool {
+			for _, gateway := range results.NatGateways {
+				err := deleteEC2NATGateway(client, *gateway.NatGatewayId, logger.WithField("NAT gateway", *gateway.NatGatewayId))
+				if err != nil {
+					if lastError != nil {
+						logger.Debug(err)
+					}
+					lastError = errors.Wrapf(err, "deleting EC2 NAT gateway %s", *gateway.NatGatewayId)
+					if failFast {
+						return false
+					}
+				}
+			}
+
+			return !lastPage
+		},
+	)
+
+	if lastError != nil {
+		return lastError
+	}
+	return err
 }
 
 func deleteEC2RouteTable(client *ec2.EC2, id string, logger logrus.FieldLogger) error {
@@ -749,7 +833,7 @@ func deleteEC2RouteTableObject(client *ec2.EC2, table *ec2.RouteTable, logger lo
 	return nil
 }
 
-func deleteEC2RouteTablesByVPC(client *ec2.EC2, vpc string, logger logrus.FieldLogger) error {
+func deleteEC2RouteTablesByVPC(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error {
 	var lastError error
 	err := client.DescribeRouteTablesPages(
 		&ec2.DescribeRouteTablesInput{
@@ -768,6 +852,9 @@ func deleteEC2RouteTablesByVPC(client *ec2.EC2, vpc string, logger logrus.FieldL
 						logger.Debug(err)
 					}
 					lastError = errors.Wrapf(err, "deleting EC2 route table %s", *table.RouteTableId)
+					if failFast {
+						return false
+					}
 				}
 			}
 
@@ -860,7 +947,7 @@ func deleteEC2NetworkInterface(client *ec2.EC2, id string, logger logrus.FieldLo
 	return nil
 }
 
-func deleteEC2NetworkInterfaceByVPC(client *ec2.EC2, vpc string, logger logrus.FieldLogger) error {
+func deleteEC2NetworkInterfaceByVPC(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error {
 	var lastError error
 	err := client.DescribeNetworkInterfacesPages(
 		&ec2.DescribeNetworkInterfacesInput{
@@ -879,6 +966,9 @@ func deleteEC2NetworkInterfaceByVPC(client *ec2.EC2, vpc string, logger logrus.F
 						logger.Debug(lastError)
 					}
 					lastError = errors.Wrapf(err, "deleting EC2 network interface %s", *networkInterface.NetworkInterfaceId)
+					if failFast {
+						return false
+					}
 				}
 			}
 
@@ -935,12 +1025,13 @@ func deleteEC2VPC(ec2Client *ec2.EC2, elbClient *elb.ELB, elbv2Client *elbv2.ELB
 		return v2lbError
 	}
 
-	for _, helper := range [](func(client *ec2.EC2, vpc string, logger logrus.FieldLogger) error){
+	for _, helper := range [](func(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error){
+		deleteEC2NATGatewaysByVPC,      // not always tagged
 		deleteEC2NetworkInterfaceByVPC, // not always tagged
 		deleteEC2RouteTablesByVPC,      // not always tagged
 		deleteEC2VPCEndpointsByVPC,     // not taggable
 	} {
-		err := helper(ec2Client, id, logger)
+		err := helper(ec2Client, id, true, logger)
 		if err != nil {
 			return err
 		}
@@ -969,7 +1060,7 @@ func deleteEC2VPCEndpoint(client *ec2.EC2, id string, logger logrus.FieldLogger)
 	return nil
 }
 
-func deleteEC2VPCEndpointsByVPC(client *ec2.EC2, vpc string, logger logrus.FieldLogger) error {
+func deleteEC2VPCEndpointsByVPC(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error {
 	response, err := client.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
 		Filters: []*ec2.Filter{
 			{
@@ -1215,7 +1306,7 @@ func deleteIAMInstanceProfileByName(client *iam.IAM, name *string, logger logrus
 		}
 		return err
 	}
-	logger.WithField("name", name).Info("Deleted")
+	logger.WithField("InstanceProfileName", *name).Info("Deleted")
 	return err
 }
 
@@ -1251,6 +1342,7 @@ func deleteIAMInstanceProfile(client *iam.IAM, profileARN arn.ARN, logger logrus
 		logger.WithField("name", name).WithField("role", *role.RoleName).Info("Disassociated")
 	}
 
+	logger = logger.WithField("arn", profileARN.String())
 	if err := deleteIAMInstanceProfileByName(client, profile.InstanceProfileName, logger); err != nil {
 		return err
 	}
@@ -1311,7 +1403,7 @@ func deleteIAMRole(client *iam.IAM, roleARN arn.ARN, logger logrus.FieldLogger) 
 					continue
 				}
 
-				err = deleteIAMInstanceProfile(client, parsed, logger.WithField("IAM instance profile", parsed.String()))
+				err = deleteIAMInstanceProfile(client, parsed, logger)
 				if err != nil {
 					if lastError != nil {
 						logger.Debug(lastError)
@@ -1529,7 +1621,7 @@ func deleteS3(session *session.Session, arn arn.ARN, logger logrus.FieldLogger) 
 		Bucket: aws.String(arn.Resource),
 	})
 	err := s3manager.NewBatchDeleteWithClient(client).Delete(aws.BackgroundContext(), iter)
-	if err != nil {
+	if err != nil && !isBucketNotFound(err) {
 		return err
 	}
 	logger.Debug("Emptied")
@@ -1537,10 +1629,32 @@ func deleteS3(session *session.Session, arn arn.ARN, logger logrus.FieldLogger) 
 	_, err = client.DeleteBucket(&s3.DeleteBucketInput{
 		Bucket: aws.String(arn.Resource),
 	})
-	if err != nil {
+	if err != nil && !isBucketNotFound(err) {
 		return err
 	}
 
 	logger.Info("Deleted")
 	return nil
+}
+
+func isBucketNotFound(err interface{}) bool {
+	switch s3Err := err.(type) {
+	case awserr.Error:
+		if s3Err.Code() == "NoSuchBucket" {
+			return true
+		}
+		origErr := s3Err.OrigErr()
+		if origErr != nil {
+			return isBucketNotFound(origErr)
+		}
+	case s3manager.Error:
+		if s3Err.OrigErr != nil {
+			return isBucketNotFound(s3Err.OrigErr)
+		}
+	case s3manager.Errors:
+		if len(s3Err) == 1 {
+			return isBucketNotFound(s3Err[0])
+		}
+	}
+	return false
 }

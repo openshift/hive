@@ -94,6 +94,10 @@ type DefaultNetworkDefinition struct {
 	// not implemented.
 	// +optional
 	OVNKubernetesConfig *OVNKubernetesConfig `json:"ovnKubernetesConfig,omitempty"`
+
+	// KuryrConfig configures the kuryr plugin
+	// +optional
+	KuryrConfig *KuryrConfig `json:"kuryrConfig,omitempty"`
 }
 
 // AdditionalNetworkDefinition configures an extra network that is available but not
@@ -107,6 +111,10 @@ type AdditionalNetworkDefinition struct {
 	// name is the name of the network. This will be populated in the resulting CRD
 	// This must be unique.
 	Name string `json:"name"`
+
+	// namespace is the namespace of the network. This will be populated in the resulting CRD
+	// If not given the network will be created in the default namespace.
+	Namespace string `json:"namespace,omitempty"`
 
 	// rawCNIConfig is the raw CNI configuration json to create in the
 	// NetworkAttachmentDefinition CRD
@@ -131,6 +139,17 @@ type OpenShiftSDNConfig struct {
 	// it will be provided separately. If set, you must provide it yourself.
 	// +optional
 	UseExternalOpenvswitch *bool `json:"useExternalOpenvswitch,omitempty"`
+}
+
+// KuryrConfig configures the Kuryr-Kubernetes SDN
+type KuryrConfig struct {
+	// The port kuryr-daemon will listen for readiness and liveness requests.
+	// +optional
+	DaemonProbesPort *uint32 `json:"daemonProbesPort,omitempty"`
+
+	// The port kuryr-controller will listen for readiness and liveness requests.
+	// +optional
+	ControllerProbesPort *uint32 `json:"controllerProbesPort,omitempty"`
 }
 
 // ovnKubernetesConfig is the proposed configuration parameters for networks
@@ -167,6 +186,9 @@ const (
 	// NetworkTypeOVNKubernetes means the ovn-kubernetes project will be configured.
 	// This is currently not implemented.
 	NetworkTypeOVNKubernetes NetworkType = "OVNKubernetes"
+
+	// NetworkTypeKuryr means the kuryr-kubernetes project will be configured.
+	NetworkTypeKuryr NetworkType = "Kuryr"
 
 	// NetworkTypeRaw
 	NetworkTypeRaw NetworkType = "Raw"

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/rest"
 )
 
@@ -14,7 +15,7 @@ func getDiscoveryClient(config *rest.Config, cacheDir string) (discovery.CachedD
 	config.Burst = 100
 	httpCacheDir := filepath.Join(cacheDir, ".kube", "http-cache")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, ".kube", "cache", "discovery"), config.Host)
-	return discovery.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
+	return disk.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive

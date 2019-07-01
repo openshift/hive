@@ -4,7 +4,7 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.11)
+- A recent Go distribution (>=1.12)
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
 
 ## Setting up the development environment

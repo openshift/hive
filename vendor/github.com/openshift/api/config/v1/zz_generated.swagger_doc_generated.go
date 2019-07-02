@@ -492,7 +492,7 @@ var map_ClusterVersionStatus = map[string]string{
 	"history":            "history contains a list of the most recent versions applied to the cluster. This value may be empty during cluster startup, and then will be updated when a new update is being applied. The newest update is first in the list and it is ordered by recency. Updates in the history have state Completed if the rollout completed - if an update was failing or halfway applied the state will be Partial. Only a limited amount of update history is preserved.",
 	"observedGeneration": "observedGeneration reports which version of the spec is being synced. If this value is not equal to metadata.generation, then the desired and conditions fields may represent from a previous version.",
 	"versionHash":        "versionHash is a fingerprint of the content that the cluster will be updated with. It is used by the operator to avoid unnecessary work and is for internal use only.",
-	"conditions":         "conditions provides information about the cluster version. The condition \"Available\" is set to true if the desiredUpdate has been reached. The condition \"Progressing\" is set to true if an update is being applied. The condition \"Failing\" is set to true if an update is currently blocked by a temporary or permanent error. Conditions are only valid for the current desiredUpdate when metadata.generation is equal to status.generation.",
+	"conditions":         "conditions provides information about the cluster version. The condition \"Available\" is set to true if the desiredUpdate has been reached. The condition \"Progressing\" is set to true if an update is being applied. The condition \"Degraded\" is set to true if an update is currently blocked by a temporary or permanent error. Conditions are only valid for the current desiredUpdate when metadata.generation is equal to status.generation.",
 	"availableUpdates":   "availableUpdates contains the list of updates that are appropriate for this cluster. This list may be empty if no updates are recommended, if the update service is unavailable, or if an invalid channel has been specified.",
 }
 
@@ -517,6 +517,7 @@ var map_Update = map[string]string{
 	"":        "Update represents a release of the ClusterVersionOperator, referenced by the Image member.",
 	"version": "version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.",
 	"image":   "image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.",
+	"force":   "force allows an administrator to update to an image that has failed verification, does not appear in the availableUpdates list, or otherwise would be blocked by normal protections on update. This option should only be used when the authenticity of the provided image has been verified out of band because the provided image will run with full administrative access to the cluster. Do not use this flag with images that comes from unknown or potentially malicious sources.\n\nThis flag does not override other forms of consistency checking that are required before a new update is deployed.",
 }
 
 func (Update) SwaggerDoc() map[string]string {
@@ -530,6 +531,7 @@ var map_UpdateHistory = map[string]string{
 	"completionTime": "completionTime, if set, is when the update was fully applied. The update that is currently being applied will have a null completion time. Completion time will always be set for entries that are not the current update (usually to the started time of the next update).",
 	"version":        "version is a semantic versioning identifying the update version. If the requested image does not define a version, or if a failure occurs retrieving the image, this value may be empty.",
 	"image":          "image is a container image location that contains the update. This value is always populated.",
+	"verified":       "verified indicates whether the provided update was properly verified before it was installed. If this is false the cluster may not be trusted.",
 }
 
 func (UpdateHistory) SwaggerDoc() map[string]string {
@@ -537,7 +539,7 @@ func (UpdateHistory) SwaggerDoc() map[string]string {
 }
 
 var map_Console = map[string]string{
-	"":         "Console holds cluster-wide information about Console.  The canonical name is `cluster`",
+	"":         "Console holds cluster-wide information about Console.  The canonical name is `cluster`.",
 	"metadata": "Standard object's metadata.",
 	"spec":     "spec holds user settable values for configuration",
 	"status":   "status holds observed values from the cluster. They may not be overridden.",
@@ -548,6 +550,7 @@ func (Console) SwaggerDoc() map[string]string {
 }
 
 var map_ConsoleAuthentication = map[string]string{
+	"":               "ConsoleAuthentication defines a list of optional configuration for console authentication.",
 	"logoutRedirect": "An optional, absolute URL to redirect web browsers to after logging out of the console. If not specified, it will redirect to the default login page. This is required when using an identity provider that supports single sign-on (SSO) such as: - OpenID (Keycloak, Azure) - RequestHeader (GSSAPI, SSPI, SAML) - OAuth (GitHub, GitLab, Google) Logging out of the console will destroy the user's token. The logoutRedirect provides the user the option to perform single logout (SLO) through the identity provider to destroy their single sign-on session.",
 }
 
@@ -563,7 +566,16 @@ func (ConsoleList) SwaggerDoc() map[string]string {
 	return map_ConsoleList
 }
 
+var map_ConsoleSpec = map[string]string{
+	"": "ConsoleSpec is the specification of the desired behavior of the Console.",
+}
+
+func (ConsoleSpec) SwaggerDoc() map[string]string {
+	return map_ConsoleSpec
+}
+
 var map_ConsoleStatus = map[string]string{
+	"":           "ConsoleStatus defines the observed status of the Console.",
 	"consoleURL": "The URL for the console. This will be derived from the host for the route that is created for the console.",
 }
 
@@ -688,13 +700,22 @@ func (RegistryLocation) SwaggerDoc() map[string]string {
 
 var map_RegistrySources = map[string]string{
 	"":                   "RegistrySources holds cluster-wide information about how to handle the registries config.",
-	"insecureRegistries": "InsecureRegistries are registries which do not have a valid SSL certificate or only support HTTP connections.",
+	"insecureRegistries": "InsecureRegistries are registries which do not have a valid TLS certificates or only support HTTP connections.",
 	"blockedRegistries":  "BlockedRegistries are blacklisted from image pull/push. All other registries are allowed.\n\nOnly one of BlockedRegistries or AllowedRegistries may be set.",
 	"allowedRegistries":  "AllowedRegistries are whitelisted for image pull/push. All other registries are blocked.\n\nOnly one of BlockedRegistries or AllowedRegistries may be set.",
 }
 
 func (RegistrySources) SwaggerDoc() map[string]string {
 	return map_RegistrySources
+}
+
+var map_AWSPlatformStatus = map[string]string{
+	"":       "AWSPlatformStatus holds the current status of the Amazon Web Services infrastructure provider.",
+	"region": "region holds the default AWS region for new AWS resources created by the cluster.",
+}
+
+func (AWSPlatformStatus) SwaggerDoc() map[string]string {
+	return map_AWSPlatformStatus
 }
 
 var map_Infrastructure = map[string]string{
@@ -727,15 +748,27 @@ func (InfrastructureSpec) SwaggerDoc() map[string]string {
 }
 
 var map_InfrastructureStatus = map[string]string{
-	"":                    "InfrastructureStatus describes the infrastructure the cluster is leveraging.",
-	"infrastructureName":  "infrastructureName uniquely identifies a cluster with a human friendly name. Once set it should not be changed. Must be of max length 27 and must have only alphanumeric or hyphen characters.",
-	"platform":            "platform is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
-	"etcdDiscoveryDomain": "etcdDiscoveryDomain is the domain used to fetch the SRV records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery",
-	"apiServerURL":        "apiServerURL is a valid URL with scheme(http/https), address and port. apiServerURL can be used by components like kubelet on machines, to contact the `apisever` using the infrastructure provider rather than the kubernetes networking.",
+	"":                     "InfrastructureStatus describes the infrastructure the cluster is leveraging.",
+	"infrastructureName":   "infrastructureName uniquely identifies a cluster with a human friendly name. Once set it should not be changed. Must be of max length 27 and must have only alphanumeric or hyphen characters.",
+	"platform":             "platform is the underlying infrastructure provider for the cluster.\n\nDeprecated: Use platformStatus.type instead.",
+	"platformStatus":       "platformStatus holds status information specific to the underlying infrastructure provider.",
+	"etcdDiscoveryDomain":  "etcdDiscoveryDomain is the domain used to fetch the SRV records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery",
+	"apiServerURL":         "apiServerURL is a valid URI with scheme(http/https), address and port.  apiServerURL can be used by components like the web console to tell users where to find the Kubernetes API.",
+	"apiServerInternalURI": "apiServerInternalURL is a valid URI with scheme(http/https), address and port.  apiServerInternalURL can be used by components like kubelets, to contact the Kubernetes API server using the infrastructure provider rather than Kubernetes networking.",
 }
 
 func (InfrastructureStatus) SwaggerDoc() map[string]string {
 	return map_InfrastructureStatus
+}
+
+var map_PlatformStatus = map[string]string{
+	"":     "PlatformStatus holds the current status specific to the underlying infrastructure provider of the current cluster. Since these are used at status-level for the underlying cluster, it is supposed that only one of the status structs is set.",
+	"type": "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
+	"aws":  "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
+}
+
+func (PlatformStatus) SwaggerDoc() map[string]string {
+	return map_PlatformStatus
 }
 
 var map_Ingress = map[string]string{
@@ -775,6 +808,26 @@ func (ClusterNetworkEntry) SwaggerDoc() map[string]string {
 	return map_ClusterNetworkEntry
 }
 
+var map_ExternalIPConfig = map[string]string{
+	"":                "ExternalIPConfig specifies some IP blocks relevant for the ExternalIP field of a Service resource.",
+	"policy":          "policy is a set of restrictions applied to the ExternalIP field. If nil, any value is allowed for an ExternalIP. If the empty/zero policy is supplied, then ExternalIP is not allowed to be set.",
+	"autoAssignCIDRs": "autoAssignCIDRs is a list of CIDRs from which to automatically assign Service.ExternalIP. These are assigned when the service is of type LoadBalancer. In general, this is only useful for bare-metal clusters. In Openshift 3.x, this was misleadingly called \"IngressIPs\". Automatically assigned External IPs are not affected by any ExternalIPPolicy rules. Currently, only one entry may be provided.",
+}
+
+func (ExternalIPConfig) SwaggerDoc() map[string]string {
+	return map_ExternalIPConfig
+}
+
+var map_ExternalIPPolicy = map[string]string{
+	"":              "ExternalIPPolicy configures exactly which IPs are allowed for the ExternalIP field in a Service. If the zero struct is supplied, then none are permitted. The policy controller always allows automatically assigned external IPs.",
+	"allowedCIDRs":  "allowedCIDRs is the list of allowed CIDRs.",
+	"rejectedCIDRs": "rejectedCIDRs is the list of disallowed CIDRs. These take precedence over allowedCIDRs.",
+}
+
+func (ExternalIPPolicy) SwaggerDoc() map[string]string {
+	return map_ExternalIPPolicy
+}
+
 var map_Network = map[string]string{
 	"":         "Network holds cluster-wide information about Network.  The canonical name is `cluster`",
 	"metadata": "Standard object's metadata.",
@@ -795,10 +848,11 @@ func (NetworkList) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkSpec = map[string]string{
-	"":               "NetworkSpec is the desired network configuration. As a general rule, this SHOULD NOT be read directly. Instead, you should consume the NetworkStatus, as it indicates the currently deployed configuration. Currently, none of these fields may be changed after installation.",
+	"":               "NetworkSpec is the desired network configuration. As a general rule, this SHOULD NOT be read directly. Instead, you should consume the NetworkStatus, as it indicates the currently deployed configuration. Currently, changing ClusterNetwork, ServiceNetwork, or NetworkType after installation is not supported.",
 	"clusterNetwork": "IP address pool to use for pod IPs.",
 	"serviceNetwork": "IP address pool for services. Currently, we only support a single entry here.",
 	"networkType":    "NetworkType is the plugin that is to be deployed (e.g. OpenShiftSDN). This should match a value that the cluster-network-operator understands, or else no networking will be installed. Currently supported values are: - OpenShiftSDN",
+	"externalIP":     "externalIP defines configuration for controllers that affect Service.ExternalIP",
 }
 
 func (NetworkSpec) SwaggerDoc() map[string]string {
@@ -1075,8 +1129,9 @@ func (TemplateReference) SwaggerDoc() map[string]string {
 }
 
 var map_Proxy = map[string]string{
-	"":     "Proxy holds cluster-wide information on how to configure default proxies for the cluster. The canonical name is `cluster`",
-	"spec": "Spec holds user-settable values for the proxy configuration",
+	"":       "Proxy holds cluster-wide information on how to configure default proxies for the cluster. The canonical name is `cluster`",
+	"spec":   "Spec holds user-settable values for the proxy configuration",
+	"status": "status holds observed values from the cluster. They may not be overridden.",
 }
 
 func (Proxy) SwaggerDoc() map[string]string {
@@ -1092,13 +1147,25 @@ func (ProxyList) SwaggerDoc() map[string]string {
 }
 
 var map_ProxySpec = map[string]string{
+	"":           "ProxySpec contains cluster proxy creation configuration.",
 	"httpProxy":  "httpProxy is the URL of the proxy for HTTP requests.  Empty means unset and will not result in an env var.",
 	"httpsProxy": "httpsProxy is the URL of the proxy for HTTPS requests.  Empty means unset and will not result in an env var.",
-	"noProxy":    "noProxy is the list of domains for which the proxy should not be used.  Empty means unset and will not result in an env var.",
+	"noProxy":    "noProxy is a comma-separated list of hostnames and/or CIDRs for which the proxy should not be used. Empty means unset and will not result in an env var.",
 }
 
 func (ProxySpec) SwaggerDoc() map[string]string {
 	return map_ProxySpec
+}
+
+var map_ProxyStatus = map[string]string{
+	"":           "ProxyStatus shows current known state of the cluster proxy.",
+	"httpProxy":  "httpProxy is the URL of the proxy for HTTP requests.",
+	"httpsProxy": "httpsProxy is the URL of the proxy for HTTPS requests.",
+	"noProxy":    "noProxy is a comma-separated list of hostnames and/or CIDRs for which the proxy should not be used.",
+}
+
+func (ProxyStatus) SwaggerDoc() map[string]string {
+	return map_ProxyStatus
 }
 
 var map_Scheduler = map[string]string{

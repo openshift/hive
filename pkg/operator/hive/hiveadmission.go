@@ -206,7 +206,7 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debug("listing secrets in hive namespace")
 	secrets := &corev1.SecretList{}
-	err := r.Client.List(context.Background(), &client.ListOptions{Namespace: hiveNamespace}, secrets)
+	err := r.Client.List(context.Background(), secrets, client.InNamespace(hiveNamespace))
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
 		return err

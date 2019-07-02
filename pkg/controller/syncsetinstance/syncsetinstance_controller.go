@@ -119,7 +119,7 @@ func (r *ReconcileSyncSetInstance) handleClusterDeployment(a handler.MapObject) 
 	}
 
 	syncSetInstanceList := &hivev1.SyncSetInstanceList{}
-	err := r.List(context.TODO(), &client.ListOptions{Namespace: cd.Namespace}, syncSetInstanceList)
+	err := r.List(context.TODO(), syncSetInstanceList, client.InNamespace(cd.Namespace))
 	if err != nil {
 		r.logger.WithError(err).Error("cannot list syncSetInstances for cluster deployment")
 		return []reconcile.Request{}

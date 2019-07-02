@@ -2,6 +2,7 @@ package remotemachineset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -64,9 +65,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		rMSL := &machineapi.MachineSetList{}
 		tm := metav1.TypeMeta{}
 		tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("MachineSet"))
-		err := rc.List(context.TODO(), &client.ListOptions{
+		err := rc.List(context.TODO(), rMSL, client.UseListOptions(&client.ListOptions{
 			Raw: &metav1.ListOptions{TypeMeta: tm},
-		}, rMSL)
+		}))
 		if err == nil {
 			return rMSL, err
 		}
@@ -376,7 +377,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 								rAWSProviderSpec, err := decodeAWSMachineProviderSpec(
 									rMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
-								log.Debugf("remote AWS: %v", rAWSProviderSpec)
+								log.Debugf("remote AWS: %v", printAWSMachineProviderConfig(rAWSProviderSpec))
 								assert.NoError(t, err)
 								assert.NotNil(t, rAWSProviderSpec)
 								eAWSProviderSpec, err := decodeAWSMachineProviderSpec(
@@ -384,7 +385,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								assert.NoError(t, err)
 								assert.NotNil(t, eAWSProviderSpec)
 								log.Debugf("%s", test.name)
-								log.Debugf("expected AWS: %v", eMS.Spec.Template.Spec.ProviderSpec)
+								log.Debugf("expected AWS: %v", printAWSMachineProviderConfig(eAWSProviderSpec))
 
 								assert.Equal(t, eAWSProviderSpec.AMI, rAWSProviderSpec.AMI)
 							}
@@ -467,9 +468,7 @@ func testMachineSetWithAMI(name, machineType, ami string, unstompedAnnotation bo
 			Name:      name,
 			Namespace: machineAPINamespace,
 			Labels: map[string]string{
-				"machine.openshift.io/cluster-api-cluster":      testInfraID,
-				"machine.openshift.io/cluster-api-machine-role": machineType,
-				"machine.openshift.io/cluster-api-machine-type": machineType,
+				"machine.openshift.io/cluster-api-cluster": testInfraID,
 			},
 			Generation: int64(generation),
 		},
@@ -575,4 +574,12 @@ func testSecret(name, key, value string) *corev1.Secret {
 		},
 	}
 	return s
+}
+
+func printAWSMachineProviderConfig(cfg *awsprovider.AWSMachineProviderConfig) string {
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		panic(err.Error())
+	}
+	return string(b)
 }

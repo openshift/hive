@@ -8,7 +8,6 @@ required = [
     "golang.org/x/net/context",
     "github.com/jteeuwen/go-bindata",
     "github.com/openshift/installer/pkg/types",
-    "k8s.io/apiserver/pkg/util/logs",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
@@ -33,9 +32,9 @@ required = [
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
-[[constraint]]
+[[override]]
   name="sigs.k8s.io/controller-runtime"
-  version="v0.1.8"
+  branch="release-0.2"
 
 # Remove when we're no longer using the master team's controller-tools repo (https://github.com/openshift/kubernetes-sigs-controller-tools).
 [[constraint]]
@@ -45,7 +44,7 @@ required = [
 
 [[override]]
   name="k8s.io/api"
-  version="kubernetes-1.13.4"
+  version="kubernetes-1.14.1"
 
 [[override]]
   name="github.com/russross/blackfriday"
@@ -53,15 +52,35 @@ required = [
 
 [[override]]
   name="k8s.io/kubernetes"
-  version="=v1.13.4"
+  version="=v1.14.1"
 
 [[override]]
   name="k8s.io/metrics"
-  version="kubernetes-1.13.4"
+  version="kubernetes-1.14.1"
 
 [[override]]
   name="k8s.io/apimachinery"
-  version="kubernetes-1.13.4"
+  version="kubernetes-1.14.1"
+
+[[override]]
+  name="k8s.io/kube-aggregator"
+  version="kubernetes-1.14.1"
+
+[[override]]
+  name="k8s.io/cli-runtime"
+  version="kubernetes-1.14.1"
+
+[[override]]
+  name="k8s.io/kube-openapi"
+  revision="07b8972065522ba66df16032247530e1dbaca011"
+
+[[override]]
+  name = "k8s.io/utils"
+  revision = "c55fbcfc754a5b2ec2fbae8fb9dcac36bdba6a12"
+
+[[override]]
+  name = "sigs.k8s.io/structured-merge-diff"
+  revision = "e85c7b244fd2cc57bb829d73a061f93a441e63ce"
 
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
@@ -79,20 +98,20 @@ version="v1.4.7"
 
 [[override]]
   name = "k8s.io/client-go"
-  version="kubernetes-1.13.4"
+  version="kubernetes-1.14.1"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "d28da4a202f23e7a11a26bad1744cd0b58e712ff"
+  revision = "63c63a0015f8f7cd894a93c0a6c0d6565ee8d05a"
 
 [[constraint]]
   name = "github.com/openshift/generic-admission-server"
-  #version = "v1.13.2"
-  branch = "release-1.13" # TODO: Can't use "version" for v1.13.2 as that release is broken. Go back to using version when fixed.
+  version = "v1.14.0"
+  # branch = "release-1.13" # TODO: Can't use "version" for v1.13.2 as that release is broken. Go back to using version when fixed.
 
 [[override]]
   name = "k8s.io/apiserver"
-  version="kubernetes-1.13.4"
+  version="kubernetes-1.14.1"
 
 [[override]]
   name = "github.com/evanphx/json-patch"

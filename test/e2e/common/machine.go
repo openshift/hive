@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -35,15 +36,11 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 		return err
 	}
 	onUpdate := func() {
-		list := informer.GetStore().List()
+		machines := &machinev1.MachineList{}
+		internalCache.List(context.TODO(), machines)
 		machineList := []*machinev1.Machine{}
-		for _, item := range list {
-			machine, ok := item.(*machinev1.Machine)
-			if !ok {
-				log.Fatalf("Item is not of type Machine: %#v", item)
-				continue
-			}
-			machineList = append(machineList, machine)
+		for i := range machines.Items {
+			machineList = append(machineList, &machines.Items[i])
 		}
 		if testFunc(machineList) {
 			done <- struct{}{}

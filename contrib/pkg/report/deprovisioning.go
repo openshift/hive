@@ -72,7 +72,7 @@ func (o *DeprovisioningReportOptions) Run(dynClient client.Client) error {
 	}
 
 	cdList := &hivev1.ClusterDeploymentList{}
-	err := dynClient.List(context.Background(), &client.ListOptions{}, cdList)
+	err := dynClient.List(context.Background(), cdList)
 	if err != nil {
 		log.WithError(err).Fatal("error listing cluster deployments")
 	}

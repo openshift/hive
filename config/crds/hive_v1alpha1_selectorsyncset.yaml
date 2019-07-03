@@ -67,13 +67,25 @@ spec:
                 type: object
               type: array
             resourceApplyMode:
-              description: ResourceApplyMode indicates if the resource apply mode
+              description: ResourceApplyMode indicates if the Resource apply mode
                 is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
                 and update. ApplyMode "sync" indicates create, update and delete.
               type: string
             resources:
-              description: Resources is the list of objects to sync.
+              description: Resources is the list of objects to sync from RawExtension
+                definitions.
               items:
+                type: object
+              type: array
+            secretReferences:
+              description: SecretReferences is the list of secrets to sync from existing
+                resources.
+              items:
+                properties:
+                  source:
+                    type: object
+                  target:
+                    type: object
                 type: object
               type: array
           type: object

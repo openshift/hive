@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	hiveresource "github.com/openshift/hive/pkg/resource"
 )
@@ -155,6 +156,14 @@ type ReconcileSyncSetInstance struct {
 // Reconcile applies SyncSet or SelectorSyncSets associated with SyncSetInstances to the owning cluster.
 // +kubebuilder:rbac:groups=hive.openshift.io,resources=syncsetinstances;syncsetinstances/status,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	ssiLog := r.logger.WithField("syncsetinstance", request.NamespacedName)
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		ssiLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	ssi := &hivev1.SyncSetInstance{}
 
 	// Fetch the syncsetinstance
@@ -168,8 +177,6 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		r.logger.WithError(err).Error("error looking up syncsetinstance")
 		return reconcile.Result{}, err
 	}
-
-	ssiLog := r.logger.WithField("syncsetinstance", request.NamespacedName)
 
 	if ssi.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(ssi, hivev1.FinalizerSyncSetInstance) {

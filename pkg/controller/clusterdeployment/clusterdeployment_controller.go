@@ -46,7 +46,6 @@ import (
 
 const (
 	controllerName     = "clusterDeployment"
-	serviceAccountName = "cluster-installer" // service account that can run the installer and upload artifacts to the cluster's namespace.
 	defaultRequeueTime = 10 * time.Second
 
 	adminSSHKeySecretKey  = "ssh-publickey"
@@ -323,7 +322,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
-	hiveImage := r.getHiveImage(cd, imageSet, cdLog)
+	hiveImage := controllerutils.GetHiveImage(cd, imageSet, cdLog)
 	releaseImage := r.getReleaseImage(cd, imageSet, cdLog)
 
 	if cd.DeletionTimestamp != nil {
@@ -497,7 +496,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cd,
 			hiveImage,
 			releaseImage,
-			serviceAccountName,
+			controllerutils.ServiceAccountName,
 			sshKey, GetInstallLogsPVCName(cd), skipGatherLogs)
 		if err != nil {
 			cdLog.WithError(err).Error("error generating install job")
@@ -746,7 +745,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
 	}
 	cliImage := images.GetCLIImage(cdLog)
-	job := imageset.GenerateImageSetJob(cd, releaseImage, serviceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
+	job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err

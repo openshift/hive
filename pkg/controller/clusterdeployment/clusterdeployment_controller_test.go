@@ -1031,7 +1031,7 @@ func testInstallJob() *batchv1.Job {
 	job, err := install.GenerateInstallerJob(cd,
 		images.DefaultHiveImage,
 		"",
-		serviceAccountName, "testSSHKey", GetInstallLogsPVCName(cd), false)
+		controllerutils.ServiceAccountName, "testSSHKey", GetInstallLogsPVCName(cd), false)
 	if err != nil {
 		fmt.Printf(err.Error())
 		panic("should not error while generating test install job")

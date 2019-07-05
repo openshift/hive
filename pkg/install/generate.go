@@ -39,6 +39,12 @@ var (
 	SSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", SSHPrivateKeyDir, SSHSecretPrivateKeyName)
 )
 
+// GenerateInstallerJobForProvision creates a job to install an OpenShift cluster
+// given a ClusterProvision.
+func GenerateInstallerJobForProvision(provision *hivev1.ClusterProvision) (*batchv1.Job, error) {
+	return nil, fmt.Errorf("installer job for provision not yet supported")
+}
+
 // GenerateInstallerJob creates a job to install an OpenShift cluster
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(

@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	// serviceAccountName will be a service account that can run the installer and then
+	// ServiceAccountName will be a service account that can run the installer and then
 	// upload artifacts to the cluster's namespace.
-	serviceAccountName = "cluster-installer"
+	ServiceAccountName = "cluster-installer"
 	roleName           = "cluster-installer"
 	roleBindingName    = "cluster-installer"
 )
@@ -27,7 +27,7 @@ const (
 func SetupClusterInstallServiceAccount(c client.Client, namespace string, logger log.FieldLogger) (*corev1.ServiceAccount, error) {
 	// create new serviceaccount if it doesn't already exist
 	currentSA := &corev1.ServiceAccount{}
-	err := c.Get(context.Background(), client.ObjectKey{Name: serviceAccountName, Namespace: namespace}, currentSA)
+	err := c.Get(context.Background(), client.ObjectKey{Name: ServiceAccountName, Namespace: namespace}, currentSA)
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, fmt.Errorf("error checking for existing serviceaccount")
 	}
@@ -35,7 +35,7 @@ func SetupClusterInstallServiceAccount(c client.Client, namespace string, logger
 	if errors.IsNotFound(err) {
 		currentSA = &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceAccountName,
+				Name:      ServiceAccountName,
 				Namespace: namespace,
 			},
 		}
@@ -44,9 +44,9 @@ func SetupClusterInstallServiceAccount(c client.Client, namespace string, logger
 		if err != nil {
 			return nil, fmt.Errorf("error creating serviceaccount: %v", err)
 		}
-		logger.WithField("name", serviceAccountName).Info("created service account")
+		logger.WithField("name", ServiceAccountName).Info("created service account")
 	} else {
-		logger.WithField("name", serviceAccountName).Debug("service account already exists")
+		logger.WithField("name", ServiceAccountName).Debug("service account already exists")
 	}
 
 	expectedRole := &rbacv1.Role{

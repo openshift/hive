@@ -27,7 +27,9 @@ import (
 )
 
 const (
-	defaultLogLevel = "info"
+	defaultLogLevel         = "info"
+	hiveNamespace           = "hive"
+	leaderElectionConfigMap = "hive-controllers-leader"
 )
 
 type controllerManagerOptions struct {
@@ -56,7 +58,10 @@ func newRootCommand() *cobra.Command {
 
 			// Create a new Cmd to provide shared dependencies and start components
 			mgr, err := manager.New(cfg, manager.Options{
-				MetricsBindAddress: ":2112",
+				MetricsBindAddress:      ":2112",
+				LeaderElection:          true,
+				LeaderElectionNamespace: hiveNamespace,
+				LeaderElectionID:        leaderElectionConfigMap,
 			})
 			if err != nil {
 				log.Fatal(err)

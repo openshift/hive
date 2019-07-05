@@ -1213,6 +1213,7 @@ rules:
   - serviceaccounts
   - secrets
   - configmaps
+  - events
   verbs:
   - get
   - list

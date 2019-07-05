@@ -4786,6 +4786,11 @@ data:
     - "data.aws_route53_zone.public: no matching Route53Zone found"
     installFailingReason: NoMatchingRoute53Zone
     installFailingMessage: No matching Route53Zone found
+  KubeAPIWaitTimeout: |
+    searchRegexStrings:
+    - "waiting for Kubernetes API: context deadline exceeded"
+    installFailingReason: KubeAPIWaitTimeout
+    installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

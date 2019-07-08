@@ -953,8 +953,8 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	} else if err != nil {
 		cdLog.WithError(err).Errorf("error getting existing install job for deleted cluster deployment")
 		return reconcile.Result{}, err
-	} else if err == nil && !installJob.DeletionTimestamp.IsZero() {
-		cdLog.Debug("install job is being deleted, requeueing to wait for deletion")
+	} else if !installJob.DeletionTimestamp.IsZero() {
+		cdLog.WithField("finalizers", installJob.Finalizers).Info("install job is being deleted, requeueing to wait for deletion")
 		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	} else {
 		err = r.Delete(context.Background(), installJob,

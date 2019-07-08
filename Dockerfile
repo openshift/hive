@@ -13,5 +13,13 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/ser
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-operator /opt/services
 
+# In the event of failures we run ssh commands to execute the script which gathers logs
+# from all systems in the cluster, and scp's those from the bootstrap node into the
+# /logs volume in the install pod. This requires the current user ID (randomly assigned by
+# the cluster) to be in the passwd file. At runtime we execute with gid 0, so making the
+# file group writable allows our install process to add our install user ID to the passwd
+# file and unblock ssh.
+RUN chmod g+rw /etc/passwd
+
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

@@ -1214,6 +1214,7 @@ rules:
   - secrets
   - configmaps
   - events
+  - persistentvolumeclaims
   verbs:
   - get
   - list
@@ -3294,6 +3295,17 @@ spec:
                     external-dns controller. If not specified, a default image will
                     be used.
                   type: string
+              type: object
+            failedProvisionConfig:
+              description: FailedProvisionConfig is used to configure settings related
+                to handling provision failures.
+              properties:
+                gatherLogs:
+                  description: GatherLogs enables functionality that will attempt
+                    to gather full logs from the cluster if an installation fails
+                    for any reason. The logs will be stored in a persistent volume
+                    for up to 7 days.
+                  type: boolean
               type: object
             globalPullSecret:
               description: GlobalPullSecret is used to specify a pull secret that

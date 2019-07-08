@@ -10,6 +10,13 @@ const (
 
 	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.
 	VeleroBackupEnvVar = "HIVE_VELERO_BACKUP"
+
+	// GatherLogsEnvVar is the environment variable which passes the configuration to enable
+	// log gathering on failed cluster installs. The value will be either "true" or "false".
+	// If unset "false" should be assumed. This variable is set by the operator depending on the
+	// value of the setting in HiveConfig, passed to the controllers deployment, as well as to
+	// install pods which do the actual log gathering.
+	GatherLogsEnvVar = "GATHER_LOGS"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -37,7 +37,7 @@ make run-operator
 
 #### Run Hive Operator Using Custom Images
 
- 1. Build and publish a custom Hive image from your current working dir: `$ IMG=quay.io/{username}/hive:latest make buildah-push`
+ 1. Build and publish a custom Hive image from your current working dir: `$ IMG=quay.io/{username}/hive:latest make buildah-dev-push`
  2. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/{username}/hive:latest make deploy`
  3. After code changes you need to rebuild the Hive images as mentioned in step 1.
  4. Delete the running Hive pods using following command, so that the new pods will be running using the latest images built in the previous step.

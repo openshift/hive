@@ -31,17 +31,17 @@ import (
 
 const longDesc = `
 OVERVIEW
-The hive-util create-cluster command generates and applies the artifacts needed 
+The hive-util create-cluster command generates and applies the artifacts needed
 to create a new Hive cluster deployment. By default, the clusterdeployment is
 generated along with corresponding secrets and then applied to the current
 cluster. If you don't need secrets generated, specify --include-secrets=false
 in the command line. If you don't want to apply the cluster deployment and
-only output it locally, specify the output flag (-o json) or (-o yaml) to 
+only output it locally, specify the output flag (-o json) or (-o yaml) to
 specify your output format.
 
 IMAGES
 An existing ClusterImageSet can be specified with the --image-set
-flag. Otherwise, one will be generated using the images specified for the 
+flag. Otherwise, one will be generated using the images specified for the
 cluster deployment. If you don't wish to use a ClusterImageSet, specify
 --use-image-set=false. This will result in images only specified on the
 cluster itself.
@@ -51,13 +51,13 @@ ENVIRONMENT VARIABLES
 The command will use the following environment variables for its output:
 
 PUBLIC_SSH_KEY - If present, it is used as the new cluster's public SSH key.
-It overrides the public ssh key flags. If not, --ssh-public-key will be used. 
-If that is not specified, then --ssh-public-key-file is used. 
+It overrides the public ssh key flags. If not, --ssh-public-key will be used.
+If that is not specified, then --ssh-public-key-file is used.
 That file's default value is %[1]s.
 
-PULL_SECRET - If present, it is used as the cluster deployment's pull 
+PULL_SECRET - If present, it is used as the cluster deployment's pull
 secret and will override the --pull-secret flag. If not present, and
-the --pull-secret flag is not specified, then the --pull-secret-file is 
+the --pull-secret flag is not specified, then the --pull-secret-file is
 used. That file's default value is %[2]s.
 
 AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID - Are used to determine your
@@ -65,16 +65,16 @@ AWS credentials. If not present, then the --aws-creds-file is used. By
 default, that flag's value is %[3]s.
 
 HIVE_IMAGE - Hive image to use for installing/uninstalling the cluster.
-If not specified, the --hive-image flag is used. If that's not specified, 
+If not specified, the --hive-image flag is used. If that's not specified,
 a default image is used: %[4]s.
 
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
-obtained from a the following URL: 
+obtained from a the following URL:
 https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
 
 INSTALLER_IMAGE - Installer image to use to install the cluster. If not specified,
-the --installer-image flag is used. If that's not specified, the image is 
+the --installer-image flag is used. If that's not specified, the image is
 derived from the release image at runtime.
 `
 const (
@@ -106,10 +106,12 @@ type Options struct {
 	IncludeSecrets     bool
 	InstallOnce        bool
 	UninstallOnce      bool
+	SimulateFailure    bool
 }
 
 const (
-	defaultHiveImage = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+	defaultHiveImage                 = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+	hiveInstallFailureTestAnnotation = "hive.openshift.io/install-failure-test"
 )
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
@@ -160,6 +162,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.BoolVar(&opt.IncludeSecrets, "include-secrets", true, "Include secrets along with ClusterDeployment")
 	flags.BoolVar(&opt.InstallOnce, "install-once", false, "Run the install only one time and fail if not successful")
 	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
+	flags.BoolVar(&opt.SimulateFailure, "simulate-failure", false, "Simulate an install failure late in the process by injecting an invalid manifest.")
 	return cmd
 }
 
@@ -522,6 +525,9 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 	}
 	if o.UninstallOnce {
 		cd.Annotations[tryUninstallOnceAnnotation] = "true"
+	}
+	if o.SimulateFailure {
+		cd.Annotations[hiveInstallFailureTestAnnotation] = "true"
 	}
 
 	imageSet, err := o.configureImages(cd)

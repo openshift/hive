@@ -13,6 +13,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -187,7 +188,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "Completed install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
-				testCompletedInstallJob(),
+				testCompletedInstallJob(time.Now()),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -203,19 +204,69 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Legacy dockercfg pull secret causes no errors once installed",
+			name: "PVC cleanup for successful install",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-					return cd
-				}(),
-				testCompletedInstallJob(),
+				testInstalledClusterDeployment(),
+				testCompletedInstallJob(time.Now()),
+				testInstallLogPVC(testInstallJob().Name),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				pvc := &corev1.PersistentVolumeClaim{}
+				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallJob().Name, Namespace: testNamespace}, pvc)
+				if assert.Error(t, err) {
+					assert.True(t, errors.IsNotFound(err))
+				}
+			},
+		},
+		{
+			name: "PVC preserved for install with restarts",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testInstalledClusterDeployment()
+					cd.Status.InstallRestarts = 5
+					return cd
+				}(),
+				testCompletedInstallJob(time.Now()),
+				testInstallLogPVC(testInstallJob().Name),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				pvc := &corev1.PersistentVolumeClaim{}
+				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallJob().Name, Namespace: testNamespace}, pvc)
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "PVC cleanup for install with restarts after 7 days",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testInstalledClusterDeployment()
+					cd.Status.InstallRestarts = 5
+					return cd
+				}(),
+				testCompletedInstallJob(time.Now().Add(-8 * 24 * time.Hour)),
+				testInstallLogPVC(testInstallJob().Name),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				pvc := &corev1.PersistentVolumeClaim{}
+				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallJob().Name, Namespace: testNamespace}, pvc)
+				if assert.Error(t, err) {
+					assert.True(t, errors.IsNotFound(err))
+				}
 			},
 		},
 		{
@@ -227,7 +278,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
-				testCompletedInstallJob(),
+				testCompletedInstallJob(time.Now()),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
@@ -235,7 +286,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Completed with install job manually deleted",
+			name: "Legacy dockercfg pull secret causes no errors once installed",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
@@ -243,6 +294,18 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
+				testCompletedInstallJob(time.Now()),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+		},
+		{
+			name: "Completed with install job manually deleted",
+			existing: []runtime.Object{
+				testInstalledClusterDeployment(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -264,7 +327,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _ := install.GenerateInstallerJob(
+					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
 						"",
@@ -323,7 +386,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _ := install.GenerateInstallerJob(
+					job, _, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
 						"",
@@ -350,7 +413,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _ := install.GenerateInstallerJob(
+					job, _, _ := install.GenerateInstallerJob(
 						testClusterDeployment(),
 						"fakeserviceaccount",
 						"",
@@ -926,6 +989,13 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func testInstalledClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Status.Installed = true
+	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+	return cd
+}
+
 func testClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.Finalizers = []string{}
@@ -956,7 +1026,7 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 
 func testInstallJob() *batchv1.Job {
 	cd := testClusterDeployment()
-	job, err := install.GenerateInstallerJob(cd,
+	job, _, err := install.GenerateInstallerJob(cd,
 		images.DefaultHiveImage,
 		"",
 		serviceAccountName, "testSSHKey")
@@ -975,7 +1045,7 @@ func testInstallJob() *batchv1.Job {
 	return job
 }
 
-func testCompletedInstallJob() *batchv1.Job {
+func testCompletedInstallJob(completionTime time.Time) *batchv1.Job {
 	job := testInstallJob()
 	job.Status.Conditions = []batchv1.JobCondition{
 		{
@@ -983,7 +1053,15 @@ func testCompletedInstallJob() *batchv1.Job {
 			Status: corev1.ConditionTrue,
 		},
 	}
+	job.Status.CompletionTime = &metav1.Time{Time: completionTime}
 	return job
+}
+
+func testInstallLogPVC(jobName string) *corev1.PersistentVolumeClaim {
+	pvc := &corev1.PersistentVolumeClaim{}
+	pvc.Name = jobName
+	pvc.Namespace = testNamespace
+	return pvc
 }
 
 func testMetadataConfigMap() *corev1.ConfigMap {

@@ -168,11 +168,6 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
-		_, err := controllerutils.SetupClusterInstallServiceAccount(r, instance.Namespace, rLog)
-		if err != nil {
-			rLog.WithError(err).Error("error setting up service account and role")
-			return reconcile.Result{}, err
-		}
 		rLog.Debug("uninstall job does not exist, creating it")
 		err = r.Create(context.TODO(), uninstallJob)
 		if err != nil {

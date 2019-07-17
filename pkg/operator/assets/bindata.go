@@ -874,6 +874,7 @@ rules:
   resources:
   - clusterdeployments
   - clusterimagesets
+  - clusterprovisions
   - dnszones
   - selectorsyncsets
   - syncsets

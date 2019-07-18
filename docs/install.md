@@ -30,26 +30,48 @@ We do not currently publish an official OLM operator package, but you can run or
 
 `$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry" DEPLOY_IMG="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
 
-### Deploy using Minishift
+#### Verify that Hive is running
+Run: `$ oc get pods -n hive`
+
+Sample output:
+
+```bash
+$ oc get pods -n hive
+NAME                                READY     STATUS    RESTARTS   AGE
+hive-controllers-777bcb5b4d-nqw7w   1/1       Running   0          38m
+hive-operator-57dc6446df-4wqnd      1/1       Running   0          38m
+hiveadmission-5dfff7f575-4kcc4      1/1       Running   0          38m
+hiveadmission-5dfff7f575-cqxgg      1/1       Running   0          38m
+```
+
+### Next Step
+
+Provision a OpenShift cluster using Hive.
+For details refer [using Hive](./using-hive.md) documentation.
+
+### Deploy on Minishift
 
 The Hive controller and the operator can run on top of the OpenShift(version 3.11) provided by [Minishift](https://github.com/minishift/minishift).
 
 Steps:
 
-  - Start minishift
-    ```bash
-    $ minishift start
-    ```bash
-  - Login to the cluster as admin
+* Start minishift
 
-    ```bash
-    $ oc login -u system:admin
-    ```
+```bash
+minishift start
+```
 
-  - Give cluster-admin role to `admin` and `developer` user
-    ```bash
-    $ oc adm policy add-cluster-role-to-user cluster-admin developer
-    $ oc adm policy add-cluster-role-to-user cluster-admin admin
-    ```
-  - Follow steps in [Deployment Options](#deployment-options)
+* Login to the cluster as admin
 
+```bash
+oc login -u system:admin
+```
+
+* Give cluster-admin role to `admin` and `developer` user
+
+```bash
+oc adm policy add-cluster-role-to-user cluster-admin developer
+oc adm policy add-cluster-role-to-user cluster-admin admin
+```
+
+* Follow steps in [Deployment Options](#deployment-options)

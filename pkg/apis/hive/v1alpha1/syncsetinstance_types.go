@@ -74,6 +74,10 @@ type SyncSetInstanceStatus struct {
 	// +optional
 	Patches []SyncStatus `json:"patches,omitempty"`
 
+	// SecretReferences is the list of SyncStatus for secrets that have been synced.
+	// +optional
+	SecretReferences []SyncStatus `json:"secretReferences,omitempty"`
+
 	// Conditions is the list of SyncConditions used to indicate UnknownObject
 	// when a resource type cannot be determined from a SyncSet resource.
 	// +optional

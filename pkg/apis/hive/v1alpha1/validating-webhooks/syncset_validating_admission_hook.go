@@ -3,6 +3,7 @@ package validatingwebhooks
 import (
 	"encoding/json"
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"net/http"
@@ -10,8 +11,11 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
 )
 
@@ -155,9 +159,18 @@ func (a *SyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admission
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonInvalid,
 				Message: message,
 			},
+		}
+	}
+
+	if allErrs := validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences")); len(allErrs) > 0 {
+		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
+		contextLogger.Infof(statusError.Message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &statusError,
 		}
 	}
 
@@ -202,9 +215,18 @@ func (a *SyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonInvalid,
 				Message: message,
 			},
+		}
+	}
+
+	if allErrs := validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences")); len(allErrs) > 0 {
+		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
+		contextLogger.Infof(statusError.Message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &statusError,
 		}
 	}
 
@@ -223,4 +245,33 @@ func checkValidPatchTypes(patches []hivev1.SyncObjectPatch) (string, bool) {
 		}
 	}
 	return "", true
+}
+
+func validateSecretReferences(secrets []hivev1.SecretReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, secret := range secrets {
+		allErrs = append(allErrs, validateSecretRef(secret.Source, fldPath.Index(i).Child("source"))...)
+		allErrs = append(allErrs, validateSecretRef(secret.Target, fldPath.Index(i).Child("target"))...)
+	}
+	return allErrs
+}
+
+func validateSecretRef(ref corev1.ObjectReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(ref.Kind) > 0 && ref.Kind != "secret" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), ref.Kind, []string{"secret"}))
+	}
+	if ref.GroupVersionKind().Group != "" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ref.APIVersion, "Group part of API version must be empty"))
+	}
+	if len(ref.Name) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "Name is required"))
+	}
+	if len(ref.FieldPath) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), ref.FieldPath, "FieldPath should not be set"))
+	}
+	if len(ref.UID) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("UID"), ref.UID, "UID should not be set"))
+	}
+	return allErrs
 }

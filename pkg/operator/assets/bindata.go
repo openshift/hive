@@ -2373,7 +2373,7 @@ spec:
                       type: object
                     type: array
                   resourceApplyMode:
-                    description: ResourceApplyMode indicates if the resource apply
+                    description: ResourceApplyMode indicates if the Resource apply
                       mode is "upsert" (default) or "sync". ApplyMode "upsert" indicates
                       create and update. ApplyMode "sync" indicates create, update
                       and delete.
@@ -2381,6 +2381,70 @@ spec:
                   resources:
                     description: Resources is the list of SyncStatus for objects that
                       have been synced.
+                    items:
+                      properties:
+                        apiVersion:
+                          description: APIVersion is the Group and Version of the
+                            object that was synced or patched.
+                          type: string
+                        conditions:
+                          description: Conditions is the list of conditions indicating
+                            success or failure of object create, update and delete
+                            as well as patch application.
+                          items:
+                            properties:
+                              lastProbeTime:
+                                description: LastProbeTime is the last time we probed
+                                  the condition.
+                                format: date-time
+                                type: string
+                              lastTransitionTime:
+                                description: LastTransitionTime is the last time the
+                                  condition transitioned from one status to another.
+                                format: date-time
+                                type: string
+                              message:
+                                description: Message is a human-readable message indicating
+                                  details about last transition.
+                                type: string
+                              reason:
+                                description: Reason is a unique, one-word, CamelCase
+                                  reason for the condition's last transition.
+                                type: string
+                              status:
+                                description: Status is the status of the condition.
+                                type: string
+                              type:
+                                description: Type is the type of the condition.
+                                type: string
+                            type: object
+                          type: array
+                        hash:
+                          description: Hash is the unique md5 hash of the resource
+                            or patch.
+                          type: string
+                        kind:
+                          description: Kind is the Kind of the object that was synced
+                            or patched.
+                          type: string
+                        name:
+                          description: Name is the name of the object that was synced
+                            or patched.
+                          type: string
+                        namespace:
+                          description: Namespace is the Namespace of the object that
+                            was synced or patched.
+                          type: string
+                        resource:
+                          description: Resource is the resource name for the object
+                            that was synced. This will be populated for resources,
+                            but not patches
+                          type: string
+                      type: object
+                    type: array
+                  secretReferences:
+                    description: SecretReferences is the list of SyncStatus for secrets
+                      that have been synced.
                     items:
                       properties:
                         apiVersion:
@@ -2549,7 +2613,7 @@ spec:
                       type: object
                     type: array
                   resourceApplyMode:
-                    description: ResourceApplyMode indicates if the resource apply
+                    description: ResourceApplyMode indicates if the Resource apply
                       mode is "upsert" (default) or "sync". ApplyMode "upsert" indicates
                       create and update. ApplyMode "sync" indicates create, update
                       and delete.
@@ -2557,6 +2621,70 @@ spec:
                   resources:
                     description: Resources is the list of SyncStatus for objects that
                       have been synced.
+                    items:
+                      properties:
+                        apiVersion:
+                          description: APIVersion is the Group and Version of the
+                            object that was synced or patched.
+                          type: string
+                        conditions:
+                          description: Conditions is the list of conditions indicating
+                            success or failure of object create, update and delete
+                            as well as patch application.
+                          items:
+                            properties:
+                              lastProbeTime:
+                                description: LastProbeTime is the last time we probed
+                                  the condition.
+                                format: date-time
+                                type: string
+                              lastTransitionTime:
+                                description: LastTransitionTime is the last time the
+                                  condition transitioned from one status to another.
+                                format: date-time
+                                type: string
+                              message:
+                                description: Message is a human-readable message indicating
+                                  details about last transition.
+                                type: string
+                              reason:
+                                description: Reason is a unique, one-word, CamelCase
+                                  reason for the condition's last transition.
+                                type: string
+                              status:
+                                description: Status is the status of the condition.
+                                type: string
+                              type:
+                                description: Type is the type of the condition.
+                                type: string
+                            type: object
+                          type: array
+                        hash:
+                          description: Hash is the unique md5 hash of the resource
+                            or patch.
+                          type: string
+                        kind:
+                          description: Kind is the Kind of the object that was synced
+                            or patched.
+                          type: string
+                        name:
+                          description: Name is the name of the object that was synced
+                            or patched.
+                          type: string
+                        namespace:
+                          description: Namespace is the Namespace of the object that
+                            was synced or patched.
+                          type: string
+                        resource:
+                          description: Resource is the resource name for the object
+                            that was synced. This will be populated for resources,
+                            but not patches
+                          type: string
+                      type: object
+                    type: array
+                  secretReferences:
+                    description: SecretReferences is the list of SyncStatus for secrets
+                      that have been synced.
                     items:
                       properties:
                         apiVersion:
@@ -3813,13 +3941,25 @@ spec:
                 type: object
               type: array
             resourceApplyMode:
-              description: ResourceApplyMode indicates if the resource apply mode
+              description: ResourceApplyMode indicates if the Resource apply mode
                 is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
                 and update. ApplyMode "sync" indicates create, update and delete.
               type: string
             resources:
-              description: Resources is the list of objects to sync.
+              description: Resources is the list of objects to sync from RawExtension
+                definitions.
               items:
+                type: object
+              type: array
+            secretReferences:
+              description: SecretReferences is the list of secrets to sync from existing
+                resources.
+              items:
+                properties:
+                  source:
+                    type: object
+                  target:
+                    type: object
                 type: object
               type: array
           type: object
@@ -4487,13 +4627,25 @@ spec:
                 type: object
               type: array
             resourceApplyMode:
-              description: ResourceApplyMode indicates if the resource apply mode
+              description: ResourceApplyMode indicates if the Resource apply mode
                 is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
                 and update. ApplyMode "sync" indicates create, update and delete.
               type: string
             resources:
-              description: Resources is the list of objects to sync.
+              description: Resources is the list of objects to sync from RawExtension
+                definitions.
               items:
+                type: object
+              type: array
+            secretReferences:
+              description: SecretReferences is the list of secrets to sync from existing
+                resources.
+              items:
+                properties:
+                  source:
+                    type: object
+                  target:
+                    type: object
                 type: object
               type: array
           required:
@@ -4681,6 +4833,68 @@ spec:
             resources:
               description: Resources is the list of SyncStatus for objects that have
                 been synced.
+              items:
+                properties:
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the object
+                      that was synced or patched.
+                    type: string
+                  conditions:
+                    description: Conditions is the list of conditions indicating success
+                      or failure of object create, update and delete as well as patch
+                      application.
+                    items:
+                      properties:
+                        lastProbeTime:
+                          description: LastProbeTime is the last time we probed the
+                            condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: LastTransitionTime is the last time the condition
+                            transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is a human-readable message indicating
+                            details about last transition.
+                          type: string
+                        reason:
+                          description: Reason is a unique, one-word, CamelCase reason
+                            for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status is the status of the condition.
+                          type: string
+                        type:
+                          description: Type is the type of the condition.
+                          type: string
+                      type: object
+                    type: array
+                  hash:
+                    description: Hash is the unique md5 hash of the resource or patch.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the object that was synced or
+                      patched.
+                    type: string
+                  name:
+                    description: Name is the name of the object that was synced or
+                      patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace of the object that was
+                      synced or patched.
+                    type: string
+                  resource:
+                    description: Resource is the resource name for the object that
+                      was synced. This will be populated for resources, but not patches
+                    type: string
+                type: object
+              type: array
+            secretReferences:
+              description: SecretReferences is the list of SyncStatus for secrets
+                that have been synced.
               items:
                 properties:
                   apiVersion:

@@ -3,6 +3,7 @@ package validatingwebhooks
 import (
 	"encoding/json"
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"net/http"
@@ -10,8 +11,10 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
 )
 
@@ -155,9 +158,18 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonInvalid,
 				Message: message,
 			},
+		}
+	}
+
+	if errs := validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences")); len(errs) > 0 {
+		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, errs).Status()
+		contextLogger.Infof(statusError.Message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &statusError,
 		}
 	}
 
@@ -202,9 +214,18 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonInvalid,
 				Message: message,
 			},
+		}
+	}
+
+	if errs := validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences")); len(errs) > 0 {
+		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, errs).Status()
+		contextLogger.Infof(statusError.Message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &statusError,
 		}
 	}
 

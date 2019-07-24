@@ -2,13 +2,15 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
+	"testing"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
 )
 
 func TestSyncSetValidatingResource(t *testing.T) {
@@ -83,6 +85,258 @@ func TestSyncSetValidate(t *testing.T) {
 			syncSet:         testSyncSet(),
 			expectedAllowed: true,
 		},
+		{
+			name:            "Test valid SecretReference create",
+			operation:       admissionv1beta1.Create,
+			syncSet:         testSecretReferenceSyncSet(),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid SecretReference update",
+			operation:       admissionv1beta1.Update,
+			syncSet:         testSecretReferenceSyncSet(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference source kind create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.Kind = "secret"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference target kind create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "secret"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference source kind update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.Kind = "secret"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference target kind update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "secret"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test invalid SecretReference source kind create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.Kind = "wrongkind"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target kind create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "wrongkind"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source kind update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.Kind = "wrongkind"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target kind update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "wrongkind"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no source name create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no target name create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no source name update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no target name update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source fieldPath set create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source UID set create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.UID = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target fieldPath set create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target UID set create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.UID = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source fieldPath set update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source UID set update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.UID = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target fieldPath set update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target UID set update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Target.UID = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test valid SecretReference source apiVersion group set create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.APIVersion = "v1"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference source apiVersion group set update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.APIVersion = "v1"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test invalid SecretReference source apiVersion group set create",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.APIVersion = "wrong/v1"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source apiVersion group set update",
+			operation: admissionv1beta1.Update,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.SecretReferences[0].Source.APIVersion = "wrong/v1"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -135,6 +389,27 @@ func testPatchSyncSet(patchType string) *hivev1.SyncSet {
 				{
 					Patch:     "foo",
 					PatchType: patchType,
+				},
+			},
+		},
+	}
+	return ss
+}
+
+func testSecretReferenceSyncSet() *hivev1.SyncSet {
+	ss := testSyncSet()
+	ss.Spec = hivev1.SyncSetSpec{
+		SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
+			SecretReferences: []hivev1.SecretReference{
+				{
+					Source: corev1.ObjectReference{
+						Name:      "foo",
+						Namespace: "foo",
+					},
+					Target: corev1.ObjectReference{
+						Name:      "foo",
+						Namespace: "foo",
+					},
 				},
 			},
 		},

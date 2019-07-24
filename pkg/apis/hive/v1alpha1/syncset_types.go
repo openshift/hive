@@ -65,6 +65,12 @@ type SyncObjectPatch struct {
 	PatchType string `json:"patchType,omitempty"`
 }
 
+// SecretReference represents a reference to an existing secret object to be synced
+type SecretReference struct {
+	Source corev1.ObjectReference `json:"source"`
+	Target corev1.ObjectReference `json:"target"`
+}
+
 // SyncConditionType is a valid value for SyncCondition.Type
 type SyncConditionType string
 
@@ -115,7 +121,7 @@ type SyncSetObjectStatus struct {
 	// +optional
 	Resources []SyncStatus `json:"resources,omitempty"`
 
-	// ResourceApplyMode indicates if the resource apply mode is "upsert" (default) or "sync".
+	// ResourceApplyMode indicates if the Resource apply mode is "upsert" (default) or "sync".
 	// ApplyMode "upsert" indicates create and update.
 	// ApplyMode "sync" indicates create, update and delete.
 	// +optional
@@ -124,6 +130,10 @@ type SyncSetObjectStatus struct {
 	// Patches is the list of SyncStatus for patches that have been applied.
 	// +optional
 	Patches []SyncStatus `json:"patches,omitempty"`
+
+	// SecretReferences is the list of SyncStatus for secrets that have been synced.
+	// +optional
+	SecretReferences []SyncStatus `json:"secretReferences,omitempty"`
 
 	// Conditions is the list of SyncConditions used to indicate UnknownObject
 	// when a resource type cannot be determined from a SyncSet resource.
@@ -162,11 +172,11 @@ type SyncStatus struct {
 
 // SyncSetCommonSpec defines the resources and patches to sync
 type SyncSetCommonSpec struct {
-	// Resources is the list of objects to sync.
+	// Resources is the list of objects to sync from RawExtension definitions.
 	// +optional
 	Resources []runtime.RawExtension `json:"resources,omitempty"`
 
-	// ResourceApplyMode indicates if the resource apply mode is "upsert" (default) or "sync".
+	// ResourceApplyMode indicates if the Resource apply mode is "upsert" (default) or "sync".
 	// ApplyMode "upsert" indicates create and update.
 	// ApplyMode "sync" indicates create, update and delete.
 	// +optional
@@ -175,6 +185,10 @@ type SyncSetCommonSpec struct {
 	// Patches is the list of patches to apply.
 	// +optional
 	Patches []SyncObjectPatch `json:"patches,omitempty"`
+
+	// SecretReferences is the list of secrets to sync from existing resources.
+	// +optional
+	SecretReferences []SecretReference `json:"secretReferences,omitempty"`
 }
 
 // SelectorSyncSetSpec defines the SyncSetCommonSpec resources and patches to sync along

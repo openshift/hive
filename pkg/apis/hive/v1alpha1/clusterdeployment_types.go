@@ -69,8 +69,8 @@ type ClusterDeploymentSpec struct {
 	Platform `json:"platform"`
 
 	// PullSecret is the reference to the secret to use when pulling images.
-	// +required
-	PullSecret corev1.LocalObjectReference `json:"pullSecret"`
+	// +optional
+	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
 
 	// PlatformSecrets contains credentials and secrets for the cluster infrastructure.
 	// +required

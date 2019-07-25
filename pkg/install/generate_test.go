@@ -1,6 +1,8 @@
 package install
 
 import (
+	"testing"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
@@ -8,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"testing"
 )
 
 const (
@@ -50,7 +51,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			ControlPlane: hivev1.MachinePool{},
 			Compute:      []hivev1.MachinePool{},
-			PullSecret: corev1.LocalObjectReference{
+			PullSecret: &corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},
 			Platform: hivev1.Platform{

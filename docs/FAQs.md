@@ -1,5 +1,7 @@
-- [Frequently Asked Questions](#frequently-asked-questions)
-  - [How is Hive different than the OpenShift installer?](#how-is-hive-different-than-the-openshift-installer)
+- [Frequently Asked Questions](#Frequently-Asked-Questions)
+  - [How does Hive relate to the OpenShift 4 installer (openshift-install)?](#How-does-Hive-relate-to-the-OpenShift-4-installer-openshift-install)
+  - [Why doesn't Hive use Federation v2 for configuration management?](#Why-doesnt-Hive-use-Federation-v2-for-configuration-management)
+  - [How does Hive relate to the sig-cluster-lifecycle Cluster API project?](#How-does-Hive-relate-to-the-sig-cluster-lifecycle-Cluster-API-project)
 
 # Frequently Asked Questions
 

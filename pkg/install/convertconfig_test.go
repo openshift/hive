@@ -54,7 +54,7 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 			SSHKey: &corev1.LocalObjectReference{
 				Name: "ssh-key",
 			},
-			PullSecret: corev1.LocalObjectReference{
+			PullSecret: &corev1.LocalObjectReference{
 				Name: "pull-secret",
 			},
 			Platform: hivev1.Platform{

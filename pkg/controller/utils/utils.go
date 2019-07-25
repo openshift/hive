@@ -1,24 +1,26 @@
 package utils
 
 import (
-	"context"
-	"fmt"
+	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
-	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+)
+
+const (
+	mergedPullSecretSuffix = "merged-pull-secret"
 )
 
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient with metrics using the provided kubeconfig.
@@ -137,20 +139,6 @@ func GetKubeClient(scheme *runtime.Scheme) (client.Client, error) {
 	return dynamicClient, nil
 }
 
-// LoadSecretData loads a given secret key and returns it's data as a string.
-func LoadSecretData(c client.Client, secretName, namespace, dataKey string) (string, error) {
-	s := &kapi.Secret{}
-	err := c.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
-	if err != nil {
-		return "", err
-	}
-	retStr, ok := s.Data[dataKey]
-	if !ok {
-		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
-	}
-	return string(retStr), nil
-}
-
 const (
 	concurrentControllerReconciles = 5
 )
@@ -160,4 +148,38 @@ const (
 // In future this may be read from an env var set by the operator, and driven by HiveConfig.
 func GetConcurrentReconciles() int {
 	return concurrentControllerReconciles
+}
+
+// MergeJsons will merge the global and local pull secret and return it
+func MergeJsons(globalPullSecret string, localPullSecret string, cdLog log.FieldLogger) (string, error) {
+
+	type dockerConfig map[string]interface{}
+	type dockerConfigJSON struct {
+		Auths dockerConfig `json:"auths"`
+	}
+
+	var mGlobal, mLocal dockerConfigJSON
+	jGlobal := []byte(globalPullSecret)
+	err := json.Unmarshal(jGlobal, &mGlobal)
+	if err != nil {
+		return "", err
+	}
+
+	jLocal := []byte(localPullSecret)
+	err = json.Unmarshal(jLocal, &mLocal)
+	if err != nil {
+		return "", err
+	}
+
+	for k, v := range mLocal.Auths {
+		if _, ok := mGlobal.Auths[k]; ok {
+			cdLog.Infof("The auth for %s from cluster deployment pull secret is used instead of global pull secret", k)
+		}
+		mGlobal.Auths[k] = v
+	}
+	jMerged, err := json.Marshal(mGlobal)
+	if err != nil {
+		return "", err
+	}
+	return string(jMerged), nil
 }

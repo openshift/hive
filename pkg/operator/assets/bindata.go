@@ -2016,7 +2016,6 @@ spec:
           - controlPlane
           - compute
           - platform
-          - pullSecret
           - platformSecrets
           type: object
         status:
@@ -3267,6 +3266,14 @@ spec:
                     external-dns controller. If not specified, a default image will
                     be used.
                   type: string
+              type: object
+            globalPullSecret:
+              description: GlobalPullSecret is used to specify a pull secret that
+                will be used globally by all of the cluster deployments. For each
+                cluster deployment, the contents of GlobalPullSecret will be merged
+                with the specific pull secret for a cluster deployment(if specified),
+                with precedence given to the contents of the pull secret for the cluster
+                deployment.
               type: object
             managedDomains:
               description: 'ManagedDomains is the list of DNS domains that are managed

@@ -16,6 +16,32 @@
         $ oc create secret generic test-creds --from-literal=aws_secret_access_key=$AWS_SECRET_ACCESS_KEY --from-literal=aws_access_key_id=$AWS_ACCESS_KEY_ID
         ```
 
+### Using Global Pull Secret
+
+GlobalPullSecret can be used to specify a pull secret that will be used globally by all of the cluster deployments created by Hive.
+When GlobalPullSecret is defined in Hive namespace and a cluster deployment specific pull secret is specified, the registry authentication in both secrets will be merged and used by the new OpenShift cluster.
+When a registry exists in both pull secrets, precedence will be given to the contents of the cluster specific pull secret.
+
+The global pull secret must live in the "hive" namespace, to create one:
+
+```bash
+oc create secret generic global-pull-secret --from-file=.dockerconfigjson=<path>/config.json --type=kubernetes.io/dockerconfigjson --namespace hive
+```
+
+Edit the HiveConfig to add global pull secret.
+
+```bash
+oc edit hiveconfig hive
+```
+
+The global pull secret name must be configured in the HiveConfig CRD.
+
+```yaml
+spec:
+  globalPullSecret:
+    name: global-pull-secret
+```
+
 ### Provisioning
 
 Hive supports two methods of specifying what version of OpenShift you wish to install. Most commonly you can create a ClusterImageSet which references an OpenShift 4 release image, and a corresponding Hive image that is capable of installing it. The two are closely linked to accomodate code changes in the installer over time.

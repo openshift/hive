@@ -24,6 +24,8 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
+
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 const (
@@ -87,6 +89,10 @@ func newRootCommand() *cobra.Command {
 			}
 
 			if err := crv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

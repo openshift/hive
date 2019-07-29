@@ -72,6 +72,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		deletedSyncSet         *hivev1.SyncSet
 		selectorSyncSet        *hivev1.SelectorSyncSet
 		deletedSelectorSyncSet *hivev1.SelectorSyncSet
+		existingObjs           []runtime.Object
 		validate               func(*testing.T, *hivev1.SyncSetInstance)
 		isDeleted              bool
 		expectDeleted          []deletedItemInfo
@@ -83,7 +84,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			syncSet: testSyncSetWithResources("ss1", testCM("cm1", "foo", "bar")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulResourceStatus([]runtime.Object{testCM("cm1", "foo", "bar")}))
+					successfulResourceStatus(testCM("cm1", "foo", "bar")))
 			},
 		},
 		{
@@ -91,16 +92,16 @@ func TestSyncSetReconcile(t *testing.T) {
 			syncSet: testSyncSetWithResources("foo", testCMs("bar", 5)...),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulResourceStatus(testCMs("bar", 5)))
+					successfulResourceStatus(testCMs("bar", 5)...))
 			},
 		},
 		{
 			name:    "Update single resource",
-			status:  successfulResourceStatus([]runtime.Object{testCM("cm1", "key1", "value1")}),
+			status:  successfulResourceStatus(testCM("cm1", "key1", "value1")),
 			syncSet: testSyncSetWithResources("ss1", testCM("cm1", "key1", "value***changed")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulResourceStatus([]runtime.Object{testCM("cm1", "key1", "value***changed")}))
+					successfulResourceStatus(testCM("cm1", "key1", "value***changed")))
 			},
 		},
 		{
@@ -119,11 +120,10 @@ func TestSyncSetReconcile(t *testing.T) {
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulResourceStatus(
-					[]runtime.Object{
-						testCM("cm1", "key1", "value1"),
-						testCM("cm2", "key2", "value***changed"),
-						testCM("cm3", "key3", "value3"),
-					}))
+					testCM("cm1", "key1", "value1"),
+					testCM("cm2", "key2", "value***changed"),
+					testCM("cm3", "key3", "value3"),
+				))
 				unchanged := []hivev1.SyncStatus{
 					ssi.Status.Resources[0],
 					ssi.Status.Resources[2],
@@ -167,13 +167,12 @@ func TestSyncSetReconcile(t *testing.T) {
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := successfulResourceStatus(
-					[]runtime.Object{
-						testCM("cm1", "key1", "value1"),
-						testCM("cm2", "key2", "value2"),
-					})
-				status.Resources = append(status.Resources, failedResourceStatus("foo", []runtime.Object{
+					testCM("cm1", "key1", "value1"),
+					testCM("cm2", "key2", "value2"),
+				)
+				status.Resources = append(status.Resources, applyFailedResourceStatus("foo",
 					testCM("apply-error", "key3", "value3"),
-				}).Resources...)
+				).Resources...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
 			expectErr: true,
@@ -185,9 +184,8 @@ func TestSyncSetReconcile(t *testing.T) {
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulResourceStatus(
-					[]runtime.Object{
-						testCM("cm1", "key1", "value1"),
-					}))
+					testCM("cm1", "key1", "value1"),
+				))
 			},
 		},
 		{
@@ -266,13 +264,12 @@ func TestSyncSetReconcile(t *testing.T) {
 				}),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := successfulResourceStatus(
-					[]runtime.Object{
-						testCM("cm1", "key1", "value1"),
-						testCM("cm2", "key2", "value2"),
-					})
-				status.Resources = append(status.Resources, failedResourceStatus("ss1", []runtime.Object{
+					testCM("cm1", "key1", "value1"),
+					testCM("cm2", "key2", "value2"),
+				)
+				status.Resources = append(status.Resources, applyFailedResourceStatus("ss1",
 					testCM("apply-error", "key3", "value3"),
-				}).Resources...)
+				).Resources...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
 			expectErr: true,
@@ -280,12 +277,11 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "resource sync mode, remove resources",
 			status: successfulResourceStatus(
-				[]runtime.Object{
-					testCM("cm1", "key1", "value1"),
-					testCM("cm2", "key2", "value2"),
-					testCM("cm3", "key3", "value3"),
-					testCM("cm4", "key4", "value4"),
-				}),
+				testCM("cm1", "key1", "value1"),
+				testCM("cm2", "key2", "value2"),
+				testCM("cm3", "key3", "value3"),
+				testCM("cm4", "key4", "value4"),
+			),
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSetWithResources("aaa",
 					testCM("cm1", "key1", "value1"),
@@ -325,13 +321,193 @@ func TestSyncSetReconcile(t *testing.T) {
 			}(),
 			isDeleted: true,
 			status: successfulResourceStatus(
-				[]runtime.Object{
-					testCM("cm1", "key1", "value1"),
-					testCM("cm2", "key2", "value2"),
-				}),
+				testCM("cm1", "key1", "value1"),
+				testCM("cm2", "key2", "value2"),
+			),
 			expectDeleted: []deletedItemInfo{
 				deletedCM("cm1"),
 				deletedCM("cm2"),
+			},
+		},
+		{
+			name: "Apply single SecretReference successfully",
+			existingObjs: []runtime.Object{
+				testSecret("foo", "bar"),
+			},
+			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				validateSyncSetInstanceStatus(t, ssi.Status,
+					successfulSecretReferenceStatus(testSecret("foo", "bar")))
+			},
+		},
+		{
+			name:      "Local SecretReference secret does not exist",
+			syncSet:   testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			expectErr: true,
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				status := hivev1.SyncSetInstanceStatus{}
+				status.SecretReferences = append(status.SecretReferences, applyFailedSecretReferenceStatus("ss1",
+					testSecret("foo", "bar"),
+				).SecretReferences...)
+				validateSyncSetInstanceStatus(t, ssi.Status, status)
+			},
+		},
+		{
+			name: "Apply multiple SecretReferences successfully",
+			existingObjs: []runtime.Object{
+				testSecret("foo", "bar"),
+				testSecret("baz", "bar"),
+			},
+			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo"), testSecretRef("baz")),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				validateSyncSetInstanceStatus(t, ssi.Status,
+					successfulSecretReferenceStatus(
+						testSecret("foo", "bar"),
+						testSecret("baz", "bar"),
+					))
+			},
+		},
+		{
+			name: "Update single secret",
+			existingObjs: []runtime.Object{
+				testSecret("foo", "data_value***changed"),
+			},
+			status:  successfulSecretReferenceStatus(testSecret("key", "data_value")),
+			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				validateSyncSetInstanceStatus(t, ssi.Status,
+					successfulSecretReferenceStatus(testSecret("foo", "data_value***changed")))
+			},
+		},
+		{
+			name: "Update only secrets that have changed",
+			existingObjs: []runtime.Object{
+				testSecret("s1", "value1"),
+				testSecret("s2", "value2***changed"),
+				testSecret("s3", "value3"),
+			},
+			status: successfulSecretReferenceStatusWithTime(
+				[]runtime.Object{
+					testSecret("s1", "value1"),
+					testSecret("s2", "value2"),
+					testSecret("s3", "value3"),
+				},
+				metav1.NewTime(tenMinutesAgo)),
+			syncSet: testSyncSetWithSecretReferences("aaa",
+				testSecretRef("s1"),
+				testSecretRef("s2"),
+				testSecretRef("s3"),
+			),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretReferenceStatus(
+					testSecret("s1", "value1"),
+					testSecret("s2", "value2***changed"),
+					testSecret("s3", "value3"),
+				))
+				unchanged := []hivev1.SyncStatus{
+					ssi.Status.SecretReferences[0],
+					ssi.Status.SecretReferences[2],
+				}
+				for _, ss := range unchanged {
+					if ss.Conditions[0].LastProbeTime.Time.Unix() != tenMinutesAgo.Unix() {
+						t.Errorf("unexpected condition last probe time for resource %s/%s. Got: %v, Expected: %v", ss.Namespace, ss.Name, ss.Conditions[0].LastProbeTime.Time, tenMinutesAgo)
+					}
+					if ss.Conditions[0].LastTransitionTime.Time.Unix() != tenMinutesAgo.Unix() {
+						t.Errorf("unexpected condition last transition time for resource %s/%s. Got: %v, Expected: %v", ss.Namespace, ss.Name, ss.Conditions[0].LastTransitionTime.Time, tenMinutesAgo)
+					}
+				}
+				changed := ssi.Status.SecretReferences[1]
+				if changed.Conditions[0].LastProbeTime.Time.Unix() <= tenMinutesAgo.Unix() {
+					t.Errorf("unexpected condition last probe time for resource %s/%s. Got: %v, Expected a more recent time", changed.Namespace, changed.Name, changed.Conditions[0].LastProbeTime.Time)
+				}
+				// The last transition time should not have changed because we went from successful to successful
+				if changed.Conditions[0].LastTransitionTime.Time.Unix() != tenMinutesAgo.Unix() {
+					t.Errorf("unexpected condition last transition time for resource %s/%s. Got: %v, Expected: %v", changed.Namespace, changed.Name, changed.Conditions[0].LastTransitionTime.Time, tenMinutesAgo)
+				}
+			},
+		},
+		{
+			name: "resource sync mode, remove secrets",
+			existingObjs: []runtime.Object{
+				testSecret("foo1", "bar"),
+				testSecret("foo2", "bar"),
+				testSecret("foo3", "bar"),
+				testSecret("foo4", "bar"),
+			},
+			status: successfulSecretReferenceStatus(
+				testSecret("foo1", "bar"),
+				testSecret("foo2", "bar"),
+				testSecret("foo3", "bar"),
+				testSecret("foo4", "bar"),
+			),
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSyncSetWithSecretReferences("aaa",
+					testSecretRef("foo1"),
+					testSecretRef("foo3"),
+				)
+				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
+				return ss
+			}(),
+			expectDeleted: []deletedItemInfo{
+				deletedSecret("foo2"),
+				deletedSecret("foo4"),
+			},
+		},
+		{
+			name: "selectorsyncset: apply single secret",
+			existingObjs: []runtime.Object{
+				testSecret("s1", "value1"),
+			},
+			selectorSyncSet: testMatchingSelectorSyncSetWithSecretReferences("foo",
+				testSecretRef("s1"),
+			),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretReferenceStatus(
+					testSecret("s1", "value1"),
+				))
+			},
+		},
+		{
+			name: "syncset: fail to delete resource",
+			status: successfulResourceStatus(
+				testCM("cm1", "key1", "value1"),
+				testCM("delete-error", "key2", "value2"),
+			),
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSyncSetWithResources("aaa", testCM("cm1", "key1", "value1"))
+				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
+				return ss
+			}(),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				status := successfulResourceStatus(
+					testCM("cm1", "key1", "value1"),
+				)
+				status.Resources = append(status.Resources, deleteFailedResourceStatus("aaa",
+					testCM("delete-error", "key2", "value2"),
+				).Resources...)
+				validateSyncSetInstanceStatus(t, ssi.Status, status)
+			},
+		},
+		{
+			name: "syncset: fail to delete secret reference secret",
+			existingObjs: []runtime.Object{
+				testSecret("foo", "bar"),
+			},
+			status: successfulSecretReferenceStatus(
+				testSecret("foo", "bar"),
+				testSecret("delete-error", "baz"),
+			),
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSyncSetWithSecretReferences("aaa", testSecretRef("foo"))
+				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
+				return ss
+			}(),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				status := successfulSecretReferenceStatus(testSecret("foo", "bar"))
+				status.SecretReferences = append(status.SecretReferences, deleteFailedSecretReferenceStatus("aaa",
+					testSecret("delete-error", "baz"),
+				).SecretReferences...)
+				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
 		},
 	}
@@ -341,7 +517,10 @@ func TestSyncSetReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var ssi *hivev1.SyncSetInstance
 			cd := testClusterDeployment()
+
 			runtimeObjs := []runtime.Object{cd, kubeconfigSecret()}
+			runtimeObjs = append(runtimeObjs, test.existingObjs...)
+
 			switch {
 			case test.deletedSyncSet != nil:
 				ssi = syncSetInstanceForSyncSet(cd, test.deletedSyncSet)
@@ -524,6 +703,24 @@ func testSyncSetWithPatches(name string, patches ...hivev1.SyncObjectPatch) *hiv
 	return ss
 }
 
+func testSyncSetWithSecretReferences(name string, refs ...hivev1.SecretReference) *hivev1.SyncSet {
+	ss := &hivev1.SyncSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Spec: hivev1.SyncSetSpec{
+			ClusterDeploymentRefs: []corev1.LocalObjectReference{
+				{
+					Name: testName,
+				},
+			},
+		},
+	}
+	ss.Spec.SecretReferences = append(ss.Spec.SecretReferences, refs...)
+	return ss
+}
+
 func testSyncObjectPatch(name, namespace, kind, apiVersion string, applyMode hivev1.SyncSetPatchApplyMode, value string) hivev1.SyncObjectPatch {
 	patch := fmt.Sprintf("{'spec': {'key: '%v'}}", value)
 	return hivev1.SyncObjectPatch{
@@ -553,6 +750,25 @@ func testSelectorSyncSetWithResources(name string, resources ...runtime.Object) 
 			Object: r,
 		})
 	}
+	return ss
+}
+
+func testMatchingSelectorSyncSetWithSecretReferences(name string, refs ...hivev1.SecretReference) *hivev1.SelectorSyncSet {
+	return testSelectorSyncSetWithSecretReferences(name, map[string]string{"region": "us-east-1"}, refs...)
+}
+
+func testSelectorSyncSetWithSecretReferences(name string, matchLabels map[string]string, refs ...hivev1.SecretReference) *hivev1.SelectorSyncSet {
+	ss := &hivev1.SelectorSyncSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: hivev1.SelectorSyncSetSpec{
+			ClusterDeploymentSelector: metav1.LabelSelector{
+				MatchLabels: matchLabels,
+			},
+		},
+	}
+	ss.Spec.SecretReferences = append(ss.Spec.SecretReferences, refs...)
 	return ss
 }
 
@@ -595,6 +811,47 @@ func testCMs(prefix string, count int) []runtime.Object {
 	return result
 }
 
+func testSecretRef(name string) hivev1.SecretReference {
+	return hivev1.SecretReference{
+		Source: corev1.ObjectReference{
+			Name:       name,
+			Namespace:  testNamespace,
+			APIVersion: "v1",
+		},
+		Target: corev1.ObjectReference{
+			Name:       name,
+			Namespace:  testNamespace,
+			APIVersion: "v1",
+		},
+	}
+}
+
+func testSecret(name, data string) *corev1.Secret {
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+		},
+		Data: map[string][]byte{
+			testName: []byte(data),
+		},
+	}
+}
+
+func deletedSecret(name string) deletedItemInfo {
+	return deletedItemInfo{
+		name:      name,
+		namespace: testNamespace,
+		group:     "",
+		version:   "v1",
+		resource:  secretsResource,
+	}
+}
+
 func kubeconfigSecret() *corev1.Secret {
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -608,7 +865,7 @@ func kubeconfigSecret() *corev1.Secret {
 	return s
 }
 
-func failedResourceStatus(name string, resources []runtime.Object) hivev1.SyncSetObjectStatus {
+func applyFailedResourceStatus(name string, resources ...runtime.Object) hivev1.SyncSetObjectStatus {
 	conditionTime := metav1.Now()
 	status := hivev1.SyncSetObjectStatus{
 		Name: name,
@@ -625,6 +882,100 @@ func failedResourceStatus(name string, resources []runtime.Object) hivev1.SyncSe
 			Conditions: []hivev1.SyncCondition{
 				{
 					Type:               hivev1.ApplyFailureSyncCondition,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: conditionTime,
+					LastProbeTime:      conditionTime,
+				},
+			},
+		})
+	}
+	return status
+}
+
+func applyFailedSecretReferenceStatus(name string, secrets ...runtime.Object) hivev1.SyncSetObjectStatus {
+	conditionTime := metav1.Now()
+	status := hivev1.SyncSetObjectStatus{
+		Name: name,
+	}
+	for _, s := range secrets {
+		obj, _ := meta.Accessor(s)
+		status.SecretReferences = append(status.SecretReferences, hivev1.SyncStatus{
+			APIVersion: s.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+			Kind:       s.GetObjectKind().GroupVersionKind().Kind,
+			Resource:   secretsResource,
+			Name:       obj.GetName(),
+			Namespace:  obj.GetNamespace(),
+			Hash:       "",
+			Conditions: []hivev1.SyncCondition{
+				{
+					Type:               hivev1.ApplyFailureSyncCondition,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: conditionTime,
+					LastProbeTime:      conditionTime,
+				},
+			},
+		})
+	}
+	return status
+}
+
+func deleteFailedResourceStatus(name string, resources ...runtime.Object) hivev1.SyncSetObjectStatus {
+	conditionTime := metav1.Now()
+	status := hivev1.SyncSetObjectStatus{
+		Name: name,
+	}
+	for _, r := range resources {
+		obj, _ := meta.Accessor(r)
+		status.Resources = append(status.Resources, hivev1.SyncStatus{
+			APIVersion: r.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+			Kind:       r.GetObjectKind().GroupVersionKind().Kind,
+			Resource:   r.GetObjectKind().GroupVersionKind().Kind,
+			Name:       obj.GetName(),
+			Namespace:  obj.GetNamespace(),
+			Hash:       objectHash(obj),
+			Conditions: []hivev1.SyncCondition{
+				{
+					Type:               hivev1.ApplySuccessSyncCondition,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: conditionTime,
+					LastProbeTime:      conditionTime,
+				},
+				{
+					Type:               hivev1.DeletionFailedSyncCondition,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: conditionTime,
+					LastProbeTime:      conditionTime,
+				},
+			},
+		})
+	}
+	return status
+}
+
+func deleteFailedSecretReferenceStatus(name string, secrets ...runtime.Object) hivev1.SyncSetObjectStatus {
+	conditionTime := metav1.Now()
+	status := hivev1.SyncSetObjectStatus{
+		Name: name,
+	}
+	for _, s := range secrets {
+		obj, _ := meta.Accessor(s)
+		hash, _ := controllerutils.GetChecksumOfObject(s)
+		status.SecretReferences = append(status.SecretReferences, hivev1.SyncStatus{
+			APIVersion: s.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+			Kind:       s.GetObjectKind().GroupVersionKind().Kind,
+			Resource:   secretsResource,
+			Name:       obj.GetName(),
+			Namespace:  obj.GetNamespace(),
+			Hash:       hash,
+			Conditions: []hivev1.SyncCondition{
+				{
+					Type:               hivev1.ApplySuccessSyncCondition,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: conditionTime,
+					LastProbeTime:      conditionTime,
+				},
+				{
+					Type:               hivev1.DeletionFailedSyncCondition,
 					Status:             corev1.ConditionTrue,
 					LastTransitionTime: conditionTime,
 					LastProbeTime:      conditionTime,
@@ -661,7 +1012,7 @@ func failedPatchStatus(name string, patches []hivev1.SyncObjectPatch) hivev1.Syn
 	return status
 }
 
-func successfulResourceStatus(resources []runtime.Object) hivev1.SyncSetInstanceStatus {
+func successfulResourceStatus(resources ...runtime.Object) hivev1.SyncSetInstanceStatus {
 	return successfulResourceStatusWithTime(resources, metav1.Now())
 }
 
@@ -676,6 +1027,35 @@ func successfulResourceStatusWithTime(resources []runtime.Object, conditionTime 
 			Name:       obj.GetName(),
 			Namespace:  obj.GetNamespace(),
 			Hash:       objectHash(obj),
+			Conditions: []hivev1.SyncCondition{
+				{
+					Type:               hivev1.ApplySuccessSyncCondition,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: conditionTime,
+					LastProbeTime:      conditionTime,
+				},
+			},
+		})
+	}
+	return status
+}
+
+func successfulSecretReferenceStatus(secrets ...runtime.Object) hivev1.SyncSetInstanceStatus {
+	return successfulSecretReferenceStatusWithTime(secrets, metav1.Now())
+}
+
+func successfulSecretReferenceStatusWithTime(secrets []runtime.Object, conditionTime metav1.Time) hivev1.SyncSetInstanceStatus {
+	status := hivev1.SyncSetInstanceStatus{}
+	for _, s := range secrets {
+		obj, _ := meta.Accessor(s)
+		hash, _ := controllerutils.GetChecksumOfObject(s)
+		status.SecretReferences = append(status.SecretReferences, hivev1.SyncStatus{
+			APIVersion: s.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+			Kind:       s.GetObjectKind().GroupVersionKind().Kind,
+			Resource:   secretsResource,
+			Name:       obj.GetName(),
+			Namespace:  obj.GetNamespace(),
+			Hash:       hash,
 			Conditions: []hivev1.SyncCondition{
 				{
 					Type:               hivev1.ApplySuccessSyncCondition,
@@ -724,8 +1104,19 @@ func (f *fakeHelper) newHelper(kubeconfig []byte, logger log.FieldLogger) Applie
 	return f
 }
 
+func (f *fakeHelper) ApplyRuntimeObject(object runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
+	data, err := json.Marshal(object)
+	if err != nil {
+		return "", fmt.Errorf("cannot serialize runtime object: %s", err)
+	}
+	return f.Apply(data)
+}
+
 func (f *fakeHelper) Apply(data []byte) (resource.ApplyResult, error) {
-	info, _ := f.Info(data)
+	info, err := f.Info(data)
+	if err != nil {
+		return "", fmt.Errorf("cannot gather resource info: %s", err)
+	}
 	if info.Name == "apply-error" {
 		return "", fmt.Errorf("cannot apply resource")
 	}
@@ -733,7 +1124,10 @@ func (f *fakeHelper) Apply(data []byte) (resource.ApplyResult, error) {
 }
 
 func (f *fakeHelper) Info(data []byte) (*resource.Info, error) {
-	r, obj, _ := decode(f.t, data)
+	r, obj, err := decode(f.t, data)
+	if err != nil {
+		return nil, fmt.Errorf("cannot decode object: %s", err)
+	}
 	// Special case when the object's name is info-error
 	if obj.GetName() == "info-error" {
 		return nil, fmt.Errorf("cannot determine info")
@@ -763,6 +1157,9 @@ func validateSyncSetInstanceStatus(t *testing.T, actual, expected hivev1.SyncSet
 	}
 	if len(actual.Patches) != len(expected.Patches) {
 		t.Errorf("number of patch statuses does not match, actual %d, expected: %d", len(actual.Patches), len(expected.Patches))
+	}
+	if len(actual.SecretReferences) != len(expected.SecretReferences) {
+		t.Errorf("number of secret reference statuses does not match, actual %d, expected: %d", len(actual.SecretReferences), len(expected.SecretReferences))
 	}
 
 	for _, actualResource := range actual.Resources {
@@ -794,6 +1191,21 @@ func validateSyncSetInstanceStatus(t *testing.T, actual, expected hivev1.SyncSet
 				actualPatch.Namespace, actualPatch.Name, actualPatch.Kind, actualPatch.APIVersion)
 		}
 	}
+
+	for _, actualSecretReference := range actual.SecretReferences {
+		found := false
+		for _, expectedSecretReference := range expected.SecretReferences {
+			if matchesSecretReferenceStatus(actualSecretReference, expectedSecretReference) {
+				found = true
+				validateSyncStatus(t, actualSecretReference, expectedSecretReference)
+				break
+			}
+		}
+		if !found {
+			t.Errorf("got unexpected secret reference status: %s/%s (kind: %s, apiVersion: %s)",
+				actualSecretReference.Namespace, actualSecretReference.Name, actualSecretReference.Kind, actualSecretReference.APIVersion)
+		}
+	}
 }
 
 func matchesResourceStatus(a, b hivev1.SyncStatus) bool {
@@ -804,6 +1216,13 @@ func matchesResourceStatus(a, b hivev1.SyncStatus) bool {
 }
 
 func matchesPatchStatus(a, b hivev1.SyncStatus) bool {
+	return a.Name == b.Name &&
+		a.Namespace == b.Namespace &&
+		a.Kind == b.Kind &&
+		a.APIVersion == b.APIVersion
+}
+
+func matchesSecretReferenceStatus(a, b hivev1.SyncStatus) bool {
 	return a.Name == b.Name &&
 		a.Namespace == b.Namespace &&
 		a.Kind == b.Kind &&
@@ -831,10 +1250,10 @@ func validateSyncStatus(t *testing.T, actual, expected hivev1.SyncStatus) {
 						actual.Namespace, actual.Name, actual.Kind, actual.APIVersion, actualCondition.Type, expectedCondition.Status, actualCondition.Status)
 				}
 			}
-			if !found {
-				t.Errorf("got unexpected condition %s in resource %s/%s (kind: %s, apiVersion: %s)",
-					actualCondition.Type, actual.Namespace, actual.Name, actual.Kind, actual.APIVersion)
-			}
+		}
+		if !found {
+			t.Errorf("got unexpected condition %s in resource %s/%s (kind: %s, apiVersion: %s)",
+				actualCondition.Type, actual.Namespace, actual.Name, actual.Kind, actual.APIVersion)
 		}
 	}
 }

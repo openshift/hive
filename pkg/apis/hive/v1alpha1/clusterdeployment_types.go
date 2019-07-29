@@ -192,6 +192,10 @@ type ClusterDeploymentStatus struct {
 	// +optional
 	InstallerImage *string `json:"installerImage,omitempty"`
 
+	// CLIImage is the name of the oc cli image to use when installing the target cluster
+	// +optional
+	CLIImage *string `json:"cliImage,omitempty"`
+
 	// Conditions includes more detailed status for the cluster deployment
 	// +optional
 	Conditions []ClusterDeploymentCondition `json:"conditions,omitempty"`

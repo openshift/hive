@@ -376,6 +376,11 @@ func (in *ClusterDeploymentStatus) DeepCopyInto(out *ClusterDeploymentStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.CLIImage != nil {
+		in, out := &in.CLIImage, &out.CLIImage
+		*out = new(string)
+		**out = **in
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]ClusterDeploymentCondition, len(*in))

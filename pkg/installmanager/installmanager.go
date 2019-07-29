@@ -380,6 +380,7 @@ func calcSleepSeconds(currentRetries int) int {
 func (m *InstallManager) waitForInstallerBinaries() {
 	fileList := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
+		filepath.Join(m.WorkDir, "oc"),
 	}
 	m.waitForFiles(fileList)
 }

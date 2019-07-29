@@ -195,6 +195,11 @@ func GenerateInstallerJob(
 	}
 	installerImage := *cd.Status.InstallerImage
 
+	if cd.Status.CLIImage == nil {
+		return nil, nil, fmt.Errorf("cli image not resolved")
+	}
+	cliImage := *cd.Status.CLIImage
+
 	installerImagePullPolicy := defaultInstallerImagePullPolicy
 	if cd.Spec.Images.InstallerImagePullPolicy != "" {
 		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
@@ -217,6 +222,17 @@ func GenerateInstallerJob(
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
 			// so it doesn't try to run a partially copied binary.
 			Args:         []string{"cp -v /bin/openshift-install /output/openshift-install.tmp && mv -v /output/openshift-install.tmp /output/openshift-install && ls -la /output"},
+			VolumeMounts: volumeMounts,
+		},
+		{
+			Name:            "cli",
+			Image:           cliImage,
+			ImagePullPolicy: installerImagePullPolicy,
+			Env:             env,
+			Command:         []string{"/bin/sh", "-c"},
+			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
+			// so it doesn't try to run a partially copied binary.
+			Args:         []string{"cp -v /usr/bin/oc /output/oc.tmp && mv -v /output/oc.tmp /output/oc && ls -la /output"},
 			VolumeMounts: volumeMounts,
 		},
 		{

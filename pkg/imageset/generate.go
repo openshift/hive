@@ -25,14 +25,23 @@ const (
 	extractImageScript = `#/bin/bash
 echo "About to run oc adm release info"
 if oc adm release info --image-for="installer" --registry-config "${PULL_SECRET}" "${RELEASE_IMAGE}" > /common/installer-image.txt 2> /common/error.log; then
-  echo "The command succeeded"
-  echo "1" > /common/success
-  exit 0
+  echo "installer image resolved successfully"
 else
-  echo "The command failed"
+  echo "installer image resolution failed"
   echo "0" > /common/success
   exit 1
 fi
+
+if oc adm release info --image-for="cli" --registry-config "${PULL_SECRET}" "${RELEASE_IMAGE}" > /common/cli-image.txt 2> /common/error.log; then
+  echo "cli image resolved successfully"
+else
+  echo "cli image resolution failed"
+  echo "0" > /common/success
+  exit 1
+fi
+
+echo "1" > /common/success
+exit 0
 `
 	// ImagesetJobLabel is the label used for counting the number of imageset jobs in Hive
 	ImagesetJobLabel = "hive.openshift.io/imageset"

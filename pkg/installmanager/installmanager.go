@@ -275,11 +275,7 @@ func (m *InstallManager) Run() error {
 
 		// Fetch logs from all cluster machines:
 		if m.isGatherLogsEnabled() {
-			_, err := m.gatherLogs(cd)
-			if err != nil {
-				// This is not a terminal error, we still want to cleanup and retry normally.
-				m.log.WithError(err).Error("error fetching logs from cluster, proceeding with cleanup")
-			}
+			m.gatherLogs(cd)
 		}
 
 		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
@@ -513,6 +509,7 @@ func (m *InstallManager) provisionCluster(cd *hivev1.ClusterDeployment) error {
 }
 
 func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
+	m.log.WithField("args", args).Info("running openshift-install binary")
 	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), args...)
 
 	// save the commands' stdout/stderr to a file
@@ -674,28 +671,63 @@ func isGatherLogsEnabled() bool {
 	return os.Getenv(constants.GatherLogsEnvVar) == "true"
 }
 
-func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) (string, error) {
+// gatherLogs will attempt to gather logs after a failed install. First we attempt
+// to gather logs from the bootstrap node. If this fails, we may have made it far enough
+// to teardown the bootstrap node, in which case we then attempt to gather with
+// 'oc adm must-gather', which would gather logs from the cluster's API itself.
+// If neither succeeds we do not consider this a fatal error,
+// we're just gathering as much information as we can and then proceeding with cleanup
+// so we can re-try.
+func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) {
 
-	m.log.Info("gathering logs from cluster")
+	err := m.gatherBootstrapNodeLogs(cd)
+	if err == nil {
+		m.log.Info("successfully gathered logs from bootstrap node")
+		return
+	}
+
+	m.log.WithError(err).Warn("error fetching logs from bootstrap node")
+
+	if err := m.gatherClusterLogs(cd); err != nil {
+		m.log.WithError(err).Warn("error fetching logs with oc adm must-gather")
+	} else {
+		m.log.Info("successfully ran oc adm must-gather")
+	}
+}
+
+func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
+	m.log.Info("attempting to gather logs with oc adm must-gather")
+	destDir := filepath.Join(m.LogsDir, fmt.Sprintf("%s-must-gather", time.Now().Format("20060102150405")))
+	cmd := exec.Command(filepath.Join(m.WorkDir, "oc"), "adm", "must-gather", "--dest-dir", destDir)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", filepath.Join(m.WorkDir, "auth", "kubeconfig")))
+	stdout, err := cmd.Output()
+	m.log.Infof("must-gather output: %s", stdout)
+	return err
+}
+
+func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) error {
+
+	m.log.Info("attempting to gather logs from cluster bootstrap node")
 
 	m.log.Debug("checking for SSH private key")
 	sshPrivKeyPath := os.Getenv("SSH_PRIV_KEY_PATH")
 	if sshPrivKeyPath == "" {
 		m.log.Warn("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
-		return "", fmt.Errorf("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
+		return fmt.Errorf("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
 	}
 	fileInfo, err := os.Stat(sshPrivKeyPath)
 	if err != nil && os.IsNotExist(err) {
 		m.log.Warn("cannot gather logs/tarball as no ssh private key file found")
-		return "", err
+		return err
 	} else if err != nil {
 		m.log.WithError(err).Error("error stating file containing private key")
-		return "", err
+		return err
 	}
 
 	if fileInfo.Size() == 0 {
 		m.log.Warn("cannot gather logs/tarball as ssh private key file is empty")
-		return "", err
+		return err
 	}
 
 	// set up ssh private key, and run the log gathering script
@@ -703,21 +735,21 @@ func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) (string, error
 	defer cleanup()
 	if err != nil {
 		m.log.WithError(err).Error("failed to setup SSH agent")
-		return "", err
+		return err
 	}
 
 	bootstrapIP, err := getBootstrapIP(m)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	logTarball, err := m.runGatherScript(bootstrapIP, fetchLogsScriptTemplate, m.WorkDir)
+	_, err = m.runGatherScript(bootstrapIP, fetchLogsScriptTemplate, m.WorkDir)
 	if err != nil {
 		m.log.Error("failed to run script for gathering logs")
-		return "", err
+		return err
 	}
 
-	return logTarball, nil
+	return nil
 }
 
 func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir string) (string, error) {

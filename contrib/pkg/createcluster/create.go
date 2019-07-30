@@ -85,28 +85,29 @@ const (
 
 // Options is the set of options to generate and apply a new cluster deployment
 type Options struct {
-	Name               string
-	Namespace          string
-	SSHPublicKeyFile   string
-	SSHPublicKey       string
-	SSHPrivateKeyFile  string
-	BaseDomain         string
-	PullSecret         string
-	PullSecretFile     string
-	AWSCredsFile       string
-	ClusterImageSet    string
-	HiveImage          string
-	InstallerImage     string
-	ReleaseImage       string
-	ReleaseImageSource string
-	DeleteAfter        string
-	UseClusterImageSet bool
-	ManageDNS          bool
-	Output             string
-	IncludeSecrets     bool
-	InstallOnce        bool
-	UninstallOnce      bool
-	SimulateFailure    bool
+	Name                     string
+	Namespace                string
+	SSHPublicKeyFile         string
+	SSHPublicKey             string
+	SSHPrivateKeyFile        string
+	BaseDomain               string
+	PullSecret               string
+	PullSecretFile           string
+	AWSCredsFile             string
+	ClusterImageSet          string
+	HiveImage                string
+	InstallerImage           string
+	ReleaseImage             string
+	ReleaseImageSource       string
+	DeleteAfter              string
+	UseClusterImageSet       bool
+	ManageDNS                bool
+	Output                   string
+	IncludeSecrets           bool
+	InstallOnce              bool
+	UninstallOnce            bool
+	SimulateBootstrapFailure bool
+	WorkerNodes              int64
 }
 
 const (
@@ -162,7 +163,8 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.BoolVar(&opt.IncludeSecrets, "include-secrets", true, "Include secrets along with ClusterDeployment")
 	flags.BoolVar(&opt.InstallOnce, "install-once", false, "Run the install only one time and fail if not successful")
 	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
-	flags.BoolVar(&opt.SimulateFailure, "simulate-failure", false, "Simulate an install failure late in the process by injecting an invalid manifest.")
+	flags.BoolVar(&opt.SimulateBootstrapFailure, "simulate-bootstrap-failure", false, "Simulate an install bootstrap failure by injecting an invalid manifest.")
+	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
 	return cmd
 }
 
@@ -503,7 +505,7 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 			Compute: []hivev1.MachinePool{
 				{
 					Name:     "worker",
-					Replicas: int64ptr(3),
+					Replicas: int64ptr(o.WorkerNodes),
 					Platform: hivev1.MachinePoolPlatform{
 						AWS: &hivev1.AWSMachinePoolPlatform{
 							InstanceType: "m4.large",
@@ -526,7 +528,7 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 	if o.UninstallOnce {
 		cd.Annotations[tryUninstallOnceAnnotation] = "true"
 	}
-	if o.SimulateFailure {
+	if o.SimulateBootstrapFailure {
 		cd.Annotations[hiveInstallFailureTestAnnotation] = "true"
 	}
 

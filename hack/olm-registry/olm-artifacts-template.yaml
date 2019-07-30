@@ -19,7 +19,7 @@ parameters:
 - name: ADDITIONAL_CERTIFICATE_AUTHORITY
   value: letsencrypt-ca
 - name: GLOBAL_PULL_SECRET
-  value: "{}"
+  value: ""
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -62,6 +62,7 @@ objects:
         credentials:
           name: ${EXTERNAL_DNS_AWS_CREDS}
       image: ${EXTERNAL_DNS_IMAGE}
-    globalPullSecret: "${{GLOBAL_PULL_SECRET}}"
+    globalPullSecret:
+      name: ${GLOBAL_PULL_SECRET}
     managedDomains:
     - ${EXTERNAL_DNS_MANAGED_DOMAIN}

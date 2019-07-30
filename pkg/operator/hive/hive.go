@@ -214,7 +214,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 }
 
 func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) {
-	if instance.Spec.GlobalPullSecret == nil {
+	if instance.Spec.GlobalPullSecret == nil || instance.Spec.GlobalPullSecret.Name == "" {
 		hLog.Debug("GlobalPullSecret is not provided in HiveConfig, it will not be deployed")
 		return
 	}

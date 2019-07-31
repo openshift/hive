@@ -31,6 +31,11 @@ type HiveConfigSpec struct {
 	// a cluster deployment(if specified), with precedence given to the contents of the pull secret for the cluster deployment.
 	// +optional
 	GlobalPullSecret *corev1.LocalObjectReference `json:"globalPullSecret,omitempty"`
+
+	// Backup specifies configuration for backup integration.
+	// If absent, backup integration will be disabled.
+	// +optional
+	Backup BackupConfig `json:"backup,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
@@ -39,6 +44,21 @@ type HiveConfigStatus struct {
 	// configmap data from the openshift-config-managed namespace. When the configmap changes,
 	// admission is redeployed.
 	AggregatorClientCAHash string `json:"aggregatorClientCAHash,omitempty"`
+}
+
+// BackupConfig contains settings for the Velero backup integration.
+type BackupConfig struct {
+	// Velero specifies configuration for the Velero backup integration.
+	// +optional
+	Velero VeleroBackupConfig `json:"velero,omitempty"`
+}
+
+// VeleroBackupConfig contains settings for the Velero backup integration.
+type VeleroBackupConfig struct {
+	// Enabled dictates if Velero backup integration is enabled.
+	// If not specified, the default is disabled.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // ExternalDNSConfig contains settings for running external-dns in a Hive

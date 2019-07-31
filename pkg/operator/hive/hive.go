@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
@@ -59,6 +60,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			Value: zoneCheckDNSServers,
 		}
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, dnsServersEnvVar)
+	}
+
+	if instance.Spec.Backup.Velero.Enabled {
+		hLog.Infof("Velero Backup Enabled.")
+		tmpEnvVar := corev1.EnvVar{
+			Name:  hiveconstants.VeleroBackupEnvVar,
+			Value: "true",
+		}
+		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, tmpEnvVar)
 	}
 
 	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {

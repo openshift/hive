@@ -20,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
@@ -63,7 +64,6 @@ const (
 	jobHashAnnotation                     = "hive.openshift.io/jobhash"
 	firstTimeInstallAnnotation            = "hive.openshift.io/first-time-install"
 	deleteAfterAnnotation                 = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
-
 )
 
 var (
@@ -473,7 +473,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	if cd.Status.Installed {
 		cdLog.Debug("cluster is already installed, no processing of install job needed")
-		r.cleanupInstallLogPVC(cd, existingJob, cdLog)
+		r.cleanupInstallLogPVC(cd, cdLog)
 	} else {
 		// Indicate that the cluster is still installing:
 		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
@@ -482,12 +482,19 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			hivemetrics.GetClusterDeploymentType(cd)).Set(
 			time.Since(cd.CreationTimestamp.Time).Seconds())
 
-		job, pvc, err := install.GenerateInstallerJob(
+		skipGatherLogs := os.Getenv(constants.SkipGatherLogsEnvVar) == "true"
+		if !skipGatherLogs {
+			if err := r.createPVC(cd, cdLog); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+
+		job, err := install.GenerateInstallerJob(
 			cd,
 			hiveImage,
 			releaseImage,
 			serviceAccountName,
-			sshKey)
+			sshKey, GetInstallLogsPVCName(cd), skipGatherLogs)
 		if err != nil {
 			cdLog.WithError(err).Error("error generating install job")
 			return reconcile.Result{}, err
@@ -509,13 +516,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		cdLog = cdLog.WithField("job", job.Name)
-
-		// pvc will be nil if log gathering is disabled:
-		if pvc != nil {
-			if err := r.reconcileLogsPVC(cd, pvc, cdLog); err != nil {
-				return reconcile.Result{}, err
-			}
-		}
 
 		if existingJob == nil {
 			cdLog.Infof("creating install job")
@@ -609,27 +609,64 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterDeployment) reconcileLogsPVC(cd *hivev1.ClusterDeployment, pvc *corev1.PersistentVolumeClaim, cdLog log.FieldLogger) error {
-	if err := controllerutil.SetControllerReference(cd, pvc, r.scheme); err != nil {
-		cdLog.WithError(err).Error("error setting controller reference on pvc")
-		return err
+// GetInstallLogsPVCName returns the expected name of the persistent volume claim for cluster install failure logs.
+func GetInstallLogsPVCName(cd *hivev1.ClusterDeployment) string {
+	return apihelpers.GetResourceName(cd.Name, "install-logs")
+}
+
+// createPVC will create the PVC for the install logs if it does not already exist.
+func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+
+	var pvc *corev1.PersistentVolumeClaim
+	labels := map[string]string{
+		constants.InstallJobLabel:            "true",
+		constants.ClusterDeploymentNameLabel: cd.Name,
+	}
+	if cd.Labels != nil {
+		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
+		if ok {
+			labels[hivev1.HiveClusterTypeLabel] = typeStr
+		}
+	}
+
+	pvc = &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      GetInstallLogsPVCName(cd),
+			Namespace: cd.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
 	}
 
 	existingPVC := &corev1.PersistentVolumeClaim{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, existingPVC)
-	if apierrors.IsNotFound(err) {
-		cdLog.WithField("pvc", pvc.Name).Info("creating persistent volume claim")
-		err = r.Create(context.TODO(), pvc)
-		if err != nil {
-			cdLog.WithError(err).Error("error creating pvc")
-			return err
-		}
-	} else if err != nil {
+	switch err := r.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, existingPVC); {
+	case err == nil:
+		cdLog.Debug("pvc already exists")
+		return nil
+	case !apierrors.IsNotFound(err):
 		cdLog.WithError(err).Error("error getting persistent volume claim")
 		return err
 	}
 
-	return nil
+	cdLog.WithField("pvc", pvc.Name).Info("creating persistent volume claim")
+	if err := controllerutil.SetControllerReference(cd, pvc, r.scheme); err != nil {
+		cdLog.WithError(err).Error("error setting controller reference on pvc")
+		return err
+	}
+	err := r.Create(context.TODO(), pvc)
+	if err != nil {
+		cdLog.WithError(err).Error("error creating pvc")
+	}
+	return err
 }
 
 // getHiveImage looks for a Hive image to use in clusterdeployment jobs in the following order:
@@ -1220,7 +1257,7 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 	if pod.Labels == nil {
 		return retval
 	}
-	cdName, ok := pod.Labels[install.ClusterDeploymentNameLabel]
+	cdName, ok := pod.Labels[constants.ClusterDeploymentNameLabel]
 	if !ok {
 		return retval
 	}
@@ -1232,7 +1269,7 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 }
 
 func (r *ReconcileClusterDeployment) calcInstallPodRestarts(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (int, error) {
-	installerPodLabels := map[string]string{install.ClusterDeploymentNameLabel: cd.Name, install.InstallJobLabel: "true"}
+	installerPodLabels := map[string]string{constants.ClusterDeploymentNameLabel: cd.Name, constants.InstallJobLabel: "true"}
 	pods := &corev1.PodList{}
 	err := r.Client.List(context.Background(), pods, client.InNamespace(cd.Namespace), client.MatchingLabels(installerPodLabels))
 	if err != nil {
@@ -1280,18 +1317,14 @@ func (r *ReconcileClusterDeployment) deleteJobOnHashChange(existingJob, generate
 
 // cleanupInstallLogPVC will immediately delete the PVC (should it exist) if the cluster was installed successfully, without retries.
 // If there were retries, it will delete the PVC if it has been more than 7 days since the job was completed.
-func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDeployment, existingJob *batchv1.Job, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	if !cd.Status.Installed {
-		return nil
-	}
-
-	if existingJob == nil {
 		return nil
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	// PVC re-uses the name of the install job as they are related, and we know it should be unique.
-	err := r.Get(context.TODO(), types.NamespacedName{Name: existingJob.Name, Namespace: existingJob.Namespace}, pvc)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: GetInstallLogsPVCName(cd), Namespace: cd.Namespace}, pvc)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil

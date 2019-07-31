@@ -17,6 +17,15 @@ const (
 	// value of the setting in HiveConfig, passed to the controllers deployment, as well as to
 	// install pods which do the actual log gathering.
 	SkipGatherLogsEnvVar = "SKIP_GATHER_LOGS"
+
+	// InstallJobLabel is the label used for artifacts specific to Hive cluster installations.
+	InstallJobLabel = "hive.openshift.io/install"
+
+	// UninstallJobLabel is the label used for artifacts specific to Hive cluster deprovision.
+	UninstallJobLabel = "hive.openshift.io/uninstall"
+
+	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
+	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

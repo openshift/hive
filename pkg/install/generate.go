@@ -2,14 +2,12 @@ package install
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
@@ -28,14 +26,6 @@ const (
 	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
 	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
-	// InstallJobLabel is the label used for counting the number of install jobs in Hive
-	InstallJobLabel = "hive.openshift.io/install"
-
-	// UninstallJobLabel is the label used for counting the number of uninstall jobs in Hive
-	UninstallJobLabel = "hive.openshift.io/uninstall"
-
-	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
-	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -55,17 +45,18 @@ func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
 	hiveImage, releaseImage string,
 	serviceAccountName string,
-	sshKey string) (*batchv1.Job, *corev1.PersistentVolumeClaim, error) {
+	sshKey string,
+	pvcName string,
+	skipGatherLogs bool) (*batchv1.Job, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
 	})
 
-	skipGatherLogs := os.Getenv(constants.SkipGatherLogsEnvVar) == "true"
-	gatherLogsStr := "false"
+	skipGatherLogsStr := "false"
 	if skipGatherLogs {
-		gatherLogsStr = "true"
+		skipGatherLogsStr = "true"
 	}
 
 	cdLog.Debug("generating installer job")
@@ -87,7 +78,7 @@ func GenerateInstallerJob(
 		},
 		{
 			Name:  constants.SkipGatherLogsEnvVar,
-			Value: gatherLogsStr,
+			Value: skipGatherLogsStr,
 		},
 	}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
@@ -191,12 +182,12 @@ func GenerateInstallerJob(
 	}
 
 	if cd.Status.InstallerImage == nil {
-		return nil, nil, fmt.Errorf("installer image not resolved")
+		return nil, fmt.Errorf("installer image not resolved")
 	}
 	installerImage := *cd.Status.InstallerImage
 
 	if cd.Status.CLIImage == nil {
-		return nil, nil, fmt.Errorf("cli image not resolved")
+		return nil, fmt.Errorf("cli image not resolved")
 	}
 	cliImage := *cd.Status.CLIImage
 
@@ -276,8 +267,8 @@ func GenerateInstallerJob(
 	}
 
 	labels := map[string]string{
-		InstallJobLabel:            "true",
-		ClusterDeploymentNameLabel: cd.Name,
+		constants.InstallJobLabel:            "true",
+		constants.ClusterDeploymentNameLabel: cd.Name,
 	}
 	if cd.Labels != nil {
 		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
@@ -309,29 +300,7 @@ func GenerateInstallerJob(
 		},
 	}
 
-	// Return nil for the PVC if log gathering is disabled.
-	var pvc *corev1.PersistentVolumeClaim
-	if skipGatherLogs {
-		pvc = &corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      installJobName, // re-use the job name
-				Namespace: cd.Namespace,
-				Labels:    labels,
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{
-					corev1.ReadWriteOnce,
-				},
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("1Gi"),
-					},
-				},
-			},
-		}
-	}
-
-	return job, pvc, nil
+	return job, nil
 }
 
 // GetInstallJobName returns the expected name of the install job for a cluster deployment.
@@ -495,7 +464,7 @@ func GenerateUninstallerJob(
 
 	completions := int32(1)
 	backoffLimit := int32(123456) // effectively limitless
-	labels := map[string]string{UninstallJobLabel: "true"}
+	labels := map[string]string{constants.UninstallJobLabel: "true"}
 
 	job := &batchv1.Job{}
 	job.Name = name

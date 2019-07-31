@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -29,7 +30,6 @@ import (
 
 const (
 	dnsServersEnvVar = "ZONE_CHECK_DNS_SERVERS"
-	gatherLogsEnvVar = "GATHER_LOGS"
 
 	// hiveAdditionalCASecret is the name of the secret in the hive namespace
 	// that will contain the aggregate of all AdditionalCertificateAuthorities
@@ -53,15 +53,16 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
 	}
 
-	gatherLogs := "false"
-	if instance.Spec.FailedProvisionConfig != nil && instance.Spec.FailedProvisionConfig.GatherLogs {
-		gatherLogs = "true"
+	// By default we will try to gather logs on failed installs:
+	skipGatherLogs := "true"
+	if instance.Spec.FailedProvisionConfig.SkipGatherLogs {
+		skipGatherLogs = "false"
 	}
-	gatherLogsEnvVar := corev1.EnvVar{
-		Name:  gatherLogsEnvVar,
-		Value: gatherLogs,
+	logsEnvVar := corev1.EnvVar{
+		Name:  constants.SkipGatherLogsEnvVar,
+		Value: skipGatherLogs,
 	}
-	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, gatherLogsEnvVar)
+	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, logsEnvVar)
 
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{

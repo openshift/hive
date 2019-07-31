@@ -62,9 +62,9 @@ func GenerateInstallerJob(
 		"namespace":         cd.Namespace,
 	})
 
-	gatherLogs := os.Getenv(constants.GatherLogsEnvVar) == "true"
+	skipGatherLogs := os.Getenv(constants.SkipGatherLogsEnvVar) == "true"
 	gatherLogsStr := "false"
-	if gatherLogs {
+	if skipGatherLogs {
 		gatherLogsStr = "true"
 	}
 
@@ -86,7 +86,7 @@ func GenerateInstallerJob(
 			},
 		},
 		{
-			Name:  constants.GatherLogsEnvVar,
+			Name:  constants.SkipGatherLogsEnvVar,
 			Value: gatherLogsStr,
 		},
 	}
@@ -159,7 +159,7 @@ func GenerateInstallerJob(
 		},
 	}
 
-	if gatherLogs {
+	if skipGatherLogs {
 		// Add a volume where we will store full logs from both the installer, and the
 		// cluster itself (assuming we made it far enough).
 		volumes = append(volumes, corev1.Volume{
@@ -311,7 +311,7 @@ func GenerateInstallerJob(
 
 	// Return nil for the PVC if log gathering is disabled.
 	var pvc *corev1.PersistentVolumeClaim
-	if gatherLogs {
+	if skipGatherLogs {
 		pvc = &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      installJobName, // re-use the job name

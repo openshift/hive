@@ -668,7 +668,9 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 }
 
 func isGatherLogsEnabled() bool {
-	return os.Getenv(constants.GatherLogsEnvVar) == "true"
+	// By default we assume to gather logs, only disable if explicitly told to via HiveConfig.
+	envVarValue := os.Getenv(constants.SkipGatherLogsEnvVar)
+	return envVarValue == "false" || envVarValue == ""
 }
 
 // gatherLogs will attempt to gather logs after a failed install. First we attempt

@@ -1156,11 +1156,7 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		**out = **in
 	}
 	out.Backup = in.Backup
-	if in.FailedProvisionConfig != nil {
-		in, out := &in.FailedProvisionConfig, &out.FailedProvisionConfig
-		*out = new(FailedProvisionConfig)
-		**out = **in
-	}
+	out.FailedProvisionConfig = in.FailedProvisionConfig
 	return
 }
 

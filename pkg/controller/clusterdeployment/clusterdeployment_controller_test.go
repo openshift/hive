@@ -157,6 +157,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					t.Errorf("got unexpected change in clusterdeployment")
 				}
 				job := getInstallJob(c)
+				t.Logf("exp: %v", testInstallJob())
+				t.Logf("cur: %v", job)
 				if job == nil || !apiequality.Semantic.DeepEqual(job, testInstallJob()) {
 					t.Errorf("got unexpected change in install job")
 				}
@@ -206,9 +208,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "PVC cleanup for successful install",
 			existing: []runtime.Object{
-				testInstalledClusterDeployment(),
+				testInstalledClusterDeployment(time.Now()),
 				testCompletedInstallJob(time.Now()),
-				testInstallLogPVC(testInstallJob().Name),
+				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -227,12 +229,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "PVC preserved for install with restarts",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testInstalledClusterDeployment()
+					cd := testInstalledClusterDeployment(time.Now())
 					cd.Status.InstallRestarts = 5
 					return cd
 				}(),
 				testCompletedInstallJob(time.Now()),
-				testInstallLogPVC(testInstallJob().Name),
+				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -241,7 +243,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallJob().Name, Namespace: testNamespace}, pvc)
+				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallLogPVC().Name, Namespace: testNamespace}, pvc)
 				assert.NoError(t, err)
 			},
 		},
@@ -249,12 +251,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "PVC cleanup for install with restarts after 7 days",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testInstalledClusterDeployment()
+					cd := testInstalledClusterDeployment(time.Now().Add(-8 * 24 * time.Hour))
 					cd.Status.InstallRestarts = 5
 					return cd
 				}(),
 				testCompletedInstallJob(time.Now().Add(-8 * 24 * time.Hour)),
-				testInstallLogPVC(testInstallJob().Name),
+				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -305,7 +307,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Completed with install job manually deleted",
 			existing: []runtime.Object{
-				testInstalledClusterDeployment(),
+				testInstalledClusterDeployment(time.Now()),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -990,9 +992,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
-func testInstalledClusterDeployment() *hivev1.ClusterDeployment {
+func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.Status.Installed = true
+	cd.Status.InstalledTimestamp = &metav1.Time{Time: installedAt}
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 	return cd
 }
@@ -1030,7 +1033,7 @@ func testInstallJob() *batchv1.Job {
 	job, err := install.GenerateInstallerJob(cd,
 		images.DefaultHiveImage,
 		"",
-		serviceAccountName, "testSSHKey", "", false)
+		serviceAccountName, "testSSHKey", GetInstallLogsPVCName(cd), false)
 	if err != nil {
 		fmt.Printf(err.Error())
 		panic("should not error while generating test install job")
@@ -1059,9 +1062,9 @@ func testCompletedInstallJob(completionTime time.Time) *batchv1.Job {
 	return job
 }
 
-func testInstallLogPVC(jobName string) *corev1.PersistentVolumeClaim {
+func testInstallLogPVC() *corev1.PersistentVolumeClaim {
 	pvc := &corev1.PersistentVolumeClaim{}
-	pvc.Name = jobName
+	pvc.Name = GetInstallLogsPVCName(testClusterDeployment())
 	pvc.Namespace = testNamespace
 	return pvc
 }

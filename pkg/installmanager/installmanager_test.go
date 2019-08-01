@@ -35,6 +35,7 @@ const (
 	testInfraID = "test-cluster-fe9531"
 
 	installerBinary     = "openshift-install"
+	ocBinary            = "oc"
 	fakeInstallerBinary = `#!/bin/sh
 echo "Fake Installer"
 echo $@
@@ -154,6 +155,11 @@ func TestInstallManager(t *testing.T) {
 			im.Complete([]string{})
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
+				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
+				t.Fail()
+			}
+
+			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, ocBinary),
 				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
 				t.Fail()
 			}

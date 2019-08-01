@@ -413,8 +413,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	if err != nil || modifiedCD {
 		if err != nil {
 			cdLog.WithError(err).Error("Error updating the merged pull secret")
+			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, err
+		// Because the global pull secret is not referenced on our cluster deployment,
+		// generating it does not cause an automatic reconcile. Manually requeue to avoid
+		// waiting 30 minutes before the cluster install proceeds.
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	if cd.Status.InstallerImage == nil {

@@ -39,6 +39,20 @@ spec:
               items:
                 type: object
               type: array
+            backup:
+              description: Backup specifies configuration for backup integration.
+                If absent, backup integration will be disabled.
+              properties:
+                velero:
+                  description: Velero specifies configuration for the Velero backup
+                    integration.
+                  properties:
+                    enabled:
+                      description: Enabled dictates if Velero backup integration is
+                        enabled. If not specified, the default is disabled.
+                      type: boolean
+                  type: object
+              type: object
             externalDNS:
               description: ExternalDNS specifies configuration for external-dns if
                 it is to be deployed by Hive. If absent, external-dns will not be

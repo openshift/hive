@@ -1,7 +1,16 @@
 package controller
 
+import (
+	"os"
+	"strings"
+
+	hiveconstants "github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/velerobackup"
+)
+
 func init() {
-	// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
-	// TODO: Uncomment this line once card CO-488 is completed (adding HiveConfig option for this).
-	//AddToManagerFuncs = append(AddToManagerFuncs, velerobackup.Add)
+	if strings.EqualFold(os.Getenv(hiveconstants.VeleroBackupEnvVar), "true") {
+		// AddToManagerFuncs is a list of functions to create controllers and add them to a manager.
+		AddToManagerFuncs = append(AddToManagerFuncs, velerobackup.Add)
+	}
 }

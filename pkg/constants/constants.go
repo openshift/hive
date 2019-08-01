@@ -7,6 +7,9 @@ import (
 
 const (
 	mergedPullSecretSuffix = "merged-pull-secret"
+
+	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.
+	VeleroBackupEnvVar = "HIVE_VELERO_BACKUP"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

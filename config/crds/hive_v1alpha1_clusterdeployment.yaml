@@ -801,6 +801,11 @@ spec:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
               type: boolean
+            installedTimestamp:
+              description: InstalledTimestamp is the time we first detected that the
+                cluster has been successfully installed.
+              format: date-time
+              type: string
             installerImage:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster

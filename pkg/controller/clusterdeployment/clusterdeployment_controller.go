@@ -571,6 +571,10 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				return reconcile.Result{}, err
 			}
 		}
+
+		if firstInstalledObserve && cd.Status.InstalledTimestamp == nil {
+			cd.Status.InstalledTimestamp = &metav1.Time{Time: time.Now()}
+		}
 	}
 
 	err = r.updateClusterDeploymentStatus(cd, origCD, existingJob, cdLog)
@@ -1333,20 +1337,27 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 		return err
 	}
 
+	pvcLog := cdLog.WithField("pvc", pvc.Name)
 	if cd.Status.InstallRestarts == 0 {
-		cdLog.WithField("pvc", pvc.Name).Info("deleting logs PersistentVolumeClaim for installed cluster with no restarts")
+		pvcLog.Info("deleting logs PersistentVolumeClaim for installed cluster with no restarts")
 		if err := r.Delete(context.TODO(), pvc); err != nil {
-			cdLog.WithError(err).Error("error deleting install logs PVC")
+			pvcLog.WithError(err).Error("error deleting install logs PVC")
 			return err
 		}
 		return nil
 	}
 
+	if cd.Status.InstalledTimestamp == nil {
+		pvcLog.Warn("cluster has an install logs PVC but no installed timestamp, PVC will never be cleaned up")
+		return nil
+	}
+
 	// Otherwise, delete if more than 7 days have passed.
-	if time.Since(existingJob.Status.CompletionTime.Time) > (7 * 24 * time.Hour) {
-		cdLog.WithField("pvc", pvc.Name).Info("deleting logs PersistentVolumeClaim for cluster that was installed after restarts more than 7 days ago")
+	if time.Since(cd.Status.InstalledTimestamp.Time) > (7 * 24 * time.Hour) {
+
+		pvcLog.Info("deleting logs PersistentVolumeClaim for cluster that was installed after restarts more than 7 days ago")
 		if err := r.Delete(context.TODO(), pvc); err != nil {
-			cdLog.WithError(err).Error("error deleting install logs PVC")
+			pvcLog.WithError(err).Error("error deleting install logs PVC")
 			return err
 		}
 		return nil

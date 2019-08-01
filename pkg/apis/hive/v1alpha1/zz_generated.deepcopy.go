@@ -393,6 +393,10 @@ func (in *ClusterDeploymentStatus) DeepCopyInto(out *ClusterDeploymentStatus) {
 		*out = make([]CertificateBundleStatus, len(*in))
 		copy(*out, *in)
 	}
+	if in.InstalledTimestamp != nil {
+		in, out := &in.InstalledTimestamp, &out.InstalledTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

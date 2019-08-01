@@ -150,14 +150,14 @@ func GenerateInstallerJob(
 		},
 	}
 
-	if skipGatherLogs {
+	if !skipGatherLogs {
 		// Add a volume where we will store full logs from both the installer, and the
 		// cluster itself (assuming we made it far enough).
 		volumes = append(volumes, corev1.Volume{
 			Name: "logs",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: installJobName,
+					ClaimName: pvcName,
 				},
 			},
 		})

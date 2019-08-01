@@ -54,9 +54,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 
 	// By default we will try to gather logs on failed installs:
-	skipGatherLogs := "true"
+	skipGatherLogs := "false"
 	if instance.Spec.FailedProvisionConfig.SkipGatherLogs {
-		skipGatherLogs = "false"
+		skipGatherLogs = "true"
 	}
 	logsEnvVar := corev1.EnvVar{
 		Name:  constants.SkipGatherLogsEnvVar,

@@ -2282,6 +2282,11 @@ spec:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
               type: boolean
+            installedTimestamp:
+              description: InstalledTimestamp is the time we first detected that the
+                cluster has been successfully installed.
+              format: date-time
+              type: string
             installerImage:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
@@ -3304,8 +3309,8 @@ spec:
               description: FailedProvisionConfig is used to configure settings related
                 to handling provision failures.
               properties:
-                gatherLogs:
-                  description: GatherLogs enables functionality that will attempt
+                skipGatherLogs:
+                  description: SkipGatherLogs disabled functionality that attempts
                     to gather full logs from the cluster if an installation fails
                     for any reason. The logs will be stored in a persistent volume
                     for up to 7 days.

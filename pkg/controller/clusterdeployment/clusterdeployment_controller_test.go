@@ -327,12 +327,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
+					job, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
 						"",
 						"fakeserviceaccount",
-						"sshkey")
+						"sshkey", "", false)
 					return job
 				}(),
 			},
@@ -386,12 +386,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
+					job, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
 						"example.com/fake:latest",
 						"",
 						"fakeserviceaccount",
-						"sshkey")
+						"sshkey", "", false)
 					return job
 				}(),
 			},
@@ -413,12 +413,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				func() *batchv1.Job {
-					job, _, _ := install.GenerateInstallerJob(
+					job, _ := install.GenerateInstallerJob(
 						testClusterDeployment(),
 						"fakeserviceaccount",
 						"",
 						"fakeserviceaccount",
-						"sshkey")
+						"sshkey", "", false)
 					wrongGeneration := "-1"
 					job.Annotations[clusterDeploymentGenerationAnnotation] = wrongGeneration
 					return job
@@ -983,6 +983,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		ClusterID:      testClusterID,
 		InfraID:        testInfraID,
 		InstallerImage: strPtr("installer-image:latest"),
+		CLIImage:       strPtr("cli:latest"),
 	}
 
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
@@ -1026,11 +1027,12 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 
 func testInstallJob() *batchv1.Job {
 	cd := testClusterDeployment()
-	job, _, err := install.GenerateInstallerJob(cd,
+	job, err := install.GenerateInstallerJob(cd,
 		images.DefaultHiveImage,
 		"",
-		serviceAccountName, "testSSHKey")
+		serviceAccountName, "testSSHKey", "", false)
 	if err != nil {
+		fmt.Printf(err.Error())
 		panic("should not error while generating test install job")
 	}
 

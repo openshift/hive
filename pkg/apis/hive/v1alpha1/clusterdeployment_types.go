@@ -203,6 +203,9 @@ type ClusterDeploymentStatus struct {
 	// CertificateBundles contains of the status of the certificate bundles associated with this cluster deployment.
 	// +optional
 	CertificateBundles []CertificateBundleStatus `json:"certificateBundles,omitempty"`
+
+	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
+	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment

@@ -163,7 +163,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 	// can't proceed if the secret(s) referred to doesn't exist
 	certBundleSecrets, err := r.getIngressSecrets(rContext)
 	if err != nil {
-		rContext.logger.WithError(err).Error("will need to retry until able to find all certBundle secrets")
+		rContext.logger.Warningf("will need to retry until able to find all certBundle secrets : %v", err)
 		conditionErr := r.setIngressCertificateNotFoundCondition(rContext, true, err.Error())
 		if conditionErr != nil {
 			rContext.logger.WithError(conditionErr).Error("unable to set IngressCertNotFound condition")

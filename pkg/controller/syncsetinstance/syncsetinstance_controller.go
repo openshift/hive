@@ -358,6 +358,16 @@ func (r *ReconcileSyncSetInstance) syncDeletedSyncSetInstance(ssi *hivev1.SyncSe
 }
 
 func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spec *hivev1.SyncSetCommonSpec, dynamicClient dynamic.Interface, h Applier, kubeConfig []byte, ssiLog log.FieldLogger) error {
+	defer func() {
+		// Temporary fix for status hot loop: do not update ssi.Status.{Patches,Resources} with empty slice.
+		if len(ssi.Status.Resources) == 0 {
+			ssi.Status.Resources = nil
+		}
+		if len(ssi.Status.Patches) == 0 {
+			ssi.Status.Patches = nil
+		}
+	}()
+
 	err := r.applySyncSetResources(ssi, spec.Resources, dynamicClient, h, ssiLog)
 	if err != nil {
 		ssiLog.WithError(err).Error("an error occurred applying syncset resources")
@@ -368,6 +378,7 @@ func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spe
 		ssiLog.WithError(err).Error("an error occurred applying syncset patches")
 		return err
 	}
+
 	return nil
 }
 

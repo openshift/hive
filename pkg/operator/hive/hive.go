@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
@@ -54,13 +55,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 
 	// By default we will try to gather logs on failed installs:
-	skipGatherLogs := "false"
-	if instance.Spec.FailedProvisionConfig.SkipGatherLogs {
-		skipGatherLogs = "true"
-	}
 	logsEnvVar := corev1.EnvVar{
 		Name:  constants.SkipGatherLogsEnvVar,
-		Value: skipGatherLogs,
+		Value: strconv.FormatBool(instance.Spec.FailedProvisionConfig.SkipGatherLogs),
 	}
 	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, logsEnvVar)
 

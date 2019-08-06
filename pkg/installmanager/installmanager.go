@@ -62,7 +62,6 @@ const (
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 	sleepSecondsFilename                = "sleep-seconds.txt"
-	hiveInstallFailureTestAnnotation    = "hive.openshift.io/install-failure-test"
 
 	fetchLogsScriptTemplate = `#!/bin/bash
 USER_ID=$(id -u)
@@ -474,8 +473,8 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 
 	// If the failure test annotation is set, write a bogus resource into the manifests which will
 	// cause a late failure in the install process, enough that we can gather logs from the cluster.
-	if _, ok := cd.Annotations[hiveInstallFailureTestAnnotation]; ok {
-		m.log.Warnf("generating a late installation failure for testing due to %s annotation on cluster deployment", hiveInstallFailureTestAnnotation)
+	if b, err := strconv.ParseBool(cd.Annotations[constants.InstallFailureTestAnnotation]); b && err == nil {
+		m.log.Warnf("generating a late installation failure for testing due to %s annotation on cluster deployment", constants.InstallFailureTestAnnotation)
 		data := []byte(testFailureManifest)
 		err = ioutil.WriteFile(filepath.Join(m.WorkDir, "manifests", "failure-test.yaml"), data, 0644)
 		if err != nil {
@@ -485,8 +484,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")
-	err = m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir})
-	if err != nil {
+	if err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir}); err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
 	}
@@ -670,7 +668,7 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 func isGatherLogsEnabled() bool {
 	// By default we assume to gather logs, only disable if explicitly told to via HiveConfig.
 	envVarValue := os.Getenv(constants.SkipGatherLogsEnvVar)
-	return envVarValue == "false" || envVarValue == ""
+	return envVarValue != "true"
 }
 
 // gatherLogs will attempt to gather logs after a failed install. First we attempt
@@ -682,19 +680,21 @@ func isGatherLogsEnabled() bool {
 // so we can re-try.
 func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) {
 
-	err := m.gatherBootstrapNodeLogs(cd)
-	if err == nil {
+	if err := m.gatherBootstrapNodeLogs(cd); err != nil {
+		m.log.WithError(err).Info("error fetching logs from bootstrap node")
+	} else {
 		m.log.Info("successfully gathered logs from bootstrap node")
 		return
 	}
 
-	m.log.WithError(err).Warn("error fetching logs from bootstrap node")
-
 	if err := m.gatherClusterLogs(cd); err != nil {
-		m.log.WithError(err).Warn("error fetching logs with oc adm must-gather")
+		m.log.WithError(err).Info("error fetching logs with oc adm must-gather")
 	} else {
 		m.log.Info("successfully ran oc adm must-gather")
+		return
 	}
+
+	m.log.Warn("unable to fetch cluster logs after install failure")
 }
 
 func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {

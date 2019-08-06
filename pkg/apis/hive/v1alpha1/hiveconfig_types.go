@@ -67,7 +67,7 @@ type VeleroBackupConfig struct {
 // FailedProvisionConfig contains settings to control behavior undertaken by Hive when an installation attempt fails.
 type FailedProvisionConfig struct {
 
-	// SkipGatherLogs disabled functionality that attempts to gather full logs from the cluster if an installation
+	// SkipGatherLogs disables functionality that attempts to gather full logs from the cluster if an installation
 	// fails for any reason. The logs will be stored in a persistent volume for up to 7 days.
 	SkipGatherLogs bool `json:"skipGatherLogs,omitempty"`
 }

@@ -26,6 +26,7 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -111,8 +112,7 @@ type Options struct {
 }
 
 const (
-	defaultHiveImage                 = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
-	hiveInstallFailureTestAnnotation = "hive.openshift.io/install-failure-test"
+	defaultHiveImage = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 )
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
@@ -529,7 +529,7 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 		cd.Annotations[tryUninstallOnceAnnotation] = "true"
 	}
 	if o.SimulateBootstrapFailure {
-		cd.Annotations[hiveInstallFailureTestAnnotation] = "true"
+		cd.Annotations[constants.InstallFailureTestAnnotation] = "true"
 	}
 
 	imageSet, err := o.configureImages(cd)

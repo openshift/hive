@@ -573,7 +573,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		if firstInstalledObserve && cd.Status.InstalledTimestamp == nil {
-			cd.Status.InstalledTimestamp = &metav1.Time{Time: time.Now()}
+			now := metav1.Now()
+			cd.Status.InstalledTimestamp = &now
 		}
 	}
 
@@ -621,7 +622,17 @@ func GetInstallLogsPVCName(cd *hivev1.ClusterDeployment) string {
 // createPVC will create the PVC for the install logs if it does not already exist.
 func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 
-	var pvc *corev1.PersistentVolumeClaim
+	pvcName := GetInstallLogsPVCName(cd)
+
+	switch err := r.Get(context.TODO(), types.NamespacedName{Name: pvcName, Namespace: cd.Namespace}, &corev1.PersistentVolumeClaim{}); {
+	case err == nil:
+		cdLog.Debug("pvc already exists")
+		return nil
+	case !apierrors.IsNotFound(err):
+		cdLog.WithError(err).Error("error getting persistent volume claim")
+		return err
+	}
+
 	labels := map[string]string{
 		constants.InstallJobLabel:            "true",
 		constants.ClusterDeploymentNameLabel: cd.Name,
@@ -633,9 +644,9 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 		}
 	}
 
-	pvc = &corev1.PersistentVolumeClaim{
+	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      GetInstallLogsPVCName(cd),
+			Name:      pvcName,
 			Namespace: cd.Namespace,
 			Labels:    labels,
 		},
@@ -649,16 +660,6 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 				},
 			},
 		},
-	}
-
-	existingPVC := &corev1.PersistentVolumeClaim{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, existingPVC); {
-	case err == nil:
-		cdLog.Debug("pvc already exists")
-		return nil
-	case !apierrors.IsNotFound(err):
-		cdLog.WithError(err).Error("error getting persistent volume claim")
-		return err
 	}
 
 	cdLog.WithField("pvc", pvc.Name).Info("creating persistent volume claim")
@@ -1327,7 +1328,6 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{}
-	// PVC re-uses the name of the install job as they are related, and we know it should be unique.
 	err := r.Get(context.TODO(), types.NamespacedName{Name: GetInstallLogsPVCName(cd), Namespace: cd.Namespace}, pvc)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -1348,7 +1348,11 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 	}
 
 	if cd.Status.InstalledTimestamp == nil {
-		pvcLog.Warn("cluster has an install logs PVC but no installed timestamp, PVC will never be cleaned up")
+		pvcLog.Warn("deleting logs PersistentVolumeClaim for cluster with errors but no installed timestamp")
+		if err := r.Delete(context.TODO(), pvc); err != nil {
+			pvcLog.WithError(err).Error("error deleting install logs PVC")
+			return err
+		}
 		return nil
 	}
 

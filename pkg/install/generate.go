@@ -54,10 +54,7 @@ func GenerateInstallerJob(
 		"namespace":         cd.Namespace,
 	})
 
-	skipGatherLogsStr := "false"
-	if skipGatherLogs {
-		skipGatherLogsStr = "true"
-	}
+	skipGatherLogsStr := strconv.FormatBool(skipGatherLogs)
 
 	cdLog.Debug("generating installer job")
 	tryOnce := false
@@ -65,7 +62,6 @@ func GenerateInstallerJob(
 		value, exists := cd.Annotations[tryInstallOnceAnnotation]
 		tryOnce = exists && value == "true"
 	}
-	installJobName := GetInstallJobName(cd)
 	env := []corev1.EnvVar{
 		{
 			Name: "PULL_SECRET",
@@ -283,7 +279,7 @@ func GenerateInstallerJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        installJobName,
+			Name:        GetInstallJobName(cd),
 			Namespace:   cd.Namespace,
 			Annotations: annotations,
 			Labels:      labels,

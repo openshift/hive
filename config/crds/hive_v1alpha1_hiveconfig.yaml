@@ -80,7 +80,7 @@ spec:
                 to handling provision failures.
               properties:
                 skipGatherLogs:
-                  description: SkipGatherLogs disabled functionality that attempts
+                  description: SkipGatherLogs disables functionality that attempts
                     to gather full logs from the cluster if an installation fails
                     for any reason. The logs will be stored in a persistent volume
                     for up to 7 days.

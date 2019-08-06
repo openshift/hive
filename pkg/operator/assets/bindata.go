@@ -1214,6 +1214,7 @@ rules:
   - secrets
   - configmaps
   - events
+  - persistentvolumeclaims
   verbs:
   - get
   - list
@@ -2059,6 +2060,10 @@ spec:
                     type: string
                 type: object
               type: array
+            cliImage:
+              description: CLIImage is the name of the oc cli image to use when installing
+                the target cluster
+              type: string
             clusterID:
               description: ClusterID is a globally unique identifier for this cluster
                 generated during installation. Used for reporting metrics among other
@@ -2277,6 +2282,11 @@ spec:
               description: Installed is true if the installer job has successfully
                 completed for this cluster.
               type: boolean
+            installedTimestamp:
+              description: InstalledTimestamp is the time we first detected that the
+                cluster has been successfully installed.
+              format: date-time
+              type: string
             installerImage:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
@@ -3294,6 +3304,17 @@ spec:
                     external-dns controller. If not specified, a default image will
                     be used.
                   type: string
+              type: object
+            failedProvisionConfig:
+              description: FailedProvisionConfig is used to configure settings related
+                to handling provision failures.
+              properties:
+                skipGatherLogs:
+                  description: SkipGatherLogs disables functionality that attempts
+                    to gather full logs from the cluster if an installation fails
+                    for any reason. The logs will be stored in a persistent volume
+                    for up to 7 days.
+                  type: boolean
               type: object
             globalPullSecret:
               description: GlobalPullSecret is used to specify a pull secret that

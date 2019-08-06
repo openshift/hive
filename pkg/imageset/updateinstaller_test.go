@@ -106,13 +106,19 @@ func testClusterDeploymentWithErrorCondition() *hivev1.ClusterDeployment {
 	return cis
 }
 
-func setupWorkDir(t *testing.T, dir, success, installerImage, errorMessage string) {
+func setupWorkDir(t *testing.T, dir, success, installerImage, cliImage, errorMessage string) {
 	err := ioutil.WriteFile(path.Join(dir, "success"), []byte(success), 0666)
 	if err != nil {
 		t.Fatalf("error writing file: %v", err)
 	}
 	if len(installerImage) != 0 {
 		err = ioutil.WriteFile(path.Join(dir, "installer-image.txt"), []byte(testInstallerImage), 0666)
+		if err != nil {
+			t.Fatalf("error writing file: %v", err)
+		}
+	}
+	if len(cliImage) != 0 {
+		err = ioutil.WriteFile(path.Join(dir, "cli-image.txt"), []byte(testCLIImage), 0666)
 		if err != nil {
 			t.Fatalf("error writing file: %v", err)
 		}
@@ -127,7 +133,7 @@ func setupWorkDir(t *testing.T, dir, success, installerImage, errorMessage strin
 }
 
 func setupSuccessfulExecutionWorkDir(t *testing.T, dir string) {
-	setupWorkDir(t, dir, "1", testInstallerImage, "")
+	setupWorkDir(t, dir, "1", testInstallerImage, testCLIImage, "")
 }
 
 func validateSuccessfulExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
@@ -159,7 +165,7 @@ func validateSuccessfulExecutionAfterFailure(t *testing.T, clusterDeployment *hi
 }
 
 func setupFailureExecutionWorkDir(t *testing.T, dir string) {
-	setupWorkDir(t, dir, "0", "", testErrorMessage)
+	setupWorkDir(t, dir, "0", "", "", testErrorMessage)
 }
 
 func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {

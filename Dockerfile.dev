@@ -1,0 +1,12 @@
+FROM openshift/origin-release:golang-1.12 as builder
+
+RUN chmod g+rw /etc/passwd
+
+ADD bin/hiveadmission /opt/services/
+ADD bin/hive-operator /opt/services/
+ADD bin/manager /opt/services/
+ADD bin/hiveutil /usr/bin/
+
+
+# TODO: should this be the operator?
+ENTRYPOINT ["/opt/services/manager"]

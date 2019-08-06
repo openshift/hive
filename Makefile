@@ -190,6 +190,12 @@ docker-push:
 buildah-build:
 	$(SUDO_CMD) buildah bud --tag ${IMG} .
 
+# Build the code locally and build+push an image with the local binaries rather than doing a full in-container compile.
+.PHONY: buildah-dev-push
+buildah-dev-push: build
+	$(SUDO_CMD) buildah bud -f Dockerfile.dev --tag ${IMG} .
+	$(SUDO_CMD) buildah push ${IMG}
+
 # Push the buildah image
 .PHONY: buildah-push
 buildah-push: buildah-build

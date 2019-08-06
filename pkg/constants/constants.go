@@ -10,6 +10,26 @@ const (
 
 	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.
 	VeleroBackupEnvVar = "HIVE_VELERO_BACKUP"
+
+	// SkipGatherLogsEnvVar is the environment variable which passes the configuration to disable
+	// log gathering on failed cluster installs. The value will be either "true" or "false".
+	// If unset "false" should be assumed. This variable is set by the operator depending on the
+	// value of the setting in HiveConfig, passed to the controllers deployment, as well as to
+	// install pods which do the actual log gathering.
+	SkipGatherLogsEnvVar = "SKIP_GATHER_LOGS"
+
+	// InstallJobLabel is the label used for artifacts specific to Hive cluster installations.
+	InstallJobLabel = "hive.openshift.io/install"
+
+	// UninstallJobLabel is the label used for artifacts specific to Hive cluster deprovision.
+	UninstallJobLabel = "hive.openshift.io/uninstall"
+
+	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
+	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
+
+	// InstallFailureTestAnnotation is a ClusterDeployment label that can be used to trigger a failed
+	// installation during the bootstrapping phase.
+	InstallFailureTestAnnotation = "hive.openshift.io/install-failure-test"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

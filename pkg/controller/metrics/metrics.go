@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	"github.com/openshift/hive/pkg/install"
+	"github.com/openshift/hive/pkg/constants"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -207,7 +207,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 
 		// install job metrics
 		installJobs := &batchv1.JobList{}
-		installJobLabelSelector := map[string]string{install.InstallJobLabel: "true"}
+		installJobLabelSelector := map[string]string{constants.InstallJobLabel: "true"}
 		err = mc.Client.List(context.Background(), installJobs, client.MatchingLabels(installJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing install jobs")
@@ -227,7 +227,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		mcLog.Debug("calculating metrics across all uninstall jobs")
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
-		uninstallJobLabelSelector := map[string]string{install.UninstallJobLabel: "true"}
+		uninstallJobLabelSelector := map[string]string{constants.UninstallJobLabel: "true"}
 		err = mc.Client.List(context.Background(), uninstallJobs, client.MatchingLabels(uninstallJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing uninstall jobs")

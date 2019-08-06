@@ -6,10 +6,12 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -44,8 +46,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 	if r.hiveImage != "" {
 		hiveDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
-		// NOTE: overwriting all environment vars here, there are no others at the time of
-		// writing:
 		hiveImageEnvVar := corev1.EnvVar{
 			Name:  images.HiveImageEnvVar,
 			Value: r.hiveImage,
@@ -53,6 +53,13 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
 	}
+
+	// By default we will try to gather logs on failed installs:
+	logsEnvVar := corev1.EnvVar{
+		Name:  constants.SkipGatherLogsEnvVar,
+		Value: strconv.FormatBool(instance.Spec.FailedProvisionConfig.SkipGatherLogs),
+	}
+	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, logsEnvVar)
 
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{

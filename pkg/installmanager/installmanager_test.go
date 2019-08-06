@@ -35,6 +35,7 @@ const (
 	testInfraID = "test-cluster-fe9531"
 
 	installerBinary     = "openshift-install"
+	ocBinary            = "oc"
 	fakeInstallerBinary = `#!/bin/sh
 echo "Fake Installer"
 echo $@
@@ -154,6 +155,11 @@ func TestInstallManager(t *testing.T) {
 			im.Complete([]string{})
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
+				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
+				t.Fail()
+			}
+
+			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, ocBinary),
 				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
 				t.Fail()
 			}
@@ -461,13 +467,13 @@ func TestGatherLogs(t *testing.T) {
 	}{
 		{
 			name:           "cannot execute script",
-			scriptTemplate: "not a bash script %s %s",
+			scriptTemplate: "not a bash script %s %s %s",
 			expectedError:  true,
 		},
 		{
 			name: "successfully run script file",
 			scriptTemplate: `#!/bin/bash
-		echo "fake log output %s %s" > log-bundle.tar.gz`,
+		echo "fake log output %s %s" > %s`,
 			expectedLogData: fmt.Sprintf("fake log output %s %s\n", fakeBootstrapIP, fakeBootstrapIP),
 		},
 		{
@@ -479,23 +485,29 @@ exit 2`,
 	}
 
 	for _, test := range tests {
-		im := InstallManager{
-			LogLevel: "debug",
-		}
-		assert.NoError(t, im.Complete([]string{}))
-		result, err := runGatherScript(fakeBootstrapIP, test.scriptTemplate, &im)
-		if test.expectedError {
-			assert.Error(t, err, "expected error for test case %s", test.name)
-		} else {
-			data, err := ioutil.ReadFile(result)
-			assert.NoError(t, err, "error reading returned log file data")
-			assert.Equal(t, test.expectedLogData, string(data))
-
-			// cleanup saved/copied logfile
-			if err := os.RemoveAll(result); err != nil {
-				t.Logf("couldn't delete saved log file: %v", err)
+		t.Run(test.name, func(t *testing.T) {
+			im := InstallManager{
+				LogLevel: "debug",
+				isGatherLogsEnabled: func() bool {
+					return true
+				},
 			}
-		}
+			assert.NoError(t, im.Complete([]string{}))
+			result, err := im.runGatherScript(fakeBootstrapIP, test.scriptTemplate, "/tmp")
+			if test.expectedError {
+				assert.Error(t, err, "expected error for test case %s", test.name)
+			} else {
+				t.Logf("result file: %s", result)
+				data, err := ioutil.ReadFile(result)
+				assert.NoError(t, err, "error reading returned log file data")
+				assert.Equal(t, test.expectedLogData, string(data))
+
+				// cleanup saved/copied logfile
+				if err := os.RemoveAll(result); err != nil {
+					t.Logf("couldn't delete saved log file: %v", err)
+				}
+			}
+		})
 	}
 }
 func TestGetBootstrapIP(t *testing.T) {

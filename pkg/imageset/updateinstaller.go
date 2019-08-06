@@ -187,7 +187,17 @@ func (o *UpdateInstallerImageOptions) Run() error {
 		}
 		installerImage := strings.TrimSpace(string(installerImageBytes))
 		o.log.Debugf("contents of installer-image.txt: %s", installerImage)
-		return o.updateInstallerImage(installerImage)
+
+		cliImageFileName := path.Join(o.WorkDir, "cli-image.txt")
+		cliImageBytes, err := ioutil.ReadFile(cliImageFileName)
+		if err != nil {
+			o.log.WithError(err).Error("could not read install image file")
+			return err
+		}
+		cliImage := strings.TrimSpace(string(cliImageBytes))
+		o.log.Debugf("contents of cli-image.txt: %s", cliImage)
+
+		return o.updateInstallerImage(installerImage, cliImage)
 	}
 
 	o.log.Debugf("the oc release info command failed")
@@ -202,7 +212,7 @@ func (o *UpdateInstallerImageOptions) Run() error {
 	return o.setImageResolutionErrorCondition(errorLog)
 }
 
-func (o *UpdateInstallerImageOptions) updateInstallerImage(installerImage string) error {
+func (o *UpdateInstallerImageOptions) updateInstallerImage(installerImage, cliImage string) error {
 	cd := &hivev1.ClusterDeployment{}
 	cdName := types.NamespacedName{Namespace: o.ClusterDeploymentNamespace, Name: o.ClusterDeploymentName}
 	logger := o.log.WithField("clusterdeployment", cdName)
@@ -213,6 +223,7 @@ func (o *UpdateInstallerImageOptions) updateInstallerImage(installerImage string
 		return err
 	}
 	cd.Status.InstallerImage = &installerImage
+	cd.Status.CLIImage = &cliImage
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
 		cd.Status.Conditions,
 		hivev1.InstallerImageResolutionFailedCondition,

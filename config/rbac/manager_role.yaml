@@ -23,6 +23,7 @@ rules:
   - secrets
   - configmaps
   - events
+  - persistentvolumeclaims
   verbs:
   - get
   - list

@@ -192,6 +192,10 @@ type ClusterDeploymentStatus struct {
 	// +optional
 	InstallerImage *string `json:"installerImage,omitempty"`
 
+	// CLIImage is the name of the oc cli image to use when installing the target cluster
+	// +optional
+	CLIImage *string `json:"cliImage,omitempty"`
+
 	// Conditions includes more detailed status for the cluster deployment
 	// +optional
 	Conditions []ClusterDeploymentCondition `json:"conditions,omitempty"`
@@ -199,6 +203,9 @@ type ClusterDeploymentStatus struct {
 	// CertificateBundles contains of the status of the certificate bundles associated with this cluster deployment.
 	// +optional
 	CertificateBundles []CertificateBundleStatus `json:"certificateBundles,omitempty"`
+
+	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
+	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment

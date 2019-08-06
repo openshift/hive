@@ -36,6 +36,9 @@ type HiveConfigSpec struct {
 	// If absent, backup integration will be disabled.
 	// +optional
 	Backup BackupConfig `json:"backup,omitempty"`
+
+	// FailedProvisionConfig is used to configure settings related to handling provision failures.
+	FailedProvisionConfig FailedProvisionConfig `json:"failedProvisionConfig"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
@@ -59,6 +62,14 @@ type VeleroBackupConfig struct {
 	// If not specified, the default is disabled.
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
+}
+
+// FailedProvisionConfig contains settings to control behavior undertaken by Hive when an installation attempt fails.
+type FailedProvisionConfig struct {
+
+	// SkipGatherLogs disables functionality that attempts to gather full logs from the cluster if an installation
+	// fails for any reason. The logs will be stored in a persistent volume for up to 7 days.
+	SkipGatherLogs bool `json:"skipGatherLogs,omitempty"`
 }
 
 // ExternalDNSConfig contains settings for running external-dns in a Hive

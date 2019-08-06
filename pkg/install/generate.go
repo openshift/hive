@@ -26,14 +26,6 @@ const (
 	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
 	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
-	// InstallJobLabel is the label used for counting the number of install jobs in Hive
-	InstallJobLabel = "hive.openshift.io/install"
-
-	// UninstallJobLabel is the label used for counting the number of uninstall jobs in Hive
-	UninstallJobLabel = "hive.openshift.io/uninstall"
-
-	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
-	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -53,12 +45,16 @@ func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
 	hiveImage, releaseImage string,
 	serviceAccountName string,
-	sshKey string) (*batchv1.Job, error) {
+	sshKey string,
+	pvcName string,
+	skipGatherLogs bool) (*batchv1.Job, error) {
 
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": cd.Name,
 		"namespace":         cd.Namespace,
 	})
+
+	skipGatherLogsStr := strconv.FormatBool(skipGatherLogs)
 
 	cdLog.Debug("generating installer job")
 	tryOnce := false
@@ -66,7 +62,6 @@ func GenerateInstallerJob(
 		value, exists := cd.Annotations[tryInstallOnceAnnotation]
 		tryOnce = exists && value == "true"
 	}
-
 	env := []corev1.EnvVar{
 		{
 			Name: "PULL_SECRET",
@@ -76,6 +71,10 @@ func GenerateInstallerJob(
 					Key:                  corev1.DockerConfigJsonKey,
 				},
 			},
+		},
+		{
+			Name:  constants.SkipGatherLogsEnvVar,
+			Value: skipGatherLogsStr,
 		},
 	}
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
@@ -123,13 +122,12 @@ func GenerateInstallerJob(
 
 	volumes := []corev1.Volume{
 		{
-			Name: "install",
+			Name: "output",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 	}
-
 	if cd.Spec.SSHKey != nil {
 		volumes = append(volumes, corev1.Volume{
 			Name: "sshkeys",
@@ -143,9 +141,26 @@ func GenerateInstallerJob(
 
 	volumeMounts := []corev1.VolumeMount{
 		{
-			Name:      "install",
+			Name:      "output",
 			MountPath: "/output",
 		},
+	}
+
+	if !skipGatherLogs {
+		// Add a volume where we will store full logs from both the installer, and the
+		// cluster itself (assuming we made it far enough).
+		volumes = append(volumes, corev1.Volume{
+			Name: "logs",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "logs",
+			MountPath: "/logs",
+		})
 	}
 
 	if cd.Spec.SSHKey != nil {
@@ -166,6 +181,11 @@ func GenerateInstallerJob(
 		return nil, fmt.Errorf("installer image not resolved")
 	}
 	installerImage := *cd.Status.InstallerImage
+
+	if cd.Status.CLIImage == nil {
+		return nil, fmt.Errorf("cli image not resolved")
+	}
+	cliImage := *cd.Status.CLIImage
 
 	installerImagePullPolicy := defaultInstallerImagePullPolicy
 	if cd.Spec.Images.InstallerImagePullPolicy != "" {
@@ -189,6 +209,17 @@ func GenerateInstallerJob(
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
 			// so it doesn't try to run a partially copied binary.
 			Args:         []string{"cp -v /bin/openshift-install /output/openshift-install.tmp && mv -v /output/openshift-install.tmp /output/openshift-install && ls -la /output"},
+			VolumeMounts: volumeMounts,
+		},
+		{
+			Name:            "cli",
+			Image:           cliImage,
+			ImagePullPolicy: installerImagePullPolicy,
+			Env:             env,
+			Command:         []string{"/bin/sh", "-c"},
+			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
+			// so it doesn't try to run a partially copied binary.
+			Args:         []string{"cp -v /usr/bin/oc /output/oc.tmp && mv -v /output/oc.tmp /output/oc && ls -la /output"},
 			VolumeMounts: volumeMounts,
 		},
 		{
@@ -232,8 +263,8 @@ func GenerateInstallerJob(
 	}
 
 	labels := map[string]string{
-		InstallJobLabel:            "true",
-		ClusterDeploymentNameLabel: cd.Name,
+		constants.InstallJobLabel:            "true",
+		constants.ClusterDeploymentNameLabel: cd.Name,
 	}
 	if cd.Labels != nil {
 		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
@@ -429,7 +460,7 @@ func GenerateUninstallerJob(
 
 	completions := int32(1)
 	backoffLimit := int32(123456) // effectively limitless
-	labels := map[string]string{UninstallJobLabel: "true"}
+	labels := map[string]string{constants.UninstallJobLabel: "true"}
 
 	job := &batchv1.Job{}
 	job.Name = name

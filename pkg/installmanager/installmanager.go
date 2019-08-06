@@ -24,6 +24,7 @@ import (
 
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 
@@ -63,8 +64,25 @@ const (
 	sleepSecondsFilename                = "sleep-seconds.txt"
 
 	fetchLogsScriptTemplate = `#!/bin/bash
+USER_ID=$(id -u)
+GROUP_ID=$(id -g)
+
+if [ x"$USER_ID" != x"0" ]; then
+
+    echo "default:x:${USER_ID}:${GROUP_ID}:Default Application User:${HOME}:/sbin/nologin" >> /etc/passwd
+
+fi
+
 ssh -o "StrictHostKeyChecking=no" -A core@%s '/usr/local/bin/installer-gather.sh'
-scp -o "StrictHostKeyChecking=no" core@%s:~/log-bundle.tar.gz .`
+scp -o "StrictHostKeyChecking=no" core@%s:~/log-bundle.tar.gz %s`
+
+	testFailureManifest = `apiVersion: v1
+kind: NotARealSecret
+metadata:
+  name: foo
+  namespace: bar
+type: TestFailResource
+`
 )
 
 var (
@@ -78,6 +96,7 @@ type InstallManager struct {
 	log                           log.FieldLogger
 	LogLevel                      string
 	WorkDir                       string
+	LogsDir                       string
 	ClusterID                     string
 	ClusterName                   string
 	Region                        string
@@ -90,6 +109,7 @@ type InstallManager struct {
 	uploadAdminKubeconfig         func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword           func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error)
 	uploadInstallerLog            func(*hivev1.ClusterDeployment, *InstallManager, error) error
+	isGatherLogsEnabled           func() bool
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -131,6 +151,7 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
+	flags.StringVar(&im.LogsDir, "logs-dir", "/logs", "directory to use for all installer logs")
 	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	return cmd
 }
@@ -143,6 +164,7 @@ func (m *InstallManager) Complete(args []string) error {
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
 	m.uploadAdminPassword = uploadAdminPassword
 	m.uploadInstallerLog = uploadInstallerLog
+	m.isGatherLogsEnabled = isGatherLogsEnabled
 	m.runUninstaller = runUninstaller
 
 	// Set log level
@@ -250,7 +272,10 @@ func (m *InstallManager) Run() error {
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
 
-		// gatherLogs(cd, m) when saving log file is implemented
+		// Fetch logs from all cluster machines:
+		if m.isGatherLogsEnabled() {
+			m.gatherLogs(cd)
+		}
 
 		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
 		if err := m.cleanupFailedInstall(cd); err != nil {
@@ -350,6 +375,7 @@ func calcSleepSeconds(currentRetries int) int {
 func (m *InstallManager) waitForInstallerBinaries() {
 	fileList := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
+		filepath.Join(m.WorkDir, "oc"),
 	}
 	m.waitForFiles(fileList)
 }
@@ -437,9 +463,28 @@ func runUninstaller(clusterName, region, infraID string, logger log.FieldLogger)
 // generateAssets runs openshift-install commands to generate on-disk assets we need to
 // upload or modify prior to provisioning resources in the cloud.
 func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
-	m.log.Info("running openshift-install create ignition-configs")
-	err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir})
+
+	m.log.Info("running openshift-install create manifests")
+	err := m.runOpenShiftInstallCommand([]string{"create", "manifests", "--dir", m.WorkDir})
 	if err != nil {
+		m.log.WithError(err).Error("error generating installer assets")
+		return err
+	}
+
+	// If the failure test annotation is set, write a bogus resource into the manifests which will
+	// cause a late failure in the install process, enough that we can gather logs from the cluster.
+	if b, err := strconv.ParseBool(cd.Annotations[constants.InstallFailureTestAnnotation]); b && err == nil {
+		m.log.Warnf("generating a late installation failure for testing due to %s annotation on cluster deployment", constants.InstallFailureTestAnnotation)
+		data := []byte(testFailureManifest)
+		err = ioutil.WriteFile(filepath.Join(m.WorkDir, "manifests", "failure-test.yaml"), data, 0644)
+		if err != nil {
+			m.log.WithError(err).Error("error writing failure manifest to disk")
+			return err
+		}
+	}
+
+	m.log.Info("running openshift-install create ignition-configs")
+	if err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir}); err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
 	}
@@ -462,6 +507,7 @@ func (m *InstallManager) provisionCluster(cd *hivev1.ClusterDeployment) error {
 }
 
 func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
+	m.log.WithField("args", args).Info("running openshift-install binary")
 	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), args...)
 
 	// save the commands' stdout/stderr to a file
@@ -619,14 +665,58 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 	return cd, nil
 }
 
-func gatherLogs(cd *hivev1.ClusterDeployment, m *InstallManager) error {
-	m.log.Info("Gathering logs/tarball")
+func isGatherLogsEnabled() bool {
+	// By default we assume to gather logs, only disable if explicitly told to via HiveConfig.
+	envVarValue := os.Getenv(constants.SkipGatherLogsEnvVar)
+	return envVarValue != "true"
+}
 
-	m.log.Debug("Checking for SSH private key")
+// gatherLogs will attempt to gather logs after a failed install. First we attempt
+// to gather logs from the bootstrap node. If this fails, we may have made it far enough
+// to teardown the bootstrap node, in which case we then attempt to gather with
+// 'oc adm must-gather', which would gather logs from the cluster's API itself.
+// If neither succeeds we do not consider this a fatal error,
+// we're just gathering as much information as we can and then proceeding with cleanup
+// so we can re-try.
+func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) {
+
+	if err := m.gatherBootstrapNodeLogs(cd); err != nil {
+		m.log.WithError(err).Info("error fetching logs from bootstrap node")
+	} else {
+		m.log.Info("successfully gathered logs from bootstrap node")
+		return
+	}
+
+	if err := m.gatherClusterLogs(cd); err != nil {
+		m.log.WithError(err).Info("error fetching logs with oc adm must-gather")
+	} else {
+		m.log.Info("successfully ran oc adm must-gather")
+		return
+	}
+
+	m.log.Warn("unable to fetch cluster logs after install failure")
+}
+
+func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
+	m.log.Info("attempting to gather logs with oc adm must-gather")
+	destDir := filepath.Join(m.LogsDir, fmt.Sprintf("%s-must-gather", time.Now().Format("20060102150405")))
+	cmd := exec.Command(filepath.Join(m.WorkDir, "oc"), "adm", "must-gather", "--dest-dir", destDir)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", filepath.Join(m.WorkDir, "auth", "kubeconfig")))
+	stdout, err := cmd.Output()
+	m.log.Infof("must-gather output: %s", stdout)
+	return err
+}
+
+func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) error {
+
+	m.log.Info("attempting to gather logs from cluster bootstrap node")
+
+	m.log.Debug("checking for SSH private key")
 	sshPrivKeyPath := os.Getenv("SSH_PRIV_KEY_PATH")
 	if sshPrivKeyPath == "" {
 		m.log.Warn("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
-		return nil
+		return fmt.Errorf("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
 	}
 	fileInfo, err := os.Stat(sshPrivKeyPath)
 	if err != nil && os.IsNotExist(err) {
@@ -655,32 +745,27 @@ func gatherLogs(cd *hivev1.ClusterDeployment, m *InstallManager) error {
 		return err
 	}
 
-	logTarball, err := runGatherScript(bootstrapIP, fetchLogsScriptTemplate, m)
+	_, err = m.runGatherScript(bootstrapIP, fetchLogsScriptTemplate, m.WorkDir)
 	if err != nil {
 		m.log.Error("failed to run script for gathering logs")
 		return err
 	}
-	defer os.Remove(logTarball)
 
-	// TODO: upload/save log file
-
-	return fmt.Errorf("ALWAYS FAIL TO SAVE LOG UNTIL IMPLEMENTED")
+	return nil
 }
 
-func runGatherScript(bootstrapIP, scriptTemplate string, m *InstallManager) (string, error) {
-	/* scriptTemplate should look like
-	ssh -o "StrictHostKeyChecking=no" -A core@%s '/usr/local/bin/installer-gather.sh'
-	scp -o "StrictHostKeyChecking=no" core@%s:~/log-bundle.tar.gz .
-	*/
+func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir string) (string, error) {
 
-	tmpFile, err := ioutil.TempFile("/tmp", "gatherlog")
+	tmpFile, err := ioutil.TempFile(workDir, "gatherlog")
 	if err != nil {
 		m.log.WithError(err).Error("failed to create temp log gathering file")
 		return "", err
 	}
 	defer os.Remove(tmpFile.Name())
 
-	script := fmt.Sprintf(scriptTemplate, bootstrapIP, bootstrapIP)
+	destTarball := filepath.Join(m.LogsDir, fmt.Sprintf("%s-log-bundle.tar.gz", time.Now().Format("20060102150405")))
+	script := fmt.Sprintf(scriptTemplate, bootstrapIP, bootstrapIP, destTarball)
+	m.log.Debugf("generated script: %s", script)
 
 	if _, err := tmpFile.Write([]byte(script)); err != nil {
 		m.log.WithError(err).Error("failed to write to log gathering file")
@@ -702,20 +787,14 @@ func runGatherScript(bootstrapIP, scriptTemplate string, m *InstallManager) (str
 		return "", err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		m.log.WithError(err).Error("failed to get current working directory")
-		return "", nil
-	}
-
-	logFileName := filepath.Join(cwd, "log-bundle.tar.gz")
-	_, err = os.Stat(logFileName)
+	_, err = os.Stat(destTarball)
 	if err != nil {
 		m.log.WithError(err).Error("error while stat-ing log tarball")
 		return "", err
 	}
+	m.log.Infof("cluster logs gathered: %s", destTarball)
 
-	return logFileName, nil
+	return destTarball, nil
 }
 
 func getBootstrapIP(m *InstallManager) (string, error) {

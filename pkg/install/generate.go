@@ -64,6 +64,12 @@ func GenerateInstallerJob(
 	}
 	env := []corev1.EnvVar{
 		{
+			// OPENSHIFT_INSTALL_INVOKER allows setting who launched the installer
+			// (it is stored in the configmap openshift-config/openshift-install)
+			Name:  "OPENSHIFT_INSTALL_INVOKER",
+			Value: "hive",
+		},
+		{
 			Name: "PULL_SECRET",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{

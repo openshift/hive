@@ -1,6 +1,7 @@
 package imageset
 
 import (
+	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,7 @@ import (
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/images"
 )
 
 // ImageSpec specifies an image reference and associated pull policy
@@ -98,6 +100,13 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 	}
 
+	hiveUtilImage := os.Getenv(images.HiveImageEnvVar)
+	if hiveUtilImage == "" {
+		// TODO: FIXME: temporary fallback to the cluster image set, just trying to get stage operational
+		// but we will hopefully always be using latest image here by end of week.
+		hiveUtilImage = hive.Image
+	}
+
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
@@ -112,7 +121,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 		{
 			Name:            "hiveutil",
-			Image:           hive.Image,
+			Image:           hiveUtilImage,
 			ImagePullPolicy: hive.PullPolicy,
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},

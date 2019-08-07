@@ -422,7 +422,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if cd.Status.InstallerImage == nil {
+	if !cd.Status.Installed && (cd.Status.InstallerImage == nil || cd.Status.CLIImage == nil) {
 		return r.resolveInstallerImage(cd, imageSet, releaseImage, hiveImage, cdLog)
 	}
 
@@ -766,7 +766,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	// If job exists and is finished, delete so we can recreate it
 	case err == nil && controllerutils.IsFinished(existingJob):
 		jobLog.WithField("successful", controllerutils.IsSuccessful(existingJob)).
-			Warning("Finished job found, but installer image is not yet resolved. Deleting.")
+			Warning("Finished job found, but all images not yet resolved. Deleting.")
 		err := r.Delete(context.Background(), existingJob,
 			client.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {

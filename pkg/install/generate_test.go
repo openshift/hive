@@ -28,7 +28,7 @@ func TestGenerate(t *testing.T) {
 	cd := testClusterDeployment()
 	cd.Status.Installed = true
 	cd.Spec.PreserveOnDelete = true
-	job, err := GenerateUninstallerJobForClusterDeployment(cd, "example.com/fake:latest")
+	job, err := GenerateUninstallerJobForClusterDeployment(cd)
 	assert.Nil(t, job)
 	assert.NotNil(t, err)
 }

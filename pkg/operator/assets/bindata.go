@@ -1872,14 +1872,6 @@ spec:
               description: Images allows overriding the default images used to provision
                 and manage the cluster.
               properties:
-                hiveImage:
-                  description: HiveImage is the image used in the sidecar container
-                    to manage execution of openshift-install.
-                  type: string
-                hiveImagePullPolicy:
-                  description: HiveImagePullPolicy is the pull policy for the installer
-                    image.
-                  type: string
                 installerImage:
                   description: InstallerImage is the image containing the openshift-install
                     binary that will be used to install.
@@ -2968,9 +2960,6 @@ metadata:
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.hiveImage
-    name: Hive
-    type: string
   - JSONPath: .status.installerImage
     name: Installer
     type: string
@@ -3003,11 +2992,6 @@ spec:
           type: object
         spec:
           properties:
-            hiveImage:
-              description: HiveImage is the Hive image to use when installing or destroying
-                a cluster. If not present, the default Hive image for the clusterdeployment
-                controller is used.
-              type: string
             installerImage:
               description: InstallerImage is the image used to install a cluster.
                 If not specified, the installer image reference is obtained from the

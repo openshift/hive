@@ -26,10 +26,6 @@ parameters:
 - name: AWS_SECRET_ACCESS_KEY
   required: true
   description: Base64 encoded AWS secret access key that can be used to provision cluster resources.
-- name: HIVE_IMAGE
-  displayName: Hive image URL
-  description: Hive image URL
-  value: "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
 - name: TRY_INSTALL_ONCE
   displayName: Try Install Only Once
   description: If set, install will only be tried once.
@@ -77,7 +73,6 @@ objects:
     name: custom
   spec:
     releaseImage: "${RELEASE_IMAGE}"
-    hiveImage: "${HIVE_IMAGE}"
 
 - apiVersion: hive.openshift.io/v1alpha1
   kind: ClusterDeployment

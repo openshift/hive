@@ -66,6 +66,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	if r.hiveImage != "" {
 		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 	}
+	if r.hiveImagePullPolicy != "" {
+		hiveAdmDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = r.hiveImagePullPolicy
+	}
 	if hiveAdmDeployment.Annotations == nil {
 		hiveAdmDeployment.Annotations = map[string]string{}
 	}

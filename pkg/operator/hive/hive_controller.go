@@ -183,8 +183,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		operatorDeployment)
 	if err == nil {
 		img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
-		log.Debugf("loaded hive image from hive-operator deployment: %s", img)
+		pullPolicy := operatorDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy
+		log.Debugf("loaded hive image from hive-operator deployment: %s (%s)", img, pullPolicy)
 		r.(*ReconcileHiveConfig).hiveImage = img
+		r.(*ReconcileHiveConfig).hiveImagePullPolicy = pullPolicy
 	} else {
 		log.WithError(err).Warn("unable to lookup hive image from hive-operator Deployment, image overriding disabled")
 	}
@@ -211,6 +213,7 @@ type ReconcileHiveConfig struct {
 	dynamicClient         dynamic.Interface
 	restConfig            *rest.Config
 	hiveImage             string
+	hiveImagePullPolicy   corev1.PullPolicy
 	syncAggregatorCA      bool
 	managedConfigCMLister corev1listers.ConfigMapLister
 }

@@ -100,7 +100,6 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--ssh-public-key-file="${CLOUD_CREDS_DIR}/ssh-publickey" \
 	--pull-secret-file="${CLOUD_CREDS_DIR}/pull-secret" \
 	--base-domain="${BASE_DOMAIN}" \
-	--hive-image="${HIVE_IMAGE}" \
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true

@@ -322,7 +322,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
-	hiveImage := controllerutils.GetHiveImage(cd, imageSet, cdLog)
 	releaseImage := r.getReleaseImage(cd, imageSet, cdLog)
 
 	if cd.DeletionTimestamp != nil {
@@ -347,7 +346,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
 		}
 
-		return r.syncDeletedClusterDeployment(cd, hiveImage, cdLog)
+		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
 
 	// requeueAfter will be used to determine if cluster should be requeued after
@@ -422,7 +421,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if !cd.Status.Installed && (cd.Status.InstallerImage == nil || cd.Status.CLIImage == nil) {
-		return r.resolveInstallerImage(cd, imageSet, releaseImage, hiveImage, cdLog)
+		return r.resolveInstallerImage(cd, imageSet, releaseImage, cdLog)
 	}
 
 	if cd.Spec.ManageDNS {
@@ -494,7 +493,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 		job, err := install.GenerateInstallerJob(
 			cd,
-			hiveImage,
 			releaseImage,
 			controllerutils.ServiceAccountName,
 			sshKey, GetInstallLogsPVCName(cd), skipGatherLogs)
@@ -677,21 +675,6 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 	return err
 }
 
-// getHiveImage looks for a Hive image to use in clusterdeployment jobs in the following order:
-// 1 - specified in the cluster deployment spec.images.hiveImage
-// 2 - referenced in the cluster deployment spec.imageSet
-// 3 - specified via environment variable to the hive controller
-// 4 - fallback default hardcoded image reference
-func (r *ReconcileClusterDeployment) getHiveImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, cdLog log.FieldLogger) string {
-	if cd.Spec.Images.HiveImage != "" {
-		return cd.Spec.Images.HiveImage
-	}
-	if imageSet != nil && imageSet.Spec.HiveImage != nil {
-		return *imageSet.Spec.HiveImage
-	}
-	return images.GetHiveImage(cdLog)
-}
-
 // getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
 // 1 - specified in the cluster deployment spec.images.releaseImage
 // 2 - referenced in the cluster deployment spec.imageSet
@@ -732,7 +715,7 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 	return err
 }
 
-func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage, hiveImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
 	if len(cd.Spec.Images.InstallerImage) > 0 {
 		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
 			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
@@ -744,8 +727,8 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
 		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
 	}
-	cliImage := images.GetCLIImage(cdLog)
-	job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage), imageset.AlwaysPullImage(hiveImage))
+	cliImage := images.GetCLIImage()
+	job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err
@@ -1019,7 +1002,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 	return &reconcile.Result{}, err
 }
 
-func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, hiveImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
+func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 
 	result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
 	if result != nil {

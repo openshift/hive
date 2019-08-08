@@ -6,12 +6,6 @@ import (
 
 // ClusterImageSetSpec defines the desired state of ClusterImageSet
 type ClusterImageSetSpec struct {
-	// HiveImage is the Hive image to use when installing or destroying a cluster.
-	// If not present, the default Hive image for the clusterdeployment controller
-	// is used.
-	// +optional
-	HiveImage *string `json:"hiveImage,omitempty"`
-
 	// ReleaseImage is the image that contains the payload to use when installing
 	// a cluster. If the installer image is specified, the release image
 	// is optional.
@@ -34,7 +28,6 @@ type ClusterImageSetStatus struct{}
 // ClusterImageSet is the Schema for the clusterimagesets API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Hive",type="string",JSONPath=".spec.hiveImage"
 // +kubebuilder:printcolumn:name="Installer",type="string",JSONPath=".status.installerImage"
 // +kubebuilder:printcolumn:name="Release",type="string",JSONPath=".spec.releaseImage"
 // +kubebuilder:resource:path=clusterimagesets,shortName=imgset

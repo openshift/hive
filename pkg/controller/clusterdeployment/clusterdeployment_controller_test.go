@@ -29,7 +29,6 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -329,7 +328,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *batchv1.Job {
 					job, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
-						"example.com/fake:latest",
 						"",
 						"fakeserviceaccount",
 						"sshkey", "", false)
@@ -388,7 +386,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *batchv1.Job {
 					job, _ := install.GenerateInstallerJob(
 						testExpiredClusterDeployment(),
-						"example.com/fake:latest",
 						"",
 						"fakeserviceaccount",
 						"sshkey", "", false)
@@ -415,7 +412,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *batchv1.Job {
 					job, _ := install.GenerateInstallerJob(
 						testClusterDeployment(),
-						"fakeserviceaccount",
 						"",
 						"fakeserviceaccount",
 						"sshkey", "", false)
@@ -733,37 +729,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Delete cluster deployment with image from clusterimageset",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testDeletedClusterDeployment()
-					cd.Spec.Images.HiveImage = ""
-					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
-					return cd
-				}(),
-				func() *hivev1.ClusterImageSet {
-					cis := testClusterImageSet()
-					testHiveImage := "hive-image-from-image-set:latest"
-					cis.Spec.HiveImage = &testHiveImage
-					return cis
-				}(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovisionRequest(c)
-				if deprovision == nil {
-					t.Errorf("did not find expected deprovision request")
-				}
-			},
-		},
-		{
 			name: "Delete cluster deployment with missing clusterimageset",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testDeletedClusterDeployment()
-					cd.Spec.Images.HiveImage = ""
 					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
@@ -773,9 +742,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				deprovision := getDeprovisionRequest(c)
-				if deprovision == nil {
-					t.Errorf("did not find expected deprovision request")
-				}
+				assert.NotNil(t, deprovision, "expected deprovision request to be created")
 			},
 		},
 		{
@@ -1029,7 +996,6 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 func testInstallJob() *batchv1.Job {
 	cd := testClusterDeployment()
 	job, err := install.GenerateInstallerJob(cd,
-		images.DefaultHiveImage,
 		"",
 		controllerutils.ServiceAccountName, "testSSHKey", GetInstallLogsPVCName(cd), false)
 	if err != nil {

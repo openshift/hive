@@ -110,10 +110,6 @@ type ProvisionImages struct {
 	InstallerImage string `json:"installerImage,omitempty"`
 	// InstallerImagePullPolicy is the pull policy for the installer image.
 	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy,omitempty"`
-	// HiveImage is the image used in the sidecar container to manage execution of openshift-install.
-	HiveImage string `json:"hiveImage,omitempty"`
-	// HiveImagePullPolicy is the pull policy for the installer image.
-	HiveImagePullPolicy corev1.PullPolicy `json:"hiveImagePullPolicy,omitempty"`
 
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.

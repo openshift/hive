@@ -13,6 +13,7 @@ import (
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/images"
 )
 
 const (
@@ -21,7 +22,6 @@ const (
 	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 
 	defaultInstallerImagePullPolicy = corev1.PullAlways
-	defaultHiveImagePullPolicy      = corev1.PullAlways
 
 	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
@@ -49,7 +49,7 @@ func GenerateInstallerJobForProvision(provision *hivev1.ClusterProvision) (*batc
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	cd *hivev1.ClusterDeployment,
-	hiveImage, releaseImage string,
+	releaseImage string,
 	serviceAccountName string,
 	sshKey string,
 	pvcName string,
@@ -204,11 +204,6 @@ func GenerateInstallerJob(
 		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
 	}
 
-	hiveImagePullPolicy := defaultHiveImagePullPolicy
-	if cd.Spec.Images.HiveImagePullPolicy != "" {
-		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
-	}
-
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
@@ -236,8 +231,8 @@ func GenerateInstallerJob(
 		},
 		{
 			Name:            "hive",
-			Image:           hiveImage,
-			ImagePullPolicy: hiveImagePullPolicy,
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/bin/sh"},
 			Args: []string{"-c",
@@ -323,8 +318,7 @@ func GetUninstallJobName(name string) string {
 
 // GenerateUninstallerJobForClusterDeployment creates a job to uninstall an OpenShift cluster
 // given a ClusterDeployment and an installer image.
-func GenerateUninstallerJobForClusterDeployment(
-	cd *hivev1.ClusterDeployment, hiveImage string) (*batchv1.Job, error) {
+func GenerateUninstallerJobForClusterDeployment(cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
 
 	if cd.Spec.PreserveOnDelete {
 		if cd.Status.Installed {
@@ -347,11 +341,6 @@ func GenerateUninstallerJobForClusterDeployment(
 		credentialsSecret = cd.Spec.PlatformSecrets.AWS.Credentials.Name
 	}
 
-	hiveImagePullPolicy := defaultHiveImagePullPolicy
-	if cd.Spec.Images.HiveImagePullPolicy != "" {
-		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
-	}
-
 	infraID := cd.Status.InfraID
 	clusterID := cd.Status.ClusterID
 	name := GetUninstallJobName(cd.Name)
@@ -364,13 +353,12 @@ func GenerateUninstallerJobForClusterDeployment(
 		credentialsSecret,
 		infraID,
 		clusterID,
-		hiveImage,
-		hiveImagePullPolicy), nil
+	), nil
 }
 
 // GenerateUninstallerJobForDeprovisionRequest generates an uninstaller job for a given deprovision request
 func GenerateUninstallerJobForDeprovisionRequest(
-	req *hivev1.ClusterDeprovisionRequest, hiveImage string) (*batchv1.Job, error) {
+	req *hivev1.ClusterDeprovisionRequest) (*batchv1.Job, error) {
 
 	if req.Spec.Platform.AWS == nil {
 		return nil, fmt.Errorf("only AWS deprovision requests currently supported")
@@ -397,8 +385,7 @@ func GenerateUninstallerJobForDeprovisionRequest(
 		credentialsSecret,
 		req.Spec.InfraID,
 		req.Spec.ClusterID,
-		hiveImage,
-		defaultHiveImagePullPolicy), nil
+	), nil
 }
 
 // GenerateUninstallerJob generates a new uninstaller job
@@ -410,8 +397,7 @@ func GenerateUninstallerJob(
 	credentialsSecret string,
 	infraID string,
 	clusterID string,
-	hiveImage string,
-	hiveImagePullPolicy corev1.PullPolicy) *batchv1.Job {
+) *batchv1.Job {
 
 	env := []corev1.EnvVar{}
 	if len(credentialsSecret) > 0 {
@@ -440,8 +426,8 @@ func GenerateUninstallerJob(
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
-			Image:           hiveImage,
-			ImagePullPolicy: hiveImagePullPolicy,
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{

@@ -118,12 +118,19 @@ const (
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
 func NewCreateClusterCommand() *cobra.Command {
 	var homeDir = "."
+
 	if u, err := user.Current(); err == nil {
 		homeDir = u.HomeDir
 	}
 	defaultSSHPublicKeyFile := filepath.Join(homeDir, ".ssh", "id_rsa.pub")
-	defaultPullSecretFile := filepath.Join(homeDir, ".pull-secret")
 	defaultAWSCredsFile := filepath.Join(homeDir, ".aws", "credentials")
+
+	defaultPullSecretFile := filepath.Join(homeDir, ".pull-secret")
+	if _, err := os.Stat(defaultPullSecretFile); os.IsNotExist(err) {
+		defaultPullSecretFile = ""
+	} else if err != nil {
+		log.WithError(err).Errorf("%v can not be used", defaultPullSecretFile)
+	}
 
 	opt := &Options{}
 	cmd := &cobra.Command{
@@ -255,18 +262,6 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 
 // GenerateObjects generates resources for a new cluster deployment
 func (o *Options) GenerateObjects() ([]runtime.Object, error) {
-	result := []runtime.Object{}
-	cd, imageSet, err := o.GenerateClusterDeployment()
-	if err != nil {
-		return nil, err
-	}
-	if imageSet != nil {
-		result = append(result, imageSet)
-	}
-	result = append(result, cd)
-	if !o.IncludeSecrets {
-		return result, nil
-	}
 	awsCreds, err := o.generateAWSCredsSecret()
 	if err != nil {
 		return nil, err
@@ -279,7 +274,32 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append([]runtime.Object{awsCreds, pullSecret, sshSecret}, result...), err
+
+	result := []runtime.Object{}
+	cd, imageSet, err := o.GenerateClusterDeployment()
+	if err != nil {
+		return nil, err
+	}
+	if imageSet != nil {
+		result = append(result, imageSet)
+	}
+
+	// Adding pull secret name to cluster deployment if pull secret exists
+	if pullSecret != nil {
+		cd.Spec.PullSecret = &corev1.LocalObjectReference{
+			Name: fmt.Sprintf("%s-pull-secret", cd.Name),
+		}
+	}
+	result = append(result, cd)
+	if !o.IncludeSecrets {
+		return result, nil
+	}
+
+	// With introduction of global pull secret, pull secret is optional now
+	if pullSecret != nil {
+		result = append(result, pullSecret)
+	}
+	return append([]runtime.Object{awsCreds, sshSecret}, result...), err
 }
 
 func (o *Options) getPullSecret() (string, error) {
@@ -299,14 +319,16 @@ func (o *Options) getPullSecret() (string, error) {
 		pullSecret = strings.TrimSpace(string(data))
 		return pullSecret, nil
 	}
-	log.Error("Cannot determine pull secret to use")
-	return "", fmt.Errorf("no pull secret")
+	return "", nil
 }
 
 func (o *Options) generatePullSecret() (*corev1.Secret, error) {
 	pullSecret, err := o.getPullSecret()
 	if err != nil {
 		return nil, err
+	}
+	if len(pullSecret) == 0 {
+		return nil, nil
 	}
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -484,9 +506,6 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 						Name: fmt.Sprintf("%s-aws-creds", o.Name),
 					},
 				},
-			},
-			PullSecret: &corev1.LocalObjectReference{
-				Name: fmt.Sprintf("%s-pull-secret", o.Name),
 			},
 			ControlPlane: hivev1.MachinePool{
 				Name:     "master",

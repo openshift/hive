@@ -13,7 +13,7 @@ type MachinePool struct {
 	// Default is 1.
 	Replicas *int64 `json:"replicas"`
 
-	// Platform is configuration for machine pool specific to the platfrom.
+	// Platform is configuration for machine pool specific to the platform.
 	Platform MachinePoolPlatform `json:"platform"`
 
 	// Map of label string keys and values that will be applied to the created MachineSet's

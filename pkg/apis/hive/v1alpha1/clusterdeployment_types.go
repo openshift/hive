@@ -389,7 +389,7 @@ type ClusterIngress struct {
 	// +required
 	Name string `json:"name"`
 
-	// Domain (sometimes refered to as shard) is the full DNS suffix that the resulting
+	// Domain (sometimes referred to as shard) is the full DNS suffix that the resulting
 	// IngressController object will service (eg abcd.mycluster.mydomain.com).
 	// +required
 	Domain string `json:"domain"`

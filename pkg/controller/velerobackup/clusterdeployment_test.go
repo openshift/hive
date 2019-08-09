@@ -365,6 +365,6 @@ func areAggregateErrorsEqualType(lhs, rhs utilerrors.Aggregate) bool {
 		}
 	}
 
-	// If we make it here, then all comparisions succeeded.
+	// If we make it here, then all comparisons succeeded.
 	return true
 }

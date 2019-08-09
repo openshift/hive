@@ -66,7 +66,7 @@ var (
 	MetricClusterDeploymentProvisionUnderwaySeconds = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "hive_cluster_deployment_provision_underway_seconds",
-			Help: "Length of time a cluster has been provisioning. Goes to 0 on succesful install and then will no longer be reported.",
+			Help: "Length of time a cluster has been provisioning. Goes to 0 on successful install and then will no longer be reported.",
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
@@ -76,7 +76,7 @@ var (
 		prometheus.GaugeOpts{
 			Name: "hive_cluster_deployment_deprovision_underway_seconds",
 			// Will clear once hive restarts.
-			Help: "Length of time a cluster has been deprovisioning. Goes to 0 on succesful deprovision and then will no longer be reported.",
+			Help: "Length of time a cluster has been deprovisioning. Goes to 0 on successful deprovision and then will no longer be reported.",
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)

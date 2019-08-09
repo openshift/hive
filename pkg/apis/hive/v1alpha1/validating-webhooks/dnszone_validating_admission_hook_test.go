@@ -2,13 +2,14 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
+	"testing"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"testing"
 )
 
 func TestDNSZoneValidatingResource(t *testing.T) {
@@ -109,7 +110,7 @@ func TestDNSZoneValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name: "Test doesn't validate with right version and resouce, but wrong group",
+			name: "Test doesn't validate with right version and resource, but wrong group",
 			gvr: &metav1.GroupVersionResource{
 				Group:    "not the right group",
 				Version:  "v1alpha1",
@@ -127,7 +128,7 @@ func TestDNSZoneValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name: "Test doesn't validate with right group and version, wrong resouce",
+			name: "Test doesn't validate with right group and version, wrong resource",
 			gvr: &metav1.GroupVersionResource{
 				Group:    "hive.openshift.io",
 				Version:  "v1alpha1",

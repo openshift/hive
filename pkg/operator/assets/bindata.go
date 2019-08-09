@@ -1582,7 +1582,7 @@ spec:
                     type: string
                   platform:
                     description: Platform is configuration for machine pool specific
-                      to the platfrom.
+                      to the platform.
                     properties:
                       aws:
                         description: AWS is the configuration used when installing
@@ -1686,7 +1686,7 @@ spec:
                   type: string
                 platform:
                   description: Platform is configuration for machine pool specific
-                    to the platfrom.
+                    to the platform.
                   properties:
                     aws:
                       description: AWS is the configuration used when installing on
@@ -1849,7 +1849,7 @@ spec:
               items:
                 properties:
                   domain:
-                    description: Domain (sometimes refered to as shard) is the full
+                    description: Domain (sometimes referred to as shard) is the full
                       DNS suffix that the resulting IngressController object will
                       service (eg abcd.mycluster.mydomain.com).
                     type: string
@@ -3973,7 +3973,7 @@ spec:
                   applyMode:
                     description: ApplyMode indicates if the patch apply mode is "AlwaysApply"
                       (default) or "ApplyOnce". ApplyMode "AlwaysApply" indicates
-                      that the patch should be applied every time reconcilation occurs.
+                      that the patch should be applied every time reconciliation occurs.
                       ApplyMode "ApplyOnce" indicates that the patch should only be
                       applied once.
                     type: string
@@ -4659,7 +4659,7 @@ spec:
                   applyMode:
                     description: ApplyMode indicates if the patch apply mode is "AlwaysApply"
                       (default) or "ApplyOnce". ApplyMode "AlwaysApply" indicates
-                      that the patch should be applied every time reconcilation occurs.
+                      that the patch should be applied every time reconciliation occurs.
                       ApplyMode "ApplyOnce" indicates that the patch should only be
                       applied once.
                     type: string

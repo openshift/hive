@@ -153,7 +153,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 	rContext.logger = cdLog
 
 	if cd.Spec.Ingress == nil {
-		// the addmission controller will ensure that we get valid-looking
+		// the admission controller will ensure that we get valid-looking
 		// Spec.Ingress (ie no missing 'default', no going from a defined
 		// ingress list to an empty list, etc)
 		rContext.logger.Debug("no ingress objects defined. using default intaller behavior.")

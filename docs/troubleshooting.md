@@ -1,5 +1,15 @@
 # Troubleshooting
 
+## Cluster Install Failure Logs
+
+In the event a cluster is brought up but overall installation fails, either during bootstrap or cluster initialization, Hive will attempt to gather logs from the cluster itself. These logs are stored in a persistent volume created for every install job. If the install succeeds on the first attempt, the persistent volume claim is immediately deleted. If the install has had any errors along the way, it will be preserved for 7 days and then removed.
+
+You can access these logs gathered from the cluster with the following script found in the hive.git repository:
+
+```bash
+$ hack/logextractor.sh mycluster ./extracted-logs/
+```
+
 ## Deprovision
 
 After deleting your cluster deployment you will see an uninstall job created. If for any reason this job gets stuck you can:

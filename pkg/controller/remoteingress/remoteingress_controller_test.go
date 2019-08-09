@@ -26,14 +26,11 @@ import (
 )
 
 const (
-	testClusterName = "foo"
-	testNamespace   = "default"
-
-	testSyncSetName                      = "foo-clusteringress"
+	testClusterName                      = "foo"
+	testNamespace                        = "default"
 	testDefaultIngressName               = "default"
 	testIngressDomain                    = "testapps.example.com"
 	testDefaultIngressServingCertificate = "test-bundle"
-	testDefaultCertBundle                = "test-bundle"
 	testDefaultCertBundleSecret          = "test-bundle-secret"
 )
 

@@ -31,8 +31,6 @@ const (
 	pullSecretSecretName = "pull-secret"
 	// testClusterID matches the json blob below:
 	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
-	// testInfraID matches the json blob below:
-	testInfraID = "test-cluster-fe9531"
 
 	installerBinary     = "openshift-install"
 	ocBinary            = "oc"

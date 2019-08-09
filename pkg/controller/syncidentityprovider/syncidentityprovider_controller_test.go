@@ -22,12 +22,10 @@ import (
 )
 
 const (
-	testName      = "foo"
-	testNamespace = "default"
-	ssidpName     = "ssidp-gh"
-	ssidpName2    = "ssidp-gh2"
-	sidpName      = "sidp-gh"
-	sidpName2     = "sidp-gh2"
+	ssidpName  = "ssidp-gh"
+	ssidpName2 = "ssidp-gh2"
+	sidpName   = "sidp-gh"
+	sidpName2  = "sidp-gh2"
 )
 
 var (

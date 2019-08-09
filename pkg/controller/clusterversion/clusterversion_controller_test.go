@@ -25,30 +25,14 @@ import (
 )
 
 const (
-	testName              = "foo-lqmsh"
-	testClusterName       = "bar"
-	testClusterID         = "testFooClusterUUID"
-	installJobName        = "foo-lqmsh-install"
-	uninstallJobName      = "foo-lqmsh-uninstall"
-	testNamespace         = "default"
-	metadataName          = "foo-lqmsh-metadata"
-	adminPasswordSecret   = "admin-password"
-	sshKeySecret          = "ssh-key"
-	pullSecretSecret      = "pull-secret"
-	testUUID              = "fakeUUID"
-	testAMI               = "ami-totallyfake"
-	adminKubeconfigSecret = "foo-lqmsh-admin-kubeconfig"
-	adminKubeconfig       = `clusters:
-- cluster:
-    certificate-authority-data: JUNK
-    server: https://bar-api.clusters.example.com:6443
-  name: bar
-`
+	testName                        = "foo-lqmsh"
+	testClusterName                 = "bar"
+	testClusterID                   = "testFooClusterUUID"
+	testNamespace                   = "default"
+	sshKeySecret                    = "ssh-key"
+	pullSecretSecret                = "pull-secret"
 	testRemoteClusterCurrentVersion = "4.0.0"
 	remoteClusterVersionObjectName  = "version"
-
-	remoteClusterRouteObjectName      = "console"
-	remoteClusterRouteObjectNamespace = "openshift-console"
 )
 
 func init() {

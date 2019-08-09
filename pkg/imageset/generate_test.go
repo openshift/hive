@@ -14,7 +14,6 @@ const (
 	testCLIImagePullPolicy  = corev1.PullNever
 	testHiveImage           = "registry.io/hive-image:latest"
 	testHiveImagePullPolicy = corev1.PullAlways
-	testPullSecretName      = "test-pull-secret"
 )
 
 var (

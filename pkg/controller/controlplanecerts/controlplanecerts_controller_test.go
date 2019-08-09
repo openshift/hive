@@ -315,10 +315,6 @@ func additionalCert(domain, secret string) additionalCertSpec {
 	}
 }
 
-func defaultCert(secret string) string {
-	return fakeName + "-" + secret
-}
-
 func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret string, additional ...additionalCertSpec) {
 	assert.Len(t, objs, 1, "single syncset expected")
 	assert.IsType(t, &hivev1.SyncSet{}, objs[0], "syncset object expected")

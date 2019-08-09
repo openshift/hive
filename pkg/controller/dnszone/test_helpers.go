@@ -14,7 +14,6 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/mock/gomock"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	"github.com/stretchr/testify/assert"
@@ -106,47 +105,6 @@ var (
 		zone.DeletionTimestamp = kubeTimeNow
 		return zone
 	}
-
-	validDNSZoneGensDontMatch = func() *hivev1.DNSZone {
-		// Take a copy of the default validDNSZone object
-		zone := validDNSZone()
-
-		// And make the 1 change needed to signal the object has not been sync'd
-		zone.Status.LastSyncGeneration = 5
-		tmpTime := metav1.Now() // LastSyncTimestamp needs to be set so that the generation difference is meaningful in the "shouldSync" check.
-		zone.Status.LastSyncTimestamp = &tmpTime
-		return zone
-	}
-
-	validDNSZoneGenTimestampSyncNotNeeded = func() *hivev1.DNSZone {
-		// Take a copy of the default validDNSZone object
-		zone := validDNSZone()
-
-		// And make the 1 change needed to signal the object has not been sync'd
-		zone.Status.LastSyncGeneration = 6
-		tmpTime := metav1.NewTime(time.Now().Add(-2 * time.Minute)) // Set the time to 2 minutes ago, which should NOT cause a sync
-		zone.Status.LastSyncTimestamp = &tmpTime
-
-		return zone
-	}
-
-	validDNSZoneGenTimestampSyncNeeded = func() *hivev1.DNSZone {
-		// Take a copy of the default validDNSZone object
-		zone := validDNSZone()
-
-		// And make the 1 change needed to signal the object has not been sync'd
-		zone.Status.LastSyncGeneration = 6
-		tmpTime := metav1.NewTime(time.Now().AddDate(0, 0, -3)) // Set the date to 3 days ago, which should cause a sync
-		zone.Status.LastSyncTimestamp = &tmpTime
-
-		return zone
-	}
-
-	validRoute53HostedZone = func() *route53.HostedZone {
-		return &route53.HostedZone{
-			Name: aws.String(validDNSZone().Spec.Zone + "."), // hosted zones always come back with a period on the end.
-		}
-	}
 )
 
 type mocks struct {
@@ -185,13 +143,4 @@ func setFakeDNSZoneInKube(mocks *mocks, dnsZone *hivev1.DNSZone) error {
 // setFakeDNSEndpointInKube creates a fake DNSEndpoint
 func setFakeDNSEndpointInKube(mocks *mocks, endpoint *hivev1.DNSEndpoint) error {
 	return mocks.fakeKubeClient.Create(context.TODO(), endpoint)
-}
-
-// inTimeSpan says if a given time is withing the start and end times.
-func inTimeSpan(timeToCheck *metav1.Time, start, end time.Time) bool {
-	if timeToCheck == nil {
-		return false
-	}
-
-	return timeToCheck.Time.After(start) && timeToCheck.Time.Before(end)
 }

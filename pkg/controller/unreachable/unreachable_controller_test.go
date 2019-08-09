@@ -41,24 +41,14 @@ import (
 )
 
 const (
-	testName              = "foo-unreachable"
-	testClusterName       = "bar"
-	testClusterID         = "testFooClusterUUID"
-	testNamespace         = "default"
-	sshKeySecret          = "ssh-key"
-	pullSecretSecret      = "pull-secret"
-	adminKubeconfigSecret = "foo-unreachable-admin-kubeconfig"
-	adminKubeconfig       = `clusters:
-- cluster:
-    certificate-authority-data: JUNK
-    server: https://bar-api.clusters.example.com:6443
-  name: bar
-`
+	testName                        = "foo-unreachable"
+	testClusterName                 = "bar"
+	testClusterID                   = "testFooClusterUUID"
+	testNamespace                   = "default"
+	sshKeySecret                    = "ssh-key"
+	pullSecretSecret                = "pull-secret"
 	testRemoteClusterCurrentVersion = "4.0.0"
 	remoteClusterVersionObjectName  = "version"
-
-	remoteClusterRouteObjectName      = "console"
-	remoteClusterRouteObjectNamespace = "openshift-console"
 )
 
 func init() {

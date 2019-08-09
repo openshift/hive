@@ -26,7 +26,6 @@ const (
 	testName                 = "foo"
 	testNamespace            = "default"
 	testAMI                  = "ami-totallyfake"
-	adminPassword            = "adminpassword"
 	adminSSHKey              = "adminSSH"
 	pullSecret               = "pullSecret"
 	awsInstanceType          = "fake-aws-type"

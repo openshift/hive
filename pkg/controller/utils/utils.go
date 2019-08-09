@@ -21,10 +21,6 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 )
 
-const (
-	mergedPullSecretSuffix = "merged-pull-secret"
-)
-
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient with metrics using the provided kubeconfig.
 // Controller name is required for metrics purposes.
 func BuildClusterAPIClientFromKubeconfig(kubeconfigData, controllerName string) (client.Client, error) {

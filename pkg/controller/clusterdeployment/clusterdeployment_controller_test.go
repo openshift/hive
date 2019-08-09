@@ -40,14 +40,11 @@ const (
 	testClusterID         = "testFooClusterUUID"
 	testInfraID           = "testFooInfraID"
 	installJobName        = "foo-lqmsh-install"
-	uninstallJobName      = "foo-lqmsh-uninstall"
 	imageSetJobName       = "foo-lqmsh-imageset"
 	testNamespace         = "default"
 	metadataName          = "foo-lqmsh-metadata"
 	sshKeySecret          = "ssh-key"
 	pullSecretSecret      = "pull-secret"
-	testUUID              = "fakeUUID"
-	testAMI               = "ami-totallyfake"
 	adminKubeconfigSecret = "foo-lqmsh-admin-kubeconfig"
 	adminKubeconfig       = `clusters:
 - cluster:

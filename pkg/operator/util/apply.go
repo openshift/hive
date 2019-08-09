@@ -7,10 +7,6 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 )
 
-const (
-	tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-)
-
 // ApplyAsset loads a path from our bindata assets and applies it to the cluster.
 func ApplyAsset(h *resource.Helper, assetPath string, hLog log.FieldLogger) error {
 	assetLog := hLog.WithField("asset", assetPath)

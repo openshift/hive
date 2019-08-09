@@ -557,31 +557,6 @@ func testSelectorSyncSetWithResources(name string, resources ...runtime.Object) 
 	return ss
 }
 
-func testMatchingSelectorSyncSetWithPatches(name string, patches ...hivev1.SyncObjectPatch) *hivev1.SelectorSyncSet {
-	return testSelectorSyncSetWithPatches(name, map[string]string{"region": "us-east-1"}, patches...)
-}
-
-func testNonMatchingSelectorSyncSetWithPatches(name string, patches ...hivev1.SyncObjectPatch) *hivev1.SelectorSyncSet {
-	return testSelectorSyncSetWithPatches(name, map[string]string{"region": "us-west-2"}, patches...)
-}
-
-func testSelectorSyncSetWithPatches(name string, matchLabels map[string]string, patches ...hivev1.SyncObjectPatch) *hivev1.SelectorSyncSet {
-	ss := &hivev1.SelectorSyncSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: hivev1.SelectorSyncSetSpec{
-			ClusterDeploymentSelector: metav1.LabelSelector{
-				MatchLabels: matchLabels,
-			},
-		},
-	}
-	for _, p := range patches {
-		ss.Spec.Patches = append(ss.Spec.Patches, p)
-	}
-	return ss
-}
-
 func testCM(name, key, value string) runtime.Object {
 	return &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{

@@ -40,14 +40,12 @@ const (
 	testClusterID            = "foo-12345-uuid"
 	testInfraID              = "foo-12345"
 	machineAPINamespace      = "openshift-machine-api"
-	metadataName             = "foo-metadata"
 	adminKubeconfigSecret    = "foo-admin-kubeconfig"
 	adminKubeconfigSecretKey = "kubeconfig"
 	adminPasswordSecret      = "foo-admin-creds"
 	adminPasswordSecretKey   = "password"
 	sshKeySecret             = "foo-ssh-key"
 	sshKeySecretKey          = "ssh-publickey"
-	testUUID                 = "fakeUUID"
 	testAMI                  = "ami-totallyfake"
 )
 

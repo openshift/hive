@@ -2,6 +2,8 @@ package controlplanecerts
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -213,6 +215,39 @@ func TestGetControlPlaneSecretNames(t *testing.T) {
 			assert.Equal(t, test.names, actual)
 		})
 	}
+}
+
+func TestSecretsHash(t *testing.T) {
+	s1 := testSecret("secret1")
+	s2 := testSecret("secret2")
+	s3 := testSecret("secret3")
+
+	secrets := []*corev1.Secret{s1, s2, s3}
+	currentHash := ""
+	for i := 0; i < 50; i++ {
+		secretsForHash := []*corev1.Secret{secrets[i%3], secrets[(i+1)%3], secrets[(i+2)%3]}
+		hash := secretsHash(secretsForHash)
+		if currentHash == "" {
+			currentHash = hash
+			continue
+		}
+		if hash != currentHash {
+			t.Fatalf("got inconsistent hash")
+		}
+	}
+}
+
+func testSecret(name string) *corev1.Secret {
+	s := &corev1.Secret{}
+	s.Name = name
+	s.Namespace = "namespace"
+	s.Data = map[string][]byte{}
+	for i := 0; i < 10; i++ {
+		b := make([]byte, 100)
+		rand.Read(b)
+		s.Data[fmt.Sprintf("key_%d", i)] = b
+	}
+	return s
 }
 
 func getFakeClusterDeployment(t *testing.T, c client.Client) *hivev1.ClusterDeployment {

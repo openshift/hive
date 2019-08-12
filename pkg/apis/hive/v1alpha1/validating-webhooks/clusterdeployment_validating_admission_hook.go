@@ -442,7 +442,7 @@ func getOriginalMachinePool(origMachinePools []hivev1.MachinePool, name string) 
 
 func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {
 	// We don't allow a ClusterDeployment which had previously defined a list of Ingress objects
-	// to then be cleared out. It either must be cleared from the begining (ie just use default behavior),
+	// to then be cleared out. It either must be cleared from the beginning (ie just use default behavior),
 	// or the ClusterDeployment must continue to define at least the 'default' ingress object.
 	if len(oldObject.Ingress) > 0 && len(newObject.Ingress) == 0 {
 		return true
@@ -466,7 +466,7 @@ func validateIngressDomainsShareClusterDomain(newObject *hivev1.ClusterDeploymen
 }
 func validateIngressDomainsNotWildcard(newObject *hivev1.ClusterDeploymentSpec) bool {
 	// check for domains with leading '*'
-	// the * is unecessary as the ingress controller assumes a wildcard
+	// the * is unnecessary as the ingress controller assumes a wildcard
 	for _, ingress := range newObject.Ingress {
 		if ingress.Domain[0] == '*' {
 			return false

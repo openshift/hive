@@ -190,7 +190,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
-			name: "Test doesn't validate with right version and resouce, but wrong group",
+			name: "Test doesn't validate with right version and resource, but wrong group",
 			gvr: &metav1.GroupVersionResource{
 				Group:    "not the right group",
 				Version:  "v1alpha1",
@@ -208,7 +208,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name: "Test doesn't validate with right group and version, wrong resouce",
+			name: "Test doesn't validate with right group and version, wrong resource",
 			gvr: &metav1.GroupVersionResource{
 				Group:    "hive.openshift.io",
 				Version:  "v1alpha1",

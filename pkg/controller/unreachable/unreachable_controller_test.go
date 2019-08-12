@@ -386,7 +386,7 @@ func getCDWithUnreachableConditionFalse() *hivev1.ClusterDeployment {
 	probeTime := time.Now().Add(-(time.Hour * 1))
 	lastProbeTime := metav1.NewTime(probeTime)
 
-	// Explictly set the condition hivev1.UnreachableCondition as false
+	// Explicitly set the condition hivev1.UnreachableCondition as false
 	var conditions []hivev1.ClusterDeploymentCondition
 	cd.Status.Conditions = append(
 		conditions,
@@ -407,7 +407,7 @@ func getCDWithUnreachableConditionTrue() *hivev1.ClusterDeployment {
 	probeTime := time.Now().Add(-(time.Hour * 1))
 	lastProbeTime := metav1.NewTime(probeTime)
 
-	// Explictly set the condition hivev1.UnreachableCondition as false
+	// Explicitly set the condition hivev1.UnreachableCondition as false
 	var conditions []hivev1.ClusterDeploymentCondition
 	cd.Status.Conditions = append(
 		conditions,

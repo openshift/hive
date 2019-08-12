@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	// FinalizerDNSZone is used on DNSZones to ensure we successfuly deprovision
+	// FinalizerDNSZone is used on DNSZones to ensure we successfully deprovision
 	// the cloud objects before cleaning up the API object.
 	FinalizerDNSZone string = "hive.openshift.io/dnszone"
 )

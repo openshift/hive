@@ -26,7 +26,7 @@ endif
 default: all
 
 .PHONY: all
-all: fmt vet verify test build
+all: fmt vet generate verify test build
 
 .PHONY: vendor
 vendor:

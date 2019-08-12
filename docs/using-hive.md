@@ -131,6 +131,8 @@ By default this command assumes the latest Hive master CI build, and the latest 
   $ oc exec -c hive <install-pod-name> -- tail -f /tmp/openshift-install-console.log
   ```
 
+In the event of installation failures, please see [Troubleshooting](./troubleshooting.md).
+
 ### Cluster Admin Kubeconfig
 
 Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:

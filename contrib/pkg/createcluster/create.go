@@ -101,6 +101,8 @@ type Options struct {
 	ReleaseImage             string
 	ReleaseImageSource       string
 	DeleteAfter              string
+	ServingCert              string
+	ServingCertKey           string
 	UseClusterImageSet       bool
 	ManageDNS                bool
 	Output                   string
@@ -142,7 +144,9 @@ func NewCreateClusterCommand() *cobra.Command {
 			if err := opt.Complete(cmd, args); err != nil {
 				return
 			}
-
+			if err := opt.Validate(cmd); err != nil {
+				return
+			}
 			err := opt.Run()
 			if err != nil {
 				log.WithError(err).Error("Error")
@@ -164,6 +168,8 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
+	flags.StringVar(&opt.ServingCert, "serving-cert", "", "Serving certificate for control plane and routes")
+	flags.StringVar(&opt.ServingCertKey, "serving-cert-key", "", "Serving certificate key for control plane and routes")
 	flags.BoolVar(&opt.ManageDNS, "manage-dns", false, "Manage this cluster's DNS")
 	flags.BoolVar(&opt.UseClusterImageSet, "use-image-set", true, "If true(default), use a cluster image set for this cluster")
 	flags.StringVarP(&opt.Output, "output", "o", "", "Output of this command (nothing will be created on cluster). Valid values: yaml,json")
@@ -196,6 +202,11 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 	if !o.UseClusterImageSet && len(o.ClusterImageSet) > 0 {
 		cmd.Usage()
 		log.Info("If not using cluster image sets, do not specify the name of one")
+		return fmt.Errorf("invalid option")
+	}
+	if len(o.ServingCert) > 0 && len(o.ServingCertKey) == 0 {
+		log.Info("If specifying a serving certificate, specify a valid serving certificate key")
+		return fmt.Errorf("invalid serving cert")
 	}
 	return nil
 }
@@ -294,11 +305,19 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	if !o.IncludeSecrets {
 		return result, nil
 	}
-
 	// With introduction of global pull secret, pull secret is optional now
 	if pullSecret != nil {
 		result = append(result, pullSecret)
 	}
+
+	servingCertSecret, err := o.generateServingCertSecret()
+	if err != nil {
+		return nil, err
+	}
+	if servingCertSecret != nil {
+		result = append(result, servingCertSecret)
+	}
+
 	return append([]runtime.Object{awsCreds, sshSecret}, result...), err
 }
 
@@ -461,6 +480,35 @@ func (o *Options) generateAWSCredsSecret() (*corev1.Secret, error) {
 	}, nil
 }
 
+func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
+	if len(o.ServingCert) == 0 {
+		return nil, nil
+	}
+	servingCert, err := ioutil.ReadFile(o.ServingCert)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %v", o.ServingCert, err)
+	}
+	servingCertKey, err := ioutil.ReadFile(o.ServingCertKey)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %v", o.ServingCertKey, err)
+	}
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-serving-cert", o.Name),
+			Namespace: o.Namespace,
+		},
+		Type: corev1.SecretTypeTLS,
+		StringData: map[string]string{
+			"tls.crt": string(servingCert),
+			"tls.key": string(servingCertKey),
+		},
+	}, nil
+}
+
 // GenerateClusterDeployment generates a new cluster deployment and optionally a corresponding cluster image set
 func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev1.ClusterImageSet, error) {
 	cd := &hivev1.ClusterDeployment{
@@ -549,6 +597,24 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 	}
 	if o.SimulateBootstrapFailure {
 		cd.Annotations[constants.InstallFailureTestAnnotation] = "true"
+	}
+	if len(o.ServingCert) > 0 {
+		cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+			{
+				Name: "serving-cert",
+				SecretRef: corev1.LocalObjectReference{
+					Name: fmt.Sprintf("%s-serving-cert", o.Name),
+				},
+			},
+		}
+		cd.Spec.ControlPlaneConfig.ServingCertificates.Default = "serving-cert"
+		cd.Spec.Ingress = []hivev1.ClusterIngress{
+			{
+				Name:               "default",
+				Domain:             fmt.Sprintf("apps.%s.%s", o.Name, o.BaseDomain),
+				ServingCertificate: "serving-cert",
+			},
+		}
 	}
 
 	imageSet, err := o.configureImages(cd)

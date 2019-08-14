@@ -92,6 +92,7 @@ type Client interface {
 	ListHostedZones(input *route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error)
 	ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error)
 	ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error)
+	ChangeResourceRecordSets(*route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error)
 
 	// ResourceTagging
 	GetResourcesPages(input *resourcegroupstaggingapi.GetResourcesInput, fn func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) error
@@ -256,6 +257,11 @@ func (c *awsClient) GetResourcesPages(input *resourcegroupstaggingapi.GetResourc
 func (c *awsClient) ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error) {
 	metricAWSAPICalls.WithLabelValues("ListResourceRecordSets").Inc()
 	return c.route53Client.ListResourceRecordSets(input)
+}
+
+func (c *awsClient) ChangeResourceRecordSets(input *route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error) {
+	metricAWSAPICalls.WithLabelValues("ListResourceRecordSets").Inc()
+	return c.route53Client.ChangeResourceRecordSets(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.

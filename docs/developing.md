@@ -90,6 +90,32 @@ spec:
         - debug
 ```
 
+## Using Serving Certificates
+
+The hiveutil command includes a utility to generate Letsencrypt certificates for use with clusters you create in Hive.
+
+Prerequisites:
+* The `certbot` command must be available and in the path of your machine. You can install it by following the instructions at:
+  [https://certbot.eff.org/docs/install.html](https://certbot.eff.org/docs/install.html)
+* You must have credentials for AWS available in your command line, either by a configured `~/.aws/credentials` or environment variables (`AWS_ACCESS_KEY` and `AWS_SECRET_ACCESS_KEY`).
+
+### Generating a Certificate
+
+1. Ensure that the `hiveutil` binary is available (`make hiveutil`)
+2. Run: `hiveutil certificate create ${CLUSTER_NAME} --base-domain ${BASE_DOMAIN}` 
+   where CLUSTER_NAME is the name of your cluster and BASE_DOMAIN is the public DNS domain for your cluster (Defaults to `new-installer.openshift.com`)
+
+### Using Generated Certificate
+
+The output of the certificate creation command will indicate where the certificate was created. You can then use the `hiveutil create-cluster` command to
+create a cluster that uses the certificate.
+
+NOTE: The cluster name and domain used to create the certificate must match the name and base domain of the cluster you create.
+
+Example:
+`hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key`
+
+
 ## Dependency management
 
 ### Installing Dep

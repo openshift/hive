@@ -488,6 +488,21 @@ func (mr *MockClientMockRecorder) ListHostedZonesByName(input interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListHostedZonesByName", reflect.TypeOf((*MockClient)(nil).ListHostedZonesByName), input)
 }
 
+// ChangeResourceRecordSets mocks base method
+func (m *MockClient) ChangeResourceRecordSets(arg0 *route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChangeResourceRecordSets", arg0)
+	ret0, _ := ret[0].(*route53.ChangeResourceRecordSetsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ChangeResourceRecordSets indicates an expected call of ChangeResourceRecordSets
+func (mr *MockClientMockRecorder) ChangeResourceRecordSets(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangeResourceRecordSets", reflect.TypeOf((*MockClient)(nil).ChangeResourceRecordSets), arg0)
+}
+
 // GetResourcesPages mocks base method
 func (m *MockClient) GetResourcesPages(input *resourcegroupstaggingapi.GetResourcesInput, fn func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) error {
 	m.ctrl.T.Helper()

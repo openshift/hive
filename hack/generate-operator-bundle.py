@@ -30,7 +30,7 @@ git_num_commits = sys.argv[3]
 git_hash = sys.argv[4]
 hive_image = sys.argv[5]
 
-full_version = "%s.%s-%s" % (VERSION_BASE, git_num_commits, git_hash)
+full_version = "%s.%s-sha%s" % (VERSION_BASE, git_num_commits, git_hash)
 print("Generating CSV for version: %s" % full_version)
 
 if not os.path.exists(outdir):

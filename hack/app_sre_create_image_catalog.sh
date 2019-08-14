@@ -34,6 +34,7 @@ if [[ "$REMOVE_UNDEPLOYED" == true ]]; then
 
         if [[ "$delete" == false ]]; then
             short_hash=$(echo $version | cut -d- -f2)
+            short_hash=${short_hash##sha}
 
             if [[ "$DEPLOYED_HASH" == "${short_hash}"* ]]; then
                 delete=true

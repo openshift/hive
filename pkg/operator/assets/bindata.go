@@ -1374,20 +1374,6 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  - secrets
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
   - hive.openshift.io
   resources:
   - clusterdeployments
@@ -5341,26 +5327,27 @@ metadata:
   name: install-log-regexes
   namespace: hive
 data:
-  DNSAlreadyExists: |
-    searchRegexStrings:
-    - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
-    installFailingReason: DNSAlreadyExists
-    installFailingMessage: DNS record already exists
-  PendingVerification: |
-    searchRegexStrings:
-    - "PendingVerification: Your request for accessing resources in this region is being validated"
-    installFailingReason: PendingVerification
-    installFailingMessage: Account pending verification for region
-  NoMatchingRoute53Zone: |
-    searchRegexStrings:
-    - "data.aws_route53_zone.public: no matching Route53Zone found"
-    installFailingReason: NoMatchingRoute53Zone
-    installFailingMessage: No matching Route53Zone found
-  KubeAPIWaitTimeout: |
-    searchRegexStrings:
-    - "waiting for Kubernetes API: context deadline exceeded"
-    installFailingReason: KubeAPIWaitTimeout
-    installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+  regexes: |
+    - name: DNSAlreadyExists
+      searchRegexStrings:
+      - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
+      installFailingReason: DNSAlreadyExists
+      installFailingMessage: DNS record already exists
+    - name: PendingVerification
+      searchRegexStrings:
+      - "PendingVerification: Your request for accessing resources in this region is being validated"
+      installFailingReason: PendingVerification
+      installFailingMessage: Account pending verification for region
+    - name: NoMatchingRoute53Zone
+      searchRegexStrings:
+      - "data.aws_route53_zone.public: no matching Route53Zone found"
+      installFailingReason: NoMatchingRoute53Zone
+      installFailingMessage: No matching Route53Zone found
+    - name: KubeAPIWaitTimeout
+      searchRegexStrings:
+      - "waiting for Kubernetes API: context deadline exceeded"
+      installFailingReason: KubeAPIWaitTimeout
+      installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

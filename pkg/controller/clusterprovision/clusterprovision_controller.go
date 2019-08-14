@@ -249,8 +249,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 		pLog.Info("install job failed")
 		stage = hivev1.ClusterProvisionStageFailed
 		cond = hivev1.ClusterProvisionFailedCondition
-		reason = "JobFailed"
-		message = "Install job failed"
+		reason, message = r.parseInstallLog(instance.Spec.InstallLog, pLog)
 		// Increment a counter metric for this cluster type and error reason:
 		metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), reason).Inc()
 	default:

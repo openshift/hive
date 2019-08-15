@@ -2,8 +2,11 @@ package controlplanecerts
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
+	"io"
 	"reflect"
+	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -39,6 +42,8 @@ const (
 	certsNotFoundMessage = "One or more serving certificates for the cluster control plane are missing"
 	certsFoundReason     = "ControlPlaneCertificatesFound"
 	certsFoundMessage    = "Control plane certificates are present"
+
+	kubeAPIServerPatchTemplate = `[ {"op": "replace", "path": "/spec/forceRedeploymentReason", "value": %q } ]`
 )
 
 var (
@@ -273,11 +278,6 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 			Domain: defaultControlPlaneDomain(cd),
 		}
 		additionalCerts = append([]hivev1.ControlPlaneAdditionalCertificate{cpCert}, additionalCerts...)
-
-		/* TODO: Change to using DefaultServingCertificate when bug in 4.1 is fixed
-		bundle := certificateBundle(cd, cd.Spec.ControlPlaneConfig.ServingCertificates.Default)
-		apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name = remoteSecretName(bundle.SecretRef.Name, cd)
-		*/
 	}
 	for _, additional := range additionalCerts {
 		cdLog.WithField("name", additional.Name).Debug("adding named certificate to control plane config")
@@ -297,7 +297,19 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 		cdLog.WithError(err).Error("cannot add typemeta to syncset resources")
 		return nil, err
 	}
+	// kubeAPIServerPatch sets the forceRedeploymentField on the kube API server cluster operator
+	// to a hash of all the cert secrets. If the content of the certs secrets changes, then the new
+	// hash value will force the kube API server to redeploy and apply the new certs.
+	kubeAPIServerPatch := hivev1.SyncObjectPatch{
+		APIVersion: "operator.openshift.io/v1",
+		Kind:       "KubeAPIServer",
+		Name:       "cluster",
+		Patch:      fmt.Sprintf(kubeAPIServerPatchTemplate, secretsHash(secrets)),
+		ApplyMode:  hivev1.AlwaysApplyPatchApplyMode,
+		PatchType:  "json",
+	}
 	syncSet.Spec.Resources = resources
+	syncSet.Spec.Patches = []hivev1.SyncObjectPatch{kubeAPIServerPatch}
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
 	if err := controllerutil.SetControllerReference(cd, syncSet, r.scheme); err != nil {
@@ -374,4 +386,29 @@ func controlPlaneCertsSyncSetName(name string) string {
 
 func defaultControlPlaneDomain(cd *hivev1.ClusterDeployment) string {
 	return fmt.Sprintf("api.%s.%s", cd.Spec.ClusterName, cd.Spec.BaseDomain)
+}
+
+func writeSecretData(w io.Writer, secret *corev1.Secret) {
+	// sort secret keys so we get a repeatable hash
+	keys := make([]string, 0, len(secret.Data))
+	for k := range secret.Data {
+		keys = append(keys, k)
+	}
+	sort.StringSlice(keys).Sort()
+	fmt.Fprintf(w, "%s/%s\n", secret.Namespace, secret.Name)
+	for _, k := range keys {
+		fmt.Fprintf(w, "%s: %x\n", k, secret.Data[k])
+	}
+}
+
+func secretsHash(secrets []*corev1.Secret) string {
+	// sort secrets by name so we get a repeatable hash
+	sort.Slice(secrets, func(i, j int) bool {
+		return secrets[i].Name < secrets[j].Name
+	})
+	hashWriter := md5.New()
+	for _, secret := range secrets {
+		writeSecretData(hashWriter, secret)
+	}
+	return fmt.Sprintf("%x", hashWriter.Sum(nil))
 }

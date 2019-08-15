@@ -112,6 +112,19 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterstates
+  - clusterstates/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - dnszones
   - dnszones/status
   - dnszones/finalizers

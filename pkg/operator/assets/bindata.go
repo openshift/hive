@@ -29,6 +29,7 @@
 // config/crds/hive_v1alpha1_clusterdeployment.yaml
 // config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml
 // config/crds/hive_v1alpha1_clusterimageset.yaml
+// config/crds/hive_v1alpha1_clusterstate.yaml
 // config/crds/hive_v1alpha1_dnsendpoint.yaml
 // config/crds/hive_v1alpha1_dnszone.yaml
 // config/crds/hive_v1alpha1_hiveconfig.yaml
@@ -846,6 +847,7 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisionrequests
+  - clusterstates
   verbs:
   - get
   - list
@@ -1002,6 +1004,7 @@ rules:
   - selectorsyncsets
   - syncsets
   - clusterdeprovisionrequests
+  - clusterstates
   verbs:
   - get
   - list
@@ -1124,6 +1127,7 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisionrequests
+  - clusterstates
   verbs:
   - get
   - list
@@ -1301,6 +1305,19 @@ rules:
   - get
   - update
   - patch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterstates
+  - clusterstates/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - hive.openshift.io
   resources:
@@ -2986,6 +3003,108 @@ func configCrdsHive_v1alpha1_clusterimagesetYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHive_v1alpha1_clusterstateYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: clusterstates.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: ClusterState
+    plural: clusterstates
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          type: object
+        status:
+          properties:
+            clusterOperators:
+              description: ClusterOperators contains the state for every cluster operator
+                in the target cluster
+              items:
+                properties:
+                  conditions:
+                    description: Conditions is the set of conditions in the status
+                      of the cluster operator on the target cluster
+                    items:
+                      properties:
+                        lastTransitionTime:
+                          description: lastTransitionTime is the time of the last
+                            update to the current status object.
+                          format: date-time
+                          type: string
+                        message:
+                          description: message provides additional information about
+                            the current condition. This is only to be consumed by
+                            humans.
+                          type: string
+                        reason:
+                          description: reason is the reason for the condition's last
+                            transition.  Reasons are CamelCase
+                          type: string
+                        status:
+                          description: status of the condition, one of True, False,
+                            Unknown.
+                          type: string
+                        type:
+                          description: type specifies the state of the operator's
+                            reconciliation functionality.
+                          type: string
+                      type: object
+                    type: array
+                  name:
+                    description: Name is the name of the cluster operator
+                    type: string
+                type: object
+              type: array
+            lastUpdated:
+              description: LastUpdated is the last time that operator state was updated
+              format: date-time
+              type: string
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHive_v1alpha1_clusterstateYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1alpha1_clusterstateYaml, nil
+}
+
+func configCrdsHive_v1alpha1_clusterstateYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1alpha1_clusterstateYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterstate.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5160,6 +5279,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":            configCrdsHive_v1alpha1_clusterdeploymentYaml,
 	"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml":    configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml,
 	"config/crds/hive_v1alpha1_clusterimageset.yaml":              configCrdsHive_v1alpha1_clusterimagesetYaml,
+	"config/crds/hive_v1alpha1_clusterstate.yaml":                 configCrdsHive_v1alpha1_clusterstateYaml,
 	"config/crds/hive_v1alpha1_dnsendpoint.yaml":                  configCrdsHive_v1alpha1_dnsendpointYaml,
 	"config/crds/hive_v1alpha1_dnszone.yaml":                      configCrdsHive_v1alpha1_dnszoneYaml,
 	"config/crds/hive_v1alpha1_hiveconfig.yaml":                   configCrdsHive_v1alpha1_hiveconfigYaml,
@@ -5220,6 +5340,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_v1alpha1_clusterdeployment.yaml":            {configCrdsHive_v1alpha1_clusterdeploymentYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterdeprovisionrequest.yaml":    {configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterimageset.yaml":              {configCrdsHive_v1alpha1_clusterimagesetYaml, map[string]*bintree{}},
+			"hive_v1alpha1_clusterstate.yaml":                 {configCrdsHive_v1alpha1_clusterstateYaml, map[string]*bintree{}},
 			"hive_v1alpha1_dnsendpoint.yaml":                  {configCrdsHive_v1alpha1_dnsendpointYaml, map[string]*bintree{}},
 			"hive_v1alpha1_dnszone.yaml":                      {configCrdsHive_v1alpha1_dnszoneYaml, map[string]*bintree{}},
 			"hive_v1alpha1_hiveconfig.yaml":                   {configCrdsHive_v1alpha1_hiveconfigYaml, map[string]*bintree{}},

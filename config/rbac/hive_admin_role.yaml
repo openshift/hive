@@ -33,6 +33,7 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisionrequests
+  - clusterstates
   verbs:
   - get
   - list

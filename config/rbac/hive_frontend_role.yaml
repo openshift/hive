@@ -49,6 +49,7 @@ rules:
   - selectorsyncsets
   - syncsets
   - clusterdeprovisionrequests
+  - clusterstates
   verbs:
   - get
   - list

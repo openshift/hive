@@ -82,6 +82,8 @@ rules:
   - syncsets
   - clusterimagesets
   - clusterdeprovisionrequests
+  - clusterstates
+  - clusterstates/status
   verbs:
   - get
   - list

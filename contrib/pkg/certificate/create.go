@@ -116,7 +116,7 @@ func (o *Options) Run() error {
 	certKey := filepath.Join(o.OutputDir, fmt.Sprintf("%s.key", o.Name))
 	caCert := filepath.Join(o.OutputDir, fmt.Sprintf("%s.ca", o.Name))
 
-	err = copyFile(filepath.Join(certbotDir, "live", fmt.Sprintf("api.%s.%s", o.Name, o.BaseDomain), "cert.pem"), certFile)
+	err = copyFile(filepath.Join(certbotDir, "live", fmt.Sprintf("api.%s.%s", o.Name, o.BaseDomain), "fullchain.pem"), certFile)
 	if err != nil {
 		return err
 	}

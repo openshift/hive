@@ -982,6 +982,7 @@ rules:
   resources:
   - secrets
   - configmaps
+  - events
   - namespaces
   verbs:
   - get

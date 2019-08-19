@@ -75,7 +75,7 @@ func InstallerPodSpec(
 			Name: "SSH_PUB_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: *cd.Spec.SSHKey,
+					LocalObjectReference: cd.Spec.SSHKey,
 					Key:                  "ssh-publickey",
 				},
 			},

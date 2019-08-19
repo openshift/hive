@@ -53,6 +53,9 @@ func validClusterDeployment() *hivev1.ClusterDeployment {
 					Name: "SameMachinePoolName",
 				},
 			},
+			SSHKey: corev1.LocalObjectReference{
+				Name: "test-sshkey",
+			},
 		},
 	}
 }
@@ -126,9 +129,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		gvr             *metav1.GroupVersionResource
 	}{
 		{
-			name:            "Test Create Operation is allowed even with mismatch objects",
-			oldObject:       validClusterDeployment(),
-			newObject:       nil,
+			name:            "Test valid create",
+			newObject:       validClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
@@ -235,6 +237,16 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validClusterDeploymentWithIngress()
 				cd.Spec.Ingress[0].Name = "notdefault"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Test new clusterdeployment with missing SSH key",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.SSHKey.Name = ""
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
@@ -416,7 +428,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			response := data.Validate(request)
 
 			// Assert
-			assert.Equal(t, tc.expectedAllowed, response.Allowed)
+			if !assert.Equal(t, tc.expectedAllowed, response.Allowed) {
+				t.Logf("Response result = %#v", response.Result)
+			}
 		})
 	}
 }

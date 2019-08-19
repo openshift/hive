@@ -1109,7 +1109,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		SSHKey: &corev1.LocalObjectReference{
+		SSHKey: corev1.LocalObjectReference{
 			Name: sshKeySecret,
 		},
 		ControlPlane: hivev1.MachinePool{},
@@ -1535,7 +1535,7 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		SSHKey: &corev1.LocalObjectReference{
+		SSHKey: corev1.LocalObjectReference{
 			Name: sshKeySecret,
 		},
 		ControlPlane: hivev1.MachinePool{},

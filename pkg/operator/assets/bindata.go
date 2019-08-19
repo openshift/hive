@@ -2065,6 +2065,7 @@ spec:
               type: object
           required:
           - clusterName
+          - sshKey
           - baseDomain
           - networking
           - controlPlane

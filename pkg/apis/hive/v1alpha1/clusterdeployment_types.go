@@ -45,7 +45,8 @@ type ClusterDeploymentSpec struct {
 	ClusterName string `json:"clusterName"`
 
 	// SSHKey is the reference to the secret that contains a public key to use for access to compute instances.
-	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
+	// +required
+	SSHKey corev1.LocalObjectReference `json:"sshKey"`
 
 	// BaseDomain is the base domain to which the cluster should belong.
 	// +required

@@ -512,7 +512,7 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			SSHKey: &corev1.LocalObjectReference{
+			SSHKey: corev1.LocalObjectReference{
 				Name: fmt.Sprintf("%s-ssh-key", o.Name),
 			},
 			Images: hivev1.ProvisionImages{

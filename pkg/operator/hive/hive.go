@@ -160,7 +160,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthorities {
 		caSecret := &corev1.Secret{}
-		err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNamespace, Name: clientCARef.Name}, caSecret)
+		err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.HiveNamespace, Name: clientCARef.Name}, caSecret)
 		if err != nil {
 			hLog.WithError(err).WithField("secret", clientCARef.Name).Errorf("Cannot read client CA secret")
 			continue
@@ -174,11 +174,11 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 
 	if additionalCA.Len() == 0 {
 		caSecret := &corev1.Secret{}
-		err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNamespace, Name: hiveAdditionalCASecret}, caSecret)
+		err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.HiveNamespace, Name: hiveAdditionalCASecret}, caSecret)
 		if err == nil {
 			err = r.Delete(context.TODO(), caSecret)
 			if err != nil {
-				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", hiveNamespace, hiveAdditionalCASecret)).
+				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", constants.HiveNamespace, hiveAdditionalCASecret)).
 					Error("cannot delete hive additional ca secret")
 				return err
 			}
@@ -188,7 +188,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 
 	caSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: hiveNamespace,
+			Namespace: constants.HiveNamespace,
 			Name:      hiveAdditionalCASecret,
 		},
 		Data: map[string][]byte{

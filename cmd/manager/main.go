@@ -11,6 +11,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller"
 	"github.com/openshift/hive/pkg/controller/utils"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -30,7 +31,6 @@ import (
 
 const (
 	defaultLogLevel         = "info"
-	hiveNamespace           = "hive"
 	leaderElectionConfigMap = "hive-controllers-leader"
 )
 
@@ -62,7 +62,7 @@ func newRootCommand() *cobra.Command {
 			mgr, err := manager.New(cfg, manager.Options{
 				MetricsBindAddress:      ":2112",
 				LeaderElection:          true,
-				LeaderElectionNamespace: hiveNamespace,
+				LeaderElectionNamespace: constants.HiveNamespace,
 				LeaderElectionID:        leaderElectionConfigMap,
 			})
 			if err != nil {

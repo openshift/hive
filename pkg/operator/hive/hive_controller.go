@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -39,8 +40,6 @@ import (
 )
 
 const (
-	// hiveNamespace is the assumed and only supported namespace where Hive will be deployed.
-	hiveNamespace = "hive"
 	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
 	hiveConfigName = "hive"
 
@@ -180,7 +179,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// using the same image as the operator.
 	operatorDeployment := &appsv1.Deployment{}
 	err = tempClient.Get(context.Background(),
-		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: hiveNamespace},
+		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: constants.HiveNamespace},
 		operatorDeployment)
 	if err == nil {
 		img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
@@ -247,9 +246,9 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
-	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(hiveNamespace), "hive-operator", &corev1.ObjectReference{
+	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(constants.HiveNamespace), "hive-operator", &corev1.ObjectReference{
 		Name:      request.Name,
-		Namespace: hiveNamespace,
+		Namespace: constants.HiveNamespace,
 	})
 
 	err = r.deleteLegacyComponents(hLog)
@@ -318,7 +317,7 @@ func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error
 	// Ensure legacy hiveadmission Daemonset is deleted, we switched to a Deployment:
 	// TODO: this can be removed once rolled out to hive-stage and hive-prod.
 	ds := &appsv1.DaemonSet{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDaemonsetName, Namespace: hiveNamespace}, ds)
+	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDaemonsetName, Namespace: constants.HiveNamespace}, ds)
 	if err != nil && !errors.IsNotFound(err) {
 		hLog.WithError(err).Error("error looking up legacy Daemonset")
 		return err

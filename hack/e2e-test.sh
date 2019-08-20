@@ -72,7 +72,7 @@ function teardown() {
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
 	oc delete --wait=false clusterdeployment ${CLUSTER_NAME}
 	errorOnUninstall=0
-	if ! go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" --log-level=debug --not-found-ok=true "${CLUSTER_NAME}-uninstall"; then
+	if ! go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" --log-level=debug "${CLUSTER_NAME}" "uninstall"; then
 		errorOnUninstall=1
 	fi
 
@@ -147,9 +147,9 @@ echo ""
 echo "Events in hive namespace"
 oc get events -n hive
 
-echo "Waiting for job ${CLUSTER_NAME}-install to start and complete"
+echo "Waiting for install job to start and complete"
 
-go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}-install"
+go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}" "install"
 
 echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
 

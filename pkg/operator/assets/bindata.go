@@ -1272,6 +1272,15 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterprovisions
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - clusterimagesets
   verbs:
   - get

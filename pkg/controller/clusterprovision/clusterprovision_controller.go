@@ -160,7 +160,7 @@ func (r *ReconcileClusterProvision) reconcileNewProvision(instance *hivev1.Clust
 }
 
 func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision, pLog log.FieldLogger) (reconcile.Result, error) {
-	job, err := install.GenerateInstallerJobForProvision(instance)
+	job, err := install.GenerateInstallerJob(instance)
 	if err != nil {
 		pLog.WithError(err).Error("error generating install job")
 		return reconcile.Result{}, err

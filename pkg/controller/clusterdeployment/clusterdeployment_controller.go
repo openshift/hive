@@ -846,7 +846,7 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 		message,
 		controllerutils.UpdateConditionNever)
 	if !reflect.DeepEqual(original.Status.Conditions, cd.Status.Conditions) {
-		cdLog.Info("setting ClusterImageSetNotFoundCondition to %v", status)
+		cdLog.Infof("setting ClusterImageSetNotFoundCondition to %v", status)
 		err := r.Status().Update(context.TODO(), cd)
 		if err != nil {
 			cdLog.WithError(err).Error("cannot update status conditions")

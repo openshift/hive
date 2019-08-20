@@ -462,22 +462,14 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	r.deleteStaleProvisions(existingProvisions, cdLog)
 
 	if cd.Spec.ManageDNS {
-		managedDNSZoneAvailable, dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
+		dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-
-		modified, err := r.setDNSNotReadyCondition(cd, managedDNSZoneAvailable, cdLog)
-		if modified || err != nil {
-			return reconcile.Result{}, err
-		}
-
-		if !managedDNSZoneAvailable {
-			// The clusterdeployment will be queued when the owned DNSZone's status
-			// is updated to available.
-			cdLog.Debug("DNSZone is not yet available. Waiting for zone to become available.")
+		if dnsZone == nil {
 			return reconcile.Result{}, nil
 		}
+
 		updated, err := r.setDNSDelayMetric(cd, dnsZone, cdLog)
 		if updated || err != nil {
 			return reconcile.Result{}, err
@@ -916,32 +908,26 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterDeployment, isReady bool, cdLog log.FieldLogger) (modified bool, err error) {
-	original := cd.DeepCopy()
+func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterDeployment, isReady bool, message string, cdLog log.FieldLogger) error {
 	status := corev1.ConditionFalse
 	reason := dnsReadyReason
-	message := "DNS Zone available"
 	if !isReady {
 		status = corev1.ConditionTrue
 		reason = dnsNotReadyReason
-		message = "DNS Zone not yet available"
 	}
-	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
 		hivev1.DNSNotReadyCondition,
 		status,
 		reason,
 		message,
 		controllerutils.UpdateConditionNever)
-	if !reflect.DeepEqual(original.Status.Conditions, cd.Status.Conditions) {
-		cdLog.Debugf("setting DNSNotReadyCondition to %v", status)
-		err := r.Status().Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Error("cannot update status conditions")
-		}
-		return true, err
+	if !changed {
+		return nil
 	}
-	return false, nil
+	cd.Status.Conditions = conditions
+	cdLog.Debugf("setting DNSNotReadyCondition to %v", status)
+	return r.Status().Update(context.TODO(), cd)
 }
 
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) (modified bool, err error) {
@@ -1234,27 +1220,55 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 	return modified, nil
 }
 
-func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, *hivev1.DNSZone, error) {
+func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.DNSZone, error) {
 	// for now we only support AWS
 	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
 		cdLog.Error("cluster deployment platform is not AWS, cannot manage DNS zone")
-		return false, nil, fmt.Errorf("only AWS managed DNS is supported")
+		if err := r.setDNSNotReadyCondition(cd, false, "Managed DNS is only supported on AWS", cdLog); err != nil {
+			cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+			return nil, err
+		}
+		return nil, errors.New("only AWS managed DNS is supported")
 	}
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
 	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
 
-	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
-	if err == nil {
-		availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
-		return availableCondition != nil && availableCondition.Status == corev1.ConditionTrue, dnsZone, nil
-	}
-	if apierrors.IsNotFound(err) {
+	switch err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone); {
+	case apierrors.IsNotFound(err):
 		logger.Info("creating new DNSZone for cluster deployment")
-		return false, nil, r.createManagedDNSZone(cd, logger)
+		return nil, r.createManagedDNSZone(cd, logger)
+	case err != nil:
+		logger.WithError(err).Error("failed to fetch DNS zone")
+		return nil, err
 	}
-	logger.WithError(err).Error("failed to fetch DNS zone")
-	return false, nil, err
+
+	if !metav1.IsControlledBy(dnsZone, cd) {
+		cdLog.Error("DNS zone already exists but is not owned by cluster deployment")
+		if err := r.setDNSNotReadyCondition(cd, false, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
+			cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+			return nil, err
+		}
+		return nil, errors.New("Existing unowned DNS zone")
+	}
+
+	availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+	if availableCondition == nil || availableCondition.Status != corev1.ConditionTrue {
+		// The clusterdeployment will be queued when the owned DNSZone's status
+		// is updated to available.
+		cdLog.Debug("DNSZone is not yet available. Waiting for zone to become available.")
+		if err := r.setDNSNotReadyCondition(cd, false, "DNS Zone not yet available", cdLog); err != nil {
+			cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	if err := r.setDNSNotReadyCondition(cd, true, "DNS Zone available", cdLog); err != nil {
+		cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+		return nil, err
+	}
+	return dnsZone, nil
 }
 
 func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {

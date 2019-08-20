@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -620,6 +621,68 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionFalse)
+			},
+		},
+		{
+			name: "Do not use unowned DNSZone",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *hivev1.DNSZone {
+					zone := testDNSZone()
+					zone.OwnerReferences = []metav1.OwnerReference{}
+					return zone
+				}(),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					if assert.NotNil(t, cond, "expected to find condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "unexpected condition status")
+						assert.Equal(t, "Existing DNS zone not owned by cluster deployment", cond.Message, "unexpected condition message")
+					}
+				}
+				zone := getDNSZone(c)
+				assert.NotNil(t, zone, "expected DNSZone to exist")
+			},
+		},
+		{
+			name: "Do not use DNSZone owned by other clusterdeployment",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				func() *hivev1.DNSZone {
+					zone := testDNSZone()
+					zone.OwnerReferences[0].UID = "other-uid"
+					return zone
+				}(),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					if assert.NotNil(t, cond, "expected to find condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "unexpected condition status")
+						assert.Equal(t, "Existing DNS zone not owned by cluster deployment", cond.Message, "unexpected condition message")
+					}
+				}
+				zone := getDNSZone(c)
+				assert.NotNil(t, zone, "expected DNSZone to exist")
 			},
 		},
 		{
@@ -1370,6 +1433,17 @@ func testDNSZone() *hivev1.DNSZone {
 	zone := &hivev1.DNSZone{}
 	zone.Name = testName + "-zone"
 	zone.Namespace = testNamespace
+	zone.OwnerReferences = append(
+		zone.OwnerReferences,
+		*metav1.NewControllerRef(
+			testClusterDeployment(),
+			schema.GroupVersionKind{
+				Group:   "hive.openshift.io",
+				Version: "v1alpha1",
+				Kind:    "clusterdeployment",
+			},
+		),
+	)
 	return zone
 }
 
@@ -1392,7 +1466,7 @@ func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType 
 	for _, cond := range cd.Status.Conditions {
 		if cond.Type == condType {
 			found = true
-			assert.Equal(t, status, cond.Status, "condition found with unexpected status")
+			assert.Equal(t, string(status), string(cond.Status), "condition found with unexpected status")
 		}
 	}
 	assert.True(t, found, "did not find expected condition type: %v", condType)

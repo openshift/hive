@@ -872,7 +872,7 @@ rules:
   - clusterimagesets
   - dnszones
   - selectorsyncsets
-  - rsyncsets
+  - syncsets
   verbs:
   - get
   - list

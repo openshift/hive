@@ -30,6 +30,12 @@ const (
 	// InstallFailureTestAnnotation is a ClusterDeployment label that can be used to trigger a failed
 	// installation during the bootstrapping phase.
 	InstallFailureTestAnnotation = "hive.openshift.io/install-failure-test"
+
+	// GlobalPullSecret is the environment variable for controllers to get the global pull secret
+	GlobalPullSecret = "GLOBAL_PULL_SECRET"
+
+	// HiveNamespace is the name of Hive operator namespace
+	HiveNamespace = "hive"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

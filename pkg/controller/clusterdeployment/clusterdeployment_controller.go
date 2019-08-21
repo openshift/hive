@@ -1486,7 +1486,14 @@ func (r *ReconcileClusterDeployment) mergePullSecrets(cd *hivev1.ClusterDeployme
 	}
 
 	// Check if global pull secret from env as it comes from hive config
-	globalPullSecret := os.Getenv("GLOBAL_PULL_SECRET")
+	globalPullSecretName := os.Getenv(constants.GlobalPullSecret)
+	var globalPullSecret string
+	if len(globalPullSecretName) != 0 {
+		globalPullSecret, err = controllerutils.LoadSecretData(r.Client, globalPullSecretName, constants.HiveNamespace, corev1.DockerConfigJsonKey)
+		if err != nil {
+			return "", errors.Wrap(err, "global pull secret could not be retrived")
+		}
+	}
 
 	switch {
 	case globalPullSecret != "" && localPullSecret != "":

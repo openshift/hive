@@ -81,6 +81,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {
 		return err
 	}
+
 	r.includeGlobalPullSecret(hLog, h, instance, hiveDeployment)
 
 	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
@@ -235,14 +236,10 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h *r
 		hLog.Debug("GlobalPullSecret is not provided in HiveConfig, it will not be deployed")
 		return
 	}
-	globalPullSecretEnvVars := corev1.EnvVar{
-		Name: "GLOBAL_PULL_SECRET",
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				LocalObjectReference: *instance.Spec.GlobalPullSecret,
-				Key:                  corev1.DockerConfigJsonKey,
-			},
-		},
+
+	globalPullSecretEnvVar := corev1.EnvVar{
+		Name:  hiveconstants.GlobalPullSecret,
+		Value: instance.Spec.GlobalPullSecret.Name,
 	}
-	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, globalPullSecretEnvVars)
+	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, globalPullSecretEnvVar)
 }

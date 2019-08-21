@@ -552,10 +552,6 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	if applyErr != nil {
 		return applyErr
 	}
-	if delErr != nil {
-		return delErr
-	}
-
 	return nil
 }
 

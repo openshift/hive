@@ -147,10 +147,8 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	if invalid, ok := checkValidPatchTypes(newObject.Spec.Patches); !ok {
 		message := fmt.Sprintf("Failed validation: Invalid patch type detected: %s. Valid patch types are: json, merge, and strategic", invalid)
@@ -203,10 +201,8 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	if invalid, ok := checkValidPatchTypes(newObject.Spec.Patches); !ok {
 		message := fmt.Sprintf("Failed validation: Invalid patch type detected: %s. Valid patch types are: json, merge, and strategic", invalid)

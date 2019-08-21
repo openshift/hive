@@ -186,10 +186,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	// TODO: Put Create Validation Here (or in openAPIV3Schema validation section of crd)
 
@@ -265,10 +263,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	oldObject := &hivev1.ClusterDeployment{}
 	err = json.Unmarshal(admissionSpec.OldObject.Raw, oldObject)
@@ -283,10 +279,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
-	if oldObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["oldObject.Name"] = oldObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
 	hasChangedImmutableField, changedFieldName := hasChangedImmutableField(&oldObject.Spec, &newObject.Spec)
 	if hasChangedImmutableField {

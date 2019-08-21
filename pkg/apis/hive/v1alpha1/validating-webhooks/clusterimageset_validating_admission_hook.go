@@ -2,8 +2,9 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"reflect"
+
+	log "github.com/sirupsen/logrus"
 
 	"net/http"
 
@@ -144,10 +145,8 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	if newObject.Spec.InstallerImage == nil && newObject.Spec.ReleaseImage == nil {
 		message := "Failed validation: you must specify either an installer image or a release image"
@@ -191,10 +190,8 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	oldObject := &hivev1.ClusterImageSet{}
 	err = json.Unmarshal(admissionSpec.OldObject.Raw, oldObject)
@@ -209,10 +206,8 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 		}
 	}
 
-	if oldObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["oldObject.Name"] = oldObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
 	if !reflect.DeepEqual(oldObject.Spec, newObject.Spec) {
 		message := "ClusterImageSet.Spec is immutable"

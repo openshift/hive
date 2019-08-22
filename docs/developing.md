@@ -7,6 +7,20 @@
 - A recent Go distribution (>=1.12)
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
 
+## Build and run tests
+
+To build and test your local changes, run:
+
+```bash
+make
+```
+
+To only run the unit tests:
+
+```bash
+make test
+```
+
 ## Setting up the development environment
 
 ### Cloning the repository

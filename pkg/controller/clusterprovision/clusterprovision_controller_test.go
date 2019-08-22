@@ -63,7 +63,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testProvision(),
 			},
-			expectedStage:        hivev1.ClusterProvisionStageProvisioning,
+			expectedStage:        hivev1.ClusterProvisionStageInitializing,
 			expectNoJobReference: true,
 		},
 		{
@@ -72,7 +72,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 				testProvision(),
 				testJob(),
 			},
-			expectedStage: hivev1.ClusterProvisionStageProvisioning,
+			expectedStage: hivev1.ClusterProvisionStageInitializing,
 		},
 		{
 			name: "running job",
@@ -80,15 +80,24 @@ func TestClusterProvisionReconcile(t *testing.T) {
 				testProvision(withJob()),
 				testJob(),
 			},
-			expectedStage: hivev1.ClusterProvisionStageProvisioning,
+			expectedStage: hivev1.ClusterProvisionStageInitializing,
 		},
 		{
 			name: "completed job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(withJob(), provisioning()),
 				testJob(completed()),
 			},
 			expectedStage: hivev1.ClusterProvisionStageComplete,
+		},
+		{
+			name: "completed job while initializing",
+			existing: []runtime.Object{
+				testProvision(withJob()),
+				testJob(completed()),
+			},
+			expectedStage:      hivev1.ClusterProvisionStageFailed,
+			expectedFailReason: "InitializationNotComplete",
 		},
 		{
 			name: "failed job",
@@ -116,13 +125,23 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			expectedStage: hivev1.ClusterProvisionStageFailed,
 		},
 		{
-			name: "lost job while provisioning",
+			name: "lost job",
 			existing: []runtime.Object{
 				testProvision(withJob()),
 			},
 			expectedStage:      hivev1.ClusterProvisionStageFailed,
 			expectedFailReason: "JobNotFound",
 			expectNoJob:        true,
+		},
+		{
+			name: "removed job while provisioning",
+			existing: []runtime.Object{
+				testProvision(provisioning()),
+			},
+			expectedStage:        hivev1.ClusterProvisionStageFailed,
+			expectedFailReason:   "NoJobReference",
+			expectNoJob:          true,
+			expectNoJobReference: true,
 		},
 		{
 			name: "removed job after abort",
@@ -207,7 +226,7 @@ func testProvision(opts ...provisionOption) *hivev1.ClusterProvision {
 			ClusterDeployment: corev1.LocalObjectReference{
 				Name: testDeploymentName,
 			},
-			Stage: hivev1.ClusterProvisionStageProvisioning,
+			Stage: hivev1.ClusterProvisionStageInitializing,
 		},
 	}
 
@@ -216,6 +235,12 @@ func testProvision(opts ...provisionOption) *hivev1.ClusterProvision {
 	}
 
 	return provision
+}
+
+func provisioning() provisionOption {
+	return func(p *hivev1.ClusterProvision) {
+		p.Spec.Stage = hivev1.ClusterProvisionStageProvisioning
+	}
 }
 
 func succeeded() provisionOption {

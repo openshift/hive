@@ -473,7 +473,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	for _, provision := range existingProvisions {
-		if provision.Spec.Stage == hivev1.ClusterProvisionStageProvisioning {
+		if provision.Spec.Attempt == cd.Status.InstallRestarts {
 			return r.adoptProvision(cd, provision, cdLog)
 		}
 	}
@@ -548,7 +548,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			},
 			PodSpec: *podSpec,
 			Attempt: cd.Status.InstallRestarts,
-			Stage:   hivev1.ClusterProvisionStageProvisioning,
+			Stage:   hivev1.ClusterProvisionStageInitializing,
 		},
 	}
 
@@ -616,6 +616,9 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 	}
 
 	switch provision.Spec.Stage {
+	case hivev1.ClusterProvisionStageInitializing:
+		cdLog.Debug("still initializing provision")
+		return reconcile.Result{}, nil
 	case hivev1.ClusterProvisionStageProvisioning:
 		cdLog.Debug("still provisioning")
 		return reconcile.Result{}, nil

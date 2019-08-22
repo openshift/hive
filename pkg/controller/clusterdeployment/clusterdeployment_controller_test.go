@@ -751,7 +751,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Adopt orphaned provision",
+			name: "Adopt provision",
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -765,6 +765,26 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					if assert.NotNil(t, cd.Status.Provision, "provision reference not set") {
 						assert.Equal(t, provisionName, cd.Status.Provision.Name, "unexpected provision referenced")
 					}
+				}
+			},
+		},
+		{
+			name: "Do not adopt provision from other attempt",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Status.InstallRestarts = 1
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testProvision(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing cluster deployment") {
+					assert.Nil(t, cd.Status.Provision, "expected provision reference to not be set")
 				}
 			},
 		},
@@ -1201,7 +1221,7 @@ func testProvision() *hivev1.ClusterProvision {
 			ClusterDeployment: corev1.LocalObjectReference{
 				Name: testName,
 			},
-			Stage: hivev1.ClusterProvisionStageProvisioning,
+			Stage: hivev1.ClusterProvisionStageInitializing,
 		},
 	}
 

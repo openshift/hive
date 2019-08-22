@@ -38,7 +38,7 @@ var (
 		{
 			APIGroups: []string{"hive.openshift.io"},
 			Resources: []string{"clusterprovisions", "clusterprovisions/finalizers", "clusterprovisions/status"},
-			Verbs:     []string{"get", "update"},
+			Verbs:     []string{"get", "list", "update", "watch"},
 		},
 	}
 )

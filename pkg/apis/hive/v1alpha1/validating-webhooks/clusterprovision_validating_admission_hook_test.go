@@ -2,6 +2,7 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -258,34 +259,6 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			}(),
 		},
 		{
-			name: "change from provisioning stage",
-			old:  testClusterProvision(),
-			new: func() *hivev1.ClusterProvision {
-				p := testClusterProvision()
-				p.Spec.Stage = hivev1.ClusterProvisionStageComplete
-				return p
-			}(),
-			expectAllowed: true,
-		},
-		{
-			name: "change to provisioning stage",
-			old:  testCompletedClusterProvision(),
-			new: func() *hivev1.ClusterProvision {
-				p := testCompletedClusterProvision()
-				p.Spec.Stage = hivev1.ClusterProvisionStageProvisioning
-				return p
-			}(),
-		},
-		{
-			name: "change to from complete to failed stage",
-			old:  testCompletedClusterProvision(),
-			new: func() *hivev1.ClusterProvision {
-				p := testCompletedClusterProvision()
-				p.Spec.Stage = hivev1.ClusterProvisionStageFailed
-				return p
-			}(),
-		},
-		{
 			name: "bad stage",
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
@@ -472,6 +445,71 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			response := cut.Validate(request)
 			assert.Equal(t, tc.expectAllowed, response.Allowed, "unexpected response: %#v", response.Result)
 		})
+	}
+}
+
+func Test_ClusterProvisionAdmission_Validate_Update_StageTransition(t *testing.T) {
+	expectedAcceptedTransitions := []struct {
+		from hivev1.ClusterProvisionStage
+		to   hivev1.ClusterProvisionStage
+	}{
+		{
+			from: hivev1.ClusterProvisionStageInitializing,
+			to:   hivev1.ClusterProvisionStageProvisioning,
+		},
+		{
+			from: hivev1.ClusterProvisionStageProvisioning,
+			to:   hivev1.ClusterProvisionStageComplete,
+		},
+		{
+			from: hivev1.ClusterProvisionStageInitializing,
+			to:   hivev1.ClusterProvisionStageFailed,
+		},
+		{
+			from: hivev1.ClusterProvisionStageProvisioning,
+			to:   hivev1.ClusterProvisionStageFailed,
+		},
+	}
+	for oldStage := range validProvisionStages {
+		for newStage := range validProvisionStages {
+			t.Run(
+				fmt.Sprintf("%s to %s", oldStage, newStage),
+				func(t *testing.T) {
+					cut := &ClusterProvisionValidatingAdmissionHook{}
+					cut.Initialize(nil, nil)
+					oldProvision := testClusterProvision()
+					oldProvision.Spec.Stage = oldStage
+					oldAsJSON, err := json.Marshal(oldProvision)
+					if !assert.NoError(t, err, "unexpected error marshalling old provision") {
+						return
+					}
+					newProvision := testClusterProvision()
+					newProvision.Spec.Stage = newStage
+					newAsJSON, err := json.Marshal(newProvision)
+					if !assert.NoError(t, err, "unexpected error marshalling new provision") {
+						return
+					}
+					request := &admissionv1beta1.AdmissionRequest{
+						Resource: metav1.GroupVersionResource{
+							Group:    clusterProvisionGroup,
+							Version:  clusterProvisionVersion,
+							Resource: clusterProvisionResource,
+						},
+						Operation: admissionv1beta1.Update,
+						Object:    runtime.RawExtension{Raw: newAsJSON},
+						OldObject: runtime.RawExtension{Raw: oldAsJSON},
+					}
+					response := cut.Validate(request)
+					expectedAllowed := oldStage == newStage
+					for _, t := range expectedAcceptedTransitions {
+						if oldStage == t.from && newStage == t.to {
+							expectedAllowed = true
+						}
+					}
+					assert.Equal(t, expectedAllowed, response.Allowed, "unexpected response")
+				},
+			)
+		}
 	}
 }
 

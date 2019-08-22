@@ -31,16 +31,22 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	clientwatch "k8s.io/client-go/tools/watch"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/openshift/installer/pkg/destroy/aws"
@@ -60,6 +66,7 @@ const (
 	adminSSHKeySecretKey                = "ssh-publickey"
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
+	provisioningTransitionTimeout       = 5 * time.Minute
 
 	fetchLogsScriptTemplate = `#!/bin/bash
 USER_ID=$(id -u)
@@ -91,23 +98,24 @@ var (
 // InstallManager coordinates executing the openshift-install binary, modifying
 // generated assets, and uploading artifacts to the kube API after completion.
 type InstallManager struct {
-	log                    log.FieldLogger
-	LogLevel               string
-	WorkDir                string
-	LogsDir                string
-	ClusterID              string
-	ClusterName            string
-	Region                 string
-	ClusterProvisionName   string
-	Namespace              string
-	DynamicClient          client.Client
-	runUninstaller         func(clusterName, region, clusterID string, logger log.FieldLogger) error
-	updateClusterProvision func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
-	readClusterMetadata    func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
-	uploadAdminKubeconfig  func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
-	uploadAdminPassword    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
-	readInstallerLog       func(*hivev1.ClusterProvision, *InstallManager) (string, error)
-	isGatherLogsEnabled    func() bool
+	log                      log.FieldLogger
+	LogLevel                 string
+	WorkDir                  string
+	LogsDir                  string
+	ClusterID                string
+	ClusterName              string
+	Region                   string
+	ClusterProvisionName     string
+	Namespace                string
+	DynamicClient            client.Client
+	runUninstaller           func(clusterName, region, clusterID string, logger log.FieldLogger) error
+	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
+	readClusterMetadata      func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
+	uploadAdminKubeconfig    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
+	uploadAdminPassword      func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
+	readInstallerLog         func(*hivev1.ClusterProvision, *InstallManager) (string, error)
+	waitForProvisioningStage func(*hivev1.ClusterProvision, *InstallManager) error
+	isGatherLogsEnabled      func() bool
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -164,6 +172,7 @@ func (m *InstallManager) Complete(args []string) error {
 	m.readInstallerLog = readInstallerLog
 	m.isGatherLogsEnabled = isGatherLogsEnabled
 	m.runUninstaller = runUninstaller
+	m.waitForProvisioningStage = waitForProvisioningStage
 
 	// Set log level
 	level, err := log.ParseLevel(m.LogLevel)
@@ -207,11 +216,13 @@ func (m *InstallManager) Run() error {
 	if err := m.loadClusterProvision(provision); err != nil {
 		m.log.WithError(err).Fatal("error looking up cluster provision")
 	}
-	if provision.Spec.Stage != hivev1.ClusterProvisionStageProvisioning {
+	switch provision.Spec.Stage {
+	case hivev1.ClusterProvisionStageInitializing, hivev1.ClusterProvisionStageProvisioning:
+	default:
 		// This should not be possible but just in-case we can somehow
 		// run the install job for a cluster provision that is already complete, exit early,
 		// and don't delete *anything*.
-		m.log.Warn("provision is not provisioning, exiting")
+		m.log.Warnf("provision is at stage %q, exiting", provision.Spec.Stage)
 		os.Exit(0)
 	}
 	cd, err := m.loadClusterDeployment(provision)
@@ -317,6 +328,12 @@ func (m *InstallManager) Run() error {
 	); err != nil {
 		m.log.WithError(err).Error("error updating cluster provision with cluster metadata")
 		return errors.Wrap(err, "error updating cluster provision with cluster metadata")
+	}
+
+	m.log.Info("waiting for ClusterProvision to transition to provisioning")
+	if err := m.waitForProvisioningStage(provision, m); err != nil {
+		m.log.WithError(err).Error("ClusterProvision failed to transition to provisioning")
+		return errors.Wrap(err, "failed to transition to provisioning")
 	}
 
 	m.log.Info("provisioning cluster")
@@ -1045,6 +1062,63 @@ func (m *InstallManager) deleteAnyExistingObject(namespacedName types.Namespaced
 	}
 
 	return nil
+}
+
+func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallManager) error {
+	waitContext, cancel := context.WithTimeout(context.Background(), provisioningTransitionTimeout)
+	defer cancel()
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return errors.Wrap(err, "could not get in-cluster REST config")
+	}
+	gvk, err := apiutil.GVKForObject(&hivev1.ClusterProvision{}, scheme.Scheme)
+	if err != nil {
+		return errors.Wrap(err, "could not get the GVK for clusterprovisions")
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, config, scheme.Codecs)
+	if err != nil {
+		return errors.Wrap(err, "could not create REST client")
+	}
+
+	_, err = clientwatch.UntilWithSync(
+		waitContext,
+		cache.NewListWatchFromClient(
+			restClient,
+			"clusterprovisions",
+			provision.Namespace,
+			fields.OneTermEqualSelector("metadata.name", provision.Name),
+		),
+		&hivev1.ClusterProvision{},
+		nil,
+		func(event watch.Event) (bool, error) {
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				provision, ok := event.Object.(*hivev1.ClusterProvision)
+				if !ok {
+					m.log.Warnf("Expected a ClusterProvision object but got a %q object instead", event.Object.GetObjectKind().GroupVersionKind())
+					return false, nil
+				}
+				switch provision.Spec.Stage {
+				case hivev1.ClusterProvisionStageInitializing:
+					m.log.Info("Still waiting for transition to provisioning stage")
+					return false, nil
+				case hivev1.ClusterProvisionStageProvisioning:
+					m.log.Info("ClusterProvisision has transitioned to provisioning stage")
+					return true, nil
+				default:
+					m.log.Warnf("ClusterProvision has transitioned to %s stage while waiting for provisioning stage", provision.Spec.Stage)
+					return false, fmt.Errorf("transition to %s", provision.Spec.Stage)
+				}
+			case watch.Deleted:
+				m.log.Warnf("ClusterProvision was deleted")
+				return false, errors.New("ClusterProvision deleted")
+			default:
+				return false, nil
+			}
+		},
+	)
+	return errors.Wrap(err, "ClusterProvision did not transition to provisioning stage")
 }
 
 type provisionMutation func(provision *hivev1.ClusterProvision)

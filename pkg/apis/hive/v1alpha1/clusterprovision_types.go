@@ -59,7 +59,9 @@ type ClusterProvisionStatus struct {
 type ClusterProvisionStage string
 
 const (
-	// ClusterProvisionStageProvisioning indicates that the cluster provision is ongoing
+	// ClusterProvisionStageInitializing indicates that pre-provision initialization is underway.
+	ClusterProvisionStageInitializing ClusterProvisionStage = "initializing"
+	// ClusterProvisionStageProvisioning indicates that the cluster provision is ongoing.
 	ClusterProvisionStageProvisioning ClusterProvisionStage = "provisioning"
 	// ClusterProvisionStageComplete indicates that the cluster provision completed successfully.
 	ClusterProvisionStageComplete ClusterProvisionStage = "complete"
@@ -91,6 +93,9 @@ type ClusterProvisionCondition struct {
 type ClusterProvisionConditionType string
 
 const (
+	// ClusterProvisionInitializedCondition is set when a cluster provision has finished initialization.
+	ClusterProvisionInitializedCondition ClusterProvisionConditionType = "ClusterProvisionInitialized"
+
 	// ClusterProvisionCompletedCondition is set when a cluster provision completes.
 	ClusterProvisionCompletedCondition ClusterProvisionConditionType = "ClusterProvisionCompleted"
 

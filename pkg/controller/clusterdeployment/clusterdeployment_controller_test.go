@@ -104,11 +104,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                 string
-		existing             []runtime.Object
-		expectErr            bool
-		expectedRequeueAfter time.Duration
-		validate             func(client.Client, *testing.T)
+		name                  string
+		existing              []runtime.Object
+		pendingCreation       bool
+		expectErr             bool
+		expectedRequeueAfter  time.Duration
+		expectPendingCreation bool
+		validate              func(client.Client, *testing.T)
 	}{
 		{
 			name: "Add finalizer",
@@ -132,9 +134,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Len(t, provisions, 1, "expected provision to exist")
+			},
+		},
+		{
+			name: "Provision not created when pending create",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			pendingCreation:       true,
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "expected provision to not exist")
 			},
 		},
 		{
@@ -504,6 +522,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				if assert.Len(t, provisions, 1, "expected provision to exist") {
@@ -616,6 +635,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testAvailableDNSZone(),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Len(t, provisions, 1, "expected provision to exist")
@@ -741,6 +761,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testFailedProvisionAttempt(2),
 				testFailedProvisionAttempt(3),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				actualAttempts := []int{}
 				for _, p := range getProvisions(c) {
@@ -781,6 +802,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testProvision(),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing cluster deployment") {
@@ -864,6 +886,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+			expectedRequeueAfter: defaultRequeueTime,
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Empty(t, provisions, "expected provision to be deleted")
@@ -920,20 +943,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("controller", "clusterDeployment")
 			fakeClient := fake.NewFakeClient(test.existing...)
+			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "clusterDeployment"),
+				logger:                        logger,
+				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
-			result, err := rcd.Reconcile(reconcile.Request{
+			reconcileRequest := reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testName,
 					Namespace: testNamespace,
 				},
-			})
+			}
+
+			if test.pendingCreation {
+				controllerExpectations.ExpectCreations(reconcileRequest.String(), 1)
+			}
+
+			result, err := rcd.Reconcile(reconcileRequest)
 
 			if test.validate != nil {
 				test.validate(fakeClient, t)
@@ -951,6 +983,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			} else {
 				assert.InDelta(t, test.expectedRequeueAfter, result.RequeueAfter, float64(10*time.Second), "unexpected requeue after")
 			}
+
+			actualPendingCreation := !controllerExpectations.SatisfiedExpectations(reconcileRequest.String())
+			assert.Equal(t, test.expectPendingCreation, actualPendingCreation, "unexpected pending creation")
 		})
 	}
 }
@@ -974,11 +1009,14 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("controller", "clusterDeployment")
 			fakeClient := fake.NewFakeClient(test.existing...)
+			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "clusterDeployment"),
+				logger:                        logger,
+				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 

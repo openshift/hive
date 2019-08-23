@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -34,7 +35,6 @@ const (
 	controllerName      = "installlogmonitor"
 	processedAnnotation = "hive.openshift.io/install-log-processed"
 	regexConfigMapName  = "install-log-regexes"
-	hiveNamespace       = "hive"
 	unknownReason       = "UnknownError"
 	unknownMessage      = "Cluster install failed but no known errors found in logs"
 	successReason       = "ClusterInstalled"
@@ -169,7 +169,7 @@ func (r *ReconcileInstallLog) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Load the regex configmap, if we don't have one, there's not much point proceeding here.
 	regexCM := &corev1.ConfigMap{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: regexConfigMapName, Namespace: hiveNamespace}, regexCM)
+	err := r.Get(context.TODO(), types.NamespacedName{Name: regexConfigMapName, Namespace: constants.HiveNamespace}, regexCM)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			iLog.Debugf("%s configmap does not exist, nothing to scan for", regexConfigMapName)

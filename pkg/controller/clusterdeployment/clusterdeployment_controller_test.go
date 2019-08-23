@@ -45,6 +45,7 @@ const (
 	metadataName          = "foo-lqmsh-metadata"
 	sshKeySecret          = "ssh-key"
 	pullSecretSecret      = "pull-secret"
+	globalPullSecret      = "global-pull-secret"
 	adminKubeconfigSecret = "foo-lqmsh-admin-kubeconfig"
 	adminKubeconfig       = `clusters:
 - cluster:
@@ -1320,6 +1321,7 @@ func getInstallJob(c client.Client) *batchv1.Job {
 }
 
 func TestUpdatePullSecretInfo(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
 	testPullSecret1 := `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`
 
 	tests := []struct {
@@ -1442,22 +1444,36 @@ func getCDFromClient(c client.Client) *hivev1.ClusterDeployment {
 	return nil
 }
 
+func createGlobalPullSecretObj(secretType corev1.SecretType, name, key, value string) *corev1.Secret {
+	secret := &corev1.Secret{
+		Type: secretType,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: constants.HiveNamespace,
+		},
+		Data: map[string][]byte{
+			key: []byte(value),
+		},
+	}
+	return secret
+}
+
 func TestMergePullSecrets(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name             string
 		localPullSecret  string
 		globalPullSecret string
 		mergedPullSecret string
-		existingCD       []runtime.Object
+		existingObjs     []runtime.Object
 		expectedErr      bool
-		expectedMismatch bool
 	}{
 		{
 			name:             "merged pull secret should be be equal to local secret",
 			localPullSecret:  `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
 			mergedPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
-			existingCD: []runtime.Object{
+			existingObjs: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := getCDWithoutPullSecret()
 					cd.Spec.PullSecret = &corev1.LocalObjectReference{
@@ -1466,30 +1482,13 @@ func TestMergePullSecrets(t *testing.T) {
 					return cd
 				}(),
 			},
-		},
-		{
-			name:             "Test should fail as merged pull secret is not equal to local secret",
-			localPullSecret:  `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
-			mergedPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "aaaaaaaaaaaaaaa"}}}`,
-			existingCD: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := getCDWithoutPullSecret()
-					cd.Spec.PullSecret = &corev1.LocalObjectReference{
-						Name: pullSecretSecret,
-					}
-					return cd
-				}(),
-			},
-			expectedMismatch: true,
 		},
 		{
 			name:             "merged pull secret should be be equal to global pull secret",
 			globalPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
 			mergedPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
-			existingCD: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					return getCDWithoutPullSecret()
-				}(),
+			existingObjs: []runtime.Object{
+				getCDWithoutPullSecret(),
 			},
 		},
 		{
@@ -1497,7 +1496,7 @@ func TestMergePullSecrets(t *testing.T) {
 			localPullSecret:  `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
 			globalPullSecret: `{"auths":{"cloud.okd.com":{"auth":"b34xVjWERckjfUyV1pMQTc=","email":"abc@xyz.com"}}}`,
 			mergedPullSecret: `{"auths":{"cloud.okd.com":{"auth":"b34xVjWERckjfUyV1pMQTc=","email":"abc@xyz.com"},"registry.svc.ci.okd.org":{"auth":"dXNljlfjldsfSDD"}}}`,
-			existingCD: []runtime.Object{
+			existingObjs: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := getCDWithoutPullSecret()
 					cd.Spec.PullSecret = &corev1.LocalObjectReference{
@@ -1509,10 +1508,8 @@ func TestMergePullSecrets(t *testing.T) {
 		},
 		{
 			name: "Test should fail as local an global pull secret is not available",
-			existingCD: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					return getCDWithoutPullSecret()
-				}(),
+			existingObjs: []runtime.Object{
+				getCDWithoutPullSecret(),
 			},
 			expectedErr: true,
 		},
@@ -1520,7 +1517,15 @@ func TestMergePullSecrets(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingCD...)
+			if test.globalPullSecret != "" {
+				globalPullSecretObj := createGlobalPullSecretObj(corev1.SecretTypeDockerConfigJson, globalPullSecret, corev1.DockerConfigJsonKey, test.globalPullSecret)
+				test.existingObjs = append(test.existingObjs, globalPullSecretObj)
+			}
+			if test.localPullSecret != "" {
+				localSecretObject := testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, test.localPullSecret)
+				test.existingObjs = append(test.existingObjs, localSecretObject)
+			}
+			fakeClient := fake.NewFakeClient(test.existingObjs...)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
@@ -1528,22 +1533,15 @@ func TestMergePullSecrets(t *testing.T) {
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
-			localSecretObject := testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, test.localPullSecret)
-			err := rcd.Create(context.TODO(), localSecretObject)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
 			cd := getCDFromClient(rcd.Client)
 			if test.globalPullSecret != "" {
-				os.Setenv("GLOBAL_PULL_SECRET", test.globalPullSecret)
+				os.Setenv(constants.GlobalPullSecret, globalPullSecret)
 			}
-			defer os.Unsetenv("GLOBAL_PULL_SECRET")
+			defer os.Unsetenv(constants.GlobalPullSecret)
+
 			expetedPullSecret, err := rcd.mergePullSecrets(cd, rcd.logger)
 			if test.expectedErr {
 				assert.Error(t, err)
-			} else if test.expectedMismatch {
-				assert.NotEqual(t, test.mergedPullSecret, expetedPullSecret)
 			} else {
 				assert.Equal(t, test.mergedPullSecret, expetedPullSecret)
 			}

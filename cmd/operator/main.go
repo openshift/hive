@@ -11,6 +11,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/operator"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -28,7 +29,6 @@ import (
 
 const (
 	defaultLogLevel         = "info"
-	hiveNamespace           = "hive"
 	leaderElectionConfigMap = "hive-operator-leader"
 )
 
@@ -58,9 +58,9 @@ func newRootCommand() *cobra.Command {
 
 			// Create a new Cmd to provide shared dependencies and start components
 			mgr, err := manager.New(cfg, manager.Options{
-				Namespace:               hiveNamespace,
+				Namespace:               constants.HiveNamespace,
 				LeaderElection:          true,
-				LeaderElectionNamespace: hiveNamespace,
+				LeaderElectionNamespace: constants.HiveNamespace,
 				LeaderElectionID:        leaderElectionConfigMap,
 			})
 			if err != nil {

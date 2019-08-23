@@ -21,6 +21,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -229,7 +230,7 @@ func buildRegexConfigMap() *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      regexConfigMapName,
-			Namespace: hiveNamespace,
+			Namespace: constants.HiveNamespace,
 		},
 		Data: map[string]string{
 			"DNSAlreadyExists": `

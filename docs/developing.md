@@ -175,6 +175,33 @@ Alternatively, you can run the Dep command directly.
 dep ensure -v
 ```
 
+### Running the e2e test locally
+
+The e2e test deploys Hive on a cluster, tests that all Hive components are working properly, then creates a cluster
+with Hive and ensures that Hive works properly with the installed cluster. It finally tears down the created cluster. It finally tears down the created cluster.
+
+You can run the e2e test by pointing to your own cluster (via the `KUBECONFIG` environment variable).
+
+Ensure that the following environment variables are set:
+
+`KUBECONFIG` - Must point to a valid Kubernetes configuration file that allows communicating with your cluster.
+`AWS_ACCESS_KEY_ID` - AWS access key for your AWS account
+`AWS_SECRET_ACCESS_KEY` - AWS secret access key for your AWS account
+
+`HIVE_IMAGE` - Hive image to deploy to the cluster
+`RELEASE_IMAGE` - OpenShift release image to use for the e2e test cluster
+`CLUSTER_NAMESPACE` - Namespace where clusterdeployment will be created for the e2e test
+`BASE_DOMAIN` - DNS domain to use for the test cluster (a corresponding Route53 public zone must exist on your account).
+`ARTIFACT_DIR` - Directory where logs will be placed by the e2e test
+`SSH_PUBLIC_KEY_FILE` - Path to a public ssh key to use for the test cluster
+`PULL_SECRET_FILE` - Path to file containing a pull secret for the test cluster
+
+For example values for these variables, see `hack/local-e2e-test.sh`
+
+Run the Hive e2e script:
+
+`hack/e2e-test.sh`
+
 ### TIP
 
 * The Dep cache located under *_$GOPATH/pkg/dep_*.

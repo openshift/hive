@@ -51,11 +51,11 @@ test-e2e:
 
 .PHONY: test-e2e-postdeploy
 test-e2e-postdeploy:
-	go test -timeout 0 ./test/e2e/postdeploy/...
+	go test -timeout 0 -count=1 ./test/e2e/postdeploy/...
 
 .PHONY: test-e2e-postinstall
 test-e2e-postinstall:
-	go test -timeout 0 ./test/e2e/postinstall/...
+	go test -timeout 0 -count=1 ./test/e2e/postinstall/...
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build

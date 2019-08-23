@@ -5,16 +5,21 @@ set -e
 max_tries=60
 sleep_between_tries=10
 component=hive
-HIVE_IMAGE=$(eval "echo $IMAGE_FORMAT")
-RELEASE_IMAGE="registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest"
-export CLUSTER_NAMESPACE=cluster-test
-export PATH=$PATH:$(pwd)
+local_hive_image=$(eval "echo $IMAGE_FORMAT")
+export HIVE_IMAGE="${HIVE_IMAGE:-$local_hive_image}"
+export RELEASE_IMAGE="${RELEASE_IMAGE:-registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest}"
+export CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-cluster-test}"
 
-# download kustomize so we can use it for deploying
-curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.0/kustomize_2.0.0_linux_amd64
-mv kustomize_2.0.0_linux_amd64 kustomize
-chmod u+x kustomize
-
+if ! which kustomize > /dev/null; then 
+  kustomize_dir="$(mktemp -d)"
+  export PATH="$PATH:${kustomize_dir}"
+  # download kustomize so we can use it for deploying
+  pushd "${kustomize_dir}"
+  curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.0/kustomize_2.0.0_linux_amd64
+  mv kustomize_2.0.0_linux_amd64 kustomize
+  chmod u+x kustomize
+  popd
+fi
 
 i=1
 while [ $i -le ${max_tries} ]; do
@@ -45,18 +50,16 @@ fi
 # Install Hive
 make deploy DEPLOY_IMAGE="${HIVE_IMAGE}"
 
-CLOUD_CREDS_DIR="/tmp/cluster"
-CLUSTER_DEPLOYMENT_FILE="/tmp/cluster-deployment.json"
-
+CLOUD_CREDS_DIR="${CLOUD_CREDS_DIR:-/tmp/cluster}"
 
 # Create a new cluster deployment
-# TODO: Determine which domain to use to create Hive clusters
-export BASE_DOMAIN="hive-ci.openshift.com"
-export CLUSTER_NAME="hive-$(uuidgen)"
-export SSH_PUB_KEY="$(cat ${CLOUD_CREDS_DIR}/ssh-publickey)"
-export PULL_SECRET="$(cat ${CLOUD_CREDS_DIR}/pull-secret)"
-export AWS_ACCESS_KEY_ID="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_access_key_id/ { print $3; exit; }')"
-export AWS_SECRET_ACCESS_KEY="$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_secret_access_key/ { print $3; exit; }')"
+export BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
+export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_access_key_id/ { print $3; exit; }')}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-$(cat ${CLOUD_CREDS_DIR}/.awscred | awk '/aws_secret_access_key/ { print $3; exit; }')}"
+export ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp}"
+export SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLOUD_CREDS_DIR}/ssh-publickey}"
+export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLOUD_CREDS_DIR}/pull-secret}"
 
 function teardown() {
 	oc logs -c hive job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_install_job.log" || true
@@ -97,8 +100,8 @@ echo "Creating cluster deployment"
 SRC_ROOT=$(git rev-parse --show-toplevel)
 
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
-	--ssh-public-key-file="${CLOUD_CREDS_DIR}/ssh-publickey" \
-	--pull-secret-file="${CLOUD_CREDS_DIR}/pull-secret" \
+	--ssh-public-key-file="${SSH_PUBLIC_KEY_FILE}" \
+	--pull-secret-file="${PULL_SECRET_FILE}" \
 	--base-domain="${BASE_DOMAIN}" \
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \

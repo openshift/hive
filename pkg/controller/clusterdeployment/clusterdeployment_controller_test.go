@@ -1462,12 +1462,13 @@ func TestMergePullSecrets(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name             string
-		localPullSecret  string
-		globalPullSecret string
-		mergedPullSecret string
-		existingObjs     []runtime.Object
-		expectedErr      bool
+		name                    string
+		localPullSecret         string
+		globalPullSecret        string
+		mergedPullSecret        string
+		existingObjs            []runtime.Object
+		expectedErr             bool
+		addGlobalSecretToHiveNs bool
 	}{
 		{
 			name:             "merged pull secret should be be equal to local secret",
@@ -1490,6 +1491,7 @@ func TestMergePullSecrets(t *testing.T) {
 			existingObjs: []runtime.Object{
 				getCDWithoutPullSecret(),
 			},
+			addGlobalSecretToHiveNs: true,
 		},
 		{
 			name:             "Both local secret and global pull secret available",
@@ -1505,6 +1507,16 @@ func TestMergePullSecrets(t *testing.T) {
 					return cd
 				}(),
 			},
+			addGlobalSecretToHiveNs: true,
+		},
+		{
+			name:             "global pull secret does not exist in Hive namespace",
+			globalPullSecret: `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`,
+			existingObjs: []runtime.Object{
+				getCDWithoutPullSecret(),
+			},
+			addGlobalSecretToHiveNs: false,
+			expectedErr:             true,
 		},
 		{
 			name: "Test should fail as local an global pull secret is not available",
@@ -1517,7 +1529,7 @@ func TestMergePullSecrets(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.globalPullSecret != "" {
+			if test.globalPullSecret != "" && test.addGlobalSecretToHiveNs == true {
 				globalPullSecretObj := createGlobalPullSecretObj(corev1.SecretTypeDockerConfigJson, globalPullSecret, corev1.DockerConfigJsonKey, test.globalPullSecret)
 				test.existingObjs = append(test.existingObjs, globalPullSecretObj)
 			}
@@ -1543,6 +1555,9 @@ func TestMergePullSecrets(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err)
 			} else {
+				assert.NoError(t, err)
+			}
+			if test.mergedPullSecret != "" {
 				assert.Equal(t, test.mergedPullSecret, expetedPullSecret)
 			}
 		})

@@ -1440,10 +1440,13 @@ rules:
   - hive.openshift.io
   resources:
   - clusterdeployments
+  - syncsets
   verbs:
   - get
   - list
   - watch
+  - create
+  - update
 - apiGroups:
   - velero.io
   resources:

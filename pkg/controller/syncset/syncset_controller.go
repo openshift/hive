@@ -142,7 +142,6 @@ type ReconcileSyncSet struct {
 
 // Reconcile lists SyncSets and SelectorSyncSets which apply to a ClusterDeployment object and applies resources and patches
 // found in each SyncSet object
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=selectorsyncsets,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}

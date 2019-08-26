@@ -152,7 +152,6 @@ func (r *ReconcileInstallLog) migrateInstallLog(cm *corev1.ConfigMap) error {
 }
 
 // Reconcile parses install log to monitor for known issues.
-// +kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileInstallLog) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	iLog := log.WithFields(log.Fields{

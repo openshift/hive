@@ -34,7 +34,7 @@ vendor:
 
 # Run tests
 .PHONY: test
-test: generate fmt vet crd rbac
+test: generate fmt vet crd
 	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
 .PHONY: test-integration
@@ -101,11 +101,11 @@ deploy: manifests install generate
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
 # the locations kubebuilder generates them.
 .PHONY: manifests
-manifests: crd rbac
+manifests: crd
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy-sd-dev
-deploy-sd-dev: crd rbac
+deploy-sd-dev: crd
 	oc apply -f config/crds
 	kustomize build overlays/sd-dev | oc apply -f -
 
@@ -113,11 +113,6 @@ deploy-sd-dev: crd rbac
 .PHONY: crd
 crd:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
-
-# Generate RBAC yaml from our kubebuilder controller annotations:
-.PHONY: rbac
-rbac:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac
 
 # Run go fmt against code
 .PHONY: fmt

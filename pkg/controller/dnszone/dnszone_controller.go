@@ -92,7 +92,6 @@ func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient cli
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
 // and what is in the DNSZone.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write DNSZones
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=dnszones;dnszones/status;dnszones/finalizers;dnsendpoints,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	dnsLog := r.logger.WithFields(log.Fields{

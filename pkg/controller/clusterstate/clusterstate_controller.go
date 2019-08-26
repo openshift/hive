@@ -83,7 +83,6 @@ type ReconcileClusterState struct {
 }
 
 // Reconcile ensures that a given ClusterState resource exists and reflects the state of cluster operators from its target cluster
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterstates;clusterstates/status,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	logger := r.logger.WithFields(log.Fields{

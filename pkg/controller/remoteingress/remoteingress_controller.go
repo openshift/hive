@@ -114,8 +114,6 @@ type ReconcileRemoteClusterIngress struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and sets up
 // any needed ClusterIngress objects up for syncing to the remote cluster.
 //
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;watch;update
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=syncsets,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	cdLog := r.logger.WithFields(log.Fields{

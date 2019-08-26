@@ -154,7 +154,6 @@ type ReconcileSyncSetInstance struct {
 }
 
 // Reconcile applies SyncSet or SelectorSyncSets associated with SyncSetInstances to the owning cluster.
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=syncsetinstances;syncsetinstances/status,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	ssiLog := r.logger.WithField("syncsetinstance", request.NamespacedName)

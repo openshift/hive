@@ -28,7 +28,7 @@ func TestGenerate(t *testing.T) {
 	cd := testClusterDeployment()
 	cd.Status.Installed = true
 	cd.Spec.PreserveOnDelete = true
-	job, err := GenerateUninstallerJobForClusterDeployment(cd, "example.com/fake:latest")
+	job, err := GenerateUninstallerJobForClusterDeployment(cd)
 	assert.Nil(t, job)
 	assert.NotNil(t, err)
 }
@@ -46,7 +46,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
-			SSHKey: &corev1.LocalObjectReference{
+			SSHKey: corev1.LocalObjectReference{
 				Name: sshKeySecret,
 			},
 			ControlPlane: hivev1.MachinePool{},

@@ -72,6 +72,7 @@ rules:
   - hiveconfigs/finalizers
   - hiveconfigs/status
   - clusterdeployments
+  - clusterprovisions
   - dnszones
   - dnsendpoints
   - selectorsyncidentityproviders
@@ -155,6 +156,7 @@ rules:
   resources:
   - clusterdeployments
   - clusterimagesets
+  - clusterprovisions
   - dnszones
   - selectorsyncsets
   - syncsets

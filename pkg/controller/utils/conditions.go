@@ -50,6 +50,29 @@ func SetClusterDeploymentCondition(
 	message string,
 	updateConditionCheck UpdateConditionCheck,
 ) []hivev1.ClusterDeploymentCondition {
+	newConditions, _ := SetClusterDeploymentConditionWithChangeCheck(
+		conditions,
+		conditionType,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	return newConditions
+}
+
+// SetClusterDeploymentConditionWithChangeCheck sets a condition on a ClusterDeployment resource's status.
+// It returns the conditions as well a boolean indicating whether there was a change made
+// to the conditions.
+func SetClusterDeploymentConditionWithChangeCheck(
+	conditions []hivev1.ClusterDeploymentCondition,
+	conditionType hivev1.ClusterDeploymentConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) ([]hivev1.ClusterDeploymentCondition, bool) {
+	changed := false
 	now := metav1.Now()
 	existingCondition := FindClusterDeploymentCondition(conditions, conditionType)
 	if existingCondition == nil {
@@ -57,6 +80,51 @@ func SetClusterDeploymentCondition(
 			conditions = append(
 				conditions,
 				hivev1.ClusterDeploymentCondition{
+					Type:               conditionType,
+					Status:             status,
+					Reason:             reason,
+					Message:            message,
+					LastTransitionTime: now,
+					LastProbeTime:      now,
+				},
+			)
+			changed = true
+		}
+	} else {
+		if shouldUpdateCondition(
+			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
+			status, reason, message,
+			updateConditionCheck,
+		) {
+			if existingCondition.Status != status {
+				existingCondition.LastTransitionTime = now
+			}
+			existingCondition.Status = status
+			existingCondition.Reason = reason
+			existingCondition.Message = message
+			existingCondition.LastProbeTime = now
+			changed = true
+		}
+	}
+	return conditions, changed
+}
+
+// SetClusterProvisionCondition sets a condition on a ClusterProvision resource's status
+func SetClusterProvisionCondition(
+	conditions []hivev1.ClusterProvisionCondition,
+	conditionType hivev1.ClusterProvisionConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) []hivev1.ClusterProvisionCondition {
+	now := metav1.Now()
+	existingCondition := FindClusterProvisionCondition(conditions, conditionType)
+	if existingCondition == nil {
+		if status == corev1.ConditionTrue {
+			conditions = append(
+				conditions,
+				hivev1.ClusterProvisionCondition{
 					Type:               conditionType,
 					Status:             status,
 					Reason:             reason,
@@ -173,6 +241,17 @@ func SetDNSZoneCondition(
 // FindClusterDeploymentCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
 func FindClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentCondition, conditionType hivev1.ClusterDeploymentConditionType) *hivev1.ClusterDeploymentCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
+// FindClusterProvisionCondition finds in the condition that has the
+// specified condition type in the given list. If none exists, then returns nil.
+func FindClusterProvisionCondition(conditions []hivev1.ClusterProvisionCondition, conditionType hivev1.ClusterProvisionConditionType) *hivev1.ClusterProvisionCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

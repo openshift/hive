@@ -188,7 +188,7 @@ func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
 }
 
 func testUninstallJob() *batchv1.Job {
-	uninstallJob, _ := install.GenerateUninstallerJobForDeprovisionRequest(testClusterDeprovisionRequest(), "hive:image")
+	uninstallJob, _ := install.GenerateUninstallerJobForDeprovisionRequest(testClusterDeprovisionRequest())
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
 		panic("should never get error calculating job spec hash")

@@ -45,7 +45,8 @@ type ClusterDeploymentSpec struct {
 	ClusterName string `json:"clusterName"`
 
 	// SSHKey is the reference to the secret that contains a public key to use for access to compute instances.
-	SSHKey *corev1.LocalObjectReference `json:"sshKey,omitempty"`
+	// +required
+	SSHKey corev1.LocalObjectReference `json:"sshKey"`
 
 	// BaseDomain is the base domain to which the cluster should belong.
 	// +required
@@ -110,10 +111,6 @@ type ProvisionImages struct {
 	InstallerImage string `json:"installerImage,omitempty"`
 	// InstallerImagePullPolicy is the pull policy for the installer image.
 	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy,omitempty"`
-	// HiveImage is the image used in the sidecar container to manage execution of openshift-install.
-	HiveImage string `json:"hiveImage,omitempty"`
-	// HiveImagePullPolicy is the pull policy for the installer image.
-	HiveImagePullPolicy corev1.PullPolicy `json:"hiveImagePullPolicy,omitempty"`
 
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
@@ -206,6 +203,10 @@ type ClusterDeploymentStatus struct {
 
 	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
 	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
+
+	// Provision is a reference to the last ClusterProvision created for the deployment
+	// +optional
+	Provision *corev1.LocalObjectReference `json:"provision,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment
@@ -259,6 +260,9 @@ const (
 	// DNSNotReadyCondition indicates that the the DNSZone object created for the clusterDeployment
 	// (ie managedDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
 	DNSNotReadyCondition ClusterDeploymentConditionType = "DNSNotReady"
+
+	// ProvisionFailedCondition indicates that a provision failed
+	ProvisionFailedCondition ClusterDeploymentConditionType = "ProvisionFailed"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -271,6 +275,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	UnreachableCondition,
 	InstallFailingCondition,
 	DNSNotReadyCondition,
+	ProvisionFailedCondition,
 }
 
 // +genclient

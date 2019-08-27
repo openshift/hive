@@ -10,10 +10,8 @@ import (
 )
 
 const (
-	testCLIImage            = "registry.io/cli-image:latest"
-	testCLIImagePullPolicy  = corev1.PullNever
-	testHiveImage           = "registry.io/hive-image:latest"
-	testHiveImagePullPolicy = corev1.PullAlways
+	testCLIImage           = "registry.io/cli-image:latest"
+	testCLIImagePullPolicy = corev1.PullNever
 )
 
 var (
@@ -21,14 +19,10 @@ var (
 		Image:      testCLIImage,
 		PullPolicy: testCLIImagePullPolicy,
 	}
-	testHiveImageSpec = ImageSpec{
-		Image:      testHiveImage,
-		PullPolicy: testHiveImagePullPolicy,
-	}
 )
 
 func TestGenerateImageSetJob(t *testing.T) {
-	job := GenerateImageSetJob(testClusterDeployment(), *testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec, testHiveImageSpec)
+	job := GenerateImageSetJob(testClusterDeployment(), *testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec)
 	validateJob(t, job)
 }
 

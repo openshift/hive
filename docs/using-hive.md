@@ -83,7 +83,6 @@ spec:
   imageSet:
     name: openshift-v4.1.0-rc.8
   images:
-    hiveImagePullPolicy: Always
     installerImagePullPolicy: Always
   networking:
     clusterNetworks:

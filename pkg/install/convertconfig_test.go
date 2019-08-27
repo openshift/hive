@@ -50,7 +50,7 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			BaseDomain: "test.example.com",
-			SSHKey: &corev1.LocalObjectReference{
+			SSHKey: corev1.LocalObjectReference{
 				Name: "ssh-key",
 			},
 			PullSecret: &corev1.LocalObjectReference{

@@ -71,6 +71,15 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterprovisions
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - clusterimagesets
   verbs:
   - get
@@ -112,6 +121,32 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterprovisions
+  - clusterprovisions/status
+  - clusterprovisions/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - clusterstates
   - clusterstates/status
   verbs:
@@ -129,20 +164,6 @@ rules:
   - dnszones/status
   - dnszones/finalizers
   - dnsendpoints
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  - secrets
-  - configmaps
   verbs:
   - get
   - list

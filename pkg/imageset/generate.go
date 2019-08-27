@@ -1,7 +1,6 @@
 package imageset
 
 import (
-	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -54,7 +53,7 @@ exit 0
 
 // GenerateImageSetJob creates a job to determine the installer image for a ClusterImageSet
 // given a release image
-func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName string, cli, hive ImageSpec) *batchv1.Job {
+func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName string, cli ImageSpec) *batchv1.Job {
 	logger := log.WithFields(log.Fields{
 		"clusterdeployment": types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(),
 	})
@@ -100,13 +99,6 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 	}
 
-	hiveUtilImage := os.Getenv(images.HiveImageEnvVar)
-	if hiveUtilImage == "" {
-		// TODO: FIXME: temporary fallback to the cluster image set, just trying to get stage operational
-		// but we will hopefully always be using latest image here by end of week.
-		hiveUtilImage = hive.Image
-	}
-
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
@@ -121,8 +113,8 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 		{
 			Name:            "hiveutil",
-			Image:           hiveUtilImage,
-			ImagePullPolicy: hive.PullPolicy,
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{

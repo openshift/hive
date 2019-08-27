@@ -3,8 +3,9 @@ package validatingwebhooks
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"net/http"
 
@@ -147,10 +148,8 @@ func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admission
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	strErrs := dnsvalidation.IsDNS1123Subdomain(newObject.Spec.Zone)
 	if len(strErrs) != 0 {
@@ -195,10 +194,8 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 		}
 	}
 
-	if newObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["object.Name"] = newObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["object.Name"] = newObject.Name
 
 	oldObject := &hivev1.DNSZone{}
 	err = json.Unmarshal(admissionSpec.OldObject.Raw, oldObject)
@@ -213,10 +210,8 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 		}
 	}
 
-	if oldObject != nil {
-		// Add the new data to the contextLogger
-		contextLogger.Data["oldObject.Name"] = oldObject.Name
-	}
+	// Add the new data to the contextLogger
+	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
 	if oldObject.Spec.Zone != newObject.Spec.Zone {
 		message := "DNSZone.Spec.Zone is immutable"

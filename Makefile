@@ -3,6 +3,10 @@ SRC_DIRS = pkg contrib
 GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata)
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
+FIRST_GOPATH:=$(firstword $(subst :, ,$(shell go env GOPATH)))
+GOLANGCI_LINT_BIN=$(FIRST_GOPATH)/bin/golangci-lint
+GOLANGCI_LINT_VERSION=v1.17.1
+
 # To use docker build, specify BUILD_CMD="docker build"
 BUILD_CMD ?= imagebuilder
 
@@ -34,7 +38,8 @@ vendor:
 
 # Run tests
 .PHONY: test
-test: generate fmt vet crd
+test: generate fmt vet crd lint
+test: generate fmt vet crd rbac lint
 	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
 .PHONY: test-integration
@@ -203,11 +208,13 @@ $(GOPATH)/bin/mockgen:
 clean:
 	rm -rf $(BINDIR)
 
-$(GOPATH)/bin/golangci-lint:
-	GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.17.1
+$(GOLANGCI_LINT_BIN):
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh \
+		| sed -e '/install -d/d' \
+| sh -s -- -b $(FIRST_GOPATH)/bin $(GOLANGCI_LINT_VERSION)
 
 # Run golangci-lint against code
 # TODO replace verify (except verify-generated), vet, fmt targets with lint as it covers all of it
 .PHONY: lint
-lint: $(GOPATH)/bin/golangci-lint
-	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
+lint: $(GOLANGCI_LINT_BIN)
+	$(GOLANGCI_LINT_BIN) run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...

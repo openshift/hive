@@ -8,14 +8,20 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
 const (
@@ -30,6 +36,16 @@ var (
 		"pods",
 		"jobs.batch",
 	}
+
+	typesToWatch = []runtime.Object{
+		&hivev1.ClusterDeployment{},
+		&hivev1.SyncSet{},
+	}
+
+	typesToList = []runtime.Object{
+		&hivev1.ClusterDeploymentList{},
+		&hivev1.SyncSetList{},
+	}
 )
 
 // Add creates a new Backup Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
@@ -41,10 +57,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileBackup{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:       mgr.GetScheme(),
-		logger:       log.WithField("controller", controllerName),
-		checksumFunc: controllerutils.GetChecksumOfObjects,
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme: mgr.GetScheme(),
+		logger: log.WithField("controller", controllerName),
 	}
 }
 
@@ -57,12 +72,21 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	reconciler := r.(*ReconcileBackup)
-	err = reconciler.registerClusterDeploymentWatch(c)
-	if err != nil {
-		return err
-	}
+	return reconciler.registerHiveObjectWatches(c)
+}
 
-	return nil // If we got here, then no errors occurred.
+func (r *ReconcileBackup) registerHiveObjectWatches(c controller.Controller) error {
+	for _, t := range typesToWatch {
+		if err := c.Watch(&source.Kind{Type: t.DeepCopyObject()}, &handler.EnqueueRequestsFromMapFunc{
+			// Queue up the NS for this Hive Object
+			ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
+				return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: a.Meta.GetNamespace()}}}
+			}),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // This ensures that ReconcileBackup struct implements all functions that the reconcile.Reconciler interface requires.
@@ -73,12 +97,10 @@ type ReconcileBackup struct {
 	client.Client
 	scheme *runtime.Scheme
 
-	logger       log.FieldLogger
-	checksumFunc controllerutils.ChecksumOfObjectsFunc
+	logger log.FieldLogger
 }
 
 // Reconcile ensures that all Hive object changes have corresponding Velero backup objects.
-// ClusterDeployment.Spec.Config.Machines
 func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	rrLogger := addReconcileRequestLoggerFields(r.logger, request)
@@ -91,27 +113,27 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 		rrLogger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 
-	// Get all ClusterDeployments that have a different hash than the last backup hash.
-	changedCDs, err := r.getModifiedClusterDeploymentsInNamespace(request.Namespace)
+	// Get all Hive objects that have a different hash than the last backup hash.
+	modifiedHObjs, err := r.getModifiedHiveObjectsInNamespace(request.Namespace)
 	if err != nil {
 		rrLogger.WithError(err).Error("error finding changed cluster deployments in namespace")
 		return reconcile.Result{}, err
 	}
 
-	if len(changedCDs) == 0 {
+	if len(modifiedHObjs) == 0 {
 		rrLogger.Debug("Nothing changed, so nothing to back up. Don't create a Velero backup object.")
 		return reconcile.Result{}, nil
 	}
 
 	// There are changes that need to be backed up.
-	err = createVeleroBackupObject(r.Client, request.Namespace)
+	err = r.createVeleroBackupObject(request.Namespace)
 	if err != nil {
 		rrLogger.WithError(err).Error("error creating velero backup object")
 		return reconcile.Result{}, err
 	}
 
-	// If the above is successful, save this objects new checksum to the "lastBackupChecksum" annotation.
-	err = r.updateClusterDeploymentLastBackupChecksum(changedCDs)
+	// If the above is successful, save this object's new checksum to the "lastBackupChecksum" annotation.
+	err = r.updateHiveObjectsLastBackupChecksum(modifiedHObjs)
 	if err != nil {
 		rrLogger.WithError(err).Errorf("error updating %v annotation", controllerutils.LastBackupAnnotation)
 		// Not returning with an error because a backup object was created,
@@ -131,7 +153,7 @@ func addReconcileRequestLoggerFields(logger log.FieldLogger, request reconcile.R
 // createVeleroBackupObjectForNamespace creates a Velero Backup object for the namespace specified.
 // The Backup options are set specifically for Hive object backups.
 // DO NOT use this function call for any other type objects as it may not back them up correctly.
-func createVeleroBackupObject(client client.Client, namespace string) error {
+func (r *ReconcileBackup) createVeleroBackupObject(namespace string) error {
 	formatStr := "2006-01-02t15-04-05z"
 	timestamp := time.Now().UTC().Format(formatStr)
 
@@ -149,5 +171,70 @@ func createVeleroBackupObject(client client.Client, namespace string) error {
 		},
 	}
 
-	return client.Create(context.TODO(), backup)
+	return r.Create(context.TODO(), backup)
+}
+
+func (r *ReconcileBackup) getModifiedHiveObjectsInNamespace(namespace string) ([]*hiveObject, error) {
+	nsLogger := addNamespaceLoggerFields(r.logger, namespace)
+
+	filteredHiveObjects := []*hiveObject{}
+
+	objList, err := getRuntimeObjects(r, typesToList, namespace)
+	if err != nil {
+		nsLogger.WithError(err).Error("Failed to list hive objects in namespace.")
+		return nil, err
+	}
+
+	for _, nsObj := range objList {
+		hobj, err := newHiveObject(nsObj, r.logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if hobj.hasChanged() {
+			filteredHiveObjects = append(filteredHiveObjects, hobj)
+		}
+	}
+
+	return filteredHiveObjects, nil
+}
+
+func (r *ReconcileBackup) updateHiveObjectsLastBackupChecksum(hobjs []*hiveObject) error {
+	for _, hobj := range hobjs {
+		hobjLogger := hobj.addLoggerFields()
+
+		hobj.setChecksumAnnotation()
+		obj := hobj.object
+
+		err := r.Update(context.TODO(), obj)
+		if err != nil {
+			hobjLogger.WithError(err).Error("Failed update.")
+			return err // If we error at all, then we should just return. The NS will be requeued in the future.
+		}
+	}
+
+	return nil
+}
+
+func addNamespaceLoggerFields(logger log.FieldLogger, namespace string) log.FieldLogger {
+	return logger.WithField("namespace", namespace)
+}
+
+func getRuntimeObjects(kclient client.Client, typesToList []runtime.Object, namespace string) ([]runtime.Object, error) {
+	nsObjects := []runtime.Object{}
+
+	for _, t := range typesToList {
+		listObj := t.DeepCopyObject()
+		if err := kclient.List(context.TODO(), listObj, client.InNamespace(namespace)); err != nil {
+			return nil, err
+		}
+		list, err := meta.ExtractList(listObj)
+		if err != nil {
+			return nil, err
+		}
+
+		nsObjects = append(nsObjects, list...)
+	}
+
+	return nsObjects, nil
 }

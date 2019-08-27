@@ -6,12 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TesCheckSums(t *testing.T) {
+func TestCheckSums(t *testing.T) {
 	tests := []struct {
-		name       string
-		jsonStr1   string
-		jsonStr2   string
-		isMismatch bool
+		name     string
+		jsonStr1 string
+		jsonStr2 string
 	}{
 		{
 			name:     "check checksum 01",

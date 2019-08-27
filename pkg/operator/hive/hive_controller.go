@@ -269,7 +269,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		case err != nil:
 			cmLog.WithError(err).Errorf("cannot retrieve configmap")
 			return reconcile.Result{}, err
-		case err == nil:
+		default:
 			caHash := computeHash(aggregatorCAConfigMap.Data)
 			cmLog.WithField("hash", caHash).Debugf("computed hash for configmap")
 			if instance.Status.AggregatorClientCAHash != caHash {
@@ -287,10 +287,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
-	if err != nil {
-		hLog.WithError(err).Error("error serializing kubeconfig")
-		return reconcile.Result{}, err
-	}
 	h := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
 	err = r.deployHive(hLog, h, instance, recorder)
 	if err != nil {

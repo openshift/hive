@@ -68,7 +68,6 @@ func TestSyncSetReconcile(t *testing.T) {
 	tests := []struct {
 		name                   string
 		status                 hivev1.SyncSetInstanceStatus
-		ssi                    *hivev1.SyncSetInstance
 		syncSet                *hivev1.SyncSet
 		deletedSyncSet         *hivev1.SyncSet
 		selectorSyncSet        *hivev1.SelectorSyncSet

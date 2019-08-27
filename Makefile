@@ -39,7 +39,6 @@ vendor:
 # Run tests
 .PHONY: test
 test: generate fmt vet crd lint
-test: generate fmt vet crd rbac lint
 	go test ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
 
 .PHONY: test-integration

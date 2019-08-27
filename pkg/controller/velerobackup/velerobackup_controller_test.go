@@ -5,7 +5,6 @@ import (
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/openshift/hive/pkg/apis"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	"github.com/openshift/hive/pkg/test/generic"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
@@ -176,11 +175,10 @@ func TestGetChangedInNamespace(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name                 string
-		getHashOfObjectsFunc controllerutils.ChecksumOfObjectsFunc
-		existingObjects      []runtime.Object
-		expectedHiveObjects  []*hiveObject
-		expectedError        error
+		name                string
+		existingObjects     []runtime.Object
+		expectedHiveObjects []*hiveObject
+		expectedError       error
 	}{
 		{
 			name:                "No Hive objects",
@@ -334,7 +332,6 @@ func TestGetRuntimeObjects(t *testing.T) {
 	tests := []struct {
 		name            string
 		existingObjects []runtime.Object
-		expectedError   error
 		expectedObjects []runtime.Object
 	}{
 		{

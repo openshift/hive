@@ -165,6 +165,10 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err
 	}
 	kubeconfig, err := controllerutils.FixupKubeconfigSecretData(kubeconfigSecret.Data)
+	if err != nil {
+		logger.WithError(err).Error("cannot fixup kubeconfig for remote cluster")
+		return reconcile.Result{}, err
+	}
 	remoteClient, err := r.remoteClientBuilder(string(kubeconfig), controllerName)
 	if err != nil {
 		logger.WithError(err).Error("error building remote cluster client connection")

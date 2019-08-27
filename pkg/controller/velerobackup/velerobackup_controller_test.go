@@ -6,6 +6,7 @@ import (
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/openshift/hive/pkg/apis"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 	"github.com/openshift/hive/pkg/test/generic"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 	"github.com/stretchr/testify/assert"
@@ -97,6 +98,36 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "1 unchanged DNSZone",
+			request: reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: namespace,
+				},
+			},
+			existingObjects: []runtime.Object{
+				testdnszone.Build(unchangedDNSZoneBase()),
+			},
+			expectedResult: reconcile.Result{},
+			expectedObjects: []runtime.Object{
+				testdnszone.Build(unchangedDNSZoneBase()),
+			},
+		},
+		{
+			name: "1 changed DNSZone",
+			request: reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: namespace,
+				},
+			},
+			existingObjects: []runtime.Object{
+				testdnszone.Build(changedDNSZoneBase()),
+			},
+			expectedResult: reconcile.Result{},
+			expectedObjects: []runtime.Object{
+				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
+			},
+		},
+		{
 			name: "Multiple unchanged HiveObject",
 			request: reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -106,11 +137,13 @@ func TestReconcile(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
 				testsyncset.Build(unchangedSyncSetBase()),
+				testdnszone.Build(unchangedDNSZoneBase()),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
 				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
 				testsyncset.Build(unchangedSyncSetBase()),
+				testdnszone.Build(unchangedDNSZoneBase()),
 			},
 		},
 		{
@@ -123,11 +156,13 @@ func TestReconcile(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testclusterdeployment.Build(changedClusterDeploymentBase()),
 				testsyncset.Build(changedSyncSetBase()),
+				testdnszone.Build(changedDNSZoneBase()),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
 				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
 				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
+				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
 			},
 		},
 		{
@@ -142,6 +177,8 @@ func TestReconcile(t *testing.T) {
 				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
 				testsyncset.Build(changedSyncSetBase()),
 				testsyncset.Build(unchangedSyncSetBase()),
+				testdnszone.Build(changedDNSZoneBase()),
+				testdnszone.Build(unchangedDNSZoneBase()),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
@@ -149,6 +186,8 @@ func TestReconcile(t *testing.T) {
 				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
 				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
 				testsyncset.Build(unchangedSyncSetBase()),
+				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
+				testdnszone.Build(unchangedDNSZoneBase()),
 			},
 		},
 	}
@@ -191,6 +230,7 @@ func TestGetChangedInNamespace(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
 				testsyncset.Build(unchangedSyncSetBase()),
+				testdnszone.Build(unchangedDNSZoneBase()),
 			},
 			expectedHiveObjects: []*hiveObject{},
 			expectedError:       nil,
@@ -213,10 +253,13 @@ func TestGetChangedInNamespace(t *testing.T) {
 				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
 				testsyncset.Build(changedSyncSetBase()),
 				testsyncset.Build(unchangedSyncSetBase()),
+				testdnszone.Build(changedDNSZoneBase()),
+				testdnszone.Build(unchangedDNSZoneBase()),
 			},
 			expectedHiveObjects: []*hiveObject{
 				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
 				ro2ho(testsyncset.Build(changedSyncSetBase())),
+				ro2ho(testdnszone.Build(changedDNSZoneBase())),
 			},
 			expectedError: nil,
 		},
@@ -282,18 +325,34 @@ func TestUpdateHiveObjectsLastBackupChecksum(t *testing.T) {
 			expectedError: nil,
 		},
 		{
+			name: "1 changed DNSZone",
+			hiveObjects: []*hiveObject{
+				ro2ho(testdnszone.Build(changedDNSZoneBase())),
+			},
+			existingObjects: []runtime.Object{
+				testdnszone.Build(changedDNSZoneBase()),
+			},
+			expectedObjects: []runtime.Object{
+				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
+			},
+			expectedError: nil,
+		},
+		{
 			name: "Multiple changed HiveObjects",
 			hiveObjects: []*hiveObject{
 				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
 				ro2ho(testsyncset.Build(changedSyncSetBase())),
+				ro2ho(testdnszone.Build(changedDNSZoneBase())),
 			},
 			existingObjects: []runtime.Object{
 				testclusterdeployment.Build(changedClusterDeploymentBase()),
 				testsyncset.Build(changedSyncSetBase()),
+				testdnszone.Build(changedDNSZoneBase()),
 			},
 			expectedObjects: []runtime.Object{
 				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
 				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
+				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
 			},
 			expectedError: nil,
 		},

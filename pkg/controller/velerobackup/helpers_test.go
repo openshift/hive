@@ -6,6 +6,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 	"github.com/openshift/hive/pkg/test/generic"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
@@ -44,6 +45,21 @@ func defaultChecksumFunc(object runtime.Object) string {
 	}
 
 	return hobj.checksum
+}
+
+func unchangedDNSZoneBase() testdnszone.Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		dnsZone.Name = "somednszone-unchanged"
+		dnsZone.Namespace = namespace
+		generic.WithBackupChecksum(defaultChecksumFunc)(dnsZone)
+	}
+}
+
+func changedDNSZoneBase() testdnszone.Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		dnsZone.Name = "somednszone-changed"
+		dnsZone.Namespace = namespace
+	}
 }
 
 func unchangedSyncSetBase() testsyncset.Option {

@@ -1,4 +1,4 @@
-package syncset
+package dnszone
 
 import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -6,11 +6,11 @@ import (
 )
 
 // Option defines a function signature for any function that wants to be passed into Build
-type Option func(*hivev1.SyncSet)
+type Option func(*hivev1.DNSZone)
 
 // Build runs each of the functions passed in to generate a cluster deployment.
-func Build(opts ...Option) *hivev1.SyncSet {
-	retval := &hivev1.SyncSet{}
+func Build(opts ...Option) *hivev1.DNSZone {
+	retval := &hivev1.DNSZone{}
 	for _, o := range opts {
 		o(retval)
 	}
@@ -20,7 +20,7 @@ func Build(opts ...Option) *hivev1.SyncSet {
 
 // Generic allows common functions applicable to all objects to be used as Options to Build
 func Generic(opt generic.Option) Option {
-	return func(syncSet *hivev1.SyncSet) {
-		opt(syncSet)
+	return func(dnsZone *hivev1.DNSZone) {
+		opt(dnsZone)
 	}
 }

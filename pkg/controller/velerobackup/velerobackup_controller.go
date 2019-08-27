@@ -40,11 +40,13 @@ var (
 	typesToWatch = []runtime.Object{
 		&hivev1.ClusterDeployment{},
 		&hivev1.SyncSet{},
+		&hivev1.DNSZone{},
 	}
 
 	typesToList = []runtime.Object{
 		&hivev1.ClusterDeploymentList{},
 		&hivev1.SyncSetList{},
+		&hivev1.DNSZoneList{},
 	}
 )
 

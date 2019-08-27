@@ -309,7 +309,7 @@ func (r *ReconcileClusterProvision) transitionStage(
 	pLog log.FieldLogger,
 ) (reconcile.Result, error) {
 	pLog.Infof("transitioning to %s", stage)
-	conditionType := hivev1.ClusterProvisionConditionType("unknown")
+	var conditionType hivev1.ClusterProvisionConditionType
 	switch stage {
 	case hivev1.ClusterProvisionStageInitializing:
 		return reconcile.Result{}, errors.New("cannot transition to initializing")

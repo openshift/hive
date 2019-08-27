@@ -23,8 +23,7 @@ const (
 
 	defaultInstallerImagePullPolicy = corev1.PullAlways
 
-	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
-	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
+	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"

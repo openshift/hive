@@ -30,9 +30,6 @@ import (
 
 const (
 	testDeploymentName = "test-deployment-name"
-	testClusterName    = "test-cluster-name"
-	testClusterID      = "test-cluster-id"
-	testInfraID        = "test-infra-id"
 	testProvisionName  = "test-provision-name"
 	installJobName     = "test-provision-name-provision"
 	testNamespace      = "test-namespace"
@@ -315,17 +312,6 @@ func failedJob() jobOption {
 			},
 		)
 	}
-}
-
-func assertConditionStatus(t *testing.T, provision *hivev1.ClusterProvision, condType hivev1.ClusterProvisionConditionType, status corev1.ConditionStatus) {
-	found := false
-	for _, cond := range provision.Status.Conditions {
-		if cond.Type == condType {
-			found = true
-			assert.Equal(t, status, cond.Status, "condition found with unexpected status")
-		}
-	}
-	assert.True(t, found, "did not find expected condition type: %v", condType)
 }
 
 func getJob(c client.Client) *batchv1.Job {

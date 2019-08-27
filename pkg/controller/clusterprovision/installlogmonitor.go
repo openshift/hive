@@ -21,8 +21,6 @@ const (
 	logMissingMessage  = "Cluster install failed but installer log was not captured"
 	regexBadMessage    = "Cluster install failed but regex configmap to parse for known reasons could not be used"
 	unknownMessage     = "Cluster install failed but no known errors found in logs"
-	successReason      = "ClusterInstalled"
-	successMessage     = "Cluster install completed successfully"
 )
 
 // parseInstallLog parses install log to monitor for known issues.

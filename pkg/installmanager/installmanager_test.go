@@ -33,8 +33,6 @@ const (
 	testNamespace        = "test-namespace"
 	sshKeySecretName     = "ssh-key"
 	pullSecretSecretName = "pull-secret"
-	// testClusterID matches the json blob below:
-	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
 
 	installerBinary     = "openshift-install"
 	ocBinary            = "oc"
@@ -91,7 +89,6 @@ func TestInstallManager(t *testing.T) {
 		expectPasswordSecret          bool
 		expectProvisionMetadataUpdate bool
 		expectProvisionLogUpdate      bool
-		expectProvisionSecretUpdate   bool
 		expectError                   bool
 	}{
 		{
@@ -340,26 +337,6 @@ func testClusterProvision() *hivev1.ClusterProvision {
 func alwaysSucceedUninstall(string, string, string, log.FieldLogger) error {
 	log.Debugf("running always successful uninstall")
 	return nil
-}
-
-func testPreexistingSecret() *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testProvisionName + "-admin-kubeconfig",
-			Namespace: testNamespace,
-		},
-		Data: map[string][]byte{}, // empty test data
-	}
-}
-
-func testPreexistingConfigMap() *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testProvisionName + "-metadata",
-			Namespace: testNamespace,
-		},
-		Data: map[string]string{}, // empty test data
-	}
 }
 
 func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.Secret {

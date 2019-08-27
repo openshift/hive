@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -61,11 +60,8 @@ const (
 	dnsReadyReason     = "DNSReady"
 	dnsReadyAnnotation = "hive.openshift.io/dnsready"
 
-	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
-	jobHashAnnotation                     = "hive.openshift.io/jobhash"
-	firstTimeInstallAnnotation            = "hive.openshift.io/first-time-install"
-	deleteAfterAnnotation                 = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
-	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
+	deleteAfterAnnotation    = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
+	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
 )
 
 var (
@@ -988,26 +984,6 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 	return false, nil
 }
 
-// Deletes the job if it exists and its generation does not match the cluster deployment's
-// genetation. Updates the config map if it is outdated too
-func (r *ReconcileClusterDeployment) updateOutdatedConfigurations(cdGeneration int64, existingJob *batchv1.Job, cdLog log.FieldLogger) (bool, error) {
-	var err error
-	var didGenerationChange bool
-	if jobGeneration, ok := existingJob.Annotations[clusterDeploymentGenerationAnnotation]; ok {
-		convertedJobGeneration, _ := strconv.ParseInt(jobGeneration, 10, 64)
-		if convertedJobGeneration < cdGeneration {
-			didGenerationChange = true
-			cdLog.Info("deleting outdated install job due to cluster deployment generation change")
-			err = r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
-			if err != nil {
-				cdLog.WithError(err).Errorf("error deleting outdated install job")
-				return didGenerationChange, err
-			}
-		}
-	}
-	return didGenerationChange, err
-}
-
 func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.Secret, cdLog log.FieldLogger) error {
 	originalSecret := secret.DeepCopy()
 
@@ -1352,53 +1328,6 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 		Namespace: pod.Namespace,
 	}})
 	return retval
-}
-
-func (r *ReconcileClusterDeployment) calcInstallPodRestarts(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (int, error) {
-	installerPodLabels := map[string]string{constants.ClusterDeploymentNameLabel: cd.Name, constants.InstallJobLabel: "true"}
-	pods := &corev1.PodList{}
-	err := r.Client.List(context.Background(), pods, client.InNamespace(cd.Namespace), client.MatchingLabels(installerPodLabels))
-	if err != nil {
-		return 0, err
-	}
-
-	if len(pods.Items) > 1 {
-		log.Warnf("found %d install pods for cluster", len(pods.Items))
-	}
-
-	// Calculate restarts across all containers in the pod:
-	containerRestarts := 0
-	for _, pod := range pods.Items {
-		for _, cs := range pod.Status.ContainerStatuses {
-			containerRestarts += int(cs.RestartCount)
-		}
-	}
-	return containerRestarts, nil
-}
-
-func (r *ReconcileClusterDeployment) deleteJobOnHashChange(existingJob, generatedJob *batchv1.Job, cdLog log.FieldLogger) (bool, error) {
-	newJobNeeded := false
-	if _, ok := existingJob.Annotations[jobHashAnnotation]; !ok {
-		// this job predates tracking the job hash, so assume we need a new job
-		newJobNeeded = true
-	}
-
-	if existingJob.Annotations[jobHashAnnotation] != generatedJob.Annotations[jobHashAnnotation] {
-		// delete the job so we get a fresh one with the new job spec
-		newJobNeeded = true
-	}
-
-	if newJobNeeded {
-		// delete the existing job
-		cdLog.Info("deleting existing install job due to updated/missing hash detected")
-		err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
-		if err != nil {
-			cdLog.WithError(err).Errorf("error deleting outdated install job")
-			return newJobNeeded, err
-		}
-	}
-
-	return newJobNeeded, nil
 }
 
 // cleanupInstallLogPVC will immediately delete the PVC (should it exist) if the cluster was installed successfully, without retries.

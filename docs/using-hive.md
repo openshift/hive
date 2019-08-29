@@ -173,7 +173,7 @@ spec:
 You can now request clusters with clusterDeployment.spec.manageDNS=true and clusterDeployment.spec.baseDomain=mycluster.hive1.example.com. Hive will create the mycluster.hive1.example.com DNS zone, and the OpenShift installer will create DNS entries such as api.mycluser.hive1.example.com.
 
 
-## Day 2 Configuration Management
+## Configuration Management
 
 ### SyncSet
 

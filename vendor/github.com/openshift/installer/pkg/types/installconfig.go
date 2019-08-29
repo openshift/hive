@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/azure"
+	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
@@ -29,13 +30,14 @@ var (
 		aws.Name,
 		azure.Name,
 		gcp.Name,
+		openstack.Name,
 	}
 	// HiddenPlatformNames is a slice with all the
 	// hidden-but-supported platform names. This list isn't presented
 	// to the user in the interactive wizard.
 	HiddenPlatformNames = []string{
+		baremetal.Name,
 		none.Name,
-		openstack.Name,
 		vsphere.Name,
 	}
 )
@@ -46,6 +48,11 @@ type InstallConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
 	metav1.ObjectMeta `json:"metadata"`
+
+	// AdditionalTrustBundle is a PEM-encoded X.509 certificate bundle
+	// that will be added to the nodes' trusted certificate store.
+	// +optional
+	AdditionalTrustBundle string `json:"additionalTrustBundle,omitempty"`
 
 	// SSHKey is the public ssh key to provide access to instances.
 	// +optional
@@ -77,6 +84,9 @@ type InstallConfig struct {
 	// If unset, the cluster will not be configured to use a proxy.
 	// +optional
 	Proxy *Proxy `json:"proxy,omitempty"`
+
+	// ImageContentSources lists sources/repositories for the release-image content.
+	ImageContentSources []ImageContentSource `json:"imageContentSources,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
@@ -94,6 +104,10 @@ type Platform struct {
 	// Azure is the configuration used when installing on Azure.
 	// +optional
 	Azure *azure.Platform `json:"azure,omitempty"`
+
+	// BareMetal is the configuration used when installing on bare metal.
+	// +optional
+	BareMetal *baremetal.Platform `json:"baremetal,omitempty"`
 
 	// GCP is the configuration used when installing on Google Cloud Platform.
 	// +optional
@@ -127,6 +141,8 @@ func (p *Platform) Name() string {
 		return aws.Name
 	case p.Azure != nil:
 		return azure.Name
+	case p.BareMetal != nil:
+		return baremetal.Name
 	case p.GCP != nil:
 		return gcp.Name
 	case p.Libvirt != nil:
@@ -210,4 +226,14 @@ type Proxy struct {
 	// NoProxy is a comma-separated list of domains and CIDRs for which the proxy should not be used.
 	// +optional
 	NoProxy string `json:"noProxy,omitempty"`
+}
+
+// ImageContentSource defines a list of sources/repositories that can be used to pull content.
+type ImageContentSource struct {
+	// Source is the repository that users refer to, e.g. in image pull specifications.
+	Source string `json:"source"`
+
+	// Mirrors is one or more repositories that may also contain the same images.
+	// +optional
+	Mirrors []string `json:"mirrors,omitempty"`
 }

@@ -44,6 +44,9 @@ import (
 	"github.com/openshift/hive/pkg/install"
 )
 
+// controllerKind contains the schema.GroupVersionKind for this controller type.
+var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+
 const (
 	controllerName     = "clusterDeployment"
 	defaultRequeueTime = 10 * time.Second
@@ -143,16 +146,23 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+	logger := log.WithField("controller", controllerName)
 	return &ReconcileClusterDeployment{
 		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:                        mgr.GetScheme(),
-		logger:                        log.WithField("controller", controllerName),
+		logger:                        logger,
+		expectations:                  controllerutils.NewExpectations(logger),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
+	cdReconciler, ok := r.(*ReconcileClusterDeployment)
+	if !ok {
+		return errors.New("reconciler supplied is not a ReconcileClusterDeployment")
+	}
+
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		log.WithField("controller", controllerName).WithError(err).Error("Error getting new cluster deployment")
@@ -167,10 +177,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for provisions
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	}); err != nil {
+	if err := cdReconciler.watchClusterProvisions(c); err != nil {
 		return err
 	}
 
@@ -224,6 +231,9 @@ type ReconcileClusterDeployment struct {
 	scheme *runtime.Scheme
 	logger log.FieldLogger
 
+	// A TTLCache of clusterprovision creates/deletes each clusterdeployment expects to see
+	expectations controllerutils.ExpectationsInterface
+
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
 	// remote cluster's cluster-api
 	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
@@ -266,6 +276,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			cdLog.Info("cluster deployment Not Found")
+			r.expectations.DeleteExpectations(request.NamespacedName.String())
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -447,6 +458,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return r.resolveInstallerImage(cd, imageSet, releaseImage, cdLog)
 	}
 
+	if !r.expectations.SatisfiedExpectations(request.String()) {
+		cdLog.Debug("waiting for expectations to be satisfied")
+		return reconcile.Result{}, nil
+	}
+
 	if cd.Status.Provision == nil {
 		if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
 			cdLog.Debug("not creating new provision since the deployment is set to try install only once")
@@ -566,8 +582,11 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		cdLog.WithError(err).Error("could not set the owner ref on provision")
 		return reconcile.Result{}, err
 	}
+
+	r.expectations.ExpectCreations(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(), 1)
 	if err := r.Create(context.TODO(), provision); err != nil {
 		cdLog.WithError(err).Error("could not create provision")
+		r.expectations.CreationObserved(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String())
 		return reconcile.Result{}, err
 	}
 
@@ -1103,10 +1122,10 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 				return reconcile.Result{}, err
 			}
 			cdLog.Info("deleted outstanding provision")
-			return reconcile.Result{}, nil
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 		default:
 			cdLog.Debug("still waiting for outstanding provision to be removed")
-			return reconcile.Result{}, nil
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 		}
 	}
 

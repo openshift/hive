@@ -45,8 +45,6 @@ const (
 
 	hiveOperatorDeploymentName = "hive-operator"
 
-	// legacyDaemonsetName is the old daemonset we will clean up if present.
-	legacyDaemonsetName       = "hiveadmission"
 	managedConfigNamespace    = "openshift-config-managed"
 	aggregatorCAConfigMapName = "kube-apiserver-aggregator-client-ca"
 )
@@ -254,12 +252,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Namespace: constants.HiveNamespace,
 	})
 
-	err = r.deleteLegacyComponents(hLog)
-	if err != nil {
-		hLog.WithError(err).Error("error deleting legacy components")
-		return reconcile.Result{}, err
-	}
-
 	if r.syncAggregatorCA {
 		// We use the configmap lister and not the regular client which only watches resources in the hive namespace
 		aggregatorCAConfigMap, err := r.managedConfigCMLister.ConfigMaps(managedConfigNamespace).Get(aggregatorCAConfigMapName)
@@ -310,28 +302,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error {
-	// Ensure legacy hiveadmission Daemonset is deleted, we switched to a Deployment:
-	// TODO: this can be removed once rolled out to hive-stage and hive-prod.
-	ds := &appsv1.DaemonSet{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDaemonsetName, Namespace: constants.HiveNamespace}, ds)
-	if err != nil && !errors.IsNotFound(err) {
-		hLog.WithError(err).Error("error looking up legacy Daemonset")
-		return err
-	} else if err != nil {
-		hLog.WithField("Daemonset", legacyDaemonsetName).Debug("legacy Daemonset does not exist")
-	} else {
-		err = r.Delete(context.Background(), ds)
-		if err != nil {
-			hLog.WithError(err).WithField("Daemonset", legacyDaemonsetName).Error(
-				"error deleting legacy Daemonset")
-			return err
-		}
-		hLog.WithField("Daemonset", legacyDaemonsetName).Info("deleted legacy Daemonset")
-	}
-	return nil
 }
 
 type informerRunnable struct {

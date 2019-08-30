@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"regexp"
 	"sort"
 	"time"
 
@@ -122,10 +121,6 @@ var (
 			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
 		},
 	)
-
-	// regex to find/replace wildcard ingress entries
-	// case-insensitive leading literal '*' followed by a literal '.'
-	wildcardDomain = regexp.MustCompile(`(?i)^\*\.`)
 )
 
 func init() {
@@ -315,19 +310,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			Requeue:      true,
 			RequeueAfter: defaultRequeueTime,
 		}, nil
-	}
-
-	// We previously allowed clusterdeployment.spec.ingress[] entries to have ingress domains with a leading '*'.
-	// Migrate the clusterdeployment to the new format if we find a wildcard ingress domain.
-	// TODO: we can one day remove this once all clusterdeployment are known to have non-wildcard data
-	if migrateWildcardIngress(cd) {
-		cdLog.Info("migrating wildcard ingress entries")
-		err := r.Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Error("failed to update cluster deployment")
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{}, nil
 	}
 
 	// TODO: remove this once clusterdeployments have been migrated. We are no longer storing syncset status
@@ -1442,18 +1424,6 @@ func generatePullSecretObj(pullSecret string, pullSecretName string, cd *hivev1.
 			corev1.DockerConfigJsonKey: pullSecret,
 		},
 	}
-}
-
-func migrateWildcardIngress(cd *hivev1.ClusterDeployment) bool {
-	migrated := false
-	for i, ingress := range cd.Spec.Ingress {
-		newIngress := wildcardDomain.ReplaceAllString(ingress.Domain, "")
-		if newIngress != ingress.Domain {
-			cd.Spec.Ingress[i].Domain = newIngress
-			migrated = true
-		}
-	}
-	return migrated
 }
 
 func dnsReadyTransitionTime(dnsZone *hivev1.DNSZone) *time.Time {

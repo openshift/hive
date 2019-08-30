@@ -696,30 +696,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Migrate wildcard ingress domains",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeploymentWithIngress()
-					cd.Spec.Ingress[0].Domain = fmt.Sprintf("*.apps.%s.example.com", cd.Spec.ClusterName)
-					cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
-						Name:   "extraingress",
-						Domain: fmt.Sprintf("*.moreingress.%s.example.com", cd.Spec.ClusterName),
-					})
-					cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
-						Name:   "notwildcardingress",
-						Domain: fmt.Sprintf("notwild.%s.example.com", cd.Spec.ClusterName),
-					})
-					return cd
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				for _, ingress := range cd.Spec.Ingress {
-					assert.NotRegexp(t, `^\*.*`, ingress.Domain, "Ingress domain %s wasn't migrated from wildcards", ingress.Domain)
-				}
-			},
-		},
-		{
 			name: "Delete legacy install job",
 			existing: []runtime.Object{
 				testClusterDeployment(),
@@ -1410,18 +1386,6 @@ func testAvailableDNSZone() *hivev1.DNSZone {
 	return zone
 }
 
-func testClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
-	cd := testClusterDeployment()
-	cd.Spec.Ingress = []hivev1.ClusterIngress{
-		{
-			Name:   "default",
-			Domain: fmt.Sprintf("apps.%s.example.com", cd.Spec.ClusterName),
-		},
-	}
-
-	return cd
-}
-
 func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType hivev1.ClusterDeploymentConditionType, status corev1.ConditionStatus) {
 	found := false
 	for _, cond := range cd.Status.Conditions {
@@ -1431,70 +1395,6 @@ func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType 
 		}
 	}
 	assert.True(t, found, "did not find expected condition type: %v", condType)
-}
-
-func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-
-	tests := []struct {
-		name              string
-		existing          *hivev1.ClusterDeployment
-		migrationExpected bool
-		expectedDomains   []string // must be same length as the number of ingress entries for the test clusterDeployment
-	}{
-		{
-			name:              "No ingress, no migration",
-			existing:          testClusterDeployment(),
-			migrationExpected: false,
-		},
-		{
-			name:              "No wildcards, no migration",
-			existing:          testClusterDeploymentWithIngress(),
-			migrationExpected: false,
-			expectedDomains:   []string{fmt.Sprintf("apps.%s.example.com", testClusterName)},
-		},
-		{
-			name: "Migrate wildcard domain",
-			existing: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeploymentWithIngress()
-				cd.Spec.Ingress[0].Domain = fmt.Sprintf("*.apps.%s.example.com", cd.Spec.ClusterName)
-
-				return cd
-			}(),
-			migrationExpected: true,
-			expectedDomains:   []string{fmt.Sprintf("apps.%s.example.com", testClusterName)},
-		},
-		{
-			name: "Migrate when only one of two is wildcard",
-			existing: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeploymentWithIngress()
-				cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
-					Name:   "extraingress",
-					Domain: fmt.Sprintf("*.moreingress.%s.example.com", cd.Spec.ClusterName),
-				})
-
-				return cd
-			}(),
-			migrationExpected: true,
-			expectedDomains: []string{
-				fmt.Sprintf("apps.%s.example.com", testClusterName),
-				fmt.Sprintf("moreingress.%s.example.com", testClusterName),
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-
-			result := migrateWildcardIngress(test.existing)
-
-			assert.Equal(t, test.migrationExpected, result)
-
-			for i, domain := range test.expectedDomains {
-				assert.Equal(t, domain, test.existing.Spec.Ingress[i].Domain)
-			}
-		})
-	}
 }
 
 func getJob(c client.Client, name string) *batchv1.Job {

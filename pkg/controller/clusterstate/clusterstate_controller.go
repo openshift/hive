@@ -117,7 +117,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		logger.Debug("ClusterDeployment resource has been deleted")
 		return reconcile.Result{}, nil
 	}
-	if !cd.Status.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if !cd.Spec.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
 		logger.Debug("ClusterDeployment is not yet ready")
 		return reconcile.Result{}, nil
 	}

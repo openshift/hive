@@ -115,7 +115,7 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// If the cluster is not installed, do not reconcile.
-	if !cd.Status.Installed {
+	if !cd.Spec.Installed {
 		cdLog.Debug("cluster installation is not complete")
 		return reconcile.Result{}, nil
 	}

@@ -40,7 +40,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "Compute", "ControlPlaneConfig", "Ingress", "PreserveOnDelete"}
+	mutableFields = []string{"CertificateBundles", "Compute", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -354,6 +354,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
 				Message: message,
 			},
+		}
+	}
+
+	if oldObject.Spec.Installed && !newObject.Spec.Installed {
+		allErrs := field.ErrorList{}
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
+		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
+		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &status,
 		}
 	}
 

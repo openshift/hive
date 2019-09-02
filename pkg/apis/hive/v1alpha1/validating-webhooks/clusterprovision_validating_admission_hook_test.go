@@ -145,12 +145,8 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 			expectAllowed: true,
 		},
 		{
-			name: "complete stage",
-			provision: func() *hivev1.ClusterProvision {
-				p := testClusterProvision()
-				p.Spec.Stage = hivev1.ClusterProvisionStageComplete
-				return p
-			}(),
+			name:          "complete stage",
+			provision:     testCompletedClusterProvision(),
 			expectAllowed: true,
 		},
 		{
@@ -187,6 +183,67 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 				return p
 			}(),
 			expectAllowed: true,
+		},
+		{
+			name:          "valid pre-installed",
+			provision:     testPreInstalledClusterProvision(),
+			expectAllowed: true,
+		},
+		{
+			name: "attempt set for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.Attempt = 1
+				return p
+			}(),
+		},
+		{
+			name: "invalid stage for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.Stage = hivev1.ClusterProvisionStageInitializing
+				return p
+			}(),
+		},
+		{
+			name: "missing infra ID for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.InfraID = nil
+				return p
+			}(),
+		},
+		{
+			name: "missing admin kubeconfig for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.AdminKubeconfigSecret = nil
+				return p
+			}(),
+		},
+		{
+			name: "missing admin password for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.AdminPasswordSecret = nil
+				return p
+			}(),
+		},
+		{
+			name: "prev cluster ID set for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.PrevClusterID = pointer.StringPtr("test-cluster-id")
+				return p
+			}(),
+		},
+		{
+			name: "prev infra ID set for pre-installed",
+			provision: func() *hivev1.ClusterProvision {
+				p := testPreInstalledClusterProvision()
+				p.Spec.PrevInfraID = pointer.StringPtr("test-infra-id")
+				return p
+			}(),
 		},
 	}
 	for _, tc := range cases {
@@ -477,13 +534,13 @@ func Test_ClusterProvisionAdmission_Validate_Update_StageTransition(t *testing.T
 				func(t *testing.T) {
 					cut := &ClusterProvisionValidatingAdmissionHook{}
 					cut.Initialize(nil, nil)
-					oldProvision := testClusterProvision()
+					oldProvision := testCompletedClusterProvision()
 					oldProvision.Spec.Stage = oldStage
 					oldAsJSON, err := json.Marshal(oldProvision)
 					if !assert.NoError(t, err, "unexpected error marshalling old provision") {
 						return
 					}
-					newProvision := testClusterProvision()
+					newProvision := testCompletedClusterProvision()
 					newProvision.Spec.Stage = newStage
 					newAsJSON, err := json.Marshal(newProvision)
 					if !assert.NoError(t, err, "unexpected error marshalling new provision") {
@@ -531,7 +588,7 @@ func testClusterProvision() *hivev1.ClusterProvision {
 				},
 			},
 			Attempt:       0,
-			Stage:         hivev1.ClusterProvisionStageProvisioning,
+			Stage:         hivev1.ClusterProvisionStageInitializing,
 			PrevClusterID: pointer.StringPtr("test-prev-cluster-id"),
 			PrevInfraID:   pointer.StringPtr("test-prev-infra-id"),
 		},
@@ -550,4 +607,22 @@ func testCompletedClusterProvision() *hivev1.ClusterProvision {
 	provision.Spec.PrevClusterID = pointer.StringPtr("test-prev-cluster-id")
 	provision.Spec.PrevInfraID = pointer.StringPtr("test-prev-infra-id")
 	return provision
+}
+
+func testPreInstalledClusterProvision() *hivev1.ClusterProvision {
+	return &hivev1.ClusterProvision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-provision",
+		},
+		Spec: hivev1.ClusterProvisionSpec{
+			ClusterDeployment: corev1.LocalObjectReference{
+				Name: "test-deployment",
+			},
+			Stage:                 hivev1.ClusterProvisionStageComplete,
+			ClusterID:             pointer.StringPtr("test-prev-cluster-id"),
+			InfraID:               pointer.StringPtr("test-prev-infra-id"),
+			AdminKubeconfigSecret: &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"},
+			AdminPasswordSecret:   &corev1.LocalObjectReference{Name: "test-admin-password"},
+		},
+	}
 }

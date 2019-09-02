@@ -134,7 +134,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
-	if !cd.Status.Installed {
+	if !cd.Spec.Installed {
 		cdLog.Debug("cluster installation is not complete")
 		return reconcile.Result{}, nil
 	}

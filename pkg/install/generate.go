@@ -293,7 +293,7 @@ func GetUninstallJobName(name string) string {
 func GenerateUninstallerJobForClusterDeployment(cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
 
 	if cd.Spec.PreserveOnDelete {
-		if cd.Status.Installed {
+		if cd.Spec.Installed {
 			return nil, fmt.Errorf("no creation of uninstaller job, because of PreserveOnDelete")
 		}
 	}

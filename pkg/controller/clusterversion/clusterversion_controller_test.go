@@ -151,10 +151,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
+			Installed: true,
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			ClusterID: testClusterID,
-			Installed: true,
 			AdminKubeconfigSecret: corev1.LocalObjectReference{
 				Name: "kubeconfig-secret",
 			},

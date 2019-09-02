@@ -229,7 +229,7 @@ func (m *InstallManager) Run() error {
 	if err != nil {
 		m.log.WithError(err).Fatal("error looking up cluster deployment")
 	}
-	if cd.Status.Installed {
+	if cd.Spec.Installed {
 		// This should not be possible but just in-case we can somehow
 		// run the install job for a cluster already installed, exit early,
 		// and don't delete *anything*.

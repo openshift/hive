@@ -200,7 +200,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
-	if !cd.Status.Installed {
+	if !cd.Spec.Installed {
 		ssiLog.Debug("cluster installation is not complete")
 		return reconcile.Result{}, nil
 	}

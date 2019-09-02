@@ -162,7 +162,7 @@ func testClusterDeployment(name, clusterType string, created metav1.Time, instal
 			CreationTimestamp: created,
 			Labels:            map[string]string{hivev1.HiveClusterTypeLabel: clusterType},
 		},
-		Status: hivev1.ClusterDeploymentStatus{
+		Spec: hivev1.ClusterDeploymentSpec{
 			Installed: installed,
 		},
 	}

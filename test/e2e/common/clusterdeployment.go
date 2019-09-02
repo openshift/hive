@@ -36,7 +36,7 @@ func MustGetClusterDeployment() *hivev1.ClusterDeployment {
 
 func MustGetInstalledClusterDeployment() *hivev1.ClusterDeployment {
 	cd := MustGetClusterDeployment()
-	if !cd.Status.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if !cd.Spec.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
 		log.WithField("clusterdeployment", fmt.Sprintf("%s/%s", cd.Namespace, cd.Name)).Fatalf("cluster deployment is not installed")
 	}
 	return cd

@@ -1544,7 +1544,7 @@ spec:
   - JSONPath: .spec.baseDomain
     name: BaseDomain
     type: string
-  - JSONPath: .status.installed
+  - JSONPath: .spec.installed
     name: Installed
     type: boolean
   - JSONPath: .status.infraID
@@ -1912,6 +1912,9 @@ spec:
                 - domain
                 type: object
               type: array
+            installed:
+              description: Installed is true if the cluster has been installed
+              type: boolean
             manageDNS:
               description: ManageDNS specifies whether a DNSZone should be created
                 and managed automatically for this ClusterDeployment
@@ -2320,7 +2323,7 @@ spec:
               type: integer
             installed:
               description: Installed is true if the installer job has successfully
-                completed for this cluster.
+                completed for this cluster. Deprecated.
               type: boolean
             installedTimestamp:
               description: InstalledTimestamp is the time we first detected that the

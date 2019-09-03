@@ -7,6 +7,8 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
+	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -297,6 +299,14 @@ type ClusterDeploymentList struct {
 type Platform struct {
 	// AWS is the configuration used when installing on AWS.
 	AWS *aws.Platform `json:"aws,omitempty"`
+
+	// Azure is the configuration used when installing on Azure.
+	// +optional
+	Azure *azure.Platform `json:"azure,omitempty"`
+
+	// GCP is the configuration used when installing on Google Cloud Platform.
+	// +optional
+	GCP *gcp.Platform `json:"gcp,omitempty"`
 }
 
 // Networking defines the pod network provider in the cluster.

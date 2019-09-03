@@ -353,20 +353,6 @@ func (in *ClusterDeploymentStatus) DeepCopyInto(out *ClusterDeploymentStatus) {
 	out.AdminKubeconfigSecret = in.AdminKubeconfigSecret
 	out.AdminPasswordSecret = in.AdminPasswordSecret
 	in.ClusterVersionStatus.DeepCopyInto(&out.ClusterVersionStatus)
-	if in.SyncSetStatus != nil {
-		in, out := &in.SyncSetStatus, &out.SyncSetStatus
-		*out = make([]SyncSetObjectStatus, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-	if in.SelectorSyncSetStatus != nil {
-		in, out := &in.SelectorSyncSetStatus, &out.SelectorSyncSetStatus
-		*out = make([]SyncSetObjectStatus, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.InstallerImage != nil {
 		in, out := &in.InstallerImage, &out.InstallerImage
 		*out = new(string)

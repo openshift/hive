@@ -21,6 +21,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -137,7 +138,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				Name: pullSecretSecret,
 			},
 			Platform: hivev1.Platform{
-				AWS: &hivev1.AWSPlatform{
+				AWS: &hivev1aws.Platform{
 					Region: "us-east-1",
 				},
 			},
@@ -145,7 +146,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				Type: hivev1.NetworkTypeOpenshiftSDN,
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1.AWSPlatformSecrets{
+				AWS: &hivev1aws.PlatformSecrets{
 					Credentials: corev1.LocalObjectReference{
 						Name: "aws-credentials",
 					},

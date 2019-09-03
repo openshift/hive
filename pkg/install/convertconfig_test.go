@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 
 	"github.com/openshift/installer/pkg/ipnet"
 	installtypes "github.com/openshift/installer/pkg/types"
@@ -57,14 +58,14 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 				Name: "pull-secret",
 			},
 			Platform: hivev1.Platform{
-				AWS: &hivev1.AWSPlatform{
+				AWS: &hivev1aws.Platform{
 					Region: awsRegion,
 					UserTags: map[string]string{
 						"foo": "bar",
 					},
-					DefaultMachinePlatform: &hivev1.AWSMachinePoolPlatform{
+					DefaultMachinePlatform: &hivev1aws.MachinePoolPlatform{
 						InstanceType: awsInstanceType,
-						EC2RootVolume: hivev1.EC2RootVolume{
+						EC2RootVolume: hivev1aws.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
 							Type: ec2VolType,
@@ -87,9 +88,9 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 				Name:     "master",
 				Replicas: &replicas,
 				Platform: hivev1.MachinePoolPlatform{
-					AWS: &hivev1.AWSMachinePoolPlatform{
+					AWS: &hivev1aws.MachinePoolPlatform{
 						InstanceType: awsInstanceType,
-						EC2RootVolume: hivev1.EC2RootVolume{
+						EC2RootVolume: hivev1aws.EC2RootVolume{
 							IOPS: ec2VolIOPS,
 							Size: ec2VolSize,
 							Type: ec2VolType,
@@ -103,9 +104,9 @@ func buildValidClusterDeployment() *hivev1.ClusterDeployment {
 					Name:     "worker",
 					Replicas: &replicas,
 					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{
 							InstanceType: awsInstanceType,
-							EC2RootVolume: hivev1.EC2RootVolume{
+							EC2RootVolume: hivev1aws.EC2RootVolume{
 								IOPS: ec2VolIOPS,
 								Size: ec2VolSize,
 								Type: ec2VolType,
@@ -269,9 +270,9 @@ func TestConvert(t *testing.T) {
 					Name:     "extra",
 					Replicas: &replicas,
 					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{
 							InstanceType: awsInstanceType,
-							EC2RootVolume: hivev1.EC2RootVolume{
+							EC2RootVolume: hivev1aws.EC2RootVolume{
 								IOPS: ec2VolIOPS,
 								Size: ec2VolSize,
 								Type: ec2VolType,
@@ -294,9 +295,9 @@ func TestConvert(t *testing.T) {
 					Name:     "extra",
 					Replicas: &replicas,
 					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{
 							InstanceType: awsInstanceType,
-							EC2RootVolume: hivev1.EC2RootVolume{
+							EC2RootVolume: hivev1aws.EC2RootVolume{
 								IOPS: ec2VolIOPS,
 								Size: ec2VolSize,
 								Type: ec2VolType,

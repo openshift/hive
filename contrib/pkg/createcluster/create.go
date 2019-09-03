@@ -26,6 +26,7 @@ import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -533,12 +534,12 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 				},
 			},
 			Platform: hivev1.Platform{
-				AWS: &hivev1.AWSPlatform{
+				AWS: &hivev1aws.Platform{
 					Region: "us-east-1",
 				},
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1.AWSPlatformSecrets{
+				AWS: &hivev1aws.PlatformSecrets{
 					Credentials: corev1.LocalObjectReference{
 						Name: fmt.Sprintf("%s-aws-creds", o.Name),
 					},
@@ -548,9 +549,9 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 				Name:     "master",
 				Replicas: int64ptr(3),
 				Platform: hivev1.MachinePoolPlatform{
-					AWS: &hivev1.AWSMachinePoolPlatform{
+					AWS: &hivev1aws.MachinePoolPlatform{
 						InstanceType: "m4.large",
-						EC2RootVolume: hivev1.EC2RootVolume{
+						EC2RootVolume: hivev1aws.EC2RootVolume{
 							IOPS: 100,
 							Size: 22,
 							Type: "gp2",
@@ -563,9 +564,9 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 					Name:     "worker",
 					Replicas: int64ptr(o.WorkerNodes),
 					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1.AWSMachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{
 							InstanceType: "m4.large",
-							EC2RootVolume: hivev1.EC2RootVolume{
+							EC2RootVolume: hivev1aws.EC2RootVolume{
 								IOPS: 100,
 								Size: 22,
 								Type: "gp2",

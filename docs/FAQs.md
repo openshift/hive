@@ -1,13 +1,13 @@
-- [Frequently Asked Questions](#Frequently-Asked-Questions)
-  - [How does Hive relate to the OpenShift 4 installer (openshift-install)?](#How-does-Hive-relate-to-the-OpenShift-4-installer-openshift-install)
-  - [Why doesn't Hive use Federation v2 for configuration management?](#Why-doesnt-Hive-use-Federation-v2-for-configuration-management)
-  - [How does Hive relate to the sig-cluster-lifecycle Cluster API project?](#How-does-Hive-relate-to-the-sig-cluster-lifecycle-Cluster-API-project)
+- [Frequently Asked Questions](#frequently-asked-questions)
+  - [How does Hive relate to the OpenShift 4 installer (openshift-install)?](#how-does-hive-relate-to-the-openshift-4-installer-openshift-install)
+  - [Why doesn't Hive use Federation v2 for configuration management?](#why-doesnt-hive-use-federation-v2-for-configuration-management)
+  - [How does Hive relate to the sig-cluster-lifecycle Cluster API project?](#how-does-hive-relate-to-the-sig-cluster-lifecycle-cluster-api-project)
 
 # Frequently Asked Questions
 
 ## How does Hive relate to the OpenShift 4 installer (openshift-install)?
 
-Hive leverages the OpenShift 4 installer to perform actual cluster provisioning. We expose a similar API, but Hive has been built for managing a large number of clusters at scale, rather than just installing one. Hive offers a programatic API to control a number of day 2 configuration parameters, as well as a mechanism to manage arbitrary Kubernetes config in the resulting cluster.
+Hive leverages the OpenShift 4 installer to perform actual cluster provisioning. We expose a similar API, but Hive has been built for managing a large number of clusters at scale, rather than just installing one. Hive offers a programatic API to provision and perform some initial configuration required for anyone bringing up OpenShift clusters at scale.
 
 ## Why doesn't Hive use Federation v2 for configuration management?
 

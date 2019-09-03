@@ -8,6 +8,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	networkoperatorv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
+	gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -1597,6 +1599,16 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.AWS != nil {
 		in, out := &in.AWS, &out.AWS
 		*out = new(aws.Platform)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Azure != nil {
+		in, out := &in.Azure, &out.Azure
+		*out = new(azure.Platform)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.GCP != nil {
+		in, out := &in.GCP, &out.GCP
+		*out = new(gcp.Platform)
 		(*in).DeepCopyInto(*out)
 	}
 	return

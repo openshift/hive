@@ -226,7 +226,7 @@ type ReconcileClusterDeployment struct {
 	scheme *runtime.Scheme
 	logger log.FieldLogger
 
-	// A TTLCache of clusterprovision creates/deletes each clusterdeployment expects to see
+	// A TTLCache of clusterprovision creates each clusterdeployment expects to see
 	expectations controllerutils.ExpectationsInterface
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the

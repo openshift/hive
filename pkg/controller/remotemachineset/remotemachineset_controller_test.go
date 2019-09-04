@@ -311,6 +311,26 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				}
 			}(),
 		},
+		{
+			// Can't control what a user might do in their cluster.
+			name: "Nil ProviderSpec",
+			localExisting: []runtime.Object{
+				testClusterDeployment([]hivev1.MachinePool{
+					testMachinePool("worker", 3, []string{}),
+				}),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.ProviderSpec.Value = nil
+					return ms
+				}(),
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -343,11 +363,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				},
 			})
 
+			if test.expectErr {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				// Should not proceed with test validations if we expected an error from the reconcile.
+				return
+			}
 			if err != nil && !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
-			}
-			if err == nil && test.expectErr {
-				t.Errorf("expected error but got none")
+				return
 			}
 
 			if test.expectedRemoteMachineSets != nil {
@@ -373,23 +398,21 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 									t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 								}
 
-								rAWSProviderSpec, err := decodeAWSMachineProviderSpec(
+								rAWSProviderSpec, _ := decodeAWSMachineProviderSpec(
 									rMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
 								log.Debugf("remote AWS: %v", printAWSMachineProviderConfig(rAWSProviderSpec))
-								assert.NoError(t, err)
 								assert.NotNil(t, rAWSProviderSpec)
-								eAWSProviderSpec, err := decodeAWSMachineProviderSpec(
-									eMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
-								assert.NoError(t, err)
-								assert.NotNil(t, eAWSProviderSpec)
-								log.Debugf("%s", test.name)
-								log.Debugf("expected AWS: %v", printAWSMachineProviderConfig(eAWSProviderSpec))
 
-								assert.Equal(t, eAWSProviderSpec.AMI, rAWSProviderSpec.AMI)
+								eAWSProviderSpec, _ := decodeAWSMachineProviderSpec(
+									eMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
+								log.Debugf("expected AWS: %v", printAWSMachineProviderConfig(eAWSProviderSpec))
+								assert.NotNil(t, eAWSProviderSpec)
+								assert.Equal(t, eAWSProviderSpec.AMI, rAWSProviderSpec.AMI, "%s AMI does not match", eMS.Name)
+
 							}
 						}
 						if !found {
-							t.Errorf("did not find expeceted remote machineset: %v", eMS.Name)
+							t.Errorf("did not find expected remote machineset: %v", eMS.Name)
 						}
 					}
 					for _, rMS := range rMSL.Items {

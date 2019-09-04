@@ -12,7 +12,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	ini "gopkg.in/ini.v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -79,6 +78,9 @@ const (
 	deleteAfterAnnotation      = "hive.openshift.io/delete-after"
 	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	cloudAWS                   = "aws"
+	cloudAzure                 = "azure"
+	cloudGCP                   = "gcp"
 )
 
 // Options is the set of options to generate and apply a new cluster deployment
@@ -91,6 +93,7 @@ type Options struct {
 	BaseDomain               string
 	PullSecret               string
 	PullSecretFile           string
+	Cloud                    string
 	AWSCredsFile             string
 	ClusterImageSet          string
 	InstallerImage           string
@@ -107,6 +110,7 @@ type Options struct {
 	UninstallOnce            bool
 	SimulateBootstrapFailure bool
 	WorkerNodes              int64
+	cloudProvider            cloudProvider
 }
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
@@ -155,6 +159,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.AWSCredsFile, "aws-creds-file", defaultAWSCredsFile, "AWS credentials file")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
@@ -199,13 +204,28 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		log.Info("If specifying a serving certificate, specify a valid serving certificate key")
 		return fmt.Errorf("invalid serving cert")
 	}
+	if o.Cloud != cloudAWS && o.Cloud != cloudAzure && o.Cloud != cloudGCP {
+		log.Infof("Unsupported cloud: %s", o.Cloud)
+		return fmt.Errorf("Unsupported cloud: %s", o.Cloud)
+	}
 	return nil
+}
+
+type cloudProvider interface {
+	generateCredentialsSecret(o *Options) (*corev1.Secret, error)
 }
 
 // Run executes the command
 func (o *Options) Run() error {
 	if err := apis.AddToScheme(scheme.Scheme); err != nil {
 		return err
+	}
+
+	switch o.Cloud {
+	case "aws":
+		o.cloudProvider = &awsCloudProvider{}
+	case "azure":
+		o.cloudProvider = &azureCloudProvider{}
 	}
 
 	objs, err := o.GenerateObjects()
@@ -264,7 +284,7 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 
 // GenerateObjects generates resources for a new cluster deployment
 func (o *Options) GenerateObjects() ([]runtime.Object, error) {
-	awsCreds, err := o.generateAWSCredsSecret()
+	awsCreds, err := o.cloudProvider.generateCredentialsSecret(o)
 	if err != nil {
 		return nil, err
 	}
@@ -416,57 +436,6 @@ func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
 		StringData: map[string]string{
 			"ssh-publickey":  sshPublicKey,
 			"ssh-privatekey": sshPrivateKey,
-		},
-	}, nil
-}
-
-func (o *Options) getAWSCreds() (string, string, error) {
-	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
-	if len(secretAccessKey) > 0 && len(accessKeyID) > 0 {
-		return accessKeyID, secretAccessKey, nil
-	}
-	if len(o.AWSCredsFile) > 0 {
-		credFile, err := ini.Load(o.AWSCredsFile)
-		if err != nil {
-			log.Error("Cannot load AWS credentials")
-			return "", "", err
-		}
-		defaultSection, err := credFile.GetSection("default")
-		if err != nil {
-			log.Error("Cannot get default section from AWS credentials file")
-			return "", "", err
-		}
-		accessKeyIDValue := defaultSection.Key("aws_access_key_id")
-		secretAccessKeyValue := defaultSection.Key("aws_secret_access_key")
-		if accessKeyIDValue == nil || secretAccessKeyValue == nil {
-			log.Error("AWS credentials file missing keys in default section")
-		}
-		accessKeyID, secretAccessKey = accessKeyIDValue.String(), secretAccessKeyValue.String()
-		return accessKeyID, secretAccessKey, nil
-	}
-	log.Error("Could not find AWS credentials")
-	return "", "", fmt.Errorf("No AWS credentials")
-}
-
-func (o *Options) generateAWSCredsSecret() (*corev1.Secret, error) {
-	accessKeyID, secretAccessKey, err := o.getAWSCreds()
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-aws-creds", o.Name),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"aws_access_key_id":     accessKeyID,
-			"aws_secret_access_key": secretAccessKey,
 		},
 	}, nil
 }

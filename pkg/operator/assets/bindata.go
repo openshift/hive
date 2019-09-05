@@ -1640,15 +1640,15 @@ spec:
                               instance.
                             properties:
                               iops:
-                                description: IOPS defines the iops for the instance.
+                                description: IOPS defines the iops for the storage.
                                 format: int64
                                 type: integer
                               size:
-                                description: Size defines the size of the instance.
+                                description: Size defines the size of the storage.
                                 format: int64
                                 type: integer
                               type:
-                                description: Type defines the type of the instance.
+                                description: Type defines the type of the storage.
                                 type: string
                             type: object
                           type:
@@ -1661,48 +1661,6 @@ spec:
                             items:
                               type: string
                             type: array
-                        type: object
-                      libvirt:
-                        description: Libvirt is the configuration used when installing
-                          on libvirt.
-                        properties:
-                          image:
-                            description: Image is the URL to the OS image. E.g. "http://aos-ostree.rhev-ci-vms.eng.rdu2.redhat.com/rhcos/images/cloud/latest/rhcos-qemu.qcow2.gz"
-                            type: string
-                          imagePool:
-                            description: ImagePool is the name of the libvirt storage
-                              pool to which the storage volume containing the OS image
-                              belongs.
-                            type: string
-                          imageVolume:
-                            description: ImageVolume is the name of the libvirt storage
-                              volume containing the OS image.
-                            type: string
-                        type: object
-                      openstack:
-                        description: OpenStack is the configuration used when installing
-                          on OpenStack.
-                        properties:
-                          rootVolume:
-                            description: OpenStackRootVolume defines the storage for
-                              Nova instance.
-                            properties:
-                              iops:
-                                description: IOPS defines the iops for the instance.
-                                format: int64
-                                type: integer
-                              size:
-                                description: Size defines the size of the instance.
-                                format: int64
-                                type: integer
-                              type:
-                                description: Type defines the type of the instance.
-                                type: string
-                            type: object
-                          type:
-                            description: FlavorName defines the OpenStack Nova flavor.
-                              eg. m1.large
-                            type: string
                         type: object
                     type: object
                   replicas:
@@ -1743,15 +1701,15 @@ spec:
                           description: EC2RootVolume defines the storage for ec2 instance.
                           properties:
                             iops:
-                              description: IOPS defines the iops for the instance.
+                              description: IOPS defines the iops for the storage.
                               format: int64
                               type: integer
                             size:
-                              description: Size defines the size of the instance.
+                              description: Size defines the size of the storage.
                               format: int64
                               type: integer
                             type:
-                              description: Type defines the type of the instance.
+                              description: Type defines the type of the storage.
                               type: string
                           type: object
                         type:
@@ -1764,48 +1722,6 @@ spec:
                           items:
                             type: string
                           type: array
-                      type: object
-                    libvirt:
-                      description: Libvirt is the configuration used when installing
-                        on libvirt.
-                      properties:
-                        image:
-                          description: Image is the URL to the OS image. E.g. "http://aos-ostree.rhev-ci-vms.eng.rdu2.redhat.com/rhcos/images/cloud/latest/rhcos-qemu.qcow2.gz"
-                          type: string
-                        imagePool:
-                          description: ImagePool is the name of the libvirt storage
-                            pool to which the storage volume containing the OS image
-                            belongs.
-                          type: string
-                        imageVolume:
-                          description: ImageVolume is the name of the libvirt storage
-                            volume containing the OS image.
-                          type: string
-                      type: object
-                    openstack:
-                      description: OpenStack is the configuration used when installing
-                        on OpenStack.
-                      properties:
-                        rootVolume:
-                          description: OpenStackRootVolume defines the storage for
-                            Nova instance.
-                          properties:
-                            iops:
-                              description: IOPS defines the iops for the instance.
-                              format: int64
-                              type: integer
-                            size:
-                              description: Size defines the size of the instance.
-                              format: int64
-                              type: integer
-                            type:
-                              description: Type defines the type of the instance.
-                              type: string
-                          type: object
-                        type:
-                          description: FlavorName defines the OpenStack Nova flavor.
-                            eg. m1.large
-                          type: string
                       type: object
                   type: object
                 replicas:
@@ -1959,15 +1875,15 @@ spec:
                           description: EC2RootVolume defines the storage for ec2 instance.
                           properties:
                             iops:
-                              description: IOPS defines the iops for the instance.
+                              description: IOPS defines the iops for the storage.
                               format: int64
                               type: integer
                             size:
-                              description: Size defines the size of the instance.
+                              description: Size defines the size of the storage.
                               format: int64
                               type: integer
                             type:
-                              description: Type defines the type of the instance.
+                              description: Type defines the type of the storage.
                               type: string
                           type: object
                         type:
@@ -1988,54 +1904,6 @@ spec:
                     userTags:
                       description: UserTags specifies additional tags for AWS resources
                         created for the cluster.
-                      type: object
-                  type: object
-                libvirt:
-                  description: Libvirt is the configuration used when installing on
-                    libvirt.
-                  properties:
-                    URI:
-                      description: URI is the identifier for the libvirtd connection.  It
-                        must be reachable from both the host (where the installer
-                        is run) and the cluster (where the cluster-API controller
-                        pod will be running).
-                      type: string
-                    defaultMachinePlatform:
-                      description: DefaultMachinePlatform is the default configuration
-                        used when installing on AWS for machine pools which do not
-                        define their own platform configuration.
-                      properties:
-                        image:
-                          description: Image is the URL to the OS image. E.g. "http://aos-ostree.rhev-ci-vms.eng.rdu2.redhat.com/rhcos/images/cloud/latest/rhcos-qemu.qcow2.gz"
-                          type: string
-                        imagePool:
-                          description: ImagePool is the name of the libvirt storage
-                            pool to which the storage volume containing the OS image
-                            belongs.
-                          type: string
-                        imageVolume:
-                          description: ImageVolume is the name of the libvirt storage
-                            volume containing the OS image.
-                          type: string
-                      type: object
-                    masterIPs:
-                      description: MasterIPs
-                      items:
-                        format: byte
-                        type: string
-                      type: array
-                    network:
-                      description: Network
-                      properties:
-                        if:
-                          description: IfName is the name of the network interface.
-                          type: string
-                        ipRange:
-                          description: IPRange is the range of IPs to use.
-                          type: string
-                        name:
-                          description: Name is the name of the nework.
-                          type: string
                       type: object
                   type: object
               type: object

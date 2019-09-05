@@ -12,6 +12,7 @@ import (
 
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 )
 
 func TestManageMachineSets(t *testing.T) {
@@ -30,9 +31,9 @@ func TestManageMachineSets(t *testing.T) {
 		Name:     "infra",
 		Replicas: int64ptr(3),
 		Platform: hivev1.MachinePoolPlatform{
-			AWS: &hivev1.AWSMachinePoolPlatform{
+			AWS: &hivev1aws.MachinePoolPlatform{
 				InstanceType: "m4.large",
-				EC2RootVolume: hivev1.EC2RootVolume{
+				EC2RootVolume: hivev1aws.EC2RootVolume{
 					IOPS: 100,
 					Size: 22,
 					Type: "gp2",

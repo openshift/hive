@@ -54,6 +54,18 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
 	}
 
+	if r.hiveImagePullPolicy != "" {
+		hiveDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = r.hiveImagePullPolicy
+
+		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(
+			hiveDeployment.Spec.Template.Spec.Containers[0].Env,
+			corev1.EnvVar{
+				Name:  images.HiveImagePullPolicyEnvVar,
+				Value: string(r.hiveImagePullPolicy),
+			},
+		)
+	}
+
 	// By default we will try to gather logs on failed installs:
 	logsEnvVar := corev1.EnvVar{
 		Name:  constants.SkipGatherLogsEnvVar,

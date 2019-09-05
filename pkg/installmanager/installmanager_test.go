@@ -9,28 +9,30 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 
+	installertypes "github.com/openshift/installer/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/openshift/hive/pkg/apis"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
 const (
-	testClusterName      = "test-cluster"
+	testDeploymentName   = "test-deployment"
+	testProvisionName    = "test-provision"
 	testNamespace        = "test-namespace"
 	sshKeySecretName     = "ssh-key"
 	pullSecretSecretName = "pull-secret"
-	// testClusterID matches the json blob below:
-	testClusterID = "fe953108-f64c-4166-bb8e-20da7665ba00"
 
 	installerBinary     = "openshift-install"
 	ocBinary            = "oc"
@@ -73,57 +75,72 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func TestCalcSleepSeconds(t *testing.T) {
-	assert.Equal(t, 60, calcSleepSeconds(0))
-	assert.Equal(t, 120, calcSleepSeconds(1))
-	assert.Equal(t, 240, calcSleepSeconds(2))
-	assert.Equal(t, 480, calcSleepSeconds(3))
-	assert.Equal(t, 86400, calcSleepSeconds(5000493985937))
-}
-
 func TestInstallManager(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
-		name                     string
-		existing                 []runtime.Object
-		failedMetadataSave       bool
-		failedKubeconfigSave     bool
-		failedStatusUpdate       bool
-		failedAdminPasswordSave  bool
-		failedUploadInstallerLog bool
+		name                          string
+		existing                      []runtime.Object
+		failedMetadataRead            bool
+		failedKubeconfigSave          bool
+		failedAdminPasswordSave       bool
+		failedInstallerLogRead        bool
+		failedProvisionUpdate         *int32
+		expectKubeconfigSecret        bool
+		expectPasswordSecret          bool
+		expectProvisionMetadataUpdate bool
+		expectProvisionLogUpdate      bool
+		expectError                   bool
 	}{
 		{
-			name:     "successful install",
-			existing: []runtime.Object{testClusterDeployment()},
+			name:                          "successful install",
+			existing:                      []runtime.Object{testClusterDeployment(), testClusterProvision()},
+			expectKubeconfigSecret:        true,
+			expectPasswordSecret:          true,
+			expectProvisionMetadataUpdate: true,
+			expectProvisionLogUpdate:      true,
 		},
 		{
-			name:     "pre-existing secret and configmap",
-			existing: []runtime.Object{testClusterDeployment(), testPreexistingConfigMap(), testPreexistingSecret()},
+			name:               "failed metadata read",
+			existing:           []runtime.Object{testClusterDeployment(), testClusterProvision()},
+			failedMetadataRead: true,
+			expectError:        true,
 		},
 		{
-			name:               "failed metadata upload", // a non-fatal error
-			existing:           []runtime.Object{testClusterDeployment()},
-			failedMetadataSave: true,
+			name:                   "failed cluster provision metadata update",
+			existing:               []runtime.Object{testClusterDeployment(), testClusterProvision()},
+			failedProvisionUpdate:  pointer.Int32Ptr(0),
+			expectKubeconfigSecret: true,
+			expectPasswordSecret:   true,
+			expectError:            true,
 		},
 		{
-			name:               "failed cluster status update", // a non-fatal error
-			existing:           []runtime.Object{testClusterDeployment()},
-			failedStatusUpdate: true,
+			name:                          "failed cluster provision log update", // a non-fatal error
+			existing:                      []runtime.Object{testClusterDeployment(), testClusterProvision()},
+			failedProvisionUpdate:         pointer.Int32Ptr(1),
+			expectKubeconfigSecret:        true,
+			expectPasswordSecret:          true,
+			expectProvisionMetadataUpdate: true,
 		},
 		{
 			name:                 "failed admin kubeconfig save", // fatal error
-			existing:             []runtime.Object{testClusterDeployment()},
+			existing:             []runtime.Object{testClusterDeployment(), testClusterProvision()},
 			failedKubeconfigSave: true,
+			expectError:          true,
 		},
 		{
 			name:                    "failed admin username/password save", // fatal error
-			existing:                []runtime.Object{testClusterDeployment()},
+			existing:                []runtime.Object{testClusterDeployment(), testClusterProvision()},
 			failedAdminPasswordSave: true,
+			expectKubeconfigSecret:  true,
+			expectError:             true,
 		},
 		{
-			name:                     "failed saving of installer log", // non-fatal
-			existing:                 []runtime.Object{testClusterDeployment()},
-			failedUploadInstallerLog: true,
+			name:                          "failed saving of installer log", // non-fatal
+			existing:                      []runtime.Object{testClusterDeployment(), testClusterProvision()},
+			failedInstallerLogRead:        true,
+			expectKubeconfigSecret:        true,
+			expectPasswordSecret:          true,
+			expectProvisionMetadataUpdate: true,
 		},
 	}
 	for _, test := range tests {
@@ -144,13 +161,15 @@ func TestInstallManager(t *testing.T) {
 			fakeClient := fake.NewFakeClient(existing...)
 
 			im := InstallManager{
-				LogLevel:              "debug",
-				WorkDir:               tempDir,
-				ClusterDeploymentName: testClusterName,
-				Namespace:             testNamespace,
-				DynamicClient:         fakeClient,
+				LogLevel:             "debug",
+				WorkDir:              tempDir,
+				ClusterProvisionName: testProvisionName,
+				Namespace:            testNamespace,
+				DynamicClient:        fakeClient,
 			}
 			im.Complete([]string{})
+
+			im.waitForProvisioningStage = func(*hivev1.ClusterProvision, *InstallManager) error { return nil }
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
 				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
@@ -162,33 +181,39 @@ func TestInstallManager(t *testing.T) {
 				t.Fail()
 			}
 
-			if test.failedMetadataSave {
-				im.uploadClusterMetadata = func(*hivev1.ClusterDeployment, *InstallManager) error {
-					return fmt.Errorf("failed to save metadata")
-				}
-			}
-
-			if test.failedStatusUpdate {
-				im.updateClusterDeploymentStatus = func(*hivev1.ClusterDeployment, string, string, *InstallManager) error {
-					return fmt.Errorf("failed to update clusterdeployment status")
+			if test.failedMetadataRead {
+				im.readClusterMetadata = func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
+					return nil, nil, fmt.Errorf("failed to save metadata")
 				}
 			}
 
 			if test.failedKubeconfigSave {
-				im.uploadAdminKubeconfig = func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error) {
+				im.uploadAdminKubeconfig = func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error) {
 					return nil, fmt.Errorf("failed to save admin kubeconfig")
 				}
 			}
 
 			if test.failedAdminPasswordSave {
-				im.uploadAdminPassword = func(*hivev1.ClusterDeployment, *InstallManager) (*corev1.Secret, error) {
+				im.uploadAdminPassword = func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error) {
 					return nil, fmt.Errorf("failed to save admin password")
 				}
 			}
 
-			if test.failedUploadInstallerLog {
-				im.uploadInstallerLog = func(*hivev1.ClusterDeployment, *InstallManager, error) error {
-					return fmt.Errorf("faiiled to save install log")
+			if test.failedInstallerLogRead {
+				im.readInstallerLog = func(*hivev1.ClusterProvision, *InstallManager) (string, error) {
+					return "", fmt.Errorf("faiiled to save install log")
+				}
+			}
+
+			if test.failedProvisionUpdate != nil {
+				calls := int32(0)
+				im.updateClusterProvision = func(provision *hivev1.ClusterProvision, im *InstallManager, mutation provisionMutation) error {
+					callNumber := calls
+					calls = calls + 1
+					if callNumber == *test.failedProvisionUpdate {
+						return fmt.Errorf("failed to update provision")
+					}
+					return updateClusterProvisionWithRetries(provision, im, mutation)
 				}
 			}
 
@@ -197,117 +222,84 @@ func TestInstallManager(t *testing.T) {
 
 			err = im.Run()
 
-			if test.failedMetadataSave || test.failedKubeconfigSave || test.failedAdminPasswordSave {
+			if test.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
 
-			if !test.failedMetadataSave {
-				// Ensure we uploaded cluster metadata:
-				metadata := &corev1.ConfigMap{}
-				err = fakeClient.Get(context.Background(),
-					types.NamespacedName{
-						Namespace: testNamespace,
-						Name:      fmt.Sprintf("%s-metadata", testClusterName),
-					},
-					metadata)
-				if !assert.NoError(t, err) {
-					t.Fail()
-				}
-				_, ok := metadata.Data["metadata.json"]
-				assert.True(t, ok)
-
-				// Ensure we set the cluster ID:
-				cd := &hivev1.ClusterDeployment{}
-				err = fakeClient.Get(context.Background(),
-					types.NamespacedName{
-						Namespace: testNamespace,
-						Name:      testClusterName,
-					},
-					cd)
-				if !assert.NoError(t, err) {
-					t.Fail()
-				}
-				assert.Equal(t, testClusterID, cd.Status.ClusterID)
-			}
-
-			if !test.failedMetadataSave && !test.failedKubeconfigSave && !test.failedAdminPasswordSave {
-				// Ensure we uploaded admin kubeconfig secret:
-				adminKubeconfig := &corev1.Secret{}
-				err = fakeClient.Get(context.Background(),
-					types.NamespacedName{
-						Namespace: testNamespace,
-						Name:      fmt.Sprintf("%s-admin-kubeconfig", testClusterName),
-					},
-					adminKubeconfig)
-				if !assert.NoError(t, err) {
-					t.Fail()
-				}
-				_, ok := adminKubeconfig.Data["kubeconfig"]
-				assert.True(t, ok)
-
-				if !test.failedStatusUpdate {
-					// Ensure we set a status reference to the admin kubeconfig secret:
-					cd := &hivev1.ClusterDeployment{}
-					err = fakeClient.Get(context.Background(),
-						types.NamespacedName{
-							Namespace: testNamespace,
-							Name:      testClusterName,
-						},
-						cd)
-					if !assert.NoError(t, err) {
-						t.Fail()
+			adminKubeconfig := &corev1.Secret{}
+			err = fakeClient.Get(context.Background(),
+				types.NamespacedName{
+					Namespace: testNamespace,
+					Name:      fmt.Sprintf("%s-admin-kubeconfig", testProvisionName),
+				},
+				adminKubeconfig)
+			if test.expectKubeconfigSecret {
+				if assert.NoError(t, err) {
+					kubeconfig, ok := adminKubeconfig.Data["kubeconfig"]
+					if assert.True(t, ok) {
+						assert.Equal(t, []byte("fakekubeconfig\n"), kubeconfig, "unexpected kubeconfig")
 					}
-					assert.Equal(t, adminKubeconfig.Name, cd.Status.AdminKubeconfigSecret.Name)
 				}
+			} else {
+				assert.True(t, apierrors.IsNotFound(err), "unexpected response from getting kubeconfig secret: %v", err)
 			}
 
-			// We don't get to this point if we failed a kubeconfig save:
-			if !test.failedMetadataSave && !test.failedAdminPasswordSave && !test.failedKubeconfigSave {
-				// Ensure we uploaded admin password secret:
-				adminPassword := &corev1.Secret{}
-				err = fakeClient.Get(context.Background(),
-					types.NamespacedName{
-						Namespace: testNamespace,
-						Name:      fmt.Sprintf("%s-admin-password", testClusterName),
-					},
-					adminPassword)
-				if !assert.NoError(t, err) {
-					t.Fail()
-				}
-
-				assert.Equal(t, "kubeadmin", string(adminPassword.Data["username"]))
-				assert.Equal(t, "fakepassword", string(adminPassword.Data["password"]))
-
-				if !test.failedStatusUpdate {
-					// Ensure we set a status reference to the admin password secret:
-					cd := &hivev1.ClusterDeployment{}
-					err = fakeClient.Get(context.Background(),
-						types.NamespacedName{
-							Namespace: testNamespace,
-							Name:      testClusterName,
-						},
-						cd)
-					if !assert.NoError(t, err) {
-						t.Fail()
+			adminPassword := &corev1.Secret{}
+			err = fakeClient.Get(context.Background(),
+				types.NamespacedName{
+					Namespace: testNamespace,
+					Name:      fmt.Sprintf("%s-admin-password", testProvisionName),
+				},
+				adminPassword)
+			if test.expectPasswordSecret {
+				if assert.NoError(t, err) {
+					username, ok := adminPassword.Data["username"]
+					if assert.True(t, ok) {
+						assert.Equal(t, []byte("kubeadmin"), username, "unexpected admin username")
 					}
-					assert.Equal(t, adminPassword.Name, cd.Status.AdminPasswordSecret.Name)
+					password, ok := adminPassword.Data["password"]
+					if assert.True(t, ok) {
+						assert.Equal(t, []byte("fakepassword"), password, "unexpected admin password")
+					}
 				}
+			} else {
+				assert.True(t, apierrors.IsNotFound(err), "unexpected response from getting password secret: %v", err)
 			}
 
-			// Install log saving checks
-			cm := &corev1.ConfigMap{}
-			installLogConfigMapKey := types.NamespacedName{Namespace: testNamespace, Name: fmt.Sprintf("%s-install-log", testClusterName)}
-			cmErr := fakeClient.Get(context.Background(), installLogConfigMapKey, cm)
-			if !test.failedUploadInstallerLog && !test.failedMetadataSave {
-				// Ensure we saved the install output to a configmap
-				assert.NoError(t, cmErr, "unexpected error fetching install log configmap")
-				assert.Contains(t, cm.Data["log"], "some fake installer log", "did not find expected log contents in configmap")
-			} else if test.failedUploadInstallerLog {
-				assert.Error(t, cmErr, "expected error when fetching non-existent configmap")
+			provision := &hivev1.ClusterProvision{}
+			if err := fakeClient.Get(context.Background(),
+				types.NamespacedName{
+					Namespace: testNamespace,
+					Name:      testProvisionName,
+				},
+				provision,
+			); !assert.NoError(t, err) {
+				t.Fail()
 			}
 
+			if test.expectProvisionMetadataUpdate {
+				assert.NotNil(t, provision.Spec.Metadata, "expected metadata to be set")
+				if assert.NotNil(t, provision.Spec.AdminKubeconfigSecret, "expected kubeconfig secret reference to be set") {
+					assert.Equal(t, "test-provision-admin-kubeconfig", provision.Spec.AdminKubeconfigSecret.Name, "unexpected name for kubeconfig secret reference")
+				}
+				if assert.NotNil(t, provision.Spec.AdminPasswordSecret, "expected password secret reference to be set") {
+					assert.Equal(t, "test-provision-admin-password", provision.Spec.AdminPasswordSecret.Name, "unexpected name for password secret reference")
+				}
+			} else {
+				assert.Nil(t, provision.Spec.Metadata, "expected metadata to be empty")
+				assert.Nil(t, provision.Spec.AdminKubeconfigSecret, "expected kubeconfig secret reference to be empty")
+				assert.Nil(t, provision.Spec.AdminPasswordSecret, "expected password secret reference to be empty")
+			}
+
+			if test.expectProvisionLogUpdate {
+				if assert.NotNil(t, provision.Spec.InstallLog, "expected install log to be set") {
+					assert.Equal(t, "some fake installer log output\n", *provision.Spec.InstallLog, "did not find expected contents in saved installer log")
+				}
+			} else {
+				assert.Nil(t, provision.Spec.InstallLog, "expected install log to be empty")
+			}
 		})
 	}
 }
@@ -321,33 +313,23 @@ func writeFakeBinary(fileName string, contents string) error {
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        testClusterName,
-			Namespace:   testNamespace,
-			Finalizers:  []string{hivev1.FinalizerDeprovision},
-			UID:         types.UID("1234"),
-			Annotations: map[string]string{},
+			Name:      testDeploymentName,
+			Namespace: testNamespace,
 		},
-		Spec: hivev1.ClusterDeploymentSpec{
-			SSHKey: &corev1.LocalObjectReference{
-				Name: "ssh-key",
+	}
+}
+
+func testClusterProvision() *hivev1.ClusterProvision {
+	return &hivev1.ClusterProvision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testProvisionName,
+			Namespace: testNamespace,
+		},
+		Spec: hivev1.ClusterProvisionSpec{
+			ClusterDeployment: corev1.LocalObjectReference{
+				Name: testDeploymentName,
 			},
-			ControlPlane: hivev1.MachinePool{},
-			Compute:      []hivev1.MachinePool{},
-			PullSecret: &corev1.LocalObjectReference{
-				Name: "pull-secret",
-			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1.AWSPlatform{
-					Region: "us-east-1",
-				},
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1.AWSPlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
-						Name: "aws-credentials",
-					},
-				},
-			},
+			Stage: hivev1.ClusterProvisionStageProvisioning,
 		},
 	}
 }
@@ -355,26 +337,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 func alwaysSucceedUninstall(string, string, string, log.FieldLogger) error {
 	log.Debugf("running always successful uninstall")
 	return nil
-}
-
-func testPreexistingSecret() *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testClusterName + "-admin-kubeconfig",
-			Namespace: testNamespace,
-		},
-		Data: map[string][]byte{}, // empty test data
-	}
-}
-
-func testPreexistingConfigMap() *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testClusterName + "-metadata",
-			Namespace: testNamespace,
-		},
-		Data: map[string]string{}, // empty test data
-	}
 }
 
 func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.Secret {

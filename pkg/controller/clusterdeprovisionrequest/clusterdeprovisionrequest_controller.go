@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	"github.com/openshift/hive/pkg/controller/images"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -137,9 +136,8 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 	}
 
 	// Generate an uninstall job
-	hiveImage := images.GetHiveImage(rLog)
 	rLog.Debug("generating uninstall job")
-	uninstallJob, err := install.GenerateUninstallerJobForDeprovisionRequest(instance, hiveImage)
+	uninstallJob, err := install.GenerateUninstallerJobForDeprovisionRequest(instance)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

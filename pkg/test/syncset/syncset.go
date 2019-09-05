@@ -5,7 +5,7 @@ import (
 	"github.com/openshift/hive/pkg/test/generic"
 )
 
-// Option defines a function signature for any function that wants to be passed into BuildSyncSet
+// Option defines a function signature for any function that wants to be passed into Build
 type Option func(*hivev1.SyncSet)
 
 // Build runs each of the functions passed in to generate a cluster deployment.

@@ -45,8 +45,6 @@ const (
 
 	hiveOperatorDeploymentName = "hive-operator"
 
-	// legacyDaemonsetName is the old daemonset we will clean up if present.
-	legacyDaemonsetName       = "hiveadmission"
 	managedConfigNamespace    = "openshift-config-managed"
 	aggregatorCAConfigMapName = "kube-apiserver-aggregator-client-ca"
 )
@@ -183,8 +181,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		operatorDeployment)
 	if err == nil {
 		img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
-		log.Debugf("loaded hive image from hive-operator deployment: %s", img)
+		pullPolicy := operatorDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy
+		log.Debugf("loaded hive image from hive-operator deployment: %s (%s)", img, pullPolicy)
 		r.(*ReconcileHiveConfig).hiveImage = img
+		r.(*ReconcileHiveConfig).hiveImagePullPolicy = pullPolicy
 	} else {
 		log.WithError(err).Warn("unable to lookup hive image from hive-operator Deployment, image overriding disabled")
 	}
@@ -211,6 +211,7 @@ type ReconcileHiveConfig struct {
 	dynamicClient         dynamic.Interface
 	restConfig            *rest.Config
 	hiveImage             string
+	hiveImagePullPolicy   corev1.PullPolicy
 	syncAggregatorCA      bool
 	managedConfigCMLister corev1listers.ConfigMapLister
 }
@@ -250,12 +251,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		Name:      request.Name,
 		Namespace: constants.HiveNamespace,
 	})
-
-	err = r.deleteLegacyComponents(hLog)
-	if err != nil {
-		hLog.WithError(err).Error("error deleting legacy components")
-		return reconcile.Result{}, err
-	}
 
 	if r.syncAggregatorCA {
 		// We use the configmap lister and not the regular client which only watches resources in the hive namespace
@@ -307,28 +302,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileHiveConfig) deleteLegacyComponents(hLog log.FieldLogger) error {
-	// Ensure legacy hiveadmission Daemonset is deleted, we switched to a Deployment:
-	// TODO: this can be removed once rolled out to hive-stage and hive-prod.
-	ds := &appsv1.DaemonSet{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: legacyDaemonsetName, Namespace: constants.HiveNamespace}, ds)
-	if err != nil && !errors.IsNotFound(err) {
-		hLog.WithError(err).Error("error looking up legacy Daemonset")
-		return err
-	} else if err != nil {
-		hLog.WithField("Daemonset", legacyDaemonsetName).Debug("legacy Daemonset does not exist")
-	} else {
-		err = r.Delete(context.Background(), ds)
-		if err != nil {
-			hLog.WithError(err).WithField("Daemonset", legacyDaemonsetName).Error(
-				"error deleting legacy Daemonset")
-			return err
-		}
-		hLog.WithField("Daemonset", legacyDaemonsetName).Info("deleted legacy Daemonset")
-	}
-	return nil
 }
 
 type informerRunnable struct {

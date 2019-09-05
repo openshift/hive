@@ -8,6 +8,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -38,6 +39,14 @@ func TestNewHiveObject(t *testing.T) {
 			expectedHiveObject: &hiveObject{
 				object:   testsyncset.Build(unchangedSyncSetBase()),
 				checksum: testsyncset.Build(unchangedSyncSetBase()).Annotations[controllerutils.LastBackupAnnotation],
+			},
+		},
+		{
+			name:   "Only Valid DNSZone",
+			object: testdnszone.Build(unchangedDNSZoneBase()),
+			expectedHiveObject: &hiveObject{
+				object:   testdnszone.Build(unchangedDNSZoneBase()),
+				checksum: testdnszone.Build(unchangedDNSZoneBase()).Annotations[controllerutils.LastBackupAnnotation],
 			},
 		},
 		{
@@ -92,6 +101,16 @@ func TestHasChanged(t *testing.T) {
 		{
 			name:            "Changed SyncSet",
 			hiveObject:      ro2ho(testsyncset.Build(changedSyncSetBase())),
+			expectedChanged: true,
+		},
+		{
+			name:            "Unchanged DNSZone",
+			hiveObject:      ro2ho(testdnszone.Build(unchangedDNSZoneBase())),
+			expectedChanged: false,
+		},
+		{
+			name:            "Changed DNSZone",
+			hiveObject:      ro2ho(testdnszone.Build(changedDNSZoneBase())),
 			expectedChanged: true,
 		},
 	}

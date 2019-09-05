@@ -83,7 +83,6 @@ spec:
   imageSet:
     name: openshift-v4.1.0-rc.8
   images:
-    hiveImagePullPolicy: Always
     installerImagePullPolicy: Always
   networking:
     clusterNetworks:
@@ -138,7 +137,7 @@ In the event of installation failures, please see [Troubleshooting](./troublesho
 Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:
 
 ```bash
-oc get secret ${CLUSTER_NAME}-admin-kubeconfig -o jsonpath='{ .data.kubeconfig }' | base64 -d > ${CLUSTER_NAME}.kubeconfig
+oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminKubeconfigSecret.name }'` -o jsonpath='{ .data.kubeconfig }' | base64 --decode > ${CLUSTER_NAME}.kubeconfig
 export KUBECONFIG=${CLUSTER_NAME}.kubeconfig
 oc get nodes
 ```
@@ -152,7 +151,7 @@ oc get nodes
 
 * Retrive the password for `kubeadmin` user
   ```
-  $ oc get secret ${CLUSTER_NAME}-admin-password -o jsonpath='{ .data.password }' | base64 -d
+  $ oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminPasswordSecret.name }'` -o jsonpath='{ .data.password }' | base64 --decode
   ```
 
 ## DNS Management
@@ -174,7 +173,7 @@ spec:
 You can now request clusters with clusterDeployment.spec.manageDNS=true and clusterDeployment.spec.baseDomain=mycluster.hive1.example.com. Hive will create the mycluster.hive1.example.com DNS zone, and the OpenShift installer will create DNS entries such as api.mycluser.hive1.example.com.
 
 
-## Day 2 Configuration Management
+## Configuration Management
 
 ### SyncSet
 

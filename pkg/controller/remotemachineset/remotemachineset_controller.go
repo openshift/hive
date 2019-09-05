@@ -195,8 +195,8 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 	for _, ms := range remoteMachineSets.Items {
 		awsProviderSpec, err := decodeAWSMachineProviderSpec(ms.Spec.Template.Spec.ProviderSpec.Value, r.scheme)
 		if err != nil {
-			cdLog.WithError(err).Error("error decoding AWSMachineProviderConfig")
-			return err
+			cdLog.WithError(err).Warn("error decoding AWSMachineProviderConfig, skipping MachineSet for AMI check")
+			continue
 		}
 		if awsProviderSpec.AMI.ID == nil {
 			// Really weird, but keep looking...
@@ -493,6 +493,9 @@ func fetchAvailabilityZones(client awsclient.Client, region string) ([]string, e
 func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*awsprovider.AWSMachineProviderConfig, error) {
 	codecFactory := serializer.NewCodecFactory(scheme)
 	decoder := codecFactory.UniversalDecoder(awsprovider.SchemeGroupVersion)
+	if rawExt == nil {
+		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+	}
 	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode AWS ProviderConfig: %v", err)

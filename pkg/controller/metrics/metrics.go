@@ -18,6 +18,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -276,7 +277,7 @@ func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal 
 	failed := map[string]int{}
 	succeeded := map[string]int{}
 	for _, job := range jobs {
-		clusterType := GetClusterDeploymentTypeForJob(job)
+		clusterType := GetClusterDeploymentType(&job)
 
 		// Sort the jobs:
 		if job.Status.Failed > 0 {
@@ -490,26 +491,9 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 
 // GetClusterDeploymentType returns the value of the hive.openshift.io/cluster-type label if set,
 // otherwise a default value.
-func GetClusterDeploymentType(cd *hivev1.ClusterDeployment) string {
-	if cd.Labels == nil {
-		return hivev1.DefaultClusterType
+func GetClusterDeploymentType(obj metav1.Object) string {
+	if typeStr, ok := obj.GetLabels()[hivev1.HiveClusterTypeLabel]; ok {
+		return typeStr
 	}
-	typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
-	if !ok {
-		return hivev1.DefaultClusterType
-	}
-	return typeStr
-}
-
-// GetClusterDeploymentTypeForJob returns the value of the hive.openshift.io/cluster-type label if set,
-// otherwise a default value.
-func GetClusterDeploymentTypeForJob(job batchv1.Job) string {
-	if job.Labels == nil {
-		return hivev1.DefaultClusterType
-	}
-	typeStr, ok := job.Labels[hivev1.HiveClusterTypeLabel]
-	if !ok {
-		return hivev1.DefaultClusterType
-	}
-	return typeStr
+	return hivev1.DefaultClusterType
 }

@@ -2,17 +2,18 @@ package install
 
 import (
 	"fmt"
-	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/images"
 )
 
 const (
@@ -21,11 +22,8 @@ const (
 	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 
 	defaultInstallerImagePullPolicy = corev1.PullAlways
-	defaultHiveImagePullPolicy      = corev1.PullAlways
 
-	tryInstallOnceAnnotation              = "hive.openshift.io/try-install-once"
-	tryUninstallOnceAnnotation            = "hive.openshift.io/try-uninstall-once"
-	clusterDeploymentGenerationAnnotation = "hive.openshift.io/cluster-deployment-generation"
+	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -39,29 +37,23 @@ var (
 	SSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", SSHPrivateKeyDir, SSHSecretPrivateKeyName)
 )
 
-// GenerateInstallerJob creates a job to install an OpenShift cluster
-// given a ClusterDeployment and an installer image.
-func GenerateInstallerJob(
+// InstallerPodSpec generates a spec for an installer pod.
+func InstallerPodSpec(
 	cd *hivev1.ClusterDeployment,
-	hiveImage, releaseImage string,
+	provisionName string,
+	releaseImage string,
 	serviceAccountName string,
-	sshKey string,
 	pvcName string,
-	skipGatherLogs bool) (*batchv1.Job, error) {
+	skipGatherLogs bool,
+) (*corev1.PodSpec, error) {
 
-	cdLog := log.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
+	pLog := log.WithFields(log.Fields{
+		"clusterProvision": provisionName,
+		"namespace":        cd.Namespace,
 	})
 
-	skipGatherLogsStr := strconv.FormatBool(skipGatherLogs)
+	pLog.Debug("generating installer pod spec")
 
-	cdLog.Debug("generating installer job")
-	tryOnce := false
-	if cd.Annotations != nil {
-		value, exists := cd.Annotations[tryInstallOnceAnnotation]
-		tryOnce = exists && value == "true"
-	}
 	env := []corev1.EnvVar{
 		{
 			// OPENSHIFT_INSTALL_INVOKER allows setting who launched the installer
@@ -79,13 +71,52 @@ func GenerateInstallerJob(
 			},
 		},
 		{
-			Name:  constants.SkipGatherLogsEnvVar,
-			Value: skipGatherLogsStr,
+			Name: "SSH_PUB_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: cd.Spec.SSHKey,
+					Key:                  "ssh-publickey",
+				},
+			},
+		},
+		// ok when the private key isn't in the secret, as the installmanager
+		// will just gracefully handle the file not being present
+		{
+			Name:  "SSH_PRIV_KEY_PATH",
+			Value: SSHPrivateKeyFilePath,
 		},
 	}
+	volumes := []corev1.Volume{
+		{
+			Name: "sshkeys",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.SSHKey.Name,
+				},
+			},
+		},
+		{
+			Name: "output",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "sshkeys",
+			MountPath: SSHPrivateKeyDir,
+		},
+		{
+			Name:      "output",
+			MountPath: "/output",
+		},
+	}
+
 	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
-		env = append(env, []corev1.EnvVar{
-			{
+		env = append(
+			env,
+			corev1.EnvVar{
 				Name: "AWS_ACCESS_KEY_ID",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
@@ -94,7 +125,7 @@ func GenerateInstallerJob(
 					},
 				},
 			},
-			{
+			corev1.EnvVar{
 				Name: "AWS_SECRET_ACCESS_KEY",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
@@ -103,53 +134,17 @@ func GenerateInstallerJob(
 					},
 				},
 			},
-		}...)
+		)
 	}
+
 	if releaseImage != "" {
-		env = append(env, []corev1.EnvVar{
-			{
+		env = append(
+			env,
+			corev1.EnvVar{
 				Name:  "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
 				Value: releaseImage,
 			},
-		}...)
-	}
-
-	if cd.Spec.SSHKey != nil {
-		env = append(env, corev1.EnvVar{
-			Name: "SSH_PUB_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: *cd.Spec.SSHKey,
-					Key:                  "ssh-publickey",
-				},
-			},
-		})
-	}
-
-	volumes := []corev1.Volume{
-		{
-			Name: "output",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-	}
-	if cd.Spec.SSHKey != nil {
-		volumes = append(volumes, corev1.Volume{
-			Name: "sshkeys",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.SSHKey.Name,
-				},
-			},
-		})
-	}
-
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "output",
-			MountPath: "/output",
-		},
+		)
 	}
 
 	if !skipGatherLogs {
@@ -167,19 +162,10 @@ func GenerateInstallerJob(
 			Name:      "logs",
 			MountPath: "/logs",
 		})
-	}
-
-	if cd.Spec.SSHKey != nil {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "sshkeys",
-			MountPath: SSHPrivateKeyDir,
-		})
-
-		// ok when the private key isn't in the secret, as the installmanager
-		// will just gracefully handle the file not being present
+	} else {
 		env = append(env, corev1.EnvVar{
-			Name:  "SSH_PRIV_KEY_PATH",
-			Value: SSHPrivateKeyFilePath,
+			Name:  constants.SkipGatherLogsEnvVar,
+			Value: "true",
 		})
 	}
 
@@ -196,11 +182,6 @@ func GenerateInstallerJob(
 	installerImagePullPolicy := defaultInstallerImagePullPolicy
 	if cd.Spec.Images.InstallerImagePullPolicy != "" {
 		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
-	}
-
-	hiveImagePullPolicy := defaultHiveImagePullPolicy
-	if cd.Spec.Images.HiveImagePullPolicy != "" {
-		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
 	}
 
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
@@ -230,74 +211,61 @@ func GenerateInstallerJob(
 		},
 		{
 			Name:            "hive",
-			Image:           hiveImage,
-			ImagePullPolicy: hiveImagePullPolicy,
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
-			Command:         []string{"/bin/sh"},
-			Args: []string{"-c",
-				// Inlining a script to be run, we cannot assume a script to be in older images, nor that older images will output
-				// a sleep-seconds.txt file. If one is written, we will sleep that number of seconds. This allows exponential backoff
-				// for failing installs.
-				fmt.Sprintf(
-					"/usr/bin/hiveutil install-manager --work-dir /output --log-level debug --region %s %s %s; installer_result=$?; if [ -f /output/sleep-seconds.txt ]; then sleep_seconds=$(cat /output/sleep-seconds.txt); echo \"sleeping for $sleep_seconds seconds until next retry\"; sleep $sleep_seconds; fi; exit $installer_result",
-					cd.Spec.Platform.AWS.Region,
-					cd.Namespace,
-					cd.Name),
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{"install-manager",
+				"--work-dir", "/output",
+				"--log-level", "debug",
+				"--region", cd.Spec.Platform.AWS.Region,
+				cd.Namespace, provisionName,
 			},
 			VolumeMounts: volumeMounts,
 		},
 	}
 
-	restartPolicy := corev1.RestartPolicyOnFailure
-	if tryOnce {
-		restartPolicy = corev1.RestartPolicyNever
-	}
-
-	podSpec := corev1.PodSpec{
+	return &corev1.PodSpec{
 		DNSPolicy:          corev1.DNSClusterFirst,
-		RestartPolicy:      restartPolicy,
+		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
-	}
+	}, nil
+}
 
-	completions := int32(1)
-	backoffLimit := int32(123456) // effectively limitless
-	if tryOnce {
-		backoffLimit = int32(0)
-	}
+// GenerateInstallerJob creates a job to install an OpenShift cluster
+// given a ClusterDeployment and an installer image.
+func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, error) {
 
-	labels := map[string]string{
-		constants.InstallJobLabel:            "true",
-		constants.ClusterDeploymentNameLabel: cd.Name,
-	}
-	if cd.Labels != nil {
-		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
-		if ok {
-			labels[hivev1.HiveClusterTypeLabel] = typeStr
-		}
-	}
+	pLog := log.WithFields(log.Fields{
+		"clusterProvision": provision.Name,
+		"namespace":        provision.Namespace,
+	})
 
-	annotations := map[string]string{
-		clusterDeploymentGenerationAnnotation: strconv.FormatInt(cd.Generation, 10),
+	pLog.Debug("generating installer job")
+
+	labels := provision.Labels
+	if labels == nil {
+		labels = map[string]string{}
 	}
+	labels[constants.InstallJobLabel] = "true"
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        GetInstallJobName(cd),
-			Namespace:   cd.Namespace,
-			Annotations: annotations,
-			Labels:      labels,
+			Name:      GetInstallJobName(provision),
+			Namespace: provision.Namespace,
+			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
-			Completions:  &completions,
-			BackoffLimit: &backoffLimit,
+			BackoffLimit: pointer.Int32Ptr(0),
+			Completions:  pointer.Int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: podSpec,
+				Spec: provision.Spec.PodSpec,
 			},
 		},
 	}
@@ -305,8 +273,13 @@ func GenerateInstallerJob(
 	return job, nil
 }
 
-// GetInstallJobName returns the expected name of the install job for a cluster deployment.
-func GetInstallJobName(cd *hivev1.ClusterDeployment) string {
+// GetInstallJobName returns the expected name of the install job for a cluster provision.
+func GetInstallJobName(provision *hivev1.ClusterProvision) string {
+	return apihelpers.GetResourceName(provision.Name, "provision")
+}
+
+// GetLegacyInstallJobName returns the expected name of the legacy install job for a cluster deployment.
+func GetLegacyInstallJobName(cd *hivev1.ClusterDeployment) string {
 	return apihelpers.GetResourceName(cd.Name, "install")
 }
 
@@ -317,8 +290,7 @@ func GetUninstallJobName(name string) string {
 
 // GenerateUninstallerJobForClusterDeployment creates a job to uninstall an OpenShift cluster
 // given a ClusterDeployment and an installer image.
-func GenerateUninstallerJobForClusterDeployment(
-	cd *hivev1.ClusterDeployment, hiveImage string) (*batchv1.Job, error) {
+func GenerateUninstallerJobForClusterDeployment(cd *hivev1.ClusterDeployment) (*batchv1.Job, error) {
 
 	if cd.Spec.PreserveOnDelete {
 		if cd.Status.Installed {
@@ -341,30 +313,23 @@ func GenerateUninstallerJobForClusterDeployment(
 		credentialsSecret = cd.Spec.PlatformSecrets.AWS.Credentials.Name
 	}
 
-	hiveImagePullPolicy := defaultHiveImagePullPolicy
-	if cd.Spec.Images.HiveImagePullPolicy != "" {
-		hiveImagePullPolicy = cd.Spec.Images.HiveImagePullPolicy
-	}
-
 	infraID := cd.Status.InfraID
 	clusterID := cd.Status.ClusterID
-	name := GetUninstallJobName(cd.Name)
 
 	return GenerateUninstallerJob(
 		cd.Namespace,
-		name,
+		cd.Name,
 		tryOnce,
 		cd.Spec.AWS.Region,
 		credentialsSecret,
 		infraID,
 		clusterID,
-		hiveImage,
-		hiveImagePullPolicy), nil
+	), nil
 }
 
 // GenerateUninstallerJobForDeprovisionRequest generates an uninstaller job for a given deprovision request
 func GenerateUninstallerJobForDeprovisionRequest(
-	req *hivev1.ClusterDeprovisionRequest, hiveImage string) (*batchv1.Job, error) {
+	req *hivev1.ClusterDeprovisionRequest) (*batchv1.Job, error) {
 
 	if req.Spec.Platform.AWS == nil {
 		return nil, fmt.Errorf("only AWS deprovision requests currently supported")
@@ -381,31 +346,27 @@ func GenerateUninstallerJobForDeprovisionRequest(
 		credentialsSecret = req.Spec.Platform.AWS.Credentials.Name
 	}
 
-	name := GetUninstallJobName(req.Name)
-
 	return GenerateUninstallerJob(
 		req.Namespace,
-		name,
+		req.Name,
 		tryOnce,
 		req.Spec.Platform.AWS.Region,
 		credentialsSecret,
 		req.Spec.InfraID,
 		req.Spec.ClusterID,
-		hiveImage,
-		defaultHiveImagePullPolicy), nil
+	), nil
 }
 
 // GenerateUninstallerJob generates a new uninstaller job
 func GenerateUninstallerJob(
 	namespace string,
-	name string,
+	clusterName string,
 	tryOnce bool,
 	region string,
 	credentialsSecret string,
 	infraID string,
 	clusterID string,
-	hiveImage string,
-	hiveImagePullPolicy corev1.PullPolicy) *batchv1.Job {
+) *batchv1.Job {
 
 	env := []corev1.EnvVar{}
 	if len(credentialsSecret) > 0 {
@@ -434,8 +395,8 @@ func GenerateUninstallerJob(
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
-			Image:           hiveImage,
-			ImagePullPolicy: hiveImagePullPolicy,
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{
@@ -466,10 +427,13 @@ func GenerateUninstallerJob(
 
 	completions := int32(1)
 	backoffLimit := int32(123456) // effectively limitless
-	labels := map[string]string{constants.UninstallJobLabel: "true"}
+	labels := map[string]string{
+		constants.UninstallJobLabel:          "true",
+		constants.ClusterDeploymentNameLabel: clusterName,
+	}
 
 	job := &batchv1.Job{}
-	job.Name = name
+	job.Name = GetUninstallJobName(clusterName)
 	job.Namespace = namespace
 	job.ObjectMeta.Labels = labels
 	job.ObjectMeta.Annotations = map[string]string{}

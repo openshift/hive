@@ -29,6 +29,7 @@
 // config/crds/hive_v1alpha1_clusterdeployment.yaml
 // config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml
 // config/crds/hive_v1alpha1_clusterimageset.yaml
+// config/crds/hive_v1alpha1_clusterprovision.yaml
 // config/crds/hive_v1alpha1_clusterstate.yaml
 // config/crds/hive_v1alpha1_dnsendpoint.yaml
 // config/crds/hive_v1alpha1_dnszone.yaml
@@ -840,6 +841,7 @@ rules:
   - hive.openshift.io
   resources:
   - clusterdeployments
+  - clusterprovisions
   - dnszones
   - dnsendpoints
   - selectorsyncidentityproviders
@@ -872,6 +874,7 @@ rules:
   resources:
   - clusterdeployments
   - clusterimagesets
+  - clusterprovisions
   - dnszones
   - selectorsyncsets
   - syncsets
@@ -1026,6 +1029,15 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterprovisions
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - clusterimagesets
   verbs:
   - get
@@ -1067,6 +1079,32 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
+  - clusterprovisions
+  - clusterprovisions/status
+  - clusterprovisions/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - hive.openshift.io
+  resources:
   - clusterstates
   - clusterstates/status
   verbs:
@@ -1084,20 +1122,6 @@ rules:
   - dnszones/status
   - dnszones/finalizers
   - dnsendpoints
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  - secrets
-  - configmaps
   verbs:
   - get
   - list
@@ -1304,6 +1328,7 @@ rules:
   - hive.openshift.io
   resources:
   - clusterdeployments
+  - clusterprovisions
   - dnszones
   - selectorsyncidentityproviders
   - syncidentityproviders
@@ -1425,6 +1450,7 @@ rules:
   - hive.openshift.io
   resources:
   - clusterdeployments
+  - clusterprovisions
   - dnszones
   - dnsendpoints
   - selectorsyncidentityproviders
@@ -1841,14 +1867,6 @@ spec:
               description: Images allows overriding the default images used to provision
                 and manage the cluster.
               properties:
-                hiveImage:
-                  description: HiveImage is the image used in the sidecar container
-                    to manage execution of openshift-install.
-                  type: string
-                hiveImagePullPolicy:
-                  description: HiveImagePullPolicy is the pull policy for the installer
-                    image.
-                  type: string
                 installerImage:
                   description: InstallerImage is the image containing the openshift-install
                     binary that will be used to install.
@@ -2047,6 +2065,7 @@ spec:
               type: object
           required:
           - clusterName
+          - sshKey
           - baseDomain
           - networking
           - controlPlane
@@ -2312,486 +2331,10 @@ spec:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
               type: string
-            selectorSyncSetStatus:
-              description: SelectorSyncSetStatus is the list of status for SelectorSyncSets
-                which apply to the cluster deployment.
-              items:
-                properties:
-                  conditions:
-                    description: Conditions is the list of SyncConditions used to
-                      indicate UnknownObject when a resource type cannot be determined
-                      from a SyncSet resource.
-                    items:
-                      properties:
-                        lastProbeTime:
-                          description: LastProbeTime is the last time we probed the
-                            condition.
-                          format: date-time
-                          type: string
-                        lastTransitionTime:
-                          description: LastTransitionTime is the last time the condition
-                            transitioned from one status to another.
-                          format: date-time
-                          type: string
-                        message:
-                          description: Message is a human-readable message indicating
-                            details about last transition.
-                          type: string
-                        reason:
-                          description: Reason is a unique, one-word, CamelCase reason
-                            for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status is the status of the condition.
-                          type: string
-                        type:
-                          description: Type is the type of the condition.
-                          type: string
-                      type: object
-                    type: array
-                  name:
-                    description: Name is the name of the SyncSet.
-                    type: string
-                  patches:
-                    description: Patches is the list of SyncStatus for patches that
-                      have been applied.
-                    items:
-                      properties:
-                        apiVersion:
-                          description: APIVersion is the Group and Version of the
-                            object that was synced or patched.
-                          type: string
-                        conditions:
-                          description: Conditions is the list of conditions indicating
-                            success or failure of object create, update and delete
-                            as well as patch application.
-                          items:
-                            properties:
-                              lastProbeTime:
-                                description: LastProbeTime is the last time we probed
-                                  the condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: Message is a human-readable message indicating
-                                  details about last transition.
-                                type: string
-                              reason:
-                                description: Reason is a unique, one-word, CamelCase
-                                  reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status is the status of the condition.
-                                type: string
-                              type:
-                                description: Type is the type of the condition.
-                                type: string
-                            type: object
-                          type: array
-                        hash:
-                          description: Hash is the unique md5 hash of the resource
-                            or patch.
-                          type: string
-                        kind:
-                          description: Kind is the Kind of the object that was synced
-                            or patched.
-                          type: string
-                        name:
-                          description: Name is the name of the object that was synced
-                            or patched.
-                          type: string
-                        namespace:
-                          description: Namespace is the Namespace of the object that
-                            was synced or patched.
-                          type: string
-                        resource:
-                          description: Resource is the resource name for the object
-                            that was synced. This will be populated for resources,
-                            but not patches
-                          type: string
-                      type: object
-                    type: array
-                  resourceApplyMode:
-                    description: ResourceApplyMode indicates if the Resource apply
-                      mode is "upsert" (default) or "sync". ApplyMode "upsert" indicates
-                      create and update. ApplyMode "sync" indicates create, update
-                      and delete.
-                    type: string
-                  resources:
-                    description: Resources is the list of SyncStatus for objects that
-                      have been synced.
-                    items:
-                      properties:
-                        apiVersion:
-                          description: APIVersion is the Group and Version of the
-                            object that was synced or patched.
-                          type: string
-                        conditions:
-                          description: Conditions is the list of conditions indicating
-                            success or failure of object create, update and delete
-                            as well as patch application.
-                          items:
-                            properties:
-                              lastProbeTime:
-                                description: LastProbeTime is the last time we probed
-                                  the condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: Message is a human-readable message indicating
-                                  details about last transition.
-                                type: string
-                              reason:
-                                description: Reason is a unique, one-word, CamelCase
-                                  reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status is the status of the condition.
-                                type: string
-                              type:
-                                description: Type is the type of the condition.
-                                type: string
-                            type: object
-                          type: array
-                        hash:
-                          description: Hash is the unique md5 hash of the resource
-                            or patch.
-                          type: string
-                        kind:
-                          description: Kind is the Kind of the object that was synced
-                            or patched.
-                          type: string
-                        name:
-                          description: Name is the name of the object that was synced
-                            or patched.
-                          type: string
-                        namespace:
-                          description: Namespace is the Namespace of the object that
-                            was synced or patched.
-                          type: string
-                        resource:
-                          description: Resource is the resource name for the object
-                            that was synced. This will be populated for resources,
-                            but not patches
-                          type: string
-                      type: object
-                    type: array
-                  secretReferences:
-                    description: SecretReferences is the list of SyncStatus for secrets
-                      that have been synced.
-                    items:
-                      properties:
-                        apiVersion:
-                          description: APIVersion is the Group and Version of the
-                            object that was synced or patched.
-                          type: string
-                        conditions:
-                          description: Conditions is the list of conditions indicating
-                            success or failure of object create, update and delete
-                            as well as patch application.
-                          items:
-                            properties:
-                              lastProbeTime:
-                                description: LastProbeTime is the last time we probed
-                                  the condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: Message is a human-readable message indicating
-                                  details about last transition.
-                                type: string
-                              reason:
-                                description: Reason is a unique, one-word, CamelCase
-                                  reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status is the status of the condition.
-                                type: string
-                              type:
-                                description: Type is the type of the condition.
-                                type: string
-                            type: object
-                          type: array
-                        hash:
-                          description: Hash is the unique md5 hash of the resource
-                            or patch.
-                          type: string
-                        kind:
-                          description: Kind is the Kind of the object that was synced
-                            or patched.
-                          type: string
-                        name:
-                          description: Name is the name of the object that was synced
-                            or patched.
-                          type: string
-                        namespace:
-                          description: Namespace is the Namespace of the object that
-                            was synced or patched.
-                          type: string
-                        resource:
-                          description: Resource is the resource name for the object
-                            that was synced. This will be populated for resources,
-                            but not patches
-                          type: string
-                      type: object
-                    type: array
-                type: object
-              type: array
-            syncSetStatus:
-              description: SyncSetStatus is the list of status for SyncSets which
-                apply to the cluster deployment.
-              items:
-                properties:
-                  conditions:
-                    description: Conditions is the list of SyncConditions used to
-                      indicate UnknownObject when a resource type cannot be determined
-                      from a SyncSet resource.
-                    items:
-                      properties:
-                        lastProbeTime:
-                          description: LastProbeTime is the last time we probed the
-                            condition.
-                          format: date-time
-                          type: string
-                        lastTransitionTime:
-                          description: LastTransitionTime is the last time the condition
-                            transitioned from one status to another.
-                          format: date-time
-                          type: string
-                        message:
-                          description: Message is a human-readable message indicating
-                            details about last transition.
-                          type: string
-                        reason:
-                          description: Reason is a unique, one-word, CamelCase reason
-                            for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status is the status of the condition.
-                          type: string
-                        type:
-                          description: Type is the type of the condition.
-                          type: string
-                      type: object
-                    type: array
-                  name:
-                    description: Name is the name of the SyncSet.
-                    type: string
-                  patches:
-                    description: Patches is the list of SyncStatus for patches that
-                      have been applied.
-                    items:
-                      properties:
-                        apiVersion:
-                          description: APIVersion is the Group and Version of the
-                            object that was synced or patched.
-                          type: string
-                        conditions:
-                          description: Conditions is the list of conditions indicating
-                            success or failure of object create, update and delete
-                            as well as patch application.
-                          items:
-                            properties:
-                              lastProbeTime:
-                                description: LastProbeTime is the last time we probed
-                                  the condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: Message is a human-readable message indicating
-                                  details about last transition.
-                                type: string
-                              reason:
-                                description: Reason is a unique, one-word, CamelCase
-                                  reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status is the status of the condition.
-                                type: string
-                              type:
-                                description: Type is the type of the condition.
-                                type: string
-                            type: object
-                          type: array
-                        hash:
-                          description: Hash is the unique md5 hash of the resource
-                            or patch.
-                          type: string
-                        kind:
-                          description: Kind is the Kind of the object that was synced
-                            or patched.
-                          type: string
-                        name:
-                          description: Name is the name of the object that was synced
-                            or patched.
-                          type: string
-                        namespace:
-                          description: Namespace is the Namespace of the object that
-                            was synced or patched.
-                          type: string
-                        resource:
-                          description: Resource is the resource name for the object
-                            that was synced. This will be populated for resources,
-                            but not patches
-                          type: string
-                      type: object
-                    type: array
-                  resourceApplyMode:
-                    description: ResourceApplyMode indicates if the Resource apply
-                      mode is "upsert" (default) or "sync". ApplyMode "upsert" indicates
-                      create and update. ApplyMode "sync" indicates create, update
-                      and delete.
-                    type: string
-                  resources:
-                    description: Resources is the list of SyncStatus for objects that
-                      have been synced.
-                    items:
-                      properties:
-                        apiVersion:
-                          description: APIVersion is the Group and Version of the
-                            object that was synced or patched.
-                          type: string
-                        conditions:
-                          description: Conditions is the list of conditions indicating
-                            success or failure of object create, update and delete
-                            as well as patch application.
-                          items:
-                            properties:
-                              lastProbeTime:
-                                description: LastProbeTime is the last time we probed
-                                  the condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: Message is a human-readable message indicating
-                                  details about last transition.
-                                type: string
-                              reason:
-                                description: Reason is a unique, one-word, CamelCase
-                                  reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status is the status of the condition.
-                                type: string
-                              type:
-                                description: Type is the type of the condition.
-                                type: string
-                            type: object
-                          type: array
-                        hash:
-                          description: Hash is the unique md5 hash of the resource
-                            or patch.
-                          type: string
-                        kind:
-                          description: Kind is the Kind of the object that was synced
-                            or patched.
-                          type: string
-                        name:
-                          description: Name is the name of the object that was synced
-                            or patched.
-                          type: string
-                        namespace:
-                          description: Namespace is the Namespace of the object that
-                            was synced or patched.
-                          type: string
-                        resource:
-                          description: Resource is the resource name for the object
-                            that was synced. This will be populated for resources,
-                            but not patches
-                          type: string
-                      type: object
-                    type: array
-                  secretReferences:
-                    description: SecretReferences is the list of SyncStatus for secrets
-                      that have been synced.
-                    items:
-                      properties:
-                        apiVersion:
-                          description: APIVersion is the Group and Version of the
-                            object that was synced or patched.
-                          type: string
-                        conditions:
-                          description: Conditions is the list of conditions indicating
-                            success or failure of object create, update and delete
-                            as well as patch application.
-                          items:
-                            properties:
-                              lastProbeTime:
-                                description: LastProbeTime is the last time we probed
-                                  the condition.
-                                format: date-time
-                                type: string
-                              lastTransitionTime:
-                                description: LastTransitionTime is the last time the
-                                  condition transitioned from one status to another.
-                                format: date-time
-                                type: string
-                              message:
-                                description: Message is a human-readable message indicating
-                                  details about last transition.
-                                type: string
-                              reason:
-                                description: Reason is a unique, one-word, CamelCase
-                                  reason for the condition's last transition.
-                                type: string
-                              status:
-                                description: Status is the status of the condition.
-                                type: string
-                              type:
-                                description: Type is the type of the condition.
-                                type: string
-                            type: object
-                          type: array
-                        hash:
-                          description: Hash is the unique md5 hash of the resource
-                            or patch.
-                          type: string
-                        kind:
-                          description: Kind is the Kind of the object that was synced
-                            or patched.
-                          type: string
-                        name:
-                          description: Name is the name of the object that was synced
-                            or patched.
-                          type: string
-                        namespace:
-                          description: Namespace is the Namespace of the object that
-                            was synced or patched.
-                          type: string
-                        resource:
-                          description: Resource is the resource name for the object
-                            that was synced. This will be populated for resources,
-                            but not patches
-                          type: string
-                      type: object
-                    type: array
-                type: object
-              type: array
+            provision:
+              description: Provision is a reference to the last ClusterProvision created
+                for the deployment
+              type: object
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.
@@ -2933,9 +2476,6 @@ metadata:
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.hiveImage
-    name: Hive
-    type: string
   - JSONPath: .status.installerImage
     name: Installer
     type: string
@@ -2968,11 +2508,6 @@ spec:
           type: object
         spec:
           properties:
-            hiveImage:
-              description: HiveImage is the Hive image to use when installing or destroying
-                a cluster. If not present, the default Hive image for the clusterdeployment
-                controller is used.
-              type: string
             installerImage:
               description: InstallerImage is the image used to install a cluster.
                 If not specified, the installer image reference is obtained from the
@@ -3006,6 +2541,155 @@ func configCrdsHive_v1alpha1_clusterimagesetYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHive_v1alpha1_clusterprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: clusterprovisions.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.clusterDeployment.name
+    name: ClusterDeployment
+    type: string
+  - JSONPath: .spec.stage
+    name: Stage
+    type: string
+  - JSONPath: .spec.infraID
+    name: InfraID
+    type: string
+  group: hive.openshift.io
+  names:
+    kind: ClusterProvision
+    plural: clusterprovisions
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            adminKubeconfigSecret:
+              description: AdminKubeconfigSecret references the secret containing
+                the admin kubeconfig for this cluster.
+              type: object
+            adminPasswordSecret:
+              description: AdminPasswordSecret references the secret containing the
+                admin username/password which can be used to login to this cluster.
+              type: object
+            attempt:
+              description: Attempt is which attempt number of the cluster deployment
+                that this ClusterProvision is
+              format: int64
+              type: integer
+            clusterDeployment:
+              description: ClusterDeployment references the cluster deployment provisioned.
+              type: object
+            clusterID:
+              description: ClusterID is a globally unique identifier for this cluster
+                generated during installation. Used for reporting metrics among other
+                places.
+              type: string
+            infraID:
+              description: InfraID is an identifier for this cluster generated during
+                installation and used for tagging/naming resources in cloud providers.
+              type: string
+            installLog:
+              description: InstallLog is the log from the installer.
+              type: string
+            metadata:
+              description: Metadata is the metadata.json generated by the installer,
+                providing metadata information about the cluster created.
+              type: object
+            podSpec:
+              description: PodSpec is the spec to use for the installer pod.
+              type: object
+            prevClusterID:
+              description: PrevClusterID is the cluster ID of the previous failed
+                provision attempt.
+              type: string
+            prevInfraID:
+              description: PrevInfraID is the infra ID of the previous failed provision
+                attempt.
+              type: string
+            stage:
+              description: Stage is the stage of provisioning that the cluster deployment
+                has reached.
+              type: string
+          type: object
+        status:
+          properties:
+            conditions:
+              description: Conditions includes more detailed status for the cluster
+                provision
+              items:
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                type: object
+              type: array
+            job:
+              type: object
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHive_v1alpha1_clusterprovisionYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1alpha1_clusterprovisionYaml, nil
+}
+
+func configCrdsHive_v1alpha1_clusterprovisionYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1alpha1_clusterprovisionYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5164,26 +4848,27 @@ metadata:
   name: install-log-regexes
   namespace: hive
 data:
-  DNSAlreadyExists: |
-    searchRegexStrings:
-    - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
-    installFailingReason: DNSAlreadyExists
-    installFailingMessage: DNS record already exists
-  PendingVerification: |
-    searchRegexStrings:
-    - "PendingVerification: Your request for accessing resources in this region is being validated"
-    installFailingReason: PendingVerification
-    installFailingMessage: Account pending verification for region
-  NoMatchingRoute53Zone: |
-    searchRegexStrings:
-    - "data.aws_route53_zone.public: no matching Route53Zone found"
-    installFailingReason: NoMatchingRoute53Zone
-    installFailingMessage: No matching Route53Zone found
-  KubeAPIWaitTimeout: |
-    searchRegexStrings:
-    - "waiting for Kubernetes API: context deadline exceeded"
-    installFailingReason: KubeAPIWaitTimeout
-    installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+  regexes: |
+    - name: DNSAlreadyExists
+      searchRegexStrings:
+      - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
+      installFailingReason: DNSAlreadyExists
+      installFailingMessage: DNS record already exists
+    - name: PendingVerification
+      searchRegexStrings:
+      - "PendingVerification: Your request for accessing resources in this region is being validated"
+      installFailingReason: PendingVerification
+      installFailingMessage: Account pending verification for region
+    - name: NoMatchingRoute53Zone
+      searchRegexStrings:
+      - "data.aws_route53_zone.public: no matching Route53Zone found"
+      installFailingReason: NoMatchingRoute53Zone
+      installFailingMessage: No matching Route53Zone found
+    - name: KubeAPIWaitTimeout
+      searchRegexStrings:
+      - "waiting for Kubernetes API: context deadline exceeded"
+      installFailingReason: KubeAPIWaitTimeout
+      installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {
@@ -5282,6 +4967,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":            configCrdsHive_v1alpha1_clusterdeploymentYaml,
 	"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml":    configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml,
 	"config/crds/hive_v1alpha1_clusterimageset.yaml":              configCrdsHive_v1alpha1_clusterimagesetYaml,
+	"config/crds/hive_v1alpha1_clusterprovision.yaml":             configCrdsHive_v1alpha1_clusterprovisionYaml,
 	"config/crds/hive_v1alpha1_clusterstate.yaml":                 configCrdsHive_v1alpha1_clusterstateYaml,
 	"config/crds/hive_v1alpha1_dnsendpoint.yaml":                  configCrdsHive_v1alpha1_dnsendpointYaml,
 	"config/crds/hive_v1alpha1_dnszone.yaml":                      configCrdsHive_v1alpha1_dnszoneYaml,
@@ -5343,6 +5029,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_v1alpha1_clusterdeployment.yaml":            {configCrdsHive_v1alpha1_clusterdeploymentYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterdeprovisionrequest.yaml":    {configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterimageset.yaml":              {configCrdsHive_v1alpha1_clusterimagesetYaml, map[string]*bintree{}},
+			"hive_v1alpha1_clusterprovision.yaml":             {configCrdsHive_v1alpha1_clusterprovisionYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterstate.yaml":                 {configCrdsHive_v1alpha1_clusterstateYaml, map[string]*bintree{}},
 			"hive_v1alpha1_dnsendpoint.yaml":                  {configCrdsHive_v1alpha1_dnsendpointYaml, map[string]*bintree{}},
 			"hive_v1alpha1_dnszone.yaml":                      {configCrdsHive_v1alpha1_dnszoneYaml, map[string]*bintree{}},

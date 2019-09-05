@@ -65,10 +65,6 @@ AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID - Are used to determine your
 AWS credentials. If not present, then the --aws-creds-file is used. By
 default, that flag's value is %[3]s.
 
-HIVE_IMAGE - Hive image to use for installing/uninstalling the cluster.
-If not specified, the --hive-image flag is used. If that's not specified,
-a default image is used: %[4]s.
-
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
 obtained from a the following URL:
@@ -96,7 +92,6 @@ type Options struct {
 	PullSecretFile           string
 	AWSCredsFile             string
 	ClusterImageSet          string
-	HiveImage                string
 	InstallerImage           string
 	ReleaseImage             string
 	ReleaseImageSource       string
@@ -112,10 +107,6 @@ type Options struct {
 	SimulateBootstrapFailure bool
 	WorkerNodes              int64
 }
-
-const (
-	defaultHiveImage = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
-)
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
 func NewCreateClusterCommand() *cobra.Command {
@@ -138,7 +129,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create-cluster CLUSTER_DEPLOYMENT_NAME",
 		Short: "Creates a new Hive cluster deployment",
-		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile, defaultAWSCredsFile, defaultHiveImage),
+		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile, defaultAWSCredsFile),
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
@@ -164,7 +155,6 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.AWSCredsFile, "aws-creds-file", defaultAWSCredsFile, "AWS credentials file")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
-	flags.StringVar(&opt.HiveImage, "hive-image", "", "Hive image to use for installing/uninstalling this cluster deployment")
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
@@ -522,12 +512,11 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			SSHKey: &corev1.LocalObjectReference{
+			SSHKey: corev1.LocalObjectReference{
 				Name: fmt.Sprintf("%s-ssh-key", o.Name),
 			},
 			Images: hivev1.ProvisionImages{
 				InstallerImagePullPolicy: corev1.PullAlways,
-				HiveImagePullPolicy:      corev1.PullAlways,
 			},
 			ClusterName: o.Name,
 			BaseDomain:  o.BaseDomain,
@@ -636,9 +625,6 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 		}
 		return nil, nil
 	}
-	if o.HiveImage == "" {
-		o.HiveImage = defaultHiveImage
-	}
 	if o.ReleaseImage == "" {
 		if o.ReleaseImageSource == "" {
 			return nil, fmt.Errorf("Specify either a release image or a release image source")
@@ -652,7 +638,6 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 	if !o.UseClusterImageSet {
 		cd.Spec.Images.InstallerImage = o.InstallerImage
 		cd.Spec.Images.ReleaseImage = o.ReleaseImage
-		cd.Spec.Images.HiveImage = o.HiveImage
 	}
 
 	name := fmt.Sprintf("%s-imageset", o.Name)
@@ -665,7 +650,6 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			APIVersion: hivev1.SchemeGroupVersion.String(),
 		},
 		Spec: hivev1.ClusterImageSetSpec{
-			HiveImage:      strptr(o.HiveImage),
 			ReleaseImage:   strptr(o.ReleaseImage),
 			InstallerImage: strptr(o.InstallerImage),
 		},

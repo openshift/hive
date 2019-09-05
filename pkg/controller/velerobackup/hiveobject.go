@@ -32,6 +32,9 @@ func newHiveObject(object runtime.Object, logger log.FieldLogger) (*hiveObject, 
 	case *hivev1.SyncSet:
 		meta = &t.ObjectMeta
 		spec = &t.Spec
+	case *hivev1.DNSZone:
+		meta = &t.ObjectMeta
+		spec = &t.Spec
 	default:
 		return nil, fmt.Errorf("Unknown Type: %T", object)
 	}

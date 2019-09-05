@@ -13,9 +13,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -230,6 +232,16 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 					Message: message,
 				},
 			}
+		}
+	}
+
+	if newObject.Spec.SSHKey.Name == "" {
+		allErrs := field.ErrorList{}
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "sshKey", "name"), "must specify an SSH key to use"))
+		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &status,
 		}
 	}
 

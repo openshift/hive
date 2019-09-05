@@ -25,7 +25,7 @@ Once these steps are completed, an install pod will be launched. The install pod
 
 In the event of an install failure, Hive will cleanup any cloud resources created and keep trying indefinitely (with backoff).
 
-Once the install completes successfully, the admin password and kubeconfig will be uploaded as secrets and linked to the ClusterDeployment. Controllers related to day 2 configuration management now begin reconciling to apply Kubernetes configuration to the end cluster itself (predominantly via the [SyncSet](syncset.md) CRD and controller).
+Once the install completes successfully, the admin password and kubeconfig will be uploaded as secrets and linked to the ClusterDeployment. Controllers related to configuration management now begin reconciling to apply Kubernetes configuration to the end cluster itself (predominantly via the [SyncSet](syncset.md) CRD and controller).
 
 When a ClusterDeployment is deleted, a deprovision job will spawn which repeatedly tries to teardown all known cloud resources matching the cluster's infra ID tag, until nothing is left.
 

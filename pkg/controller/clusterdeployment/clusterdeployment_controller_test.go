@@ -17,7 +17,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -29,9 +31,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/install"
 )
 
 const (
@@ -39,7 +39,8 @@ const (
 	testClusterName       = "bar"
 	testClusterID         = "testFooClusterUUID"
 	testInfraID           = "testFooInfraID"
-	installJobName        = "foo-lqmsh-install"
+	provisionName         = "foo-lqmsh-random"
+	legacyInstallJobName  = "foo-lqmsh-install"
 	imageSetJobName       = "foo-lqmsh-imageset"
 	testNamespace         = "default"
 	metadataName          = "foo-lqmsh-metadata"
@@ -53,6 +54,7 @@ const (
     server: https://bar-api.clusters.example.com:6443
   name: bar
 `
+	adminPasswordSecret             = "foo-lqmsh-admin-password"
 	testRemoteClusterCurrentVersion = "4.0.0"
 	remoteClusterVersionObjectName  = "version"
 
@@ -102,10 +104,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		existing  []runtime.Object
-		expectErr bool
-		validate  func(client.Client, *testing.T)
+		name                  string
+		existing              []runtime.Object
+		pendingCreation       bool
+		expectErr             bool
+		expectedRequeueAfter  time.Duration
+		expectPendingCreation bool
+		validate              func(client.Client, *testing.T)
 	}{
 		{
 			name: "Add finalizer",
@@ -122,56 +127,81 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Create install job",
+			name: "Create provision",
 			existing: []runtime.Object{
 				testClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
-				job := getInstallJob(c)
-				if job == nil {
-					t.Errorf("did not find expected install job")
-				}
+				provisions := getProvisions(c)
+				assert.Len(t, provisions, 1, "expected provision to exist")
+			},
+		},
+		{
+			name: "Provision not created when pending create",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			pendingCreation:       true,
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "expected provision to not exist")
+			},
+		},
+		{
+			name: "Adopt provision",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testProvision(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if value := cd.Annotations[firstTimeInstallAnnotation]; value != "true" {
-					t.Errorf("did not get a clusterdeployment with firstTimeInstallAnnotation")
+				if assert.NotNil(t, cd, "no clusterdeployment found") {
+					if assert.NotNil(t, cd.Status.Provision, "missing provision ref") {
+						assert.Equal(t, provisionName, cd.Status.Provision.Name, "unexpected provision ref name")
+					}
 				}
 			},
 		},
 		{
-			name: "No-op Running install job",
+			name: "No-op Running provision",
 			existing: []runtime.Object{
-				testClusterDeployment(),
-				testInstallJob(),
+				testClusterDeploymentWithProvision(),
+				testProvision(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd == nil || !apiequality.Semantic.DeepEqual(cd, testClusterDeployment()) {
-					t.Errorf("got unexpected change in clusterdeployment")
+				if assert.NotNil(t, cd, "no clusterdeployment found") {
+					if e, a := testClusterDeploymentWithProvision(), cd; !assert.True(t, apiequality.Semantic.DeepEqual(e, a), "unexpected change in clusterdeployment") {
+						t.Logf("diff = %s", diff.ObjectReflectDiff(e, a))
+					}
 				}
-				job := getInstallJob(c)
-				t.Logf("exp: %v", testInstallJob())
-				t.Logf("cur: %v", job)
-				if job == nil || !apiequality.Semantic.DeepEqual(job, testInstallJob()) {
-					t.Errorf("got unexpected change in install job")
+				provisions := getProvisions(c)
+				if assert.Len(t, provisions, 1, "expected provision to exist") {
+					if e, a := testProvision(), provisions[0]; !assert.True(t, apiequality.Semantic.DeepEqual(e, a), "unexpected change in provision") {
+						t.Logf("diff = %s", diff.ObjectReflectDiff(e, a))
+					}
 				}
 			},
 		},
 		{
 			name: "Parse server URL from admin kubeconfig",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-					return cd
-				}(),
-				testInstallJob(),
+				testClusterDeploymentWithProvision(),
+				testSuccessfulProvision(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
@@ -185,10 +215,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Completed install job",
+			name: "Completed provision",
 			existing: []runtime.Object{
-				testClusterDeployment(),
-				testCompletedInstallJob(time.Now()),
+				testClusterDeploymentWithProvision(),
+				testSuccessfulProvision(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -207,7 +237,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "PVC cleanup for successful install",
 			existing: []runtime.Object{
 				testInstalledClusterDeployment(time.Now()),
-				testCompletedInstallJob(time.Now()),
 				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -217,7 +246,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallJob().Name, Namespace: testNamespace}, pvc)
+				err := c.Get(context.TODO(), client.ObjectKey{Name: GetInstallLogsPVCName(testClusterDeployment()), Namespace: testNamespace}, pvc)
 				if assert.Error(t, err) {
 					assert.True(t, errors.IsNotFound(err))
 				}
@@ -231,7 +260,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.InstallRestarts = 5
 					return cd
 				}(),
-				testCompletedInstallJob(time.Now()),
 				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -253,7 +281,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.InstallRestarts = 5
 					return cd
 				}(),
-				testCompletedInstallJob(time.Now().Add(-8 * 24 * time.Hour)),
 				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -263,7 +290,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallJob().Name, Namespace: testNamespace}, pvc)
+				err := c.Get(context.TODO(), client.ObjectKey{Name: GetInstallLogsPVCName(testClusterDeployment()), Namespace: testNamespace}, pvc)
 				if assert.Error(t, err) {
 					assert.True(t, errors.IsNotFound(err))
 				}
@@ -274,14 +301,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					cd.Spec.PullSecret = nil
 					return cd
 				}(),
-				testCompletedInstallJob(time.Now()),
-				testMetadataConfigMap(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			expectErr: true,
 		},
@@ -294,53 +316,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
-				testCompletedInstallJob(time.Now()),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-		},
-		{
-			name: "Completed with install job manually deleted",
-			existing: []runtime.Object{
-				testInstalledClusterDeployment(time.Now()),
-				testMetadataConfigMap(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				assert.True(t, cd.Status.Installed)
-				job := getInstallJob(c)
-				assert.Nil(t, job)
-			},
-		},
-		{
-			name: "Delete cluster deployment",
-			existing: []runtime.Object{
-				testDeletedClusterDeployment(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job, _ := install.GenerateInstallerJob(
-						testExpiredClusterDeployment(),
-						"example.com/fake:latest",
-						"",
-						"fakeserviceaccount",
-						"sshkey", "", false)
-					return job
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				instJob := getInstallJob(c)
-				if instJob != nil {
-					t.Errorf("got unexpected install job (expected delete)")
-				}
 			},
 		},
 		{
@@ -385,48 +365,14 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job, _ := install.GenerateInstallerJob(
-						testExpiredClusterDeployment(),
-						"example.com/fake:latest",
-						"",
-						"fakeserviceaccount",
-						"sshkey", "", false)
-					return job
-				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
+				}
 				deprovision := getDeprovisionRequest(c)
-				assert.Nil(t, deprovision)
-			},
-		},
-		{
-			name: "Test deletion of expired jobs",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.Installed = false
-					return cd
-				}(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job, _ := install.GenerateInstallerJob(
-						testClusterDeployment(),
-						"fakeserviceaccount",
-						"",
-						"fakeserviceaccount",
-						"sshkey", "", false)
-					wrongGeneration := "-1"
-					job.Annotations[clusterDeploymentGenerationAnnotation] = wrongGeneration
-					return job
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				job := getInstallJob(c)
-				assert.Nil(t, job)
+				assert.Nil(t, deprovision, "expected no deprovision request")
 			},
 		},
 		{
@@ -444,7 +390,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				deprovision := getDeprovisionRequest(c)
-				assert.NotNil(t, deprovision)
+				assert.NotNil(t, deprovision, "expected deprovision request")
 			},
 		},
 		{
@@ -479,7 +425,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				func() *hivev1.ClusterImageSet {
 					cis := testClusterImageSet()
-					cis.Spec.InstallerImage = strPtr("test-cis-installer-image:latest")
+					cis.Spec.InstallerImage = pointer.StringPtr("test-cis-installer-image:latest")
 					return cis
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -562,42 +508,41 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
-					cd.Status.InstallerImage = strPtr("test-installer-image:latest")
+					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image:latest")
 					cd.Spec.Images.InstallerImage = ""
 					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
 				func() *hivev1.ClusterImageSet {
 					cis := testClusterImageSet()
-					cis.Spec.ReleaseImage = strPtr("test-release-image:latest")
+					cis.Spec.ReleaseImage = pointer.StringPtr("test-release-image:latest")
 					return cis
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
-				job := getInstallJob(c)
-				if job == nil {
-					t.Errorf("did not get expected job")
-					return
-				}
-				env := job.Spec.Template.Spec.Containers[0].Env
-				variable := corev1.EnvVar{}
-				found := false
-				for _, e := range env {
-					if e.Name == "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" {
-						variable = e
-						found = true
-						break
+				provisions := getProvisions(c)
+				if assert.Len(t, provisions, 1, "expected provision to exist") {
+					env := provisions[0].Spec.PodSpec.Containers[0].Env
+					variable := corev1.EnvVar{}
+					found := false
+					for _, e := range env {
+						if e.Name == "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" {
+							variable = e
+							found = true
+							break
+						}
 					}
-				}
-				if !found {
-					t.Errorf("did not find expected override environment variable in job")
-					return
-				}
-				if variable.Value != "test-release-image:latest" {
-					t.Errorf("environment variable did not have the expected value. actual: %s", variable.Value)
+					if !found {
+						t.Errorf("did not find expected override environment variable in job")
+						return
+					}
+					if variable.Value != "test-release-image:latest" {
+						t.Errorf("environment variable did not have the expected value. actual: %s", variable.Value)
+					}
 				}
 			},
 		},
@@ -632,8 +577,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testDNSZone(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				installJob := getInstallJob(c)
-				assert.Nil(t, installJob, "install job should not exist")
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "provision should not exist")
 			},
 		},
 		{
@@ -677,12 +622,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Create install job when DNSZone is ready",
+			name: "Create provision when DNSZone is ready",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Spec.ManageDNS = true
-					cd.Annotations[dnsReadyAnnotation] = "NOW"
+					cd.Annotations = map[string]string{dnsReadyAnnotation: "NOW"}
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -690,9 +635,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testAvailableDNSZone(),
 			},
+			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
-				installJob := getInstallJob(c)
-				assert.NotNil(t, installJob, "install job should exist")
+				provisions := getProvisions(c)
+				assert.Len(t, provisions, 1, "expected provision to exist")
 			},
 		},
 		{
@@ -733,37 +679,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Delete cluster deployment with image from clusterimageset",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testDeletedClusterDeployment()
-					cd.Spec.Images.HiveImage = ""
-					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
-					return cd
-				}(),
-				func() *hivev1.ClusterImageSet {
-					cis := testClusterImageSet()
-					testHiveImage := "hive-image-from-image-set:latest"
-					cis.Spec.HiveImage = &testHiveImage
-					return cis
-				}(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovisionRequest(c)
-				if deprovision == nil {
-					t.Errorf("did not find expected deprovision request")
-				}
-			},
-		},
-		{
 			name: "Delete cluster deployment with missing clusterimageset",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testDeletedClusterDeployment()
-					cd.Spec.Images.HiveImage = ""
 					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
@@ -773,113 +692,256 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				deprovision := getDeprovisionRequest(c)
-				if deprovision == nil {
-					t.Errorf("did not find expected deprovision request")
-				}
+				assert.NotNil(t, deprovision, "expected deprovision request to be created")
 			},
 		},
 		{
-			name: "Migrate wildcard ingress domains",
+			name: "Delete legacy install job",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeploymentWithIngress()
-					cd.Spec.Ingress[0].Domain = fmt.Sprintf("*.apps.%s.example.com", cd.Spec.ClusterName)
-					cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
-						Name:   "extraingress",
-						Domain: fmt.Sprintf("*.moreingress.%s.example.com", cd.Spec.ClusterName),
-					})
-					cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
-						Name:   "notwildcardingress",
-						Domain: fmt.Sprintf("notwild.%s.example.com", cd.Spec.ClusterName),
-					})
+				testClusterDeployment(),
+				testLegacyInstallJob(),
+			},
+			expectedRequeueAfter: defaultRequeueTime,
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getLegacyInstallJob(c)
+				assert.Nil(t, installJob, "legacy install job should be deleted")
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "no provision until legacy install job deleted")
+			},
+		},
+		{
+			name: "Delete legacy install job even when deployment has been deleted",
+			existing: []runtime.Object{
+				testDeletedClusterDeployment(),
+				testLegacyInstallJob(),
+			},
+			expectedRequeueAfter: defaultRequeueTime,
+			validate: func(c client.Client, t *testing.T) {
+				installJob := getLegacyInstallJob(c)
+				assert.Nil(t, installJob, "legacy install job should be deleted")
+			},
+		},
+		{
+			name: "Delete old provisions",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Status.InstallRestarts = 4
 					return cd
 				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testFailedProvisionAttempt(0),
+				testFailedProvisionAttempt(1),
+				testFailedProvisionAttempt(2),
+				testFailedProvisionAttempt(3),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				actualAttempts := []int{}
+				for _, p := range getProvisions(c) {
+					actualAttempts = append(actualAttempts, p.Spec.Attempt)
+				}
+				expectedAttempts := []int{0, 2, 3, 4}
+				assert.ElementsMatch(t, expectedAttempts, actualAttempts, "unexpected provisions kept")
+			},
+		},
+		{
+			name: "Adopt provision",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testProvision(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				for _, ingress := range cd.Spec.Ingress {
-					assert.NotRegexp(t, `^\*.*`, ingress.Domain, "Ingress domain %s wasn't migrated from wildcards", ingress.Domain)
+				if assert.NotNil(t, cd, "missing cluster deployment") {
+					if assert.NotNil(t, cd.Status.Provision, "provision reference not set") {
+						assert.Equal(t, provisionName, cd.Status.Provision.Name, "unexpected provision referenced")
+					}
 				}
 			},
 		},
 		{
-			name: "Delete old install job when job hash missing",
+			name: "Do not adopt provision from other attempt",
 			existing: []runtime.Object{
-				testClusterDeployment(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job := testInstallJob()
-					delete(job.Annotations, jobHashAnnotation)
-					return job
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				installJob := getInstallJob(c)
-				assert.Nil(t, installJob, "install job should not exist")
-			},
-		},
-		{
-			name: "Delete old install job when job hash changes",
-			existing: []runtime.Object{
-				testClusterDeployment(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job := testInstallJob()
-					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
-					return job
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				installJob := getInstallJob(c)
-				assert.Nil(t, installJob, "install job should not exist")
-			},
-		},
-		{
-			name: "Ignore old install job hash difference if cluster already installed",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
+				func() runtime.Object {
 					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					cd.Status.InstallRestarts = 1
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testProvision(),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing cluster deployment") {
+					assert.Nil(t, cd.Status.Provision, "expected provision reference to not be set")
+				}
+			},
+		},
+		{
+			name: "Delete-after requeue",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					cd.CreationTimestamp = metav1.Now()
+					cd.Annotations[deleteAfterAnnotation] = "8h"
+					return cd
+				}(),
+				testProvision(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectedRequeueAfter: 8*time.Hour + 60*time.Second,
+		},
+		{
+			name: "Wait after failed provision",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					cd.CreationTimestamp = metav1.Now()
+					cd.Annotations[deleteAfterAnnotation] = "8h"
+					return cd
+				}(),
+				testFailedProvisionTime(time.Now()),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectedRequeueAfter: 1 * time.Minute,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					if assert.NotNil(t, cd.Status.Provision, "missing provision ref") {
+						assert.Equal(t, provisionName, cd.Status.Provision.Name, "unexpected provision ref name")
+					}
+				}
+			},
+		},
+		{
+			name: "Clear out provision after wait time",
+			existing: []runtime.Object{
+				testClusterDeploymentWithProvision(),
+				testFailedProvisionTime(time.Now().Add(-2 * time.Minute)),
+				testMetadataConfigMap(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Nil(t, cd.Status.Provision, "expected empty provision ref")
+					assert.Equal(t, 1, cd.Status.InstallRestarts, "expected incremented install restart count")
+				}
+			},
+		},
+		{
+			name: "Delete outstanding provision on delete",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testProvision(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectedRequeueAfter: defaultRequeueTime,
+			validate: func(c client.Client, t *testing.T) {
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "expected provision to be deleted")
+				deprovision := getDeprovisionRequest(c)
+				assert.Nil(t, deprovision, "expect not to create deprovision request until provision removed")
+			},
+		},
+		{
+			name: "Remove finalizer after early-failure provision removed",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					cd.Status.InfraID = ""
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				func() *batchv1.Job {
-					job := testInstallJob()
-					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
-					return job
-				}(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				installJob := getInstallJob(c)
-				assert.NotNil(t, installJob, "install job should not be touched after the clusterdeployment is installed")
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
+				}
+			},
+		},
+		{
+			name: "Create deprovision after late-failure provision removed",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected hive finalizer")
+				}
+				deprovision := getDeprovisionRequest(c)
+				assert.NotNil(t, deprovision, "missing deprovision request")
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("controller", "clusterDeployment")
 			fakeClient := fake.NewFakeClient(test.existing...)
+			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "clusterDeployment"),
+				logger:                        logger,
+				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
-			_, err := rcd.Reconcile(reconcile.Request{
+			reconcileRequest := reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testName,
 					Namespace: testNamespace,
 				},
-			})
+			}
+
+			if test.pendingCreation {
+				controllerExpectations.ExpectCreations(reconcileRequest.String(), 1)
+			}
+
+			result, err := rcd.Reconcile(reconcileRequest)
 
 			if test.validate != nil {
 				test.validate(fakeClient, t)
@@ -891,6 +953,15 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			if err == nil && test.expectErr {
 				t.Errorf("Expected error but got none")
 			}
+
+			if test.expectedRequeueAfter == 0 {
+				assert.Zero(t, result.RequeueAfter, "expected empty requeue after")
+			} else {
+				assert.InDelta(t, test.expectedRequeueAfter, result.RequeueAfter, float64(10*time.Second), "unexpected requeue after")
+			}
+
+			actualPendingCreation := !controllerExpectations.SatisfiedExpectations(reconcileRequest.String())
+			assert.Equal(t, test.expectPendingCreation, actualPendingCreation, "unexpected pending creation")
 		})
 	}
 }
@@ -914,11 +985,14 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("controller", "clusterDeployment")
 			fakeClient := fake.NewFakeClient(test.existing...)
+			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "clusterDeployment"),
+				logger:                        logger,
+				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
@@ -932,6 +1006,121 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 			assert.NoError(t, err, "unexpected error")
 
 			assert.Equal(t, test.exptectedReconcileResult, reconcileResult, "unexpected reconcile result")
+		})
+	}
+}
+
+func TestCalculateNextProvisionTime(t *testing.T) {
+	cases := []struct {
+		name             string
+		failureTime      time.Time
+		attempt          int
+		expectedNextTime time.Time
+	}{
+		{
+			name:             "first attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          0,
+			expectedNextTime: time.Date(2019, time.July, 16, 0, 1, 0, 0, time.UTC),
+		},
+		{
+			name:             "second attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          1,
+			expectedNextTime: time.Date(2019, time.July, 16, 0, 2, 0, 0, time.UTC),
+		},
+		{
+			name:             "third attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          2,
+			expectedNextTime: time.Date(2019, time.July, 16, 0, 4, 0, 0, time.UTC),
+		},
+		{
+			name:             "eleventh attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          10,
+			expectedNextTime: time.Date(2019, time.July, 16, 17, 4, 0, 0, time.UTC),
+		},
+		{
+			name:             "twelfth attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          11,
+			expectedNextTime: time.Date(2019, time.July, 17, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:             "thirteenth attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          12,
+			expectedNextTime: time.Date(2019, time.July, 17, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:             "millionth attempt",
+			failureTime:      time.Date(2019, time.July, 16, 0, 0, 0, 0, time.UTC),
+			attempt:          999999,
+			expectedNextTime: time.Date(2019, time.July, 17, 0, 0, 0, 0, time.UTC),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualNextTime := calculateNextProvisionTime(tc.failureTime, tc.attempt, log.WithField("controller", "clusterDeployment"))
+			assert.Equal(t, tc.expectedNextTime.String(), actualNextTime.String(), "unexpected next provision time")
+		})
+	}
+}
+
+func TestDeleteStaleProvisions(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+	cases := []struct {
+		name             string
+		existingAttempts []int
+		expectedAttempts []int
+	}{
+		{
+			name: "none",
+		},
+		{
+			name:             "one",
+			existingAttempts: []int{0},
+			expectedAttempts: []int{0},
+		},
+		{
+			name:             "three",
+			existingAttempts: []int{0, 1, 2},
+			expectedAttempts: []int{0, 1, 2},
+		},
+		{
+			name:             "four",
+			existingAttempts: []int{0, 1, 2, 3},
+			expectedAttempts: []int{0, 2, 3},
+		},
+		{
+			name:             "five",
+			existingAttempts: []int{0, 1, 2, 3, 4},
+			expectedAttempts: []int{0, 3, 4},
+		},
+		{
+			name:             "five mixed order",
+			existingAttempts: []int{10, 3, 7, 8, 1},
+			expectedAttempts: []int{1, 8, 10},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			provisions := make([]runtime.Object, len(tc.existingAttempts))
+			for i, a := range tc.existingAttempts {
+				provisions[i] = testFailedProvisionAttempt(a)
+			}
+			fakeClient := fake.NewFakeClient(provisions...)
+			rcd := &ReconcileClusterDeployment{
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+			}
+			rcd.deleteStaleProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteStaleProvisions"))
+			actualAttempts := []int{}
+			for _, p := range getProvisions(fakeClient) {
+				actualAttempts = append(actualAttempts, p.Spec.Attempt)
+			}
+			assert.ElementsMatch(t, tc.expectedAttempts, actualAttempts, "unexpected provisions kept")
 		})
 	}
 }
@@ -954,7 +1143,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		SSHKey: &corev1.LocalObjectReference{
+		SSHKey: corev1.LocalObjectReference{
 			Name: sshKeySecret,
 		},
 		ControlPlane: hivev1.MachinePool{},
@@ -982,8 +1171,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		ClusterID:      testClusterID,
 		InfraID:        testInfraID,
-		InstallerImage: strPtr("installer-image:latest"),
-		CLIImage:       strPtr("cli:latest"),
+		InstallerImage: pointer.StringPtr("installer-image:latest"),
+		CLIImage:       pointer.StringPtr("cli:latest"),
 	}
 
 	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
@@ -1026,37 +1215,77 @@ func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
-func testInstallJob() *batchv1.Job {
+func testClusterDeploymentWithProvision() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
-	job, err := install.GenerateInstallerJob(cd,
-		images.DefaultHiveImage,
-		"",
-		serviceAccountName, "testSSHKey", GetInstallLogsPVCName(cd), false)
-	if err != nil {
-		fmt.Printf(err.Error())
-		panic("should not error while generating test install job")
+	cd.Status.Provision = &corev1.LocalObjectReference{Name: provisionName}
+	return cd
+}
+
+func testProvision() *hivev1.ClusterProvision {
+	cd := testClusterDeployment()
+	provision := &hivev1.ClusterProvision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      provisionName,
+			Namespace: testNamespace,
+			Labels: map[string]string{
+				constants.ClusterDeploymentNameLabel: testName,
+			},
+		},
+		Spec: hivev1.ClusterProvisionSpec{
+			ClusterDeployment: corev1.LocalObjectReference{
+				Name: testName,
+			},
+			Stage: hivev1.ClusterProvisionStageInitializing,
+		},
+	}
+
+	controllerutil.SetControllerReference(cd, provision, scheme.Scheme)
+
+	return provision
+}
+
+func testSuccessfulProvision() *hivev1.ClusterProvision {
+	provision := testProvision()
+	provision.Spec.Stage = hivev1.ClusterProvisionStageComplete
+	provision.Spec.ClusterID = pointer.StringPtr(testClusterID)
+	provision.Spec.InfraID = pointer.StringPtr(testInfraID)
+	provision.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+	provision.Spec.AdminPasswordSecret = &corev1.LocalObjectReference{Name: adminPasswordSecret}
+	return provision
+}
+
+func testFailedProvisionAttempt(attempt int) *hivev1.ClusterProvision {
+	provision := testProvision()
+	provision.Name = fmt.Sprintf("%s-%02d", provision.Name, attempt)
+	provision.Spec.Attempt = attempt
+	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
+	return provision
+}
+
+func testFailedProvisionTime(time time.Time) *hivev1.ClusterProvision {
+	provision := testProvision()
+	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
+	provision.Status.Conditions = []hivev1.ClusterProvisionCondition{
+		{
+			Type:               hivev1.ClusterProvisionFailedCondition,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: metav1.NewTime(time),
+		},
+	}
+	return provision
+}
+
+func testLegacyInstallJob() *batchv1.Job {
+	cd := testClusterDeployment()
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: testNamespace,
+			Name:      legacyInstallJobName,
+		},
 	}
 
 	controllerutil.SetControllerReference(cd, job, scheme.Scheme)
 
-	hash, err := controllerutils.CalculateJobSpecHash(job)
-	if err != nil {
-		panic("should never get error calculating job spec hash")
-	}
-
-	job.Annotations[jobHashAnnotation] = hash
-	return job
-}
-
-func testCompletedInstallJob(completionTime time.Time) *batchv1.Job {
-	job := testInstallJob()
-	job.Status.Conditions = []batchv1.JobCondition{
-		{
-			Type:   batchv1.JobComplete,
-			Status: corev1.ConditionTrue,
-		},
-	}
-	job.Status.CompletionTime = &metav1.Time{Time: completionTime}
 	return job
 }
 
@@ -1132,7 +1361,7 @@ func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
 func testClusterImageSet() *hivev1.ClusterImageSet {
 	cis := &hivev1.ClusterImageSet{}
 	cis.Name = testClusterImageSetName
-	cis.Spec.ReleaseImage = strPtr("test-release-image:latest")
+	cis.Spec.ReleaseImage = pointer.StringPtr("test-release-image:latest")
 	return cis
 }
 
@@ -1157,18 +1386,6 @@ func testAvailableDNSZone() *hivev1.DNSZone {
 	return zone
 }
 
-func testClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
-	cd := testClusterDeployment()
-	cd.Spec.Ingress = []hivev1.ClusterIngress{
-		{
-			Name:   "default",
-			Domain: fmt.Sprintf("apps.%s.example.com", cd.Spec.ClusterName),
-		},
-	}
-
-	return cd
-}
-
 func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType hivev1.ClusterDeploymentConditionType, status corev1.ConditionStatus) {
 	found := false
 	for _, cond := range cd.Status.Conditions {
@@ -1180,133 +1397,6 @@ func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType 
 	assert.True(t, found, "did not find expected condition type: %v", condType)
 }
 
-func TestClusterDeploymentWildcardDomainMigration(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-
-	tests := []struct {
-		name              string
-		existing          *hivev1.ClusterDeployment
-		migrationExpected bool
-		expectedDomains   []string // must be same length as the number of ingress entries for the test clusterDeployment
-	}{
-		{
-			name:              "No ingress, no migration",
-			existing:          testClusterDeployment(),
-			migrationExpected: false,
-		},
-		{
-			name:              "No wildcards, no migration",
-			existing:          testClusterDeploymentWithIngress(),
-			migrationExpected: false,
-			expectedDomains:   []string{fmt.Sprintf("apps.%s.example.com", testClusterName)},
-		},
-		{
-			name: "Migrate wildcard domain",
-			existing: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeploymentWithIngress()
-				cd.Spec.Ingress[0].Domain = fmt.Sprintf("*.apps.%s.example.com", cd.Spec.ClusterName)
-
-				return cd
-			}(),
-			migrationExpected: true,
-			expectedDomains:   []string{fmt.Sprintf("apps.%s.example.com", testClusterName)},
-		},
-		{
-			name: "Migrate when only one of two is wildcard",
-			existing: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeploymentWithIngress()
-				cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
-					Name:   "extraingress",
-					Domain: fmt.Sprintf("*.moreingress.%s.example.com", cd.Spec.ClusterName),
-				})
-
-				return cd
-			}(),
-			migrationExpected: true,
-			expectedDomains: []string{
-				fmt.Sprintf("apps.%s.example.com", testClusterName),
-				fmt.Sprintf("moreingress.%s.example.com", testClusterName),
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-
-			result := migrateWildcardIngress(test.existing)
-
-			assert.Equal(t, test.migrationExpected, result)
-
-			for i, domain := range test.expectedDomains {
-				assert.Equal(t, domain, test.existing.Spec.Ingress[i].Domain)
-			}
-		})
-	}
-}
-
-func TestClusterDeploymentJobHashing(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-
-	tests := []struct {
-		name           string
-		existingJob    *batchv1.Job
-		generatedJob   *batchv1.Job
-		expectedResult bool
-		expectedError  bool
-	}{
-		{
-			name: "No existing annotation",
-			existingJob: func() *batchv1.Job {
-				job := testInstallJob()
-				delete(job.Annotations, jobHashAnnotation)
-				return job
-			}(),
-			generatedJob:   testInstallJob(),
-			expectedResult: true,
-		},
-		{
-			name: "Different hash",
-			existingJob: func() *batchv1.Job {
-				job := testInstallJob()
-				job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
-				return job
-			}(),
-			generatedJob:   testInstallJob(),
-			expectedResult: true,
-		},
-		{
-			name:           "Same hash",
-			existingJob:    testInstallJob(),
-			generatedJob:   testInstallJob(),
-			expectedResult: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingJob)
-			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-			}
-			tLogger := log.New()
-
-			result, err := rcd.deleteJobOnHashChange(test.existingJob, test.generatedJob, tLogger)
-
-			if test.expectedError {
-				assert.Error(t, err, "expected error during test case")
-			} else {
-				assert.Equal(t, test.expectedResult, result)
-
-				if test.expectedResult { //if job was deleted
-					job := getInstallJob(fakeClient)
-					assert.Nil(t, job, "previous install job should have been deleted")
-				}
-			}
-
-		})
-	}
-}
-
 func getJob(c client.Client, name string) *batchv1.Job {
 	job := &batchv1.Job{}
 	err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: testNamespace}, job)
@@ -1316,8 +1406,8 @@ func getJob(c client.Client, name string) *batchv1.Job {
 	return nil
 }
 
-func getInstallJob(c client.Client) *batchv1.Job {
-	return getJob(c, installJobName)
+func getLegacyInstallJob(c client.Client) *batchv1.Job {
+	return getJob(c, legacyInstallJobName)
 }
 
 func TestUpdatePullSecretInfo(t *testing.T) {
@@ -1403,7 +1493,7 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		SSHKey: &corev1.LocalObjectReference{
+		SSHKey: corev1.LocalObjectReference{
 			Name: sshKeySecret,
 		},
 		ControlPlane: hivev1.MachinePool{},
@@ -1427,7 +1517,7 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		ClusterID:      testClusterID,
 		InfraID:        testInfraID,
-		InstallerImage: strPtr("installer-image:latest"),
+		InstallerImage: pointer.StringPtr("installer-image:latest"),
 	}
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 
@@ -1562,4 +1652,16 @@ func TestMergePullSecrets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getProvisions(c client.Client) []*hivev1.ClusterProvision {
+	provisionList := &hivev1.ClusterProvisionList{}
+	if err := c.List(context.TODO(), provisionList); err != nil {
+		return nil
+	}
+	provisions := make([]*hivev1.ClusterProvision, len(provisionList.Items))
+	for i := range provisionList.Items {
+		provisions[i] = &provisionList.Items[i]
+	}
+	return provisions
 }

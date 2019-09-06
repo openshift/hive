@@ -229,9 +229,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd == nil || !cd.Spec.Installed {
-					t.Errorf("did not get a clusterdeployment with a status of Installed")
-					return
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
+					assert.True(t, cd.Status.Installed, "expected Installed field in Status to be true")
 				}
 			},
 		},
@@ -1024,6 +1024,22 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					}
 					assert.Equal(t, expectedSpec, provisions[0].Spec, "unexpected data in provision spec")
 					assert.True(t, metav1.IsControlledBy(provisions[0], getCD(c)), "expected provision to be owned by cd")
+				}
+			},
+		},
+		{
+			name: "Test legacy Status Installed sets Spec Installed",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Status.Installed = true
+					return cd
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.True(t, cd.Spec.Installed, "expected Spec to have Installed field set")
 				}
 			},
 		},

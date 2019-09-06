@@ -690,6 +690,7 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 	}
 
+	cd.Status.Installed = true
 	now := metav1.Now()
 	cd.Status.InstalledTimestamp = &now
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(

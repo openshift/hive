@@ -8,7 +8,7 @@ Like `SyncSets` and `SelectorSyncSets`, you use a `SyncIdentityProvider` to mana
 
 ## SyncIdentityProvider Object Definition
 
-A `SyncIdentityProvider` contains a list of `identityProviders` to apply to specific clusters in that namespace. When you apply the `SyncIdentityProvider`, a `SyncSet` is generated for each `IdentityProvider` that contains a patch that modifies the cluster `oauth` object. 
+A `SyncIdentityProvider` contains a list of `identityProviders` to apply to specific clusters in that namespace. When you apply the `SyncIdentityProvider`, a `SyncSet` is generated for each `IdentityProvider` that contains a patch that modifies the cluster `oauth` object.
 
 ```yaml
 ---
@@ -27,7 +27,7 @@ spec:
   - name: "MyCluster"
 ```
 
-| Field | Usage | 
+| Field | Usage |
 | ----- | ----- |
 | `identityProviders` | List of identity providers to be used for matching clusters. |
 | `clusterDeploymentRefs` | List of `ClusterDeployment` names in the current namespace which the `SyncIdentityProvider` will apply to. |
@@ -39,7 +39,7 @@ spec:
 ```yaml
 ---
 apiVersion: hive.openshift.io/v1alpha1
-kind: SyncIdentityProvider
+kind: SelectorSyncIdentityProvider
 metadata:
   name: allowall-identity-provider
 spec:

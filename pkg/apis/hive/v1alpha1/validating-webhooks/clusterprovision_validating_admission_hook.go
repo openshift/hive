@@ -269,13 +269,38 @@ func validateClusterProvisionSpecInvariants(spec *hivev1.ClusterProvisionSpec, f
 	if spec.ClusterDeployment.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("clusterDeployment", "name"), "must have reference to clusterdeployment"))
 	}
-	// TODO: Vendor in "k8s.io/kubernetes/pkg/apis/core/validation"
-	//allErrs = append(allErrs, apivalidation.ValidatePodSpec(spec.PodSpec, fldPath.Child("podSpec"))...)
 	if spec.Attempt < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("attempt"), spec.Attempt, "attempt number must not be negative"))
 	}
 	if !validProvisionStages[spec.Stage] {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("stage"), spec.Stage, validProvisionStageValues))
+	}
+	if len(spec.PodSpec.Containers) == 0 {
+		if spec.Attempt != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("attempt"), spec.Attempt, "attempt number must not be set for pre-installed cluster"))
+		}
+		if spec.Stage != hivev1.ClusterProvisionStageComplete {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("stage"), spec.Stage, fmt.Sprintf("stage must be %s for pre-installed cluster", hivev1.ClusterProvisionStageComplete)))
+		}
+		if spec.PrevClusterID != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("prevClusterID"), spec.PrevClusterID, "previous cluster ID must not be set for pre-installed cluster"))
+		}
+		if spec.PrevInfraID != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("prevInfraID"), spec.PrevInfraID, "previous infra ID must not be set for pre-installed cluster"))
+		}
+	}
+	if spec.Stage == hivev1.ClusterProvisionStageProvisioning || spec.Stage == hivev1.ClusterProvisionStageComplete {
+		if spec.InfraID == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("infraID"), fmt.Sprintf("infra ID must be set for %s or %s cluster", hivev1.ClusterProvisionStageProvisioning, hivev1.ClusterProvisionStageComplete)))
+		}
+	}
+	if spec.Stage == hivev1.ClusterProvisionStageComplete {
+		if spec.AdminKubeconfigSecret == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("adminKubeConfigSecret"), fmt.Sprintf("admin kubeconfig secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
+		}
+		if spec.AdminPasswordSecret == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("adminPasswordSecret"), fmt.Sprintf("admin password secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
+		}
 	}
 	if spec.ClusterID != nil && *spec.ClusterID == "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterID"), spec.ClusterID, "cluster ID must not be an empty string"))

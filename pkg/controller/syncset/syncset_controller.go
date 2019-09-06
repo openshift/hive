@@ -168,7 +168,7 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
-	if !cd.Status.Installed {
+	if !cd.Spec.Installed {
 		// Cluster isn't installed yet, return
 		cdLog.Debug("cluster installation is not complete")
 		return reconcile.Result{}, nil

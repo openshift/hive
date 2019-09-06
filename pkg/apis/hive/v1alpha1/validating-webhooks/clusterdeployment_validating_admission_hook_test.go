@@ -156,6 +156,28 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:      "Test setting installed flag",
+			oldObject: validClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.Installed = true
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Test clearing installed flag",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeployment()
+				cd.Spec.Installed = true
+				return cd
+			}(),
+			newObject:       validClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
 			name:      "Test Update PreserveOnDelete",
 			oldObject: validClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {

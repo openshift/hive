@@ -102,6 +102,9 @@ type ClusterDeploymentSpec struct {
 	// for this ClusterDeployment
 	// +optional
 	ManageDNS bool `json:"manageDNS,omitempty"`
+
+	// Installed is true if the cluster has been installed
+	Installed bool `json:"installed"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
@@ -138,6 +141,7 @@ type ClusterDeploymentStatus struct {
 	InfraID string `json:"infraID,omitempty"`
 
 	// Installed is true if the installer job has successfully completed for this cluster.
+	// Deprecated.
 	Installed bool `json:"installed"`
 
 	// Federated is true if the cluster deployment has been federated with the host cluster.
@@ -267,7 +271,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 // +kubebuilder:printcolumn:name="ClusterName",type="string",JSONPath=".spec.clusterName"
 // +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels.hive\.openshift\.io/cluster-type"
 // +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
-// +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".status.installed"
+// +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".spec.installed"
 // +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".status.infraID"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:path=clusterdeployments,shortName=cd

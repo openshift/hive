@@ -228,7 +228,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd == nil || !cd.Status.Installed {
+				if cd == nil || !cd.Spec.Installed {
 					t.Errorf("did not get a clusterdeployment with a status of Installed")
 					return
 				}
@@ -313,7 +313,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
-					cd.Status.Installed = true
+					cd.Spec.Installed = true
 					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
@@ -359,7 +359,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testDeletedClusterDeployment()
-					cd.Status.Installed = true
+					cd.Spec.Installed = true
 					cd.Spec.PreserveOnDelete = true
 					return cd
 				}(),
@@ -382,7 +382,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testDeletedClusterDeployment()
 					cd.Spec.PreserveOnDelete = true
-					cd.Status.Installed = false
+					cd.Spec.Installed = false
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -767,17 +767,16 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Do not adopt provision from other attempt",
+			name: "Do not adopt failed provision",
 			existing: []runtime.Object{
 				func() runtime.Object {
 					cd := testClusterDeployment()
-					cd.Status.InstallRestarts = 1
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-				testProvision(),
+				testFailedProvisionAttempt(0),
 			},
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
@@ -1182,7 +1181,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
-	cd.Status.Installed = true
+	cd.Spec.Installed = true
 	cd.Status.InstalledTimestamp = &metav1.Time{Time: installedAt}
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 	return cd

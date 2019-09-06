@@ -166,7 +166,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 				accumulator.processCluster(&cd)
 
 				if cd.DeletionTimestamp == nil {
-					if !cd.Status.Installed {
+					if !cd.Spec.Installed {
 						// Similarly for installing clusters we report the seconds since
 						// cluster was created. clusterdeployment_controller should set to 0
 						// once we know we've first observed install success, and then this
@@ -426,7 +426,7 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 		}
 	}
 
-	if cd.Status.Installed {
+	if cd.Spec.Installed {
 		ca.installed[clusterType]++
 	} else {
 		// Sort uninstall clusters into buckets based on how long since

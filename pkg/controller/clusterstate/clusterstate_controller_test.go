@@ -213,8 +213,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Namespace: testNamespace,
 			Name:      testName,
 		},
-		Status: hivev1.ClusterDeploymentStatus{
+		Spec: hivev1.ClusterDeploymentSpec{
 			Installed: true,
+		},
+		Status: hivev1.ClusterDeploymentStatus{
 			AdminKubeconfigSecret: corev1.LocalObjectReference{
 				Name: testKubeconfigSecretName,
 			},

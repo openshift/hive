@@ -378,7 +378,7 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 	}
-	cd.Status.Installed = true
+	cd.Spec.Installed = true
 	return cd
 }
 

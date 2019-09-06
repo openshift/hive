@@ -447,9 +447,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				"region": "us-east-1",
 			},
 		},
-		Spec: hivev1.ClusterDeploymentSpec{},
+		Spec: hivev1.ClusterDeploymentSpec{
+			Installed: true,
+		},
 		Status: hivev1.ClusterDeploymentStatus{
-			Installed:             true,
 			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 		},
 	}

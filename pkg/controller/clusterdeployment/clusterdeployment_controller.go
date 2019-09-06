@@ -312,6 +312,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}, nil
 	}
 
+	// TODO: Remove once all clusterdeployments have been transitioned to use
+	// the Installed field from Spec instead of from Status.
+	if cd.Status.Installed && !cd.Spec.Installed {
+		cd.Spec.Installed = true
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
+	}
+
 	imageSet, modified, err := r.getClusterImageSet(cd, cdLog)
 	if modified || err != nil {
 		return reconcile.Result{}, err
@@ -334,7 +341,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 		// If the cluster never made it to installed, make sure we clear the provisioning
 		// underway metric.
-		if !cd.Status.Installed {
+		if !cd.Spec.Installed {
 			hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
 				cd.Name,
 				cd.Namespace,
@@ -390,10 +397,26 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
-	if cd.Status.Installed {
-		cdLog.Debug("cluster is already installed, no processing of provision needed")
-		r.cleanupInstallLogPVC(cd, cdLog)
-		return reconcile.Result{}, nil
+	if cd.Spec.Installed {
+		if cd.Status.InstalledTimestamp != nil {
+			cdLog.Debug("cluster is already installed, no processing of provision needed")
+			r.cleanupInstallLogPVC(cd, cdLog)
+			return reconcile.Result{}, nil
+		}
+		if cd.Status.Provision == nil {
+			existingProvisions, err := r.existingProvisions(cd, cdLog)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			for _, provision := range existingProvisions {
+				if provision.Spec.Stage == hivev1.ClusterProvisionStageComplete {
+					return r.adoptProvision(cd, provision, cdLog)
+				}
+			}
+			cdLog.Warn("cluster is already installed, but provision could not be found")
+			return reconcile.Result{}, nil
+		}
+		return r.reconcileExistingProvision(cd, cdLog)
 	}
 
 	// Indicate that the cluster is still installing:
@@ -454,7 +477,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	for _, provision := range existingProvisions {
-		if provision.Spec.Attempt == cd.Status.InstallRestarts {
+		if provision.Spec.Stage != hivev1.ClusterProvisionStageFailed {
 			return r.adoptProvision(cd, provision, cdLog)
 		}
 	}
@@ -656,7 +679,36 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
 	cdLog.Info("provision completed successfully")
 
-	cd.Status.Installed = true
+	if !cd.Spec.Installed {
+		cd.Spec.Installed = true
+		if err := r.Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Error("failed to set the Installed flag")
+			return reconcile.Result{}, err
+		}
+
+		// jobDuration calculates the time elapsed since the first clusterprovision was created
+		startTime := cd.CreationTimestamp
+		if firstProvision := r.getFirstProvision(cd, cdLog); firstProvision != nil {
+			startTime = firstProvision.CreationTimestamp
+		}
+		jobDuration := time.Since(startTime.Time)
+		cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
+		metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
+
+		// Report a metric for the total number of install restarts:
+		metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
+			Observe(float64(cd.Status.InstallRestarts))
+
+		// Clear the install underway seconds metric. After this no-one should be reporting
+		// this metric for this cluster.
+		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+
+		metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+	}
+
 	now := metav1.Now()
 	cd.Status.InstalledTimestamp = &now
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
@@ -693,28 +745,6 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		cdLog.Error("could not update status")
 		return reconcile.Result{}, err
 	}
-
-	// jobDuration calculates the time elapsed since the first clusterprovision was created
-	startTime := cd.CreationTimestamp
-	if firstProvision := r.getFirstProvision(cd, cdLog); firstProvision != nil {
-		startTime = firstProvision.CreationTimestamp
-	}
-	jobDuration := time.Since(startTime.Time)
-	cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
-	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
-
-	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
-		Observe(float64(cd.Status.InstallRestarts))
-
-	// Clear the install underway seconds metric. After this no-one should be reporting
-	// this metric for this cluster.
-	hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-		cd.Name,
-		cd.Namespace,
-		hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
-
-	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 
 	return reconcile.Result{}, nil
 }
@@ -1100,7 +1130,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 
 	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed
 	if cd.Spec.PreserveOnDelete {
-		if cd.Status.Installed {
+		if cd.Spec.Installed {
 			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
 			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 				err = r.removeClusterDeploymentFinalizer(cd)
@@ -1321,7 +1351,7 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 // cleanupInstallLogPVC will immediately delete the PVC (should it exist) if the cluster was installed successfully, without retries.
 // If there were retries, it will delete the PVC if it has been more than 7 days since the job was completed.
 func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	if !cd.Status.Installed {
+	if !cd.Spec.Installed {
 		return nil
 	}
 
@@ -1432,7 +1462,7 @@ func clearUnderwaySecondsMetrics(cd *hivev1.ClusterDeployment) {
 		hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
 
 	// Clear the install underway seconds metric if this cluster was still installing.
-	if !cd.Status.Installed {
+	if !cd.Spec.Installed {
 		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
 			cd.Name,
 			cd.Namespace,

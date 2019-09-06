@@ -62,9 +62,10 @@ export SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLOUD_CREDS_DIR}/ssh-public
 export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLOUD_CREDS_DIR}/pull-secret}"
 
 function teardown() {
-	oc logs -c hive job/${CLUSTER_NAME}-install &> "${ARTIFACT_DIR}/hive_install_job.log" || true
+	INSTALL_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/install=true" -o jsonpath='{.items[0].metadata.name}')
+	oc logs -c hive job/${INSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_install_job.log" || true
 	echo "************* INSTALL JOB LOG *************"
-	if oc get cm/${CLUSTER_NAME}-install-log -o jsonpath='{ .data.log }' &> "${ARTIFACT_DIR}/hive_install_console.log"; then
+	if oc get clusterprovision -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME}" -o jsonpath='{.items[0].spec.installLog}' &> "${ARTIFACT_DIR}/hive_install_console.log"; then
 		cat "${ARTIFACT_DIR}/hive_install_console.log"
 	else
 		cat "${ARTIFACT_DIR}/hive_install_job.log"

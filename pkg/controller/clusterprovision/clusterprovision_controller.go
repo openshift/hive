@@ -103,8 +103,6 @@ type ReconcileClusterProvision struct {
 
 // Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read
 // and what is in the ClusterProvision.Spec
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterprovisions;clusterprovisions/status;clusterprovisions/finalizers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	pLog := log.WithFields(log.Fields{

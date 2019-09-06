@@ -62,7 +62,7 @@ with open('config/operator/operator_role.yaml', 'r') as stream:
         })
 
 # Add our hive-controllers role to the CSV:
-with open('config/rbac/manager_role.yaml', 'r') as stream:
+with open('config/rbac/hive_controllers_role.yaml', 'r') as stream:
     hive_role = yaml.load(stream, Loader=yaml.SafeLoader)
     csv['spec']['install']['spec']['clusterPermissions'].append(
         {

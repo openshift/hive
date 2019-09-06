@@ -103,8 +103,6 @@ type ReconcileBackup struct {
 }
 
 // Reconcile ensures that all Hive object changes have corresponding Velero backup objects.
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments;syncsets,verbs=get;list;watch;create;update
-// +kubebuilder:rbac:groups=velero.io,resources=backups,verbs=create
 func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	rrLogger := addReconcileRequestLoggerFields(r.logger, request)

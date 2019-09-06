@@ -53,9 +53,6 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=syncidentityproviders,verbs=get;list;watch
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=selectorsyncidentityproviders,verbs=get;list;watch
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;list;watch
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(controllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
@@ -160,8 +157,6 @@ type identityProviderPatchSpec struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes to the
 // remote cluster MachineSets based on the state read and the worker machines defined in
 // ClusterDeployment.Spec.Config.Machines
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=clusterdeployments,verbs=get;list;watch
-// +kubebuilder:rbac:groups=hive.openshift.io,resources=syncsets,verbs=get;create;update;delete;patch;list;watch
 func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	contextLogger := addReconcileRequestLoggerFields(r.logger, request)

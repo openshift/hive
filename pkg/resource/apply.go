@@ -23,7 +23,7 @@ var (
 	// UnchangedApplyResult is returned when no change occurred
 	UnchangedApplyResult ApplyResult = "unchanged"
 
-	// CreatedApplyResult is returned when no a resource was created
+	// CreatedApplyResult is returned when a resource was created
 	CreatedApplyResult ApplyResult = "created"
 
 	// UnknownApplyResult is returned when the resulting action could not be determined

@@ -396,14 +396,17 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, nil
 		}
 		if cd.Status.Provision == nil {
-			// TODO: Remove the code for creating a dummy clusterprovision once
-			// all legacy clusterdeployments have had clusterprovisions created
-			// for them.
-			if cd.Status.InfraID != "" {
-				cdLog.Info("cluster was created prior to clusterprovisions, creating dummy clusterprovision")
-				return r.createClusterProvisionForLegacyCD(cd, cdLog)
+			existingProvisions, err := r.existingProvisions(cd, cdLog)
+			if err != nil {
+				return reconcile.Result{}, err
 			}
-			return r.findAndAdoptRestoredClusterProvision(cd, cdLog)
+			for _, provision := range existingProvisions {
+				if provision.Spec.Stage == hivev1.ClusterProvisionStageComplete {
+					return r.adoptProvision(cd, provision, cdLog)
+				}
+			}
+			cdLog.Warn("cluster is already installed, but provision could not be found")
+			return reconcile.Result{}, nil
 		}
 		return r.reconcileExistingProvision(cd, cdLog)
 	}
@@ -1402,92 +1405,6 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 	cdLog.WithField("pvc", pvc.Name).Debug("preserving logs PersistentVolumeClaim for cluster with install restarts for 7 days")
 	return nil
 
-}
-
-func (r *ReconcileClusterDeployment) createClusterProvisionForLegacyCD(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
-	labels := cd.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[constants.ClusterDeploymentNameLabel] = cd.Name
-
-	provision := &hivev1.ClusterProvision{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      apihelpers.GetResourceName(cd.Name, fmt.Sprintf("0-%s", utilrand.String(5))),
-			Namespace: cd.Namespace,
-			Labels:    labels,
-		},
-		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
-				Name: cd.Name,
-			},
-			Stage:                 hivev1.ClusterProvisionStageComplete,
-			InfraID:               &cd.Status.InfraID,
-			ClusterID:             &cd.Status.ClusterID,
-			AdminKubeconfigSecret: &cd.Status.AdminKubeconfigSecret,
-			AdminPasswordSecret:   &cd.Status.AdminPasswordSecret,
-		},
-	}
-
-	logsConfigMap := &corev1.ConfigMap{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Namespace: cd.Namespace, Name: fmt.Sprintf("%s-install-log", cd.Name)}, logsConfigMap); {
-	case apierrors.IsNotFound(err):
-		cdLog.Warn("legacy installed clusterdeployment does not have corresponding logs configmap")
-	case err != nil:
-		cdLog.WithError(err).Error("failed to get logs configmap for legacy clusterdeployment")
-	default:
-		if log, ok := logsConfigMap.Data["log"]; ok {
-			provision.Spec.InstallLog = &log
-		} else {
-			cdLog.Warn("logs configmap for legacy clusterdeployment does not have a \"log\" data entry")
-		}
-	}
-
-	metadataConfigMap := &corev1.ConfigMap{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Namespace: cd.Namespace, Name: fmt.Sprintf("%s-metadata", cd.Name)}, metadataConfigMap); {
-	case apierrors.IsNotFound(err):
-		cdLog.Warn("legacy installed clusterdeployment does not have corresponding metadata configmap")
-	case err != nil:
-		cdLog.WithError(err).Error("failed to get metadata configmap for legacy clusterdeployment")
-	default:
-		if metadata, ok := metadataConfigMap.Data["metadata.json"]; ok {
-			provision.Spec.Metadata = &runtime.RawExtension{
-				Raw: []byte(metadata),
-			}
-		} else {
-			cdLog.Warn("metadata configmap for legacy clusterdeployment does not have a \"metadata.json\" data entry")
-		}
-	}
-
-	if err := controllerutil.SetControllerReference(cd, provision, r.scheme); err != nil {
-		cdLog.WithError(err).Error("could not set the owner ref on provision")
-		return reconcile.Result{}, err
-	}
-
-	r.expectations.ExpectCreations(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(), 1)
-	if err := r.Create(context.TODO(), provision); err != nil {
-		cdLog.WithError(err).Error("could not create provision")
-		r.expectations.CreationObserved(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String())
-		return reconcile.Result{}, err
-	}
-
-	cdLog.WithField("provision", provision.Name).Info("dummy clusterprovision created")
-
-	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileClusterDeployment) findAndAdoptRestoredClusterProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
-	existingProvisions, err := r.existingProvisions(cd, cdLog)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	for _, provision := range existingProvisions {
-		if provision.Spec.Stage == hivev1.ClusterProvisionStageComplete {
-			return r.adoptProvision(cd, provision, cdLog)
-		}
-	}
-	cdLog.Warn("cluster is already installed, but provision could not be found")
-	return reconcile.Result{}, nil
 }
 
 func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) *hivev1.ClusterDeprovisionRequest {

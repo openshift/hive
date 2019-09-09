@@ -39,6 +39,9 @@ const (
 )
 
 var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterProvision")
+
 	metricInstallErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "hive_install_errors",
 		Help: "Counter incremented every time we observe certain errors strings in install logs.",
@@ -59,11 +62,22 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterProvision{Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName), scheme: mgr.GetScheme()}
+	logger := log.WithField("controller", controllerName)
+	return &ReconcileClusterProvision{
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:       mgr.GetScheme(),
+		logger:       logger,
+		expectations: controllerutils.NewExpectations(logger),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
+	provisionReconciler, ok := r.(*ReconcileClusterProvision)
+	if !ok {
+		return errors.New("reconciler supplied is not a ReconcileClusterProvision")
+	}
+
 	// Create a new controller
 	c, err := controller.New("clusterprovision-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -76,10 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for install jobs created for ClusterProvision
-	if err := c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterProvision{},
-	}); err != nil {
+	if err := provisionReconciler.watchJobs(c); err != nil {
 		return errors.Wrap(err, "could not watch jobs")
 	}
 
@@ -99,16 +110,16 @@ var _ reconcile.Reconciler = &ReconcileClusterProvision{}
 type ReconcileClusterProvision struct {
 	client.Client
 	scheme *runtime.Scheme
+	logger log.FieldLogger
+	// A TTLCache of job creates each clusterprovision expects to see
+	expectations controllerutils.ExpectationsInterface
 }
 
 // Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read
 // and what is in the ClusterProvision.Spec
 func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	pLog := log.WithFields(log.Fields{
-		"name":       request.NamespacedName.String(),
-		"controller": controllerName,
-	})
+	pLog := r.logger.WithField("name", request.NamespacedName)
 
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	pLog.Info("reconciling cluster provision")
@@ -124,6 +135,7 @@ func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconc
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			pLog.Debug("ClusterProvision not found, skipping")
+			r.expectations.DeleteExpectations(request.NamespacedName.String())
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -133,6 +145,11 @@ func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconc
 
 	if !instance.DeletionTimestamp.IsZero() {
 		pLog.Debug("ClusterProvision being deleted, skipping")
+		return reconcile.Result{}, nil
+	}
+
+	if !r.expectations.SatisfiedExpectations(request.String()) {
+		pLog.Debug("waiting for expectations to be satisfied")
 		return reconcile.Result{}, nil
 	}
 
@@ -187,8 +204,10 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 	}
 
 	pLog.Infof("creating install job")
+	r.expectations.ExpectCreations(types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}.String(), 1)
 	if err := r.Create(context.TODO(), job); err != nil {
 		pLog.WithError(err).Error("error creating job")
+		r.expectations.CreationObserved(types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}.String())
 		return reconcile.Result{}, err
 	}
 

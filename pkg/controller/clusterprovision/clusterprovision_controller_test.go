@@ -47,12 +47,14 @@ func TestClusterProvisionReconcile(t *testing.T) {
 	tests := []struct {
 		name                    string
 		existing                []runtime.Object
+		pendingCreation         bool
 		expectedReconcileResult reconcile.Result
 		expectErr               bool
 		expectedStage           hivev1.ClusterProvisionStage
 		expectedFailReason      string
 		expectNoJob             bool
 		expectNoJobReference    bool
+		expectPendingCreation   bool
 		validate                func(client.Client, *testing.T)
 	}{
 		{
@@ -60,8 +62,20 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testProvision(),
 			},
-			expectedStage:        hivev1.ClusterProvisionStageInitializing,
-			expectNoJobReference: true,
+			expectedStage:         hivev1.ClusterProvisionStageInitializing,
+			expectNoJobReference:  true,
+			expectPendingCreation: true,
+		},
+		{
+			name: "job not created when pending create",
+			existing: []runtime.Object{
+				testProvision(),
+			},
+			pendingCreation:       true,
+			expectedStage:         hivev1.ClusterProvisionStageInitializing,
+			expectNoJob:           true,
+			expectNoJobReference:  true,
+			expectPendingCreation: true,
 		},
 		{
 			name: "adopt job",
@@ -153,18 +167,28 @@ func TestClusterProvisionReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("controller", "clusterProvision")
 			fakeClient := fake.NewFakeClient(test.existing...)
+			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterProvision{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:       fakeClient,
+				scheme:       scheme.Scheme,
+				logger:       logger,
+				expectations: controllerExpectations,
 			}
 
-			result, err := rcp.Reconcile(reconcile.Request{
+			reconcileRequest := reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testProvisionName,
 					Namespace: testNamespace,
 				},
-			})
+			}
+
+			if test.pendingCreation {
+				controllerExpectations.ExpectCreations(reconcileRequest.String(), 1)
+			}
+
+			result, err := rcp.Reconcile(reconcileRequest)
 
 			assert.Equal(t, test.expectedReconcileResult, result, "unexpected reconcile result")
 
@@ -200,6 +224,9 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			} else {
 				assert.NotNil(t, job, "expected job")
 			}
+
+			actualPendingCreation := !controllerExpectations.SatisfiedExpectations(reconcileRequest.String())
+			assert.Equal(t, test.expectPendingCreation, actualPendingCreation, "unexpected pending creation")
 
 			if test.validate != nil {
 				test.validate(fakeClient, t)

@@ -315,6 +315,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Spec.Installed = true
+					installTime := metav1.Date(2019, 9, 6, 11, 58, 32, 45, time.UTC)
+					cd.Status.InstalledTimestamp = &installTime
 					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
@@ -832,10 +834,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Do not adopt failed provision",
 			existing: []runtime.Object{
-				func() runtime.Object {
-					cd := testClusterDeployment()
-					return cd
-				}(),
+				testClusterDeployment(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
@@ -976,6 +975,56 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 				deprovision := getDeprovisionRequest(c)
 				assert.NotNil(t, deprovision, "missing deprovision request")
+			},
+		},
+		{
+			name: "Create dummy provision for legacy clusterdeployment",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					cd.Status.InfraID = "test-infra-id"
+					cd.Status.ClusterID = "test-cluster-id"
+					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: "test-kubeconfig"}
+					cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: "test-password"}
+					return cd
+				}(),
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo-lqmsh-install-log",
+						Namespace: testNamespace,
+					},
+					Data: map[string]string{
+						"log": "test-install-log",
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo-lqmsh-metadata",
+						Namespace: testNamespace,
+					},
+					Data: map[string]string{
+						"metadata.json": "\"test-metadata\"",
+					},
+				},
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				provisions := getProvisions(c)
+				if assert.Len(t, provisions, 1, "expected provision to exist") {
+					expectedSpec := hivev1.ClusterProvisionSpec{
+						ClusterDeployment:     corev1.LocalObjectReference{Name: testName},
+						Stage:                 hivev1.ClusterProvisionStageComplete,
+						InfraID:               pointer.StringPtr("test-infra-id"),
+						ClusterID:             pointer.StringPtr("test-cluster-id"),
+						InstallLog:            pointer.StringPtr("test-install-log"),
+						Metadata:              &runtime.RawExtension{Raw: []byte("\"test-metadata\"")},
+						AdminKubeconfigSecret: &corev1.LocalObjectReference{Name: "test-kubeconfig"},
+						AdminPasswordSecret:   &corev1.LocalObjectReference{Name: "test-password"},
+					}
+					assert.Equal(t, expectedSpec, provisions[0].Spec, "unexpected data in provision spec")
+					assert.True(t, metav1.IsControlledBy(provisions[0], getCD(c)), "expected provision to be owned by cd")
+				}
 			},
 		},
 	}

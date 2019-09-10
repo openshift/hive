@@ -678,7 +678,7 @@
   version = "v1.14.0"
 
 [[projects]]
-  digest = "1:2df7f3427c2bd044b207d209484a897e583152cd2d2b18b052b392528b484267"
+  digest = "1:9a534a24bb6e27a51fb71d7dac2602bd8660c98b6321090dd37adeb7fbc7442a"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -699,7 +699,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "ae2baf820f22b9bf1ed40932e7b702d790087574"
+  revision = "6fdffbb9c21d90ba97fc79dff3ccbeac22fb2a0e"
 
 [[projects]]
   branch = "master"
@@ -1889,6 +1889,7 @@
     "k8s.io/apimachinery/pkg/runtime/serializer",
     "k8s.io/apimachinery/pkg/runtime/serializer/json",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/apimachinery/pkg/util/clock",
     "k8s.io/apimachinery/pkg/util/diff",
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/rand",

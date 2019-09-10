@@ -131,7 +131,6 @@ func (o *ClusterUninstaller) Run() error {
 		tagClientNames[tagClient] = "us-east-1"
 	}
 
-	deleted := map[string]struct{}{}
 	iamClient := iam.New(awsSession)
 	iamRoleSearch := &iamRoleSearch{
 		client:  iamClient,
@@ -142,6 +141,11 @@ func (o *ClusterUninstaller) Run() error {
 		client:  iamClient,
 		filters: o.Filters,
 		logger:  o.Logger,
+	}
+
+	deleted, err := terminateEC2InstancesByTags(ec2.New(awsSession), iamClient, o.Filters, o.Logger)
+	if err != nil {
+		return err
 	}
 
 	err = wait.PollImmediateInfinite(
@@ -532,7 +536,7 @@ func deleteEC2(session *session.Session, arn arn.ARN, filter Filter, logger logr
 	case "image":
 		return deleteEC2Image(client, id, filter, logger)
 	case "instance":
-		return deleteEC2Instance(client, iam.New(session), id, logger)
+		return terminateEC2Instance(client, iam.New(session), id, logger)
 	case "internet-gateway":
 		return deleteEC2InternetGateway(client, id, logger)
 	case "natgateway":
@@ -628,7 +632,7 @@ func deleteEC2ElasticIP(client *ec2.EC2, id string, logger logrus.FieldLogger) e
 	return nil
 }
 
-func deleteEC2Instance(ec2Client *ec2.EC2, iamClient *iam.IAM, id string, logger logrus.FieldLogger) error {
+func terminateEC2Instance(ec2Client *ec2.EC2, iamClient *iam.IAM, id string, logger logrus.FieldLogger) error {
 	response, err := ec2Client.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(id)},
 	})
@@ -641,33 +645,114 @@ func deleteEC2Instance(ec2Client *ec2.EC2, iamClient *iam.IAM, id string, logger
 
 	for _, reservation := range response.Reservations {
 		for _, instance := range reservation.Instances {
-			// Skip 'terminated' instances since they take a while to really get cleaned up
-			if *instance.State.Name == "terminated" {
-				continue
-			}
-			if instance.IamInstanceProfile != nil {
-				parsed, err := arn.Parse(*instance.IamInstanceProfile.Arn)
-				if err != nil {
-					return errors.Wrap(err, "parse ARN for IAM instance profile")
-				}
-
-				err = deleteIAMInstanceProfile(iamClient, parsed, logger)
-				if err != nil {
-					return errors.Wrapf(err, "deleting %s", parsed.String())
-				}
-			}
-
-			_, err := ec2Client.TerminateInstances(&ec2.TerminateInstancesInput{
-				InstanceIds: []*string{instance.InstanceId},
-			})
+			err = terminateEC2InstanceByInstance(ec2Client, iamClient, instance, logger)
 			if err != nil {
 				return err
 			}
-
-			logger.Info("Deleted")
 		}
 	}
 	return nil
+}
+
+func terminateEC2InstanceByInstance(ec2Client *ec2.EC2, iamClient *iam.IAM, instance *ec2.Instance, logger logrus.FieldLogger) error {
+	// Skip 'shutting-down' and 'terminated' instances since they take a while to get cleaned up
+	if instance.State == nil || *instance.State.Name == "shutting-down" || *instance.State.Name == "terminated" {
+		return nil
+	}
+
+	if instance.IamInstanceProfile != nil {
+		parsed, err := arn.Parse(*instance.IamInstanceProfile.Arn)
+		if err != nil {
+			return errors.Wrap(err, "parse ARN for IAM instance profile")
+		}
+
+		err = deleteIAMInstanceProfile(iamClient, parsed, logger)
+		if err != nil {
+			return errors.Wrapf(err, "deleting %s", parsed.String())
+		}
+	}
+
+	_, err := ec2Client.TerminateInstances(&ec2.TerminateInstancesInput{
+		InstanceIds: []*string{instance.InstanceId},
+	})
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Terminating")
+	return nil
+}
+
+// terminateEC2InstancesByTags loops until there all instances which
+// match the given tags are terminated.
+func terminateEC2InstancesByTags(ec2Client *ec2.EC2, iamClient *iam.IAM, filters []Filter, logger logrus.FieldLogger) (map[string]struct{}, error) {
+	if ec2Client.Config.Region == nil {
+		return nil, errors.New("EC2 client does not have region configured")
+	}
+
+	terminated := map[string]struct{}{}
+	err := wait.PollImmediateInfinite(
+		time.Second*10,
+		func() (done bool, err error) {
+			var loopError error
+			matched := false
+			for _, filter := range filters {
+				logger.Debugf("search for and delete matching instances by tag matching %#+v", filter)
+				instanceFilters := make([]*ec2.Filter, 0, len(filter))
+				for key, value := range filter {
+					instanceFilters = append(instanceFilters, &ec2.Filter{
+						Name:   aws.String("tag:" + key),
+						Values: []*string{aws.String(value)},
+					})
+				}
+				err = ec2Client.DescribeInstancesPages(
+					&ec2.DescribeInstancesInput{Filters: instanceFilters},
+					func(results *ec2.DescribeInstancesOutput, lastPage bool) bool {
+						for _, reservation := range results.Reservations {
+							if reservation.OwnerId == nil {
+								continue
+							}
+
+							for _, instance := range reservation.Instances {
+								if instance.InstanceId == nil || instance.State == nil {
+									continue
+								}
+
+								instanceLogger := logger.WithField("instance", *instance.InstanceId)
+								if *instance.State.Name == "terminated" {
+									arn := fmt.Sprintf("arn:aws:ec2:%s:%s:instance/%s", *ec2Client.Config.Region, *reservation.OwnerId, *instance.InstanceId)
+									if _, ok := terminated[arn]; !ok {
+										instanceLogger.Debug("Terminated")
+										terminated[arn] = exists
+									}
+									continue
+								}
+
+								matched = true
+								err := terminateEC2InstanceByInstance(ec2Client, iamClient, instance, instanceLogger)
+								if err != nil {
+									instanceLogger.Debug(err)
+									loopError = errors.Wrapf(err, "terminating %s", *instance.InstanceId)
+									continue
+								}
+							}
+						}
+
+						return !lastPage
+					},
+				)
+				if err != nil {
+					err = errors.Wrap(err, "describe instances")
+					logger.Info(err)
+					matched = true
+					loopError = err
+				}
+			}
+
+			return !matched && loopError == nil, nil
+		},
+	)
+	return terminated, err
 }
 
 // This is a bit of hack. Some objects, like Instance Profiles, can not be tagged in AWS.
@@ -880,31 +965,45 @@ func deleteEC2SecurityGroup(client *ec2.EC2, id string, logger logrus.FieldLogge
 	}
 
 	for _, group := range response.SecurityGroups {
-		if len(group.IpPermissions) > 0 {
-			_, err := client.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
-				GroupId:       group.GroupId,
-				IpPermissions: group.IpPermissions,
-			})
-			if err != nil {
-				return errors.Wrap(err, "revoking ingress permissions")
-			}
-			logger.Debug("Revoked ingress permissions")
-		}
-
-		if len(group.IpPermissionsEgress) > 0 {
-			_, err := client.RevokeSecurityGroupEgress(&ec2.RevokeSecurityGroupEgressInput{
-				GroupId:       group.GroupId,
-				IpPermissions: group.IpPermissionsEgress,
-			})
-			if err != nil {
-				return errors.Wrap(err, "revoking egress permissions")
-			}
-			logger.Debug("Revoked egress permissions")
+		err = deleteEC2SecurityGroupObject(client, group, logger)
+		if err != nil {
+			return err
 		}
 	}
 
-	_, err = client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
-		GroupId: aws.String(id),
+	return nil
+}
+
+func deleteEC2SecurityGroupObject(client *ec2.EC2, group *ec2.SecurityGroup, logger logrus.FieldLogger) error {
+	if group.GroupName != nil && *group.GroupName == "default" {
+		logger.Debug("Skipping default security group")
+		return nil
+	}
+
+	if len(group.IpPermissions) > 0 {
+		_, err := client.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
+			GroupId:       group.GroupId,
+			IpPermissions: group.IpPermissions,
+		})
+		if err != nil {
+			return errors.Wrap(err, "revoking ingress permissions")
+		}
+		logger.Debug("Revoked ingress permissions")
+	}
+
+	if len(group.IpPermissionsEgress) > 0 {
+		_, err := client.RevokeSecurityGroupEgress(&ec2.RevokeSecurityGroupEgressInput{
+			GroupId:       group.GroupId,
+			IpPermissions: group.IpPermissionsEgress,
+		})
+		if err != nil {
+			return errors.Wrap(err, "revoking egress permissions")
+		}
+		logger.Debug("Revoked egress permissions")
+	}
+
+	_, err := client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
+		GroupId: group.GroupId,
 	})
 	if err != nil {
 		if err.(awserr.Error).Code() == "InvalidGroup.NotFound" {
@@ -915,6 +1014,41 @@ func deleteEC2SecurityGroup(client *ec2.EC2, id string, logger logrus.FieldLogge
 
 	logger.Info("Deleted")
 	return nil
+}
+
+func deleteEC2SecurityGroupsByVPC(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error {
+	var lastError error
+	err := client.DescribeSecurityGroupsPages(
+		&ec2.DescribeSecurityGroupsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{&vpc},
+				},
+			},
+		},
+		func(results *ec2.DescribeSecurityGroupsOutput, lastPage bool) bool {
+			for _, group := range results.SecurityGroups {
+				err := deleteEC2SecurityGroupObject(client, group, logger.WithField("security group", *group.GroupId))
+				if err != nil {
+					if lastError != nil {
+						logger.Debug(err)
+					}
+					lastError = errors.Wrapf(err, "deleting EC2 security group %s", *group.GroupId)
+					if failFast {
+						return false
+					}
+				}
+			}
+
+			return !lastPage
+		},
+	)
+
+	if lastError != nil {
+		return lastError
+	}
+	return err
 }
 
 func deleteEC2Snapshot(client *ec2.EC2, id string, logger logrus.FieldLogger) error {
@@ -997,6 +1131,35 @@ func deleteEC2Subnet(client *ec2.EC2, id string, logger logrus.FieldLogger) erro
 	return nil
 }
 
+func deleteEC2SubnetsByVPC(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error {
+	// FIXME: port to DescribeSubnetsPages once we bump our vendored AWS package past v1.19.30
+	results, err := client.DescribeSubnets(
+		&ec2.DescribeSubnetsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{&vpc},
+				},
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, subnet := range results.Subnets {
+		err := deleteEC2Subnet(client, *subnet.SubnetId, logger.WithField("subnet", *subnet.SubnetId))
+		if err != nil {
+			err = errors.Wrapf(err, "deleting EC2 subnet %s", *subnet.SubnetId)
+			if failFast {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func deleteEC2Volume(client *ec2.EC2, id string, logger logrus.FieldLogger) error {
 	_, err := client.DeleteVolume(&ec2.DeleteVolumeInput{
 		VolumeId: aws.String(id),
@@ -1029,6 +1192,8 @@ func deleteEC2VPC(ec2Client *ec2.EC2, elbClient *elb.ELB, elbv2Client *elbv2.ELB
 		deleteEC2NATGatewaysByVPC,      // not always tagged
 		deleteEC2NetworkInterfaceByVPC, // not always tagged
 		deleteEC2RouteTablesByVPC,      // not always tagged
+		deleteEC2SecurityGroupsByVPC,   // not always tagged
+		deleteEC2SubnetsByVPC,          // not always tagged
 		deleteEC2VPCEndpointsByVPC,     // not taggable
 	} {
 		err := helper(ec2Client, id, true, logger)

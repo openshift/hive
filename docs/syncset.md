@@ -50,7 +50,50 @@ spec:
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
 | `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. You can also specify`"ApplyOnce"` to apply the patch only once. | 
 
+### Example of SyncSet use
 
+In this example you can change the replicaset of a deployment running on top of a Hive managed OpenShift cluster.
+
+* Get the required information of the deployment
+
+```sh
+$ oc get deployment <deployment name> -o yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: sise
+  name: sise-deploy
+  namespace: default
+  replicas: 2
+  xxxxxxx
+```
+
+* Create the SyncSet object in the cluster deployment namespace in Hive managed cluster as mentioned below.
+  * Run `$ oc create -f <syncset_file.yaml> -n <namespace>`
+
+SyncSet File:
+
+```yaml
+apiVersion: hive.openshift.io/v1alpha1
+kind: SyncSet
+metadata:
+  name: sise-deploy-syncset
+spec:
+  clusterDeploymentRefs:
+  - name: <cluster name>
+
+  patches:
+  - kind: Deployment
+    apiVersion: extensions/v1beta1
+    name: sise-deploy
+    namespace: default
+    patch: |-
+      { "spec": { "replicas": 3 } }
+    patchType: strategic
+```
+
+* To see the syncset status, run `$ oc get syncsetinstances <synsetinstance name> -o yaml or json`
 
 ## SelectorSyncSet Object Definition
 
@@ -78,20 +121,14 @@ spec:
 |-------|-------|
 | `clusterDeploymentSelector` | A key/value label pair which selects matching `ClusterDeployments` in any namespace. |
 
-## Diagnosing SyncSet problems
+## Diagnosing SyncSet Failures
 
-`SyncSet` status is stored within `ClusterDeployment` status for each cluster the `SyncSet` applies to. Status will be kept per resource and patch unless an error was encountered gathering resource info. In this case, status contains the index of the broken resource along with an error message.
+The failure logs for syncset is present in Hive controller POD logs.
 
-```yaml
-  syncSetStatus:
-  - conditions:
-    - lastProbeTime: 2019-04-09T21:06:29Z
-      lastTransitionTime: 2019-04-09T21:06:29Z
-      message: 'Unable to gather Info for SyncSet resource at index 0 in resources:
-        could not get info from passed resource: unable to recognize "object": no
-        matches for kind "Group" in version "v1"'
-      reason: UnknownObjectFound
-      status: "True"
-      type: UnknownObject
-    name: mygroup
+To find the status of the syncset, check the corresponding syncsetinstance object in the cluster deployment namespace.
+
+```sh
+oc get syncsetinstance -n <namespace>
 ```
+
+To see details, run `$ oc get syncsetinstances <synsetinstance name> -o yaml or json`.

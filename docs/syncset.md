@@ -77,21 +77,3 @@ spec:
 | Field | Usage |
 |-------|-------|
 | `clusterDeploymentSelector` | A key/value label pair which selects matching `ClusterDeployments` in any namespace. |
-
-## Diagnosing SyncSet problems
-
-`SyncSet` status is stored within `ClusterDeployment` status for each cluster the `SyncSet` applies to. Status will be kept per resource and patch unless an error was encountered gathering resource info. In this case, status contains the index of the broken resource along with an error message.
-
-```yaml
-  syncSetStatus:
-  - conditions:
-    - lastProbeTime: 2019-04-09T21:06:29Z
-      lastTransitionTime: 2019-04-09T21:06:29Z
-      message: 'Unable to gather Info for SyncSet resource at index 0 in resources:
-        could not get info from passed resource: unable to recognize "object": no
-        matches for kind "Group" in version "v1"'
-      reason: UnknownObjectFound
-      status: "True"
-      type: UnknownObject
-    name: mygroup
-```

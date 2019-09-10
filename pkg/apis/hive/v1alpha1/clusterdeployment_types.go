@@ -255,6 +255,9 @@ const (
 
 	// ProvisionFailedCondition indicates that a provision failed
 	ProvisionFailedCondition ClusterDeploymentConditionType = "ProvisionFailed"
+
+	// SyncSetFailedCondition indicates if any syncset for a cluster deployment failed
+	SyncSetFailedCondition ClusterDeploymentConditionType = "SyncSetFailed"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -268,6 +271,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	InstallFailingCondition,
 	DNSNotReadyCondition,
 	ProvisionFailedCondition,
+	SyncSetFailedCondition,
 }
 
 // +genclient

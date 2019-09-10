@@ -68,8 +68,8 @@ type Applier interface {
 	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
 }
 
-// Add creates a new SyncSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
-// Controller and Start it when the Manager is Started.
+// Add creates a new SyncSet controller and adds it to the manager with default RBAC. The manager will set fields on the
+// controller and start it when the manager starts.
 func Add(mgr manager.Manager) error {
 	return AddToManager(mgr, NewReconciler(mgr))
 }
@@ -208,7 +208,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
-	// If the cluster is unreachable, do not reconcile.
+	// If the cluster is unreachable, return from here.
 	if controllerutils.HasUnreachableCondition(cd) {
 		ssiLog.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil

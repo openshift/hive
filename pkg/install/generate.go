@@ -113,28 +113,53 @@ func InstallerPodSpec(
 		},
 	}
 
-	if cd.Spec.PlatformSecrets.AWS != nil && len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
-		env = append(
-			env,
-			corev1.EnvVar{
-				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-						Key:                  "aws_access_key_id",
+	switch {
+	case cd.Spec.PlatformSecrets.AWS != nil:
+		if len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
+			env = append(
+				env,
+				corev1.EnvVar{
+					Name: "AWS_ACCESS_KEY_ID",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+							Key:                  "aws_access_key_id",
+						},
 					},
 				},
-			},
-			corev1.EnvVar{
-				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-						Key:                  "aws_secret_access_key",
+				corev1.EnvVar{
+					Name: "AWS_SECRET_ACCESS_KEY",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
+							Key:                  "aws_secret_access_key",
+						},
 					},
 				},
-			},
-		)
+			)
+		}
+	case cd.Spec.PlatformSecrets.Azure != nil:
+		if len(cd.Spec.PlatformSecrets.Azure.Credentials.Name) > 0 {
+			volumes = append(volumes, corev1.Volume{
+				Name: "azure",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.PlatformSecrets.Azure.Credentials.Name,
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "azure",
+				MountPath: "/.azure",
+			})
+			env = append(env, corev1.EnvVar{
+				Name:  "AZURE_AUTH_LOCATION",
+				Value: "/.azure/osServicePrincipal.json",
+			})
+		}
+	case cd.Spec.PlatformSecrets.GCP != nil:
+		// TODO: Need to set credentials for GCP
+		pLog.Warn("need to set credentials for GCP")
 	}
 
 	if releaseImage != "" {
@@ -218,7 +243,6 @@ func InstallerPodSpec(
 			Args: []string{"install-manager",
 				"--work-dir", "/output",
 				"--log-level", "debug",
-				"--region", cd.Spec.Platform.AWS.Region,
 				cd.Namespace, provisionName,
 			},
 			VolumeMounts: volumeMounts,
@@ -299,6 +323,7 @@ func GenerateUninstallerJobForClusterDeployment(cd *hivev1.ClusterDeployment) (*
 	}
 
 	if cd.Spec.AWS == nil {
+		// TODO: Need to support un-install for Azure and GCP
 		return nil, fmt.Errorf("only AWS ClusterDeployments currently supported")
 	}
 
@@ -332,6 +357,7 @@ func GenerateUninstallerJobForDeprovisionRequest(
 	req *hivev1.ClusterDeprovisionRequest) (*batchv1.Job, error) {
 
 	if req.Spec.Platform.AWS == nil {
+		// TODO: Need to support un-install for Azure and GCP
 		return nil, fmt.Errorf("only AWS deprovision requests currently supported")
 	}
 

@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 )
 
 var validTestManagedDomains = []string{
@@ -55,6 +56,14 @@ func validClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			SSHKey: corev1.LocalObjectReference{
 				Name: "test-sshkey",
+			},
+			Platform: hivev1.Platform{
+				AWS: &hivev1aws.Platform{
+					Region: "test-region",
+				},
+			},
+			PlatformSecrets: hivev1.PlatformSecrets{
+				AWS: &hivev1aws.PlatformSecrets{},
 			},
 		},
 	}

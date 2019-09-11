@@ -1464,6 +1464,11 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 		*out = new(aws.MachinePoolPlatform)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Azure != nil {
+		in, out := &in.Azure, &out.Azure
+		*out = new(azure.MachinePool)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -1535,6 +1540,16 @@ func (in *PlatformSecrets) DeepCopyInto(out *PlatformSecrets) {
 	if in.AWS != nil {
 		in, out := &in.AWS, &out.AWS
 		*out = new(aws.PlatformSecrets)
+		**out = **in
+	}
+	if in.Azure != nil {
+		in, out := &in.Azure, &out.Azure
+		*out = new(azure.PlatformSecrets)
+		**out = **in
+	}
+	if in.GCP != nil {
+		in, out := &in.GCP, &out.GCP
+		*out = new(gcp.PlatformSecrets)
 		**out = **in
 	}
 	return

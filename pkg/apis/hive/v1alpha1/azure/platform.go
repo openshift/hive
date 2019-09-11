@@ -1,6 +1,10 @@
 package azure
 
-import "strings"
+import (
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 // Platform stores all the global configuration that all machinesets
 // use.
@@ -22,4 +26,11 @@ func (p *Platform) SetBaseDomain(baseDomainID string) error {
 	parts := strings.Split(baseDomainID, "/")
 	p.BaseDomainResourceGroupName = parts[4]
 	return nil
+}
+
+// PlatformSecrets contains secrets for clusters on the Azure platform.
+type PlatformSecrets struct {
+	// Credentials refers to a secret that contains the Azure account access
+	// credentials.
+	Credentials corev1.LocalObjectReference `json:"credentials"`
 }

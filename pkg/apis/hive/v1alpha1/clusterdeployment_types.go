@@ -131,6 +131,10 @@ type ClusterImageSetReference struct {
 type PlatformSecrets struct {
 	// +optional
 	AWS *aws.PlatformSecrets `json:"aws,omitempty"`
+	// +optional
+	Azure *azure.PlatformSecrets `json:"azure,omitempty"`
+	// +optional
+	GCP *gcp.PlatformSecrets `json:"gcp,omitempty"`
 }
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment

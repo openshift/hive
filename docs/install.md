@@ -55,9 +55,10 @@ The Hive controller and the operator can run on top of the OpenShift(version 3.1
 
 Steps:
 
-* Start minishift
 
+* Enable the admission webhook validation plugin (for hiveadmission to work) and start minishift:
 ```bash
+minishift addons enable admissions-webhook
 minishift start
 ```
 

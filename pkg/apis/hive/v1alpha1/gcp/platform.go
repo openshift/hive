@@ -1,5 +1,9 @@
 package gcp
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 // Platform stores all the global configuration that all machinesets
 // use.
 type Platform struct {
@@ -14,4 +18,11 @@ type Platform struct {
 	// platform configuration.
 	// +optional
 	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
+}
+
+// PlatformSecrets contains secrets for clusters on the GCP platform.
+type PlatformSecrets struct {
+	// Credentials refers to a secret that contains the GCP account access
+	// credentials.
+	Credentials corev1.LocalObjectReference `json:"credentials"`
 }

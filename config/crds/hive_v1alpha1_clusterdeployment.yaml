@@ -134,6 +134,30 @@ spec:
                               type: string
                             type: array
                         type: object
+                      azure:
+                        description: Azure is the configuration used when installin
+                          on Azure.
+                        properties:
+                          osDisk:
+                            description: OSDisk defines the storage for instance.
+                            properties:
+                              diskSizeGB:
+                                description: DiskSizeGB defines the size of disk in
+                                  GB.
+                                format: int32
+                                type: integer
+                            type: object
+                          type:
+                            description: InstanceType defines the azure instance type.
+                              eg. Standard_DS_V2
+                            type: string
+                          zones:
+                            description: Zones is list of availability zones that
+                              can be used. eg. ["1", "2", "3"]
+                            items:
+                              type: string
+                            type: array
+                        type: object
                     type: object
                   replicas:
                     description: Replicas is the count of machines for this machine
@@ -191,6 +215,30 @@ spec:
                         zones:
                           description: Zones is list of availability zones that can
                             be used.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    azure:
+                      description: Azure is the configuration used when installin
+                        on Azure.
+                      properties:
+                        osDisk:
+                          description: OSDisk defines the storage for instance.
+                          properties:
+                            diskSizeGB:
+                              description: DiskSizeGB defines the size of disk in
+                                GB.
+                              format: int32
+                              type: integer
+                          type: object
+                        type:
+                          description: InstanceType defines the azure instance type.
+                            eg. Standard_DS_V2
+                          type: string
+                        zones:
+                          description: Zones is list of availability zones that can
+                            be used. eg. ["1", "2", "3"]
                           items:
                             type: string
                           type: array
@@ -458,6 +506,20 @@ spec:
                     credentials:
                       description: Credentials refers to a secret that contains the
                         AWS account access credentials.
+                      type: object
+                  type: object
+                azure:
+                  properties:
+                    credentials:
+                      description: Credentials refers to a secret that contains the
+                        Azure account access credentials.
+                      type: object
+                  type: object
+                gcp:
+                  properties:
+                    credentials:
+                      description: Credentials refers to a secret that contains the
+                        GCP account access credentials.
                       type: object
                   type: object
               type: object

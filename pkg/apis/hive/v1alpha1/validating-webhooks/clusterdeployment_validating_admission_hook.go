@@ -235,9 +235,68 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
 	if newObject.Spec.SSHKey.Name == "" {
-		allErrs := field.ErrorList{}
-		allErrs = append(allErrs, field.Required(field.NewPath("spec", "sshKey", "name"), "must specify an SSH key to use"))
+		allErrs = append(allErrs, field.Required(specPath.Child("sshKey", "name"), "must specify an SSH key to use"))
+	}
+
+	platformPath := specPath.Child("platform")
+	platformSecretsPath := specPath.Child("platformSecrets")
+	numberOfPlatforms := 0
+	canManageDNS := false
+	if newObject.Spec.Platform.AWS != nil {
+		numberOfPlatforms++
+		canManageDNS = true
+		if newObject.Spec.PlatformSecrets.AWS == nil {
+			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("aws"), "must specify secrets for AWS access"))
+		}
+		aws := newObject.Spec.Platform.AWS
+		awsPath := platformPath.Child("aws")
+		if aws.Region == "" {
+			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
+		}
+	}
+	if newObject.Spec.Platform.Azure != nil {
+		numberOfPlatforms++
+		if newObject.Spec.PlatformSecrets.Azure == nil {
+			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("azure"), "must specify secrets for Azure access"))
+		}
+		azure := newObject.Spec.Platform.Azure
+		azurePath := platformPath.Child("azure")
+		if azure.Region == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("region"), "must specify Azure region"))
+		}
+		if azure.BaseDomainResourceGroupName == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
+		}
+	}
+	if newObject.Spec.Platform.GCP != nil {
+		numberOfPlatforms++
+		if newObject.Spec.PlatformSecrets.GCP == nil {
+			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("gcp"), "must specify secrets for GCP access"))
+		}
+		gcp := newObject.Spec.Platform.GCP
+		gcpPath := platformPath.Child("gcp")
+		if gcp.ProjectID == "" {
+			allErrs = append(allErrs, field.Required(gcpPath.Child("projectID"), "must specify GCP project ID"))
+		}
+		if gcp.Region == "" {
+			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
+		}
+	}
+	switch {
+	case numberOfPlatforms == 0:
+		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))
+	case numberOfPlatforms > 1:
+		allErrs = append(allErrs, field.Invalid(platformPath, newObject.Spec.Platform, "must specify only a single platform"))
+	}
+	if !canManageDNS && newObject.Spec.ManageDNS {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), newObject.Spec.ManageDNS, "cannot manage DNS for the selected platform"))
+	}
+
+	if len(allErrs) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

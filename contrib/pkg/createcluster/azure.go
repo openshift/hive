@@ -10,6 +10,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
 )
 
 const (
@@ -21,9 +24,9 @@ var _ cloudProvider = (*azureCloudProvider)(nil)
 type azureCloudProvider struct {
 }
 
-func (acp *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
+func (p *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
 	spFile := filepath.Join(os.Getenv("HOME"), ".azure", azureCredFile)
-	log.Info("Loading Azure service principal from: %s", spFile)
+	log.Infof("Loading Azure service principal from: %s", spFile)
 	spFileContents, err := ioutil.ReadFile(spFile)
 	if err != nil {
 		return nil, err
@@ -35,7 +38,7 @@ func (acp *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Se
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-azure-creds", o.Name),
+			Name:      p.credsSecretName(o),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -43,4 +46,25 @@ func (acp *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Se
 			azureCredFile: spFileContents,
 		},
 	}, nil
+}
+
+func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error {
+	cd.Spec.Platform = hivev1.Platform{
+		Azure: &hivev1azure.Platform{
+			Region:                      "centralus",
+			BaseDomainResourceGroupName: o.BaseDomainResourceGroupName,
+		},
+	}
+	cd.Spec.PlatformSecrets = hivev1.PlatformSecrets{
+		Azure: &hivev1azure.PlatformSecrets{
+			Credentials: corev1.LocalObjectReference{
+				Name: p.credsSecretName(o),
+			},
+		},
+	}
+	return nil
+}
+
+func (p *azureCloudProvider) credsSecretName(o *Options) string {
+	return fmt.Sprintf("%s-azure-creds", o.Name)
 }

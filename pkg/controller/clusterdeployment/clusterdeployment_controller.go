@@ -1140,7 +1140,11 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Generate a deprovision request
-	request := generateDeprovisionRequest(cd)
+	request, err := generateDeprovisionRequest(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("error generating deprovision request")
+		return reconcile.Result{}, err
+	}
 	err = controllerutil.SetControllerReference(cd, request, r.scheme)
 	if err != nil {
 		cdLog.Errorf("error setting controller reference on deprovision request: %v", err)
@@ -1498,7 +1502,7 @@ func (r *ReconcileClusterDeployment) findAndAdoptRestoredClusterProvision(cd *hi
 	return false, nil
 }
 
-func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) *hivev1.ClusterDeprovisionRequest {
+func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisionRequest, error) {
 	req := &hivev1.ClusterDeprovisionRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cd.Name,
@@ -1507,21 +1511,26 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) *hivev1.ClusterDep
 		Spec: hivev1.ClusterDeprovisionRequestSpec{
 			InfraID:   cd.Status.InfraID,
 			ClusterID: cd.Status.ClusterID,
-			Platform: hivev1.ClusterDeprovisionRequestPlatform{
-				AWS: &hivev1.AWSClusterDeprovisionRequest{},
-			},
 		},
 	}
 
-	if cd.Spec.Platform.AWS != nil {
-		req.Spec.Platform.AWS.Region = cd.Spec.Platform.AWS.Region
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		if cd.Spec.PlatformSecrets.AWS == nil {
+			return nil, errors.New("missing AWS platform secrets")
+		}
+		req.Spec.Platform = hivev1.ClusterDeprovisionRequestPlatform{
+			AWS: &hivev1.AWSClusterDeprovisionRequest{
+				Region:      cd.Spec.Platform.AWS.Region,
+				Credentials: &cd.Spec.PlatformSecrets.AWS.Credentials,
+			},
+		}
+	default:
+		// TODO: Need to deprovision Azure and GCP
+		return nil, errors.New("cannot deprovision other than AWS")
 	}
 
-	if cd.Spec.PlatformSecrets.AWS != nil {
-		req.Spec.Platform.AWS.Credentials = &cd.Spec.PlatformSecrets.AWS.Credentials
-	}
-
-	return req
+	return req, nil
 }
 
 func generatePullSecretObj(pullSecret string, pullSecretName string, cd *hivev1.ClusterDeployment) *corev1.Secret {

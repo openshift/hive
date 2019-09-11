@@ -105,7 +105,6 @@ type InstallManager struct {
 	LogsDir                  string
 	ClusterID                string
 	ClusterName              string
-	Region                   string
 	ClusterProvisionName     string
 	Namespace                string
 	DynamicClient            client.Client
@@ -159,7 +158,6 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.LogsDir, "logs-dir", "/logs", "directory to use for all installer logs")
-	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	return cmd
 }
 
@@ -265,7 +263,7 @@ func (m *InstallManager) Run() error {
 	// If the cluster provision has a clusterID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
 	m.log.Info("cleaning up from past install attempts")
-	if err := m.cleanupFailedInstall(provision); err != nil {
+	if err := m.cleanupFailedInstall(cd, provision); err != nil {
 		m.log.WithError(err).Error("error while trying to preemptively clean up")
 		return err
 	}
@@ -348,7 +346,7 @@ func (m *InstallManager) Run() error {
 		}
 
 		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
-		if err := m.cleanupFailedInstall(provision); err != nil {
+		if err := m.cleanupFailedInstall(cd, provision); err != nil {
 			// Log the error but continue. It is possible we were not able to clear the infraID
 			// here, but we will attempt this again anyhow when the next job retries. The
 			// goal here is just to minimize running resources in the event of a long wait
@@ -408,7 +406,7 @@ func (m *InstallManager) waitForInstallerBinaries() {
 }
 
 // cleanupFailedInstall allows recovering from an installation error and allows retries
-func (m *InstallManager) cleanupFailedInstall(provision *hivev1.ClusterProvision) error {
+func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision) error {
 	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
 		return err
 	}
@@ -423,10 +421,16 @@ func (m *InstallManager) cleanupFailedInstall(provision *hivev1.ClusterProvision
 	}
 	if infraID != nil {
 		m.log.Info("InfraID set from failed install, running deprovison")
-		if err := m.runUninstaller(m.ClusterName, m.Region, *infraID, m.log); err != nil {
-			return err
+		switch {
+		case cd.Spec.Platform.AWS != nil:
+			if err := m.runUninstaller(m.ClusterName, cd.Spec.Platform.AWS.Region, *infraID, m.log); err != nil {
+				return err
+			}
+		default:
+			// TODO: Need to clean up failed installs on Azure and GCP
+			m.log.Warn("cannot clean up platforms other than AWS")
+			return errors.New("cannot clean up failed installs on non-AWS platforms")
 		}
-
 	} else {
 		m.log.Warn("skipping cleanup as no infra ID set")
 	}

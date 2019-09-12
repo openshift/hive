@@ -234,14 +234,12 @@ func validateClusterProvisionUpdate(old, new *hivev1.ClusterProvision) field.Err
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.PodSpec, old.Spec.PodSpec, specPath.Child("podSpec"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Attempt, old.Spec.Attempt, specPath.Child("attempt"))...)
 	if old.Spec.Stage != new.Spec.Stage {
-		badStageTransition := false
+		badStageTransition := true
 		switch old.Spec.Stage {
 		case hivev1.ClusterProvisionStageInitializing:
 			badStageTransition = new.Spec.Stage == hivev1.ClusterProvisionStageComplete
 		case hivev1.ClusterProvisionStageProvisioning:
 			badStageTransition = new.Spec.Stage == hivev1.ClusterProvisionStageInitializing
-		default:
-			badStageTransition = true
 		}
 		if badStageTransition {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("stage"), new.Spec.Stage, fmt.Sprintf("cannot transition from %s to %s", old.Spec.Stage, new.Spec.Stage)))

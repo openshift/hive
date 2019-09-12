@@ -229,6 +229,133 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 			}(),
 			expectedAllowed: false,
 		},
+		{
+			name:            "Test invalid unmarshalable TypeMeta Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": 798786}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test valid Role authorization.k8s.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "Role"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid Role authorization.k8s.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "Role"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test invalid Role authorization.openshift.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "Role"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test invalid Role authorization.openshift.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "Role"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test valid RoleBinding authorization.k8s.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "RoleBinding"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid RoleBinding authorization.k8s.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "RoleBinding"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test invalid RoleBinding authorization.openshift.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "RoleBinding"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test invalid RoleBinding authorization.openshift.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "RoleBinding"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test valid ClusterRole authorization.k8s.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRole"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid ClusterRole authorization.k8s.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRole"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test invalid ClusterRole authorization.openshift.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRole"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test invalid ClusterRole authorization.openshift.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRole"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test valid ClusterRoleBinding authorization.k8s.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRoleBinding"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid ClusterRoleBinding authorization.k8s.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRoleBinding"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test invalid ClusterRoleBinding authorization.openshift.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRoleBinding"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test invalid ClusterRoleBinding authorization.openshift.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRoleBinding"}`),
+			expectedAllowed: false,
+		},
+
+		{
+			name:            "Test valid SubjectAccessReview authorization.k8s.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "SubjectAccessReview"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid SubjectAccessReview authorization.k8s.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "SubjectAccessReview"}`),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test invalid SubjectAccessReview authorization.openshift.io Resource create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "SubjectAccessReview"}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test invalid SubjectAccessReview authorization.openshift.io Resource update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "SubjectAccessReview"}`),
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -316,4 +443,12 @@ func testSelectorSyncSet() *hivev1.SelectorSyncSet {
 			Namespace: "test-namespace",
 		},
 	}
+}
+
+func testSelectorSyncSetWithResources(resources ...string) *hivev1.SelectorSyncSet {
+	ss := testSelectorSyncSet()
+	for _, resource := range resources {
+		ss.Spec.Resources = append(ss.Spec.Resources, runtime.RawExtension{Raw: []byte(resource)})
+	}
+	return ss
 }

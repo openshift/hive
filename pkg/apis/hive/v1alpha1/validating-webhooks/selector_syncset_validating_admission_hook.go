@@ -2,7 +2,6 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
-	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
@@ -150,20 +149,13 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
-	if invalid, ok := checkValidPatchTypes(newObject.Spec.Patches); !ok {
-		message := fmt.Sprintf("Failed validation: Invalid patch type detected: %s. Valid patch types are: json, merge, and strategic", invalid)
-		contextLogger.Infof(message)
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonInvalid,
-				Message: message,
-			},
-		}
-	}
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec").Child("resources"))...)
+	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec").Child("patches"))...)
+	allErrs = append(allErrs, validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences"))...)
 
-	if errs := validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences")); len(errs) > 0 {
-		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, errs).Status()
+	if len(allErrs) > 0 {
+		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
 		contextLogger.Infof(statusError.Message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -204,20 +196,13 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
-	if invalid, ok := checkValidPatchTypes(newObject.Spec.Patches); !ok {
-		message := fmt.Sprintf("Failed validation: Invalid patch type detected: %s. Valid patch types are: json, merge, and strategic", invalid)
-		contextLogger.Infof(message)
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonInvalid,
-				Message: message,
-			},
-		}
-	}
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec", "resources"))...)
+	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec", "patches"))...)
+	allErrs = append(allErrs, validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec", "secretReferences"))...)
 
-	if errs := validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences")); len(errs) > 0 {
-		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, errs).Status()
+	if len(allErrs) > 0 {
+		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
 		contextLogger.Infof(statusError.Message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

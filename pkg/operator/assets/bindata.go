@@ -26,6 +26,7 @@
 // config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
+// config/crds/hive_v1alpha1_checkpoint.yaml
 // config/crds/hive_v1alpha1_clusterdeployment.yaml
 // config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml
 // config/crds/hive_v1alpha1_clusterimageset.yaml
@@ -1522,6 +1523,77 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/rbac/hive_reader_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHive_v1alpha1_checkpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: checkpoints.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: Checkpoint
+    plural: checkpoints
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            lastBackupChecksum:
+              description: LastBackupChecksum is the checksum of all Hive objects
+                in the namespace at the time of the last backup.
+              type: string
+            lastBackupRef:
+              description: LastBackupRef is a reference to last backup object created
+              type: object
+            lastBackupTime:
+              description: LastBackupTime is the last time we performed a backup of
+                the namespace
+              format: date-time
+              type: string
+          type: object
+        status:
+          type: object
+  version: v1alpha1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHive_v1alpha1_checkpointYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1alpha1_checkpointYaml, nil
+}
+
+func configCrdsHive_v1alpha1_checkpointYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1alpha1_checkpointYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_checkpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4835,6 +4907,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_frontend_serviceaccount.yaml":               configRbacHive_frontend_serviceaccountYaml,
 	"config/rbac/hive_reader_role.yaml":                           configRbacHive_reader_roleYaml,
 	"config/rbac/hive_reader_role_binding.yaml":                   configRbacHive_reader_role_bindingYaml,
+	"config/crds/hive_v1alpha1_checkpoint.yaml":                   configCrdsHive_v1alpha1_checkpointYaml,
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":            configCrdsHive_v1alpha1_clusterdeploymentYaml,
 	"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml":    configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml,
 	"config/crds/hive_v1alpha1_clusterimageset.yaml":              configCrdsHive_v1alpha1_clusterimagesetYaml,
@@ -4897,6 +4970,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},
 		"crds": {nil, map[string]*bintree{
+			"hive_v1alpha1_checkpoint.yaml":                   {configCrdsHive_v1alpha1_checkpointYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterdeployment.yaml":            {configCrdsHive_v1alpha1_clusterdeploymentYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterdeprovisionrequest.yaml":    {configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml, map[string]*bintree{}},
 			"hive_v1alpha1_clusterimageset.yaml":              {configCrdsHive_v1alpha1_clusterimagesetYaml, map[string]*bintree{}},

@@ -1,15 +1,22 @@
 package velerobackup
 
 import (
+	"context"
+	"fmt"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/openshift/hive/pkg/apis"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 	"github.com/openshift/hive/pkg/test/generic"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -29,165 +36,118 @@ func TestReconcile(t *testing.T) {
 		expectedObjects []runtime.Object
 	}{
 		{
-			name: "Empty Namespace",
+			name: "Simulate Empty Namespace",
 			request: reconcile.Request{
 				NamespacedName: types.NamespacedName{},
 			},
-			existingObjects: []runtime.Object{},
+			existingObjects: emptyRuntimeObjectSlice,
 			expectedResult:  reconcile.Result{},
-			expectedObjects: []runtime.Object{},
+			expectedObjects: emptyRuntimeObjectSlice,
 		},
 		{
-			name: "1 unchanged ClusterDeployment",
+			name: "Simulate first backup of a namespace",
 			request: reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: namespace,
 				},
 			},
 			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testdnszone.Build(dnsZoneBase()),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testdnszone.Build(dnsZoneBase()),
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+					[]runtime.Object{
+						testclusterdeployment.Build(clusterDeploymentBase()),
+						testsyncset.Build(syncSetBase()),
+						testdnszone.Build(dnsZoneBase()),
+					}))),
 			},
 		},
 		{
-			name: "1 changed ClusterDeployment",
+			name: "Simulate no changes since last backup of a namespace",
 			request: reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: namespace,
 				},
 			},
 			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testcheckpoint.Build(checkpointBase(),
+					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupTime(metav1.Now()),
+					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+						[]runtime.Object{
+							testclusterdeployment.Build(clusterDeploymentBase()),
+						}))),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testcheckpoint.Build(checkpointBase(),
+					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupTime(metav1.Now()),
+					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+						[]runtime.Object{
+							testclusterdeployment.Build(clusterDeploymentBase()),
+						}))),
 			},
 		},
 		{
-			name: "1 unchanged SyncSet",
+			name: "Simulate adding 1 object since last backup of a namespace",
 			request: reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: namespace,
 				},
 			},
 			existingObjects: []runtime.Object{
-				testsyncset.Build(unchangedSyncSetBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+					[]runtime.Object{
+						testclusterdeployment.Build(clusterDeploymentBase()),
+					}))),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testsyncset.Build(unchangedSyncSetBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+					[]runtime.Object{
+						testclusterdeployment.Build(clusterDeploymentBase()),
+						testsyncset.Build(syncSetBase()),
+					}))),
 			},
 		},
 		{
-			name: "1 changed SyncSet",
+			name: "Simulate removing 1 object since last backup of a namespace",
 			request: reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: namespace,
 				},
 			},
 			existingObjects: []runtime.Object{
-				testsyncset.Build(changedSyncSetBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+					[]runtime.Object{
+						testclusterdeployment.Build(clusterDeploymentBase()),
+					}))),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-		},
-		{
-			name: "1 unchanged DNSZone",
-			request: reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: namespace,
-				},
-			},
-			existingObjects: []runtime.Object{
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-			expectedResult: reconcile.Result{},
-			expectedObjects: []runtime.Object{
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-		},
-		{
-			name: "1 changed DNSZone",
-			request: reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: namespace,
-				},
-			},
-			existingObjects: []runtime.Object{
-				testdnszone.Build(changedDNSZoneBase()),
-			},
-			expectedResult: reconcile.Result{},
-			expectedObjects: []runtime.Object{
-				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-		},
-		{
-			name: "Multiple unchanged HiveObject",
-			request: reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: namespace,
-				},
-			},
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testsyncset.Build(unchangedSyncSetBase()),
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-			expectedResult: reconcile.Result{},
-			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testsyncset.Build(unchangedSyncSetBase()),
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-		},
-		{
-			name: "Multiple changed HiveObject",
-			request: reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: namespace,
-				},
-			},
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
-				testsyncset.Build(changedSyncSetBase()),
-				testdnszone.Build(changedDNSZoneBase()),
-			},
-			expectedResult: reconcile.Result{},
-			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-		},
-		{
-			name: "Multiple changed / unchanged HiveObject",
-			request: reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: namespace,
-				},
-			},
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testsyncset.Build(changedSyncSetBase()),
-				testsyncset.Build(unchangedSyncSetBase()),
-				testdnszone.Build(changedDNSZoneBase()),
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-			expectedResult: reconcile.Result{},
-			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testsyncset.Build(unchangedSyncSetBase()),
-				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testdnszone.Build(unchangedDNSZoneBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+					[]runtime.Object{
+						testclusterdeployment.Build(clusterDeploymentBase()),
+						testsyncset.Build(syncSetBase()),
+					}))),
 			},
 		},
 	}
@@ -196,13 +156,17 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			r := fakeClientReconcileBackup(test.existingObjects)
+			types := append(hiveNamespaceScopedListTypes, &hivev1.CheckpointList{})
 
 			// Act
 			actualResult, actualError := r.Reconcile(test.request)
-			actualObjects, err := getRuntimeObjects(r, typesToList, namespace)
+			actualObjects, err := r.getRuntimeObjects(types, namespace)
+			lastBackupName, lastBackupTimestamp := ignoreUncomparedFields(test.expectedObjects, actualObjects)
 
 			// Assert
 			assert.NoError(t, err)
+			assert.NotEmpty(t, lastBackupName)
+			assert.NotEmpty(t, lastBackupTimestamp)
 			assert.Equal(t, test.expectedResult, actualResult)
 			assert.Equal(t, test.expectedError, actualError)
 			assert.Equal(t, test.expectedObjects, actualObjects)
@@ -210,178 +174,28 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
-func TestGetChangedInNamespace(t *testing.T) {
+func TestCreateVeleroBackupObject(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
+	velerov1.AddToScheme(scheme.Scheme)
 
-	tests := []struct {
-		name                string
-		existingObjects     []runtime.Object
-		expectedHiveObjects []*hiveObject
-		expectedError       error
-	}{
-		{
-			name:                "No Hive objects",
-			existingObjects:     []runtime.Object{},
-			expectedHiveObjects: []*hiveObject{},
-			expectedError:       nil,
-		},
-		{
-			name: "No Changed Hive objects",
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testsyncset.Build(unchangedSyncSetBase()),
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-			expectedHiveObjects: []*hiveObject{},
-			expectedError:       nil,
-		},
-		{
-			name: "1 Changed Hive object",
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
-			},
-			expectedHiveObjects: []*hiveObject{
-				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "Multiple Changed Hive objects",
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testsyncset.Build(changedSyncSetBase()),
-				testsyncset.Build(unchangedSyncSetBase()),
-				testdnszone.Build(changedDNSZoneBase()),
-				testdnszone.Build(unchangedDNSZoneBase()),
-			},
-			expectedHiveObjects: []*hiveObject{
-				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
-				ro2ho(testsyncset.Build(changedSyncSetBase())),
-				ro2ho(testdnszone.Build(changedDNSZoneBase())),
-			},
-			expectedError: nil,
-		},
+	// Arrange
+	formatStr := "2006-01-02t15-04-05"
+	actualBackups := &velerov1.BackupList{}
+	r := fakeClientReconcileBackup(emptyRuntimeObjectSlice)
+	timestamp := metav1.Now()
+	expectedBackupRef := corev1.ObjectReference{
+		Name:      fmt.Sprintf("backup-%v-%v", namespace, timestamp.Format(formatStr)),
+		Namespace: "velero",
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Arrange
-			r := fakeClientReconcileBackup(test.existingObjects)
+	// Act
+	actualBackupRef, actualError := r.createVeleroBackupObject(namespace, timestamp)
+	r.List(context.TODO(), actualBackups)
 
-			// Act
-			actualHiveObjects, actualError := r.getModifiedHiveObjectsInNamespace(namespace)
-
-			// Assert
-			assert.Equal(t, len(test.expectedHiveObjects), len(actualHiveObjects))
-			assertHiveObjectsEqual(t, test.expectedHiveObjects, actualHiveObjects)
-			assert.Equal(t, test.expectedError, actualError)
-		})
-	}
-}
-
-func TestUpdateHiveObjectsLastBackupChecksum(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-
-	tests := []struct {
-		name            string
-		hiveObjects     []*hiveObject
-		existingObjects []runtime.Object
-		expectedObjects []runtime.Object
-		expectedError   error
-	}{
-		{
-			name:            "No HiveObjects",
-			hiveObjects:     []*hiveObject{},
-			existingObjects: []runtime.Object{},
-			expectedObjects: []runtime.Object{},
-			expectedError:   nil,
-		},
-		{
-			name: "1 changed ClusterDeployment",
-			hiveObjects: []*hiveObject{
-				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
-			},
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
-			},
-			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "1 changed SyncSet",
-			hiveObjects: []*hiveObject{
-				ro2ho(testsyncset.Build(changedSyncSetBase())),
-			},
-			existingObjects: []runtime.Object{
-				testsyncset.Build(changedSyncSetBase()),
-			},
-			expectedObjects: []runtime.Object{
-				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "1 changed DNSZone",
-			hiveObjects: []*hiveObject{
-				ro2ho(testdnszone.Build(changedDNSZoneBase())),
-			},
-			existingObjects: []runtime.Object{
-				testdnszone.Build(changedDNSZoneBase()),
-			},
-			expectedObjects: []runtime.Object{
-				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "Multiple changed HiveObjects",
-			hiveObjects: []*hiveObject{
-				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
-				ro2ho(testsyncset.Build(changedSyncSetBase())),
-				ro2ho(testdnszone.Build(changedDNSZoneBase())),
-			},
-			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase()),
-				testsyncset.Build(changedSyncSetBase()),
-				testdnszone.Build(changedDNSZoneBase()),
-			},
-			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(changedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testsyncset.Build(changedSyncSetBase(), testsyncset.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-				testdnszone.Build(changedDNSZoneBase(), testdnszone.Generic(generic.WithBackupChecksum(defaultChecksumFunc))),
-			},
-			expectedError: nil,
-		},
-		{
-			name: "List error",
-			hiveObjects: []*hiveObject{
-				ro2ho(testclusterdeployment.Build(changedClusterDeploymentBase())),
-			},
-			existingObjects: []runtime.Object{},
-			expectedError:   &errStatus,
-			expectedObjects: []runtime.Object{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// Arrange
-			r := fakeClientReconcileBackup(test.existingObjects)
-
-			// Act
-			actualError := r.updateHiveObjectsLastBackupChecksum(test.hiveObjects)
-			actualObjects, err := getRuntimeObjects(r, typesToList, namespace)
-
-			// Assert
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedObjects, actualObjects)
-			assertErrorsAreEqualType(t, test.expectedError, actualError)
-		})
-	}
+	// Assert
+	assert.NoError(t, actualError)
+	assert.Equal(t, expectedBackupRef, actualBackupRef)
+	assert.Equal(t, namespace, actualBackups.Items[0].Spec.IncludedNamespaces[0])
 }
 
 func TestGetRuntimeObjects(t *testing.T) {
@@ -395,26 +209,26 @@ func TestGetRuntimeObjects(t *testing.T) {
 	}{
 		{
 			name:            "Empty Namespace",
-			existingObjects: []runtime.Object{},
-			expectedObjects: []runtime.Object{},
+			existingObjects: emptyRuntimeObjectSlice,
+			expectedObjects: emptyRuntimeObjectSlice,
 		},
 		{
 			name: "1 ClusterDeployment",
 			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
 			},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
 			},
 		},
 		{
 			name: "2 ClusterDeployments in different namespaces",
 			existingObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
-				testclusterdeployment.Build(unchangedClusterDeploymentBase(), testclusterdeployment.Generic(generic.WithNamespace("not the correct namespace"))),
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.Generic(generic.WithNamespace("not the correct namespace"))),
 			},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(unchangedClusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase()),
 			},
 		},
 	}
@@ -425,11 +239,159 @@ func TestGetRuntimeObjects(t *testing.T) {
 			r := fakeClientReconcileBackup(test.existingObjects)
 
 			// Act
-			actualObjects, actualError := getRuntimeObjects(r, typesToList, namespace)
+			actualObjects, actualError := r.getRuntimeObjects(hiveNamespaceScopedListTypes, namespace)
 
 			// Assert
 			assert.NoError(t, actualError)
 			assert.Equal(t, test.expectedObjects, actualObjects)
+		})
+	}
+}
+
+func TestGetNamespaceCheckpoint(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+	velerov1.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name               string
+		existingObjects    []runtime.Object
+		expectedCheckpoint *hivev1.Checkpoint
+		expectedFound      bool
+		expectedError      error
+	}{
+		{
+			name:               "No Checkpoint",
+			expectedFound:      false,
+			existingObjects:    emptyRuntimeObjectSlice,
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase()),
+			expectedError:      nil,
+		},
+		{
+			name:               "Existing Checkpoint",
+			expectedFound:      true,
+			existingObjects:    []runtime.Object{testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"))},
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL")),
+			expectedError:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			r := fakeClientReconcileBackup(test.existingObjects)
+
+			// Act
+			actualCheckpoint, actualFound, actualError := r.getNamespaceCheckpoint(namespace, r.logger)
+
+			// Assert
+			assert.Equal(t, test.expectedCheckpoint, actualCheckpoint)
+			assert.Equal(t, test.expectedFound, actualFound)
+			assertErrorsAreEqualType(t, test.expectedError, actualError)
+		})
+	}
+}
+
+func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+	velerov1.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name               string
+		existingObjects    []runtime.Object
+		found              bool
+		checkpoint         *hivev1.Checkpoint
+		expectedCheckpoint *hivev1.Checkpoint
+		expectedError      error
+	}{
+		{
+			name:               "Create Checkpoint",
+			found:              false,
+			checkpoint:         testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL")),
+			existingObjects:    emptyRuntimeObjectSlice,
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL")),
+			expectedError:      nil,
+		},
+		{
+			name:       "Update Checkpoint",
+			found:      true,
+			checkpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER")),
+			existingObjects: []runtime.Object{
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
+			},
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER")),
+			expectedError:      nil,
+		},
+		{
+			name:       "Error Creating",
+			found:      false,
+			checkpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER")),
+			existingObjects: []runtime.Object{
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
+			},
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
+			expectedError:      statusErr,
+		},
+		{
+			name:               "Error Updating",
+			found:              true,
+			checkpoint:         testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER")),
+			existingObjects:    emptyRuntimeObjectSlice,
+			expectedCheckpoint: &hivev1.Checkpoint{},
+			expectedError:      statusErr,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			actualCheckpoint := &hivev1.Checkpoint{}
+			namespacedName := types.NamespacedName{Namespace: namespace, Name: checkpointName}
+			r := fakeClientReconcileBackup(test.existingObjects)
+
+			// Act
+			actualError := r.createOrUpdateNamespaceCheckpoint(test.checkpoint, test.found, r.logger)
+			r.Get(context.TODO(), namespacedName, actualCheckpoint)
+
+			// Assert
+			assert.Equal(t, test.expectedCheckpoint, actualCheckpoint)
+			assertErrorsAreEqualType(t, test.expectedError, actualError)
+		})
+	}
+}
+
+func TestCalculateObjectsChecksumWithoutStatus(t *testing.T) {
+	tests := []struct {
+		name             string
+		object           runtime.Object
+		expectedChecksum string
+	}{
+		{
+			name:             "Valid ClusterDeployment Checksum",
+			object:           testclusterdeployment.Build(clusterDeploymentBase()),
+			expectedChecksum: calculateClusterDeploymentChecksum(testclusterdeployment.Build(clusterDeploymentBase())),
+		},
+		{
+			name:             "Invalid type (not a hive object)",
+			object:           &corev1.Pod{},
+			expectedChecksum: calculateErrorChecksum(),
+		},
+		{
+			name:             "Invalid nil object",
+			object:           nil,
+			expectedChecksum: calculateErrorChecksum(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			r := fakeClientReconcileBackup(emptyRuntimeObjectSlice)
+
+			// Act
+			actualChecksum := r.calculateObjectsChecksumWithoutStatus(r.logger, test.object)
+
+			// Assert
+			assert.Equal(t, test.expectedChecksum, actualChecksum)
 		})
 	}
 }

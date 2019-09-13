@@ -5,14 +5,15 @@ import (
 	"testing"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
-	"github.com/openshift/hive/pkg/test/generic"
-	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,95 +24,100 @@ import (
 )
 
 const (
-	namespace = "notarealns"
+	namespace      = "notarealns"
+	checkpointName = "hive"
 )
 
 var (
-	errStatus = kerrors.StatusError{
+	statusErr = &kerrors.StatusError{
 		ErrStatus: metav1.Status{},
 	}
+
+	emptyRuntimeObjectSlice = []runtime.Object{}
 )
 
-func assertHiveObjectsEqual(t *testing.T, expected, actual []*hiveObject) {
-	for i := range expected {
-		assert.Equal(t, expected[i].object, actual[i].object)
-	}
+func calculateRuntimeObjectsChecksum(objects []runtime.Object) string {
+	r := fakeClientReconcileBackup(emptyRuntimeObjectSlice)
+	return r.calculateObjectsChecksumWithoutStatus(r.logger, objects...)
 }
 
-func defaultChecksumFunc(object runtime.Object) string {
-	hobj, err := newHiveObject(object, defaultLogger())
+func ignoreUncomparedFields(expected, actual []runtime.Object) (corev1.ObjectReference, metav1.Time) {
+	// We need this for the comparisons to work.
+	if len(expected) > 0 {
+		expectedCheckpoint := expected[len(expected)-1].(*hivev1.Checkpoint)
+		actualCheckpoint := actual[len(actual)-1].(*hivev1.Checkpoint)
+
+		// These are fields that we do not want to compare.
+		expectedCheckpoint.Spec.LastBackupTime = actualCheckpoint.Spec.LastBackupTime
+		expectedCheckpoint.Spec.LastBackupRef = actualCheckpoint.Spec.LastBackupRef
+
+		return actualCheckpoint.Spec.LastBackupRef, actualCheckpoint.Spec.LastBackupTime
+	}
+
+	return corev1.ObjectReference{Namespace: namespace}, metav1.Now()
+}
+
+func calculateErrorChecksum() string {
+	checksums := []string{errChecksum}
+
+	combinedChecksum, err := controllerutils.GetChecksumOfObject(checksums)
 	if err != nil {
-		panic(err)
+		panic("error calculating object checksum")
 	}
 
-	return hobj.checksum
+	return combinedChecksum
 }
 
-func unchangedDNSZoneBase() testdnszone.Option {
+func calculateClusterDeploymentChecksum(clusterDeployment *hivev1.ClusterDeployment) string {
+	checksum, err := controllerutils.GetChecksumOfObjects(clusterDeployment.ObjectMeta, clusterDeployment.Spec)
+	if err != nil {
+		panic("error calculating object checksum")
+	}
+
+	checksums := []string{checksum}
+
+	combinedChecksum, err := controllerutils.GetChecksumOfObject(checksums)
+	if err != nil {
+		panic("error calculating object checksum")
+	}
+
+	return combinedChecksum
+}
+
+func checkpointBase() testcheckpoint.Option {
+	return func(checkpoint *hivev1.Checkpoint) {
+		checkpoint.Name = checkpointName
+		checkpoint.Namespace = namespace
+	}
+}
+
+func dnsZoneBase() testdnszone.Option {
 	return func(dnsZone *hivev1.DNSZone) {
-		dnsZone.Name = "somednszone-unchanged"
-		dnsZone.Namespace = namespace
-		generic.WithBackupChecksum(defaultChecksumFunc)(dnsZone)
-	}
-}
-
-func changedDNSZoneBase() testdnszone.Option {
-	return func(dnsZone *hivev1.DNSZone) {
-		dnsZone.Name = "somednszone-changed"
+		dnsZone.Name = "somednszone"
 		dnsZone.Namespace = namespace
 	}
 }
 
-func unchangedSyncSetBase() testsyncset.Option {
+func syncSetBase() testsyncset.Option {
 	return func(syncSet *hivev1.SyncSet) {
-		syncSet.Name = "somesyncset-unchanged"
-		syncSet.Namespace = namespace
-		generic.WithBackupChecksum(defaultChecksumFunc)(syncSet)
-	}
-}
-
-func changedSyncSetBase() testsyncset.Option {
-	return func(syncSet *hivev1.SyncSet) {
-		syncSet.Name = "somesyncset-changed"
+		syncSet.Name = "somesyncset"
 		syncSet.Namespace = namespace
 	}
 }
 
-func unchangedClusterDeploymentBase() testclusterdeployment.Option {
+func clusterDeploymentBase() testclusterdeployment.Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
-		clusterDeployment.Name = "someclusterdeployment-unchanged"
-		clusterDeployment.Namespace = namespace
-		testgeneric.WithBackupChecksum(defaultChecksumFunc)(clusterDeployment)
-	}
-}
-
-func changedClusterDeploymentBase() testclusterdeployment.Option {
-	return func(clusterDeployment *hivev1.ClusterDeployment) {
-		clusterDeployment.Name = "someclusterdeployment-changed"
+		clusterDeployment.Name = "someclusterdeployment"
 		clusterDeployment.Namespace = namespace
 	}
-}
-
-func defaultLogger() log.FieldLogger {
-	return log.WithField("controller", controllerName)
 }
 
 func fakeClientReconcileBackup(existingObjects []runtime.Object) *ReconcileBackup {
 	return &ReconcileBackup{
 		Client: fake.NewFakeClient(existingObjects...),
 		scheme: scheme.Scheme,
-		logger: defaultLogger(),
+		logger: log.WithField("controller", controllerName),
 	}
-}
-
-func ro2ho(ro runtime.Object) *hiveObject {
-	obj, err := newHiveObject(ro, defaultLogger())
-
-	if err != nil {
-		panic("This should never happen since we control the test data.")
-	}
-
-	return obj
 }
 
 func assertErrorsAreEqualType(t *testing.T, expected, actual error) {

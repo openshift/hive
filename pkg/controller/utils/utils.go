@@ -182,9 +182,6 @@ func MergeJsons(globalPullSecret string, localPullSecret string, cdLog log.Field
 	return string(jMerged), nil
 }
 
-// ChecksumOfObjectFunc is a function signature for returning a checksum of a single object.
-type ChecksumOfObjectFunc func(objects ...interface{}) (string, error)
-
 // GetChecksumOfObject returns the md5sum hash of the object passed in.
 func GetChecksumOfObject(object interface{}) (string, error) {
 	b, err := json.Marshal(object)
@@ -194,14 +191,7 @@ func GetChecksumOfObject(object interface{}) (string, error) {
 	return fmt.Sprintf("%x", md5.Sum(b)), nil
 }
 
-// ChecksumOfObjectsFunc is a function signature for returning a checksum of multiple objects.
-type ChecksumOfObjectsFunc func(objects ...interface{}) (string, error)
-
 // GetChecksumOfObjects returns the md5sum hash of the objects passed in.
 func GetChecksumOfObjects(objects ...interface{}) (string, error) {
-	b, err := json.Marshal(objects)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", md5.Sum(b)), nil
+	return GetChecksumOfObject(objects)
 }

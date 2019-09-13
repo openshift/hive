@@ -36,6 +36,9 @@ const (
 
 	// HiveNamespace is the name of Hive operator namespace
 	HiveNamespace = "hive"
+
+	// CheckpointName is the name of the object in each namespace in which the namespace's backup information is stored.
+	CheckpointName = "hive"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

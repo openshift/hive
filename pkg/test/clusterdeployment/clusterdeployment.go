@@ -8,7 +8,7 @@ import (
 // Option defines a function signature for any function that wants to be passed into Build
 type Option func(*hivev1.ClusterDeployment)
 
-// Build runs each of the functions passed in to generate a cluster deployment.
+// Build runs each of the functions passed in to generate the object.
 func Build(opts ...Option) *hivev1.ClusterDeployment {
 	retval := &hivev1.ClusterDeployment{}
 	for _, o := range opts {

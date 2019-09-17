@@ -67,6 +67,7 @@ const (
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 	provisioningTransitionTimeout       = 5 * time.Minute
+	sshCopyTempFile                     = "/tmp/ssh-privatekey"
 
 	fetchLogsScriptTemplate = `#!/bin/bash
 USER_ID=$(id -u)
@@ -683,13 +684,18 @@ func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) e
 		return err
 	}
 
+	newSSHPrivKeyPath, err := m.chmodSSHPrivateKey(sshPrivKeyPath)
+	if err != nil {
+		return err
+	}
+
 	if fileInfo.Size() == 0 {
 		m.log.Warn("cannot gather logs/tarball as ssh private key file is empty")
 		return err
 	}
 
 	// set up ssh private key, and run the log gathering script
-	cleanup, err := initSSHAgent(sshPrivKeyPath, m)
+	cleanup, err := initSSHAgent(newSSHPrivKeyPath, m)
 	defer cleanup()
 	if err != nil {
 		m.log.WithError(err).Error("failed to setup SSH agent")
@@ -708,6 +714,22 @@ func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) e
 	}
 
 	return nil
+}
+
+// chmodSSHPrivateKey copies the mounted volume with the ssh private key to
+// a temporary file, which allows us to chmod it 0600 to appease ssh-add.
+func (m *InstallManager) chmodSSHPrivateKey(sshPrivKeyPath string) (string, error) {
+	input, err := ioutil.ReadFile(sshPrivKeyPath)
+	if err != nil {
+		m.log.WithError(err).Error("error reading ssh private key to copy")
+		return "", err
+	}
+
+	if err := ioutil.WriteFile(sshCopyTempFile, input, 0600); err != nil {
+		m.log.WithError(err).Error("error writing copy of ssh private key")
+		return "", err
+	}
+	return sshCopyTempFile, nil
 }
 
 func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir string) (string, error) {

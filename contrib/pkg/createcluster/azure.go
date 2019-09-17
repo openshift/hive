@@ -52,7 +52,7 @@ func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDe
 	cd.Spec.Platform = hivev1.Platform{
 		Azure: &hivev1azure.Platform{
 			Region:                      "centralus",
-			BaseDomainResourceGroupName: o.BaseDomainResourceGroupName,
+			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 		},
 	}
 	cd.Spec.PlatformSecrets = hivev1.PlatformSecrets{

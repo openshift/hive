@@ -103,7 +103,6 @@ type Options struct {
 	PullSecret               string
 	PullSecretFile           string
 	Cloud                    string
-	AWSCredsFile             string
 	CredsFile                string
 	ClusterImageSet          string
 	InstallerImage           string
@@ -122,10 +121,10 @@ type Options struct {
 	WorkerNodes              int64
 
 	// Azure
-	BaseDomainResourceGroupName string
+	AzureBaseDomainResourceGroupName string
 
 	// GCP
-	ProjectID string
+	GCPProjectID string
 
 	homeDir       string
 	cloudProvider cloudProvider
@@ -152,8 +151,8 @@ func NewCreateClusterCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: `create-cluster CLUSTER_DEPLOYMENT_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --base-domain-resource-group-name=RESOURCE_GROUP_NAME
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --project-id=PROJECT_ID`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -173,6 +172,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --project-id=PROJECT_ID`,
 	}
 
 	flags := cmd.Flags()
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp)")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -181,9 +181,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --project-id=PROJECT_ID`,
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
-	flags.StringVar(&opt.AWSCredsFile, "aws-creds-file", "", "(deprecated) AWS credentials file")
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file")
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
@@ -200,10 +198,10 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --project-id=PROJECT_ID`,
 	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
 
 	// Azure flags
-	flags.StringVar(&opt.BaseDomainResourceGroupName, "base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
+	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
 
 	// GCP flags
-	flags.StringVar(&opt.ProjectID, "project-id", "", "Project ID is the ID of the GCP project to use")
+	flags.StringVar(&opt.GCPProjectID, "gcp-project-id", "", "Project ID is the ID of the GCP project to use")
 
 	return cmd
 }
@@ -236,22 +234,9 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		log.Infof("Unsupported cloud: %s", o.Cloud)
 		return fmt.Errorf("Unsupported cloud: %s", o.Cloud)
 	}
-	if o.AWSCredsFile != "" {
-		if o.CredsFile != "" {
-			cmd.Usage()
-			log.Infof("Cannot use both the creds-file flag and the aws-creds-file flag. Use only the creds-file flag, as the aws-creds-file flag is deprecated.")
-			return fmt.Errorf("cannot use both creds-file and aws-creds-file flags")
-		}
-		if o.Cloud != cloudAWS {
-			cmd.Usage()
-			log.Infof("Cannot use the aws-creds-file flag when the cloud is not AWS. Use the creds-file flag instead.")
-			return fmt.Errorf("aws-creds-file flag when not using AWS")
-		}
-		log.Infof("The aws-creds-file flag is deprecated. Use the creds-file flag instead.")
-	}
 	switch o.Cloud {
 	case cloudGCP:
-		if o.ProjectID == "" {
+		if o.GCPProjectID == "" {
 			cmd.Usage()
 			log.Infof("Must specify the GCP project ID when installing on GCP. Use the --project-id flag.")
 			return fmt.Errorf("gcp requires project-id flag")

@@ -51,7 +51,7 @@ func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error {
 	cd.Spec.Platform = hivev1.Platform{
 		GCP: &hivev1gcp.Platform{
-			ProjectID: o.ProjectID,
+			ProjectID: o.GCPProjectID,
 			Region:    "us-east1",
 		},
 	}

@@ -47,8 +47,6 @@ func (p *awsCloudProvider) getAWSCreds(o *Options) (string, string, error) {
 	switch {
 	case o.CredsFile != "":
 		credsFilePath = o.CredsFile
-	case o.AWSCredsFile != "":
-		credsFilePath = o.AWSCredsFile
 	default:
 		secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 		accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")

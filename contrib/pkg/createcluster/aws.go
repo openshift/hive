@@ -85,26 +85,22 @@ func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 			},
 		},
 	}
-	cd.Spec.ControlPlane.Platform = hivev1.MachinePoolPlatform{
-		AWS: &hivev1aws.MachinePoolPlatform{
-			InstanceType: "m4.large",
-			EC2RootVolume: hivev1aws.EC2RootVolume{
-				IOPS: 100,
-				Size: 22,
-				Type: "gp2",
-			},
+	// Used for both control plane and workers.
+	mpp := &hivev1aws.MachinePoolPlatform{
+		InstanceType: "m4.large",
+		EC2RootVolume: hivev1aws.EC2RootVolume{
+			IOPS: 100,
+			Size: 22,
+			Type: "gp2",
 		},
 	}
-	for _, c := range cd.Spec.Compute {
-		c.Platform = hivev1.MachinePoolPlatform{
-			AWS: &hivev1aws.MachinePoolPlatform{
-				InstanceType: "m4.large",
-				EC2RootVolume: hivev1aws.EC2RootVolume{
-					IOPS: 100,
-					Size: 22,
-					Type: "gp2",
-				},
-			},
+
+	cd.Spec.ControlPlane.Platform = hivev1.MachinePoolPlatform{
+		AWS: mpp,
+	}
+	for i := range cd.Spec.Compute {
+		cd.Spec.Compute[i].Platform = hivev1.MachinePoolPlatform{
+			AWS: mpp,
 		}
 	}
 	return nil

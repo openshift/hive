@@ -62,7 +62,7 @@ the --pull-secret flag is not specified, then the --pull-secret-file is
 used. That file's default value is %[2]s.
 
 AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID - Are used to determine your
-AWS credentials. These is only relevant for creating a cluster on AWS. If
+AWS credentials. These are only relevant for creating a cluster on AWS. If
 --creds-file or --aws-creds-file are used, then they will take precedence over
 these environment variables.
 
@@ -181,7 +181,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
-	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file")
+	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")

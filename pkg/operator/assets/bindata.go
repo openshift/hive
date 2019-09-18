@@ -1735,7 +1735,7 @@ spec:
                             type: array
                         type: object
                       azure:
-                        description: Azure is the configuration used when installin
+                        description: Azure is the configuration used when installing
                           on Azure.
                         properties:
                           osDisk:
@@ -1820,7 +1820,7 @@ spec:
                           type: array
                       type: object
                     azure:
-                      description: Azure is the configuration used when installin
+                      description: Azure is the configuration used when installing
                         on Azure.
                       properties:
                         osDisk:

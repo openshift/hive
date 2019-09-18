@@ -35,6 +35,6 @@ type MachinePool struct {
 type MachinePoolPlatform struct {
 	// AWS is the configuration used when installing on AWS.
 	AWS *aws.MachinePoolPlatform `json:"aws,omitempty"`
-	// Azure is the configuration used when installin on Azure.
+	// Azure is the configuration used when installing on Azure.
 	Azure *azure.MachinePool `json:"azure,omitempty"`
 }

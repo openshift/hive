@@ -103,7 +103,7 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 			}
 		}
 		// Remove the finalizer from the DNSZone. It will be persisted when we persist status
-		zr.logger.Debug("Removing DNSZone finalizer")
+		zr.logger.Info("Removing DNSZone finalizer")
 		controllerutils.DeleteFinalizer(zr.dnsZone, hivev1.FinalizerDNSZone)
 		err := zr.kubeClient.Update(context.TODO(), zr.dnsZone)
 		if err != nil {
@@ -112,7 +112,7 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 		return reconcile.Result{}, err
 	}
 	if !controllerutils.HasFinalizer(zr.dnsZone, hivev1.FinalizerDNSZone) {
-		zr.logger.Debug("DNSZone does not have a finalizer. Adding one.")
+		zr.logger.Info("DNSZone does not have a finalizer. Adding one.")
 		controllerutils.AddFinalizer(zr.dnsZone, hivev1.FinalizerDNSZone)
 		err := zr.kubeClient.Update(context.TODO(), zr.dnsZone)
 		if err != nil {
@@ -121,14 +121,14 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 		return reconcile.Result{}, err
 	}
 	if hostedZone == nil {
-		zr.logger.Debug("No corresponding hosted zone found on cloud provider, creating one")
+		zr.logger.Info("No corresponding hosted zone found on cloud provider, creating one")
 		hostedZone, err = zr.createRoute53HostedZone()
 		if err != nil {
 			zr.logger.WithError(err).Error("Failed to create hosted zone")
 			return reconcile.Result{}, err
 		}
 	} else {
-		zr.logger.Debug("Existing hosted zone found. Syncing with DNSZone resource")
+		zr.logger.Info("Existing hosted zone found. Syncing with DNSZone resource")
 		// For now, tags are the only things we can sync with existing zones.
 		err = zr.syncTags(hostedZone.Id, tags)
 		if err != nil {
@@ -158,6 +158,7 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 
 	reconcileResult := reconcile.Result{}
 	if !isZoneSOAAvailable {
+		zr.logger.Info("SOA record for DNS zone not available")
 		reconcileResult.Requeue = true
 		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
 	}

@@ -1525,9 +1525,18 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDe
 				Credentials: &cd.Spec.PlatformSecrets.AWS.Credentials,
 			},
 		}
+	case cd.Spec.Platform.Azure != nil:
+		if cd.Spec.PlatformSecrets.Azure == nil {
+			return nil, errors.New("missing Azure platform secrets")
+		}
+		req.Spec.Platform = hivev1.ClusterDeprovisionRequestPlatform{
+			Azure: &hivev1.AzureClusterDeprovisionRequest{
+				Credentials: &cd.Spec.PlatformSecrets.Azure.Credentials,
+			},
+		}
+	// TODO: Add support for GCP
 	default:
-		// TODO: Need to deprovision Azure and GCP
-		return nil, errors.New("cannot deprovision other than AWS")
+		return nil, errors.New("unsupported cloud provider for deprovision")
 	}
 
 	return req, nil

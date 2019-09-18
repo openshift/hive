@@ -254,6 +254,15 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error marshalling install-config.yaml")
 		return err
 	}
+
+	// TODO: delete this, it has passwords, devel only
+	m.log.Info("install config:")
+	dataStr := string(d)
+	lines := strings.Split(dataStr, "\n")
+	for _, l := range lines {
+		m.log.Info(l)
+	}
+
 	err = ioutil.WriteFile(filepath.Join(m.WorkDir, "install-config.yaml"), d, 0644)
 	if err != nil {
 		m.log.WithError(err).Error("error writing install-config.yaml to disk")
@@ -271,11 +280,13 @@ func (m *InstallManager) Run() error {
 	// Generate installer assets we need to modify or upload.
 	m.log.Info("generating assets")
 	if err := m.generateAssets(provision); err != nil {
+		m.log.Info("reading installer log")
 		installLog, readErr := m.readInstallerLog(provision, m)
 		if readErr != nil {
 			m.log.WithError(readErr).Error("error reading asset generation log")
 			return err
 		}
+		m.log.Info("updating clusterprovision")
 		if err := m.updateClusterProvision(
 			provision,
 			m,

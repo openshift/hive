@@ -63,8 +63,8 @@ used. That file's default value is %[2]s.
 
 AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID - Are used to determine your
 AWS credentials. These are only relevant for creating a cluster on AWS. If
---creds-file or --aws-creds-file are used, then they will take precedence over
-these environment variables.
+--creds-file is used it will take precedence over these environment
+variables.
 
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
@@ -238,8 +238,8 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 	case cloudGCP:
 		if o.GCPProjectID == "" {
 			cmd.Usage()
-			log.Infof("Must specify the GCP project ID when installing on GCP. Use the --project-id flag.")
-			return fmt.Errorf("gcp requires project-id flag")
+			log.Infof("Must specify the GCP project ID when installing on GCP. Use the --gcp-project-id flag.")
+			return fmt.Errorf("gcp requires gcp-project-id flag")
 
 		}
 	}

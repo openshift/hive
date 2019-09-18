@@ -2507,6 +2507,14 @@ spec:
                         request
                       type: string
                   type: object
+                azure:
+                  description: Azure contains Azure-specific deprovision request settings
+                  properties:
+                    credentials:
+                      description: Credentials is the Azure account credentials to
+                        use for deprovisioning the cluster
+                      type: object
+                  type: object
               type: object
           type: object
         status:

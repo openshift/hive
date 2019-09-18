@@ -12,6 +12,7 @@ import (
 )
 
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
+// TODO: Port to a sub-command of deprovision.
 func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	opt := &aws.ClusterUninstaller{}
 	var logLevel string
@@ -25,7 +26,7 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 				return
 			}
 			if err := opt.Run(); err != nil {
-				log.WithError(err).Error("Runtime error")
+				log.WithError(err).Fatal("Runtime error")
 			}
 		},
 	}

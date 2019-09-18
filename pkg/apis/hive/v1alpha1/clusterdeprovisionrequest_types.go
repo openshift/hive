@@ -28,6 +28,8 @@ type ClusterDeprovisionRequestStatus struct {
 type ClusterDeprovisionRequestPlatform struct {
 	// AWS contains AWS-specific deprovision request settings
 	AWS *AWSClusterDeprovisionRequest `json:"aws,omitempty"`
+	// Azure contains Azure-specific deprovision request settings
+	Azure *AzureClusterDeprovisionRequest `json:"azure,omitempty"`
 }
 
 // AWSClusterDeprovisionRequest contains AWS-specific configuration for a ClusterDeprovisionRequest
@@ -36,6 +38,12 @@ type AWSClusterDeprovisionRequest struct {
 	Region string `json:"region"`
 
 	// Credentials is the AWS account credentials to use for deprovisioning the cluster
+	Credentials *corev1.LocalObjectReference `json:"credentials,omitempty"`
+}
+
+// AzureClusterDeprovisionRequest contains Azure-specific configuration for a ClusterDeprovisionRequest
+type AzureClusterDeprovisionRequest struct {
+	// Credentials is the Azure account credentials to use for deprovisioning the cluster
 	Credentials *corev1.LocalObjectReference `json:"credentials,omitempty"`
 }
 

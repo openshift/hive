@@ -28,8 +28,11 @@ import (
 )
 
 const (
-	defaultLogLevel         = "info"
-	leaderElectionConfigMap = "hive-operator-leader"
+	defaultLogLevel             = "info"
+	leaderElectionConfigMap     = "hive-operator-leader"
+	leaderElectionLeaseDuration = "2m"
+	leaderElectionRenewDeadline = "1m45s"
+	leaderElectionlRetryPeriod  = "10s"
 )
 
 type controllerManagerOptions struct {
@@ -50,6 +53,20 @@ func newRootCommand() *cobra.Command {
 			log.SetLevel(level)
 			log.Debug("debug logging enabled")
 
+			// Parse leader election options
+			leaseDuration, err := time.ParseDuration(leaderElectionLeaseDuration)
+			if err != nil {
+				log.WithError(err).Fatal("Cannot parse lease duration")
+			}
+			renewDeadline, err := time.ParseDuration(leaderElectionRenewDeadline)
+			if err != nil {
+				log.WithError(err).Fatal("Cannot parse renew deadline")
+			}
+			retryPeriod, err := time.ParseDuration(leaderElectionlRetryPeriod)
+			if err != nil {
+				log.WithError(err).Fatal("Cannot parse retry period")
+			}
+
 			// Get a config to talk to the apiserver
 			cfg, err := config.GetConfig()
 			if err != nil {
@@ -62,6 +79,9 @@ func newRootCommand() *cobra.Command {
 				LeaderElection:          true,
 				LeaderElectionNamespace: constants.HiveNamespace,
 				LeaderElectionID:        leaderElectionConfigMap,
+				LeaseDuration:           &leaseDuration,
+				RenewDeadline:           &renewDeadline,
+				RetryPeriod:             &retryPeriod,
 			})
 			if err != nil {
 				log.Fatal(err)

@@ -49,7 +49,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/aws"
+	"github.com/openshift/installer/pkg/destroy/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
 )
 
@@ -108,7 +110,7 @@ type InstallManager struct {
 	ClusterProvisionName     string
 	Namespace                string
 	DynamicClient            client.Client
-	runUninstaller           func(clusterName, region, clusterID string, logger log.FieldLogger) error
+	runUninstaller           func(cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
 	readClusterMetadata      func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
@@ -269,7 +271,7 @@ func (m *InstallManager) Run() error {
 		return err
 	}
 
-	// If the cluster provision has a clusterID set, this implies we failed an install
+	// If the cluster provision has an infraID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
 	m.log.Info("cleaning up from past install attempts")
 	if err := m.cleanupFailedInstall(cd, provision); err != nil {
@@ -432,15 +434,8 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, prov
 	}
 	if infraID != nil {
 		m.log.Info("InfraID set from failed install, running deprovison")
-		switch {
-		case cd.Spec.Platform.AWS != nil:
-			if err := m.runUninstaller(m.ClusterName, cd.Spec.Platform.AWS.Region, *infraID, m.log); err != nil {
-				return err
-			}
-		default:
-			// TODO: Need to clean up failed installs on Azure and GCP
-			m.log.Warn("cannot clean up platforms other than AWS")
-			return errors.New("cannot clean up failed installs on non-AWS platforms")
+		if err := m.runUninstaller(cd, *infraID, m.log); err != nil {
+			return err
 		}
 	} else {
 		m.log.Warn("skipping cleanup as no infra ID set")
@@ -449,18 +444,39 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, prov
 	return nil
 }
 
-func runUninstaller(clusterName, region, infraID string, logger log.FieldLogger) error {
-	// run the uninstaller to clean up any cloud resources previously created
-	filters := []aws.Filter{
-		{kubernetesKeyPrefix + infraID: "owned"},
-	}
-	uninstaller := &aws.ClusterUninstaller{
-		Filters: filters,
-		Region:  region,
-		Logger:  logger,
-	}
+func runUninstaller(cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		// run the uninstaller to clean up any cloud resources previously created
+		filters := []aws.Filter{
+			{kubernetesKeyPrefix + infraID: "owned"},
+		}
+		uninstaller := &aws.ClusterUninstaller{
+			Filters: filters,
+			Region:  cd.Spec.Platform.AWS.Region,
+			Logger:  logger,
+		}
 
-	return uninstaller.Run()
+		return uninstaller.Run()
+	case cd.Spec.Platform.Azure != nil:
+		uninstaller := &azure.ClusterUninstaller{}
+		uninstaller.Logger = logger
+		session, err := azuresession.GetSession()
+		if err != nil {
+			return err
+		}
+
+		uninstaller.InfraID = infraID
+		uninstaller.SubscriptionID = session.Credentials.SubscriptionID
+		uninstaller.TenantID = session.Credentials.TenantID
+		uninstaller.GraphAuthorizer = session.GraphAuthorizer
+		uninstaller.Authorizer = session.Authorizer
+
+		return uninstaller.Run()
+	default:
+		logger.Warn("unknown platform for re-try cleanup")
+		return errors.New("unknown platform for re-try cleanup")
+	}
 }
 
 // generateAssets runs openshift-install commands to generate on-disk assets we need to

@@ -74,6 +74,8 @@ type ClusterDeploymentSpec struct {
 	// +optional
 	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
 
+	// TODO: Should PlatformSecrets be moved within each Platform for v1?
+
 	// PlatformSecrets contains credentials and secrets for the cluster infrastructure.
 	// +required
 	PlatformSecrets PlatformSecrets `json:"platformSecrets"`

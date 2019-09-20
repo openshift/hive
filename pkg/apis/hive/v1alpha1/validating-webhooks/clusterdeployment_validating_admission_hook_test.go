@@ -17,6 +17,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
 )
 
 var validTestManagedDomains = []string{
@@ -27,7 +28,7 @@ var validTestManagedDomains = []string{
 }
 
 func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
-	cd := validClusterDeployment()
+	cd := validAWSClusterDeployment()
 	cd.Spec.Ingress = []hivev1.ClusterIngress{
 		{
 			Name:   "default",
@@ -38,13 +39,13 @@ func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
 }
 
 func clusterDeploymentWithManagedDomain(domain string) *hivev1.ClusterDeployment {
-	cd := validClusterDeployment()
+	cd := validAWSClusterDeployment()
 	cd.Spec.ManageDNS = true
 	cd.Spec.BaseDomain = domain
 	return cd
 }
 
-func validClusterDeployment() *hivev1.ClusterDeployment {
+func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		Spec: hivev1.ClusterDeploymentSpec{
 			BaseDomain:  "example.com",
@@ -69,9 +70,37 @@ func validClusterDeployment() *hivev1.ClusterDeployment {
 	}
 }
 
+func validAzureClusterDeployment() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
+		Spec: hivev1.ClusterDeploymentSpec{
+			BaseDomain:  "azure.example.com",
+			ClusterName: "AzureCluster",
+			Compute: []hivev1.MachinePool{
+				{
+					Name: "SameMachinePoolName",
+				},
+			},
+			SSHKey: corev1.LocalObjectReference{
+				Name: "test-sshkey",
+			},
+			Platform: hivev1.Platform{
+				Azure: &hivev1azure.Platform{
+					Region:                      "test-region",
+					BaseDomainResourceGroupName: "os4-common",
+				},
+			},
+			PlatformSecrets: hivev1.PlatformSecrets{
+				Azure: &hivev1azure.PlatformSecrets{
+					Credentials: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+				},
+			},
+		},
+	}
+}
+
 // Meant to be used to compare new and old as the same values.
 func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
-	return validClusterDeployment()
+	return validAWSClusterDeployment()
 }
 
 func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
@@ -88,7 +117,7 @@ func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
 }
 
 func validClusterDeploymentDifferentMutableValue() *hivev1.ClusterDeployment {
-	cd := validClusterDeployment()
+	cd := validAWSClusterDeployment()
 	cd.Spec.Compute = []hivev1.MachinePool{
 		{
 			Name: "DifferentMachinePoolName",
@@ -139,36 +168,36 @@ func TestClusterDeploymentValidate(t *testing.T) {
 	}{
 		{
 			name:            "Test valid create",
-			newObject:       validClusterDeployment(),
+			newObject:       validAWSClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Delete Operation is allowed even with mismatch objects",
-			oldObject:       validClusterDeployment(),
+			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentDifferentImmutableValue(),
 			operation:       admissionv1beta1.Delete,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with same data",
-			oldObject:       validClusterDeployment(),
+			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentSameValues(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with different mutable data",
-			oldObject:       validClusterDeployment(),
+			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentDifferentMutableValue(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:      "Test setting installed flag",
-			oldObject: validClusterDeployment(),
+			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.Installed = true
 				return cd
 			}(),
@@ -178,19 +207,19 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name: "Test clearing installed flag",
 			oldObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.Installed = true
 				return cd
 			}(),
-			newObject:       validClusterDeployment(),
+			newObject:       validAWSClusterDeployment(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:      "Test Update PreserveOnDelete",
-			oldObject: validClusterDeployment(),
+			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.PreserveOnDelete = true
 				return cd
 			}(),
@@ -199,7 +228,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:            "Test Update Operation is NOT allowed with different immutable data",
-			oldObject:       validClusterDeployment(),
+			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentDifferentImmutableValue(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
@@ -253,7 +282,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "Test going from previously defined list of ingress to empty ingress list",
 			oldObject:       validClusterDeploymentWithIngress(),
-			newObject:       validClusterDeployment(),
+			newObject:       validAWSClusterDeployment(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
@@ -285,7 +314,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:            "Test updating existing empty ingress to populated ingress",
-			oldObject:       validClusterDeployment(),
+			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentWithIngress(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
@@ -315,9 +344,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:      "Test allow modifying controlPlaneConfig",
-			oldObject: validClusterDeployment(),
+			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.ControlPlaneConfig = hivev1.ControlPlaneConfigSpec{
 					ServingCertificates: hivev1.ControlPlaneServingCertificateSpec{
 						Default: "someNonExistentCertificateBundle",
@@ -330,9 +359,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:      "Test allow modifying certificateBundles",
-			oldObject: validClusterDeployment(),
+			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 					{
 						Name:     "testCertificateBundle",
@@ -350,9 +379,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:      "Test unallowed update of existing machinepool labels",
-			oldObject: validClusterDeployment(),
+			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.Compute[0].Labels = map[string]string{
 					"newlabel": "newvalue",
 				}
@@ -364,9 +393,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:      "Test unallowed update of existing machinepool taints",
-			oldObject: validClusterDeployment(),
+			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.Compute[0].Taints = []corev1.Taint{
 					{
 						Key:   "testTaint",
@@ -402,7 +431,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name: "Cluster deployment name is too long",
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Name = "this-is-a-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-name"
 				return cd
 			}(),
@@ -412,8 +441,76 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name: "Cluster name is too long",
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validClusterDeployment()
+				cd := validAWSClusterDeployment()
 				cd.Spec.ClusterName = "this-is-a-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-name"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Azure create valid",
+			newObject:       validAzureClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "Azure create missing region",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Platform.Azure.Region = ""
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Azure create missing credentials",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.PlatformSecrets.Azure = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Azure create missing baseDomainResourceGroupName",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Platform.Azure.BaseDomainResourceGroupName = ""
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:      "Azure update region",
+			oldObject: validAzureClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Platform.Azure.Region = ""
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "create with two cloud platforms",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				awsCD := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS = awsCD.Spec.Platform.AWS
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "create with no cloud platforms",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Platform.Azure = nil
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

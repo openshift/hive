@@ -145,6 +145,12 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
+	if cd.Spec.Platform.AWS == nil {
+		// TODO: add support for GCP and azure
+		cdLog.Warn("skipping machine set management for unsupported cloud platform")
+		return reconcile.Result{}, nil
+	}
+
 	adminKubeconfigSecret := &kapi.Secret{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {

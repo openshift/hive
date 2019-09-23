@@ -354,13 +354,9 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 	assert.Len(t, objs, 1, "single syncset expected")
 	assert.IsType(t, &hivev1.SyncSet{}, objs[0], "syncset object expected")
 	ss := objs[0].(*hivev1.SyncSet)
-	secrets := []*corev1.Secret{}
+	secretReferences := ss.Spec.SecretReferences
 	var apiServerConfig *configv1.APIServer
 	for _, rr := range ss.Spec.Resources {
-		if secret, ok := rr.Object.(*corev1.Secret); ok {
-			secrets = append(secrets, secret)
-			continue
-		}
 		if config, ok := rr.Object.(*configv1.APIServer); ok {
 			apiServerConfig = config
 			continue
@@ -368,19 +364,19 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 		assert.Fail(t, "unexpected resource type", "syncset resource type: %T", rr.Object)
 	}
 	// Ensure there are no duplicate names
-	names := secretNames(secrets)
+	names := secretNames(secretReferences)
 	assert.Equal(t, sets.NewString(names...).Len(), len(names))
 
 	if defaultSecret != "" {
-		s := findSecret(secrets, defaultSecret)
+		s := findSecret(secretReferences, defaultSecret)
 		assert.NotNil(t, s)
-		assert.Equal(t, apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name, s.Name)
+		assert.Equal(t, apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name, s)
 	} else {
 		assert.Empty(t, apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name)
 	}
 
 	for i, c := range additional {
-		s := findSecret(secrets, c.secret)
+		s := findSecret(secretReferences, c.secret)
 		assert.NotNil(t, s)
 		assert.Contains(t, apiServerConfig.Spec.ServingCerts.NamedCertificates[i].Names, c.domain)
 		assert.Equal(t, apiServerConfig.Spec.ServingCerts.NamedCertificates[i].ServingCertificate.Name, c.secret)
@@ -391,7 +387,7 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 
 	// If not setting any secrets, ensure they're empty
 	if defaultSecret == "" && len(additional) == 0 {
-		assert.Empty(t, secrets)
+		assert.Empty(t, secretReferences)
 	}
 }
 
@@ -410,19 +406,19 @@ func fakeSyncSet() *hivev1.SyncSet {
 	return ss
 }
 
-func findSecret(ss []*corev1.Secret, name string) *corev1.Secret {
+func findSecret(ss []hivev1.SecretReference, name string) string {
 	for _, s := range ss {
-		if s.Name == name {
-			return s
+		if s.Target.Name == name {
+			return name
 		}
 	}
-	return nil
+	return ""
 }
 
-func secretNames(ss []*corev1.Secret) []string {
+func secretNames(ss []hivev1.SecretReference) []string {
 	names := []string{}
 	for _, s := range ss {
-		names = append(names, s.Name)
+		names = append(names, s.Target.Name)
 	}
 	return names
 }

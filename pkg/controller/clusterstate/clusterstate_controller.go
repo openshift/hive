@@ -121,6 +121,12 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil
 	}
 
+	// If the cluster is unreachable, do not reconcile.
+	if controllerutils.HasUnreachableCondition(cd) {
+		logger.Debug("skipping cluster with unreachable condition")
+		return reconcile.Result{}, nil
+	}
+
 	// Fetch corresponding ClusterState instance
 	st := &hivev1.ClusterState{}
 	switch err = r.Get(context.TODO(), request.NamespacedName, st); {

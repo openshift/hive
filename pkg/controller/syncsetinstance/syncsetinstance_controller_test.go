@@ -353,6 +353,19 @@ func TestSyncSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Local SecretReference secret has OwnerReference",
+			existingObjs: []runtime.Object{
+				testSecretWithOwner("foo", "bar"),
+			},
+			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				validateSyncSetInstanceStatus(t, ssi.Status,
+					successfulSecretReferenceStatus(
+						testSecret("foo", "bar"),
+					))
+			},
+		},
+		{
 			name: "Apply multiple SecretReferences successfully",
 			existingObjs: []runtime.Object{
 				testSecret("foo", "bar"),
@@ -841,6 +854,17 @@ func testSecret(name, data string) *corev1.Secret {
 			testName: []byte(data),
 		},
 	}
+}
+
+func testSecretWithOwner(name, data string) *corev1.Secret {
+	secret := testSecret(name, data)
+	secret.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: "foo.io/v1",
+			Kind:       "Foo",
+		},
+	}
+	return secret
 }
 
 func deletedSecret(name string) deletedItemInfo {

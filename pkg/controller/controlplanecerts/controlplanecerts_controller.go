@@ -311,7 +311,6 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 		Kind:       "KubeAPIServer",
 		Name:       "cluster",
 		Patch:      fmt.Sprintf(kubeAPIServerPatchTemplate, secretsHash(secrets)),
-		ApplyMode:  hivev1.AlwaysApplyPatchApplyMode,
 		PatchType:  "json",
 	}
 	syncSet.Spec.Resources = resources

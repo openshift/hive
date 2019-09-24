@@ -42,13 +42,6 @@ spec:
                     description: APIVersion is the Group and Version of the object
                       to be patched.
                     type: string
-                  applyMode:
-                    description: ApplyMode indicates if the patch apply mode is "AlwaysApply"
-                      (default) or "ApplyOnce". ApplyMode "AlwaysApply" indicates
-                      that the patch should be applied every time reconciliation occurs.
-                      ApplyMode "ApplyOnce" indicates that the patch should only be
-                      applied once.
-                    type: string
                   kind:
                     description: Kind is the Kind of the object to be patched.
                     type: string

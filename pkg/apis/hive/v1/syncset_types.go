@@ -51,12 +51,6 @@ type SyncObjectPatch struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// ApplyMode indicates if the patch apply mode is "AlwaysApply" (default) or "ApplyOnce".
-	// ApplyMode "AlwaysApply" indicates that the patch should be applied every time reconciliation occurs.
-	// ApplyMode "ApplyOnce" indicates that the patch should only be applied once.
-	// +optional
-	ApplyMode SyncSetPatchApplyMode `json:"applyMode,omitempty"`
-
 	// Patch is the patch to apply.
 	Patch string `json:"patch"`
 

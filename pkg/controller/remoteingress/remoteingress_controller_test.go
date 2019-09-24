@@ -473,8 +473,8 @@ func syncSetFromClusterDeployment(cd *hivev1.ClusterDeployment) *hivev1.SyncSet 
 		certBundleSecrets: fakeSecretListForCertBundles(cd),
 	}
 	rawExtensions := rawExtensionsFromClusterDeployment(&rContext)
-	srList := secretRefrenceFromClusterDeployment(&rContext)
-	ssSpec := newSyncSetSpec(cd, rawExtensions, srList)
+
+	ssSpec := newSyncSetSpec(cd, rawExtensions)
 	return &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cd.Name + "clusteringress",

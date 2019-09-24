@@ -196,8 +196,8 @@ func (r *ReconcileRemoteClusterIngress) syncClusterIngress(rContext *reconcileCo
 	rContext.logger.Info("reconciling ClusterIngress for cluster deployment")
 
 	rawList := rawExtensionsFromClusterDeployment(rContext)
-	srList := secretRefrenceFromClusterDeployment(rContext)
-	return r.syncSyncSet(rContext, rawList, srList)
+
+	return r.syncSyncSet(rContext, rawList)
 }
 
 // rawExtensionsFromClusterDeployment will return the slice of runtime.RawExtension objects
@@ -222,33 +222,10 @@ func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.Ra
 	return rawList
 }
 
-// secretRefrenceFromClusterDeployment will return the slice of hivev1.SecretReference objects
-// (really the syncSet.Spec.SecretReferences) to satisfy the ingress config for the clusterDeployment
-func secretRefrenceFromClusterDeployment(rContext *reconcileContext) []hivev1.SecretReference {
-	secretReferences := []hivev1.SecretReference{}
-
-	// first the certBundle secrets
-	for _, cbSecret := range rContext.certBundleSecrets {
-		secretReference := hivev1.SecretReference{
-			Source: corev1.ObjectReference{
-				Namespace: cbSecret.Namespace,
-				Name:      cbSecret.Name,
-			},
-			Target: corev1.ObjectReference{
-				Namespace: remoteIngressConrollerSecretsNamespace,
-				Name:      remoteSecretNameForCertificateBundleSecret(cbSecret.Name, rContext.clusterDeployment),
-			},
-		}
-		secretReferences = append(secretReferences, secretReference)
-	}
-	return secretReferences
-}
-
-func newSyncSetSpec(cd *hivev1.ClusterDeployment, rawExtensions []runtime.RawExtension, srList []hivev1.SecretReference) *hivev1.SyncSetSpec {
+func newSyncSetSpec(cd *hivev1.ClusterDeployment, rawExtensions []runtime.RawExtension) *hivev1.SyncSetSpec {
 	ssSpec := &hivev1.SyncSetSpec{
 		SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
 			Resources:         rawExtensions,
-			SecretReferences:  srList,
 			ResourceApplyMode: "sync",
 		},
 		ClusterDeploymentRefs: []corev1.LocalObjectReference{
@@ -261,10 +238,10 @@ func newSyncSetSpec(cd *hivev1.ClusterDeployment, rawExtensions []runtime.RawExt
 }
 
 // syncSyncSet builds up a syncSet object with the passed-in rawExtensions as the spec.Resources
-func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, rawExtensions []runtime.RawExtension, srList []hivev1.SecretReference) error {
+func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, rawExtensions []runtime.RawExtension) error {
 	ssName := apihelpers.GetResourceName(rContext.clusterDeployment.Name, "clusteringress")
 
-	newSyncSetSpec := newSyncSetSpec(rContext.clusterDeployment, rawExtensions, srList)
+	newSyncSetSpec := newSyncSetSpec(rContext.clusterDeployment, rawExtensions)
 	syncSet := &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ssName,

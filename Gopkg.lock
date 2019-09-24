@@ -780,14 +780,16 @@
   version = "v1.14.0"
 
 [[projects]]
-  digest = "1:f96365542377d37170423b42eeb87ac7db66fb2a5cd11b95e5ca06d764355a4e"
+  digest = "1:b312cf984ba7c8e95540f3274c2cd4cf5189215c60a567df75a5529028ec6c65"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
     "pkg/asset/installconfig/azure",
+    "pkg/asset/installconfig/gcp",
     "pkg/asset/machines/aws",
     "pkg/destroy/aws",
     "pkg/destroy/azure",
+    "pkg/destroy/gcp",
     "pkg/destroy/providers",
     "pkg/ipnet",
     "pkg/types",
@@ -796,6 +798,7 @@
     "pkg/types/azure",
     "pkg/types/baremetal",
     "pkg/types/gcp",
+    "pkg/types/gcp/validation",
     "pkg/types/libvirt",
     "pkg/types/none",
     "pkg/types/openstack",
@@ -1125,12 +1128,27 @@
   version = "v2.0.0"
 
 [[projects]]
-  digest = "1:5f003878aabe31d7f6b842d4de32b41c46c214bb629bb485387dbcce1edf5643"
+  digest = "1:d1d6b1c0690a979aeed2c349708b84ef0482dcd95c1effc73f324bf4cb9bd6cf"
   name = "google.golang.org/api"
-  packages = ["support/bundler"]
+  packages = [
+    "cloudresourcemanager/v1",
+    "compute/v1",
+    "dns/v1",
+    "gensupport",
+    "googleapi",
+    "googleapi/internal/uritemplates",
+    "googleapi/transport",
+    "iam/v1",
+    "internal",
+    "option",
+    "storage/v1",
+    "support/bundler",
+    "transport/http",
+    "transport/http/internal/propagation",
+  ]
   pruneopts = "NUT"
-  revision = "09a9d0a772eb18da65a7917760cf4ca9ae943c83"
-  version = "v0.10.0"
+  revision = "0cbcb99a9ea0c8023c794b2693cbe1def82ed4d7"
+  version = "v0.3.2"
 
 [[projects]]
   digest = "1:e2da54c7866453ac5831c61c7ec5d887f39328cac088c806553303bff4048e6f"
@@ -2005,6 +2023,7 @@
     "github.com/openshift/installer/pkg/asset/machines/aws",
     "github.com/openshift/installer/pkg/destroy/aws",
     "github.com/openshift/installer/pkg/destroy/azure",
+    "github.com/openshift/installer/pkg/destroy/gcp",
     "github.com/openshift/installer/pkg/ipnet",
     "github.com/openshift/installer/pkg/types",
     "github.com/openshift/installer/pkg/types/aws",

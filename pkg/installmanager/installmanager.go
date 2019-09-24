@@ -52,7 +52,9 @@ import (
 	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/openshift/installer/pkg/destroy/azure"
+	"github.com/openshift/installer/pkg/destroy/gcp"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 )
 
 const (
@@ -472,6 +474,21 @@ func runUninstaller(cd *hivev1.ClusterDeployment, infraID string, logger log.Fie
 		uninstaller.GraphAuthorizer = session.GraphAuthorizer
 		uninstaller.Authorizer = session.Authorizer
 
+		return uninstaller.Run()
+	case cd.Spec.Platform.GCP != nil:
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				GCP: &installertypesgcp.Metadata{
+					Region:    cd.Spec.Platform.GCP.Region,
+					ProjectID: cd.Spec.Platform.GCP.ProjectID,
+				},
+			},
+		}
+		uninstaller, err := gcp.New(logger, metadata)
+		if err != nil {
+			return err
+		}
 		return uninstaller.Run()
 	default:
 		logger.Warn("unknown platform for re-try cleanup")

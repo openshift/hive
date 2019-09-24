@@ -30,6 +30,8 @@ type ClusterDeprovisionRequestPlatform struct {
 	AWS *AWSClusterDeprovisionRequest `json:"aws,omitempty"`
 	// Azure contains Azure-specific deprovision request settings
 	Azure *AzureClusterDeprovisionRequest `json:"azure,omitempty"`
+	// GCP contains GCP-specific deprovision request settings
+	GCP *GCPClusterDeprovisionRequest `json:"gcp,omitempty"`
 }
 
 // AWSClusterDeprovisionRequest contains AWS-specific configuration for a ClusterDeprovisionRequest
@@ -44,6 +46,16 @@ type AWSClusterDeprovisionRequest struct {
 // AzureClusterDeprovisionRequest contains Azure-specific configuration for a ClusterDeprovisionRequest
 type AzureClusterDeprovisionRequest struct {
 	// Credentials is the Azure account credentials to use for deprovisioning the cluster
+	Credentials *corev1.LocalObjectReference `json:"credentials,omitempty"`
+}
+
+// GCPClusterDeprovisionRequest contains GCP-specific configuration for a ClusterDeprovisionRequest
+type GCPClusterDeprovisionRequest struct {
+	// Region is the GCP region for this deprovisioning request
+	Region string `json:"region"`
+	// ProjectID is the ID of the GCP project in which the cluster exists
+	ProjectID string `json:"projectID"`
+	// Credentials is the GCP account credentials to use for deprovisioning the cluster
 	Credentials *corev1.LocalObjectReference `json:"credentials,omitempty"`
 }
 

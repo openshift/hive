@@ -3,6 +3,7 @@ package install
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -23,7 +24,10 @@ const (
 
 	defaultInstallerImagePullPolicy = corev1.PullAlways
 	tryUninstallOnceAnnotation      = "hive.openshift.io/try-uninstall-once"
-	azureAuthFile                   = "/.azure/osServicePrincipal.json"
+	azureAuthDir                    = "/.azure"
+	azureAuthFile                   = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir                      = "/.gcp"
+	gcpAuthFile                     = gcpAuthDir + "/osServiceAccount.json"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -150,7 +154,7 @@ func InstallerPodSpec(
 			})
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{
 				Name:      "azure",
-				MountPath: "/.azure",
+				MountPath: azureAuthDir,
 			})
 			env = append(env, corev1.EnvVar{
 				Name:  "AZURE_AUTH_LOCATION",
@@ -158,8 +162,24 @@ func InstallerPodSpec(
 			})
 		}
 	case cd.Spec.PlatformSecrets.GCP != nil:
-		// TODO: Need to set credentials for GCP
-		pLog.Warn("need to set credentials for GCP")
+		if len(cd.Spec.PlatformSecrets.GCP.Credentials.Name) > 0 {
+			volumes = append(volumes, corev1.Volume{
+				Name: "gcp",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.PlatformSecrets.GCP.Credentials.Name,
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "gcp",
+				MountPath: gcpAuthDir,
+			})
+			env = append(env, corev1.EnvVar{
+				Name:  "GOOGLE_CREDENTIALS",
+				Value: gcpAuthFile,
+			})
+		}
 	}
 
 	if releaseImage != "" {
@@ -316,11 +336,6 @@ func GetUninstallJobName(name string) string {
 func GenerateUninstallerJobForDeprovisionRequest(
 	req *hivev1.ClusterDeprovisionRequest) (*batchv1.Job, error) {
 
-	if req.Spec.Platform.AWS == nil && req.Spec.Platform.Azure == nil {
-		// TODO: Need to support un-install for GCP
-		return nil, fmt.Errorf("only AWS and Azure deprovision requests currently supported")
-	}
-
 	tryOnce := false
 	if req.Annotations != nil {
 		value, exists := req.Annotations[tryUninstallOnceAnnotation]
@@ -362,6 +377,10 @@ func GenerateUninstallerJobForDeprovisionRequest(
 		completeAWSDeprovisionJob(req, job)
 	case req.Spec.Platform.Azure != nil:
 		completeAzureDeprovisionJob(req, job)
+	case req.Spec.Platform.GCP != nil:
+		completeGCPDeprovisionJob(req, job)
+	default:
+		return nil, errors.New("deprovision requests currently supported for platform")
 	}
 
 	return job, nil
@@ -434,7 +453,7 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *bat
 	})
 	volumeMounts = append(volumeMounts, corev1.VolumeMount{
 		Name:      "azure",
-		MountPath: "/.azure",
+		MountPath: azureAuthDir,
 	})
 	env = append(env, corev1.EnvVar{
 		Name:  "AZURE_AUTH_LOCATION",
@@ -460,4 +479,49 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *bat
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
 
+}
+
+func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+	env := []corev1.EnvVar{}
+	volumes = append(volumes, corev1.Volume{
+		Name: "gcp",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: req.Spec.Platform.GCP.Credentials.Name,
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "gcp",
+		MountPath: gcpAuthDir,
+	})
+	env = append(env, corev1.EnvVar{
+		Name:  "GOOGLE_CREDENTIALS",
+		Value: gcpAuthFile,
+	})
+	containers := []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Env:             env,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"deprovision",
+				"gcp",
+				"--loglevel",
+				"debug",
+				"--region",
+				req.Spec.Platform.GCP.Region,
+				"--gcp-project-id",
+				req.Spec.Platform.GCP.ProjectID,
+				req.Spec.InfraID,
+			},
+			VolumeMounts: volumeMounts,
+		},
+	}
+	job.Spec.Template.Spec.Containers = containers
+	job.Spec.Template.Spec.Volumes = volumes
 }

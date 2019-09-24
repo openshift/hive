@@ -257,6 +257,12 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if aws.Region == "" {
 			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
 		}
+		for i, mp := range newObject.Spec.Compute {
+			computePath := specPath.Child("compute").Index(i)
+			if mp.Platform.AWS == nil {
+				allErrs = append(allErrs, field.Required(computePath.Child("aws"), "must specify platform for compute machine sets"))
+			}
+		}
 	}
 	if newObject.Spec.Platform.Azure != nil {
 		numberOfPlatforms++
@@ -270,6 +276,12 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 		if azure.BaseDomainResourceGroupName == "" {
 			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
+		}
+		for i, mp := range newObject.Spec.Compute {
+			computePath := specPath.Child("compute").Index(i)
+			if mp.Platform.Azure == nil {
+				allErrs = append(allErrs, field.Required(computePath.Child("azure"), "must specify platform for compute machine sets"))
+			}
 		}
 	}
 	if newObject.Spec.Platform.GCP != nil {
@@ -285,6 +297,15 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if gcp.Region == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
 		}
+		// TODO: Uncomment once ready for GCP
+		/*
+			for i, mp := range newObject.Spec.Compute {
+				computePath := specPath.Child("compute").Index(i)
+				if mp.Platform.GCP == nil {
+					allErrs = append(allErrs, field.Required(computePath.Child("gcp"), "must specify platform for compute machine sets"))
+				}
+			}
+		*/
 	}
 	switch {
 	case numberOfPlatforms == 0:

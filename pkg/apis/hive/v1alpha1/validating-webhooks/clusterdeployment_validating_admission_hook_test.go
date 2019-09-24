@@ -53,6 +53,9 @@ func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 			Compute: []hivev1.MachinePool{
 				{
 					Name: "SameMachinePoolName",
+					Platform: hivev1.MachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{},
+					},
 				},
 			},
 			SSHKey: corev1.LocalObjectReference{
@@ -78,6 +81,9 @@ func validAzureClusterDeployment() *hivev1.ClusterDeployment {
 			Compute: []hivev1.MachinePool{
 				{
 					Name: "SameMachinePoolName",
+					Platform: hivev1.MachinePoolPlatform{
+						Azure: &hivev1azure.MachinePool{},
+					},
 				},
 			},
 			SSHKey: corev1.LocalObjectReference{
@@ -449,6 +455,16 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "AWS create missing machine pool platform",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Compute[0].Platform.AWS = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
 			name:            "Azure create valid",
 			newObject:       validAzureClusterDeployment(),
 			operation:       admissionv1beta1.Create,
@@ -469,6 +485,16 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAzureClusterDeployment()
 				cd.Spec.PlatformSecrets.Azure = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Azure create missing machine pool platform",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Compute[0].Platform.Azure = nil
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

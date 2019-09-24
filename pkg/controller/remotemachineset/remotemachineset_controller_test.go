@@ -314,7 +314,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		},
 		{
 			// Can't control what a user might do in their cluster.
-			name: "Nil ProviderSpec",
+			name: "Nil ProviderSpec in remote MachineSet",
 			localExisting: []runtime.Object{
 				testClusterDeployment([]hivev1.MachinePool{
 					testMachinePool("worker", 3, []string{}),
@@ -329,6 +329,27 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.ProviderSpec.Value = nil
 					return ms
 				}(),
+			},
+			expectErr: true,
+		},
+		{
+			name: "Nil worker pool platform",
+			localExisting: []runtime.Object{
+				testClusterDeployment([]hivev1.MachinePool{
+					func() hivev1.MachinePool {
+						mp := testMachinePool("worker", 3, []string{})
+						mp.Platform.AWS = nil
+						return mp
+					}(),
+				}),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
 			expectErr: true,
 		},

@@ -346,6 +346,11 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	switch ic.Platform.Name() {
 	case "aws":
 		for _, workerPool := range workerPools {
+			// Validation should catch this now but just in-case, do not crash:
+			if workerPool.Platform.AWS == nil {
+				return nil, fmt.Errorf("workpool %s has no platform", workerPool.Name)
+			}
+
 			if len(workerPool.Platform.AWS.Zones) == 0 {
 				awsClient, err := r.getAWSClient(cd)
 				if err != nil {

@@ -704,6 +704,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretReferences(ssi *hivev1.Sync
 		secret.Generation = 0
 		secret.ResourceVersion = ""
 		secret.UID = ""
+		secret.OwnerReferences = nil
 
 		var hash string
 		hash, applyErr = controllerutils.GetChecksumOfObject(secret)

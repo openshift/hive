@@ -1519,22 +1519,26 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDe
 		if cd.Spec.PlatformSecrets.AWS == nil {
 			return nil, errors.New("missing AWS platform secrets")
 		}
-		req.Spec.Platform = hivev1.ClusterDeprovisionRequestPlatform{
-			AWS: &hivev1.AWSClusterDeprovisionRequest{
-				Region:      cd.Spec.Platform.AWS.Region,
-				Credentials: &cd.Spec.PlatformSecrets.AWS.Credentials,
-			},
+		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovisionRequest{
+			Region:      cd.Spec.Platform.AWS.Region,
+			Credentials: &cd.Spec.PlatformSecrets.AWS.Credentials,
 		}
 	case cd.Spec.Platform.Azure != nil:
 		if cd.Spec.PlatformSecrets.Azure == nil {
 			return nil, errors.New("missing Azure platform secrets")
 		}
-		req.Spec.Platform = hivev1.ClusterDeprovisionRequestPlatform{
-			Azure: &hivev1.AzureClusterDeprovisionRequest{
-				Credentials: &cd.Spec.PlatformSecrets.Azure.Credentials,
-			},
+		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovisionRequest{
+			Credentials: &cd.Spec.PlatformSecrets.Azure.Credentials,
 		}
-	// TODO: Add support for GCP
+	case cd.Spec.Platform.GCP != nil:
+		if cd.Spec.PlatformSecrets.GCP == nil {
+			return nil, errors.New("missing GCP platform secrets")
+		}
+		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovisionRequest{
+			Region:      cd.Spec.Platform.GCP.Region,
+			ProjectID:   cd.Spec.Platform.GCP.ProjectID,
+			Credentials: &cd.Spec.PlatformSecrets.GCP.Credentials,
+		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
 	}

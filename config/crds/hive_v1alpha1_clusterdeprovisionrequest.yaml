@@ -77,6 +77,22 @@ spec:
                         use for deprovisioning the cluster
                       type: object
                   type: object
+                gcp:
+                  description: GCP contains GCP-specific deprovision request settings
+                  properties:
+                    credentials:
+                      description: Credentials is the GCP account credentials to use
+                        for deprovisioning the cluster
+                      type: object
+                    projectID:
+                      description: ProjectID is the ID of the GCP project in which
+                        the cluster exists
+                      type: string
+                    region:
+                      description: Region is the GCP region for this deprovisioning
+                        request
+                      type: string
+                  type: object
               type: object
           type: object
         status:

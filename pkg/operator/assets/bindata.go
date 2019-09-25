@@ -3827,6 +3827,8 @@ spec:
   names:
     kind: SelectorSyncSet
     plural: selectorsyncsets
+    shortNames:
+    - sss
   scope: Cluster
   validation:
     openAPIV3Schema:
@@ -4510,6 +4512,8 @@ spec:
   names:
     kind: SyncSet
     plural: syncsets
+    shortNames:
+    - ss
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -4632,6 +4636,8 @@ spec:
   names:
     kind: SyncSetInstance
     plural: syncsetinstances
+    shortNames:
+    - ssi
   scope: Namespaced
   subresources:
     status: {}

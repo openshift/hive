@@ -1758,6 +1758,21 @@ spec:
                               type: string
                             type: array
                         type: object
+                      gcp:
+                        description: GCP is the configuration used when installing
+                          on GCP.
+                        properties:
+                          type:
+                            description: InstanceType defines the GCP instance type.
+                              eg. n1-standard-4
+                            type: string
+                          zones:
+                            description: Zones is list of availability zones that
+                              can be used.
+                            items:
+                              type: string
+                            type: array
+                        type: object
                     type: object
                   replicas:
                     description: Replicas is the count of machines for this machine
@@ -1839,6 +1854,21 @@ spec:
                         zones:
                           description: Zones is list of availability zones that can
                             be used. eg. ["1", "2", "3"]
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    gcp:
+                      description: GCP is the configuration used when installing on
+                        GCP.
+                      properties:
+                        type:
+                          description: InstanceType defines the GCP instance type.
+                            eg. n1-standard-4
+                          type: string
+                        zones:
+                          description: Zones is list of availability zones that can
+                            be used.
                           items:
                             type: string
                           type: array

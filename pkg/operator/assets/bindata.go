@@ -1734,6 +1734,30 @@ spec:
                               type: string
                             type: array
                         type: object
+                      azure:
+                        description: Azure is the configuration used when installing
+                          on Azure.
+                        properties:
+                          osDisk:
+                            description: OSDisk defines the storage for instance.
+                            properties:
+                              diskSizeGB:
+                                description: DiskSizeGB defines the size of disk in
+                                  GB.
+                                format: int32
+                                type: integer
+                            type: object
+                          type:
+                            description: InstanceType defines the azure instance type.
+                              eg. Standard_DS_V2
+                            type: string
+                          zones:
+                            description: Zones is list of availability zones that
+                              can be used. eg. ["1", "2", "3"]
+                            items:
+                              type: string
+                            type: array
+                        type: object
                     type: object
                   replicas:
                     description: Replicas is the count of machines for this machine
@@ -1791,6 +1815,30 @@ spec:
                         zones:
                           description: Zones is list of availability zones that can
                             be used.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    azure:
+                      description: Azure is the configuration used when installing
+                        on Azure.
+                      properties:
+                        osDisk:
+                          description: OSDisk defines the storage for instance.
+                          properties:
+                            diskSizeGB:
+                              description: DiskSizeGB defines the size of disk in
+                                GB.
+                              format: int32
+                              type: integer
+                          type: object
+                        type:
+                          description: InstanceType defines the azure instance type.
+                            eg. Standard_DS_V2
+                          type: string
+                        zones:
+                          description: Zones is list of availability zones that can
+                            be used. eg. ["1", "2", "3"]
                           items:
                             type: string
                           type: array
@@ -1981,6 +2029,73 @@ spec:
                         created for the cluster.
                       type: object
                   type: object
+                azure:
+                  description: Azure is the configuration used when installing on
+                    Azure.
+                  properties:
+                    baseDomainResourceGroupName:
+                      description: BaseDomainResourceGroupName specifies the resource
+                        group where the azure DNS zone for the base domain is found
+                      type: string
+                    defaultMachinePlatform:
+                      description: DefaultMachinePlatform is the default configuration
+                        used when installing on Azure for machine pools which do not
+                        define their own platform configuration.
+                      properties:
+                        osDisk:
+                          description: OSDisk defines the storage for instance.
+                          properties:
+                            diskSizeGB:
+                              description: DiskSizeGB defines the size of disk in
+                                GB.
+                              format: int32
+                              type: integer
+                          type: object
+                        type:
+                          description: InstanceType defines the azure instance type.
+                            eg. Standard_DS_V2
+                          type: string
+                        zones:
+                          description: Zones is list of availability zones that can
+                            be used. eg. ["1", "2", "3"]
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    region:
+                      description: Region specifies the Azure region where the cluster
+                        will be created.
+                      type: string
+                  type: object
+                gcp:
+                  description: GCP is the configuration used when installing on Google
+                    Cloud Platform.
+                  properties:
+                    defaultMachinePlatform:
+                      description: DefaultMachinePlatform is the default configuration
+                        used when installing on GCP for machine pools which do not
+                        define their own platform configuration.
+                      properties:
+                        type:
+                          description: InstanceType defines the GCP instance type.
+                            eg. n1-standard-4
+                          type: string
+                        zones:
+                          description: Zones is list of availability zones that can
+                            be used.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    projectID:
+                      description: ProjectID is the the project that will be used
+                        for the cluster.
+                      type: string
+                    region:
+                      description: Region specifies the GCP region where the cluster
+                        will be created.
+                      type: string
+                  type: object
               type: object
             platformSecrets:
               description: PlatformSecrets contains credentials and secrets for the
@@ -1991,6 +2106,20 @@ spec:
                     credentials:
                       description: Credentials refers to a secret that contains the
                         AWS account access credentials.
+                      type: object
+                  type: object
+                azure:
+                  properties:
+                    credentials:
+                      description: Credentials refers to a secret that contains the
+                        Azure account access credentials.
+                      type: object
+                  type: object
+                gcp:
+                  properties:
+                    credentials:
+                      description: Credentials refers to a secret that contains the
+                        GCP account access credentials.
                       type: object
                   type: object
               type: object
@@ -2377,6 +2506,14 @@ spec:
                       description: Region is the AWS region for this deprovisioning
                         request
                       type: string
+                  type: object
+                azure:
+                  description: Azure contains Azure-specific deprovision request settings
+                  properties:
+                    credentials:
+                      description: Credentials is the Azure account credentials to
+                        use for deprovisioning the cluster
+                      type: object
                   type: object
               type: object
           type: object

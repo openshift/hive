@@ -21,7 +21,7 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.SetLevel(log.DebugLevel)
 
-	cmd := newCOUtilityCommand()
+	cmd := newHiveutilCommand()
 
 	err := cmd.Execute()
 	if err != nil {
@@ -30,7 +30,7 @@ func main() {
 	}
 }
 
-func newCOUtilityCommand() *cobra.Command {
+func newHiveutilCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hiveutil SUB-COMMAND",
 		Short: "Utilities for hive",
@@ -40,6 +40,7 @@ func newCOUtilityCommand() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(deprovision.NewDeprovisionAWSWithTagsCommand())
+	cmd.AddCommand(deprovision.NewDeprovisionCommand())
 	cmd.AddCommand(verification.NewVerifyImportsCommand())
 	cmd.AddCommand(installmanager.NewInstallManagerCommand())
 	cmd.AddCommand(imageset.NewUpdateInstallerImageCommand())

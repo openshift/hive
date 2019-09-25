@@ -1,14 +1,19 @@
 package install
 
 import (
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	networkv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
 	installeraws "github.com/openshift/installer/pkg/types/aws"
+	installerazure "github.com/openshift/installer/pkg/types/azure"
+	installergcp "github.com/openshift/installer/pkg/types/gcp"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
 )
 
 // GenerateInstallConfig builds an InstallConfig for the installer from our ClusterDeploymentSpec.
@@ -20,40 +25,41 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 	spec := cd.Spec
 
 	platform := types.Platform{}
-	if spec.Platform.AWS != nil {
+	switch {
+	case spec.Platform.AWS != nil:
 		aws := spec.Platform.AWS
 		platform.AWS = &installeraws.Platform{
-			Region:   aws.Region,
-			UserTags: aws.UserTags,
+			Region:                 aws.Region,
+			UserTags:               aws.UserTags,
+			DefaultMachinePlatform: convertAWSMachinePool(aws.DefaultMachinePlatform),
 		}
-		if aws.DefaultMachinePlatform != nil {
-			platform.AWS.DefaultMachinePlatform = &installeraws.MachinePool{
-				InstanceType: aws.DefaultMachinePlatform.InstanceType,
-				EC2RootVolume: installeraws.EC2RootVolume{
-					IOPS: aws.DefaultMachinePlatform.EC2RootVolume.IOPS,
-					Size: aws.DefaultMachinePlatform.EC2RootVolume.Size,
-					Type: aws.DefaultMachinePlatform.EC2RootVolume.Type,
-				},
-				Zones: aws.DefaultMachinePlatform.Zones,
-			}
+	case spec.Platform.Azure != nil:
+		azure := spec.Platform.Azure
+		platform.Azure = &installerazure.Platform{
+			Region:                      azure.Region,
+			BaseDomainResourceGroupName: azure.BaseDomainResourceGroupName,
+			DefaultMachinePlatform:      convertAzureMachinePool(azure.DefaultMachinePlatform),
+		}
+	case spec.Platform.GCP != nil:
+		gcp := spec.Platform.GCP
+		platform.GCP = &installergcp.Platform{
+			ProjectID:              gcp.ProjectID,
+			Region:                 gcp.Region,
+			DefaultMachinePlatform: convertGCPMachinePool(gcp.DefaultMachinePlatform),
 		}
 	}
 
-	if spec.ControlPlane.Name != "master" {
-		spec.ControlPlane.Name = "master"
-	}
+	spec.ControlPlane.Name = "master"
 	controlPlaneMachinePool := convertMachinePools(spec.ControlPlane)[0]
 	computeMachinePools := convertMachinePools(spec.Compute...)
 
 	if generateForInstall {
-		computeWorkerPool := []hivev1.MachinePool{}
 		for _, mp := range spec.Compute {
 			// Only add "worker" pool when generating config for installer.
 			if mp.Name == "worker" {
-				computeWorkerPool = append(computeWorkerPool, mp)
+				computeMachinePools = convertMachinePools(mp)
 			}
 		}
-		computeMachinePools = convertMachinePools(computeWorkerPool...)
 	}
 
 	ic := &types.InstallConfig{
@@ -83,29 +89,59 @@ func GenerateInstallConfig(cd *hivev1.ClusterDeployment, sshKey, pullSecret stri
 }
 
 func convertMachinePools(pools ...hivev1.MachinePool) []types.MachinePool {
-
-	machinePools := []types.MachinePool{}
-
-	for _, mp := range pools {
-		newMP := types.MachinePool{
+	machinePools := make([]types.MachinePool, len(pools))
+	for i, mp := range pools {
+		machinePools[i] = types.MachinePool{
 			Name:     mp.Name,
 			Replicas: mp.Replicas,
+			Platform: *convertMachinePoolPlatform(&mp.Platform),
 		}
-		if mp.Platform.AWS != nil {
-			newMP.Platform.AWS = &installeraws.MachinePool{
-				InstanceType: mp.Platform.AWS.InstanceType,
-				EC2RootVolume: installeraws.EC2RootVolume{
-					IOPS: mp.Platform.AWS.EC2RootVolume.IOPS,
-					Size: mp.Platform.AWS.EC2RootVolume.Size,
-					Type: mp.Platform.AWS.EC2RootVolume.Type,
-				},
-				Zones: mp.Platform.AWS.Zones,
-			}
-		}
-		machinePools = append(machinePools, newMP)
 	}
-
 	return machinePools
+}
+
+func convertMachinePoolPlatform(p *hivev1.MachinePoolPlatform) *types.MachinePoolPlatform {
+	return &types.MachinePoolPlatform{
+		AWS: convertAWSMachinePool(p.AWS),
+	}
+}
+
+func convertAWSMachinePool(p *hivev1aws.MachinePoolPlatform) *installeraws.MachinePool {
+	if p == nil {
+		return nil
+	}
+	return &installeraws.MachinePool{
+		InstanceType: p.InstanceType,
+		EC2RootVolume: installeraws.EC2RootVolume{
+			IOPS: p.EC2RootVolume.IOPS,
+			Size: p.EC2RootVolume.Size,
+			Type: p.EC2RootVolume.Type,
+		},
+		Zones: p.Zones,
+	}
+}
+
+func convertAzureMachinePool(p *hivev1azure.MachinePool) *installerazure.MachinePool {
+	if p == nil {
+		return nil
+	}
+	return &installerazure.MachinePool{
+		Zones:        p.Zones,
+		InstanceType: p.InstanceType,
+		OSDisk: installerazure.OSDisk{
+			DiskSizeGB: p.OSDisk.DiskSizeGB,
+		},
+	}
+}
+
+func convertGCPMachinePool(p *hivev1gcp.MachinePool) *installergcp.MachinePool {
+	if p == nil {
+		return nil
+	}
+	return &installergcp.MachinePool{
+		Zones:        p.Zones,
+		InstanceType: p.InstanceType,
+	}
 }
 
 func parseCIDR(s string) *ipnet.IPNet {
@@ -116,13 +152,13 @@ func parseCIDR(s string) *ipnet.IPNet {
 }
 
 func convertClusterNetworks(networks []networkv1.ClusterNetwork) []types.ClusterNetworkEntry {
-	output := make([]types.ClusterNetworkEntry, 0, len(networks))
-	for _, network := range networks {
-		output = append(output, types.ClusterNetworkEntry{
+	output := make([]types.ClusterNetworkEntry, len(networks))
+	for i, network := range networks {
+		output[i] = types.ClusterNetworkEntry{
 			CIDR: *parseCIDR(network.CIDR),
 			// TODO: deviation from installer API here
 			HostPrefix: int32(network.HostSubnetLength),
-		})
+		}
 	}
 	return output
 }

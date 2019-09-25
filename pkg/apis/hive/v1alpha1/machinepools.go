@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -34,4 +35,6 @@ type MachinePool struct {
 type MachinePoolPlatform struct {
 	// AWS is the configuration used when installing on AWS.
 	AWS *aws.MachinePoolPlatform `json:"aws,omitempty"`
+	// Azure is the configuration used when installing on Azure.
+	Azure *azure.MachinePool `json:"azure,omitempty"`
 }

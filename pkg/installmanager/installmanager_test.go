@@ -334,7 +334,7 @@ func testClusterProvision() *hivev1.ClusterProvision {
 	}
 }
 
-func alwaysSucceedUninstall(string, string, string, log.FieldLogger) error {
+func alwaysSucceedUninstall(*hivev1.ClusterDeployment, string, log.FieldLogger) error {
 	log.Debugf("running always successful uninstall")
 	return nil
 }

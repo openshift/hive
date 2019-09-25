@@ -49,7 +49,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/aws"
+	"github.com/openshift/installer/pkg/destroy/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
 )
 
@@ -105,11 +107,10 @@ type InstallManager struct {
 	LogsDir                  string
 	ClusterID                string
 	ClusterName              string
-	Region                   string
 	ClusterProvisionName     string
 	Namespace                string
 	DynamicClient            client.Client
-	runUninstaller           func(clusterName, region, clusterID string, logger log.FieldLogger) error
+	runUninstaller           func(cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
 	readClusterMetadata      func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
@@ -159,7 +160,6 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.LogsDir, "logs-dir", "/logs", "directory to use for all installer logs")
-	flags.StringVar(&im.Region, "region", "us-east-1", "Region installing into")
 	return cmd
 }
 
@@ -256,16 +256,25 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error marshalling install-config.yaml")
 		return err
 	}
+
+	// TODO: delete this, it has passwords, devel only
+	m.log.Info("install config:")
+	dataStr := string(d)
+	lines := strings.Split(dataStr, "\n")
+	for _, l := range lines {
+		m.log.Info(l)
+	}
+
 	err = ioutil.WriteFile(filepath.Join(m.WorkDir, "install-config.yaml"), d, 0644)
 	if err != nil {
 		m.log.WithError(err).Error("error writing install-config.yaml to disk")
 		return err
 	}
 
-	// If the cluster provision has a clusterID set, this implies we failed an install
+	// If the cluster provision has an infraID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
 	m.log.Info("cleaning up from past install attempts")
-	if err := m.cleanupFailedInstall(provision); err != nil {
+	if err := m.cleanupFailedInstall(cd, provision); err != nil {
 		m.log.WithError(err).Error("error while trying to preemptively clean up")
 		return err
 	}
@@ -273,11 +282,13 @@ func (m *InstallManager) Run() error {
 	// Generate installer assets we need to modify or upload.
 	m.log.Info("generating assets")
 	if err := m.generateAssets(provision); err != nil {
+		m.log.Info("reading installer log")
 		installLog, readErr := m.readInstallerLog(provision, m)
 		if readErr != nil {
 			m.log.WithError(readErr).Error("error reading asset generation log")
 			return err
 		}
+		m.log.Info("updating clusterprovision")
 		if err := m.updateClusterProvision(
 			provision,
 			m,
@@ -348,7 +359,7 @@ func (m *InstallManager) Run() error {
 		}
 
 		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
-		if err := m.cleanupFailedInstall(provision); err != nil {
+		if err := m.cleanupFailedInstall(cd, provision); err != nil {
 			// Log the error but continue. It is possible we were not able to clear the infraID
 			// here, but we will attempt this again anyhow when the next job retries. The
 			// goal here is just to minimize running resources in the event of a long wait
@@ -408,7 +419,7 @@ func (m *InstallManager) waitForInstallerBinaries() {
 }
 
 // cleanupFailedInstall allows recovering from an installation error and allows retries
-func (m *InstallManager) cleanupFailedInstall(provision *hivev1.ClusterProvision) error {
+func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision) error {
 	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
 		return err
 	}
@@ -423,10 +434,9 @@ func (m *InstallManager) cleanupFailedInstall(provision *hivev1.ClusterProvision
 	}
 	if infraID != nil {
 		m.log.Info("InfraID set from failed install, running deprovison")
-		if err := m.runUninstaller(m.ClusterName, m.Region, *infraID, m.log); err != nil {
+		if err := m.runUninstaller(cd, *infraID, m.log); err != nil {
 			return err
 		}
-
 	} else {
 		m.log.Warn("skipping cleanup as no infra ID set")
 	}
@@ -434,18 +444,39 @@ func (m *InstallManager) cleanupFailedInstall(provision *hivev1.ClusterProvision
 	return nil
 }
 
-func runUninstaller(clusterName, region, infraID string, logger log.FieldLogger) error {
-	// run the uninstaller to clean up any cloud resources previously created
-	filters := []aws.Filter{
-		{kubernetesKeyPrefix + infraID: "owned"},
-	}
-	uninstaller := &aws.ClusterUninstaller{
-		Filters: filters,
-		Region:  region,
-		Logger:  logger,
-	}
+func runUninstaller(cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		// run the uninstaller to clean up any cloud resources previously created
+		filters := []aws.Filter{
+			{kubernetesKeyPrefix + infraID: "owned"},
+		}
+		uninstaller := &aws.ClusterUninstaller{
+			Filters: filters,
+			Region:  cd.Spec.Platform.AWS.Region,
+			Logger:  logger,
+		}
 
-	return uninstaller.Run()
+		return uninstaller.Run()
+	case cd.Spec.Platform.Azure != nil:
+		uninstaller := &azure.ClusterUninstaller{}
+		uninstaller.Logger = logger
+		session, err := azuresession.GetSession()
+		if err != nil {
+			return err
+		}
+
+		uninstaller.InfraID = infraID
+		uninstaller.SubscriptionID = session.Credentials.SubscriptionID
+		uninstaller.TenantID = session.Credentials.TenantID
+		uninstaller.GraphAuthorizer = session.GraphAuthorizer
+		uninstaller.Authorizer = session.Authorizer
+
+		return uninstaller.Run()
+	default:
+		logger.Warn("unknown platform for re-try cleanup")
+		return errors.New("unknown platform for re-try cleanup")
+	}
 }
 
 // generateAssets runs openshift-install commands to generate on-disk assets we need to

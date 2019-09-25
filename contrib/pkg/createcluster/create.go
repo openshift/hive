@@ -12,7 +12,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	ini "gopkg.in/ini.v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,12 +20,12 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -63,8 +62,9 @@ the --pull-secret flag is not specified, then the --pull-secret-file is
 used. That file's default value is %[2]s.
 
 AWS_SECRET_ACCESS_KEY and AWS_ACCESS_KEY_ID - Are used to determine your
-AWS credentials. If not present, then the --aws-creds-file is used. By
-default, that flag's value is %[3]s.
+AWS credentials. These are only relevant for creating a cluster on AWS. If
+--creds-file is used it will take precedence over these environment
+variables.
 
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
@@ -79,6 +79,17 @@ const (
 	deleteAfterAnnotation      = "hive.openshift.io/delete-after"
 	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	cloudAWS                   = "aws"
+	cloudAzure                 = "azure"
+	cloudGCP                   = "gcp"
+)
+
+var (
+	validClouds = map[string]bool{
+		cloudAWS:   true,
+		cloudAzure: true,
+		cloudGCP:   true,
+	}
 )
 
 // Options is the set of options to generate and apply a new cluster deployment
@@ -91,7 +102,8 @@ type Options struct {
 	BaseDomain               string
 	PullSecret               string
 	PullSecretFile           string
-	AWSCredsFile             string
+	Cloud                    string
+	CredsFile                string
 	ClusterImageSet          string
 	InstallerImage           string
 	ReleaseImage             string
@@ -107,30 +119,43 @@ type Options struct {
 	UninstallOnce            bool
 	SimulateBootstrapFailure bool
 	WorkerNodes              int64
+
+	// Azure
+	AzureBaseDomainResourceGroupName string
+
+	// GCP
+	GCPProjectID string
+
+	homeDir       string
+	cloudProvider cloudProvider
 }
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
 func NewCreateClusterCommand() *cobra.Command {
-	var homeDir = "."
+	opt := &Options{}
+
+	opt.homeDir = "."
 
 	if u, err := user.Current(); err == nil {
-		homeDir = u.HomeDir
+		opt.homeDir = u.HomeDir
 	}
-	defaultSSHPublicKeyFile := filepath.Join(homeDir, ".ssh", "id_rsa.pub")
-	defaultAWSCredsFile := filepath.Join(homeDir, ".aws", "credentials")
+	defaultSSHPublicKeyFile := filepath.Join(opt.homeDir, ".ssh", "id_rsa.pub")
 
-	defaultPullSecretFile := filepath.Join(homeDir, ".pull-secret")
+	defaultPullSecretFile := filepath.Join(opt.homeDir, ".pull-secret")
 	if _, err := os.Stat(defaultPullSecretFile); os.IsNotExist(err) {
 		defaultPullSecretFile = ""
 	} else if err != nil {
 		log.WithError(err).Errorf("%v can not be used", defaultPullSecretFile)
 	}
 
-	opt := &Options{}
 	cmd := &cobra.Command{
-		Use:   "create-cluster CLUSTER_DEPLOYMENT_NAME",
+		Use: `create-cluster CLUSTER_DEPLOYMENT_NAME
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 		Short: "Creates a new Hive cluster deployment",
-		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile, defaultAWSCredsFile),
+		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
+		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
@@ -145,7 +170,9 @@ func NewCreateClusterCommand() *cobra.Command {
 			}
 		},
 	}
+
 	flags := cmd.Flags()
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp)")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -154,14 +181,14 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
-	flags.StringVar(&opt.AWSCredsFile, "aws-creds-file", defaultAWSCredsFile, "AWS credentials file")
+	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
 	flags.StringVar(&opt.ServingCert, "serving-cert", "", "Serving certificate for control plane and routes")
 	flags.StringVar(&opt.ServingCertKey, "serving-cert-key", "", "Serving certificate key for control plane and routes")
-	flags.BoolVar(&opt.ManageDNS, "manage-dns", false, "Manage this cluster's DNS")
+	flags.BoolVar(&opt.ManageDNS, "manage-dns", false, "Manage this cluster's DNS. This is only available for AWS.")
 	flags.BoolVar(&opt.UseClusterImageSet, "use-image-set", true, "If true(default), use a cluster image set for this cluster")
 	flags.StringVarP(&opt.Output, "output", "o", "", "Output of this command (nothing will be created on cluster). Valid values: yaml,json")
 	flags.BoolVar(&opt.IncludeSecrets, "include-secrets", true, "Include secrets along with ClusterDeployment")
@@ -169,16 +196,18 @@ func NewCreateClusterCommand() *cobra.Command {
 	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
 	flags.BoolVar(&opt.SimulateBootstrapFailure, "simulate-bootstrap-failure", false, "Simulate an install bootstrap failure by injecting an invalid manifest.")
 	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
+
+	// Azure flags
+	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
+
+	// GCP flags
+	flags.StringVar(&opt.GCPProjectID, "gcp-project-id", "", "Project ID is the ID of the GCP project to use")
+
 	return cmd
 }
 
 // Complete finishes parsing arguments for the command
 func (o *Options) Complete(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		cmd.Usage()
-		log.Info("You must specify a cluster deployment name")
-		return fmt.Errorf("no cluster deployment specified")
-	}
 	o.Name = args[0]
 	return nil
 }
@@ -196,16 +225,46 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid option")
 	}
 	if len(o.ServingCert) > 0 && len(o.ServingCertKey) == 0 {
+		cmd.Usage()
 		log.Info("If specifying a serving certificate, specify a valid serving certificate key")
 		return fmt.Errorf("invalid serving cert")
 	}
+	if !validClouds[o.Cloud] {
+		cmd.Usage()
+		log.Infof("Unsupported cloud: %s", o.Cloud)
+		return fmt.Errorf("Unsupported cloud: %s", o.Cloud)
+	}
+	switch o.Cloud {
+	case cloudGCP:
+		if o.GCPProjectID == "" {
+			cmd.Usage()
+			log.Infof("Must specify the GCP project ID when installing on GCP. Use the --gcp-project-id flag.")
+			return fmt.Errorf("gcp requires gcp-project-id flag")
+
+		}
+	}
 	return nil
+}
+
+type cloudProvider interface {
+	generateCredentialsSecret(o *Options) (*corev1.Secret, error)
+
+	addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error
 }
 
 // Run executes the command
 func (o *Options) Run() error {
 	if err := apis.AddToScheme(scheme.Scheme); err != nil {
 		return err
+	}
+
+	switch o.Cloud {
+	case cloudAWS:
+		o.cloudProvider = &awsCloudProvider{}
+	case cloudAzure:
+		o.cloudProvider = &azureCloudProvider{}
+	case cloudGCP:
+		o.cloudProvider = &gcpCloudProvider{}
 	}
 
 	objs, err := o.GenerateObjects()
@@ -236,7 +295,7 @@ func (o *Options) Run() error {
 	for _, obj := range objs {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			log.Errorf("Cannot create accessor for object of type %T", obj)
+			log.WithError(err).Errorf("Cannot create accessor for object of type %T", obj)
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)
@@ -255,7 +314,7 @@ func (o *Options) defaultNamespace() (string, error) {
 func (o *Options) getResourceHelper() (*resource.Helper, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
-		log.Error("Cannot get client config")
+		log.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
 	helper := resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "create-cluster"))
@@ -264,21 +323,23 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 
 // GenerateObjects generates resources for a new cluster deployment
 func (o *Options) GenerateObjects() ([]runtime.Object, error) {
-	awsCreds, err := o.generateAWSCredsSecret()
-	if err != nil {
-		return nil, err
-	}
+	result := []runtime.Object{}
+
 	pullSecret, err := o.generatePullSecret()
 	if err != nil {
 		return nil, err
 	}
-	sshSecret, err := o.generateSSHSecret()
+
+	cd, err := o.GenerateClusterDeployment(pullSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	result := []runtime.Object{}
-	cd, imageSet, err := o.GenerateClusterDeployment()
+	if err := o.cloudProvider.addPlatformDetails(o, cd); err != nil {
+		return nil, err
+	}
+
+	imageSet, err := o.configureImages(cd)
 	if err != nil {
 		return nil, err
 	}
@@ -286,30 +347,35 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		result = append(result, imageSet)
 	}
 
-	// Adding pull secret name to cluster deployment if pull secret exists
-	if pullSecret != nil {
-		cd.Spec.PullSecret = &corev1.LocalObjectReference{
-			Name: fmt.Sprintf("%s-pull-secret", cd.Name),
+	if o.IncludeSecrets {
+		if pullSecret != nil {
+			result = append(result, pullSecret)
+		}
+
+		creds, err := o.cloudProvider.generateCredentialsSecret(o)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, creds)
+
+		sshSecret, err := o.generateSSHSecret()
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, sshSecret)
+
+		servingCertSecret, err := o.generateServingCertSecret()
+		if err != nil {
+			return nil, err
+		}
+		if servingCertSecret != nil {
+			result = append(result, servingCertSecret)
 		}
 	}
+
 	result = append(result, cd)
-	if !o.IncludeSecrets {
-		return result, nil
-	}
-	// With introduction of global pull secret, pull secret is optional now
-	if pullSecret != nil {
-		result = append(result, pullSecret)
-	}
 
-	servingCertSecret, err := o.generateServingCertSecret()
-	if err != nil {
-		return nil, err
-	}
-	if servingCertSecret != nil {
-		result = append(result, servingCertSecret)
-	}
-
-	return append([]runtime.Object{awsCreds, sshSecret}, result...), err
+	return result, err
 }
 
 func (o *Options) getPullSecret() (string, error) {
@@ -420,57 +486,6 @@ func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
 	}, nil
 }
 
-func (o *Options) getAWSCreds() (string, string, error) {
-	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
-	if len(secretAccessKey) > 0 && len(accessKeyID) > 0 {
-		return accessKeyID, secretAccessKey, nil
-	}
-	if len(o.AWSCredsFile) > 0 {
-		credFile, err := ini.Load(o.AWSCredsFile)
-		if err != nil {
-			log.Error("Cannot load AWS credentials")
-			return "", "", err
-		}
-		defaultSection, err := credFile.GetSection("default")
-		if err != nil {
-			log.Error("Cannot get default section from AWS credentials file")
-			return "", "", err
-		}
-		accessKeyIDValue := defaultSection.Key("aws_access_key_id")
-		secretAccessKeyValue := defaultSection.Key("aws_secret_access_key")
-		if accessKeyIDValue == nil || secretAccessKeyValue == nil {
-			log.Error("AWS credentials file missing keys in default section")
-		}
-		accessKeyID, secretAccessKey = accessKeyIDValue.String(), secretAccessKeyValue.String()
-		return accessKeyID, secretAccessKey, nil
-	}
-	log.Error("Could not find AWS credentials")
-	return "", "", fmt.Errorf("No AWS credentials")
-}
-
-func (o *Options) generateAWSCredsSecret() (*corev1.Secret, error) {
-	accessKeyID, secretAccessKey, err := o.getAWSCreds()
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-aws-creds", o.Name),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"aws_access_key_id":     accessKeyID,
-			"aws_secret_access_key": secretAccessKey,
-		},
-	}, nil
-}
-
 func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
 	if len(o.ServingCert) == 0 {
 		return nil, nil
@@ -500,8 +515,8 @@ func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
 	}, nil
 }
 
-// GenerateClusterDeployment generates a new cluster deployment and optionally a corresponding cluster image set
-func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev1.ClusterImageSet, error) {
+// GenerateClusterDeployment generates a new cluster deployment
+func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.ClusterDeployment, error) {
 	cd := &hivev1.ClusterDeployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterDeployment",
@@ -533,46 +548,14 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 					},
 				},
 			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1aws.Platform{
-					Region: "us-east-1",
-				},
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
-						Name: fmt.Sprintf("%s-aws-creds", o.Name),
-					},
-				},
-			},
 			ControlPlane: hivev1.MachinePool{
 				Name:     "master",
-				Replicas: int64ptr(3),
-				Platform: hivev1.MachinePoolPlatform{
-					AWS: &hivev1aws.MachinePoolPlatform{
-						InstanceType: "m4.large",
-						EC2RootVolume: hivev1aws.EC2RootVolume{
-							IOPS: 100,
-							Size: 22,
-							Type: "gp2",
-						},
-					},
-				},
+				Replicas: pointer.Int64Ptr(3),
 			},
 			Compute: []hivev1.MachinePool{
 				{
 					Name:     "worker",
-					Replicas: int64ptr(o.WorkerNodes),
-					Platform: hivev1.MachinePoolPlatform{
-						AWS: &hivev1aws.MachinePoolPlatform{
-							InstanceType: "m4.large",
-							EC2RootVolume: hivev1aws.EC2RootVolume{
-								IOPS: 100,
-								Size: 22,
-								Type: "gp2",
-							},
-						},
-					},
+					Replicas: pointer.Int64Ptr(o.WorkerNodes),
 				},
 			},
 			ManageDNS: o.ManageDNS,
@@ -587,6 +570,9 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 	}
 	if o.SimulateBootstrapFailure {
 		cd.Annotations[constants.InstallFailureTestAnnotation] = "true"
+	}
+	if pullSecret != nil {
+		cd.Spec.PullSecret = &corev1.LocalObjectReference{Name: pullSecret.Name}
 	}
 	if len(o.ServingCert) > 0 {
 		cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
@@ -607,16 +593,11 @@ func (o *Options) GenerateClusterDeployment() (*hivev1.ClusterDeployment, *hivev
 		}
 	}
 
-	imageSet, err := o.configureImages(cd)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	if o.DeleteAfter != "" {
 		cd.ObjectMeta.Annotations[deleteAfterAnnotation] = o.DeleteAfter
 	}
 
-	return cd, imageSet, nil
+	return cd, nil
 }
 
 func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.ClusterImageSet, error) {
@@ -636,27 +617,27 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			return nil, fmt.Errorf("Cannot determine release image: %v", err)
 		}
 	}
-	if !o.UseClusterImageSet {
+	if o.UseClusterImageSet {
 		cd.Spec.Images.InstallerImage = o.InstallerImage
 		cd.Spec.Images.ReleaseImage = o.ReleaseImage
+		return nil, nil
 	}
 
-	name := fmt.Sprintf("%s-imageset", o.Name)
 	imageSet := &hivev1.ClusterImageSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name: fmt.Sprintf("%s-imageset", o.Name),
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterImageSet",
 			APIVersion: hivev1.SchemeGroupVersion.String(),
 		},
 		Spec: hivev1.ClusterImageSetSpec{
-			ReleaseImage:   strptr(o.ReleaseImage),
-			InstallerImage: strptr(o.InstallerImage),
+			ReleaseImage:   &o.ReleaseImage,
+			InstallerImage: &o.InstallerImage,
 		},
 	}
 	cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{
-		Name: name,
+		Name: imageSet.Name,
 	}
 
 	return imageSet, nil
@@ -680,17 +661,6 @@ func printObjects(objects []runtime.Object, scheme *runtime.Scheme, printer prin
 		meta.SetList(list, objects)
 		typeSetterPrinter.PrintObj(list, os.Stdout)
 	}
-}
-
-func int64ptr(n int64) *int64 {
-	return &n
-}
-
-func strptr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }
 
 type releasePayload struct {

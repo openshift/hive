@@ -10,6 +10,8 @@ spec:
   names:
     kind: SyncSetInstance
     plural: syncsetinstances
+    shortNames:
+    - ssi
   scope: Namespaced
   subresources:
     status: {}

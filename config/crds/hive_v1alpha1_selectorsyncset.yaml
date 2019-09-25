@@ -10,6 +10,8 @@ spec:
   names:
     kind: SelectorSyncSet
     plural: selectorsyncsets
+    shortNames:
+    - sss
   scope: Cluster
   validation:
     openAPIV3Schema:

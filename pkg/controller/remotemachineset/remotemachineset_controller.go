@@ -35,6 +35,7 @@ import (
 
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
 	installtypes "github.com/openshift/installer/pkg/types"
+	installtypesaws "github.com/openshift/installer/pkg/types/aws"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
@@ -346,6 +347,9 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	switch ic.Platform.Name() {
 	case "aws":
 		for _, workerPool := range workerPools {
+			if workerPool.Platform.AWS == nil {
+				workerPool.Platform.AWS = &installtypesaws.MachinePool{}
+			}
 			if len(workerPool.Platform.AWS.Zones) == 0 {
 				awsClient, err := r.getAWSClient(cd)
 				if err != nil {

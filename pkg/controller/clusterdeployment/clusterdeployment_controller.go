@@ -215,6 +215,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to SyncSetInstance
+	err = c.Watch(&source.Kind{Type: &hivev1.SyncSetInstance{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &hivev1.ClusterDeployment{},
+	})
+	if err != nil {
+		return fmt.Errorf("cannot start watch on syncset instance: %v", err)
+	}
+
 	return nil
 }
 
@@ -390,6 +399,17 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Spec.Installed {
+
+		// update SyncSetFailedCondition status condition
+		cdLog.Info("Check if any syncsetinstance Failed")
+		updateCD, err := r.setSyncSetFailedCondition(cd, cdLog)
+		if err != nil {
+			cdLog.WithError(err).Error("Error updating SyncSetFailedCondition status condition")
+			return reconcile.Result{}, err
+		} else if updateCD {
+			return reconcile.Result{}, nil
+		}
+
 		if cd.Status.InstalledTimestamp != nil {
 			cdLog.Debug("cluster is already installed, no processing of provision needed")
 			r.cleanupInstallLogPVC(cd, cdLog)
@@ -1771,4 +1791,101 @@ func (r *ReconcileClusterDeployment) deleteStaleProvisions(provs []*hivev1.Clust
 			pLog.WithError(err).Error("failed to delete old provision")
 		}
 	}
+}
+
+// getAllSyncSetInstances returns all syncset instances for a specific cluster deployment
+func (r *ReconcileClusterDeployment) getAllSyncSetInstances(cd *hivev1.ClusterDeployment) ([]*hivev1.SyncSetInstance, error) {
+
+	list := &hivev1.SyncSetInstanceList{}
+	err := r.List(context.TODO(), list, client.InNamespace(cd.Namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	syncSetInstances := []*hivev1.SyncSetInstance{}
+	for i, syncSetInstance := range list.Items {
+		if syncSetInstance.Spec.ClusterDeployment.Name == cd.Name {
+			syncSetInstances = append(syncSetInstances, &list.Items[i])
+		}
+	}
+	return syncSetInstances, nil
+}
+
+// checkForFailedSyncSetInstance returns true if it finds failed syncset instance
+func checkForFailedSyncSetInstance(syncSetInstances []*hivev1.SyncSetInstance) bool {
+
+	for _, syncSetInstance := range syncSetInstances {
+		if checkSyncSetConditionsForFailure(syncSetInstance.Status.Conditions) {
+			return true
+		}
+		for _, r := range syncSetInstance.Status.Resources {
+			if checkSyncSetConditionsForFailure(r.Conditions) {
+				return true
+			}
+		}
+		for _, p := range syncSetInstance.Status.Patches {
+			if checkSyncSetConditionsForFailure(p.Conditions) {
+				return true
+			}
+		}
+		for _, s := range syncSetInstance.Status.SecretReferences {
+			if checkSyncSetConditionsForFailure(s.Conditions) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkSyncSetConditionsForFailure returns true when the condition contains hivev1.ApplyFailureSyncCondition
+// and condition status is equal to true
+func checkSyncSetConditionsForFailure(conds []hivev1.SyncCondition) bool {
+	for _, c := range conds {
+		if c.Status != corev1.ConditionTrue {
+			continue
+		}
+		switch c.Type {
+		case hivev1.ApplyFailureSyncCondition, hivev1.DeletionFailedSyncCondition, hivev1.UnknownObjectSyncCondition:
+			return true
+		}
+	}
+	return false
+}
+
+// setSyncSetFailedCondition returns true when it sets or updates the hivev1.SyncSetFailedCondition
+func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
+	// get all syncset instances for this cluster deployment
+	syncSetInstances, err := r.getAllSyncSetInstances(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("Unable to list related syncset instances for cluster deployment")
+		return false, err
+	}
+
+	isFailedCondition := checkForFailedSyncSetInstance(syncSetInstances)
+
+	status := corev1.ConditionFalse
+	reason := "SyncSetApplySuccess"
+	message := "SyncSet apply is successful"
+	if isFailedCondition {
+		status = corev1.ConditionTrue
+		reason = "SyncSetApplyFailure"
+		message = "One of the SyncSetInstance apply has failed"
+	}
+	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.SyncSetFailedCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionNever,
+	)
+	if !changed {
+		return false, nil
+	}
+	cd.Status.Conditions = conds
+	if err := r.Status().Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Error("error updating syncset failed condition")
+		return false, err
+	}
+	return true, nil
 }

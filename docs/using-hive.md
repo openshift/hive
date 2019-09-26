@@ -104,15 +104,45 @@ spec:
     name: mycluster-ssh-key
 ```
 
-The hiveutil CLI (see `make hiveutil`) offers a create-cluster command for generating a cluster deployment and submitting it to the cluster defined by your current kubeconfig.
-
-```bash
-bin/hiveutil create-cluster --base-domain=mydomain.example.com mycluster
-```
+The hiveutil CLI (see `make hiveutil`) offers a create-cluster command for generating a cluster deployment and submitting it to the Hive cluster using your current kubeconfig.
 
 To view what create-cluster generates, *without* submitting it to the API server, add `-o yaml` to the above command. If you need to make any changes not supported by create-cluster options, the output can be saved, edited, and then submitted with `oc apply`.
 
-By default this command assumes the latest Hive master CI build, and the latest OpenShift stable release. `--hive-image` can be specified to use a specific Hive image to run the install, and `--release-image` can be specified to control which OpenShift release image to install in the cluster.
+By default this command assumes the latest Hive master CI build, and the latest OpenShift stable release. `--release-image` can be specified to control which OpenShift release image to install in the cluster.
+
+#### Create Cluster on AWS
+
+Credentials will be read from your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables. Alternatively you can specify an AWS credentials file with --creds-file.
+
+```bash
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=aws mycluster
+```
+
+#### Create Cluster on Azure
+
+Credentials will be read from ~/.azure/osServicePrincipal.json typically created via the `az login` command.
+
+```bash
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
+```
+
+`--release-image` is used above as Azure installer support is only present in 4.2 dev preview builds.
+
+#### Create Cluster on GCP
+
+Credentials will be read from ~/.gcp/osServiceAccount.json, this can be created by:
+
+ 1. Login to GCP console at https://console.cloud.google.com/
+ 1. Create a service account with the owner role.
+ 1. Create a key for the service account.
+ 1. Select JSON for the key type.
+ 1. Download resulting JSON file and save to ~/.gcp/osServiceAccount.json.
+
+```bash
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp --gcp-project-id=myproject --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
+```
+
+`--release-image` is used above as GCP installer support is only present in 4.2 dev preview builds.
 
 ### Monitor the Install Job
 

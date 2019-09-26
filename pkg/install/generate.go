@@ -380,7 +380,7 @@ func GenerateUninstallerJobForDeprovisionRequest(
 	case req.Spec.Platform.GCP != nil:
 		completeGCPDeprovisionJob(req, job)
 	default:
-		return nil, errors.New("deprovision requests currently supported for platform")
+		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
 
 	return job, nil

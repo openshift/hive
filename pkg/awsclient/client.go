@@ -268,6 +268,9 @@ func (c *awsClient) ChangeResourceRecordSets(input *route53.ChangeResourceRecord
 // For authentication the underlying clients will use either the cluster AWS credentials
 // secret if defined (i.e. in the root cluster),
 // otherwise the IAM profile of the master where the actuator will run. (target clusters)
+//
+// Pass a nil client, and empty secret name and namespace to load credentials from the standard
+// AWS environment variables.
 func NewClient(kubeClient client.Client, secretName, namespace, region string) (Client, error) {
 	awsConfig := &aws.Config{Region: aws.String(region)}
 

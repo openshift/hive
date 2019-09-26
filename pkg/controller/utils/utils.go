@@ -19,6 +19,8 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 )
 
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient with metrics using the provided kubeconfig.
@@ -194,4 +196,9 @@ func GetChecksumOfObject(object interface{}) (string, error) {
 // GetChecksumOfObjects returns the md5sum hash of the objects passed in.
 func GetChecksumOfObjects(objects ...interface{}) (string, error) {
 	return GetChecksumOfObject(objects)
+}
+
+// DNSZoneName returns the predictable name for a DNSZone for the given ClusterDeployment.
+func DNSZoneName(cdName string) string {
+	return apihelpers.GetResourceName(cdName, "zone")
 }

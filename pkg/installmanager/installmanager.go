@@ -24,6 +24,7 @@ import (
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 
 	corev1 "k8s.io/api/core/v1"
@@ -112,7 +113,7 @@ type InstallManager struct {
 	ClusterProvisionName     string
 	Namespace                string
 	DynamicClient            client.Client
-	runUninstaller           func(cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
+	cleanupFailedProvision   func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
 	readClusterMetadata      func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
@@ -174,7 +175,7 @@ func (m *InstallManager) Complete(args []string) error {
 	m.uploadAdminPassword = uploadAdminPassword
 	m.readInstallerLog = readInstallerLog
 	m.isGatherLogsEnabled = isGatherLogsEnabled
-	m.runUninstaller = runUninstaller
+	m.cleanupFailedProvision = cleanupFailedProvision
 	m.waitForProvisioningStage = waitForProvisioningStage
 
 	// Set log level
@@ -428,7 +429,7 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, prov
 	}
 	if infraID != nil {
 		m.log.Info("InfraID set from failed install, running deprovison")
-		if err := m.runUninstaller(cd, *infraID, m.log); err != nil {
+		if err := m.cleanupFailedProvision(m.DynamicClient, cd, *infraID, m.log); err != nil {
 			return err
 		}
 	} else {
@@ -438,7 +439,7 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, prov
 	return nil
 }
 
-func runUninstaller(cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
+func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		// run the uninstaller to clean up any cloud resources previously created
@@ -451,7 +452,31 @@ func runUninstaller(cd *hivev1.ClusterDeployment, infraID string, logger log.Fie
 			Logger:  logger,
 		}
 
-		return uninstaller.Run()
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
+
+		// If we're managing DNS for this cluster, lookup the DNSZone and cleanup
+		// any leftover A records that may have leaked due to
+		// https://jira.coreos.com/browse/CORS-1195.
+		if cd.Spec.ManageDNS {
+			dnsZone := &hivev1.DNSZone{}
+			dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
+			err := dynClient.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
+			if err != nil {
+				logger.WithError(err).Error("error looking up managed dnszone")
+				return err
+			}
+			if dnsZone.Status.AWS == nil {
+				return fmt.Errorf("found non-AWS DNSZone for AWS ClusterDeployment")
+			}
+			if dnsZone.Status.AWS.ZoneID == nil {
+				// Shouldn't really be possible as we block install until DNS is ready:
+				return fmt.Errorf("DNSZone %s has no ZoneID set", dnsZone.Name)
+			}
+			return cleanupDNSZone(*dnsZone.Status.AWS.ZoneID, cd.Spec.Platform.AWS.Region, logger)
+		}
+		return nil
 	case cd.Spec.Platform.Azure != nil:
 		uninstaller := &azure.ClusterUninstaller{}
 		uninstaller.Logger = logger

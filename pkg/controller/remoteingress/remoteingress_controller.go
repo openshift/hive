@@ -205,14 +205,6 @@ func (r *ReconcileRemoteClusterIngress) syncClusterIngress(rContext *reconcileCo
 func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.RawExtension {
 	rawList := []runtime.RawExtension{}
 
-	// first the certBundle secrets
-	for _, cbSecret := range rContext.certBundleSecrets {
-		secret := createSecret(rContext, cbSecret)
-		raw := runtime.RawExtension{Object: secret}
-		rawList = append(rawList, raw)
-	}
-
-	// then the ingressControllers
 	for _, ingress := range rContext.clusterDeployment.Spec.Ingress {
 		ingressObj := createIngressController(rContext.clusterDeployment, ingress, rContext.certBundleSecrets)
 		raw := runtime.RawExtension{Object: ingressObj}
@@ -227,7 +219,6 @@ func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.Ra
 func secretRefrenceFromClusterDeployment(rContext *reconcileContext) []hivev1.SecretReference {
 	secretReferences := []hivev1.SecretReference{}
 
-	// first the certBundle secrets
 	for _, cbSecret := range rContext.certBundleSecrets {
 		secretReference := hivev1.SecretReference{
 			Source: corev1.ObjectReference{
@@ -289,23 +280,6 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 	}
 
 	return nil
-}
-
-// createSecret returns the secret that needs to be synced to the remote cluster
-// to satisfy any ingressController object that depends on the secret.
-func createSecret(rContext *reconcileContext, cbSecret *corev1.Secret) *corev1.Secret {
-	newSecret := cbSecret.DeepCopy()
-
-	// don't want all the local object meta (eg creation/uuid/etc), so replace it
-	// with a clean one with just the data we want.
-	newSecret.ObjectMeta = metav1.ObjectMeta{
-		Name:        remoteSecretNameForCertificateBundleSecret(cbSecret.Name, rContext.clusterDeployment),
-		Namespace:   remoteIngressConrollerSecretsNamespace,
-		Labels:      cbSecret.Labels,
-		Annotations: cbSecret.Annotations,
-	}
-
-	return newSecret
 }
 
 // createIngressController will return an ingressController based on a clusterDeployment's

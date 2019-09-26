@@ -593,9 +593,10 @@ type createdResourceInfo struct {
 	defaultCertificate string
 }
 type createdSyncSetInfo struct {
-	name      string
-	namespace string
-	resources []createdResourceInfo
+	name             string
+	namespace        string
+	resources        []createdResourceInfo
+	secretRefefences []hivev1.SecretReference
 }
 
 type fakeKubeCLI struct {
@@ -639,6 +640,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			continue
 		}
 	}
+	created.secretRefefences = ss.Spec.SecretReferences
 
 	f.createdSyncSet = created
 
@@ -648,13 +650,13 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedSecrets []string, expectedIngressControllers []SyncSetIngressEntry) {
 	for _, secret := range expectedSecrets {
 		found := false
-		for _, resObj := range existingSyncSet.resources {
-			if resObj.kind == "Secret" && resObj.name == secret {
+		for _, sr := range existingSyncSet.secretRefefences {
+			if sr.Target.Name == secret {
 				found = true
 				break
 			}
 		}
-		assert.True(t, found, "didn't find expected secret: %v", secret)
+		assert.True(t, found, "didn't find expected secretreference: %v", secret)
 	}
 
 	for _, ic := range expectedIngressControllers {

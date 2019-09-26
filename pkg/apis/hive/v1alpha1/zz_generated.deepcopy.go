@@ -1616,6 +1616,11 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 		*out = new(azure.MachinePool)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.GCP != nil {
+		in, out := &in.GCP, &out.GCP
+		*out = new(gcp.MachinePool)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

@@ -102,7 +102,9 @@ func convertMachinePools(pools ...hivev1.MachinePool) []types.MachinePool {
 
 func convertMachinePoolPlatform(p *hivev1.MachinePoolPlatform) *types.MachinePoolPlatform {
 	return &types.MachinePoolPlatform{
-		AWS: convertAWSMachinePool(p.AWS),
+		AWS:   convertAWSMachinePool(p.AWS),
+		Azure: convertAzureMachinePool(p.Azure),
+		GCP:   convertGCPMachinePool(p.GCP),
 	}
 }
 

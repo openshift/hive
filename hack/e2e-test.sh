@@ -10,7 +10,7 @@ export HIVE_IMAGE="${HIVE_IMAGE:-$local_hive_image}"
 export RELEASE_IMAGE="${RELEASE_IMAGE:-registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest}"
 export CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-cluster-test}"
 
-if ! which kustomize > /dev/null; then 
+if ! which kustomize > /dev/null; then
   kustomize_dir="$(mktemp -d)"
   export PATH="$PATH:${kustomize_dir}"
   # download kustomize so we can use it for deploying
@@ -64,6 +64,9 @@ export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLOUD_CREDS_DIR}/pull-secret}"
 function teardown() {
 	INSTALL_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/install=true" -o jsonpath='{.items[0].metadata.name}')
 	oc logs -c hive job/${INSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_install_job.log" || true
+	oc get clusterdeployment -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterdeployment.yaml" || true
+	oc get clusterimageset -o yaml &> "${ARTIFACT_DIR}/hive_clusterimagesets.yaml" || true
+	oc get job ${INSTALL_JOB_NAME} -o yaml &> "${ARTIFACT_DIR}/hive_install_job.yaml" || true
 	echo "************* INSTALL JOB LOG *************"
 	if oc get clusterprovision -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME}" -o jsonpath='{.items[0].spec.installLog}' &> "${ARTIFACT_DIR}/hive_install_console.log"; then
 		cat "${ARTIFACT_DIR}/hive_install_console.log"
@@ -98,6 +101,7 @@ echo "Running post-deploy tests"
 make test-e2e-postdeploy
 
 echo "Creating cluster deployment"
+echo "Release image: $RELEASE_IMAGE"
 SRC_ROOT=$(git rev-parse --show-toplevel)
 
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \

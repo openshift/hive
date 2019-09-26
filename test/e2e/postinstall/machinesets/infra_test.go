@@ -18,6 +18,11 @@ import (
 func TestManageMachineSets(t *testing.T) {
 	cd := common.MustGetInstalledClusterDeployment()
 
+	if cd.Spec.Platform.AWS == nil {
+		t.Log("Remote machineset management is only implemented for AWS")
+		return
+	}
+
 	c := common.MustGetClient()
 	found := -1
 	for i, machinePool := range cd.Spec.Compute {

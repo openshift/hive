@@ -636,33 +636,33 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 			dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
 		}
 	}
-	logger.WithField("servers", dnsServers).Debug("looking up domain SOA record")
+	logger.WithField("servers", dnsServers).Info("looking up domain SOA record")
 
 	m := &dns.Msg{}
 	m.SetQuestion(zone+".", dns.TypeSOA)
 	for _, s := range dnsServers {
 		in, rtt, err := client.Exchange(m, s)
 		if err != nil {
-			logger.WithError(err).WithField("server", s).Debug("query for SOA record failed")
+			logger.WithError(err).WithField("server", s).Info("query for SOA record failed")
 			continue
 		}
-		log.WithField("server", s).Debugf("SOA query duration: %v", rtt)
+		log.WithField("server", s).Infof("SOA query duration: %v", rtt)
 		if len(in.Answer) > 0 {
 			for _, rr := range in.Answer {
 				soa, ok := rr.(*dns.SOA)
 				if !ok {
-					logger.Debugf("Record returned is not an SOA record: %#v", rr)
+					logger.Info("Record returned is not an SOA record: %#v", rr)
 					continue
 				}
 				if soa.Hdr.Name != appendPeriod(zone) {
-					logger.WithField("zone", soa.Hdr.Name).Debug("SOA record returned but it does not match the lookup zone")
+					logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned but it does not match the lookup zone")
 					return false, nil
 				}
-				logger.WithField("zone", soa.Hdr.Name).Debug("SOA record returned, zone is reachable")
+				logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned, zone is reachable")
 				return true, nil
 			}
 		}
-		logger.WithField("server", s).Debug("no answer for SOA record returned")
+		logger.WithField("server", s).Info("no answer for SOA record returned")
 		return false, nil
 	}
 	return false, nil

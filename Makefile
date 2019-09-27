@@ -22,6 +22,11 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
+# set the cache directory to an accessible location
+ifeq ($(XDG_CACHE_HOME),)
+	export XDG_CACHE_HOME:=/tmp
+endif
+
 .PHONY: default
 default: all
 
@@ -208,5 +213,4 @@ clean:
 # TODO: reenable once the CI permission denied on /.cache is fixed.
 .PHONY: lint
 lint:
-	echo "TODO: make lint target disabled due to CI issues"
-	#golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
+	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...

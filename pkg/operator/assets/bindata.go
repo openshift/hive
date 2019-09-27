@@ -130,15 +130,15 @@ var _configHiveadmissionClusterdeploymentWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: clusterdeployments.admission.hive.openshift.io
+  name: clusterdeploymentvalidators.admission.hive.openshift.io
 webhooks:
-- name: clusterdeployments.admission.hive.openshift.io
+- name: clusterdeploymentvalidators.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/clusterdeployments
+      path: /apis/admission.hive.openshift.io/v1alpha1/clusterdeploymentvalidators
   rules:
   - operations:
     - CREATE
@@ -171,15 +171,15 @@ var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: clusterimagesets.admission.hive.openshift.io
+  name: clusterimagesetvalidators.admission.hive.openshift.io
 webhooks:
-- name: clusterimagesets.admission.hive.openshift.io
+- name: clusterimagesetvalidators.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/clusterimagesets
+      path: /apis/admission.hive.openshift.io/v1alpha1/clusterimagesetvalidators
   rules:
   - operations:
     - CREATE
@@ -284,15 +284,15 @@ var _configHiveadmissionDnszonesWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: dnszones.admission.hive.openshift.io
+  name: dnszonevalidators.admission.hive.openshift.io
 webhooks:
-- name: dnszones.admission.hive.openshift.io
+- name: dnszonevalidators.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/dnszones
+      path: /apis/admission.hive.openshift.io/v1alpha1/dnszonevalidators
   rules:
   - operations:
     - CREATE
@@ -449,15 +449,15 @@ var _configHiveadmissionSelectorsyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: selectorsyncsets.admission.hive.openshift.io
+  name: selectorsyncsetvalidators.admission.hive.openshift.io
 webhooks:
-- name: selectorsyncsets.admission.hive.openshift.io
+- name: selectorsyncsetvalidators.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/selectorsyncsets
+      path: /apis/admission.hive.openshift.io/v1alpha1/selectorsyncsetvalidators
   rules:
   - operations:
     - CREATE
@@ -545,15 +545,15 @@ var _configHiveadmissionSyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: syncsets.admission.hive.openshift.io
+  name: syncsetvalidators.admission.hive.openshift.io
 webhooks:
-- name: syncsets.admission.hive.openshift.io
+- name: syncsetvalidators.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/syncsets
+      path: /apis/admission.hive.openshift.io/v1alpha1/syncsetvalidators
   rules:
   - operations:
     - CREATE

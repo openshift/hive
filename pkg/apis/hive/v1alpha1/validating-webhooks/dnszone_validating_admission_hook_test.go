@@ -18,9 +18,9 @@ func TestDNSZoneValidatingResource(t *testing.T) {
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1alpha1",
-		Resource: "dnszones",
+		Resource: "dnszonevalidators",
 	}
-	expectedSingular := "dnszone"
+	expectedSingular := "dnszonevalidator"
 
 	// Act
 	plural, singular := data.ValidatingResource()

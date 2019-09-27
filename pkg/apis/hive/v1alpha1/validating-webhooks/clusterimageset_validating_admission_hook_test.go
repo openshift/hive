@@ -18,9 +18,9 @@ func TestClusterImageSetValidatingResource(t *testing.T) {
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1alpha1",
-		Resource: "clusterimagesets",
+		Resource: "clusterimagesetvalidators",
 	}
-	expectedSingular := "clusterimageset"
+	expectedSingular := "clusterimagesetvalidator"
 
 	// Act
 	plural, singular := data.ValidatingResource()

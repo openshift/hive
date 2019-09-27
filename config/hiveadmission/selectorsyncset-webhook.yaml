@@ -2,15 +2,15 @@
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: selectorsyncsets.admission.hive.openshift.io
+  name: selectorsyncsetvalidators.admission.hive.openshift.io
 webhooks:
-- name: selectorsyncsets.admission.hive.openshift.io
+- name: selectorsyncsetvalidators.admission.hive.openshift.io
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/selectorsyncsets
+      path: /apis/admission.hive.openshift.io/v1alpha1/selectorsyncsetvalidators
   rules:
   - operations:
     - CREATE

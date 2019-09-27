@@ -50,21 +50,21 @@ type ClusterProvisionValidatingAdmissionHook struct {
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 // webhook is accessed by the kube apiserver.
-// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1alpha1/clusterprovisions".
+// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1alpha1/clusterprovisionvalidators".
 // When the kube apiserver calls this registered REST resource, the generic-admission-server calls the Validate() method below.
 func (a *ClusterProvisionValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",
 		"version":  "v1alpha1",
-		"resource": "clusterprovisions",
+		"resource": "clusterprovisionvalidator",
 	}).Info("Registering validation REST resource")
 	// NOTE: This GVR is meant to be different than the ClusterProvision CRD GVR which has group "hive.openshift.io".
 	return schema.GroupVersionResource{
 			Group:    "admission.hive.openshift.io",
 			Version:  "v1alpha1",
-			Resource: "clusterprovisions",
+			Resource: "clusterprovisionvalidators",
 		},
-		"clusterprovision"
+		"clusterprovisionvalidator"
 }
 
 // Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
@@ -72,7 +72,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) Initialize(kubeClientConfig *r
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",
 		"version":  "v1alpha1",
-		"resource": "clusterprovisions",
+		"resource": "clusterprovisionvalidator",
 	}).Info("Initializing validation REST resource")
 
 	scheme := runtime.NewScheme()

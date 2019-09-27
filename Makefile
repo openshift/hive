@@ -210,7 +210,6 @@ clean:
 
 # Run golangci-lint against code
 # TODO replace verify (except verify-generated), vet, fmt targets with lint as it covers all of it
-# TODO: reenable once the CI permission denied on /.cache is fixed.
 .PHONY: lint
 lint:
 	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...

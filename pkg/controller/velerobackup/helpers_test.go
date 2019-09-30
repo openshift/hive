@@ -3,6 +3,7 @@ package velerobackup
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -29,6 +30,10 @@ const (
 )
 
 var (
+	twoMinutesAgo     = metav1.NewTime(time.Now().Add(-twoMinuteDuration))
+	fiveHoursAgo      = metav1.NewTime(time.Now().Add(-5 * time.Hour))
+	twoMinuteDuration = 2 * time.Minute
+
 	statusErr = &kerrors.StatusError{
 		ErrStatus: metav1.Status{},
 	}
@@ -114,9 +119,10 @@ func clusterDeploymentBase() testclusterdeployment.Option {
 
 func fakeClientReconcileBackup(existingObjects []runtime.Object) *ReconcileBackup {
 	return &ReconcileBackup{
-		Client: fake.NewFakeClient(existingObjects...),
-		scheme: scheme.Scheme,
-		logger: log.WithField("controller", controllerName),
+		Client:                     fake.NewFakeClient(existingObjects...),
+		scheme:                     scheme.Scheme,
+		reconcileRateLimitDuration: defaultReconcileRateLimitDuration,
+		logger:                     log.WithField("controller", controllerName),
 	}
 }
 

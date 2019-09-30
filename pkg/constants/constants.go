@@ -11,6 +11,9 @@ const (
 	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.
 	VeleroBackupEnvVar = "HIVE_VELERO_BACKUP"
 
+	// MinBackupPeriodSecondsEnvVar is the name of the environment variable used to tell the controller manager the minimum period of time between backups.
+	MinBackupPeriodSecondsEnvVar = "HIVE_MIN_BACKUP_PERIOD_SECONDS"
+
 	// SkipGatherLogsEnvVar is the environment variable which passes the configuration to disable
 	// log gathering on failed cluster installs. The value will be either "true" or "false".
 	// If unset "false" should be assumed. This variable is set by the operator depending on the

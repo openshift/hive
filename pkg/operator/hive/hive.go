@@ -90,6 +90,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, tmpEnvVar)
 	}
 
+	if instance.Spec.Backup.MinBackupPeriodSeconds != nil {
+		hLog.Infof("MinBackupPeriodSeconds specified.")
+		tmpEnvVar := corev1.EnvVar{
+			Name:  hiveconstants.MinBackupPeriodSecondsEnvVar,
+			Value: strconv.Itoa(*instance.Spec.Backup.MinBackupPeriodSeconds),
+		}
+		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, tmpEnvVar)
+	}
+
 	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {
 		return err
 	}

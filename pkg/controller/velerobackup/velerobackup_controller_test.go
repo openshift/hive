@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -13,6 +14,7 @@ import (
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+
 	"github.com/openshift/hive/pkg/test/generic"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 	"github.com/stretchr/testify/assert"
@@ -80,7 +82,7 @@ func TestReconcile(t *testing.T) {
 				testclusterdeployment.Build(clusterDeploymentBase()),
 				testcheckpoint.Build(checkpointBase(),
 					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
-					testcheckpoint.WithLastBackupTime(metav1.Now()),
+					testcheckpoint.WithLastBackupTime(fiveHoursAgo),
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
 							testclusterdeployment.Build(clusterDeploymentBase()),
@@ -91,7 +93,40 @@ func TestReconcile(t *testing.T) {
 				testclusterdeployment.Build(clusterDeploymentBase()),
 				testcheckpoint.Build(checkpointBase(),
 					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
-					testcheckpoint.WithLastBackupTime(metav1.Now()),
+					testcheckpoint.WithLastBackupTime(fiveHoursAgo),
+					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+						[]runtime.Object{
+							testclusterdeployment.Build(clusterDeploymentBase()),
+						}))),
+			},
+		},
+		{
+			name: "Simulate adding 1 object and getting rate limited",
+			request: reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: namespace,
+				},
+			},
+			existingObjects: []runtime.Object{
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testcheckpoint.Build(checkpointBase(),
+					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupTime(twoMinutesAgo),
+					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
+						[]runtime.Object{
+							testclusterdeployment.Build(clusterDeploymentBase()),
+						}))),
+			},
+			expectedResult: reconcile.Result{
+				RequeueAfter: ((3 * time.Minute) - twoMinuteDuration),
+			},
+			expectedObjects: []runtime.Object{
+				testclusterdeployment.Build(clusterDeploymentBase()),
+				testsyncset.Build(syncSetBase()),
+				testcheckpoint.Build(checkpointBase(),
+					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupTime(twoMinutesAgo),
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
 							testclusterdeployment.Build(clusterDeploymentBase()),
@@ -157,6 +192,7 @@ func TestReconcile(t *testing.T) {
 			// Arrange
 			r := fakeClientReconcileBackup(test.existingObjects)
 			types := append(hiveNamespaceScopedListTypes, &hivev1.CheckpointList{})
+			tolerance := float64(10 * time.Second)
 
 			// Act
 			actualResult, actualError := r.Reconcile(test.request)
@@ -167,7 +203,8 @@ func TestReconcile(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotEmpty(t, lastBackupName)
 			assert.NotEmpty(t, lastBackupTimestamp)
-			assert.Equal(t, test.expectedResult, actualResult)
+			assert.Equal(t, test.expectedResult.Requeue, actualResult.Requeue)
+			assert.InDelta(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter, tolerance)
 			assert.Equal(t, test.expectedError, actualError)
 			assert.Equal(t, test.expectedObjects, actualObjects)
 		})
@@ -179,10 +216,10 @@ func TestCreateVeleroBackupObject(t *testing.T) {
 	velerov1.AddToScheme(scheme.Scheme)
 
 	// Arrange
-	formatStr := "2006-01-02t15-04-05"
+	formatStr := "2006-01-02t15-04-05z"
 	actualBackups := &velerov1.BackupList{}
 	r := fakeClientReconcileBackup(emptyRuntimeObjectSlice)
-	timestamp := metav1.Now()
+	timestamp := metav1.NewTime(time.Now().UTC())
 	expectedBackupRef := corev1.ObjectReference{
 		Name:      fmt.Sprintf("backup-%v-%v", namespace, timestamp.Format(formatStr)),
 		Namespace: "velero",

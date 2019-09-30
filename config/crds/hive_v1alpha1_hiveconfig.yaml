@@ -43,6 +43,15 @@ spec:
               description: Backup specifies configuration for backup integration.
                 If absent, backup integration will be disabled.
               properties:
+                minBackupPeriodSeconds:
+                  description: MinBackupPeriodSeconds specifies that a minimum of
+                    MinBackupPeriodSeconds will occur in between each backup. This
+                    is used to rate limit backups. This potentially batches together
+                    multiple changes into 1 backup. No backups will be lost as changes
+                    that happen during this interval are queued up and will result
+                    in a backup happening once the interval has been completed.
+                  format: int64
+                  type: integer
                 velero:
                   description: Velero specifies configuration for the Velero backup
                     integration.

@@ -54,6 +54,13 @@ type BackupConfig struct {
 	// Velero specifies configuration for the Velero backup integration.
 	// +optional
 	Velero VeleroBackupConfig `json:"velero,omitempty"`
+
+	// MinBackupPeriodSeconds specifies that a minimum of MinBackupPeriodSeconds will occur in between each backup.
+	// This is used to rate limit backups. This potentially batches together multiple changes into 1 backup.
+	// No backups will be lost as changes that happen during this interval are queued up and will result in a
+	// backup happening once the interval has been completed.
+	// +optional
+	MinBackupPeriodSeconds *int `json:"minBackupPeriodSeconds,omitempty"`
 }
 
 // VeleroBackupConfig contains settings for the Velero backup integration.

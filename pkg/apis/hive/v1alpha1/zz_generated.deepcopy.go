@@ -120,6 +120,11 @@ func (in *AzureClusterDeprovisionRequest) DeepCopy() *AzureClusterDeprovisionReq
 func (in *BackupConfig) DeepCopyInto(out *BackupConfig) {
 	*out = *in
 	out.Velero = in.Velero
+	if in.MinBackupPeriodSeconds != nil {
+		in, out := &in.MinBackupPeriodSeconds, &out.MinBackupPeriodSeconds
+		*out = new(int)
+		**out = **in
+	}
 	return
 }
 
@@ -1498,7 +1503,7 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
-	out.Backup = in.Backup
+	in.Backup.DeepCopyInto(&out.Backup)
 	out.FailedProvisionConfig = in.FailedProvisionConfig
 	return
 }

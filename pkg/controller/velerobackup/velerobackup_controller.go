@@ -3,7 +3,9 @@ package velerobackup
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -33,6 +35,9 @@ import (
 const (
 	controllerName = "velerobackup"
 	errChecksum    = "HIVE_CHECKSUM_ERR_97A29D08"
+
+	// Default reconcile rate limiting to 1 backup every 3 minutes.
+	defaultReconcileRateLimitDuration = 3 * time.Minute
 )
 
 var (
@@ -61,16 +66,35 @@ var (
 // Add creates a new Backup Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	reconciler, err := NewReconciler(mgr)
+	if err != nil {
+		return err
+	}
+
+	return AddToManager(mgr, reconciler)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileBackup{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme: mgr.GetScheme(),
-		logger: log.WithField("controller", controllerName),
+func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
+	logger := log.WithField("controller", controllerName)
+	reconcileRateLimitDuration := defaultReconcileRateLimitDuration
+	minBackupPeriodSecondsStr := os.Getenv(hiveconstants.MinBackupPeriodSecondsEnvVar)
+	if minBackupPeriodSecondsStr != "" {
+		// The environment variable has been specified.
+		minBackupPeriodSeconds, err := strconv.Atoi(minBackupPeriodSecondsStr)
+		if err != nil {
+			logger.WithError(err).Errorf("Couldn't parse environment variable %v: %v", hiveconstants.MinBackupPeriodSecondsEnvVar, minBackupPeriodSecondsStr)
+			return nil, err
+		}
+		reconcileRateLimitDuration = time.Duration(minBackupPeriodSeconds) * time.Second
 	}
+
+	return &ReconcileBackup{
+		Client:                     controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:                     mgr.GetScheme(),
+		reconcileRateLimitDuration: reconcileRateLimitDuration,
+		logger:                     logger,
+	}, nil
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -105,7 +129,8 @@ var _ reconcile.Reconciler = &ReconcileBackup{}
 // ReconcileBackup ensures that Velero backup objects are created when changes are made to Hive objects.
 type ReconcileBackup struct {
 	client.Client
-	scheme *runtime.Scheme
+	reconcileRateLimitDuration time.Duration
+	scheme                     *runtime.Scheme
 
 	logger log.FieldLogger
 }
@@ -123,10 +148,27 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 		nsLogger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 
-	cp, found, err := r.getNamespaceCheckpoint(request.Namespace, nsLogger)
+	cp, checkpointFound, err := r.getNamespaceCheckpoint(request.Namespace, nsLogger)
 	if err != nil {
 		nsLogger.WithError(err).Error("error getting namespace CheckPoint")
 		return reconcile.Result{}, err
+	}
+
+	// Only rate limit AFTER the first checkpoint has been created.
+	if checkpointFound {
+		// Check to see how long since the last back was taken (we may need to rate limit)
+		timeSinceLastBackup := time.Since(cp.Spec.LastBackupTime.Time)
+		if timeSinceLastBackup < r.reconcileRateLimitDuration {
+			// calculate the next time this reconcile should attempt to run.
+			requestAfter := (r.reconcileRateLimitDuration - timeSinceLastBackup)
+
+			nsLogger.Infof("Rate limiting this reconcile. Will reconcile this namespace again in %v", requestAfter)
+
+			// Requeue this reconcile because we've already taken a backup within the rate limit duration.
+			return reconcile.Result{
+				RequeueAfter: requestAfter,
+			}, nil
+		}
 	}
 
 	objects, err := r.getRuntimeObjects(hiveNamespaceScopedListTypes, request.Namespace)
@@ -155,7 +197,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 	cp.Spec.LastBackupChecksum = currentChecksum
 	cp.Spec.LastBackupTime = timestamp
 	cp.Spec.LastBackupRef = backupRef
-	err = r.createOrUpdateNamespaceCheckpoint(cp, found, nsLogger)
+	err = r.createOrUpdateNamespaceCheckpoint(cp, checkpointFound, nsLogger)
 	if err != nil {
 		nsLogger.WithError(err).Error("error updating namespace CheckPoint.")
 		// Not returning with an error because a backup object was created,
@@ -170,8 +212,8 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 // The Backup options are set specifically for Hive object backups.
 // DO NOT use this function call for any other type objects as it may not back them up correctly.
 func (r *ReconcileBackup) createVeleroBackupObject(namespace string, t metav1.Time) (corev1.ObjectReference, error) {
-	formatStr := "2006-01-02t15-04-05"
-	timestamp := t.Format(formatStr)
+	formatStr := "2006-01-02t15-04-05z"
+	timestamp := t.UTC().Format(formatStr)
 
 	backup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{

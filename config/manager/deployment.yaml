@@ -30,7 +30,7 @@ spec:
         name: manager
         resources:
           requests:
-            cpu: 500m
+            cpu: 50m
             memory: 512Mi
         command:
           - /opt/services/manager

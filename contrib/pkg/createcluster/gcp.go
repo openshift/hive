@@ -25,9 +25,15 @@ type gcpCloudProvider struct {
 }
 
 func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	saFile := filepath.Join(os.Getenv("HOME"), ".gcp", gcpCredFile)
-	log.Infof("Loading gcp service account from: %s", saFile)
-	saFileContents, err := ioutil.ReadFile(saFile)
+	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", gcpCredFile)
+	if l := os.Getenv("GCP_SHARED_CREDENTIALS_FILE"); l != "" {
+		credsFilePath = l
+	}
+	if o.CredsFile != "" {
+		credsFilePath = o.CredsFile
+	}
+	log.Infof("Loading gcp service account from: %s", credsFilePath)
+	saFileContents, err := ioutil.ReadFile(credsFilePath)
 	if err != nil {
 		return nil, err
 	}

@@ -25,9 +25,15 @@ type azureCloudProvider struct {
 }
 
 func (p *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	spFile := filepath.Join(os.Getenv("HOME"), ".azure", azureCredFile)
-	log.Infof("Loading Azure service principal from: %s", spFile)
-	spFileContents, err := ioutil.ReadFile(spFile)
+	credsFilePath := filepath.Join(os.Getenv("HOME"), ".azure", azureCredFile)
+	if l := os.Getenv("AZURE_AUTH_LOCATION"); l != "" {
+		credsFilePath = l
+	}
+	if o.CredsFile != "" {
+		credsFilePath = o.CredsFile
+	}
+	log.Infof("Loading Azure service principal from: %s", credsFilePath)
+	spFileContents, err := ioutil.ReadFile(credsFilePath)
 	if err != nil {
 		return nil, err
 	}

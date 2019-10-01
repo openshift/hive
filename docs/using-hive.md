@@ -188,19 +188,49 @@ oc get nodes
 
 Hive can optionally create delegated Route53 DNS zones for each cluster.
 
-To use this functionality you must first define the base domains you want to manage DNS for in your HiveConfig.
+NOTE: This feature is not yet available for GCP and Azure clusters.
+
+To use this feature:
+
+  1. Manually create a Route53 hosted zone for your "root" domain (i.e. hive.example.com in the example below) and ensure your DNS is operational.
+  1. Create a secret in the "hive" namespace with AWS credentials with permissions to manage the root hosted zone.
+     ```
+     apiVersion: v1
+     data:
+       aws_access_key_id: REDACTED
+       aws_secret_access_key: REDACTED
+     kind: Secret
+     metadata:
+       name: route53-aws-creds
+     type: Opaque
+     ```
+  1. Update your HiveConfig to enable externalDNS and set the list of managed domains:
+     ```
+     apiVersion: hive.openshift.io/v1alpha1
+     kind: HiveConfig
+     metadata:
+       name: hive
+     spec:
+       managedDomains:
+       - hive.example.com
+       externalDNS:
+         aws:
+           credentials:
+             name: route53-aws-creds
+     ```
+
+You can now create clusters with manageDNS enabled and a basedomain of mydomain.hive.example.com.
 
 ```
-apiVersion: hive.openshift.io/v1alpha1
-kind: HiveConfig
-metadata:
-  name: hive
-spec:
-  managedDomains:
-  - hive1.example.com
+$ bin/hiveutil create-cluster --base-domain=mydomain.hive.example.com mycluster --manage-dns
 ```
 
-You can now request clusters with clusterDeployment.spec.manageDNS=true and clusterDeployment.spec.baseDomain=mycluster.hive1.example.com. Hive will create the mycluster.hive1.example.com DNS zone, and the OpenShift installer will create DNS entries such as api.mycluser.hive1.example.com.
+Hive will then:
+
+  1. Create a mydomain.hive.example.com Route53 hosted zone.
+  1. Create NS records in the hive.example.com to forward DNS to the new mydomain.hive.example.com hosted zone.
+  1. Wait for the SOA record for the new domain to be resolvable, indicating that DNS is functioning.
+  1. Launch the install, which will create DNS entries for the new cluster ("\*.apps.mycluster.mydomain.hive.example.com", "api.mycluster.mydomain.hive.example.com", etc) in the new mydomain.hive.example.com hosted zone.
 
 
 ## Configuration Management

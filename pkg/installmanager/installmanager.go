@@ -259,14 +259,6 @@ func (m *InstallManager) Run() error {
 		return err
 	}
 
-	// TODO: delete this, it has passwords, devel only
-	m.log.Info("install config:")
-	dataStr := string(d)
-	lines := strings.Split(dataStr, "\n")
-	for _, l := range lines {
-		m.log.Info(l)
-	}
-
 	err = ioutil.WriteFile(filepath.Join(m.WorkDir, "install-config.yaml"), d, 0644)
 	if err != nil {
 		m.log.WithError(err).Error("error writing install-config.yaml to disk")

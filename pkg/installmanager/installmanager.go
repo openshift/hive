@@ -759,7 +759,7 @@ func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) e
 
 	if fileInfo.Size() == 0 {
 		m.log.Warn("cannot gather logs/tarball as ssh private key file is empty")
-		return err
+		return errors.New("cannot gather logs/tarball as ssh private key file is empty")
 	}
 
 	// set up ssh private key, and run the log gathering script

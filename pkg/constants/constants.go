@@ -42,6 +42,9 @@ const (
 
 	// CheckpointName is the name of the object in each namespace in which the namespace's backup information is stored.
 	CheckpointName = "hive"
+
+	// SyncsetPauseAnnotation is a annotation used by clusterDeployment, if it's true, then we will disable syncing to a specific cluster
+	SyncsetPauseAnnotation = "hive.openshift.io/syncset-pause"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

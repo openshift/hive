@@ -31,6 +31,7 @@ import (
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 )
@@ -159,6 +160,26 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 						*testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
 					},
 				}
+			}(),
+		},
+		{
+			name: "Skip create missing machine set when clusterDeployment has annotation hive.openshift.io/syncset-pause: true ",
+			localExisting: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment([]hivev1.MachinePool{
+						testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
+					})
+					cd.Annotations = map[string]string{}
+					cd.Annotations[constants.SyncsetPauseAnnotation] = "true"
+					return cd
+				}(),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{},
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{}
 			}(),
 		},
 		{

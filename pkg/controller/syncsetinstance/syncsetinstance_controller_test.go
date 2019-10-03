@@ -46,6 +46,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -73,6 +74,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		selectorSyncSet        *hivev1.SelectorSyncSet
 		deletedSelectorSyncSet *hivev1.SelectorSyncSet
 		existingObjs           []runtime.Object
+		clusterDeployment      *hivev1.ClusterDeployment
 		validate               func(*testing.T, *hivev1.SyncSetInstance)
 		isDeleted              bool
 		expectDeleted          []deletedItemInfo
@@ -176,6 +178,24 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
 			expectErr: true,
+		},
+		{
+			name: "Stop applying resources when have annotation: hive.openshift.io/syncset-pause=true",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Annotations = map[string]string{}
+				cd.Annotations[constants.SyncsetPauseAnnotation] = "true"
+				return cd
+			}(),
+			syncSet: testSyncSetWithResources("foo",
+				testCM("cm1", "key1", "value1"),
+			),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				if ssi.Status.Conditions != nil {
+					t.Fatalf("conditions should be nil")
+				}
+			},
+			expectErr: false,
 		},
 		{
 			name: "selectorsyncset: apply single resource",
@@ -530,7 +550,9 @@ func TestSyncSetReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var ssi *hivev1.SyncSetInstance
 			cd := testClusterDeployment()
-
+			if test.clusterDeployment != nil {
+				cd = test.clusterDeployment
+			}
 			runtimeObjs := []runtime.Object{cd, kubeconfigSecret()}
 			runtimeObjs = append(runtimeObjs, test.existingObjs...)
 

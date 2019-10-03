@@ -39,6 +39,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -128,6 +129,10 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		// Error reading the object - requeue the request
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
+	}
+	if cd.Annotations[constants.SyncsetPauseAnnotation] == "true" {
+		log.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
+		return reconcile.Result{}, nil
 	}
 
 	// If the cluster is unreachable, do not reconcile.

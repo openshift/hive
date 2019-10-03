@@ -1081,7 +1081,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 		return nil, nil
 	}
 	dnsZone := &hivev1.DNSZone{}
-	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
+	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
 	if err != nil && !apierrors.IsNotFound(err) {
 		cdLog.WithError(err).Error("error looking up managed dnszone")
@@ -1283,7 +1283,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		return nil, errors.New("only AWS managed DNS is supported")
 	}
 	dnsZone := &hivev1.DNSZone{}
-	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: dnsZoneName(cd.Name)}
+	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
 
 	switch err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone); {
@@ -1326,7 +1326,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
 	dnsZone := &hivev1.DNSZone{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      dnsZoneName(cd.Name),
+			Name:      controllerutils.DNSZoneName(cd.Name),
 			Namespace: cd.Namespace,
 		},
 		Spec: hivev1.DNSZoneSpec{
@@ -1355,10 +1355,6 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 	}
 	logger.Info("dns zone created")
 	return nil
-}
-
-func dnsZoneName(cdName string) string {
-	return apihelpers.GetResourceName(cdName, "zone")
 }
 
 func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {

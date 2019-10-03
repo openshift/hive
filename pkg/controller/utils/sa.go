@@ -32,6 +32,11 @@ var (
 		},
 		{
 			APIGroups: []string{"hive.openshift.io"},
+			Resources: []string{"dnszones"},
+			Verbs:     []string{"get"},
+		},
+		{
+			APIGroups: []string{"hive.openshift.io"},
 			Resources: []string{"clusterdeployments", "clusterdeployments/finalizers", "clusterdeployments/status"},
 			Verbs:     []string{"get", "update"},
 		},

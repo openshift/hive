@@ -21,6 +21,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	installertypes "github.com/openshift/installer/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/hive/pkg/apis"
@@ -218,7 +219,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			// We don't want to run the uninstaller, so stub it out
-			im.runUninstaller = alwaysSucceedUninstall
+			im.cleanupFailedProvision = alwaysSucceedCleanupFailedProvision
 
 			err = im.Run()
 
@@ -334,7 +335,7 @@ func testClusterProvision() *hivev1.ClusterProvision {
 	}
 }
 
-func alwaysSucceedUninstall(*hivev1.ClusterDeployment, string, log.FieldLogger) error {
+func alwaysSucceedCleanupFailedProvision(client.Client, *hivev1.ClusterDeployment, string, log.FieldLogger) error {
 	log.Debugf("running always successful uninstall")
 	return nil
 }

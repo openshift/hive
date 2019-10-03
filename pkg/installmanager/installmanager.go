@@ -518,7 +518,7 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) error {
 
 	m.log.Info("running openshift-install create manifests")
-	err := m.runOpenShiftInstallCommand([]string{"create", "manifests", "--dir", m.WorkDir})
+	err := m.runOpenShiftInstallCommand("create", "manifests")
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
@@ -537,7 +537,7 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")
-	if err := m.runOpenShiftInstallCommand([]string{"create", "ignition-configs", "--dir", m.WorkDir}); err != nil {
+	if err := m.runOpenShiftInstallCommand("create", "ignition-configs"); err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
 	}
@@ -551,17 +551,23 @@ func (m *InstallManager) provisionCluster() error {
 
 	m.log.Info("running openshift-install create cluster")
 
-	err := m.runOpenShiftInstallCommand([]string{"create", "cluster", "--dir", m.WorkDir})
-	if err != nil {
-		m.log.WithError(err).Errorf("error provisioning cluster")
-		return err
+	if err := m.runOpenShiftInstallCommand("create", "cluster"); err != nil {
+		if m.isBootstrapComplete() {
+			m.log.WithError(err).Warn("provisioning cluster failed after completing bootstrapping, waiting longer for install to complete")
+			err = m.runOpenShiftInstallCommand("wait-for", "install-complete")
+		}
+		if err != nil {
+			m.log.WithError(err).Error("error provisioning cluster")
+			return err
+		}
 	}
 	return nil
 }
 
-func (m *InstallManager) runOpenShiftInstallCommand(args []string) error {
+func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 	m.log.WithField("args", args).Info("running openshift-install binary")
-	cmd := exec.Command(filepath.Join(m.WorkDir, "openshift-install"), args...)
+	cmd := exec.Command("./openshift-install", args...)
+	cmd.Dir = m.WorkDir
 
 	// save the commands' stdout/stderr to a file
 	stdOutAndErrOutput, err := os.Create(installerConsoleLogFilePath)
@@ -701,22 +707,19 @@ func isGatherLogsEnabled() bool {
 // we're just gathering as much information as we can and then proceeding with cleanup
 // so we can re-try.
 func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) {
-
-	if err := m.gatherBootstrapNodeLogs(cd); err != nil {
-		m.log.WithError(err).Info("error fetching logs from bootstrap node")
-	} else {
+	if !m.isBootstrapComplete() {
+		if err := m.gatherBootstrapNodeLogs(cd); err != nil {
+			m.log.WithError(err).Warn("error fetching logs from bootstrap node")
+			return
+		}
 		m.log.Info("successfully gathered logs from bootstrap node")
-		return
-	}
-
-	if err := m.gatherClusterLogs(cd); err != nil {
-		m.log.WithError(err).Info("error fetching logs with oc adm must-gather")
 	} else {
+		if err := m.gatherClusterLogs(cd); err != nil {
+			m.log.WithError(err).Warn("error fetching logs with oc adm must-gather")
+			return
+		}
 		m.log.Info("successfully ran oc adm must-gather")
-		return
 	}
-
-	m.log.Warn("unable to fetch cluster logs after install failure")
 }
 
 func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
@@ -838,6 +841,14 @@ func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir st
 	m.log.Infof("cluster logs gathered: %s", destTarball)
 
 	return destTarball, nil
+}
+
+func (m *InstallManager) isBootstrapComplete() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "./openshift-install", "wait-for", "bootstrap-complete")
+	cmd.Dir = m.WorkDir
+	return cmd.Run() != nil
 }
 
 func getBootstrapIP(m *InstallManager) (string, error) {

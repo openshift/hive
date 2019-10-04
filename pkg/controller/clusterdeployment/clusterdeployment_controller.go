@@ -1171,12 +1171,16 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 
 	// Check if deprovision request already exists:
 	existingRequest := &hivev1.ClusterDeprovisionRequest{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Name, Namespace: cd.Namespace}, existingRequest)
-	if err != nil && apierrors.IsNotFound(err) {
-		cdLog.Infof("creating deprovision request for cluster deployment")
-		err = r.Create(context.TODO(), request)
-		if err != nil {
-			cdLog.WithError(err).Errorf("error creating deprovision request")
+	switch err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Name, Namespace: cd.Namespace}, existingRequest); {
+	case apierrors.IsNotFound(err):
+		cdLog.Info("creating deprovision request for cluster deployment")
+		switch err = r.Create(context.TODO(), request); {
+		case apierrors.IsAlreadyExists(err):
+			cdLog.Info("deprovision request already exists")
+			// requeue the clusterdeployment immediately to process the status of the deprovision request
+			return reconcile.Result{Requeue: true}, nil
+		case err != nil:
+			cdLog.WithError(err).Error("error creating deprovision request")
 			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
 			// the cluster go away.
 			ns := &corev1.Namespace{}
@@ -1193,10 +1197,11 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 				}
 			}
 			return reconcile.Result{}, err
+		default:
+			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, nil
-	} else if err != nil {
-		cdLog.WithError(err).Errorf("error getting deprovision request")
+	case err != nil:
+		cdLog.WithError(err).Error("error getting deprovision request")
 		return reconcile.Result{}, err
 	}
 

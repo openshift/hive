@@ -1082,31 +1082,29 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 	}
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
-	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
-	if err != nil && !apierrors.IsNotFound(err) {
-		cdLog.WithError(err).Error("error looking up managed dnszone")
-		return &reconcile.Result{}, err
-	}
-	if apierrors.IsNotFound(err) || !dnsZone.DeletionTimestamp.IsZero() {
-		cdLog.Debug("dnszone has been deleted or is getting deleted")
+	switch err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone); {
+	case apierrors.IsNotFound(err):
+		cdLog.Debug("dnszone has been deleted")
 		return nil, nil
+	case err != nil:
+		cdLog.WithError(err).Error("error looking up managed dnszone")
+		return nil, err
 	}
-	cdLog.Warn("managed dnszone did not get a deletionTimestamp when parent cluster deployment was deleted, deleting manually")
-	err = r.Delete(context.TODO(), dnsZone,
-		client.PropagationPolicy(metav1.DeletePropagationForeground))
-	if err != nil {
-		cdLog.WithError(err).Error("error deleting managed dnszone")
+	if dnsZone.DeletionTimestamp.IsZero() {
+		if err := r.Delete(context.TODO(), dnsZone, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+			cdLog.WithError(err).Error("error deleting managed dnszone")
+			return nil, err
+		}
 	}
-	return &reconcile.Result{}, err
+	return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 }
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 
-	result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
-	if result != nil {
+	switch result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog); {
+	case result != nil:
 		return *result, err
-	}
-	if err != nil {
+	case err != nil:
 		return reconcile.Result{}, err
 	}
 
@@ -1137,7 +1135,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		if cd.Spec.Installed {
 			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
 			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-				err = r.removeClusterDeploymentFinalizer(cd)
+				err := r.removeClusterDeploymentFinalizer(cd)
 				if err != nil {
 					cdLog.WithError(err).Error("error removing finalizer")
 				}
@@ -1152,7 +1150,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 
 	if cd.Status.InfraID == "" {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
-		err = r.removeClusterDeploymentFinalizer(cd)
+		err := r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
 			cdLog.WithError(err).Error("error removing finalizer")
 		}

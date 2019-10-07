@@ -848,7 +848,7 @@ func (m *InstallManager) isBootstrapComplete() bool {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "./openshift-install", "wait-for", "bootstrap-complete")
 	cmd.Dir = m.WorkDir
-	return cmd.Run() != nil
+	return cmd.Run() == nil
 }
 
 func getBootstrapIP(m *InstallManager) (string, error) {

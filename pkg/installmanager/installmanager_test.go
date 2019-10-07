@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -690,6 +691,41 @@ func TestInstallManagerSSH(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+
+func TestIsBootstrapComplete(t *testing.T) {
+	cases := []struct {
+		name             string
+		errCode          int
+		expectedComplete bool
+	}{
+		{
+			name:             "complete",
+			errCode:          0,
+			expectedComplete: true,
+		},
+		{
+			name:             "not complete",
+			errCode:          1,
+			expectedComplete: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, err := ioutil.TempDir("", "TestIsBootstrapComplete")
+			if err != nil {
+				t.Fatalf("could not create temp dir: %v", err)
+			}
+			defer os.RemoveAll(dir)
+			script := fmt.Sprintf("#!/bin/bash\nexit %d", tc.errCode)
+			if err := ioutil.WriteFile(path.Join(dir, "openshift-install"), []byte(script), 0777); err != nil {
+				t.Fatalf("could not write openshift-install file: %v", err)
+			}
+			im := &InstallManager{WorkDir: dir}
+			actualComplete := im.isBootstrapComplete()
+			assert.Equal(t, tc.expectedComplete, actualComplete, "unexpected bootstrap complete")
 		})
 	}
 }

@@ -24,6 +24,7 @@ import (
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -116,20 +117,21 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
 
-	asset = assets.MustAsset("config/hiveadmission/clusterdeployment-webhook.yaml")
-	cdWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
-
-	asset = assets.MustAsset("config/hiveadmission/clusterimageset-webhook.yaml")
-	cisWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
-
-	asset = assets.MustAsset("config/hiveadmission/dnszones-webhook.yaml")
-	dnsZonesWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
-
-	asset = assets.MustAsset("config/hiveadmission/syncset-webhook.yaml")
-	syncSetsWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
-
-	asset = assets.MustAsset("config/hiveadmission/selectorsyncset-webhook.yaml")
-	selectorSyncSetsWebhook := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
+	webhooks := map[string]runtime.Object{}
+	validatingWebhooks := []*admregv1.ValidatingWebhookConfiguration{}
+	for _, yaml := range []string{
+		"config/hiveadmission/clusterdeployment-webhook.yaml",
+		"config/hiveadmission/clusterimageset-webhook.yaml",
+		"config/hiveadmission/clusterprovision-webhook.yaml",
+		"config/hiveadmission/dnszones-webhook.yaml",
+		"config/hiveadmission/syncset-webhook.yaml",
+		"config/hiveadmission/selectorsyncset-webhook.yaml",
+	} {
+		asset = assets.MustAsset(yaml)
+		wh := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
+		webhooks[yaml] = wh
+		validatingWebhooks = append(validatingWebhooks, wh)
+	}
 
 	// If on 3.11 we need to set the service CA on the apiservice.
 	is311, err := r.is311(hLog)
@@ -139,10 +141,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	}
 	if is311 {
 		hLog.Debug("3.11 cluster detected, modifying objects for CA certs")
-		err = r.injectCerts(apiService,
-			[]*admregv1.ValidatingWebhookConfiguration{cdWebhook, cisWebhook, dnsZonesWebhook, syncSetsWebhook, selectorSyncSetsWebhook},
-			[]*admregv1.MutatingWebhookConfiguration{},
-			hLog)
+		err = r.injectCerts(apiService, validatingWebhooks, nil, hLog)
 		if err != nil {
 			hLog.WithError(err).Error("error injecting certs")
 			return err
@@ -156,12 +155,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	}
 	hLog.Infof("apiservice applied (%s)", result)
 
-	result, err = h.ApplyRuntimeObject(cdWebhook, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying cluster deployment validating webhook")
-		return err
+	for webhookFile, webhook := range webhooks {
+		result, err = h.ApplyRuntimeObject(webhook, scheme.Scheme)
+		if err != nil {
+			hLog.WithError(err).Errorf("error applying validating webhook %q", webhookFile)
+			return err
+		}
+		hLog.Infof("validating webhook %q applied (%s)", webhookFile, result)
 	}
-	hLog.Infof("cluster deployment validating webhook applied (%s)", result)
 
 	if _, err = r.dynamicClient.Resource(mutatingWebhookConfigurationResource).Get(deprecatedClusterDeploymentMutatingWebhook, metav1.GetOptions{}); err == nil {
 		err = r.dynamicClient.Resource(mutatingWebhookConfigurationResource).Delete(deprecatedClusterDeploymentMutatingWebhook, &metav1.DeleteOptions{})
@@ -171,34 +172,6 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		}
 		hLog.Infof("deprecated mutating webhook configuration (%s) removed", deprecatedClusterDeploymentMutatingWebhook)
 	}
-
-	result, err = h.ApplyRuntimeObject(cisWebhook, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying cluster image set webhook")
-		return err
-	}
-	hLog.Infof("cluster image set webhook applied (%s)", result)
-
-	result, err = h.ApplyRuntimeObject(dnsZonesWebhook, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying dns zones webhook")
-		return err
-	}
-	hLog.Infof("dns zones webhook applied (%s)", result)
-
-	result, err = h.ApplyRuntimeObject(syncSetsWebhook, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying syncsets webhook")
-		return err
-	}
-	hLog.Infof("syncsets webhook applied (%s)", result)
-
-	result, err = h.ApplyRuntimeObject(selectorSyncSetsWebhook, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying selectorsyncsets webhook")
-		return err
-	}
-	hLog.Infof("selectorsyncsets webhook applied (%s)", result)
 
 	// Remove outdated validatingwebhookconfigurations
 	removeValidatingWebhooks := []string{

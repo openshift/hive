@@ -185,7 +185,12 @@ else
 	cat "${ARTIFACT_DIR}/hive_install_job.log"
 fi
 
-if [[ "${INSTALL_RESULT}" != "success" ]]; then exit 1; fi
+if [[ "${INSTALL_RESULT}" != "success" ]]
+then
+	mkdir "${ARTIFACT_DIR}/hive"
+	${SRC_ROOT}/hack/logextractor.sh ${CLUSTER_NAME} "${ARTIFACT_DIR}/hive"
+	exit 1
+fi
 
 echo "Running post-install tests"
 make test-e2e-postinstall

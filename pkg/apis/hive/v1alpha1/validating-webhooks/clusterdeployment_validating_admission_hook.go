@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
@@ -220,6 +221,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	// validate the ingress
 	if ingressValidationResult := validateIngress(newObject, contextLogger); ingressValidationResult != nil {
 		return ingressValidationResult
+	}
+
+	// validate the certificate bundles
+	if r := validateCertificateBundles(newObject, contextLogger); r != nil {
+		return r
 	}
 
 	if newObject.Spec.ManageDNS {
@@ -551,6 +557,21 @@ func validateIngressDomainsNotWildcard(newObject *hivev1.ClusterDeploymentSpec) 
 	return true
 }
 
+func validateIngressServingCertificateExists(newObject *hivev1.ClusterDeploymentSpec) bool {
+	// Include the empty string in the set of certs so that an ingress with
+	// an empty serving certificate passes.
+	certs := sets.NewString("")
+	for _, cert := range newObject.CertificateBundles {
+		certs.Insert(cert.Name)
+	}
+	for _, ingress := range newObject.Ingress {
+		if !certs.Has(ingress.ServingCertificate) {
+			return false
+		}
+	}
+	return true
+}
+
 // empty ingress is allowed (for create), but if it's non-zero
 // it must include an entry for 'default'
 func validateIngressList(newObject *hivev1.ClusterDeploymentSpec) bool {
@@ -640,6 +661,46 @@ func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Ent
 		}
 	}
 
+	if !validateIngressServingCertificateExists(&newObject.Spec) {
+		message := "Ingress has serving certificate that does not exist in certificate bundle"
+		contextLogger.Infof("Failed validation: %v", message)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
 	// everything passed
+	return nil
+}
+
+func validateCertificateBundles(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+	for _, certBundle := range newObject.Spec.CertificateBundles {
+		if certBundle.Name == "" {
+			message := "Certificate bundle is missing a name"
+			contextLogger.Infof("Failed validation: %v", message)
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+					Message: message,
+				},
+			}
+		}
+		if certBundle.SecretRef.Name == "" {
+			message := "Certificate bundle is missing a secret reference"
+			contextLogger.Infof("Failed validation: %v", message)
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+					Message: message,
+				},
+			}
+		}
+	}
 	return nil
 }

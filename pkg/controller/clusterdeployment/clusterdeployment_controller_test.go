@@ -740,7 +740,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testDNSZone(),
 			},
-			expectedRequeueAfter: defaultRequeueTime,
 			validate: func(c client.Client, t *testing.T) {
 				dnsZone := getDNSZone(c)
 				assert.Nil(t, dnsZone, "dnsZone should not exist")

@@ -1101,13 +1101,6 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 
-	switch result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog); {
-	case result != nil:
-		return *result, err
-	case err != nil:
-		return reconcile.Result{}, err
-	}
-
 	// Wait for outstanding provision to be removed before creating deprovision request
 	if cd.Status.Provision != nil {
 		provision := &hivev1.ClusterProvision{}
@@ -1206,18 +1199,24 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Deprovision request exists, check whether it has completed
-	if existingRequest.Status.Completed {
-		cdLog.Infof("deprovision request completed, removing finalizer")
-		err = r.removeClusterDeploymentFinalizer(cd)
-		if err != nil {
-			cdLog.WithError(err).Error("error removing finalizer")
-		}
+	if !existingRequest.Status.Completed {
+		cdLog.Debug("deprovision request not yet completed")
+		return reconcile.Result{}, nil
+	}
+
+	switch result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog); {
+	case result != nil:
+		return *result, err
+	case err != nil:
 		return reconcile.Result{}, err
 	}
 
-	cdLog.Debug("deprovision request not yet completed")
-
-	return reconcile.Result{}, nil
+	cdLog.Infof("deprovision request completed, removing finalizer")
+	err = r.removeClusterDeploymentFinalizer(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("error removing finalizer")
+	}
+	return reconcile.Result{}, err
 }
 
 func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {

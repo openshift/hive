@@ -739,6 +739,15 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testDNSZone(),
+				&hivev1.ClusterDeprovisionRequest{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespace,
+						Name:      testName,
+					},
+					Status: hivev1.ClusterDeprovisionRequestStatus{
+						Completed: true,
+					},
+				},
 			},
 			expectedRequeueAfter: defaultRequeueTime,
 			validate: func(c client.Client, t *testing.T) {

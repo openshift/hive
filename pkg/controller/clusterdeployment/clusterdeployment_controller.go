@@ -1091,7 +1091,6 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 		cdLog.Debug("dnszone has been deleted or is getting deleted")
 		return nil, nil
 	}
-	cdLog.Warn("managed dnszone did not get a deletionTimestamp when parent cluster deployment was deleted, deleting manually")
 	err = r.Delete(context.TODO(), dnsZone,
 		client.PropagationPolicy(metav1.DeletePropagationForeground))
 	if err != nil {

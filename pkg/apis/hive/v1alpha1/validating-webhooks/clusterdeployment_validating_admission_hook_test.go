@@ -516,6 +516,81 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
 		},
+		{
+			name: "ingress with serving certificate",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.Ingress[0].ServingCertificate = "test-serving-cert"
+				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+					{
+						Name:      "test-serving-cert",
+						SecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "ingress with missing serving certificate",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validClusterDeploymentWithIngress()
+				cd.Spec.Ingress[0].ServingCertificate = "missing-serving-cert"
+				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+					{
+						Name:      "test-serving-cert",
+						SecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "valid serving certificate",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+					{
+						Name:      "test-serving-cert",
+						SecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "serving certificate without name",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+					{
+						SecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "serving certificate without secret reference",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
+					{
+						Name: "test-serving-cert",
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {

@@ -150,7 +150,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 
 	rContext.logger = cdLog
 
-	if cd.Spec.Ingress == nil {
+	if len(cd.Spec.Ingress) == 0 {
 		// the admission controller will ensure that we get valid-looking
 		// Spec.Ingress (ie no missing 'default', no going from a defined
 		// ingress list to an empty list, etc)
@@ -359,9 +359,7 @@ func (r *ReconcileRemoteClusterIngress) getIngressSecrets(rContext *reconcileCon
 
 				if err := r.Get(context.TODO(), searchKey, cbSecret); err != nil {
 					if errors.IsNotFound(err) {
-						msg := fmt.Sprintf("secret %v for certbundle %v was not found", cb.SecretRef.Name, cb.Name)
-						rContext.logger.Error(msg)
-						return cbSecrets, fmt.Errorf(msg)
+						return cbSecrets, fmt.Errorf("secret %v for certbundle %v was not found", cb.SecretRef.Name, cb.Name)
 					}
 					rContext.logger.WithError(err).Error("error while gathering certBundle secret")
 					return cbSecrets, err

@@ -12,8 +12,10 @@ Hive contains an operator which is responsible for handling deployment logic for
 ### Deploy Hive Operator Using Latest Master Images
 
 To deploy the operator from a git checkout:
-
-  `$ make deploy`
+```
+$ make vendor
+$ make deploy
+```
 
 By default the operator will use the latest images published by CI from the master branch.
 

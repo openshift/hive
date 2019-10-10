@@ -10,6 +10,8 @@ The Hive service can be used to provision and perform initial configuration of O
 ## Supported cloud providers
 
 * AWS
+* Azure
+* Google Cloud Platform
 
 In the future Hive will support more cloud providers.
 

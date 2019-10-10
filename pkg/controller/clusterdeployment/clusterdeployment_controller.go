@@ -320,13 +320,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
-	imageSet, modified, err := r.getClusterImageSet(cd, cdLog)
-	if modified || err != nil {
-		return reconcile.Result{}, err
-	}
-
-	releaseImage := r.getReleaseImage(cd, imageSet, cdLog)
-
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			clearUnderwaySecondsMetrics(cd)
@@ -442,6 +435,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cd.Namespace,
 		hivemetrics.GetClusterDeploymentType(cd)).Set(
 		time.Since(cd.CreationTimestamp.Time).Seconds())
+
+	imageSet, err := r.getClusterImageSet(cd, cdLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	releaseImage := r.getReleaseImage(cd, imageSet, cdLog)
 
 	cdLog.Debug("loading pull secrets")
 	pullSecret, err := r.mergePullSecrets(cd, cdLog)
@@ -862,23 +862,23 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 	return ""
 }
 
-func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, bool, error) {
+func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
 	if cd.Spec.ImageSet == nil || len(cd.Spec.ImageSet.Name) == 0 {
-		return nil, false, nil
+		return nil, nil
 	}
 	imageSet := &hivev1.ClusterImageSet{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet)
-	switch {
-	case apierrors.IsNotFound(err):
-		cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Warning("clusterdeployment references non-existent clusterimageset")
-		modified, err := r.setImageSetNotFoundCondition(cd, false, cdLog)
-		return nil, modified, err
-	case err != nil:
-		cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
-		return nil, false, err
-	default:
-		return imageSet, false, nil
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet); err != nil {
+		if apierrors.IsNotFound(err) {
+			cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Warning("clusterdeployment references non-existent clusterimageset")
+			if err := r.setImageSetNotFoundCondition(cd, false, cdLog); err != nil {
+				return nil, err
+			}
+		} else {
+			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
+		}
+		return nil, err
 	}
+	return imageSet, nil
 }
 
 func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
@@ -978,8 +978,7 @@ func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterD
 	return r.Status().Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) (modified bool, err error) {
-	original := cd.DeepCopy()
+func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) error {
 	status := corev1.ConditionFalse
 	reason := clusterImageSetFoundReason
 	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.ImageSet.Name)
@@ -988,22 +987,23 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 		reason = clusterImageSetNotFoundReason
 		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.ImageSet.Name)
 	}
-	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
 		hivev1.ClusterImageSetNotFoundCondition,
 		status,
 		reason,
 		message,
 		controllerutils.UpdateConditionNever)
-	if !reflect.DeepEqual(original.Status.Conditions, cd.Status.Conditions) {
-		cdLog.Infof("setting ClusterImageSetNotFoundCondition to %v", status)
-		err := r.Status().Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Error("cannot update status conditions")
-		}
-		return true, err
+	if !changed {
+		return nil
 	}
-	return false, nil
+	cdLog.Infof("setting ClusterImageSetNotFoundCondition to %v", status)
+	cd.Status.Conditions = conds
+	err := r.Status().Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Error("cannot update status conditions")
+	}
+	return err
 }
 
 func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.Secret, cdLog log.FieldLogger) error {

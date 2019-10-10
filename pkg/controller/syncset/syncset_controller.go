@@ -204,7 +204,7 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		err := r.Update(context.TODO(), syncSetInstance)
 		if err != nil {
 			name := fmt.Sprintf("%s/%s", syncSetInstance.Namespace, syncSetInstance.Name)
-			cdLog.WithError(err).WithField("syncSetInstance", name).Error("cannot update sync set instance")
+			cdLog.WithError(err).WithField("syncSetInstance", name).Log(controllerutils.LogLevel(err), "cannot update sync set instance")
 			return reconcile.Result{}, err
 		}
 	}

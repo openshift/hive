@@ -199,7 +199,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 	cp.Spec.LastBackupRef = backupRef
 	err = r.createOrUpdateNamespaceCheckpoint(cp, checkpointFound, nsLogger)
 	if err != nil {
-		nsLogger.WithError(err).Error("error updating namespace CheckPoint.")
+		nsLogger.WithError(err).Log(controllerutils.LogLevel(err), "error updating namespace CheckPoint.")
 		// Not returning with an error because a backup object was created,
 		// we just failed to update the backup checksum in the CheckPoint object (not a fatal error).
 		// This will cause these objects to be backed up during the next change in this ns or the next reconcile.
@@ -284,7 +284,7 @@ func (r *ReconcileBackup) createOrUpdateNamespaceCheckpoint(cp *hivev1.Checkpoin
 	}
 
 	if err != nil {
-		logger.WithError(err).Error("Failed to create or update CheckPoint object in namespace.")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to create or update CheckPoint object in namespace.")
 	}
 
 	return err

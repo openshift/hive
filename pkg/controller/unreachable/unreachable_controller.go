@@ -183,10 +183,9 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	cd.Status.Conditions = conds
 	err = r.Status().Update(context.TODO(), cd)
 	if err != nil {
-		cdLog.WithError(err).Errorf("error updating cluster deployment with unreachable condition (= %v)", status)
-		return reconcile.Result{}, err
+		cdLog.WithError(err).Logf(controllerutils.LogLevel(err), "error updating cluster deployment with unreachable condition (= %v)", status)
 	}
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, err
 }
 
 func (r *ReconcileRemoteMachineSet) loadSecretData(secretName, namespace, dataKey string) (string, error) {

@@ -172,7 +172,7 @@ func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterD
 	cdLog.Infof("status has changed, updating cluster deployment")
 	err := r.Status().Update(context.TODO(), cd)
 	if err != nil {
-		cdLog.WithError(err).Error("error updating cluster deployment status")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment status")
 		return err
 	}
 	return nil

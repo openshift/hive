@@ -3,8 +3,12 @@ package utils
 import (
 	"testing"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestMergeJsons(t *testing.T) {
@@ -53,4 +57,52 @@ func TestMergeJsons(t *testing.T) {
 		})
 	}
 
+}
+
+func TestLogLevel(t *testing.T) {
+	cases := []struct {
+		name          string
+		err           error
+		expectedLevel log.Level
+	}{
+		{
+			name:          "nil",
+			err:           nil,
+			expectedLevel: log.ErrorLevel,
+		},
+		{
+			name:          "already exists",
+			err:           apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
+			expectedLevel: log.InfoLevel,
+		},
+		{
+			name:          "conflict",
+			err:           apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			expectedLevel: log.InfoLevel,
+		},
+		{
+			name:          "other api error",
+			err:           apierrors.NewUnauthorized(""),
+			expectedLevel: log.ErrorLevel,
+		},
+		{
+			name:          "wrapped info-level error",
+			err:           errors.Wrap(apierrors.NewAlreadyExists(schema.GroupResource{}, ""), "wrapper"),
+			expectedLevel: log.InfoLevel,
+		},
+		{
+			name:          "wrapped error-level error",
+			err:           errors.Wrap(apierrors.NewUnauthorized(""), "wrapper"),
+			expectedLevel: log.ErrorLevel,
+		},
+		{
+			name:          "double-wrapped error",
+			err:           errors.Wrap(errors.Wrap(apierrors.NewAlreadyExists(schema.GroupResource{}, ""), "inner wrapper"), "outer wrapper"),
+			expectedLevel: log.InfoLevel,
+		},
+	}
+	for _, tc := range cases {
+		actualLevel := LogLevel(tc.err)
+		assert.Equal(t, tc.expectedLevel, actualLevel)
+	}
 }

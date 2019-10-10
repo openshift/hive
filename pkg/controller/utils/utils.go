@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -201,4 +204,21 @@ func GetChecksumOfObjects(objects ...interface{}) (string, error) {
 // DNSZoneName returns the predictable name for a DNSZone for the given ClusterDeployment.
 func DNSZoneName(cdName string) string {
 	return apihelpers.GetResourceName(cdName, "zone")
+}
+
+// LogLevel returns the log level to use to log the specified error.
+func LogLevel(err error) log.Level {
+	if err == nil {
+		return log.ErrorLevel
+	}
+	for {
+		if apierrors.IsAlreadyExists(err) || apierrors.IsConflict(err) {
+			return log.InfoLevel
+		}
+		cause := errors.Cause(err)
+		if cause == err {
+			return log.ErrorLevel
+		}
+		err = cause
+	}
 }

@@ -201,7 +201,7 @@ func (r *ReconcileClusterState) syncOperatorStates(operators []configv1.ClusterO
 		now := metav1.Now()
 		st.Status.LastUpdated = &now
 		if err := r.updateStatus(r, st); err != nil {
-			logger.WithError(err).Error("failed to update cluster operator state")
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster operator state")
 			return reconcile.Result{}, err
 		}
 		logger.Info("clusterState has been updated")

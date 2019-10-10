@@ -29,9 +29,8 @@ const (
 	clusterDeploymentVersion  = "v1alpha1"
 	clusterDeploymentResource = "clusterdeployments"
 
-	clusterDeploymentAdmissionGroup    = "admission.hive.openshift.io"
-	clusterDeploymentAdmissionVersion  = "v1alpha1"
-	clusterDeploymentAdmissionResource = "clusterdeployments"
+	clusterDeploymentAdmissionGroup   = "admission.hive.openshift.io"
+	clusterDeploymentAdmissionVersion = "v1alpha1"
 
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
@@ -70,22 +69,22 @@ func NewClusterDeploymentValidatingAdmissionHook() *ClusterDeploymentValidatingA
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
-// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1alpha1/clusterdeployments".
+// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1alpha1/clusterdeploymentvalidators".
 //              When the kube apiserver calls this registered REST resource, the generic-admission-server calls the Validate() method below.
 func (a *ClusterDeploymentValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	log.WithFields(log.Fields{
 		"group":    clusterDeploymentAdmissionGroup,
 		"version":  clusterDeploymentAdmissionVersion,
-		"resource": clusterDeploymentAdmissionResource,
+		"resource": "clusterdeploymentvalidator",
 	}).Info("Registering validation REST resource")
 
 	// NOTE: This GVR is meant to be different than the ClusterDeployment CRD GVR which has group "hive.openshift.io".
 	return schema.GroupVersionResource{
 			Group:    clusterDeploymentAdmissionGroup,
 			Version:  clusterDeploymentAdmissionVersion,
-			Resource: clusterDeploymentAdmissionResource,
+			Resource: "clusterdeploymentvalidators",
 		},
-		"clusterdeployment"
+		"clusterdeploymentvalidator"
 }
 
 // Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
@@ -93,7 +92,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) Initialize(kubeClientConfig *
 	log.WithFields(log.Fields{
 		"group":    clusterDeploymentAdmissionGroup,
 		"version":  clusterDeploymentAdmissionVersion,
-		"resource": clusterDeploymentAdmissionResource,
+		"resource": "clusterdeploymentvalidator",
 	}).Info("Initializing validation REST resource")
 	return nil // No initialization needed right now.
 }

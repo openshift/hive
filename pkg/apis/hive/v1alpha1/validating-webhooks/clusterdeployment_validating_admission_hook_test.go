@@ -132,9 +132,9 @@ func TestClusterDeploymentValidatingResource(t *testing.T) {
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1alpha1",
-		Resource: "clusterdeployments",
+		Resource: "clusterdeploymentvalidators",
 	}
-	expectedSingular := "clusterdeployment"
+	expectedSingular := "clusterdeploymentvalidator"
 
 	// Act
 	plural, singular := data.ValidatingResource()

@@ -28,21 +28,21 @@ type SelectorSyncSetValidatingAdmissionHook struct{}
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
-// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1alpha1/selectorsyncsets".
+// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1alpha1/selectorsyncsetvalidators".
 //              When the kube apiserver calls this registered REST resource, the generic-admission-server calls the Validate() method below.
 func (a *SelectorSyncSetValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",
 		"version":  "v1alpha1",
-		"resource": "selectorsyncsets",
+		"resource": "selectorsyncsetvalidator",
 	}).Info("Registering validation REST resource")
 	// NOTE: This GVR is meant to be different than the SelectorSyncSet CRD GVR which has group "hive.openshift.io".
 	return schema.GroupVersionResource{
 			Group:    "admission.hive.openshift.io",
 			Version:  "v1alpha1",
-			Resource: "selectorsyncsets",
+			Resource: "selectorsyncsetvalidators",
 		},
-		"selectorsyncset"
+		"selectorsyncsetvalidator"
 }
 
 // Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
@@ -50,7 +50,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) Initialize(kubeClientConfig *re
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",
 		"version":  "v1alpha1",
-		"resource": "selectorsyncsets",
+		"resource": "selectorsyncsetvalidator",
 	}).Info("Initializing validation REST resource")
 	return nil // No initialization needed right now.
 }

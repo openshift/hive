@@ -19,9 +19,9 @@ func TestSyncSetValidatingResource(t *testing.T) {
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1alpha1",
-		Resource: "syncsets",
+		Resource: "syncsetvalidators",
 	}
-	expectedSingular := "syncset"
+	expectedSingular := "syncsetvalidator"
 
 	// Act
 	plural, singular := data.ValidatingResource()

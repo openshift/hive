@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	admregv1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -199,8 +200,33 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	}
 	hLog.Infof("selectorsyncsets webhook applied (%s)", result)
 
-	hLog.Info("hiveadmission components reconciled successfully")
+	// Remove outdated validatingwebhookconfigurations
+	removeValidatingWebhooks := []string{
+		"clusterdeployments.admission.hive.openshift.io",
+		"clusterimagesets.admission.hive.openshift.io",
+		"dnszones.admission.hive.openshift.io",
+		"selectorsyncsets.admission.hive.openshift.io",
+		"syncsets.admission.hive.openshift.io",
+	}
+	for _, webhookName := range removeValidatingWebhooks {
+		webhookConfig := &admissionregistrationv1beta1.ValidatingWebhookConfiguration{}
+		err := r.Get(context.Background(), types.NamespacedName{Name: webhookName}, webhookConfig)
+		if err != nil && !errors.IsNotFound(err) {
+			hLog.WithError(err).Error("error looking for obsolete ValidatingWebhookConfiguration")
+			return err
+		}
+		if err == nil {
+			err = r.Delete(context.Background(), webhookConfig)
+			if err != nil {
+				hLog.WithError(err).WithField("ValidatingWebhookConfiguration", webhookConfig).Error(
+					"error deleting outdated ValidatingWebhookConfiguration")
+				return err
+			}
+			hLog.WithField("ValidatingWebhookConfiguration", webhookName).Info("deleted outdated ValidatingWebhookConfiguration")
+		}
+	}
 
+	hLog.Info("hiveadmission components reconciled successfully")
 	return nil
 }
 

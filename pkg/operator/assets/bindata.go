@@ -5052,6 +5052,11 @@ data:
       - "waiting for Kubernetes API: context deadline exceeded"
       installFailingReason: KubeAPIWaitTimeout
       installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+    - name: MonitoringOperatorStillUpdating
+      searchRegexStrings:
+      - "failed to initialize the cluster: Cluster operator monitoring is still updating"
+      installFailingReason: MonitoringOperatorStillUpdating
+      installFailingMessage: Timeout waiting for the monitoring operator to become ready
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

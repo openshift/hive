@@ -311,8 +311,8 @@ func TestSyncSetReconcile(t *testing.T) {
 				return ss
 			}(),
 			expectDeleted: []deletedItemInfo{
-				deletedCM("cm2"),
-				deletedCM("cm4"),
+				deletedItem("cm2", "ConfigMap"),
+				deletedItem("cm4", "ConfigMap"),
 			},
 		},
 		{
@@ -345,8 +345,8 @@ func TestSyncSetReconcile(t *testing.T) {
 				testCM("cm2", "key2", "value2"),
 			),
 			expectDeleted: []deletedItemInfo{
-				deletedCM("cm1"),
-				deletedCM("cm2"),
+				deletedItem("cm1", "ConfigMap"),
+				deletedItem("cm2", "ConfigMap"),
 			},
 		},
 		{
@@ -482,8 +482,8 @@ func TestSyncSetReconcile(t *testing.T) {
 				return ss
 			}(),
 			expectDeleted: []deletedItemInfo{
-				deletedSecret("foo2"),
-				deletedSecret("foo4"),
+				deletedItem("foo2", secretsResource),
+				deletedItem("foo4", secretsResource),
 			},
 		},
 		{
@@ -541,6 +541,26 @@ func TestSyncSetReconcile(t *testing.T) {
 					testSecret("delete-error", "baz"),
 				).SecretReferences...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
+			},
+		},
+		{
+			name: "cleanup deleted syncset secrets",
+			deletedSyncSet: func() *hivev1.SyncSet {
+				ss := testSyncSetWithSecretReferences("aaa",
+					testSecretRef("foo"),
+					testSecretRef("bar"),
+				)
+				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
+				return ss
+			}(),
+			isDeleted: true,
+			status: successfulSecretReferenceStatus(
+				testSecret("foo", "bar"),
+				testSecret("bar", "baz"),
+			),
+			expectDeleted: []deletedItemInfo{
+				deletedItem("foo", secretsResource),
+				deletedItem("bar", secretsResource),
 			},
 		},
 	}
@@ -827,13 +847,13 @@ func testCM(name, key, value string) runtime.Object {
 	}
 }
 
-func deletedCM(name string) deletedItemInfo {
+func deletedItem(name, resource string) deletedItemInfo {
 	return deletedItemInfo{
 		name:      name,
 		namespace: testNamespace,
 		group:     "",
 		version:   "v1",
-		resource:  "ConfigMap",
+		resource:  resource,
 	}
 }
 
@@ -887,16 +907,6 @@ func testSecretWithOwner(name, data string) *corev1.Secret {
 		},
 	}
 	return secret
-}
-
-func deletedSecret(name string) deletedItemInfo {
-	return deletedItemInfo{
-		name:      name,
-		namespace: testNamespace,
-		group:     "",
-		version:   "v1",
-		resource:  secretsResource,
-	}
 }
 
 func kubeconfigSecret() *corev1.Secret {

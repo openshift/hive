@@ -360,10 +360,14 @@ func (r *ReconcileSyncSetInstance) syncDeletedSyncSetInstance(ssi *hivev1.SyncSe
 
 	ssiLog.Info("deleting syncset resources on target cluster")
 	err = r.deleteSyncSetResources(ssi, dynamicClient, ssiLog)
-	if err == nil {
-		return reconcile.Result{}, r.removeSyncSetInstanceFinalizer(ssi, ssiLog)
+	if err != nil {
+		return reconcile.Result{}, err
 	}
-	return reconcile.Result{}, err
+	err = r.deleteSyncSetSecretReferences(ssi, dynamicClient, ssiLog)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	return reconcile.Result{}, r.removeSyncSetInstanceFinalizer(ssi, ssiLog)
 }
 
 func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spec *hivev1.SyncSetCommonSpec, dynamicClient dynamic.Interface, h Applier, kubeConfig []byte, ssiLog log.FieldLogger) error {
@@ -406,7 +410,7 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetIns
 			WithField("kind", resourceStatus.Kind)
 		gv, err := schema.ParseGroupVersion(resourceStatus.APIVersion)
 		if err != nil {
-			itemLog.WithError(err).Error("cannot parse resource apiVersion, skipping deletiong")
+			itemLog.WithError(err).Error("cannot parse resource apiVersion, skipping deletion")
 			continue
 		}
 		gvr := gv.WithResource(resourceStatus.Resource)
@@ -422,6 +426,36 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetIns
 				lastError = err
 				itemLog.WithError(err).Error("error deleting resource")
 				ssi.Status.Resources[index].Conditions = r.setDeletionFailedSyncCondition(ssi.Status.Resources[index].Conditions, fmt.Errorf("failed to delete resource: %v", err))
+			}
+		}
+	}
+	return lastError
+}
+
+func (r *ReconcileSyncSetInstance) deleteSyncSetSecretReferences(ssi *hivev1.SyncSetInstance, dynamicClient dynamic.Interface, ssiLog log.FieldLogger) error {
+	var lastError error
+	for index, secretStatus := range ssi.Status.SecretReferences {
+		secretLog := ssiLog.WithField("secret", fmt.Sprintf("%s/%s", secretStatus.Namespace, secretStatus.Name)).
+			WithField("apiVersion", secretStatus.APIVersion).
+			WithField("kind", secretStatus.Kind)
+		gv, err := schema.ParseGroupVersion(secretStatus.APIVersion)
+		if err != nil {
+			secretLog.WithError(err).Error("cannot parse secret apiVersion, skipping deletion")
+			continue
+		}
+		gvr := gv.WithResource(secretStatus.Resource)
+		secretLog.Debug("deleting secret")
+		err = dynamicClient.Resource(gvr).Namespace(secretStatus.Namespace).Delete(secretStatus.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			switch {
+			case errors.IsNotFound(err):
+				secretLog.Debug("secret not found, nothing to do")
+			case errors.IsForbidden(err):
+				secretLog.WithError(err).Error("forbidden secret deletion, skipping")
+			default:
+				lastError = err
+				secretLog.WithError(err).Error("error deleting secret")
+				ssi.Status.SecretReferences[index].Conditions = r.setDeletionFailedSyncCondition(ssi.Status.SecretReferences[index].Conditions, fmt.Errorf("failed to delete secret: %v", err))
 			}
 		}
 	}

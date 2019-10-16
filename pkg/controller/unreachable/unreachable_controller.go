@@ -159,38 +159,31 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	}
 
 	cdLog.Info("checking if cluster is reachable")
-	_, err = r.remoteClusterAPIClientBuilder(secretData, controllerName)
-	if err != nil {
+	status := corev1.ConditionFalse
+	reason := "ClusterReachable"
+	message := "cluster is reachable"
+	updateCheck := controllerutils.UpdateConditionNever
+	if _, err := r.remoteClusterAPIClientBuilder(secretData, controllerName); err != nil {
 		cdLog.Warn("unable to create remote API client, marking cluster unreachable")
-		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition,
-			corev1.ConditionTrue, "ErrorConnectingToCluster", err.Error(), controllerutils.UpdateConditionAlways)
-		err := r.Status().Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Error("error updating cluster deployment with unreachable condition (= true)")
-			return reconcile.Result{}, err
-		}
-		cdLog.Info("cluster is unreachable")
+		status = corev1.ConditionTrue
+		reason = "ErrorConnectingToCluster"
+		message = err.Error()
+		updateCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
+	}
+	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(cd.Status.Conditions, hivev1.UnreachableCondition, status, reason, message, updateCheck)
+
+	if !changed {
 		return reconcile.Result{}, nil
 	}
 
-	// check if cluster has condition set to true
-	cond = controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-	if cond != nil {
-		if cond.Status == corev1.ConditionTrue {
-			cdLog.Infof("cluster is reachable now, %s condition will be set to %s", hivev1.UnreachableCondition, corev1.ConditionFalse)
-		}
-	} else {
-		cdLog.Info("Cluster is reachable and unreachable condition does not exist")
-		return reconcile.Result{}, nil
+	if status == corev1.ConditionFalse {
+		cdLog.Info("cluster is reachable now")
 	}
 
-	// If cluster already has "unreachable" condition set is true, set the "unreachable" condition to false
-	// as the cluster is reachable now
-	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition,
-		corev1.ConditionFalse, "ClusterReachable", "cluster is reachable", controllerutils.UpdateConditionAlways)
+	cd.Status.Conditions = conds
 	err = r.Status().Update(context.TODO(), cd)
 	if err != nil {
-		cdLog.WithError(err).Error("error updating cluster deployment with unreachable condition (= false)")
+		cdLog.WithError(err).Errorf("error updating cluster deployment with unreachable condition (= %v)", status)
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

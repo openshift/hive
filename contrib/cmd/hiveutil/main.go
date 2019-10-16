@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/hive/contrib/pkg/adm"
 	"github.com/openshift/hive/contrib/pkg/certificate"
 	"github.com/openshift/hive/contrib/pkg/createcluster"
 	"github.com/openshift/hive/contrib/pkg/deprovision"
@@ -48,6 +49,7 @@ func newHiveutilCommand() *cobra.Command {
 	cmd.AddCommand(createcluster.NewCreateClusterCommand())
 	cmd.AddCommand(report.NewClusterReportCommand())
 	cmd.AddCommand(certificate.NewCertificateCommand())
+	cmd.AddCommand(adm.NewAdmCommand())
 
 	return cmd
 }

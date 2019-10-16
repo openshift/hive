@@ -89,14 +89,26 @@ case "${CLOUD}" in
 "aws")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/.awscred"
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
+	# Generate a short random shard string for this cluster similar to OSD prod.
+	# This is to prevent name conflicts across customer clusters.
+	CLUSTER_SHARD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 4 | head -n 1)
+	CLUSTER_DOMAIN="${CLUSTER_SHARD}.${BASE_DOMAIN}"
+	echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
+	EXTRA_CREATE_CLUSTER_ARGS=" --manage-dns"
+	oc process config/templates/hiveconfig-managedns.yaml -e BASE_DOMAIN=${BASE_DOMAIN}
 	;;
 "azure")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/osServicePrincipal.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
+	# NOTE: No plans to implement DNS management for Azure at this time, so the cluster
+	# will use the root base domain.
+	CLUSTER_DOMAIN="${BASE_DOMAIN}"
 	;;
 "gcp")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/gce.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
+	# TODO: Use a sharded base domain and --manage-dns as we do for AWS above
+	CLUSTER_DOMAIN="${BASE_DOMAIN}"
 	EXTRA_CREATE_CLUSTER_ARGS=" --gcp-project-id=openshift-gce-devel-ci"
 	;;
 *)
@@ -104,14 +116,14 @@ case "${CLOUD}" in
 	exit 1
 	;;
 esac
-	
+
 echo "Creating cluster deployment"
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
 	--cloud="${CLOUD}" \
 	--creds-file="${CREDS_FILE}" \
 	--ssh-public-key-file="${SSH_PUBLIC_KEY_FILE}" \
 	--pull-secret-file="${PULL_SECRET_FILE}" \
-	--base-domain="${BASE_DOMAIN}" \
+	--base-domain="${CLUSTER_DOMAIN}" \
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true \

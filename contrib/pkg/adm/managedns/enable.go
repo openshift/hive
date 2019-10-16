@@ -35,7 +35,6 @@ the ExternalDNS section of HiveConfig.
 `
 const (
 	cloudAWS                   = "aws"
-	cloudGCP                   = "gcp"
 	hiveNamespace              = "hive"
 	manageDNSCredentialsSecret = "manage-dns-creds"
 )
@@ -43,8 +42,6 @@ const (
 var (
 	validClouds = map[string]bool{
 		cloudAWS: true,
-		// TODO:
-		//cloudGCP:   true,
 	}
 )
 

@@ -2,15 +2,12 @@ package createcluster
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-
-	log "github.com/sirupsen/logrus"
-	ini "gopkg.in/ini.v1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 )
@@ -21,7 +18,8 @@ type awsCloudProvider struct {
 }
 
 func (p *awsCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	accessKeyID, secretAccessKey, err := p.getAWSCreds(o)
+	defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
+	accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -40,36 +38,6 @@ func (p *awsCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 			"aws_secret_access_key": secretAccessKey,
 		},
 	}, nil
-}
-
-func (p *awsCloudProvider) getAWSCreds(o *Options) (string, string, error) {
-	credsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-	switch {
-	case o.CredsFile != "":
-		credsFilePath = o.CredsFile
-	default:
-		secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
-		accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
-		if len(secretAccessKey) > 0 && len(accessKeyID) > 0 {
-			return accessKeyID, secretAccessKey, nil
-		}
-	}
-	credFile, err := ini.Load(credsFilePath)
-	if err != nil {
-		log.Error("Cannot load AWS credentials")
-		return "", "", err
-	}
-	defaultSection, err := credFile.GetSection("default")
-	if err != nil {
-		log.Error("Cannot get default section from AWS credentials file")
-		return "", "", err
-	}
-	accessKeyIDValue := defaultSection.Key("aws_access_key_id")
-	secretAccessKeyValue := defaultSection.Key("aws_secret_access_key")
-	if accessKeyIDValue == nil || secretAccessKeyValue == nil {
-		log.Error("AWS credentials file missing keys in default section")
-	}
-	return accessKeyIDValue.String(), secretAccessKeyValue.String(), nil
 }
 
 func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error {

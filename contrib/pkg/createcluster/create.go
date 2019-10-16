@@ -32,7 +32,7 @@ import (
 
 const longDesc = `
 OVERVIEW
-The hive-util create-cluster command generates and applies the artifacts needed
+The hiveutil create-cluster command generates and applies the artifacts needed
 to create a new Hive cluster deployment. By default, the clusterdeployment is
 generated along with corresponding secrets and then applied to the current
 cluster. If you don't need secrets generated, specify --include-secrets=false
@@ -281,7 +281,7 @@ func (o *Options) Run() error {
 		printObjects(objs, scheme.Scheme, printer)
 		return err
 	}
-	resource, err := o.getResourceHelper()
+	rh, err := o.getResourceHelper()
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func (o *Options) Run() error {
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)
-		resource.ApplyRuntimeObject(obj, scheme.Scheme)
+		rh.ApplyRuntimeObject(obj, scheme.Scheme)
 	}
 	return nil
 }

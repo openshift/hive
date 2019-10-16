@@ -7,9 +7,9 @@ Hive leverages the [OpenShift Installer](https://github.com/openshift/installer)
 
 ## Components
 
- 1. **Hive Operator**: First Hive pod to run, acts as a deployer. Manages the Kubernetes Deployments for other components to ensure they are properly configured and running. Also handles migrations and cleanup and anything else that might require programatic logic in a long term Hive deployment. Reconciles on a HiveConfig CRD which provides some configuration options for Hive itself.
- 1. **Hive Admission**: Small stateless HTTP server used for CRD webhook validation. Its only responsibility is to approve or deny creation or updates to our core CRDs.
- 1. **Hive Controllers**: Core Hive controllers which reconcile all CRDs.
+ 1. **Hive Operator**: First Hive pod to run, acts as a deployer. Manages the Kubernetes Deployments for other components to ensure they are properly configured and running. Also handles migrations and cleanup and anything else that might require programatic logic in a long term Hive deployment. Reconciles on a HiveConfig CR which provides some configuration options for Hive itself.
+ 1. **Hive Admission**: Small stateless HTTP server used for CR webhook validation. Its only responsibility is to approve or deny creation or updates to our core CRs.
+ 1. **Hive Controllers**: Core Hive controllers which reconcile all CRs.
 
 ## How Hive Works
 

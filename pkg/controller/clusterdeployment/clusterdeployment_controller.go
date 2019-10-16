@@ -403,12 +403,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, nil
 		}
 
-		if cd.Status.InstalledTimestamp != nil {
-			cdLog.Debug("cluster is already installed, no processing of provision needed")
-			r.cleanupInstallLogPVC(cd, cdLog)
-			return reconcile.Result{}, nil
-		}
 		if cd.Status.Provision != nil {
+			if cd.Status.InstalledTimestamp != nil {
+				cdLog.Debug("cluster is already installed, no processing of provision needed")
+				r.cleanupInstallLogPVC(cd, cdLog)
+				return reconcile.Result{}, nil
+			}
 			return r.reconcileExistingProvision(cd, cdLog)
 		}
 		if !r.expectations.SatisfiedExpectations(request.String()) {
@@ -426,6 +426,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			// for them.
 			cdLog.Info("cluster was created prior to clusterprovisions, creating dummy clusterprovision")
 			return r.createClusterProvisionForLegacyCD(cd, cdLog)
+		default:
+			cdLog.Warn("cluster is installed but does not have an infra ID or a clusterprovision")
+			return reconcile.Result{}, nil
 		}
 	}
 

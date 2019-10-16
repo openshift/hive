@@ -107,7 +107,7 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 		controllerutils.DeleteFinalizer(zr.dnsZone, hivev1.FinalizerDNSZone)
 		err := zr.kubeClient.Update(context.TODO(), zr.dnsZone)
 		if err != nil {
-			zr.logger.WithError(err).Error("Failed to remove DNSZone finalizer")
+			zr.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
 		}
 		return reconcile.Result{}, err
 	}
@@ -116,7 +116,7 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 		controllerutils.AddFinalizer(zr.dnsZone, hivev1.FinalizerDNSZone)
 		err := zr.kubeClient.Update(context.TODO(), zr.dnsZone)
 		if err != nil {
-			zr.logger.WithError(err).Error("Failed to add finalizer to DNSZone")
+			zr.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to add finalizer to DNSZone")
 		}
 		return reconcile.Result{}, err
 	}
@@ -196,7 +196,7 @@ func (zr *ZoneReconciler) syncParentDomainLink(nameServers []string) error {
 	if !reflect.DeepEqual(existingLinkRecord.Spec, linkRecord.Spec) {
 		existingLinkRecord.Spec = linkRecord.Spec
 		if err = zr.kubeClient.Update(context.TODO(), existingLinkRecord); err != nil {
-			zr.logger.WithError(err).Error("failed to update existing DNSEndpoint")
+			zr.logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update existing DNSEndpoint")
 			return err
 		}
 	}
@@ -569,7 +569,7 @@ func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServe
 	if !reflect.DeepEqual(orig.Status, zr.dnsZone.Status) {
 		err := zr.kubeClient.Status().Update(context.TODO(), zr.dnsZone)
 		if err != nil {
-			zr.logger.WithError(err).Error("Cannot update DNSZone status")
+			zr.logger.WithError(err).Log(controllerutils.LogLevel(err), "Cannot update DNSZone status")
 		}
 		return err
 	}

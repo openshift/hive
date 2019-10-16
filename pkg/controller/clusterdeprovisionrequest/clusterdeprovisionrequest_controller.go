@@ -186,7 +186,7 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 		instance.Status.Completed = true
 		err = r.Status().Update(context.TODO(), instance)
 		if err != nil {
-			rLog.WithError(err).Error("error updating request status")
+			rLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating request status")
 			return reconcile.Result{}, err
 		}
 		metricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))

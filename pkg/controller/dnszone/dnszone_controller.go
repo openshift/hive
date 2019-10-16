@@ -151,7 +151,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 					controllerutils.DeleteFinalizer(desiredState, hivev1.FinalizerDNSZone)
 					err := r.Client.Update(context.TODO(), desiredState)
 					if err != nil {
-						dnsLog.WithError(err).Error("Failed to remove DNSZone finalizer")
+						dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
 					}
 				}
 				return reconcile.Result{}, err

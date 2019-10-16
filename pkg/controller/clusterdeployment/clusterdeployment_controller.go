@@ -384,7 +384,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment finalizer")
 		if err := r.addClusterDeploymentFinalizer(cd); err != nil {
-			cdLog.WithError(err).Error("error adding finalizer")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
 		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
@@ -454,7 +454,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	modifiedCD, err := r.updatePullSecretInfo(pullSecret, cd, cdLog)
 	if err != nil || modifiedCD {
 		if err != nil {
-			cdLog.WithError(err).Error("Error updating the merged pull secret")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error updating the merged pull secret")
 			return reconcile.Result{}, err
 		}
 		// Because the global pull secret is not referenced on our cluster deployment,
@@ -517,7 +517,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	if err := controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog); err != nil {
-		cdLog.WithError(err).Error("error setting up service account and role")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
 		return reconcile.Result{}, err
 	}
 
@@ -628,6 +628,9 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 			cd.Status.InfraID = *provision.Spec.InfraID
 		}
 		err := r.Status().Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterdeployment status with infra ID")
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -691,7 +694,7 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	if !cd.Spec.Installed {
 		cd.Spec.Installed = true
 		if err := r.Update(context.TODO(), cd); err != nil {
-			cdLog.WithError(err).Error("failed to set the Installed flag")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set the Installed flag")
 			return reconcile.Result{}, err
 		}
 
@@ -752,7 +755,7 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	}
 
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		cdLog.Error("could not update status")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
 		return reconcile.Result{}, err
 	}
 
@@ -763,7 +766,7 @@ func (r *ReconcileClusterDeployment) clearOutCurrentProvision(cd *hivev1.Cluster
 	cd.Status.Provision = nil
 	cd.Status.InstallRestarts = cd.Status.InstallRestarts + 1
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		cdLog.Error("could not update status")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not clear out current provision")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
@@ -884,7 +887,7 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	err := r.Status().Update(context.TODO(), cd)
 	if err != nil {
-		cdLog.WithError(err).Error("cannot update clusterdeployment status")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot update clusterdeployment status")
 	}
 	return err
 }
@@ -933,7 +936,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		jobLog.WithField("releaseImage", releaseImage).Info("creating imageset job")
 		err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 		if err != nil {
-			cdLog.WithError(err).Error("error setting up service account and role")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
 			return reconcile.Result{}, err
 		}
 
@@ -1001,7 +1004,7 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 	cd.Status.Conditions = conds
 	err := r.Status().Update(context.TODO(), cd)
 	if err != nil {
-		cdLog.WithError(err).Error("cannot update status conditions")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot update status conditions")
 	}
 	return err
 }
@@ -1029,7 +1032,7 @@ func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.S
 
 	err = r.Update(context.TODO(), secret)
 	if err != nil {
-		cdLog.WithError(err).Error("error updated admin kubeconfig secret")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updated admin kubeconfig secret")
 		return err
 	}
 
@@ -1138,7 +1141,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 				err = r.removeClusterDeploymentFinalizer(cd)
 				if err != nil {
-					cdLog.WithError(err).Error("error removing finalizer")
+					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 				}
 				return reconcile.Result{}, err
 			}
@@ -1153,7 +1156,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
-			cdLog.WithError(err).Error("error removing finalizer")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
 		return reconcile.Result{}, err
 	}
@@ -1194,7 +1197,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 				cdLog.Warn("detected a namespace deleted before deprovision request could be created, giving up on deprovision and removing finalizer")
 				err = r.removeClusterDeploymentFinalizer(cd)
 				if err != nil {
-					cdLog.WithError(err).Error("error removing finalizer")
+					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 				}
 			}
 			return reconcile.Result{}, err
@@ -1211,7 +1214,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.Infof("deprovision request completed, removing finalizer")
 		err = r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
-			cdLog.WithError(err).Error("error removing finalizer")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
 		return reconcile.Result{}, err
 	}
@@ -1231,16 +1234,16 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 
 	cd = cd.DeepCopy()
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
-	err := r.Update(context.TODO(), cd)
-
-	if err == nil {
-		clearUnderwaySecondsMetrics(cd)
-
-		// Increment the clusters deleted counter:
-		metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+	if err := r.Update(context.TODO(), cd); err != nil {
+		return err
 	}
 
-	return err
+	clearUnderwaySecondsMetrics(cd)
+
+	// Increment the clusters deleted counter:
+	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+
+	return nil
 }
 
 // setDNSDelayMetric will calculate the amount of time elapsed from clusterdeployment creation
@@ -1265,8 +1268,8 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 	dnsDelayDuration := readyTimestamp.Sub(cd.CreationTimestamp.Time)
 	cdLog.WithField("duration", dnsDelayDuration.Seconds()).Info("DNS ready")
 	cd.Annotations[dnsReadyAnnotation] = dnsDelayDuration.String()
-	if err := r.Client.Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Error("failed to save annotation marking DNS becoming ready")
+	if err := r.Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to save annotation marking DNS becoming ready")
 		return modified, err
 	}
 	modified = true
@@ -1281,7 +1284,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
 		cdLog.Error("cluster deployment platform is not AWS, cannot manage DNS zone")
 		if err := r.setDNSNotReadyCondition(cd, false, "Managed DNS is only supported on AWS", cdLog); err != nil {
-			cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return nil, err
 		}
 		return nil, errors.New("only AWS managed DNS is supported")
@@ -1302,7 +1305,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	if !metav1.IsControlledBy(dnsZone, cd) {
 		cdLog.Error("DNS zone already exists but is not owned by cluster deployment")
 		if err := r.setDNSNotReadyCondition(cd, false, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
-			cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return nil, err
 		}
 		return nil, errors.New("Existing unowned DNS zone")
@@ -1314,14 +1317,14 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		// is updated to available.
 		cdLog.Debug("DNSZone is not yet available. Waiting for zone to become available.")
 		if err := r.setDNSNotReadyCondition(cd, false, "DNS Zone not yet available", cdLog); err != nil {
-			cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return nil, err
 		}
 		return nil, nil
 	}
 
 	if err := r.setDNSNotReadyCondition(cd, true, "DNS Zone available", cdLog); err != nil {
-		cdLog.WithError(err).Error("could not update DNSNotReadyCondition")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 		return nil, err
 	}
 	return dnsZone, nil
@@ -1767,7 +1770,7 @@ func (r *ReconcileClusterDeployment) adoptProvision(cd *hivev1.ClusterDeployment
 	pLog := cdLog.WithField("provision", provision.Name)
 	cd.Status.Provision = &corev1.LocalObjectReference{Name: provision.Name}
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		pLog.WithError(err).Error("could not adopt provision")
+		pLog.WithError(err).Log(controllerutils.LogLevel(err), "could not adopt provision")
 		return err
 	}
 	pLog.Info("adopted provision")
@@ -1884,7 +1887,7 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 	}
 	cd.Status.Conditions = conds
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Error("error updating syncset failed condition")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating syncset failed condition")
 		return false, err
 	}
 	return true, nil

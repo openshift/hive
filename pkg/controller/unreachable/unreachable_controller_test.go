@@ -255,7 +255,7 @@ func TestIsTimeForConnectivityCheck(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "lastProbeTime 20Mins ago and lastTransitionTime10Mins ago",
+			name: "lastProbeTime 20Mins ago and lastTransitionTime 100Mins ago",
 			cd: func() *hivev1.ClusterDeployment {
 				lastProbeTime := metav1.NewTime(time.Now().Add(-(time.Minute * 20)))
 				lastTransitionTime := metav1.NewTime(time.Now().Add(-(time.Minute * 100)))

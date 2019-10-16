@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -299,7 +300,11 @@ func (r *ReconcileSyncSetInstance) addSyncSetInstanceFinalizer(ssi *hivev1.SyncS
 	controllerutils.AddFinalizer(ssi, hivev1.FinalizerSyncSetInstance)
 	err := r.Update(context.TODO(), ssi)
 	if err != nil {
-		ssiLog.WithError(err).Error("cannot add finalizer")
+		level := log.ErrorLevel
+		if apierrors.IsConflict(err) {
+			level = log.InfoLevel
+		}
+		ssiLog.WithError(err).Log(level, "cannot add finalizer")
 	}
 	return err
 }
@@ -309,7 +314,7 @@ func (r *ReconcileSyncSetInstance) removeSyncSetInstanceFinalizer(ssi *hivev1.Sy
 	controllerutils.DeleteFinalizer(ssi, hivev1.FinalizerSyncSetInstance)
 	err := r.Update(context.TODO(), ssi)
 	if err != nil {
-		ssiLog.WithError(err).Error("cannot remove finalizer")
+		ssiLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot remove finalizer")
 	}
 	return err
 }
@@ -778,9 +783,8 @@ func (r *ReconcileSyncSetInstance) updateSyncSetInstanceStatus(ssi *hivev1.SyncS
 	// Update syncsetinstance status if changed:
 	if !reflect.DeepEqual(ssi.Status, original.Status) {
 		ssiLog.Infof("syncset instance status has changed, updating")
-		err := r.Status().Update(context.TODO(), ssi)
-		if err != nil {
-			ssiLog.WithError(err).Error("error updating syncsetinstance status")
+		if err := r.Status().Update(context.TODO(), ssi); err != nil {
+			ssiLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating syncsetinstance status")
 			return err
 		}
 	}

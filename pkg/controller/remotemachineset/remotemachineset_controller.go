@@ -317,7 +317,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 		cdLog.WithField("machineset", ms.Name).Info("updating machineset")
 		err = remoteClusterAPIClient.Update(context.Background(), ms)
 		if err != nil {
-			cdLog.WithError(err).Error("unable to update machine set")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "unable to update machine set")
 			return err
 		}
 	}

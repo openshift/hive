@@ -404,7 +404,7 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 
 	if !reflect.DeepEqual(rContext.clusterDeployment.Status.Conditions, origCD.Status.Conditions) {
 		if err := r.Status().Update(context.TODO(), rContext.clusterDeployment); err != nil {
-			rContext.logger.WithError(err).Error("error updating clusterDeployment condition")
+			rContext.logger.WithError(err).Log(utils.LogLevel(err), "error updating clusterDeployment condition")
 			return err
 		}
 	}

@@ -144,27 +144,20 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 		cdLog.WithError(err).Error("failed to check cert secret availability")
 		return reconcile.Result{}, err
 	}
-	if !secretsAvailable {
-		cdLog.Debug("cert secrets are not available yet, setting condition on clusterdeployment")
-		updated, err := r.setCertsNotFoundCondition(cd, true, cdLog)
-		if err != nil {
-			cdLog.WithError(err).Error("cannot update cluster deployment secrets not found condition")
-			return reconcile.Result{}, err
-		}
-		if updated {
-			return reconcile.Result{}, nil
-		}
-		return reconcile.Result{Requeue: true, RequeueAfter: secretCheckInterval}, nil
-	}
 
 	// clear condition if certs were found
-	updated, err := r.setCertsNotFoundCondition(cd, false, cdLog)
+	updated, err := r.setCertsNotFoundCondition(cd, !secretsAvailable, cdLog)
 	if err != nil {
-		cdLog.WithError(err).Error("cannot update cluster deployment secrets not found condition")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot update cluster deployment secrets not found condition")
 		return reconcile.Result{}, err
 	}
 	if updated {
 		return reconcile.Result{}, nil
+	}
+
+	if !secretsAvailable {
+		cdLog.Debugf("cert secrets are not available yet, requeueing clusterdeployment for %s", secretCheckInterval)
+		return reconcile.Result{RequeueAfter: secretCheckInterval}, nil
 	}
 
 	if len(secrets) == 0 && existingSyncSet == nil {

@@ -6,6 +6,8 @@ VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 # To use docker build, specify BUILD_CMD="docker build"
 BUILD_CMD ?= imagebuilder
 
+DOCKER_CMD ?= docker
+
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
@@ -108,12 +110,6 @@ deploy: manifests install generate
 .PHONY: manifests
 manifests: crd
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-.PHONY: deploy-sd-dev
-deploy-sd-dev: crd
-	oc apply -f config/crds
-	kustomize build overlays/sd-dev | oc apply -f -
-
 # Generate CRD yaml from our api types:
 .PHONY: crd
 crd:
@@ -179,6 +175,12 @@ generate: $(GOPATH)/bin/mockgen
 .PHONY: docker-build
 docker-build:
 	$(BUILD_CMD) -t ${IMG} .
+
+# Build the docker image
+.PHONY: docker-dev-push
+docker-dev-push: build
+	$(DOCKER_CMD) build -t ${IMG} -f Dockerfile.dev .
+	$(DOCKER_CMD) push ${IMG}
 
 # Push the docker image
 .PHONY: docker-push

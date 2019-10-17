@@ -42,7 +42,6 @@ const (
 	testClusterID           = "testFooClusterUUID"
 	testInfraID             = "testFooInfraID"
 	provisionName           = "foo-lqmsh-random"
-	legacyInstallJobName    = "foo-lqmsh-install"
 	imageSetJobName         = "foo-lqmsh-imageset"
 	testNamespace           = "default"
 	testSyncsetInstanceName = "testSSI"
@@ -763,32 +762,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Delete legacy install job",
-			existing: []runtime.Object{
-				testClusterDeployment(),
-				testLegacyInstallJob(),
-			},
-			expectedRequeueAfter: defaultRequeueTime,
-			validate: func(c client.Client, t *testing.T) {
-				installJob := getLegacyInstallJob(c)
-				assert.Nil(t, installJob, "legacy install job should be deleted")
-				provisions := getProvisions(c)
-				assert.Empty(t, provisions, "no provision until legacy install job deleted")
-			},
-		},
-		{
-			name: "Delete legacy install job even when deployment has been deleted",
-			existing: []runtime.Object{
-				testDeletedClusterDeployment(),
-				testLegacyInstallJob(),
-			},
-			expectedRequeueAfter: defaultRequeueTime,
-			validate: func(c client.Client, t *testing.T) {
-				installJob := getLegacyInstallJob(c)
-				assert.Nil(t, installJob, "legacy install job should be deleted")
-			},
-		},
-		{
 			name: "Delete old provisions",
 			existing: []runtime.Object{
 				func() runtime.Object {
@@ -1484,20 +1457,6 @@ func testFailedProvisionTime(time time.Time) *hivev1.ClusterProvision {
 	return provision
 }
 
-func testLegacyInstallJob() *batchv1.Job {
-	cd := testClusterDeployment()
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: testNamespace,
-			Name:      legacyInstallJobName,
-		},
-	}
-
-	controllerutil.SetControllerReference(cd, job, scheme.Scheme)
-
-	return job
-}
-
 func testInstallLogPVC() *corev1.PersistentVolumeClaim {
 	pvc := &corev1.PersistentVolumeClaim{}
 	pvc.Name = GetInstallLogsPVCName(testClusterDeployment())
@@ -1624,10 +1583,6 @@ func getJob(c client.Client, name string) *batchv1.Job {
 		return job
 	}
 	return nil
-}
-
-func getLegacyInstallJob(c client.Client) *batchv1.Job {
-	return getJob(c, legacyInstallJobName)
 }
 
 func TestUpdatePullSecretInfo(t *testing.T) {

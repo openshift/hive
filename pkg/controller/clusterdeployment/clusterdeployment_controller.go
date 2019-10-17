@@ -306,13 +306,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}, nil
 	}
 
-	// TODO: Remove once all clusterdeployments have been transitioned to use
-	// the Installed field from Spec instead of from Status.
-	if cd.Status.Installed && !cd.Spec.Installed {
-		cd.Spec.Installed = true
-		return reconcile.Result{}, r.Update(context.TODO(), cd)
-	}
-
 	// Set platform label on the ClusterDeployment
 	if platform := getClusterPlatform(cd); cd.Labels[hivev1.HiveClusterPlatformLabel] != platform {
 		if cd.Labels == nil {

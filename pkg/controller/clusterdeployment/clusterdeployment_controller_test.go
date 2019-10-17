@@ -1053,22 +1053,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Test legacy Status Installed sets Spec Installed",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					cd := testClusterDeployment()
-					cd.Status.Installed = true
-					return cd
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					assert.True(t, cd.Spec.Installed, "expected Spec to have Installed field set")
-				}
-			},
-		},
-		{
 			name: "setSyncSetFailedCondition should be present",
 			existing: []runtime.Object{
 				testInstalledClusterDeployment(time.Now()),

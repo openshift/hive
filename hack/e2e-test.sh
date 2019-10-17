@@ -94,7 +94,8 @@ case "${CLOUD}" in
 	CLUSTER_SHARD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 4 | head -n 1)
 	CLUSTER_DOMAIN="${CLUSTER_SHARD}.${BASE_DOMAIN}"
 	echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
-	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN}
+	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
+		--creds-file="${CREDS_FILE}"
 	EXTRA_CREATE_CLUSTER_ARGS=" --manage-dns"
 	;;
 "azure")

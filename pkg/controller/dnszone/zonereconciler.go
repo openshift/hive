@@ -187,7 +187,7 @@ func (zr *ZoneReconciler) syncParentDomainLink(nameServers []string) error {
 
 	if dnsEndpointNotFound {
 		if err = zr.kubeClient.Create(context.TODO(), linkRecord); err != nil {
-			zr.logger.WithError(err).Error("failed creating DNSEndpoint")
+			zr.logger.WithError(err).Log(controllerutils.LogLevel(err), "failed creating DNSEndpoint")
 			return err
 		}
 		return nil

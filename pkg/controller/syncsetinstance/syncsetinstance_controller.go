@@ -28,7 +28,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -300,11 +299,7 @@ func (r *ReconcileSyncSetInstance) addSyncSetInstanceFinalizer(ssi *hivev1.SyncS
 	controllerutils.AddFinalizer(ssi, hivev1.FinalizerSyncSetInstance)
 	err := r.Update(context.TODO(), ssi)
 	if err != nil {
-		level := log.ErrorLevel
-		if apierrors.IsConflict(err) {
-			level = log.InfoLevel
-		}
-		ssiLog.WithError(err).Log(level, "cannot add finalizer")
+		ssiLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot add finalizer")
 	}
 	return err
 }

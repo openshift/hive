@@ -167,7 +167,7 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 		rLog.Debug("uninstall job does not exist, creating it")
 		err = r.Create(context.TODO(), uninstallJob)
 		if err != nil {
-			rLog.WithError(err).Errorf("error creating uninstall job")
+			rLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating uninstall job")
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil

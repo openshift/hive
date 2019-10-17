@@ -22,7 +22,6 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -75,7 +74,6 @@ func TestClusterVersionReconcile(t *testing.T) {
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				expected := testRemoteClusterVersionStatus()
-				controllerutils.FixupEmptyClusterVersionFields(&expected)
 				if !reflect.DeepEqual(cd.Status.ClusterVersionStatus, expected) {
 					t.Errorf("did not get expected clusterversion status. Expected: \n%#v\nGot: \n%#v", expected, cd.Status.ClusterVersionStatus)
 				}
@@ -161,7 +159,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 	}
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return cd
 }
 

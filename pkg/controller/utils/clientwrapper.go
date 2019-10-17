@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,11 +9,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
 
 var (
@@ -52,7 +57,7 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Cli
 			ClientReader: c,
 		},
 		Writer:       c,
-		StatusClient: c,
+		StatusClient: &hiveStatusClient{c},
 	}
 }
 
@@ -128,4 +133,35 @@ func parsePath(path string) (string, error) {
 
 	}
 	return "", fmt.Errorf("unable to parse path for client metrics: %s", path)
+}
+
+// hiveStatusClient is a wrapper around a client.StatusClient that returns
+// a hiveStatusWriter wrapped around the client.StatusWriter returned by the
+// client.StatusClient.
+type hiveStatusClient struct {
+	client.StatusClient
+}
+
+// Status implements StatusClient.Status
+func (sc *hiveStatusClient) Status() client.StatusWriter {
+	return &hiveStatusWriter{sc.StatusClient.Status()}
+}
+
+// hiveStatusWriter is a wrapper around a client.StatusWrapper that massages
+// the statuses of clustedeployments so that they pass validation.
+type hiveStatusWriter struct {
+	client.StatusWriter
+}
+
+// Update implements StatusWriter.Update
+func (sw *hiveStatusWriter) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOptionFunc) error {
+	switch t := obj.(type) {
+	case *hivev1.ClusterDeployment:
+		// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates
+		// Place an empty list if needed to satisfy the object validation.
+		if t.Status.ClusterVersionStatus.AvailableUpdates == nil {
+			t.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
+		}
+	}
+	return sw.StatusWriter.Update(ctx, obj, opts...)
 }

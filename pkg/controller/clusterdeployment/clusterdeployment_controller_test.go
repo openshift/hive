@@ -1370,7 +1370,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		CLIImage:       pointer.StringPtr("cli:latest"),
 	}
 
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return cd
 }
 
@@ -1715,8 +1714,6 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 		InstallerImage: pointer.StringPtr("installer-image:latest"),
 	}
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return cd
 }
 

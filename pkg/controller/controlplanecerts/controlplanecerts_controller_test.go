@@ -281,7 +281,6 @@ func fakeClusterDeployment() *fakeClusterDeploymentWrapper {
 			BaseDomain:  fakeDomain,
 		},
 	}
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
 	return &fakeClusterDeploymentWrapper{cd: cd}
 }
 

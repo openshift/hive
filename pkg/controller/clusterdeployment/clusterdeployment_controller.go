@@ -284,28 +284,6 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 }
 
 func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnErr error) {
-	origCD := cd
-	cd = cd.DeepCopy()
-
-	// TODO: We may want to remove this fix in future.
-	// Handle pre-existing clusters with older status version structs that did not have the new
-	// cluster version mandatory fields defined.
-	// NOTE: removing this is causing the imageset job to fail. Please leave it in until
-	// we can determine what needs to be fixed.
-	controllerutils.FixupEmptyClusterVersionFields(&cd.Status.ClusterVersionStatus)
-	if !reflect.DeepEqual(origCD.Status, cd.Status) {
-		cdLog.Info("correcting empty cluster version fields")
-		err := r.Status().Update(context.TODO(), cd)
-		if err != nil {
-			cdLog.WithError(err).Error("error updating cluster deployment status")
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{
-			Requeue:      true,
-			RequeueAfter: defaultRequeueTime,
-		}, nil
-	}
-
 	// Set platform label on the ClusterDeployment
 	if platform := getClusterPlatform(cd); cd.Labels[hivev1.HiveClusterPlatformLabel] != platform {
 		if cd.Labels == nil {

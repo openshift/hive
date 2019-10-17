@@ -971,7 +971,10 @@ func configRbacHive_admin_roleYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configRbacHive_admin_role_bindingYaml = []byte(`apiVersion: authorization.openshift.io/v1
+var _configRbacHive_admin_role_bindingYaml = []byte(`# NOTE: This binding uses the openshift apigroup as it is the only way to link
+# to an openshift user group. This will not work if running hive on vanilla Kube,
+# but the Hive operator will detect this and skip creation of the binding.
+apiVersion: authorization.openshift.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: hive-admin
@@ -1541,7 +1544,10 @@ func configRbacHive_reader_roleYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configRbacHive_reader_role_bindingYaml = []byte(`apiVersion: authorization.openshift.io/v1
+var _configRbacHive_reader_role_bindingYaml = []byte(`# NOTE: This binding uses the openshift apigroup as it is the only way to link
+# to an openshift user group. This will not work if running hive on vanilla Kube,
+# but the Hive operator will detect this and skip creation of the binding.
+apiVersion: authorization.openshift.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: hive-reader

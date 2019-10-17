@@ -312,7 +312,7 @@ func (r *ReconcileClusterProvision) abortProvision(instance *hivev1.ClusterProvi
 		return reconcile.Result{}, err
 	}
 	if err := r.Delete(context.TODO(), job, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
-		pLog.WithError(err).Error("could not delete install job")
+		pLog.WithError(err).Log(controllerutils.LogLevel(err), "could not delete install job")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

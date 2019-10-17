@@ -366,7 +366,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				cdLog.WithField("expiry", expiry).Info("cluster has expired, issuing delete")
 				err := r.Delete(context.TODO(), cd)
 				if err != nil {
-					cdLog.WithError(err).Error("error deleting expired cluster")
+					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting expired cluster")
 				}
 				return reconcile.Result{}, err
 			}
@@ -916,7 +916,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		err := r.Delete(context.Background(), existingJob,
 			client.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {
-			jobLog.WithError(err).Error("cannot delete imageset job")
+			jobLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot delete imageset job")
 		}
 		return reconcile.Result{}, err
 	case apierrors.IsNotFound(err):
@@ -1084,7 +1084,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 	err = r.Delete(context.TODO(), dnsZone,
 		client.PropagationPolicy(metav1.DeletePropagationForeground))
 	if err != nil {
-		cdLog.WithError(err).Error("error deleting managed dnszone")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting managed dnszone")
 	}
 	return &reconcile.Result{}, err
 }
@@ -1110,7 +1110,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			return reconcile.Result{}, err
 		case provision.DeletionTimestamp == nil:
 			if err := r.Delete(context.TODO(), provision); err != nil {
-				cdLog.WithError(err).Error("could not delete provision")
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not delete provision")
 				return reconcile.Result{}, err
 			}
 			cdLog.Info("deleted outstanding provision")
@@ -1392,38 +1392,25 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 	}
 
 	pvcLog := cdLog.WithField("pvc", pvc.Name)
-	if cd.Status.InstallRestarts == 0 {
+
+	switch {
+	case cd.Status.InstallRestarts == 0:
 		pvcLog.Info("deleting logs PersistentVolumeClaim for installed cluster with no restarts")
-		if err := r.Delete(context.TODO(), pvc); err != nil {
-			pvcLog.WithError(err).Error("error deleting install logs PVC")
-			return err
-		}
-		return nil
-	}
-
-	if cd.Status.InstalledTimestamp == nil {
+	case cd.Status.InstalledTimestamp == nil:
 		pvcLog.Warn("deleting logs PersistentVolumeClaim for cluster with errors but no installed timestamp")
-		if err := r.Delete(context.TODO(), pvc); err != nil {
-			pvcLog.WithError(err).Error("error deleting install logs PVC")
-			return err
-		}
-		return nil
-	}
-
 	// Otherwise, delete if more than 7 days have passed.
-	if time.Since(cd.Status.InstalledTimestamp.Time) > (7 * 24 * time.Hour) {
-
+	case time.Since(cd.Status.InstalledTimestamp.Time) > (7 * 24 * time.Hour):
 		pvcLog.Info("deleting logs PersistentVolumeClaim for cluster that was installed after restarts more than 7 days ago")
-		if err := r.Delete(context.TODO(), pvc); err != nil {
-			pvcLog.WithError(err).Error("error deleting install logs PVC")
-			return err
-		}
+	default:
+		cdLog.WithField("pvc", pvc.Name).Debug("preserving logs PersistentVolumeClaim for cluster with install restarts for 7 days")
 		return nil
 	}
 
-	cdLog.WithField("pvc", pvc.Name).Debug("preserving logs PersistentVolumeClaim for cluster with install restarts for 7 days")
+	if err := r.Delete(context.TODO(), pvc); err != nil {
+		pvcLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting install logs PVC")
+		return err
+	}
 	return nil
-
 }
 
 func (r *ReconcileClusterDeployment) createClusterProvisionForLegacyCD(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
@@ -1778,7 +1765,7 @@ func (r *ReconcileClusterDeployment) deleteStaleProvisions(provs []*hivev1.Clust
 		pLog := cdLog.WithField("provision", provision.Name)
 		pLog.Info("Deleting old provision")
 		if err := r.Delete(context.TODO(), provision); err != nil {
-			pLog.WithError(err).Error("failed to delete old provision")
+			pLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to delete old provision")
 		}
 	}
 }

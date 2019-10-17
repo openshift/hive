@@ -210,7 +210,7 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 			rLog.Info("deleting existing deprovision job due to updated/missing hash detected")
 			err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil {
-				rLog.WithError(err).Errorf("error deleting outdated deprovision job")
+				rLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting outdated deprovision job")
 			}
 		}
 		return reconcile.Result{}, err

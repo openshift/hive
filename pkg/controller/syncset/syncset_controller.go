@@ -213,7 +213,7 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		err := r.Delete(context.TODO(), syncSetInstance)
 		if err != nil && !errors.IsNotFound(err) {
 			name := fmt.Sprintf("%s/%s", syncSetInstance.Namespace, syncSetInstance.Name)
-			cdLog.WithError(err).WithField("syncSetInstance", name).Error("cannot delete sync set instance")
+			cdLog.WithError(err).WithField("syncSetInstance", name).Log(controllerutils.LogLevel(err), "cannot delete sync set instance")
 			return reconcile.Result{}, err
 		}
 	}

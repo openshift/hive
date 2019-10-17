@@ -81,6 +81,11 @@ func TestLogLevel(t *testing.T) {
 			expectedLevel: log.InfoLevel,
 		},
 		{
+			name:          "not found",
+			err:           apierrors.NewNotFound(schema.GroupResource{}, ""),
+			expectedLevel: log.InfoLevel,
+		},
+		{
 			name:          "other api error",
 			err:           apierrors.NewUnauthorized(""),
 			expectedLevel: log.ErrorLevel,

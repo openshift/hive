@@ -234,7 +234,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		ssiLog.Info("source has been deleted, deleting syncsetinstance")
 		err = r.Delete(context.TODO(), ssi)
 		if err != nil {
-			ssiLog.WithError(err).Error("failed to delete syncsetinstance")
+			ssiLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to delete syncsetinstance")
 		}
 		return reconcile.Result{}, err
 	}

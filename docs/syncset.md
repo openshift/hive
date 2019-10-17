@@ -56,7 +56,7 @@ In this example you can change the replicaset of a deployment running on top of 
 
 * Get the required information of the deployment
 
-```sh
+```console
 $ oc get deployment <deployment name> -o yaml
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -69,8 +69,11 @@ metadata:
   xxxxxxx
 ```
 
-* Create the SyncSet object in the cluster deployment namespace in Hive managed cluster as mentioned below.
-  * Run `$ oc create -f <syncset_file.yaml> -n <namespace>`
+* Create the `SyncSet` object in the cluster deployment namespace in Hive managed cluster as mentioned below.
+
+```sh
+oc create -f <syncset_file.yaml> -n <namespace>
+```
 
 SyncSet File:
 
@@ -93,7 +96,11 @@ spec:
     patchType: strategic
 ```
 
-* To see the syncset status, run `$ oc get syncsetinstances <synsetinstance name> -o yaml or json`
+* To see the syncset status, run as below.
+
+```sh
+oc get syncsetinstances <synsetinstance name> -o yaml
+```
 
 ## SelectorSyncSet Object Definition
 
@@ -131,4 +138,8 @@ To find the status of the syncset, check the corresponding syncsetinstance objec
 oc get syncsetinstance -n <namespace>
 ```
 
-To see details, run `$ oc get syncsetinstances <synsetinstance name> -o yaml or json`.
+To see details, run as below.
+
+```sh
+oc get syncsetinstances <synsetinstance name> -o yaml
+```

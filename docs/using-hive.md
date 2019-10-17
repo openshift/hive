@@ -15,6 +15,7 @@
         ```bash
         $ oc create secret generic test-creds --from-literal=aws_secret_access_key=$AWS_SECRET_ACCESS_KEY --from-literal=aws_access_key_id=$AWS_ACCESS_KEY_ID
         ```
+  1. Create a `PersistentVolume` for your ClusterDeployment to store the installation logs. The `accessModes` is `ReadWriteOnce` for your `PersistentVolume`.
 
 ### Using Global Pull Secret
 

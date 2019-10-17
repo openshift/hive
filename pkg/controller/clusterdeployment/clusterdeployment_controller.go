@@ -1690,7 +1690,7 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 		if !ok {
 			return false, fmt.Errorf("Pull secret %s did not contain key %s", mergedSecretName, corev1.DockerConfigJsonKey)
 		}
-		if controllerutils.GetHashOfPullSecret(string(existingPullSecret)) == controllerutils.GetHashOfPullSecret(pullSecret) {
+		if string(existingPullSecret) == pullSecret {
 			cdLog.Debug("Existing and the new merged pull secret are same")
 			return false, nil
 		}

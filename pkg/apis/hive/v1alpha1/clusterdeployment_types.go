@@ -34,6 +34,12 @@ const (
 
 	// HiveInstallLogLabel is used on ConfigMaps uploaded by the install manager which contain an install log.
 	HiveInstallLogLabel = "hive.openshift.io/install-log"
+
+	// HiveClusterPlatformLabel is a label that is applied to ClusterDeployments
+	// to denote which platform the cluster was created on. This can be used in
+	// searching and filtering clusters, as well as in SelectorSyncSets to only
+	// target specific cloud platforms.
+	HiveClusterPlatformLabel = "hive.openshift.io/cluster-platform"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment

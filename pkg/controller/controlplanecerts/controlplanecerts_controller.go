@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
-	"reflect"
 	"sort"
 	"time"
 
@@ -328,23 +327,16 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 }
 
 func (r *ReconcileControlPlaneCerts) setCertsNotFoundCondition(cd *hivev1.ClusterDeployment, notFound bool, cdLog log.FieldLogger) (bool, error) {
-
-	origCD := cd.DeepCopy()
-
-	var status corev1.ConditionStatus
-	var reason, message string
-
+	status := corev1.ConditionFalse
+	reason := certsFoundReason
+	message := certsFoundMessage
 	if notFound {
 		status = corev1.ConditionTrue
 		reason = certsNotFoundReason
 		message = certsNotFoundMessage
-	} else {
-		status = corev1.ConditionFalse
-		reason = certsFoundReason
-		message = certsFoundMessage
 	}
 
-	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
 		hivev1.ControlPlaneCertificateNotFoundCondition,
 		status,
@@ -353,9 +345,11 @@ func (r *ReconcileControlPlaneCerts) setCertsNotFoundCondition(cd *hivev1.Cluste
 		controllerutils.UpdateConditionNever,
 	)
 
-	if reflect.DeepEqual(origCD.Status, cd.Status) {
+	if !changed {
 		return false, nil
 	}
+
+	cd.Status.Conditions = conds
 	return true, r.Status().Update(context.TODO(), cd)
 }
 

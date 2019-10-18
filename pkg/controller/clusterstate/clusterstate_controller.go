@@ -140,7 +140,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		}
 		err = r.Create(context.TODO(), st)
 		if err != nil {
-			logger.WithError(err).Error("failed to create cluster state")
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to create cluster state")
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil

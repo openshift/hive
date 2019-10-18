@@ -847,7 +847,7 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 	}
 	err := r.Create(context.TODO(), pvc)
 	if err != nil {
-		cdLog.WithError(err).Error("error creating pvc")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating pvc")
 	}
 	return err
 }
@@ -942,7 +942,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 
 		err = r.Create(context.TODO(), job)
 		if err != nil {
-			jobLog.WithError(err).Error("error creating job")
+			jobLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating job")
 		} else {
 			// kickstartDuration calculates the delay between creation of cd and start of imageset job
 			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
@@ -1184,7 +1184,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			// requeue the clusterdeployment immediately to process the status of the deprovision request
 			return reconcile.Result{Requeue: true}, nil
 		case err != nil:
-			cdLog.WithError(err).Error("error creating deprovision request")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating deprovision request")
 			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
 			// the cluster go away.
 			ns := &corev1.Namespace{}
@@ -1357,7 +1357,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 
 	err := r.Create(context.TODO(), dnsZone)
 	if err != nil {
-		logger.WithError(err).Error("cannot create DNS zone")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "cannot create DNS zone")
 		return err
 	}
 	logger.Info("dns zone created")

@@ -275,7 +275,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 		}
 
 		if err := r.Create(context.TODO(), ss); err != nil {
-			contextLogger.WithError(err).Error("error creating syncset")
+			contextLogger.WithError(err).Log(controllerutils.LogLevel(err), "error creating syncset")
 			return err
 		}
 

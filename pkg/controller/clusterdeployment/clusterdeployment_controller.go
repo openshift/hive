@@ -454,15 +454,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	// Update the pull secret object if required
-	modifiedCD, err := r.updatePullSecretInfo(pullSecret, cd, cdLog)
-	if err != nil || modifiedCD {
-		if err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error updating the merged pull secret")
-			return reconcile.Result{}, err
-		}
-		// Because the global pull secret is not referenced on our cluster deployment,
-		// generating it does not cause an automatic reconcile. Manually requeue to avoid
-		// waiting 30 minutes before the cluster install proceeds.
+	switch updated, err := r.updatePullSecretInfo(pullSecret, cd, cdLog); {
+	case err != nil:
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error updating the merged pull secret")
+		return reconcile.Result{}, err
+	case updated:
+		// The controller will not automatically requeue the cluster deployment
+		// since the controller is not watching for secrets. So, requeue manually.
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -1671,8 +1669,8 @@ func (r *ReconcileClusterDeployment) mergePullSecrets(cd *hivev1.ClusterDeployme
 	}
 }
 
-// updatePullSecretInfo adds pull secret information in cluster deployment and cluster deployment status.
-// It returns true when cluster deployment status has been updated.
+// updatePullSecretInfo creates or updates the merged pull secret for the clusterdeployment.
+// It returns true when the merged pull secret has been created or updated.
 func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
 	var err error
 	pullSecretObjExists := true

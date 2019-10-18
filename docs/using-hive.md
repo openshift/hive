@@ -15,7 +15,7 @@
         ```bash
         $ oc create secret generic test-creds --from-literal=aws_secret_access_key=$AWS_SECRET_ACCESS_KEY --from-literal=aws_access_key_id=$AWS_ACCESS_KEY_ID
         ```
-
+  1. Create a [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) for your `ClusterDeployment` to store the installation logs. The `accessModes` is `ReadWriteOnce` for your `PersistentVolume`. Note that if you do not want to capture must-gather logs then you can set `.spec.failedProvisionConfig.skipGatherLogs` to `true` in the `HiveConfig`.
 ### Using Global Pull Secret
 
 GlobalPullSecret can be used to specify a pull secret that will be used globally by all of the cluster deployments created by Hive.

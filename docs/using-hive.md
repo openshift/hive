@@ -7,7 +7,7 @@
   1. You will need a live and functioning Route53 DNS zone in the AWS account you will be installing the new cluster(s) into. For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
     * Note that there is an additional mode of DNS management where Hive can automatically create delegated zones for approved base domains. i.e. if hive.example.com exists already, you can specify a base domain of cluster1.hive.example.com on your ClusterDeployment, and Hive will create this zone for you, wait for it to resolve, and then proceed with installation. See below for additional info.
   1. Determine what OpenShift release image you wish to install, and possibly what Hive image you want to use to install it.
-  1. Create a Kubernetes secret containing a docker registry pull secret (typically obtained from [try.openshift.com](https://try.openshift.com)).
+  1. Create a Kubernetes secret containing a docker registry pull secret (typically obtained from [Infrastructure Provider](https://cloud.redhat.com/openshift/install/)).
         ```bash
         $ oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson
         ```

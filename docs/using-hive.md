@@ -9,11 +9,11 @@
   1. Determine what OpenShift release image you wish to install, and possibly what Hive image you want to use to install it.
   1. Create a Kubernetes secret containing a docker registry pull secret (typically obtained from [try.openshift.com](https://try.openshift.com)).
         ```bash
-        $ oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson
+        oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson
         ```
   1. Create a Kubernetes secret containing your AWS credentials:
         ```bash
-        $ oc create secret generic test-creds --from-literal=aws_secret_access_key=$AWS_SECRET_ACCESS_KEY --from-literal=aws_access_key_id=$AWS_ACCESS_KEY_ID
+        oc create secret generic test-creds --from-literal=aws_secret_access_key=$AWS_SECRET_ACCESS_KEY --from-literal=aws_access_key_id=$AWS_ACCESS_KEY_ID
         ```
   1. Create a [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) for your `ClusterDeployment` to store the installation logs. The `accessModes` is `ReadWriteOnce` for your `PersistentVolume`. Note that if you do not want to capture must-gather logs then you can set `.spec.failedProvisionConfig.skipGatherLogs` to `true` in the `HiveConfig`.
 ### Using Global Pull Secret
@@ -120,7 +120,7 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=aws myclu
 
 #### Create Cluster on Azure
 
-Credentials will be read from ~/.azure/osServicePrincipal.json typically created via the `az login` command.
+Credentials will be read from `~/.azure/osServicePrincipal.json` typically created via the `az login` command.
 
 ```bash
 bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
@@ -130,13 +130,13 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --a
 
 #### Create Cluster on GCP
 
-Credentials will be read from ~/.gcp/osServiceAccount.json, this can be created by:
+Credentials will be read from `~/.gcp/osServiceAccount.json`, this can be created by:
 
  1. Login to GCP console at https://console.cloud.google.com/
  1. Create a service account with the owner role.
  1. Create a key for the service account.
  1. Select JSON for the key type.
- 1. Download resulting JSON file and save to ~/.gcp/osServiceAccount.json.
+ 1. Download resulting JSON file and save to `~/.gcp/osServiceAccount.json`.
 
 ```bash
 bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp --gcp-project-id=myproject --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
@@ -149,15 +149,15 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp --gcp
 * Get the namespace in which your cluster deployment was created
 * Get the install pod name
   ```bash
-  $ oc get pods -o json --selector job-name==${CLUSTER_NAME}-install | jq -r '.items | .[].metadata.name'
+  oc get pods -o json --selector job-name==${CLUSTER_NAME}-install | jq -r '.items | .[].metadata.name'
   ```
 * Run following command to watch the cluster deployment
   ```bash
-  $ oc logs -f <install-pod-name> -c hive
+  oc logs -f <install-pod-name> -c hive
   ```
   Alternatively, you can watch the summarized output of the installer using
   ```bash
-  $ oc exec -c hive <install-pod-name> -- tail -f /tmp/openshift-install-console.log
+  oc exec -c hive <install-pod-name> -- tail -f /tmp/openshift-install-console.log
   ```
 
 In the event of installation failures, please see [Troubleshooting](./troubleshooting.md).
@@ -176,12 +176,12 @@ oc get nodes
 
 * Get the webconsole URL
   ```
-  $ oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
+  oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
   ```
 
 * Retrive the password for `kubeadmin` user
   ```
-  $ oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminPasswordSecret.name }'` -o jsonpath='{ .data.password }' | base64 --decode
+  oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminPasswordSecret.name }'` -o jsonpath='{ .data.password }' | base64 --decode
   ```
 
 ## DNS Management
@@ -194,7 +194,7 @@ To use this feature:
 
   1. Manually create a Route53 hosted zone for your "root" domain (i.e. hive.example.com in the example below) and ensure your DNS is operational.
   1. Create a secret in the "hive" namespace with AWS credentials with permissions to manage the root hosted zone.
-     ```
+     ```yaml
      apiVersion: v1
      data:
        aws_access_key_id: REDACTED
@@ -205,7 +205,7 @@ To use this feature:
      type: Opaque
      ```
   1. Update your HiveConfig to enable externalDNS and set the list of managed domains:
-     ```
+     ```yaml
      apiVersion: hive.openshift.io/v1alpha1
      kind: HiveConfig
      metadata:
@@ -222,7 +222,7 @@ To use this feature:
 You can now create clusters with manageDNS enabled and a basedomain of mydomain.hive.example.com.
 
 ```
-$ bin/hiveutil create-cluster --base-domain=mydomain.hive.example.com mycluster --manage-dns
+bin/hiveutil create-cluster --base-domain=mydomain.hive.example.com mycluster --manage-dns
 ```
 
 Hive will then:
@@ -250,10 +250,9 @@ For more information please see the [SyncIdentityProvider](syncidentityprovider.
 ## Cluster Deprovisioning
 
 ```bash
-$ oc delete clusterdeployment ${CLUSTER_NAME} --wait=false
+oc delete clusterdeployment ${CLUSTER_NAME} --wait=false
 ```
 
 Deleting a ClusterDeployment will create a ClusterDeprovisionRequest resource, which in turn will launch a pod to attempt to delete all cloud resources created for and by the cluster. This is done by scanning the cloud provider for resources tagged with the cluster's generated InfraID. (i.e. kubernetes.io/cluster/mycluster-fcp4z=owned) Once all resources have been deleted the pod will terminate, finalizers will be removed, and the ClusterDeployment and dependent objects will be removed. The deprovision process is powered by vendoring the same code from the OpenShift installer used for `openshift-install cluster destroy`.
 
 The ClusterDeprovisionRequest resource can also be used to manually run a deprovision pod for clusters which no longer have a ClusterDeployment. (i.e. clusterDeployment.spec.preserveOnDelete=true)
-

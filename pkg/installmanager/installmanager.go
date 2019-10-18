@@ -31,7 +31,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -73,19 +72,6 @@ const (
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 	provisioningTransitionTimeout       = 5 * time.Minute
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
-
-	fetchLogsScriptTemplate = `#!/bin/bash
-USER_ID=$(id -u)
-GROUP_ID=$(id -g)
-
-if [ x"$USER_ID" != x"0" ]; then
-
-    echo "default:x:${USER_ID}:${GROUP_ID}:Default Application User:${HOME}:/sbin/nologin" >> /etc/passwd
-
-fi
-
-ssh -o "StrictHostKeyChecking=no" -A core@%s '/usr/local/bin/installer-gather.sh'
-scp -o "StrictHostKeyChecking=no" core@%s:~/log-bundle.tar.gz %s`
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -763,6 +749,7 @@ func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) e
 	}
 
 	// set up ssh private key, and run the log gathering script
+	// TODO: is this still required now that we're using the installer's gather command?
 	cleanup, err := initSSHAgent(newSSHPrivKeyPath, m)
 	defer cleanup()
 	if err != nil {
@@ -770,16 +757,30 @@ func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) e
 		return err
 	}
 
-	bootstrapIP, err := getBootstrapIP(m)
+	m.log.Info("attempting to gather logs with 'openshift-install gather bootstrap'")
+	err = m.runOpenShiftInstallCommand("gather", "bootstrap", "--key", newSSHPrivKeyPath)
 	if err != nil {
+		m.log.WithError(err).Error("failed to gather logs from bootstrap node")
 		return err
 	}
 
-	_, err = m.runGatherScript(bootstrapIP, fetchLogsScriptTemplate, m.WorkDir)
+	m.log.Infof("copying log bundles from %s to %s", m.WorkDir, m.LogsDir)
+	logBundles, err := filepath.Glob(filepath.Join(m.WorkDir, "log-bundle-*.tar.gz"))
 	if err != nil {
-		m.log.Error("failed to run script for gathering logs")
+		m.log.WithError(err).Error("erroring globbing log bundles")
 		return err
 	}
+	for _, lb := range logBundles {
+		// Using mv here rather than reading them into memory to write them out again.
+		cmd := exec.Command("mv", lb, m.LogsDir)
+		err = cmd.Run()
+		if err != nil {
+			log.WithError(err).Errorf("error moving file %s", lb)
+			return err
+		}
+		m.log.Infof("moved %s to %s", lb, m.LogsDir)
+	}
+	m.log.Info("bootstrap node log gathering complete")
 
 	return nil
 }
@@ -849,65 +850,6 @@ func (m *InstallManager) isBootstrapComplete() bool {
 	cmd := exec.CommandContext(ctx, "./openshift-install", "wait-for", "bootstrap-complete")
 	cmd.Dir = m.WorkDir
 	return cmd.Run() == nil
-}
-
-func getBootstrapIP(m *InstallManager) (string, error) {
-	tfStatefile := filepath.Join(m.WorkDir, "terraform.tfstate")
-
-	data, err := ioutil.ReadFile(tfStatefile)
-	if err != nil {
-		m.log.WithError(err).Error("error reading in terraform state file")
-		return "", err
-	}
-	var tf terraformState
-	if err := json.Unmarshal(data, &tf); err != nil {
-		m.log.WithError(err).Error("failed to unmarshal terraform statefile json")
-		return "", err
-	}
-
-	boot, found, err := unstructured.NestedString(tf.Modules["root/bootstrap"].Resources, "aws_instance.bootstrap", "primary", "attributes", "public_ip")
-	if err != nil {
-		m.log.WithError(err).Error("failed trying read in public IP for bootstrap instance")
-		return "", err
-	}
-	if !found {
-		msg := "failed to find public IP for bootstrap instance"
-		m.log.Error(msg)
-		return "", fmt.Errorf(msg)
-	}
-	m.log.Debugf("found bootstrap IP: %v", boot)
-	return boot, nil
-}
-
-// These types and json unmarshaling are taken from the openshift installer
-type terraformState struct {
-	Modules map[string]terraformStateModule
-}
-
-type terraformStateModule struct {
-	Resources map[string]interface{} `json:"resources"`
-}
-
-func (tfs *terraformState) UnmarshalJSON(raw []byte) error {
-	var transform struct {
-		Modules []struct {
-			Path []string `json:"path"`
-			terraformStateModule
-		} `json:"modules"`
-	}
-	if err := json.Unmarshal(raw, &transform); err != nil {
-		return err
-	}
-	if tfs == nil {
-		tfs = &terraformState{}
-	}
-	if tfs.Modules == nil {
-		tfs.Modules = make(map[string]terraformStateModule)
-	}
-	for _, m := range transform.Modules {
-		tfs.Modules[strings.Join(m.Path, "/")] = terraformStateModule{Resources: m.Resources}
-	}
-	return nil
 }
 
 func initSSHAgent(privKeyPath string, m *InstallManager) (func(), error) {

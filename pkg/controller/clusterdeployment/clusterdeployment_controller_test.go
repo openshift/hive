@@ -313,14 +313,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Legacy dockercfg pull secret causes no errors once installed",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Spec.Installed = true
-					installTime := metav1.Date(2019, 9, 6, 11, 58, 32, 45, time.UTC)
-					cd.Status.InstalledTimestamp = &installTime
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-					return cd
-				}(),
+				testInstalledClusterDeployment(time.Date(2019, 9, 6, 11, 58, 32, 45, time.UTC)),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1068,6 +1061,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Abort reconcile of installed clusterdeployment without clusterprovision",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					cd.Status.InfraID = ""
+					return cd
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing cluster deployment") {
+					assert.Nil(t, cd.Status.Provision, "expected no reference to provision")
+				}
+				provisions := getProvisions(c)
+				assert.Len(t, provisions, 0, "unexpected number of provisions")
+			},
+		},
+		{
 			name: "Test legacy Status Installed sets Spec Installed",
 			existing: []runtime.Object{
 				func() runtime.Object {
@@ -1393,6 +1405,7 @@ func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeploy
 	cd.Spec.Installed = true
 	cd.Status.InstalledTimestamp = &metav1.Time{Time: installedAt}
 	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+	cd.Status.Provision = &corev1.LocalObjectReference{Name: provisionName}
 	return cd
 }
 

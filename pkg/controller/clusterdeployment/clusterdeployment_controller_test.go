@@ -1136,6 +1136,20 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "Add cluster platform label",
+			existing: []runtime.Object{
+				testClusterDeploymentWithoutPlatformLabel(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					if assert.NotNil(t, cd.Labels, "missing labels map") {
+						assert.Equal(t, cd.Labels[hivev1.HiveClusterPlatformLabel], getClusterPlatform(cd), "incorrect cluster platform label")
+					}
+				}
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1354,6 +1368,7 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 			Finalizers:  []string{hivev1.FinalizerDeprovision},
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
+			Labels:      map[string]string{},
 		},
 	}
 	return cd
@@ -1389,6 +1404,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 	}
 
+	cd.Labels[hivev1.HiveClusterPlatformLabel] = "aws"
+
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		ClusterID:      testClusterID,
 		InfraID:        testInfraID,
@@ -1412,6 +1429,12 @@ func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeploy
 func testClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.Finalizers = []string{}
+	return cd
+}
+
+func testClusterDeploymentWithoutPlatformLabel() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	delete(cd.Labels, hivev1.HiveClusterPlatformLabel)
 	return cd
 }
 

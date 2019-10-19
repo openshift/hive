@@ -320,6 +320,19 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
+	// Set platform label on the ClusterDeployment
+	if platform := getClusterPlatform(cd); cd.Labels[hivev1.HiveClusterPlatformLabel] != platform {
+		if cd.Labels == nil {
+			cd.Labels = make(map[string]string)
+		}
+		cd.Labels[hivev1.HiveClusterPlatformLabel] = platform
+		err := r.Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster platform label")
+		}
+		return reconcile.Result{}, err
+	}
+
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			clearUnderwaySecondsMetrics(cd)
@@ -1892,4 +1905,17 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 		return false, err
 	}
 	return true, nil
+}
+
+// getClusterPlatform returns the platform of a given ClusterDeployment
+func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		return "aws"
+	case cd.Spec.Platform.Azure != nil:
+		return "azure"
+	case cd.Spec.Platform.GCP != nil:
+		return "gcp"
+	}
+	return "unknown"
 }

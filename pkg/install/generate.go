@@ -322,11 +322,6 @@ func GetInstallJobName(provision *hivev1.ClusterProvision) string {
 	return apihelpers.GetResourceName(provision.Name, "provision")
 }
 
-// GetLegacyInstallJobName returns the expected name of the legacy install job for a cluster deployment.
-func GetLegacyInstallJobName(cd *hivev1.ClusterDeployment) string {
-	return apihelpers.GetResourceName(cd.Name, "install")
-}
-
 // GetUninstallJobName returns the expected name of the deprovision job for a cluster deployment.
 func GetUninstallJobName(name string) string {
 	return apihelpers.GetResourceName(name, "uninstall")

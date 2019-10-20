@@ -287,13 +287,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	origCD := cd
 	cd = cd.DeepCopy()
 
-	// Delete any remaining legacy install jobs associated with the deployment.
-	// All install jobs should be run through a clusterprovision.
-	// TODO: remove once this change is live in prod
-	if reconcileResult, err := r.deleteLegacyInstallJob(cd, cdLog); reconcileResult != nil {
-		return *reconcileResult, err
-	}
-
 	// TODO: We may want to remove this fix in future.
 	// Handle pre-existing clusters with older status version structs that did not have the new
 	// cluster version mandatory fields defined.
@@ -784,26 +777,6 @@ func (r *ReconcileClusterDeployment) clearOutCurrentProvision(cd *hivev1.Cluster
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileClusterDeployment) deleteLegacyInstallJob(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {
-	existingJob := &batchv1.Job{}
-	installJobName := install.GetLegacyInstallJobName(cd)
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: installJobName, Namespace: cd.Namespace}, existingJob); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, nil
-		}
-		cdLog.WithError(err).Error("error looking for install job")
-		return &reconcile.Result{}, err
-	}
-	cdLog.Info("waiting for legacy install job to be removed")
-	if existingJob.DeletionTimestamp.IsZero() {
-		if err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
-			cdLog.WithError(err).Error("error deleting legacy install job")
-			return &reconcile.Result{}, err
-		}
-	}
-	return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 }
 
 // GetInstallLogsPVCName returns the expected name of the persistent volume claim for cluster install failure logs.

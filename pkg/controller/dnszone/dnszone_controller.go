@@ -74,21 +74,6 @@ type ReconcileDNSZone struct {
 	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
 }
 
-// NewReconcileDNSZone creates a new reconciler for testing purposes
-func NewReconcileDNSZone(client client.Client, scheme *runtime.Scheme, logger log.FieldLogger, awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)) *ReconcileDNSZone {
-	return &ReconcileDNSZone{
-		Client:           client,
-		scheme:           scheme,
-		logger:           logger,
-		awsClientBuilder: awsClientBuilder,
-	}
-}
-
-// SetAWSClientBuilder sets the AWS client builder for testing purposes
-func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)) {
-	r.awsClientBuilder = awsClientBuilder
-}
-
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
 // and what is in the DNSZone.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write DNSZones
@@ -122,7 +107,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// Handle an edge case here where if the DNSZone has been deleted, it has it's finalizer, our AWS
+	// Handle an edge case here where if the DNSZone has been deleted, it has its finalizer, our AWS
 	// creds secret is missing, and our namespace is terminated, we know we've entered a bad state
 	// where we must give up and remove the finalizer. A followup fix should prevent this problem from
 	// happening but we need to cleanup stuck DNSZones regardless.

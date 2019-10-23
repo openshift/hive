@@ -389,10 +389,7 @@ func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spe
 	if err := r.applySyncSetPatches(ssi, spec.Patches, kubeConfig, ssiLog); err != nil {
 		return err
 	}
-	if err := r.applySyncSetSecretReferences(ssi, spec.SecretReferences, dynamicClient, h, ssiLog); err != nil {
-		return err
-	}
-	return nil
+	return r.applySyncSetSecretReferences(ssi, spec.SecretReferences, dynamicClient, h, ssiLog)
 }
 
 func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetInstance, dynamicClient dynamic.Interface, ssiLog log.FieldLogger) error {

@@ -4,6 +4,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// FinalizerDNSEndpoint is used on DNSEndpoints to ensure we successfully deprovision
+	// the cloud objects before cleaning up the API object.
+	FinalizerDNSEndpoint string = "hive.openshift.io/dnsendpoint"
+)
+
 // DNSEndpointSpec defines the desired state of DNSEndpoint
 type DNSEndpointSpec struct {
 	// Endpoints is the list of DNS records to create/update

@@ -83,10 +83,6 @@ type FailedProvisionConfig struct {
 // environment.
 type ExternalDNSConfig struct {
 
-	// Image is a reference to the image that will run the external-dns controller.
-	// If not specified, a default image will be used.
-	Image string `json:"image,omitempty"`
-
 	// AWS contains AWS-specific settings for external DNS
 	// +optional
 	AWS *ExternalDNSAWSConfig `json:"aws,omitempty"`

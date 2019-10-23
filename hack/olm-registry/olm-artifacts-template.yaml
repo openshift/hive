@@ -10,8 +10,6 @@ parameters:
   value: staging
 - name: IMAGE_TAG
   value: latest
-- name: EXTERNAL_DNS_IMAGE
-  value: quay.io/jdiaz/external-dns:latest
 - name: EXTERNAL_DNS_AWS_CREDS
   value: external-dns-route53-admin
 - name: EXTERNAL_DNS_MANAGED_DOMAIN
@@ -61,7 +59,6 @@ objects:
       aws:
         credentials:
           name: ${EXTERNAL_DNS_AWS_CREDS}
-      image: ${EXTERNAL_DNS_IMAGE}
     globalPullSecret:
       name: ${GLOBAL_PULL_SECRET}
     managedDomains:

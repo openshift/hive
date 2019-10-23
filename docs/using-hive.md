@@ -44,11 +44,11 @@ spec:
 
 ### Provisioning
 
-Hive supports two methods of specifying what version of OpenShift you wish to install. Most commonly you can create a ClusterImageSet which references an OpenShift 4 release image, and a corresponding Hive image that is capable of installing it. The two are closely linked to accomodate code changes in the installer over time.
+Hive supports two methods of specifying what version of OpenShift you wish to install. Most commonly you can create a ClusterImageSet which references an OpenShift 4 release image.
 
-Alternatively you can specify release and Hive image overrides directly on your ClusterDeployment when you create one.
+Alternatively you can specify release image overrides directly on your ClusterDeployment when you create one.
 
-Cluster provisioning begings when a caller creates a ClusterDeployment CRD, which is the core Hive resource to control the lifecycle of a cluster.
+Cluster provisioning begins when a caller creates a ClusterDeployment CRD, which is the core Hive resource to control the lifecycle of a cluster.
 
 An example ClusterDeployment:
 

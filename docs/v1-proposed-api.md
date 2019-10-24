@@ -103,10 +103,14 @@ status:
 ### Proposed Changes
 
 
- 1. Add Spec.InstallConfigSecret containing a full openshift-install InstallConfig  to pass directly to installer.
+ 1. Add Spec.Installation struct to contain install specific, immutable settings.
+ 1. Add Spec.Installation.InstallConfigSecret containing a full openshift-install InstallConfig  to pass directly to installer.
    * This will allow immediate use of new openshift-install features without needing to mirror in Hive's API.
    * Ideally most items in ClusterDeployment.Spec should be assumed mutable, however this will not universally be true.
    * There will be some overlap, information that must be provided in both the InstallConfig and the ClusterDeployment. We will attempt to error if you mismatch this information whenever possible.
+ 1. Add Spec.Installation.ManifestsConfigMap for injecting additional manifests into the install process.
+   * Can be used for something like switching to Calico for networking.
+   * ConfigMap with a file in each key. Will mount the whole configmap and iterate each file, adding to the installer's manifests dir.
  1. Remove:
    * Spec.ClusterName - In install config, not relevant thereafter.
      * May be used in some naming, but hopefully can transition to CD.Name instead.
@@ -184,6 +188,11 @@ spec:
     adminPasswordSecret:
       name: ci-cluster-v4-1-0-ndv7l-admin-password
   installed: true
+  installation:
+    installConfigSecret:
+      name: cluster-install-config
+    manifestsConfigMap:
+      name: additional-install-manifests
   manageDNS: true # immutable
   platform:
     aws:

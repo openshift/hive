@@ -30,8 +30,3 @@ Once the install completes successfully, the admin password and kubeconfig will 
 When a ClusterDeployment is deleted, a deprovision job will spawn which repeatedly tries to teardown all known cloud resources matching the cluster's infra ID tag, until nothing is left.
 
 For more information about additional features please see [Using Hive](using-hive.md).
-
-## Supported Clouds
-
-Today Hive supports provisioning clusters on AWS, with additional cloud providers coming soon, roughly as support is added in OpenShift 4 itself.
-

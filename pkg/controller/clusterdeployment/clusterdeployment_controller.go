@@ -311,6 +311,10 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		if cd.Labels == nil {
 			cd.Labels = make(map[string]string)
 		}
+		if cd.Labels[hivev1.HiveClusterPlatformLabel] != "" {
+			cdLog.Warnf("changing the value of %s from %s to %s", hivev1.HiveClusterPlatformLabel,
+				cd.Labels[hivev1.HiveClusterPlatformLabel], platform)
+		}
 		cd.Labels[hivev1.HiveClusterPlatformLabel] = platform
 		err := r.Update(context.TODO(), cd)
 		if err != nil {

@@ -212,7 +212,10 @@ func LogLevel(err error) log.Level {
 		return log.ErrorLevel
 	}
 	for {
-		if apierrors.IsAlreadyExists(err) || apierrors.IsConflict(err) {
+		switch {
+		case apierrors.IsAlreadyExists(err),
+			apierrors.IsConflict(err),
+			apierrors.IsNotFound(err):
 			return log.InfoLevel
 		}
 		cause := errors.Cause(err)

@@ -436,10 +436,6 @@ func (r *ReconcileSyncSetInstance) getSyncSetCommonSpec(ssi *hivev1.SyncSetInsta
 			ssiLog.WithError(err).WithField("syncset", syncSetName).Error("cannot get associated syncset")
 			return nil, false, err
 		}
-		if !syncSet.DeletionTimestamp.IsZero() {
-			ssiLog.WithError(err).WithField("syncset", syncSetName).Warning("syncset is being deleted")
-			return nil, false, nil
-		}
 		return &syncSet.Spec.SyncSetCommonSpec, false, nil
 	} else if ssi.Spec.SelectorSyncSet != nil {
 		selectorSyncSet := &hivev1.SelectorSyncSet{}

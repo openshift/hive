@@ -129,6 +129,7 @@ rules:
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - authorization.openshift.io
   resources:

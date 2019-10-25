@@ -46,6 +46,17 @@ spec:
 
 Hive supports two methods of specifying what version of OpenShift you wish to install. Most commonly you can create a ClusterImageSet which references an OpenShift 4 release image.
 
+An example ClusterImageSet:
+
+```yaml
+apiVersion: hive.openshift.io/v1alpha1
+kind: ClusterImageSet
+metadata:
+  name: openshift-v4.2.0
+spec:
+  releaseImage: quay.io/openshift-release-dev/ocp-release:4.2.0
+```
+
 Alternatively you can specify release image overrides directly on your ClusterDeployment when you create one.
 
 Cluster provisioning begins when a caller creates a ClusterDeployment CRD, which is the core Hive resource to control the lifecycle of a cluster.
@@ -81,7 +92,7 @@ spec:
         type: m4.large
     replicas: 3
   imageSet:
-    name: openshift-v4.1.0-rc.8
+    name: openshift-v4.2.0
   images:
     installerImagePullPolicy: Always
   networking:

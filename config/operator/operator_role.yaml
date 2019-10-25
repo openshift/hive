@@ -121,14 +121,6 @@ rules:
   - update
   - patch
   - delete
-# Used to determine if we're running on OpenShift:
-- apiGroups:
-  - apps.openshift.io
-  resources:
-  - deploymentconfigs
-  verbs:
-  - get
-  - list
 - apiGroups:
   - authorization.openshift.io
   resources:

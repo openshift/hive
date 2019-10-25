@@ -18,7 +18,6 @@ import (
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 
-	oappsv1 "github.com/openshift/api/apps/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
@@ -28,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -153,16 +151,12 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		}
 	}
 
-	if r.runningOnOpenShift(hLog) {
-		hLog.Info("deploying OpenShift specific assets")
-		for _, a := range openshiftSpecificAssets {
-			err = util.ApplyAsset(h, a, hLog)
-			if err != nil {
-				return err
-			}
+	hLog.Info("deploying OpenShift specific assets")
+	for _, a := range openshiftSpecificAssets {
+		err = util.ApplyAsset(h, a, hLog)
+		if err != nil {
+			return err
 		}
-	} else {
-		hLog.Warn("hive is not running on OpenShift, some optional assets will not be deployed")
 	}
 
 	// Remove legacy ClusterImageSets we do not want installable anymore.
@@ -281,15 +275,4 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h *r
 		Value: instance.Spec.GlobalPullSecret.Name,
 	}
 	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, globalPullSecretEnvVar)
-}
-
-func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) bool {
-	// DeploymentConfig is an OpenShift specific type we have go types vendored for, see
-	// if we can list them to determine if we're running on OpenShift or vanilla Kube.
-	dcs := &oappsv1.DeploymentConfigList{}
-	err := r.List(context.Background(), dcs, client.InNamespace(constants.HiveNamespace))
-	if err != nil {
-		hLog.WithError(err).Debug("error listing DeploymentConfig to determine if running on OpenShift")
-	}
-	return err == nil
 }

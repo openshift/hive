@@ -90,17 +90,6 @@ func BuildDynamicClientFromKubeconfig(kubeconfigData, controllerName string) (dy
 	return client, nil
 }
 
-// FixupEmptyClusterVersionFields will un-'nil' fields that would fail validation in the ClusterVersion.Status
-func FixupEmptyClusterVersionFields(clusterVersionStatus *openshiftapiv1.ClusterVersionStatus) {
-
-	// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates
-	// Place an empty list if needed to satisfy the object validation.
-
-	if clusterVersionStatus.AvailableUpdates == nil {
-		clusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
-	}
-}
-
 // HasFinalizer returns true if the given object has the given finalizer
 func HasFinalizer(object metav1.Object, finalizer string) bool {
 	for _, f := range object.GetFinalizers() {

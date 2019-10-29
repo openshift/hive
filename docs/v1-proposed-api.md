@@ -243,12 +243,30 @@ status:
 
 CRD versioning functionality is not available in OpenShift 3.11 where prod/stage run and will continue to do so until private cluster support is ready and we can migrate. We must however move on V1 now.
 
-Possible solutions:
+To avoid having to fork and abandon stage/prod until they can move to 4.3+ we propose the following solution using an aggregated API server.
 
-  1. Fork the codebase. Branch for dedicated and backport critical fixes only. Once migrated to 4.x they can upgrade to newer Hive and gain access to the V1 API.
-  2. Introduce a new parallel APIGroup.
-    * Duplicate all controllers for the new types.
-    * Coordinate move to V1 API with all dependent components. (OCM, cert operator, pagerduty operator, possibly others)
-    * Maintain both sets of CRDs and controllers until the above coordination is complete.
-    * Implement migration in hive-operator to port all legacy Cluster data to the new API.
-    * Drop support for old CRs and controllers, remove migration code.
+  1. Add new Hive CRDs, same names as old (aside from those being renamed), but in a new API group.
+  1. Hive controller code all ported to use the new types. No code still references the old.
+  1. Hive operator performs the migration:
+    1. Shut down hive-controllers. We likely will want to coordinate scaledown for all SRE operators as well.
+    1. Copy all types from old to new.
+      * New ClusterDeployment should have no InstallConfig referenced as there is little point in migrating data that is install time only for clusters that are now installed. Some data will be lost. (network config, other things being removed)
+    1. Remove finalizers on old objects to help ensure nothing takes action on them.
+    1. Delete all v1alpha1 custom resources.
+      * Obviously the most risky part of this. Finalizers should be gone and controllers scaled down so no action should be taken.
+    1. Delete all v1alpha1 CRDs, at this point the API is temporarily down for anyone using v1alpha1.
+  1. Hive operator rolls out the new aggregated API server.
+    * Aggregated API will serve v1alpha1 exactly as we do today, no change is required for callers such as OCM and SRE operators.
+    * Aggregated API is translating all incoming and outgoing data to the underlying (new) CRD version.
+  1. Hive operator scales the hive controllers back up using the new code and new types.
+
+Benefits:
+
+  * No forking of codebase required.
+  * All Hive code outside the aggregated API server is using the new types.
+  * Once everyone is off v1alpha1, we can simply delete the aggregated API server to remove v1alpha1.
+
+Concerns:
+
+  * Must be very careful nothing can possibly be listening when we do the migration, particularly when deleting the old CRs, which would trigger a cluster deprovision. However if finalizers are removed and controllers are scaled down, this should not be possible.
+

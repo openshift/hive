@@ -28,8 +28,12 @@ resources:
 - ./rbac/hive_controllers_role_binding.yaml
 - ./rbac/hive_frontend_role.yaml
 - ./rbac/hive_frontend_role_binding.yaml
+- ./rbac/prometheus_role.yaml
+- ./rbac/prometheus_role_binding.yaml
 - ./hiveadmission/hiveadmission_rbac_role.yaml
 - ./hiveadmission/hiveadmission_rbac_role_binding.yaml
 - ./operator/operator_role.yaml
 - ./operator/operator_role_binding.yaml
 - ./operator/operator_deployment.yaml
+- ./operator/servicemonitor.yaml
+- ./operator/metrics-service.yaml

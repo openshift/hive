@@ -2,3 +2,5 @@ kind: Namespace
 apiVersion: v1
 metadata:
   name: hive
+  labels:
+    openshift.io/cluster-monitoring: "true"

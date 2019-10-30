@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hive-operator
+  namespace: hive
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    port: hive-metrics-port
+    scheme: http
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: hive-metrics.hive.svc
+  namespaceSelector:
+    matchNames:
+    - hive
+  selector: {}

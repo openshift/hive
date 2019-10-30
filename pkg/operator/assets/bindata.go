@@ -23,6 +23,8 @@
 // config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
+// config/rbac/prometheus_role.yaml
+// config/rbac/prometheus_role_binding.yaml
 // config/crds/hive_v1alpha1_checkpoint.yaml
 // config/crds/hive_v1alpha1_clusterdeployment.yaml
 // config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml
@@ -1429,6 +1431,69 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/rbac/hive_reader_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacPrometheus_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: hive
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+`)
+
+func configRbacPrometheus_roleYamlBytes() ([]byte, error) {
+	return _configRbacPrometheus_roleYaml, nil
+}
+
+func configRbacPrometheus_roleYaml() (*asset, error) {
+	bytes, err := configRbacPrometheus_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/prometheus_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacPrometheus_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: hive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+`)
+
+func configRbacPrometheus_role_bindingYamlBytes() ([]byte, error) {
+	return _configRbacPrometheus_role_bindingYaml, nil
+}
+
+func configRbacPrometheus_role_bindingYaml() (*asset, error) {
+	bytes, err := configRbacPrometheus_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/prometheus_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5008,6 +5073,8 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_frontend_serviceaccount.yaml":               configRbacHive_frontend_serviceaccountYaml,
 	"config/rbac/hive_reader_role.yaml":                           configRbacHive_reader_roleYaml,
 	"config/rbac/hive_reader_role_binding.yaml":                   configRbacHive_reader_role_bindingYaml,
+	"config/rbac/prometheus_role.yaml":                            configRbacPrometheus_roleYaml,
+	"config/rbac/prometheus_role_binding.yaml":                    configRbacPrometheus_role_bindingYaml,
 	"config/crds/hive_v1alpha1_checkpoint.yaml":                   configCrdsHive_v1alpha1_checkpointYaml,
 	"config/crds/hive_v1alpha1_clusterdeployment.yaml":            configCrdsHive_v1alpha1_clusterdeploymentYaml,
 	"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml":    configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml,
@@ -5114,6 +5181,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_frontend_serviceaccount.yaml":  {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},
 			"hive_reader_role.yaml":              {configRbacHive_reader_roleYaml, map[string]*bintree{}},
 			"hive_reader_role_binding.yaml":      {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
+			"prometheus_role.yaml":               {configRbacPrometheus_roleYaml, map[string]*bintree{}},
+			"prometheus_role_binding.yaml":       {configRbacPrometheus_role_bindingYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

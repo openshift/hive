@@ -13,6 +13,7 @@ metadata:
   labels:
     control-plane: hive-operator
     controller-tools.k8s.io: "1.0"
+    app: hive-operator
 spec:
   selector:
     matchLabels:

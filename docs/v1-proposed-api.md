@@ -241,7 +241,7 @@ status:
 
 # Migrating to V1
 
-CRD versioning functionality is not available in OpenShift 3.11 where prod/stage run and will continue to do so until private cluster support is ready and we can migrate. We must however move on V1 now.
+CRD versioning functionality is not available in OpenShift 3.11 where prod/stage run and will continue to do so until private cluster support is ready and we can migrate. We must however move to V1 as soon as possible.
 
 To avoid having to fork and abandon stage/prod until they can move to 4.3+ we propose the following solution using an aggregated API server.
 
@@ -250,10 +250,10 @@ To avoid having to fork and abandon stage/prod until they can move to 4.3+ we pr
   1. Hive operator performs the migration:
     1. Shut down hive-controllers. We likely will want to coordinate scaledown for all SRE operators as well.
     1. Copy all types from old to new.
-      * New ClusterDeployment should have no InstallConfig referenced as there is little point in migrating data that is install time only for clusters that are now installed. Some data will be lost. (network config, other things being removed)
-    1. Remove finalizers on old objects to help ensure nothing takes action on them.
+      * New ClusterDeployments will have no InstallConfig reference as we do not need to migrate data that is only used at install time. Some minor data will be lost. (i.e. network config)
+    1. Remove finalizers on v1alpha1 objects to help ensure the controllers do not attempt to deprovision or perform any actions when we delete.
     1. Delete all v1alpha1 custom resources.
-      * Obviously the most risky part of this. Finalizers should be gone and controllers scaled down so no action should be taken.
+      * Finalizers should be deleted and controllers scaled down, so no action should be taken.
     1. Delete all v1alpha1 CRDs, at this point the API is temporarily down for anyone using v1alpha1.
   1. Hive operator rolls out the new aggregated API server.
     * Aggregated API will serve v1alpha1 exactly as we do today, no change is required for callers such as OCM and SRE operators.

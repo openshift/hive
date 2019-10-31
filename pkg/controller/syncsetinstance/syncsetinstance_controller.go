@@ -136,8 +136,8 @@ func (r *ReconcileSyncSetInstance) handleClusterDeployment(a handler.MapObject) 
 		if metav1.IsControlledBy(&syncSetInstance, cd) {
 			retval = append(retval, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      cd.Name,
-					Namespace: cd.Namespace,
+					Name:      syncSetInstance.Name,
+					Namespace: syncSetInstance.Namespace,
 				},
 			})
 		}

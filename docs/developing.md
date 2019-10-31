@@ -111,7 +111,7 @@ The hiveutil command includes a utility to generate Letsencrypt certificates for
 Prerequisites:
 * The `certbot` command must be available and in the path of your machine. You can install it by following the instructions at:
   [https://certbot.eff.org/docs/install.html](https://certbot.eff.org/docs/install.html)
-* You must have credentials for AWS available in your command line, either by a configured `~/.aws/credentials` or environment variables (`AWS_ACCESS_KEY` and `AWS_SECRET_ACCESS_KEY`).
+* You must have credentials for AWS available in your command line, either by a configured `~/.aws/credentials` or environment variables (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`).
 
 ### Generating a Certificate
 

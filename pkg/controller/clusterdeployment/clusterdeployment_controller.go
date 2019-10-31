@@ -866,6 +866,16 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
 		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
 	}
+
+	// If the .status.clusterVersionsStatus.availableUpdates field is nil,
+	// do a status update to set it to an empty list. All status updates
+	// done by controllers set this automatically. However, the imageset
+	// job does not. If the field is still nil when the imageset job tries
+	// to update the status, then the update will fail validation.
+	if cd.Status.ClusterVersionStatus.AvailableUpdates == nil {
+		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
+	}
+
 	cliImage := images.GetCLIImage()
 	job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {

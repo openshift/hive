@@ -83,12 +83,6 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
 
 ## Enable Debug Logging In Hive Controllers
 
-Scale down the Hive operator to zero
-
-```bash
-oc scale -n hive deployment.v1.apps/hive-operator --replicas=0
-```
-
 Edit the controller deployment to replace the `info` log-level to `debug`.
 
 ```bash
@@ -97,11 +91,11 @@ oc edit deployment/hive-controllers -n hive
 
 ```yaml
 spec:
-      containers:
-      - command:
-        - /opt/services/manager
-        - --log-level
-        - debug
+  containers:
+  - command:
+    - /opt/services/manager
+    - --log-level
+    - debug
 ```
 
 ## Using Serving Certificates

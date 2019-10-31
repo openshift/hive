@@ -444,6 +444,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Status.InstallerImage = nil
 					cd.Spec.Images.InstallerImage = ""
 					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
 					return cd
 				}(),
 				testClusterImageSet(),
@@ -477,6 +478,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.Images.InstallerImage = ""
 					cd.Spec.Images.ReleaseImage = "embedded-release-image:latest"
 					cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
 					return cd
 				}(),
 				testClusterImageSet(),

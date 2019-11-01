@@ -32,24 +32,37 @@ cd $GOPATH/src/openshift
 git clone https://github.com/openshift/hive.git
 ```
 
-## Deploying with Kubernetes on Docker (kind)
+## Deploying with Kubernetes In Docker (kind)
 
 [Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
 
-This approach requires [Docker](https://docs.docker.com/install/linux/docker-ce/fedora/). At present we do not have kind working with podman.
+This approach requires [Docker](https://docs.docker.com/install). At present we do not have kind working with podman.
 
-For first time usage you can create the insecure registry and the kind cluster in one command:
+Deploy a local insecure registry container, and configure your host docker daemon to be able to use it:
 
 ```bash
-CREATE_INSECURE_REGISTRY=true CONFIGURE_INSECURE_REGISTRY_HOST=TRUE CONFIGURE_INSECURE_REGISTRY_CLUSTER=true NUM_CLUSTERS=1 hack/create-clusters.sh
+./hack/create-insecure-registry.sh
 ```
 
-`docker ps` should now show you a "registry" and a "cluster1" container running.
+Create a kind cluster named 'hive' to deploy to. You can create as many kind clusters as you need.:
+
+```ash
+./hack/create-kind-cluster.sh hive
+```
+
+`docker ps` should now show you a "registry" and a "hive" container running.
+
+```bash
+$ docker ps
+CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                                  NAMES
+2756e565065a        kindest/node:v1.15.3   "/usr/local/bin/entr…"   29 hours ago        Up 29 hours         40393/tcp, 127.0.0.1:40393->6443/tcp   hive-control-plane
+1dc8a3c59d84        registry:2             "/entrypoint.sh /etc…"   2 weeks ago         Up 8 days           0.0.0.0:5000->5000/tcp                 registry
+```
 
 Configure kubectl to talk to your new cluster:
 
 ```bash
-export KUBECONFIG="$(kind get kubeconfig-path --name="cluster1")"
+export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
 ```
 
 You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.

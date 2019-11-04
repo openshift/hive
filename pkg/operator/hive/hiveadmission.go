@@ -7,8 +7,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	webhooks "github.com/openshift/hive/pkg/apis/hive/v1alpha1/validating-webhooks"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	webhooks "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
 	"github.com/openshift/hive/pkg/constants"
 
 	"github.com/openshift/hive/pkg/operator/assets"

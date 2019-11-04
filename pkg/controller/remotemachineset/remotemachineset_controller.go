@@ -37,7 +37,7 @@ import (
 	installtypes "github.com/openshift/installer/pkg/types"
 	installtypesaws "github.com/openshift/installer/pkg/types/aws"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"

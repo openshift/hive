@@ -4,7 +4,7 @@ import (
 	admissionCmd "github.com/openshift/generic-admission-server/pkg/cmd"
 	log "github.com/sirupsen/logrus"
 
-	hivevalidatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1alpha1/validating-webhooks"
+	hivevalidatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
 )
 
 func main() {

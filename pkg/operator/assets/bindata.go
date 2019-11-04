@@ -27,20 +27,20 @@
 // config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
-// config/crds/hive_v1alpha1_checkpoint.yaml
-// config/crds/hive_v1alpha1_clusterdeployment.yaml
-// config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml
-// config/crds/hive_v1alpha1_clusterimageset.yaml
-// config/crds/hive_v1alpha1_clusterprovision.yaml
-// config/crds/hive_v1alpha1_clusterstate.yaml
-// config/crds/hive_v1alpha1_dnsendpoint.yaml
-// config/crds/hive_v1alpha1_dnszone.yaml
-// config/crds/hive_v1alpha1_hiveconfig.yaml
-// config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml
-// config/crds/hive_v1alpha1_selectorsyncset.yaml
-// config/crds/hive_v1alpha1_syncidentityprovider.yaml
-// config/crds/hive_v1alpha1_syncset.yaml
-// config/crds/hive_v1alpha1_syncsetinstance.yaml
+// config/crds/hive_v1_checkpoint.yaml
+// config/crds/hive_v1_clusterdeployment.yaml
+// config/crds/hive_v1_clusterdeprovisionrequest.yaml
+// config/crds/hive_v1_clusterimageset.yaml
+// config/crds/hive_v1_clusterprovision.yaml
+// config/crds/hive_v1_clusterstate.yaml
+// config/crds/hive_v1_dnsendpoint.yaml
+// config/crds/hive_v1_dnszone.yaml
+// config/crds/hive_v1_hiveconfig.yaml
+// config/crds/hive_v1_selectorsyncidentityprovider.yaml
+// config/crds/hive_v1_selectorsyncset.yaml
+// config/crds/hive_v1_syncidentityprovider.yaml
+// config/crds/hive_v1_syncset.yaml
+// config/crds/hive_v1_syncsetinstance.yaml
 // config/configmaps/install-log-regexes-configmap.yaml
 // DO NOT EDIT!
 
@@ -1575,7 +1575,7 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_checkpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_checkpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -1622,7 +1622,7 @@ spec:
           type: object
         status:
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -1631,22 +1631,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_checkpointYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_checkpointYaml, nil
+func configCrdsHive_v1_checkpointYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_checkpointYaml, nil
 }
 
-func configCrdsHive_v1alpha1_checkpointYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_checkpointYamlBytes()
+func configCrdsHive_v1_checkpointYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_checkpointYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_checkpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_checkpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_clusterdeploymentYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_clusterdeploymentYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2490,7 +2490,7 @@ spec:
                 UI.
               type: string
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -2499,22 +2499,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_clusterdeploymentYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_clusterdeploymentYaml, nil
+func configCrdsHive_v1_clusterdeploymentYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_clusterdeploymentYaml, nil
 }
 
-func configCrdsHive_v1alpha1_clusterdeploymentYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_clusterdeploymentYamlBytes()
+func configCrdsHive_v1_clusterdeploymentYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_clusterdeploymentYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_clusterdeprovisionrequestYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2617,7 +2617,7 @@ spec:
               description: Completed is true when the uninstall has completed successfully
               type: boolean
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -2626,22 +2626,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_clusterdeprovisionrequestYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml, nil
+func configCrdsHive_v1_clusterdeprovisionrequestYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_clusterdeprovisionrequestYaml, nil
 }
 
-func configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_clusterdeprovisionrequestYamlBytes()
+func configCrdsHive_v1_clusterdeprovisionrequestYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_clusterdeprovisionrequestYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeprovisionrequest.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_clusterimagesetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_clusterimagesetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2695,7 +2695,7 @@ spec:
           type: object
         status:
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -2704,22 +2704,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_clusterimagesetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_clusterimagesetYaml, nil
+func configCrdsHive_v1_clusterimagesetYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_clusterimagesetYaml, nil
 }
 
-func configCrdsHive_v1alpha1_clusterimagesetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_clusterimagesetYamlBytes()
+func configCrdsHive_v1_clusterimagesetYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_clusterimagesetYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_clusterprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_clusterprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2844,7 +2844,7 @@ spec:
             job:
               type: object
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -2853,22 +2853,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_clusterprovisionYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_clusterprovisionYaml, nil
+func configCrdsHive_v1_clusterprovisionYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_clusterprovisionYaml, nil
 }
 
-func configCrdsHive_v1alpha1_clusterprovisionYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_clusterprovisionYamlBytes()
+func configCrdsHive_v1_clusterprovisionYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_clusterprovisionYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_clusterprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_clusterstateYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_clusterstateYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2946,7 +2946,7 @@ spec:
               format: date-time
               type: string
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -2955,22 +2955,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_clusterstateYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_clusterstateYaml, nil
+func configCrdsHive_v1_clusterstateYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_clusterstateYaml, nil
 }
 
-func configCrdsHive_v1alpha1_clusterstateYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_clusterstateYamlBytes()
+func configCrdsHive_v1_clusterstateYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_clusterstateYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_clusterstate.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_clusterstate.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_dnsendpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_dnsendpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -3039,7 +3039,7 @@ spec:
               format: int64
               type: integer
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -3048,22 +3048,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_dnsendpointYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_dnsendpointYaml, nil
+func configCrdsHive_v1_dnsendpointYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_dnsendpointYaml, nil
 }
 
-func configCrdsHive_v1alpha1_dnsendpointYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_dnsendpointYamlBytes()
+func configCrdsHive_v1_dnsendpointYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_dnsendpointYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_dnsendpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_dnsendpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_dnszoneYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_dnszoneYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -3185,7 +3185,7 @@ spec:
                 type: string
               type: array
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -3194,22 +3194,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_dnszoneYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_dnszoneYaml, nil
+func configCrdsHive_v1_dnszoneYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_dnszoneYaml, nil
 }
 
-func configCrdsHive_v1alpha1_dnszoneYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_dnszoneYamlBytes()
+func configCrdsHive_v1_dnszoneYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_dnszoneYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_dnszone.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_dnszone.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_hiveconfigYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_hiveconfigYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -3332,7 +3332,7 @@ spec:
                 When the configmap changes, admission is redeployed.
               type: string
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -3341,22 +3341,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_hiveconfigYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_hiveconfigYaml, nil
+func configCrdsHive_v1_hiveconfigYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_hiveconfigYaml, nil
 }
 
-func configCrdsHive_v1alpha1_hiveconfigYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_hiveconfigYamlBytes()
+func configCrdsHive_v1_hiveconfigYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_hiveconfigYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_hiveconfig.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_hiveconfig.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_selectorsyncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -3894,7 +3894,7 @@ spec:
           type: object
         status:
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -3903,22 +3903,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_selectorsyncidentityproviderYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml, nil
+func configCrdsHive_v1_selectorsyncidentityproviderYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_selectorsyncidentityproviderYaml, nil
 }
 
-func configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_selectorsyncidentityproviderYamlBytes()
+func configCrdsHive_v1_selectorsyncidentityproviderYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_selectorsyncidentityproviderYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_selectorsyncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_selectorsyncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_selectorsyncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -4013,7 +4013,7 @@ spec:
           type: object
         status:
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -4022,22 +4022,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_selectorsyncsetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_selectorsyncsetYaml, nil
+func configCrdsHive_v1_selectorsyncsetYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_selectorsyncsetYaml, nil
 }
 
-func configCrdsHive_v1alpha1_selectorsyncsetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_selectorsyncsetYamlBytes()
+func configCrdsHive_v1_selectorsyncsetYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_selectorsyncsetYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_selectorsyncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_selectorsyncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_syncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_syncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -4579,7 +4579,7 @@ spec:
           type: object
         status:
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -4588,22 +4588,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_syncidentityproviderYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_syncidentityproviderYaml, nil
+func configCrdsHive_v1_syncidentityproviderYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_syncidentityproviderYaml, nil
 }
 
-func configCrdsHive_v1alpha1_syncidentityproviderYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_syncidentityproviderYamlBytes()
+func configCrdsHive_v1_syncidentityproviderYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_syncidentityproviderYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_syncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_syncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_syncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_syncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -4703,7 +4703,7 @@ spec:
           type: object
         status:
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -4712,22 +4712,22 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_syncsetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_syncsetYaml, nil
+func configCrdsHive_v1_syncsetYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_syncsetYaml, nil
 }
 
-func configCrdsHive_v1alpha1_syncsetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_syncsetYamlBytes()
+func configCrdsHive_v1_syncsetYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_syncsetYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_syncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_syncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1alpha1_syncsetinstanceYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_syncsetinstanceYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -5007,7 +5007,7 @@ spec:
                 type: object
               type: array
           type: object
-  version: v1alpha1
+  version: v1
 status:
   acceptedNames:
     kind: ""
@@ -5016,17 +5016,17 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1alpha1_syncsetinstanceYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1alpha1_syncsetinstanceYaml, nil
+func configCrdsHive_v1_syncsetinstanceYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_syncsetinstanceYaml, nil
 }
 
-func configCrdsHive_v1alpha1_syncsetinstanceYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1alpha1_syncsetinstanceYamlBytes()
+func configCrdsHive_v1_syncsetinstanceYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_syncsetinstanceYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1alpha1_syncsetinstance.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_syncsetinstance.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5132,48 +5132,48 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"config/hiveadmission/apiservice.yaml":                        configHiveadmissionApiserviceYaml,
-	"config/hiveadmission/clusterdeployment-webhook.yaml":         configHiveadmissionClusterdeploymentWebhookYaml,
-	"config/hiveadmission/clusterimageset-webhook.yaml":           configHiveadmissionClusterimagesetWebhookYaml,
-	"config/hiveadmission/clusterprovision-webhook.yaml":          configHiveadmissionClusterprovisionWebhookYaml,
-	"config/hiveadmission/deployment.yaml":                        configHiveadmissionDeploymentYaml,
-	"config/hiveadmission/dnszones-webhook.yaml":                  configHiveadmissionDnszonesWebhookYaml,
-	"config/hiveadmission/hiveadmission_rbac_role.yaml":           configHiveadmissionHiveadmission_rbac_roleYaml,
-	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml":   configHiveadmissionHiveadmission_rbac_role_bindingYaml,
-	"config/hiveadmission/selectorsyncset-webhook.yaml":           configHiveadmissionSelectorsyncsetWebhookYaml,
-	"config/hiveadmission/service-account.yaml":                   configHiveadmissionServiceAccountYaml,
-	"config/hiveadmission/service.yaml":                           configHiveadmissionServiceYaml,
-	"config/hiveadmission/syncset-webhook.yaml":                   configHiveadmissionSyncsetWebhookYaml,
-	"config/manager/deployment.yaml":                              configManagerDeploymentYaml,
-	"config/manager/service.yaml":                                 configManagerServiceYaml,
-	"config/external-dns/deployment.yaml":                         configExternalDnsDeploymentYaml,
-	"config/external-dns/rbac_role.yaml":                          configExternalDnsRbac_roleYaml,
-	"config/external-dns/rbac_role_binding.yaml":                  configExternalDnsRbac_role_bindingYaml,
-	"config/external-dns/service_account.yaml":                    configExternalDnsService_accountYaml,
-	"config/rbac/hive_admin_role.yaml":                            configRbacHive_admin_roleYaml,
-	"config/rbac/hive_admin_role_binding.yaml":                    configRbacHive_admin_role_bindingYaml,
-	"config/rbac/hive_controllers_role.yaml":                      configRbacHive_controllers_roleYaml,
-	"config/rbac/hive_controllers_role_binding.yaml":              configRbacHive_controllers_role_bindingYaml,
-	"config/rbac/hive_frontend_role.yaml":                         configRbacHive_frontend_roleYaml,
-	"config/rbac/hive_frontend_role_binding.yaml":                 configRbacHive_frontend_role_bindingYaml,
-	"config/rbac/hive_frontend_serviceaccount.yaml":               configRbacHive_frontend_serviceaccountYaml,
-	"config/rbac/hive_reader_role.yaml":                           configRbacHive_reader_roleYaml,
-	"config/rbac/hive_reader_role_binding.yaml":                   configRbacHive_reader_role_bindingYaml,
-	"config/crds/hive_v1alpha1_checkpoint.yaml":                   configCrdsHive_v1alpha1_checkpointYaml,
-	"config/crds/hive_v1alpha1_clusterdeployment.yaml":            configCrdsHive_v1alpha1_clusterdeploymentYaml,
-	"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml":    configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml,
-	"config/crds/hive_v1alpha1_clusterimageset.yaml":              configCrdsHive_v1alpha1_clusterimagesetYaml,
-	"config/crds/hive_v1alpha1_clusterprovision.yaml":             configCrdsHive_v1alpha1_clusterprovisionYaml,
-	"config/crds/hive_v1alpha1_clusterstate.yaml":                 configCrdsHive_v1alpha1_clusterstateYaml,
-	"config/crds/hive_v1alpha1_dnsendpoint.yaml":                  configCrdsHive_v1alpha1_dnsendpointYaml,
-	"config/crds/hive_v1alpha1_dnszone.yaml":                      configCrdsHive_v1alpha1_dnszoneYaml,
-	"config/crds/hive_v1alpha1_hiveconfig.yaml":                   configCrdsHive_v1alpha1_hiveconfigYaml,
-	"config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml": configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml,
-	"config/crds/hive_v1alpha1_selectorsyncset.yaml":              configCrdsHive_v1alpha1_selectorsyncsetYaml,
-	"config/crds/hive_v1alpha1_syncidentityprovider.yaml":         configCrdsHive_v1alpha1_syncidentityproviderYaml,
-	"config/crds/hive_v1alpha1_syncset.yaml":                      configCrdsHive_v1alpha1_syncsetYaml,
-	"config/crds/hive_v1alpha1_syncsetinstance.yaml":              configCrdsHive_v1alpha1_syncsetinstanceYaml,
-	"config/configmaps/install-log-regexes-configmap.yaml":        configConfigmapsInstallLogRegexesConfigmapYaml,
+	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
+	"config/hiveadmission/clusterdeployment-webhook.yaml":       configHiveadmissionClusterdeploymentWebhookYaml,
+	"config/hiveadmission/clusterimageset-webhook.yaml":         configHiveadmissionClusterimagesetWebhookYaml,
+	"config/hiveadmission/clusterprovision-webhook.yaml":        configHiveadmissionClusterprovisionWebhookYaml,
+	"config/hiveadmission/deployment.yaml":                      configHiveadmissionDeploymentYaml,
+	"config/hiveadmission/dnszones-webhook.yaml":                configHiveadmissionDnszonesWebhookYaml,
+	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
+	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
+	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
+	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
+	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
+	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
+	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
+	"config/manager/service.yaml":                               configManagerServiceYaml,
+	"config/external-dns/deployment.yaml":                       configExternalDnsDeploymentYaml,
+	"config/external-dns/rbac_role.yaml":                        configExternalDnsRbac_roleYaml,
+	"config/external-dns/rbac_role_binding.yaml":                configExternalDnsRbac_role_bindingYaml,
+	"config/external-dns/service_account.yaml":                  configExternalDnsService_accountYaml,
+	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
+	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
+	"config/rbac/hive_controllers_role.yaml":                    configRbacHive_controllers_roleYaml,
+	"config/rbac/hive_controllers_role_binding.yaml":            configRbacHive_controllers_role_bindingYaml,
+	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
+	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
+	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
+	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
+	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
+	"config/crds/hive_v1_checkpoint.yaml":                       configCrdsHive_v1_checkpointYaml,
+	"config/crds/hive_v1_clusterdeployment.yaml":                configCrdsHive_v1_clusterdeploymentYaml,
+	"config/crds/hive_v1_clusterdeprovisionrequest.yaml":        configCrdsHive_v1_clusterdeprovisionrequestYaml,
+	"config/crds/hive_v1_clusterimageset.yaml":                  configCrdsHive_v1_clusterimagesetYaml,
+	"config/crds/hive_v1_clusterprovision.yaml":                 configCrdsHive_v1_clusterprovisionYaml,
+	"config/crds/hive_v1_clusterstate.yaml":                     configCrdsHive_v1_clusterstateYaml,
+	"config/crds/hive_v1_dnsendpoint.yaml":                      configCrdsHive_v1_dnsendpointYaml,
+	"config/crds/hive_v1_dnszone.yaml":                          configCrdsHive_v1_dnszoneYaml,
+	"config/crds/hive_v1_hiveconfig.yaml":                       configCrdsHive_v1_hiveconfigYaml,
+	"config/crds/hive_v1_selectorsyncidentityprovider.yaml":     configCrdsHive_v1_selectorsyncidentityproviderYaml,
+	"config/crds/hive_v1_selectorsyncset.yaml":                  configCrdsHive_v1_selectorsyncsetYaml,
+	"config/crds/hive_v1_syncidentityprovider.yaml":             configCrdsHive_v1_syncidentityproviderYaml,
+	"config/crds/hive_v1_syncset.yaml":                          configCrdsHive_v1_syncsetYaml,
+	"config/crds/hive_v1_syncsetinstance.yaml":                  configCrdsHive_v1_syncsetinstanceYaml,
+	"config/configmaps/install-log-regexes-configmap.yaml":      configConfigmapsInstallLogRegexesConfigmapYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -5222,20 +5222,20 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},
 		"crds": {nil, map[string]*bintree{
-			"hive_v1alpha1_checkpoint.yaml":                   {configCrdsHive_v1alpha1_checkpointYaml, map[string]*bintree{}},
-			"hive_v1alpha1_clusterdeployment.yaml":            {configCrdsHive_v1alpha1_clusterdeploymentYaml, map[string]*bintree{}},
-			"hive_v1alpha1_clusterdeprovisionrequest.yaml":    {configCrdsHive_v1alpha1_clusterdeprovisionrequestYaml, map[string]*bintree{}},
-			"hive_v1alpha1_clusterimageset.yaml":              {configCrdsHive_v1alpha1_clusterimagesetYaml, map[string]*bintree{}},
-			"hive_v1alpha1_clusterprovision.yaml":             {configCrdsHive_v1alpha1_clusterprovisionYaml, map[string]*bintree{}},
-			"hive_v1alpha1_clusterstate.yaml":                 {configCrdsHive_v1alpha1_clusterstateYaml, map[string]*bintree{}},
-			"hive_v1alpha1_dnsendpoint.yaml":                  {configCrdsHive_v1alpha1_dnsendpointYaml, map[string]*bintree{}},
-			"hive_v1alpha1_dnszone.yaml":                      {configCrdsHive_v1alpha1_dnszoneYaml, map[string]*bintree{}},
-			"hive_v1alpha1_hiveconfig.yaml":                   {configCrdsHive_v1alpha1_hiveconfigYaml, map[string]*bintree{}},
-			"hive_v1alpha1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1alpha1_selectorsyncidentityproviderYaml, map[string]*bintree{}},
-			"hive_v1alpha1_selectorsyncset.yaml":              {configCrdsHive_v1alpha1_selectorsyncsetYaml, map[string]*bintree{}},
-			"hive_v1alpha1_syncidentityprovider.yaml":         {configCrdsHive_v1alpha1_syncidentityproviderYaml, map[string]*bintree{}},
-			"hive_v1alpha1_syncset.yaml":                      {configCrdsHive_v1alpha1_syncsetYaml, map[string]*bintree{}},
-			"hive_v1alpha1_syncsetinstance.yaml":              {configCrdsHive_v1alpha1_syncsetinstanceYaml, map[string]*bintree{}},
+			"hive_v1_checkpoint.yaml":                   {configCrdsHive_v1_checkpointYaml, map[string]*bintree{}},
+			"hive_v1_clusterdeployment.yaml":            {configCrdsHive_v1_clusterdeploymentYaml, map[string]*bintree{}},
+			"hive_v1_clusterdeprovisionrequest.yaml":    {configCrdsHive_v1_clusterdeprovisionrequestYaml, map[string]*bintree{}},
+			"hive_v1_clusterimageset.yaml":              {configCrdsHive_v1_clusterimagesetYaml, map[string]*bintree{}},
+			"hive_v1_clusterprovision.yaml":             {configCrdsHive_v1_clusterprovisionYaml, map[string]*bintree{}},
+			"hive_v1_clusterstate.yaml":                 {configCrdsHive_v1_clusterstateYaml, map[string]*bintree{}},
+			"hive_v1_dnsendpoint.yaml":                  {configCrdsHive_v1_dnsendpointYaml, map[string]*bintree{}},
+			"hive_v1_dnszone.yaml":                      {configCrdsHive_v1_dnszoneYaml, map[string]*bintree{}},
+			"hive_v1_hiveconfig.yaml":                   {configCrdsHive_v1_hiveconfigYaml, map[string]*bintree{}},
+			"hive_v1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1_selectorsyncidentityproviderYaml, map[string]*bintree{}},
+			"hive_v1_selectorsyncset.yaml":              {configCrdsHive_v1_selectorsyncsetYaml, map[string]*bintree{}},
+			"hive_v1_syncidentityprovider.yaml":         {configCrdsHive_v1_syncidentityproviderYaml, map[string]*bintree{}},
+			"hive_v1_syncset.yaml":                      {configCrdsHive_v1_syncsetYaml, map[string]*bintree{}},
+			"hive_v1_syncsetinstance.yaml":              {configCrdsHive_v1_syncsetinstanceYaml, map[string]*bintree{}},
 		}},
 		"external-dns": {nil, map[string]*bintree{
 			"deployment.yaml":        {configExternalDnsDeploymentYaml, map[string]*bintree{}},

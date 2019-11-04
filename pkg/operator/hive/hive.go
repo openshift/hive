@@ -10,7 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
@@ -123,16 +123,16 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 		// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
 		// the latest in the operator to ensure updates roll out.
-		"config/crds/hive_v1alpha1_clusterdeployment.yaml",
-		"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml",
-		"config/crds/hive_v1alpha1_clusterimageset.yaml",
-		"config/crds/hive_v1alpha1_dnsendpoint.yaml",
-		"config/crds/hive_v1alpha1_dnszone.yaml",
-		"config/crds/hive_v1alpha1_hiveconfig.yaml",
-		"config/crds/hive_v1alpha1_selectorsyncidentityprovider.yaml",
-		"config/crds/hive_v1alpha1_selectorsyncset.yaml",
-		"config/crds/hive_v1alpha1_syncidentityprovider.yaml",
-		"config/crds/hive_v1alpha1_syncset.yaml",
+		"config/crds/hive_v1_clusterdeployment.yaml",
+		"config/crds/hive_v1_clusterdeprovisionrequest.yaml",
+		"config/crds/hive_v1_clusterimageset.yaml",
+		"config/crds/hive_v1_dnsendpoint.yaml",
+		"config/crds/hive_v1_dnszone.yaml",
+		"config/crds/hive_v1_hiveconfig.yaml",
+		"config/crds/hive_v1_selectorsyncidentityprovider.yaml",
+		"config/crds/hive_v1_selectorsyncset.yaml",
+		"config/crds/hive_v1_syncidentityprovider.yaml",
+		"config/crds/hive_v1_syncset.yaml",
 
 		"config/configmaps/install-log-regexes-configmap.yaml",
 	}

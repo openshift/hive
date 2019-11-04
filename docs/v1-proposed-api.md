@@ -245,17 +245,17 @@ CRD versioning functionality is not available in OpenShift 3.11 where prod/stage
 
 To avoid having to fork and abandon stage/prod until they can move to 4.3+ we propose the following solution using an aggregated API server. The migration will be orchestrated by the hive-operator.
 
-  1. Create an OSD branch in hive.git and override appsre job to use the new branch.
-  1. Begin V1 work in master. Keep v1alpha1 CRDs, but all controller code ported to use new V1.
-  1. As soon as time allows, deliver hive-operator migration code:
-    1. Scale down v1alpha1 controllers.
+  1. Begin V1 work in v1 branch. Will merge back to master once we have the migration code ready. (may be a period of a few weeks)
+  1. hive-operator migration
+    1. Scale down v1alpha1 controllers pod.
     1. Deploy an admission validating webhook that blocks all mutating actions on v1alpha1 CRDs.
       * This will block all integrating applications from making any changes while data is being migrated.
+      * WARNING: we're not sure this works, the removal of finalizers is an update, we'd block ourselves.
     1. Delete the v1alpha1 controller deployments.
     1. Deploy the new v1 Hive CRDs.
       * These will have the same names as in v1alpha1 but reside in a new API group.
     1. Migrate v1alpha1 CRs to v1.
-      * New ClusterDeployments will have no InstallConfig reference as we do not need to migrate data that is only used at install time. Some minor data will be lost. (i.e. network config)
+      * We will create an InstallConfig secret for all legacy ClusterDeployments during this process. This ensures no data is lost and API responses remain consistent.
     1. Remove finalizers on v1alpha1 objects to help ensure the controllers do not attempt to deprovision or perform any actions when we delete.
     1. Delete all v1alpha1 custom resources.
       * Finalizers should be deleted and controllers scaled down, so no action should be taken.
@@ -276,4 +276,5 @@ Benefits:
 Concerns:
 
   * Must be very careful nothing can possibly be listening when we do the migration, particularly when deleting the old CRs, which would trigger a cluster deprovision. However if finalizers are removed and controllers are scaled down, this should not be possible.
+  * We will want to ensure callers are migrating off v1alpha1 in a timely manner to limit maintenance overhead of the aggregated api.
 

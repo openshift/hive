@@ -13,6 +13,9 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+
+	installertypes "github.com/openshift/installer/pkg/types"
+	installergcp "github.com/openshift/installer/pkg/types/gcp"
 )
 
 const (
@@ -54,7 +57,15 @@ func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 	}, nil
 }
 
-func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error {
+func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment,
+	installConfig *installertypes.InstallConfig) error {
+
+	installConfig.Platform = installertypes.Platform{
+		GCP: &installergcp.Platform{
+			ProjectID: o.GCPProjectID,
+			Region:    "us-east1",
+		},
+	}
 	cd.Spec.Platform = hivev1.Platform{
 		GCP: &hivev1gcp.Platform{
 			ProjectID: o.GCPProjectID,

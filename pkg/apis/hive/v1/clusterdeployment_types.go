@@ -5,7 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
@@ -59,14 +58,6 @@ type ClusterDeploymentSpec struct {
 	// +required
 	BaseDomain string `json:"baseDomain"`
 
-	// Networking defines the pod network provider in the cluster.
-	// +required
-	Networking `json:"networking"`
-
-	// ControlPlane is the MachinePool containing control plane nodes that need to be installed.
-	// +required
-	ControlPlane MachinePool `json:"controlPlane"`
-
 	// Compute is the list of MachinePools containing compute nodes that need to be installed.
 	// +required
 	Compute []MachinePool `json:"compute"`
@@ -115,12 +106,28 @@ type ClusterDeploymentSpec struct {
 
 	// Installed is true if the cluster has been installed
 	Installed bool `json:"installed"`
+
+	// Provisioning contains settings used only for initial cluster provisioning.
+	// May be unset in the case of adopted clusters.
+	Provisioning *Provisioning `json:"provisioning"`
+}
+
+// Provisioning contains settings used only for initial cluster provisioning.
+type Provisioning struct {
+	// InstallConfigSecret is the reference to a secret that contains an openshift-install
+	// InstallConfig. This file will be passed through directly to the installer.
+	// Any version of InstallConfig can be used, provided it can be parsed by the openshift-install
+	// version for the release you are provisioning.
+	InstallConfigSecret corev1.LocalObjectReference `json:"installConfigSecret,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
 type ProvisionImages struct {
+	// TODO: This struct should be moved under Provisioning
+
 	// InstallerImage is the image containing the openshift-install binary that will be used to install.
 	InstallerImage string `json:"installerImage,omitempty"`
+
 	// InstallerImagePullPolicy is the pull policy for the installer image.
 	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy,omitempty"`
 
@@ -324,31 +331,6 @@ type Platform struct {
 	// +optional
 	GCP *gcp.Platform `json:"gcp,omitempty"`
 }
-
-// Networking defines the pod network provider in the cluster.
-type Networking struct {
-	// MachineCIDR is the IP address space from which to assign machine IPs.
-	MachineCIDR string `json:"machineCIDR"`
-
-	// Type is the network type to install
-	Type NetworkType `json:"type"`
-
-	// ServiceCIDR is the IP address space from which to assign service IPs.
-	ServiceCIDR string `json:"serviceCIDR"`
-
-	// ClusterNetworks is the IP address space from which to assign pod IPs.
-	ClusterNetworks []netopv1.ClusterNetwork `json:"clusterNetworks,omitempty"`
-}
-
-// NetworkType defines the pod network provider in the cluster.
-type NetworkType string
-
-const (
-	// NetworkTypeOpenshiftSDN is used to install with SDN.
-	NetworkTypeOpenshiftSDN NetworkType = "OpenShiftSDN"
-	// NetworkTypeOpenshiftOVN is used to install with OVN.
-	NetworkTypeOpenshiftOVN NetworkType = "OVNKubernetes"
-)
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects
 // that should exist on the cluster.

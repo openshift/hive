@@ -33,21 +33,24 @@ import (
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 
-	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
-	installtypes "github.com/openshift/installer/pkg/types"
-	installtypesaws "github.com/openshift/installer/pkg/types/aws"
+	awsmachines "github.com/openshift/installer/pkg/asset/machines/aws"
+	installertypes "github.com/openshift/installer/pkg/types"
+	installeraws "github.com/openshift/installer/pkg/types/aws"
+	installerazure "github.com/openshift/installer/pkg/types/azure"
+	installergcp "github.com/openshift/installer/pkg/types/gcp"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/install"
 )
 
 const (
-	controllerName       = "remotemachineset"
-	adminSSHKeySecretKey = "ssh-publickey"
+	controllerName = "remotemachineset"
 )
 
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
@@ -341,7 +344,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	generatedMachineSets := []*machineapi.MachineSet{}
 	installerMachineSets := []machineapi.MachineSet{}
 
-	// Generate InstallConfig from ClusterDeployment
+	// Generate minimal/partial InstallConfig from ClusterDeployment
 	ic, err := r.generateInstallConfigFromClusterDeployment(cd)
 	if err != nil {
 		return nil, err
@@ -353,7 +356,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 	case "aws":
 		for _, workerPool := range workerPools {
 			if workerPool.Platform.AWS == nil {
-				workerPool.Platform.AWS = &installtypesaws.MachinePool{}
+				workerPool.Platform.AWS = &installeraws.MachinePool{}
 			}
 			if len(workerPool.Platform.AWS.Zones) == 0 {
 				awsClient, err := r.getAWSClient(cd)
@@ -371,7 +374,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				workerPool.Platform.AWS.Zones = azs
 			}
 
-			icMachineSets, err := installaws.MachineSets(cd.Status.InfraID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
+			icMachineSets, err := awsmachines.MachineSets(cd.Status.InfraID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
 			if err != nil {
 				return nil, err
 			}
@@ -441,30 +444,89 @@ func findHiveMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.
 	return nil
 }
 
-func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installtypes.InstallConfig, error) {
-	cdLog := r.logger.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-	})
+// generateInstallConfigFromClusterDeployment creates a partial InstallConfig containing just enough of the information we need
+// to reconcile machine pools. (most notably the platform information) We cannot load the InstallConfig
+// the cluster was created with as this data is meant to be provision time only, all future reconciliation is
+// driven by the ClusterDeployment.
+func (r *ReconcileRemoteMachineSet) generateInstallConfigFromClusterDeployment(cd *hivev1.ClusterDeployment) (*installertypes.InstallConfig, error) {
 	cd = cd.DeepCopy()
 
-	cdLog.Debug("loading SSH key secret")
-	sshKey, err := controllerutils.LoadSecretData(r, cd.Spec.SSHKey.Name,
-		cd.Namespace, adminSSHKeySecretKey)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to load ssh key from secret")
-		return nil, err
-	}
+	computeMachinePools := convertMachinePools(cd.Spec.Compute...)
 
-	// Using a fake pull secret here, we don't need the pull secret given our use of
-	// this install config, all we're after are the machine pools.
-	ic, err := install.GenerateInstallConfig(cd, sshKey, "{}", false)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to generate install config")
-		return nil, err
+	// TODO: AWS only right now, add GCP and someday Azure
+	var ic *installertypes.InstallConfig
+	if cd.Spec.Platform.AWS != nil {
+		ic = &installertypes.InstallConfig{
+			Platform: installertypes.Platform{
+				AWS: &installeraws.Platform{
+					Region: cd.Spec.Platform.AWS.Region,
+				},
+			},
+			Compute: computeMachinePools,
+		}
+	} else {
+		return nil, fmt.Errorf("unsupported platform for remote machineset management")
 	}
 
 	return ic, nil
+}
+
+func convertMachinePools(pools ...hivev1.MachinePool) []installertypes.MachinePool {
+	machinePools := make([]installertypes.MachinePool, len(pools))
+	for i, mp := range pools {
+		machinePools[i] = installertypes.MachinePool{
+			Name:     mp.Name,
+			Replicas: mp.Replicas,
+			Platform: *convertMachinePoolPlatform(&mp.Platform),
+		}
+	}
+	return machinePools
+}
+
+func convertMachinePoolPlatform(p *hivev1.MachinePoolPlatform) *installertypes.MachinePoolPlatform {
+	return &installertypes.MachinePoolPlatform{
+		AWS:   convertAWSMachinePool(p.AWS),
+		Azure: convertAzureMachinePool(p.Azure),
+		GCP:   convertGCPMachinePool(p.GCP),
+	}
+}
+
+func convertAWSMachinePool(p *hivev1aws.MachinePoolPlatform) *installeraws.MachinePool {
+	if p == nil {
+		return nil
+	}
+	return &installeraws.MachinePool{
+		InstanceType: p.InstanceType,
+		EC2RootVolume: installeraws.EC2RootVolume{
+			IOPS: p.EC2RootVolume.IOPS,
+			Size: p.EC2RootVolume.Size,
+			Type: p.EC2RootVolume.Type,
+		},
+		Zones: p.Zones,
+	}
+}
+
+func convertAzureMachinePool(p *hivev1azure.MachinePool) *installerazure.MachinePool {
+	if p == nil {
+		return nil
+	}
+	return &installerazure.MachinePool{
+		Zones:        p.Zones,
+		InstanceType: p.InstanceType,
+		OSDisk: installerazure.OSDisk{
+			DiskSizeGB: p.OSDisk.DiskSizeGB,
+		},
+	}
+}
+
+func convertGCPMachinePool(p *hivev1gcp.MachinePool) *installergcp.MachinePool {
+	if p == nil {
+		return nil
+	}
+	return &installergcp.MachinePool{
+		Zones:        p.Zones,
+		InstanceType: p.InstanceType,
+	}
 }
 
 // getAWSClient generates an awsclient

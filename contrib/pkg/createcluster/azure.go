@@ -13,6 +13,8 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+
+	installertypes "github.com/openshift/installer/pkg/types"
 )
 
 const (
@@ -54,7 +56,8 @@ func (p *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secr
 	}, nil
 }
 
-func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error {
+func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment,
+	installConfig *installertypes.InstallConfig) error {
 	cd.Spec.Platform = hivev1.Platform{
 		Azure: &hivev1azure.Platform{
 			Region:                      "centralus",

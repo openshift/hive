@@ -162,12 +162,19 @@ func TestInstallManager(t *testing.T) {
 
 			fakeClient := fake.NewFakeClient(existing...)
 
+			// create a fake install-config
+			mountedInstallConfigFile := filepath.Join(tempDir, "mounted-install-config.yaml")
+			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("FAKE INSTALL CONFIG"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake install-config file: %v", err)
+			}
+
 			im := InstallManager{
-				LogLevel:             "debug",
-				WorkDir:              tempDir,
-				ClusterProvisionName: testProvisionName,
-				Namespace:            testNamespace,
-				DynamicClient:        fakeClient,
+				LogLevel:               "debug",
+				WorkDir:                tempDir,
+				ClusterProvisionName:   testProvisionName,
+				Namespace:              testNamespace,
+				DynamicClient:          fakeClient,
+				InstallConfigMountPath: mountedInstallConfigFile,
 			}
 			im.Complete([]string{})
 
@@ -554,6 +561,12 @@ func TestInstallManagerSSH(t *testing.T) {
 				t.Fatalf("error creating fake ssh-agent binary: %v", err)
 			}
 
+			// create a fake install-config
+			mountedInstallConfigFile := filepath.Join(testDir, "mounted-install-config.yaml")
+			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("FAKE INSTALL CONFIG"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake install-config file: %v", err)
+			}
+
 			tempDir, err := ioutil.TempDir("", "installmanagersshtestresults")
 			if err != nil {
 				t.Fatalf("errored while setting up temp dir for test: %v", err)
@@ -561,8 +574,9 @@ func TestInstallManagerSSH(t *testing.T) {
 			defer os.RemoveAll(tempDir)
 
 			im := InstallManager{
-				LogLevel: "debug",
-				WorkDir:  tempDir,
+				LogLevel:               "debug",
+				WorkDir:                tempDir,
+				InstallConfigMountPath: mountedInstallConfigFile,
 			}
 
 			if test.existingSSHAgentRunning {

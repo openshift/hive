@@ -10,6 +10,9 @@ import (
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+
+	installertypes "github.com/openshift/installer/pkg/types"
+	awsinstallertypes "github.com/openshift/installer/pkg/types/aws"
 )
 
 var _ cloudProvider = (*awsCloudProvider)(nil)
@@ -40,12 +43,16 @@ func (p *awsCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 	}, nil
 }
 
-func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error {
+func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment,
+	installConfig *installertypes.InstallConfig) error {
+
+	// Inject platform details into ClusterDeployment:
 	cd.Spec.Platform = hivev1.Platform{
 		AWS: &hivev1aws.Platform{
 			Region: "us-east-1",
 		},
 	}
+
 	cd.Spec.PlatformSecrets = hivev1.PlatformSecrets{
 		AWS: &hivev1aws.PlatformSecrets{
 			Credentials: corev1.LocalObjectReference{
@@ -53,24 +60,37 @@ func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 			},
 		},
 	}
+
+	cd.Spec.Compute[0].Platform = hivev1.MachinePoolPlatform{
+		AWS: &hivev1aws.MachinePoolPlatform{
+			InstanceType: "m4.xlarge",
+			EC2RootVolume: hivev1aws.EC2RootVolume{
+				IOPS: 100,
+				Size: 22,
+				Type: "gp2",
+			},
+		},
+	}
+
+	// Inject platform details into InstallConfig:
+	installConfig.Platform = installertypes.Platform{
+		AWS: &awsinstallertypes.Platform{
+			Region: "us-east-1",
+		},
+	}
+
 	// Used for both control plane and workers.
-	mpp := &hivev1aws.MachinePoolPlatform{
-		InstanceType: "m4.large",
-		EC2RootVolume: hivev1aws.EC2RootVolume{
+	mpp := &awsinstallertypes.MachinePool{
+		InstanceType: "m4.xlarge",
+		EC2RootVolume: awsinstallertypes.EC2RootVolume{
 			IOPS: 100,
 			Size: 22,
 			Type: "gp2",
 		},
 	}
+	installConfig.ControlPlane.Platform.AWS = mpp
+	installConfig.Compute[0].Platform.AWS = mpp
 
-	cd.Spec.ControlPlane.Platform = hivev1.MachinePoolPlatform{
-		AWS: mpp,
-	}
-	for i := range cd.Spec.Compute {
-		cd.Spec.Compute[i].Platform = hivev1.MachinePoolPlatform{
-			AWS: mpp,
-		}
-	}
 	return nil
 }
 

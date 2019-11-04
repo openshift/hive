@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -25,7 +24,6 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/install"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,6 +70,7 @@ const (
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 	provisioningTransitionTimeout       = 5 * time.Minute
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
+	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -98,6 +97,7 @@ type InstallManager struct {
 	ClusterName              string
 	ClusterProvisionName     string
 	Namespace                string
+	InstallConfigMountPath   string
 	DynamicClient            client.Client
 	cleanupFailedProvision   func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
@@ -128,6 +128,7 @@ func NewInstallManagerCommand() *cobra.Command {
 			}
 			// Parse the namespace/name for our cluster provision:
 			im.Namespace, im.ClusterProvisionName = args[0], args[1]
+			im.InstallConfigMountPath = defaultInstallConfigMountPath
 
 			if err := im.Validate(); err != nil {
 				log.WithError(err).Error("invalid command options")
@@ -231,26 +232,16 @@ func (m *InstallManager) Run() error {
 
 	m.waitForInstallerBinaries()
 
-	// Generate an install-config.yaml:
-	sshKey := os.Getenv("SSH_PUB_KEY")
-	pullSecret := os.Getenv("PULL_SECRET")
-	m.log.Info("generating install config")
-	ic, err := install.GenerateInstallConfig(cd, sshKey, pullSecret, true)
+	m.log.Info("copying install-config.yaml")
+	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
+	cmd := exec.Command("cp", m.InstallConfigMountPath, destInstallConfigPath)
+	err = cmd.Run()
 	if err != nil {
-		m.log.WithError(err).Error("error generating install-config")
+		log.WithError(err).Errorf("error copying install-config.yaml from %s to %s",
+			m.InstallConfigMountPath, destInstallConfigPath)
 		return err
 	}
-	d, err := yaml.Marshal(ic)
-	if err != nil {
-		m.log.WithError(err).Error("error marshalling install-config.yaml")
-		return err
-	}
-
-	err = ioutil.WriteFile(filepath.Join(m.WorkDir, "install-config.yaml"), d, 0644)
-	if err != nil {
-		m.log.WithError(err).Error("error writing install-config.yaml to disk")
-		return err
-	}
+	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
 
 	// If the cluster provision has an infraID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.

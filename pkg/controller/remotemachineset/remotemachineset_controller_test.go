@@ -582,16 +582,12 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			SSHKey: corev1.LocalObjectReference{
 				Name: sshKeySecret,
 			},
-			ClusterName:  testName,
-			ControlPlane: hivev1.MachinePool{},
-			Compute:      computePools,
+			ClusterName: testName,
+			Compute:     computePools,
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
 					Region: "us-east-1",
 				},
-			},
-			Networking: hivev1.Networking{
-				Type: hivev1.NetworkTypeOpenshiftSDN,
 			},
 			PlatformSecrets: hivev1.PlatformSecrets{
 				AWS: &hivev1aws.PlatformSecrets{

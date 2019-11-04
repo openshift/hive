@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -23,7 +24,9 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+	"github.com/openshift/installer/pkg/ipnet"
+	installertypes "github.com/openshift/installer/pkg/types"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -249,7 +252,10 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 type cloudProvider interface {
 	generateCredentialsSecret(o *Options) (*corev1.Secret, error)
 
-	addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment) error
+	addPlatformDetails(
+		o *Options,
+		cd *hivev1.ClusterDeployment,
+		installConfig *installertypes.InstallConfig) error
 }
 
 // Run executes the command
@@ -325,18 +331,70 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	result := []runtime.Object{}
 
-	pullSecret, err := o.generatePullSecret()
+	pullSecret, err := o.getPullSecret()
 	if err != nil {
 		return nil, err
 	}
 
-	cd, err := o.GenerateClusterDeployment(pullSecret)
+	pullSecretSecret, err := o.generatePullSecret(pullSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := o.cloudProvider.addPlatformDetails(o, cd); err != nil {
+	cd, err := o.GenerateClusterDeployment(pullSecretSecret)
+	if err != nil {
 		return nil, err
+	}
+
+	sshPublicKey, err := o.getSSHPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	// Platform info will be injected by o.cloudProvider
+	installConfig := &installertypes.InstallConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: o.Name,
+		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: installertypes.InstallConfigVersion,
+		},
+		SSHKey:     sshPublicKey,
+		BaseDomain: o.BaseDomain,
+		Networking: &installertypes.Networking{
+			NetworkType:    "OpenShiftSDN",
+			ServiceNetwork: []ipnet.IPNet{*ipnet.MustParseCIDR("172.30.0.0/16")},
+			ClusterNetwork: []installertypes.ClusterNetworkEntry{
+				{
+					CIDR:       *ipnet.MustParseCIDR("10.128.0.0/14"),
+					HostPrefix: 23,
+				},
+			},
+			MachineCIDR: ipnet.MustParseCIDR("10.0.0.0/16"),
+		},
+		PullSecret: pullSecret,
+		ControlPlane: &installertypes.MachinePool{
+			Name:     "master",
+			Replicas: pointer.Int64Ptr(3),
+		},
+		Compute: []installertypes.MachinePool{
+			{
+				Name:     "worker",
+				Replicas: &o.WorkerNodes,
+			},
+		},
+	}
+
+	if err := o.cloudProvider.addPlatformDetails(o, cd, installConfig); err != nil {
+		return nil, err
+	}
+
+	installConfigSecret, err := o.generateInstallConfigSecret(installConfig)
+	if err != nil {
+		return nil, err
+	}
+	cd.Spec.Provisioning = &hivev1.Provisioning{
+		InstallConfigSecret: corev1.LocalObjectReference{Name: installConfigSecret.Name},
 	}
 
 	imageSet, err := o.configureImages(cd)
@@ -348,8 +406,8 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	}
 
 	if o.IncludeSecrets {
-		if pullSecret != nil {
-			result = append(result, pullSecret)
+		if pullSecretSecret != nil {
+			result = append(result, pullSecretSecret)
 		}
 
 		creds, err := o.cloudProvider.generateCredentialsSecret(o)
@@ -373,9 +431,30 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 	}
 
-	result = append(result, cd)
+	result = append(result, installConfigSecret, cd)
 
 	return result, err
+}
+
+func (o *Options) generateInstallConfigSecret(ic *installertypes.InstallConfig) (*corev1.Secret, error) {
+	d, err := yaml.Marshal(ic)
+	if err != nil {
+		return nil, err
+	}
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-install-config", o.Name),
+			Namespace: o.Namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"install-config.yaml": d,
+		},
+	}, nil
 }
 
 func (o *Options) getPullSecret() (string, error) {
@@ -398,11 +477,7 @@ func (o *Options) getPullSecret() (string, error) {
 	return "", nil
 }
 
-func (o *Options) generatePullSecret() (*corev1.Secret, error) {
-	pullSecret, err := o.getPullSecret()
-	if err != nil {
-		return nil, err
-	}
+func (o *Options) generatePullSecret(pullSecret string) (*corev1.Secret, error) {
 	if len(pullSecret) == 0 {
 		return nil, nil
 	}
@@ -536,22 +611,6 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.
 			},
 			ClusterName: o.Name,
 			BaseDomain:  o.BaseDomain,
-			// TODO: Generate networking from installer default
-			Networking: hivev1.Networking{
-				Type:        hivev1.NetworkTypeOpenshiftSDN,
-				ServiceCIDR: "172.30.0.0/16",
-				MachineCIDR: "10.0.0.0/16",
-				ClusterNetworks: []netopv1.ClusterNetwork{
-					{
-						CIDR:             "10.128.0.0/14",
-						HostSubnetLength: 23,
-					},
-				},
-			},
-			ControlPlane: hivev1.MachinePool{
-				Name:     "master",
-				Replicas: pointer.Int64Ptr(3),
-			},
 			Compute: []hivev1.MachinePool{
 				{
 					Name:     "worker",

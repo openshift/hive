@@ -949,9 +949,13 @@
   version = "v1.0.3"
 
 [[projects]]
-  digest = "1:bacb8b590716ab7c33f2277240972c9582d389593ee8d66fc10074e0508b8126"
+  digest = "1:b31059dac028ff111793a8345eacf0f99d0f1150ead34ebf32fdd2b7d54c2d45"
   name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  packages = [
+    "assert",
+    "require",
+    "suite",
+  ]
   pruneopts = "NUT"
   revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
   version = "v1.2.2"
@@ -2023,9 +2027,11 @@
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/suite",
     "golang.org/x/net/context",
     "golang.org/x/oauth2/google",
     "google.golang.org/api/cloudresourcemanager/v1",
+    "google.golang.org/api/dns/v1",
     "google.golang.org/api/option",
     "google.golang.org/api/serviceusage/v1",
     "gopkg.in/ini.v1",

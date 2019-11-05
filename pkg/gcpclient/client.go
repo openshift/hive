@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	compute "google.golang.org/api/compute/v1"
 	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/option"
 	serviceusage "google.golang.org/api/serviceusage/v1"
@@ -31,6 +32,10 @@ type Client interface {
 	CreateManagedZone(managedZone *dns.ManagedZone) (*dns.ManagedZone, error)
 
 	DeleteManagedZone(managedZone string) error
+
+	ListComputeZones(ListComputeZonesOptions) (*compute.ZoneList, error)
+
+	ListComputeImages(ListComputeImagesOptions) (*compute.ImageList, error)
 }
 
 // ListManagedZonesOptions are the options for listing managed zones.
@@ -52,6 +57,7 @@ type gcpClient struct {
 	projectName                string
 	creds                      *google.Credentials
 	cloudResourceManagerClient *cloudresourcemanager.Service
+	computeClient              *compute.Service
 	serviceUsageClient         *serviceusage.Service
 	dnsClient                  *dns.Service
 }
@@ -148,6 +154,51 @@ func (c *gcpClient) changeResourceRecordSet(managedZone string, change *dns.Chan
 	return err
 }
 
+// ListComputeZonesOptions are the options for listing compute zones.
+type ListComputeZonesOptions struct {
+	MaxResults int64
+	PageToken  string
+	Filter     string
+}
+
+func (c *gcpClient) ListComputeZones(opts ListComputeZonesOptions) (*compute.ZoneList, error) {
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+
+	call := c.computeClient.Zones.List(c.projectName).Filter(opts.Filter).Context(ctx)
+
+	if opts.MaxResults > 0 {
+		call.MaxResults(opts.MaxResults)
+	}
+	if opts.PageToken != "" {
+		call.PageToken(opts.PageToken)
+	}
+
+	return call.Do()
+}
+
+// ListComputeImagesOptions are the options for listing compute images.
+type ListComputeImagesOptions struct {
+	MaxResults int64
+	PageToken  string
+	Filter     string
+}
+
+func (c *gcpClient) ListComputeImages(opts ListComputeImagesOptions) (*compute.ImageList, error) {
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+
+	call := c.computeClient.Images.List(c.projectName).Filter(opts.Filter).Context(ctx)
+
+	if opts.MaxResults > 0 {
+		call.MaxResults(opts.MaxResults)
+	}
+	if opts.PageToken != "" {
+		call.PageToken(opts.PageToken)
+	}
+	return call.Do()
+}
+
 // NewClient creates our client wrapper object for interacting with GCP.
 func NewClient(projectName string, authJSON []byte) (Client, error) {
 	c, err := newClient(authJSON)
@@ -187,6 +238,11 @@ func newClient(authJSON []byte) (*gcpClient, error) {
 		return nil, err
 	}
 
+	computeClient, err := compute.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
 	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
 		return nil, err
@@ -201,6 +257,7 @@ func newClient(authJSON []byte) (*gcpClient, error) {
 		projectName:                creds.ProjectID,
 		creds:                      creds,
 		cloudResourceManagerClient: cloudResourceManagerClient,
+		computeClient:              computeClient,
 		serviceUsageClient:         serviceUsageClient,
 		dnsClient:                  dnsClient,
 	}, nil

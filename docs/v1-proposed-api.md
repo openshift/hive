@@ -136,8 +136,7 @@ status:
    * Future feature: Add support for [autoscaling](https://docs.openshift.com/container-platform/4.2/machine_management/applying-autoscaling.html#machine-autoscaler-cr_applying-autoscaling) here.
      * MachinePool.Spec.Autoscaling.MinReplicas and MaxReplicas.
      * Can exactly one of MachinePool.Spec.Replicas and MachinePool.Spec.Autoscaling.
-     * Using this feature would require you to specify one, and only one availability zone. It would not be logical to specify no zones getting your machinesets spread across multiple zones, with one set of
-     Needs to be handled carefully as autoscaling config is tied to a specific machine set, whereas our pool maps to multiple machine sets. A simple implementation across the pool would likely do something unintended. May need to require explicit region list, with auto-scale per region. This implies transition from a list of strings for AZs to a struct that could carry additional info.
+     * Requested min/max would be broken down across all specified availability zones as we do for replicas today. If a user wants more control and less magic over this, they can create multiple MachinePools with just one AZ, each with it's own autoscaling config.
    * Future feature: Add support for configuring [MachineConfigPools](https://github.com/openshift/machine-config-operator/blob/master/docs/MachineConfigController.md#machineconfigpool) for this MachinePool.
  1. Add support for bare metal provisioning.
    * At this point, we do not see any major implications for BareMetal. This is modelled as a separate platform in install config (see [this example](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md#install-config))

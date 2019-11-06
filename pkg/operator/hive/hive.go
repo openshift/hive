@@ -79,6 +79,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 					Value: e.AWS.Credentials.Name,
 				},
 			)
+		case e.GCP != nil:
+			hiveContainer.Env = append(
+				hiveContainer.Env,
+				corev1.EnvVar{
+					Name:  constants.ExternalDNSGCPCredsEnvVar,
+					Value: e.GCP.Credentials.Name,
+				},
+			)
 		}
 		addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec)
 	}

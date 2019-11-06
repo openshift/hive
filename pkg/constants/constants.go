@@ -18,6 +18,10 @@ const (
 	// secret to use when creating external DNS records in AWS.
 	ExternalDNSAWSCredsEnvVar = "HIVE_EXTERNAL_DNS_AWS_CREDS"
 
+	// ExternalDNSGCPCredsEnvVar is the name of the environment variable that contains the name of the
+	// secret to use when creating external DNS records in GCP.
+	ExternalDNSGCPCredsEnvVar = "HIVE_EXTERNAL_DNS_GCP_CREDS"
+
 	// SkipGatherLogsEnvVar is the environment variable which passes the configuration to disable
 	// log gathering on failed cluster installs. The value will be either "true" or "false".
 	// If unset "false" should be assumed. This variable is set by the operator depending on the

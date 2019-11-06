@@ -36,7 +36,7 @@ func TestAWSGet(t *testing.T) {
 		{
 			name: "no public hosted zones for domain",
 			listHostedZonesOutputs: []*route53.ListHostedZonesByNameOutput{
-				testListHostedZonesOutput(hzTruncated(), withHostedZones(testHostedZone("other-domain.", "other-zone-id", private()))),
+				testListHostedZonesOutput(withHostedZones(testHostedZone("test-domain.", "test-zone-id", private()))),
 			},
 		},
 		{

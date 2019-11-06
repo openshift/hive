@@ -1,0 +1,207 @@
+package nameserver
+
+import (
+	"context"
+
+	"github.com/pkg/errors"
+	dns "google.golang.org/api/dns/v1"
+	"google.golang.org/api/googleapi"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openshift/hive/pkg/constants"
+	gcpclient "github.com/openshift/hive/pkg/gcpclient"
+)
+
+// NewGCPQuery creates a new name server query for GCP.
+func NewGCPQuery(c client.Client, credsSecretName string) Query {
+	return &gcpQuery{
+		getGCPClient: func() (gcpclient.Client, error) {
+			secret := &corev1.Secret{}
+			if err := c.Get(
+				context.Background(),
+				client.ObjectKey{Namespace: constants.HiveNamespace, Name: credsSecretName},
+				secret,
+			); err != nil {
+				return nil, errors.Wrap(err, "could not get the creds secret")
+			}
+			authJSON, ok := secret.Data["osServiceAccount.json"]
+			if !ok {
+				return nil, errors.New("creds secret does not contain \"osServiceAccount.json\" data")
+			}
+			gcpClient, err := gcpclient.NewClientWithDefaultProject(authJSON)
+			return gcpClient, errors.Wrap(err, "error creating GCP client")
+		},
+	}
+}
+
+type gcpQuery struct {
+	getGCPClient func() (gcpclient.Client, error)
+}
+
+var _ Query = (*gcpQuery)(nil)
+
+// Get implements Query.Get.
+func (q *gcpQuery) Get(domain string) (map[string]sets.String, error) {
+	gcpClient, err := q.getGCPClient()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get GCP client")
+	}
+	zoneName, err := q.queryZoneName(gcpClient, domain)
+	if err != nil {
+		return nil, errors.Wrap(err, "error querying zone name")
+	}
+	if zoneName == "" {
+		return nil, nil
+	}
+	currentNameServers, err := q.queryNameServers(gcpClient, zoneName)
+	return currentNameServers, errors.Wrap(err, "error querying name servers")
+}
+
+// Create implements Query.Create.
+func (q *gcpQuery) Create(rootDomain string, domain string, values sets.String) error {
+	gcpClient, err := q.getGCPClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get GCP client")
+	}
+	zoneName, err := q.queryZoneName(gcpClient, rootDomain)
+	if err != nil {
+		return errors.Wrap(err, "error querying zone name")
+	}
+	if zoneName == "" {
+		return errors.New("no public managed zone found for domain")
+	}
+	return errors.Wrap(
+		q.createNameServers(gcpClient, zoneName, domain, values),
+		"error creating the name server",
+	)
+}
+
+// Delete implements Query.Delete.
+func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.String) error {
+	gcpClient, err := q.getGCPClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get GCP client")
+	}
+	zoneName, err := q.queryZoneName(gcpClient, rootDomain)
+	if err != nil {
+		return errors.Wrap(err, "error querying zone name")
+	}
+	if zoneName == "" {
+		return errors.New("no public managed zone found for domain")
+	}
+	if len(values) != 0 {
+		// If values were provided for the name servers, attempt to perform a
+		// delete using those values.
+		err = q.deleteNameServers(gcpClient, zoneName, domain, values)
+		gcpErr, ok := err.(*googleapi.Error)
+		if !ok {
+			return errors.Wrap(err, "error deleting the name server")
+		}
+		if gcpErr.Code == 404 {
+			return nil
+		}
+		if gcpErr.Code != 412 {
+			return errors.Wrap(err, "error deleting the name server")
+		}
+	}
+	// Since we do not have up-to-date values for the name servers, we need
+	// to query GCP for the current values to use them in the delete.
+	values, err = q.queryNameServer(gcpClient, zoneName, domain)
+	if err != nil {
+		return errors.Wrap(err, "error querying the current values of the name server")
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	return errors.Wrap(
+		q.deleteNameServers(gcpClient, zoneName, domain, values),
+		"error deleting the name server with recently read values",
+	)
+}
+
+// queryZoneName queries GCP for the public managed zone for the specified domain.
+func (q *gcpQuery) queryZoneName(gcpClient gcpclient.Client, domain string) (string, error) {
+	listOpts := gcpclient.ListManagedZonesOptions{
+		DNSName: dotted(domain),
+	}
+	for {
+		listOutput, err := gcpClient.ListManagedZones(listOpts)
+		if err != nil {
+			return "", err
+		}
+		for _, zone := range listOutput.ManagedZones {
+			if zone.Visibility != "public" {
+				continue
+			}
+			return zone.Name, nil
+		}
+		if listOutput.NextPageToken == "" {
+			return "", nil
+		}
+		listOpts.PageToken = listOutput.NextPageToken
+	}
+}
+
+// queryNameServers queries GCP for the name servers in the specified managed zone.
+func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone string) (map[string]sets.String, error) {
+	nameServers := map[string]sets.String{}
+	listOpts := gcpclient.ListResourceRecordSetsOptions{}
+	for {
+		listOutput, err := gcpClient.ListResourceRecordSets(managedZone, listOpts)
+		if err != nil {
+			return nil, err
+		}
+		for _, recordSet := range listOutput.Rrsets {
+			if recordSet.Type != "NS" {
+				continue
+			}
+			nameServers[undotted(recordSet.Name)] = sets.NewString(recordSet.Rrdatas...)
+		}
+		if listOutput.NextPageToken == "" {
+			return nameServers, nil
+		}
+		listOpts.PageToken = listOutput.NextPageToken
+	}
+}
+
+// queryNameServer queries GCP for the name servers for the specified domain in the specified managed zone.
+func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone string, domain string) (sets.String, error) {
+	listOutput, err := gcpClient.ListResourceRecordSets(
+		managedZone,
+		gcpclient.ListResourceRecordSetsOptions{
+			MaxResults: 1,
+			Name:       dotted(domain),
+			Type:       "NS",
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(listOutput.Rrsets) == 0 {
+		return nil, nil
+	}
+	recordSet := listOutput.Rrsets[0]
+	return sets.NewString(recordSet.Rrdatas...), nil
+}
+
+// createNameServers creates the name servers for the specified domain in the specified managed zone.
+func (q *gcpQuery) createNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.String) error {
+	return gcpClient.AddResourceRecordSet(managedZone, q.resourceRecordSet(domain, values))
+}
+
+// deleteNameServers deletes the name servers for the specified domain in the specified managed zone.
+func (q *gcpQuery) deleteNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.String) error {
+	return gcpClient.DeleteResourceRecordSet(managedZone, q.resourceRecordSet(domain, values))
+}
+
+func (q *gcpQuery) resourceRecordSet(domain string, values sets.String) *dns.ResourceRecordSet {
+	return &dns.ResourceRecordSet{
+		Name:    dotted(domain),
+		Rrdatas: values.List(),
+		Ttl:     int64(60),
+		Type:    "NS",
+	}
+}

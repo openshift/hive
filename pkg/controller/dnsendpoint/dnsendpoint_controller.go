@@ -38,13 +38,6 @@ func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", controllerName)
 	c := controllerutils.NewClientWithMetricsOrDie(mgr, controllerName)
 
-	credsSecretName := os.Getenv(constants.ExternalDNSAWSCredsEnvVar)
-	if credsSecretName == "" {
-		logger.Info("no aws creds for external DNS; controller disabled")
-		return nil
-	}
-	logger.Infof("using aws creds for external DNS stored in %q secret", credsSecretName)
-
 	managedDomains, err := manageddns.ReadManagedDomainsFile()
 	if err != nil {
 		logger.WithError(err).Error("could not read managed domains file")
@@ -55,7 +48,11 @@ func Add(mgr manager.Manager) error {
 		return nil
 	}
 
-	nameServerQuery := nameserver.NewAWSQuery(c, credsSecretName)
+	nameServerQuery := createNameServerQuery(c, logger)
+	if nameServerQuery == nil {
+		logger.Info("no platform found for external DNS; controller disabled")
+		return nil
+	}
 
 	nameServerChanges := make(chan event.GenericEvent, 1024)
 
@@ -212,4 +209,20 @@ func isValidDNSEndpoint(instance *hivev1.DNSEndpoint, dnsLog log.FieldLogger) bo
 		return false
 	}
 	return true
+}
+
+func createNameServerQuery(c client.Client, logger log.FieldLogger) nameserver.Query {
+	awsCredsSecretName := os.Getenv(constants.ExternalDNSAWSCredsEnvVar)
+	if awsCredsSecretName != "" {
+		logger.Infof("using aws creds for external DNS stored in %q secret", awsCredsSecretName)
+		return nameserver.NewAWSQuery(c, awsCredsSecretName)
+	}
+
+	gcpCredsSecretName := os.Getenv(constants.ExternalDNSGCPCredsEnvVar)
+	if gcpCredsSecretName != "" {
+		logger.Infof("using gcp creds for external DNS stored in %q secret", gcpCredsSecretName)
+		return nameserver.NewGCPQuery(c, gcpCredsSecretName)
+	}
+
+	return nil
 }

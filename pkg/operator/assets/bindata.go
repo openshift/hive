@@ -3147,6 +3147,17 @@ spec:
                         and 'aws_secret_access_key'.
                       type: object
                   type: object
+                gcp:
+                  description: GCP contains GCP-specific settings for external DNS
+                  properties:
+                    credentials:
+                      description: Credentials references a secret that will be used
+                        to authenticate with GCP DNS. It will need permission to manage
+                        entries in each of the managed domains for this cluster. Secret
+                        should have a key names 'osServiceAccount.json'. The credentials
+                        must specify the project to use.
+                      type: object
+                  type: object
               type: object
             failedProvisionConfig:
               description: FailedProvisionConfig is used to configure settings related

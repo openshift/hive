@@ -101,6 +101,22 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
+	args := []string{
+		"update-installer-image",
+		"--work-dir",
+		"/common",
+		"--log-level",
+		"debug",
+		"--cluster-deployment-name",
+		cd.Name,
+		"--cluster-deployment-namespace",
+		cd.Namespace,
+	}
+	// If installer image override is set from resolveInstallerImage, we provide it to
+	// resolved to indicate that we should skip installer image resolution
+	if cd.Status.InstallerImage != nil {
+		args = append(args, "--installer-image", *cd.Status.InstallerImage)
+	}
 	containers := []corev1.Container{
 		{
 			Name:            "release",
@@ -117,18 +133,8 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"update-installer-image",
-				"--work-dir",
-				"/common",
-				"--log-level",
-				"debug",
-				"--cluster-deployment-name",
-				cd.Name,
-				"--cluster-deployment-namespace",
-				cd.Namespace,
-			},
-			VolumeMounts: volumeMounts,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
 		},
 	}
 

@@ -46,6 +46,7 @@ type UpdateInstallerImageOptions struct {
 	ClusterDeploymentName      string
 	ClusterDeploymentNamespace string
 	LogLevel                   string
+	InstallerImage             string
 	WorkDir                    string
 	log                        log.FieldLogger
 	client                     client.Client
@@ -80,6 +81,7 @@ func NewUpdateInstallerImageCommand() *cobra.Command {
 	flags.StringVar(&opt.WorkDir, "work-dir", "/common", "directory to use for all input and output")
 	flags.StringVar(&opt.ClusterDeploymentName, "cluster-deployment-name", "", "name of ClusterDeployment to update")
 	flags.StringVar(&opt.ClusterDeploymentNamespace, "cluster-deployment-namespace", "", "namespace of ClusterDeployment to update")
+	flags.StringVar(&opt.InstallerImage, "installer-image", "", "installer image override")
 	return cmd
 }
 
@@ -179,14 +181,20 @@ func (o *UpdateInstallerImageOptions) Run() error {
 
 	if success {
 		o.log.Debugf("the oc release info command was successful")
-		installerImageFileName := path.Join(o.WorkDir, "installer-image.txt")
-		installerImageBytes, err := ioutil.ReadFile(installerImageFileName)
-		if err != nil {
-			o.log.WithError(err).Error("could not read install image file")
-			return err
+		var installerImage, cliImage string
+		if len(o.InstallerImage) > 0 {
+			o.log.Debugf("installer image override provided - skip installer image resolution")
+			installerImage = o.InstallerImage
+		} else {
+			installerImageFileName := path.Join(o.WorkDir, "installer-image.txt")
+			installerImageBytes, err := ioutil.ReadFile(installerImageFileName)
+			if err != nil {
+				o.log.WithError(err).Error("could not read install image file")
+				return err
+			}
+			installerImage = strings.TrimSpace(string(installerImageBytes))
+			o.log.Debugf("contents of installer-image.txt: %s", installerImage)
 		}
-		installerImage := strings.TrimSpace(string(installerImageBytes))
-		o.log.Debugf("contents of installer-image.txt: %s", installerImage)
 
 		cliImageFileName := path.Join(o.WorkDir, "cli-image.txt")
 		cliImageBytes, err := ioutil.ReadFile(cliImageFileName)
@@ -194,7 +202,7 @@ func (o *UpdateInstallerImageOptions) Run() error {
 			o.log.WithError(err).Error("could not read install image file")
 			return err
 		}
-		cliImage := strings.TrimSpace(string(cliImageBytes))
+		cliImage = strings.TrimSpace(string(cliImageBytes))
 		o.log.Debugf("contents of cli-image.txt: %s", cliImage)
 
 		return o.updateInstallerImage(installerImage, cliImage)
@@ -222,6 +230,7 @@ func (o *UpdateInstallerImageOptions) updateInstallerImage(installerImage, cliIm
 		logger.WithError(err).Error("failed to get ClusterDeployment")
 		return err
 	}
+
 	cd.Status.InstallerImage = &installerImage
 	cd.Status.CLIImage = &cliImage
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(

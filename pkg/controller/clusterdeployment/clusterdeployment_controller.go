@@ -855,16 +855,26 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 }
 
 func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
-	if len(cd.Spec.Images.InstallerImage) > 0 {
-		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
-			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
-		cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
-		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
-	}
+	// we set InstallerImage only if it is not set already to the same image
 	if imageSet != nil && imageSet.Spec.InstallerImage != nil {
-		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
-		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
-		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
+		if cd.Status.InstallerImage != nil && *cd.Status.InstallerImage == *imageSet.Spec.InstallerImage {
+			cdLog.WithField("imageset", imageSet.Name).Debug("status.InstallerImage already set to imageSet.Spec.InstallerImage")
+		} else {
+			cd.Status.InstallerImage = imageSet.Spec.InstallerImage
+			cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
+			return reconcile.Result{}, r.statusUpdate(cd, cdLog)
+		}
+	}
+	// cd.Spec.Images.InstallerImage takes over ImageSet.InstallerImage
+	if len(cd.Spec.Images.InstallerImage) > 0 {
+		if cd.Status.InstallerImage != nil && *cd.Status.InstallerImage == cd.Spec.Images.InstallerImage {
+			cdLog.WithField("imageset", imageSet.Name).Debug("status.InstallerImage already set to cd.Spec.Images.InstallerImage")
+		} else {
+			cdLog.WithField("image", cd.Spec.Images.InstallerImage).
+				Debug("setting status.InstallerImage to the value in spec.images.installerImage")
+			cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
+			return reconcile.Result{}, r.statusUpdate(cd, cdLog)
+		}
 	}
 
 	// If the .status.clusterVersionsStatus.availableUpdates field is nil,

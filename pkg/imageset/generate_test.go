@@ -1,6 +1,7 @@
 package imageset
 
 import (
+	"strings"
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -22,8 +23,50 @@ var (
 )
 
 func TestGenerateImageSetJob(t *testing.T) {
-	job := GenerateImageSetJob(testClusterDeployment(), *testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec)
-	validateJob(t, job)
+
+	tests := []struct {
+		name string
+		cd   func(*hivev1.ClusterDeployment)
+		// additionalValidation must return true if validation is passed
+		additionalValidation func(*batchv1.Job) bool
+	}{
+		{
+			name:                 "cli-image-only",
+			additionalValidation: func(job *batchv1.Job) bool { return true },
+		},
+		{
+			name: "installer-image-override",
+			cd: func(cd *hivev1.ClusterDeployment) {
+				cd.Status.InstallerImage = strPtr("custom-image")
+			},
+			additionalValidation: func(job *batchv1.Job) bool {
+				for _, c := range job.Spec.Template.Spec.Containers {
+					if c.Name == "hiveutil" {
+						for _, a := range c.Args {
+							if strings.Contains(a, "custom-image") {
+								return true
+							}
+						}
+					}
+				}
+				return false
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			deployment := testClusterDeployment()
+			if test.cd != nil {
+				test.cd(deployment)
+			}
+			job := GenerateImageSetJob(deployment, *testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec)
+			validateJob(t, job)
+			if !test.additionalValidation(job) {
+				t.Errorf("additional validation failed %s", test.name)
+			}
+		})
+	}
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

@@ -30,11 +30,12 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name                      string
-		existingClusterDeployment *hivev1.ClusterDeployment
-		expectError               bool
-		setupWorkDir              func(t *testing.T, dir string)
-		validateClusterDeployment func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment)
+		name                        string
+		existingClusterDeployment   *hivev1.ClusterDeployment
+		expectError                 bool
+		setupWorkDir                func(t *testing.T, dir string)
+		validateClusterDeployment   func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment)
+		updateInstallerImageOptions UpdateInstallerImageOptions
 	}{
 		{
 			name:                      "successful execution",
@@ -54,6 +55,15 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			setupWorkDir:              setupSuccessfulExecutionWorkDir,
 			validateClusterDeployment: validateSuccessfulExecutionAfterFailure,
 		},
+		{
+			name:                      "installer override in spec",
+			existingClusterDeployment: testClusterDeploymentWithCustomInstaller(),
+			setupWorkDir:              setupSuccessfulExecutionWorkDir,
+			validateClusterDeployment: validateCustomInstallerlExecution,
+			updateInstallerImageOptions: UpdateInstallerImageOptions{
+				InstallerImage: "custom-installer",
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -63,12 +73,11 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating test directory: %v", err)
 			}
-			opt := UpdateInstallerImageOptions{
-				ClusterDeploymentName: testClusterDeployment().Name,
-				WorkDir:               workDir,
-				log:                   log.WithField("test", test.name),
-				client:                client,
-			}
+			opt := test.updateInstallerImageOptions
+			opt.ClusterDeploymentName = test.existingClusterDeployment.Name
+			opt.WorkDir = workDir
+			opt.log = log.WithField("test", test.name)
+			opt.client = client
 
 			test.setupWorkDir(t, workDir)
 
@@ -106,6 +115,12 @@ func testClusterDeploymentWithErrorCondition() *hivev1.ClusterDeployment {
 	return cis
 }
 
+func testClusterDeploymentWithCustomInstaller() *hivev1.ClusterDeployment {
+	cis := testClusterDeployment()
+	cis.Status.InstallerImage = strPtr("custom-image")
+	return cis
+}
+
 func setupWorkDir(t *testing.T, dir, success, installerImage, cliImage, errorMessage string) {
 	err := ioutil.WriteFile(path.Join(dir, "success"), []byte(success), 0666)
 	if err != nil {
@@ -134,6 +149,16 @@ func setupWorkDir(t *testing.T, dir, success, installerImage, cliImage, errorMes
 
 func setupSuccessfulExecutionWorkDir(t *testing.T, dir string) {
 	setupWorkDir(t, dir, "1", testInstallerImage, testCLIImage, "")
+}
+
+func validateCustomInstallerlExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
+	if clusterDeployment.Status.InstallerImage == nil ||
+		*clusterDeployment.Status.InstallerImage != "custom-installer" {
+		t.Errorf("did not get expected custom installer image in status")
+	}
+	if len(clusterDeployment.Status.Conditions) != 0 {
+		t.Errorf("conditions is not empty")
+	}
 }
 
 func validateSuccessfulExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {

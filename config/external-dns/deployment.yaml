@@ -21,7 +21,7 @@ spec:
         image: registry.svc.ci.openshift.org/openshift/hive-v4.0:external-dns
         args:
         - --source=crd
-        - --crd-source-apiversion=hive.openshift.io/v1alpha1
+        - --crd-source-apiversion=hive.openshift.io/v1
         - --crd-source-kind=DNSEndpoint
         - --registry=txt
         - --policy=sync

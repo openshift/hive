@@ -1564,7 +1564,7 @@ func testDNSZone() *hivev1.DNSZone {
 			testClusterDeployment(),
 			schema.GroupVersionKind{
 				Group:   "hive.openshift.io",
-				Version: "v1alpha1",
+				Version: "v1",
 				Kind:    "clusterdeployment",
 			},
 		),

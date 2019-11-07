@@ -49,7 +49,7 @@ Hive supports two methods of specifying what version of OpenShift you wish to in
 An example ClusterImageSet:
 
 ```yaml
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: ClusterImageSet
 metadata:
   name: openshift-v4.2.0
@@ -64,7 +64,7 @@ Cluster provisioning begins when a caller creates a ClusterDeployment CRD, which
 An example ClusterDeployment:
 
 ```yaml
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: ClusterDeployment
 metadata:
   name: mycluster
@@ -217,7 +217,7 @@ To use this feature:
      ```
   1. Update your HiveConfig to enable externalDNS and set the list of managed domains:
      ```yaml
-     apiVersion: hive.openshift.io/v1alpha1
+     apiVersion: hive.openshift.io/v1
      kind: HiveConfig
      metadata:
        name: hive

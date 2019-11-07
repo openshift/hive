@@ -50,7 +50,7 @@ objects:
     source: hive-catalog
     sourceNamespace: hive
 
-- apiVersion: hive.openshift.io/v1alpha1
+- apiVersion: hive.openshift.io/v1
   kind: HiveConfig
   metadata:
     name: hive

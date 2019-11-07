@@ -99,7 +99,7 @@ var _configHiveadmissionApiserviceYaml = []byte(`---
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
-  name: v1alpha1.admission.hive.openshift.io
+  name: v1.admission.hive.openshift.io
   annotations:
     service.alpha.openshift.io/inject-cabundle: "true"
 spec:
@@ -109,7 +109,7 @@ spec:
   service:
     name: hiveadmission
     namespace: hive
-  version: v1alpha1
+  version: v1
 `)
 
 func configHiveadmissionApiserviceYamlBytes() ([]byte, error) {
@@ -139,7 +139,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/clusterdeploymentvalidators
+      path: /apis/admission.hive.openshift.io/v1/clusterdeploymentvalidators
   rules:
   - operations:
     - CREATE
@@ -147,7 +147,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - clusterdeployments
   failurePolicy: Fail
@@ -180,7 +180,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/clusterimagesetvalidators
+      path: /apis/admission.hive.openshift.io/v1/clusterimagesetvalidators
   rules:
   - operations:
     - CREATE
@@ -188,7 +188,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - clusterimagesets
   failurePolicy: Fail
@@ -221,7 +221,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/clusterprovisionvalidators
+      path: /apis/admission.hive.openshift.io/v1/clusterprovisionvalidators
   rules:
   - operations:
     - CREATE
@@ -229,7 +229,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - clusterprovisions
   failurePolicy: Fail
@@ -334,7 +334,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/dnszonevalidators
+      path: /apis/admission.hive.openshift.io/v1/dnszonevalidators
   rules:
   - operations:
     - CREATE
@@ -342,7 +342,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - dnszones
   failurePolicy: Fail
@@ -499,7 +499,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/selectorsyncsetvalidators
+      path: /apis/admission.hive.openshift.io/v1/selectorsyncsetvalidators
   rules:
   - operations:
     - CREATE
@@ -507,7 +507,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - selectorsyncsets
   failurePolicy: Fail
@@ -595,7 +595,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/syncsetvalidators
+      path: /apis/admission.hive.openshift.io/v1/syncsetvalidators
   rules:
   - operations:
     - CREATE
@@ -603,7 +603,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - syncsets
   failurePolicy: Fail
@@ -741,7 +741,7 @@ spec:
         image: registry.svc.ci.openshift.org/openshift/hive-v4.0:external-dns
         args:
         - --source=crd
-        - --crd-source-apiversion=hive.openshift.io/v1alpha1
+        - --crd-source-apiversion=hive.openshift.io/v1
         - --crd-source-kind=DNSEndpoint
         - --registry=txt
         - --policy=sync

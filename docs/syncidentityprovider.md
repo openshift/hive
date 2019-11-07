@@ -12,7 +12,7 @@ A `SyncIdentityProvider` contains a list of `identityProviders` to apply to spec
 
 ```yaml
 ---
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SyncIdentityProvider
 metadata:
   name: allowall-identity-provider
@@ -38,7 +38,7 @@ spec:
 
 ```yaml
 ---
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SelectorSyncIdentityProvider
 metadata:
   name: allowall-identity-provider

@@ -11,7 +11,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1alpha1/dnszonevalidators
+      path: /apis/admission.hive.openshift.io/v1/dnszonevalidators
   rules:
   - operations:
     - CREATE
@@ -19,7 +19,7 @@ webhooks:
     apiGroups:
     - hive.openshift.io
     apiVersions:
-    - v1alpha1
+    - v1
     resources:
     - dnszones
   failurePolicy: Fail

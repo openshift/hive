@@ -1,4 +1,4 @@
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: DNSZone
 metadata:
   labels:

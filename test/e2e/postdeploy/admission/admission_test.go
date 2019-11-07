@@ -17,7 +17,7 @@ import (
 const (
 	hiveNamespace           = "hive"
 	hiveAdmissionDeployment = "hiveadmission"
-	hiveAdmissionAPIService = "v1alpha1.admission.hive.openshift.io"
+	hiveAdmissionAPIService = "v1.admission.hive.openshift.io"
 )
 
 func waitForAdmissionDeployment(t *testing.T) bool {

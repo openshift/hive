@@ -78,11 +78,6 @@ spec:
                         and 'aws_secret_access_key'.
                       type: object
                   type: object
-                image:
-                  description: Image is a reference to the image that will run the
-                    external-dns controller. If not specified, a default image will
-                    be used.
-                  type: string
               type: object
             failedProvisionConfig:
               description: FailedProvisionConfig is used to configure settings related

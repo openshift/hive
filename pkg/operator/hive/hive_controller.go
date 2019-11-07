@@ -283,6 +283,12 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	h := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
+
+	if err := deployManagedDomainsConfigMap(h, instance); err != nil {
+		hLog.WithError(err).Error("error deploying managed domains configmap")
+		return reconcile.Result{}, err
+	}
+
 	err = r.deployHive(hLog, h, instance, recorder)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
@@ -295,9 +301,8 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployExternalDNS(hLog, h, instance, recorder)
-	if err != nil {
-		hLog.WithError(err).Error("error deploying ExternalDNS")
+	if err := r.teardownLegacyExternalDNS(hLog); err != nil {
+		hLog.WithError(err).Error("error tearing down legacy ExternalDNS")
 		return reconcile.Result{}, err
 	}
 

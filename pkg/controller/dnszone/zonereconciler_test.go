@@ -63,11 +63,6 @@ func TestNewZoneReconciler(t *testing.T) {
 				expectedZoneReconciler.awsClient,
 				expectedZoneReconciler.scheme,
 			)
-			// Function equality cannot be tested by assert.Equal
-			// therefore it is set to nil for comparison
-			if zr != nil {
-				zr.soaLookup = nil
-			}
 
 			// Assert
 			assertErrorNilOrMessage(t, err, tc.expectedErrString)
@@ -92,7 +87,6 @@ func TestReconcile(t *testing.T) {
 		validateZone        func(*testing.T, *hivev1.DNSZone)
 		validateDNSEndpoint func(*testing.T, *hivev1.DNSEndpoint)
 		errorExpected       bool
-		soaLookupResult     bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -203,10 +197,9 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:            "Existing zone, link to parent, reachable SOA",
-			dnsZone:         validDNSZoneWithLinkToParent(),
-			dnsEndpoint:     validDNSEndpoint(),
-			soaLookupResult: true,
+			name:        "Existing zone, link to parent",
+			dnsZone:     validDNSZoneWithLinkToParent(),
+			dnsEndpoint: validDNSEndpoint(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
 				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
 				mockExistingTags(expect)
@@ -231,9 +224,6 @@ func TestReconcile(t *testing.T) {
 				mocks.mockAWSClient,
 				scheme.Scheme,
 			)
-			zr.soaLookup = func(string, log.FieldLogger) (bool, error) {
-				return tc.soaLookupResult, nil
-			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
 			defer mocks.mockCtrl.Finish()

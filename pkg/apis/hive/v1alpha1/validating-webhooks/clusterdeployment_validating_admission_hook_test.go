@@ -18,6 +18,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 var validTestManagedDomains = []string{
@@ -656,7 +657,7 @@ func TestNewClusterDeploymentValidatingAdmissionHook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	os.Setenv(ManagedDomainsFileEnvVar, tempFile.Name())
+	os.Setenv(constants.ManagedDomainsFileEnvVar, tempFile.Name())
 	webhook := NewClusterDeploymentValidatingAdmissionHook()
 	assert.Equal(t, webhook.validManagedDomains, domains, "valid domains must match expected")
 }

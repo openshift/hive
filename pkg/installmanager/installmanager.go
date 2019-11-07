@@ -26,9 +26,9 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
+	"github.com/openshift/hive/pkg/resource"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1087,21 +1087,7 @@ func (m *InstallManager) cleanupAdminPasswordSecret() error {
 
 // deleteAnyExistingObject will look for any object that exists that matches the passed in 'obj' and will delete it if it exists
 func (m *InstallManager) deleteAnyExistingObject(namespacedName types.NamespacedName, obj runtime.Object) error {
-	switch err := m.DynamicClient.Get(context.Background(), namespacedName, obj); {
-	case apierrors.IsNotFound(err):
-		// object doesn't exist so ignore
-	case err != nil:
-		return err
-	default:
-		// found existing object so delete it
-		m.log.Infof("deleting existing object: %v/%v", namespacedName.Namespace, namespacedName.Name)
-		if err := m.DynamicClient.Delete(context.Background(), obj); err != nil {
-			m.log.WithError(err).Errorf("error deleting object: %v/%v", namespacedName.Namespace, namespacedName.Name)
-			return err
-		}
-	}
-
-	return nil
+	return resource.DeleteAnyExistingObject(m.DynamicClient, namespacedName, obj, m.log)
 }
 
 func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallManager) error {

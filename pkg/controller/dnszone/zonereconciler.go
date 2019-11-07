@@ -3,12 +3,9 @@ package dnszone
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
-	"time"
 
-	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -33,12 +30,8 @@ import (
 )
 
 const (
-	hiveDNSZoneTag                  = "hive.openshift.io/dnszone"
-	domainAvailabilityCheckInterval = 30 * time.Second
-	defaultNSRecordTTL              = hivev1.TTL(60)
-	dnsClientTimeout                = 30 * time.Second
-	resolverConfigFile              = "/etc/resolv.conf"
-	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
+	hiveDNSZoneTag     = "hive.openshift.io/dnszone"
+	defaultNSRecordTTL = hivev1.TTL(60)
 )
 
 // ZoneReconciler manages getting the desired state, getting the current state and reconciling the two.
@@ -57,9 +50,6 @@ type ZoneReconciler struct {
 
 	// scheme is the controller manager's scheme
 	scheme *runtime.Scheme
-
-	// soaLookup is a function that looks up a zone's SOA record
-	soaLookup func(string, log.FieldLogger) (bool, error)
 }
 
 // NewZoneReconciler creates a new ZoneReconciler object. A new ZoneReconciler is expected to be created for each controller sync.
@@ -78,7 +68,6 @@ func NewZoneReconciler(
 		kubeClient: kubeClient,
 		logger:     logger,
 		awsClient:  awsClient,
-		soaLookup:  lookupSOARecord,
 		scheme:     scheme,
 	}
 
@@ -151,19 +140,7 @@ func (zr *ZoneReconciler) Reconcile() (reconcile.Result, error) {
 		}
 	}
 
-	isZoneSOAAvailable, err := zr.soaLookup(zr.dnsZone.Spec.Zone, zr.logger)
-	if err != nil {
-		zr.logger.WithError(err).Error("error looking up SOA record for zone")
-	}
-
-	reconcileResult := reconcile.Result{}
-	if !isZoneSOAAvailable {
-		zr.logger.Info("SOA record for DNS zone not available")
-		reconcileResult.Requeue = true
-		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
-	}
-
-	return reconcileResult, zr.updateStatus(hostedZone, nameServers, isZoneSOAAvailable)
+	return reconcile.Result{}, zr.updateStatus(hostedZone, nameServers)
 }
 
 func (zr *ZoneReconciler) syncParentDomainLink(nameServers []string) error {
@@ -534,7 +511,7 @@ func (zr *ZoneReconciler) deleteRoute53HostedZone(hostedZone *route53.HostedZone
 	return err
 }
 
-func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServers []string, isSOAAvailable bool) error {
+func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServers []string) error {
 	orig := zr.dnsZone.DeepCopy()
 	zr.logger.Debug("Updating DNSZone status")
 
@@ -542,28 +519,17 @@ func (zr *ZoneReconciler) updateStatus(hostedZone *route53.HostedZone, nameServe
 	zr.dnsZone.Status.AWS = &hivev1.AWSDNSZoneStatus{
 		ZoneID: hostedZone.Id,
 	}
-	var availableStatus corev1.ConditionStatus
-	var availableReason, availableMessage string
-	if isSOAAvailable {
-		// We need to keep track of the last time we synced to rate limit our AWS calls.
-		tmpTime := metav1.Now()
-		zr.dnsZone.Status.LastSyncTimestamp = &tmpTime
+	// We need to keep track of the last time we synced to rate limit our AWS calls.
+	tmpTime := metav1.Now()
+	zr.dnsZone.Status.LastSyncTimestamp = &tmpTime
 
-		availableStatus = corev1.ConditionTrue
-		availableReason = "ZoneAvailable"
-		availableMessage = "DNS SOA record for zone is reachable"
-	} else {
-		availableStatus = corev1.ConditionFalse
-		availableReason = "ZoneUnavailable"
-		availableMessage = "DNS SOA record for zone is not reachable"
-	}
 	zr.dnsZone.Status.LastSyncGeneration = zr.dnsZone.ObjectMeta.Generation
 	zr.dnsZone.Status.Conditions = controllerutils.SetDNSZoneCondition(
 		zr.dnsZone.Status.Conditions,
 		hivev1.ZoneAvailableDNSZoneCondition,
-		availableStatus,
-		availableReason,
-		availableMessage,
+		corev1.ConditionTrue,
+		"ZoneAvailable",
+		"DNS records for zone created",
 		controllerutils.UpdateConditionNever)
 
 	if !reflect.DeepEqual(orig.Status, zr.dnsZone.Status) {
@@ -614,65 +580,6 @@ func (zr *ZoneReconciler) getHostedZoneNSRecord(zoneID string) ([]string, error)
 
 func parentLinkRecordName(dnsZoneName string) string {
 	return apihelpers.GetResourceName(dnsZoneName, "ns")
-}
-
-func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
-	// TODO: determine if there's a better way to obtain resolver endpoints
-	clientConfig, _ := dns.ClientConfigFromFile(resolverConfigFile)
-	client := dns.Client{Timeout: dnsClientTimeout}
-
-	dnsServers := []string{}
-	serversFromEnv := os.Getenv(zoneCheckDNSServersEnvVar)
-	if len(serversFromEnv) > 0 {
-		dnsServers = strings.Split(serversFromEnv, ",")
-		// Add port to servers with unspecified port
-		for i := range dnsServers {
-			if !strings.Contains(dnsServers[i], ":") {
-				dnsServers[i] = dnsServers[i] + ":53"
-			}
-		}
-	} else {
-		for _, s := range clientConfig.Servers {
-			dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
-		}
-	}
-	logger.WithField("servers", dnsServers).Info("looking up domain SOA record")
-
-	m := &dns.Msg{}
-	m.SetQuestion(zone+".", dns.TypeSOA)
-	for _, s := range dnsServers {
-		in, rtt, err := client.Exchange(m, s)
-		if err != nil {
-			logger.WithError(err).WithField("server", s).Info("query for SOA record failed")
-			continue
-		}
-		log.WithField("server", s).Infof("SOA query duration: %v", rtt)
-		if len(in.Answer) > 0 {
-			for _, rr := range in.Answer {
-				soa, ok := rr.(*dns.SOA)
-				if !ok {
-					logger.Info("Record returned is not an SOA record: %#v", rr)
-					continue
-				}
-				if soa.Hdr.Name != appendPeriod(zone) {
-					logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned but it does not match the lookup zone")
-					return false, nil
-				}
-				logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned, zone is reachable")
-				return true, nil
-			}
-		}
-		logger.WithField("server", s).Info("no answer for SOA record returned")
-		return false, nil
-	}
-	return false, nil
-}
-
-func appendPeriod(name string) string {
-	if !strings.HasSuffix(name, ".") {
-		return name + "."
-	}
-	return name
 }
 
 func tagEquals(a, b *route53.Tag) bool {

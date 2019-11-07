@@ -626,14 +626,6 @@
   revision = "9520e82c474b0a04dd04f8a40959027271bab992"
 
 [[projects]]
-  digest = "1:e624132565a00fcc120432b96f71c71e8a049a4c22905c63220712f1f108acc9"
-  name = "github.com/miekg/dns"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "73601d4aed9d844322611759d7f3619110b7c88e"
-  version = "v1.1.8"
-
-[[projects]]
   digest = "1:f9f72e583aaacf1d1ac5d6121abd4afd3c690baa9e14e1d009df26bf831ba347"
   name = "github.com/mitchellh/go-homedir"
   packages = ["."]
@@ -957,9 +949,13 @@
   version = "v1.0.3"
 
 [[projects]]
-  digest = "1:bacb8b590716ab7c33f2277240972c9582d389593ee8d66fc10074e0508b8126"
+  digest = "1:b31059dac028ff111793a8345eacf0f99d0f1150ead34ebf32fdd2b7d54c2d45"
   name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  packages = [
+    "assert",
+    "require",
+    "suite",
+  ]
   pruneopts = "NUT"
   revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
   version = "v1.2.2"
@@ -991,11 +987,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:47b97bf9245593ea58d0fb11a0b9ef528895ebc543cb39f244e212755db38084"
+  digest = "1:670ac353e434afad9b6d96ba9735f243c5808c58ed67fdce9768e160d84389ba"
   name = "golang.org/x/crypto"
   packages = [
-    "ed25519",
-    "ed25519/internal/edwards25519",
     "pkcs12",
     "pkcs12/internal/rc2",
     "ssh/terminal",
@@ -1005,10 +999,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:dc8c680bed88df29c516a9ec48dd56b6f8f86c7122365ffb381a2fa442128e66"
+  digest = "1:172f91a78eb0474888d17c378cdc14ca276463099390c7efd180120b35cfe25d"
   name = "golang.org/x/net"
   packages = [
-    "bpf",
     "context",
     "context/ctxhttp",
     "html",
@@ -1018,11 +1011,7 @@
     "http2",
     "http2/hpack",
     "idna",
-    "internal/iana",
-    "internal/socket",
     "internal/timeseries",
-    "ipv4",
-    "ipv6",
     "trace",
     "websocket",
   ]
@@ -2009,7 +1998,6 @@
     "github.com/heptio/velero/pkg/apis/velero/v1",
     "github.com/json-iterator/go",
     "github.com/jteeuwen/go-bindata",
-    "github.com/miekg/dns",
     "github.com/modern-go/reflect2",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
@@ -2039,9 +2027,11 @@
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/suite",
     "golang.org/x/net/context",
     "golang.org/x/oauth2/google",
     "google.golang.org/api/cloudresourcemanager/v1",
+    "google.golang.org/api/dns/v1",
     "google.golang.org/api/option",
     "google.golang.org/api/serviceusage/v1",
     "gopkg.in/ini.v1",

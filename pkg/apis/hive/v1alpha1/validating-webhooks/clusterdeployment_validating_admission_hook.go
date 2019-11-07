@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/rest"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
+
 	"github.com/openshift/hive/pkg/manageddns"
 )
 
@@ -296,6 +298,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
+	// validate machinePools are filled out
+	if r := validateMachinePools(newObject, contextLogger); r != nil {
+		return r
+	}
+
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
@@ -417,6 +424,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 			Allowed: false,
 			Result:  &status,
 		}
+	}
+
+	// validate machinePools are filled out
+	if r := validateMachinePools(newObject, contextLogger); r != nil {
+		return r
 	}
 
 	// If we get here, then all checks passed, so the object is valid.
@@ -588,6 +600,55 @@ func validateDomain(domain string, validDomains []string) bool {
 		}
 	}
 	return false
+}
+
+func validateMachinePools(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+
+	if reason, result := validateMachinePool(newObject, &newObject.Spec.ControlPlane, contextLogger); !result {
+		message := fmt.Sprintf("Control plane machine pool validation failure: %s", reason)
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: message,
+			},
+		}
+	}
+
+	for _, mp := range newObject.Spec.Compute {
+		if reason, result := validateMachinePool(newObject, &mp, contextLogger); !result {
+			message := fmt.Sprintf("Compute machine pool %s validation failure: %s", mp.Name, reason)
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+					Message: message,
+				},
+			}
+		}
+	}
+	return nil
+}
+
+func validateMachinePool(cd *hivev1.ClusterDeployment, mp *hivev1.MachinePool, contextLogger *log.Entry) (string, bool) {
+	if cd.Spec.PlatformSecrets.GCP != nil {
+		if mp.Platform.GCP == nil {
+			return "no Platform defined", false
+		}
+		if reason, result := validateGCPMachinePool(mp.Platform.GCP); !result {
+			return reason, false
+		}
+	}
+
+	return "", true
+}
+
+func validateGCPMachinePool(mpPlatform *hivev1gcp.MachinePool) (string, bool) {
+	if mpPlatform.InstanceType == "" {
+		return "no instance-type found", false
+	}
+
+	return "", true
 }
 
 func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {

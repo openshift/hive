@@ -32,6 +32,56 @@ cd $GOPATH/src/openshift
 git clone https://github.com/openshift/hive.git
 ```
 
+## Deploying with Kubernetes In Docker (kind)
+
+[Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
+
+This approach requires [Docker](https://docs.docker.com/install). At present we do not have kind working with podman.
+
+Deploy a local insecure registry container, and configure your host docker daemon to be able to use it:
+
+```bash
+./hack/create-insecure-registry.sh
+```
+
+Create a kind cluster named 'hive' to deploy to. You can create as many kind clusters as you need.:
+
+```ash
+./hack/create-kind-cluster.sh hive
+```
+
+`docker ps` should now show you a "registry" and a "hive" container running.
+
+```bash
+$ docker ps
+CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                                  NAMES
+2756e565065a        kindest/node:v1.15.3   "/usr/local/bin/entr…"   29 hours ago        Up 29 hours         40393/tcp, 127.0.0.1:40393->6443/tcp   hive-control-plane
+1dc8a3c59d84        registry:2             "/entrypoint.sh /etc…"   2 weeks ago         Up 8 days           0.0.0.0:5000->5000/tcp                 registry
+```
+
+Configure kubectl to talk to your new cluster:
+
+```bash
+export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
+```
+
+You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
+
+```bash
+IMG=172.17.0.1:5000/hive:latest make docker-dev-push
+DEPLOY_IMAGE=172.17.0.1:5000/hive:latest make deploy
+./hack/hiveadmission-dev-cert.sh
+```
+
+Hive should now be running.
+
+You can leave your registry container running indefinitely. The kind cluster can be replaced quickly as necessary:
+
+```bash
+kind delete cluster --name cluster1
+CONFIGURE_INSECURE_REGISTRY_HOST=TRUE CONFIGURE_INSECURE_REGISTRY_CLUSTER=true NUM_CLUSTERS=1 hack/create-clusters.sh
+```
+
 ## Writing/Testing Code
 
 Our typical approach to manually testing code is to deploy Hive into your current cluster as defined by kubeconfig, scale down the relevant component you wish to test, and then run its code locally.
@@ -116,7 +166,7 @@ Prerequisites:
 ### Generating a Certificate
 
 1. Ensure that the `hiveutil` binary is available (`make hiveutil`)
-2. Run: `hiveutil certificate create ${CLUSTER_NAME} --base-domain ${BASE_DOMAIN}` 
+2. Run: `hiveutil certificate create ${CLUSTER_NAME} --base-domain ${BASE_DOMAIN}`
    where CLUSTER_NAME is the name of your cluster and BASE_DOMAIN is the public DNS domain for your cluster (Defaults to `new-installer.openshift.com`)
 
 ### Using Generated Certificate

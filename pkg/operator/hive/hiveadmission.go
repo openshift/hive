@@ -114,8 +114,13 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		hLog.Error("error detecting 3.11 cluster")
 		return err
 	}
-	if is311 {
-		hLog.Debug("3.11 cluster detected, modifying objects for CA certs")
+	// If we're running on vanilla Kube (mostly devs using kind), or OpenShift 3.x, we
+	// will not have access to the service cert injection we normally use. Lookup
+	// the cluster CA and inject into the webhooks.
+	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
+	// secret, see hack/hiveadmission-dev-cert.sh.
+	if !r.runningOnOpenShift(hLog) || is311 {
+		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
 		err = r.injectCerts(apiService, validatingWebhooks, nil, hLog)
 		if err != nil {
 			hLog.WithError(err).Error("error injecting certs")
@@ -209,7 +214,8 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	// Load the service CA:
 	serviceCA, ok := firstSATokenSecret.Data["service-ca.crt"]
 	if !ok {
-		return fmt.Errorf("secret %s did not contain key service-ca.crt", firstSATokenSecret.Name)
+		hLog.Warnf("secret %s did not contain key service-ca.crt, likely not running on OpenShift, using ca.crt instead", firstSATokenSecret.Name)
+		serviceCA = kubeCA
 	}
 	hLog.Debugf("found service CA: %s", string(serviceCA))
 

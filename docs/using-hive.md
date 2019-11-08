@@ -11,6 +11,10 @@
         ```bash
         oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson
         ```
+  1. Create a Kubenertes secret containing a ssh public key (typically generated with `ssh-keygen`)
+        ```bash
+        oc create secret generic mycluster-ssh-key --from-file=ssh-publickey=/path/to/public/key
+        ```
   1. Create a Kubernetes secret containing your AWS credentials:
         ```bash
         oc create secret generic mycluster-aws-creds --from-literal=aws_secret_access_key=$AWS_SECRET_ACCESS_KEY --from-literal=aws_access_key_id=$AWS_ACCESS_KEY_ID

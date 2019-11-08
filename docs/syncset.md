@@ -14,7 +14,7 @@ With both `SyncSets` and `SelectorSyncSets`, the individual resources and patche
 
 ```yaml
 ---
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SyncSet
 metadata:
   name: mygroup
@@ -48,7 +48,7 @@ spec:
 | `clusterDeploymentRefs` | List of `ClusterDeployment` names in the current namespace which the `SyncSet` will apply to. |
 | `resourceApplyMode` | Defaults to `"Upsert"`, which indicates that objects will be created and updated to match the `SyncSet`. Existing resources that are not listed in the `SyncSet` are retained. Specify `"Sync"` to delete existing objects that were previously in the `resources` list. |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
-| `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. You can also specify`"ApplyOnce"` to apply the patch only once. | 
+| `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. You can also specify`"ApplyOnce"` to apply the patch only once. |
 
 ### Example of SyncSet use
 
@@ -78,7 +78,7 @@ oc create -f <syncset_file.yaml> -n <namespace>
 SyncSet File:
 
 ```yaml
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SyncSet
 metadata:
   name: sise-deploy-syncset
@@ -108,7 +108,7 @@ oc get syncsetinstances <synsetinstance name> -o yaml
 
 ```yaml
 ---
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SelectorSyncSet
 metadata:
   name: mygroup

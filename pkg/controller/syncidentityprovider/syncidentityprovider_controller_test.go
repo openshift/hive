@@ -8,7 +8,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"

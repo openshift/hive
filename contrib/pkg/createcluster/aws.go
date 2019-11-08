@@ -8,8 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 )
 
 var _ cloudProvider = (*awsCloudProvider)(nil)

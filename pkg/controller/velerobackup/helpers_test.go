@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"

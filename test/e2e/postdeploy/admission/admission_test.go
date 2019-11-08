@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	webhook "github.com/openshift/hive/pkg/apis/hive/v1alpha1/validating-webhooks"
+	webhook "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
 	"github.com/openshift/hive/test/e2e/common"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +17,7 @@ import (
 const (
 	hiveNamespace           = "hive"
 	hiveAdmissionDeployment = "hiveadmission"
-	hiveAdmissionAPIService = "v1alpha1.admission.hive.openshift.io"
+	hiveAdmissionAPIService = "v1.admission.hive.openshift.io"
 )
 
 func waitForAdmissionDeployment(t *testing.T) bool {

@@ -4,12 +4,12 @@
   "request": {
     "kind": {
       "group": "hive.openshift.io",
-      "version": "v1alpha1",
+      "version": "v1",
       "kind": "DNSZone"
     },
     "resource": {
       "group": "hive.openshift.io",
-      "version": "v1alpha1",
+      "version": "v1",
       "resource": "dnszones"
     },
     "operation": "CREATE",

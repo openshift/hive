@@ -1,0 +1,53 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  annotations:
+    hive.openshift.io/delete-after: "8h"
+  name: foo
+spec:
+  preserveOnDelete: false
+  clusterName: foo
+  baseDomain: bar.baz
+  networking:
+    type: OpenshiftSDN
+    serviceCIDR: "10.3.0.0/16"
+    machineCIDR: "10.0.0.0/16"
+    podCIDR: "10.2.0.0/16"
+
+  controlPlane:
+    name: master
+    replicas: 3
+    platform:
+      aws:
+        type: m4.large
+        rootVolume:
+          iops: 100 # TODO
+          size: 22
+          type: gp2
+
+  compute:
+  - name: worker
+    replicas: 3
+    platform:
+      aws:
+        type: m4.large
+        rootVolume:
+          iops: 100 # TODO
+          size: 22
+          type: gp2
+
+  platform:
+    aws:
+      region: us-east-1
+      vpcID: ""
+      vpcCIDRBlock: 10.0.0.0/16
+
+  platformSecrets:
+    aws:
+      credentials:
+        name: "foo-aws-creds"
+
+  pullSecret:
+    name: "foo-pull-secret"

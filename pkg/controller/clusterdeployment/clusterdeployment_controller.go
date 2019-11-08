@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"

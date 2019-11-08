@@ -10,10 +10,10 @@ import (
 	installerazure "github.com/openshift/installer/pkg/types/azure"
 	installergcp "github.com/openshift/installer/pkg/types/gcp"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
-	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 )
 
 // GenerateInstallConfig builds an InstallConfig for the installer from our ClusterDeploymentSpec.

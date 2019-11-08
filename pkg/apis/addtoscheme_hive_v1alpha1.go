@@ -1,7 +1,7 @@
 package apis
 
 import (
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 func init() {

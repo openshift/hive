@@ -45,34 +45,34 @@ func TestPathParse(t *testing.T) {
 		},
 		{
 			name:     "hive global crd list",
-			path:     "/apis/hive.openshift.io/v1alpha1/selectorsyncidentityproviders",
-			expected: "hive.openshift.io/v1alpha1/selectorsyncidentityproviders",
+			path:     "/apis/hive.openshift.io/v1/selectorsyncidentityproviders",
+			expected: "hive.openshift.io/v1/selectorsyncidentityproviders",
 		},
 		{
 			name:     "hive global crd update",
-			path:     "/apis/hive.openshift.io/v1alpha1/selectorsyncidentityproviders/ssname",
-			expected: "hive.openshift.io/v1alpha1/selectorsyncidentityproviders",
+			path:     "/apis/hive.openshift.io/v1/selectorsyncidentityproviders/ssname",
+			expected: "hive.openshift.io/v1/selectorsyncidentityproviders",
 		},
 		{
 			name:     "hive namespaced crd create",
-			path:     "/apis/hive.openshift.io/v1alpha1/namespaces/hive/clusterdeprovisionrequests",
-			expected: "hive.openshift.io/v1alpha1/clusterdeprovisionrequests",
+			path:     "/apis/hive.openshift.io/v1/namespaces/hive/clusterdeprovisionrequests",
+			expected: "hive.openshift.io/v1/clusterdeprovisionrequests",
 		},
 		{
 			name:     "hive namespaced crd update",
-			path:     "/apis/hive.openshift.io/v1alpha1/namespaces/hive/clusterdeployments/dgoodwin-del",
-			expected: "hive.openshift.io/v1alpha1/clusterdeployments",
+			path:     "/apis/hive.openshift.io/v1/namespaces/hive/clusterdeployments/dgoodwin-del",
+			expected: "hive.openshift.io/v1/clusterdeployments",
 		},
 		{
 			name:     "hive namespaced crd update status",
-			path:     "/apis/hive.openshift.io/v1alpha1/namespaces/hive/clusterdeployments/dgoodwin-del/status",
-			expected: "hive.openshift.io/v1alpha1/clusterdeployments",
+			path:     "/apis/hive.openshift.io/v1/namespaces/hive/clusterdeployments/dgoodwin-del/status",
+			expected: "hive.openshift.io/v1/clusterdeployments",
 		},
 		// Clients sometimes make calls like this on startup I believe for caching purposes.
 		// We don't want to track these as metrics, returning an error from the parse indicates to skip.
 		{
 			name:        "client caching",
-			path:        "/apis/hive.openshift.io/v1alpha1",
+			path:        "/apis/hive.openshift.io/v1",
 			expectedErr: true,
 		},
 		{

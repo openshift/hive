@@ -1,0 +1,12 @@
+apiVersion: hive.openshift.io/v1
+kind: DNSZone
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: dnszone-sample
+spec:
+  zone: testzone.testdomain.com
+  aws:
+    accountSecret:
+      name: route53-creds-secret
+    region: us-east-1

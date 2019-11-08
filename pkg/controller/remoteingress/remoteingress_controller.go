@@ -28,7 +28,7 @@ import (
 
 	ingresscontroller "github.com/openshift/api/operator/v1"
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"

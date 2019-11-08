@@ -11,8 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 )
 
 const (

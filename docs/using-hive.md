@@ -11,7 +11,7 @@
         ```bash
         oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson
         ```
-  1. Create a Kubenertes secret containing a ssh key pair (typically generated with `ssh-keygen`)
+  1. Create a Kubernetes secret containing a ssh key pair (typically generated with `ssh-keygen`)
         ```bash
         oc create secret generic mycluster-ssh-key --from-file=ssh-privatekey=/path/to/private/key --from-file=ssh-publickey=/path/to/public/key
         ```

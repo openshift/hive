@@ -75,13 +75,10 @@ func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 		InstanceType: defaultInstanceType,
 	}
 
-	cd.Spec.ControlPlane.Platform = hivev1.MachinePoolPlatform{
-		GCP: mpp,
-	}
+	cd.Spec.ControlPlane.Platform.GCP = mpp
+
 	for i := range cd.Spec.Compute {
-		cd.Spec.Compute[i].Platform = hivev1.MachinePoolPlatform{
-			GCP: mpp,
-		}
+		cd.Spec.Compute[i].Platform.GCP = mpp
 	}
 
 	return nil

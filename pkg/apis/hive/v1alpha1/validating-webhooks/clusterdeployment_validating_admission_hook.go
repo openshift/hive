@@ -290,17 +290,15 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), newObject.Spec.ManageDNS, "cannot manage DNS for the selected platform"))
 	}
 
+	// validate machinepools
+	allErrs = append(allErrs, validateMachinePools(newObject)...)
+
 	if len(allErrs) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
-	}
-
-	// validate machinePools are filled out
-	if r := validateMachinePools(newObject, contextLogger); r != nil {
-		return r
 	}
 
 	// If we get here, then all checks passed, so the object is valid.
@@ -415,20 +413,22 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
+	allErrs := field.ErrorList{}
+
 	if oldObject.Spec.Installed && !newObject.Spec.Installed {
-		allErrs := field.ErrorList{}
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
+	}
+
+	// validate machinepools
+	allErrs = append(allErrs, validateMachinePools(newObject)...)
+
+	if len(allErrs) > 0 {
 		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
-	}
-
-	// validate machinePools are filled out
-	if r := validateMachinePools(newObject, contextLogger); r != nil {
-		return r
 	}
 
 	// If we get here, then all checks passed, so the object is valid.
@@ -602,53 +602,40 @@ func validateDomain(domain string, validDomains []string) bool {
 	return false
 }
 
-func validateMachinePools(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+func validateMachinePools(cd *hivev1.ClusterDeployment) field.ErrorList {
+	vErrs := field.ErrorList{}
 
-	if reason, result := validateMachinePool(newObject, &newObject.Spec.ControlPlane, contextLogger); !result {
-		message := fmt.Sprintf("Control plane machine pool validation failure: %s", reason)
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
+	vErrs = append(vErrs, validateMachinePool(cd, &cd.Spec.ControlPlane, field.NewPath("spec", "controlPlane"))...)
+
+	for i, mp := range cd.Spec.Compute {
+		vErrs = append(vErrs, validateMachinePool(cd, &mp, field.NewPath("spec", "compute").Index(i))...)
 	}
 
-	for _, mp := range newObject.Spec.Compute {
-		if reason, result := validateMachinePool(newObject, &mp, contextLogger); !result {
-			message := fmt.Sprintf("Compute machine pool %s validation failure: %s", mp.Name, reason)
-			return &admissionv1beta1.AdmissionResponse{
-				Allowed: false,
-				Result: &metav1.Status{
-					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-					Message: message,
-				},
-			}
-		}
-	}
-	return nil
+	return vErrs
 }
 
-func validateMachinePool(cd *hivev1.ClusterDeployment, mp *hivev1.MachinePool, contextLogger *log.Entry) (string, bool) {
-	if cd.Spec.PlatformSecrets.GCP != nil {
+func validateMachinePool(cd *hivev1.ClusterDeployment, mp *hivev1.MachinePool, parentPath *field.Path) field.ErrorList {
+	vErrs := field.ErrorList{}
+
+	if cd.Spec.Platform.GCP != nil {
+		path := parentPath.Child("platform", "gcp")
 		if mp.Platform.GCP == nil {
-			return "no Platform defined", false
-		}
-		if reason, result := validateGCPMachinePool(mp.Platform.GCP); !result {
-			return reason, false
+			vErrs = append(vErrs, field.Invalid(path, mp.Platform.GCP, "platform must not be empty"))
+		} else {
+			vErrs = append(vErrs, validateGCPMachinePool(mp.Platform.GCP, path)...)
 		}
 	}
 
-	return "", true
+	return vErrs
 }
 
-func validateGCPMachinePool(mpPlatform *hivev1gcp.MachinePool) (string, bool) {
+func validateGCPMachinePool(mpPlatform *hivev1gcp.MachinePool, parentPath *field.Path) field.ErrorList {
+	vErrors := field.ErrorList{}
 	if mpPlatform.InstanceType == "" {
-		return "no instance-type found", false
+		vErrors = append(vErrors, field.Invalid(parentPath.Child("instanceType"), mpPlatform.InstanceType, "instanceType must be defined"))
 	}
 
-	return "", true
+	return vErrors
 }
 
 func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {

@@ -146,13 +146,13 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
-			Installed: true,
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterID: testClusterID,
-			AdminKubeconfigSecret: corev1.LocalObjectReference{
-				Name: "kubeconfig-secret",
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				ClusterID: testClusterID,
+				AdminKubeconfigSecret: corev1.LocalObjectReference{
+					Name: "kubeconfig-secret",
+				},
 			},
+			Installed: true,
 		},
 	}
 	return cd

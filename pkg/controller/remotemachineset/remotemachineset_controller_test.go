@@ -596,12 +596,12 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 					},
 				},
 			},
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				AdminKubeconfigSecret: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
+				ClusterID:             testClusterID,
+				InfraID:               testInfraID,
+			},
 			Installed: true,
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
-			ClusterID:             testClusterID,
-			InfraID:               testInfraID,
 		},
 	}
 }

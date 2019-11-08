@@ -14,6 +14,7 @@ import (
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,7 +41,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "Compute", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
+	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "Compute", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -421,9 +422,24 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
-	if oldObject.Spec.Installed && !newObject.Spec.Installed {
-		allErrs := field.ErrorList{}
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
+	if newObject.Spec.Installed {
+		if newObject.Spec.ClusterMetadata != nil {
+			if oldObject.Spec.Installed {
+				allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
+			}
+		} else {
+			allErrs = append(allErrs, field.Required(specPath.Child("clusterMetadata"), "installed cluster must have cluster metadata"))
+		}
+	} else {
+		if oldObject.Spec.Installed {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
+		}
+	}
+
+	if len(allErrs) > 0 {
 		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{

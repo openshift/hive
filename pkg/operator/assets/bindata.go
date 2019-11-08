@@ -1728,6 +1728,30 @@ spec:
                 - name
                 type: object
               type: array
+            clusterMetadata:
+              description: ClusterMetadata contains metadata information about the
+                installed cluster.
+              properties:
+                adminKubeconfigSecret:
+                  description: AdminKubeconfigSecret references the secret containing
+                    the admin kubeconfig for this cluster.
+                  type: object
+                adminPasswordSecret:
+                  description: AdminPasswordSecret references the secret containing
+                    the admin username/password which can be used to login to this
+                    cluster.
+                  type: object
+                clusterID:
+                  description: ClusterID is a globally unique identifier for this
+                    cluster generated during installation. Used for reporting metrics
+                    among other places.
+                  type: string
+                infraID:
+                  description: InfraID is an identifier for this cluster generated
+                    during installation and used for tagging/naming resources in cloud
+                    providers.
+                  type: string
+              type: object
             clusterName:
               description: ClusterName is the friendly name of the cluster. It is
                 used for subdomains, some resource tagging, and other instances where
@@ -2109,14 +2133,6 @@ spec:
           type: object
         status:
           properties:
-            adminKubeconfigSecret:
-              description: AdminKubeconfigSecret references the secret containing
-                the admin kubeconfig for this cluster.
-              type: object
-            adminPasswordSecret:
-              description: AdminPasswordSecret references the secret containing the
-                admin username/password which can be used to login to this cluster.
-              type: object
             apiURL:
               description: APIURL is the URL where the cluster's API can be accessed.
               type: string
@@ -2137,11 +2153,6 @@ spec:
             cliImage:
               description: CLIImage is the name of the oc cli image to use when installing
                 the target cluster
-              type: string
-            clusterID:
-              description: ClusterID is a globally unique identifier for this cluster
-                generated during installation. Used for reporting metrics among other
-                places.
               type: string
             clusterVersionStatus:
               description: ClusterVersionStatus will hold a copy of the remote cluster's
@@ -2343,19 +2354,11 @@ spec:
               description: FederatedClusterRef is the reference to the federated cluster
                 resource associated with this ClusterDeployment.
               type: object
-            infraID:
-              description: InfraID is an identifier for this cluster generated during
-                installation and used for tagging/naming resources in cloud providers.
-              type: string
             installRestarts:
               description: InstallRestarts is the total count of container restarts
                 on the clusters install job.
               format: int64
               type: integer
-            installed:
-              description: Installed is true if the installer job has successfully
-                completed for this cluster. Deprecated.
-              type: boolean
             installedTimestamp:
               description: InstalledTimestamp is the time we first detected that the
                 cluster has been successfully installed.

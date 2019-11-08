@@ -214,13 +214,18 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
+	if cd.Spec.ClusterMetadata == nil {
+		ssiLog.Error("installed cluster with no cluster metadata")
+		return reconcile.Result{}, nil
+	}
+
 	// If the cluster is unreachable, return from here.
 	if controllerutils.HasUnreachableCondition(cd) {
 		ssiLog.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
 
-	if len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name) == 0 {
 		ssiLog.Debug("admin kubeconfig secret name is not set on clusterdeployment")
 		return reconcile.Result{}, nil
 	}
@@ -280,11 +285,11 @@ func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInsta
 }
 
 func (r *ReconcileSyncSetInstance) getKubeconfigSecret(cd *hivev1.ClusterDeployment, ssiLog log.FieldLogger) (*corev1.Secret, error) {
-	if len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name) == 0 {
 		return nil, fmt.Errorf("no kubeconfigconfig secret is set on clusterdeployment")
 	}
 	secret := &corev1.Secret{}
-	secretName := types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}
+	secretName := types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}
 	err := r.Get(context.TODO(), secretName, secret)
 	if err != nil {
 		ssiLog.WithError(err).WithField("secret", secretName).Error("unable to load admin kubeconfig secret")
@@ -389,10 +394,7 @@ func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spe
 	if err := r.applySyncSetPatches(ssi, spec.Patches, kubeConfig, ssiLog); err != nil {
 		return err
 	}
-	if err := r.applySyncSetSecretReferences(ssi, spec.SecretReferences, dynamicClient, h, ssiLog); err != nil {
-		return err
-	}
-	return nil
+	return r.applySyncSetSecretReferences(ssi, spec.SecretReferences, dynamicClient, h, ssiLog)
 }
 
 func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetInstance, dynamicClient dynamic.Interface, ssiLog log.FieldLogger) error {

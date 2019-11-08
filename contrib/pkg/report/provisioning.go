@@ -107,7 +107,7 @@ func (o *ProvisioningReportOptions) Run(dynClient client.Client) error {
 	var total, installed, provisioning int
 	for _, cd := range cdList.Items {
 		total++
-		if cd.Status.Installed {
+		if cd.Spec.Installed {
 			installed++
 			continue
 		}

@@ -199,6 +199,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
 				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
 				return cd
 			}(),
 			operation:       admissionv1beta1.Update,
@@ -212,6 +213,38 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			newObject:       validAWSClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test setting installed flag without cluster metadata",
+			oldObject: validAWSClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "Test mutating cluster metadata after installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "old-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "new-infra-id",
+				}
+				return cd
+			}(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},

@@ -673,73 +673,74 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
 	cdLog.Info("provision completed successfully")
 
-	if !cd.Spec.Installed {
-		cd.Spec.Installed = true
-		if err := r.Update(context.TODO(), cd); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set the Installed flag")
+	// Set status fields
+	if !cd.Status.Installed {
+		cd.Status.Installed = true
+		now := metav1.Now()
+		cd.Status.InstalledTimestamp = &now
+		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+			cd.Status.Conditions,
+			hivev1.ProvisionFailedCondition,
+			corev1.ConditionFalse,
+			"ProvisionSucceeded",
+			fmt.Sprintf("Provision %s succeeded.", provision.Name),
+			controllerutils.UpdateConditionNever,
+		)
+
+		if provision.Spec.AdminKubeconfigSecret != nil {
+			cd.Status.AdminKubeconfigSecret = *provision.Spec.AdminKubeconfigSecret
+		}
+		if provision.Spec.AdminPasswordSecret != nil {
+			cd.Status.AdminPasswordSecret = *provision.Spec.AdminPasswordSecret
+		}
+
+		adminKubeconfigSecret := &corev1.Secret{}
+		if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret); err != nil {
+			cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
+			return reconcile.Result{}, err
+		}
+		if err := r.fixupAdminKubeconfigSecret(adminKubeconfigSecret, cdLog); err != nil {
+			cdLog.WithError(err).Error("failed to fix up admin kubeconfig secret")
+			return reconcile.Result{}, err
+		}
+		if err := r.setAdminKubeconfigStatus(cd, adminKubeconfigSecret, cdLog); err != nil {
+			cdLog.WithError(err).Error("failed to set admin kubeconfig status")
 			return reconcile.Result{}, err
 		}
 
-		// jobDuration calculates the time elapsed since the first clusterprovision was created
-		startTime := cd.CreationTimestamp
-		if firstProvision := r.getFirstProvision(cd, cdLog); firstProvision != nil {
-			startTime = firstProvision.CreationTimestamp
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
+			return reconcile.Result{}, err
 		}
-		jobDuration := time.Since(startTime.Time)
-		cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
-		metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
-
-		// Report a metric for the total number of install restarts:
-		metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
-			Observe(float64(cd.Status.InstallRestarts))
-
-		// Clear the install underway seconds metric. After this no-one should be reporting
-		// this metric for this cluster.
-		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-			cd.Name,
-			cd.Namespace,
-			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
-
-		metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 	}
 
-	cd.Status.Installed = true
-	now := metav1.Now()
-	cd.Status.InstalledTimestamp = &now
-	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
-		cd.Status.Conditions,
-		hivev1.ProvisionFailedCondition,
-		corev1.ConditionFalse,
-		"ProvisionSucceeded",
-		fmt.Sprintf("Provision %s succeeded.", provision.Name),
-		controllerutils.UpdateConditionNever,
-	)
-
-	if provision.Spec.AdminKubeconfigSecret != nil {
-		cd.Status.AdminKubeconfigSecret = *provision.Spec.AdminKubeconfigSecret
-	}
-	if provision.Spec.AdminPasswordSecret != nil {
-		cd.Status.AdminPasswordSecret = *provision.Spec.AdminPasswordSecret
-	}
-
-	adminKubeconfigSecret := &corev1.Secret{}
-	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret); err != nil {
-		cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
-		return reconcile.Result{}, err
-	}
-	if err := r.fixupAdminKubeconfigSecret(adminKubeconfigSecret, cdLog); err != nil {
-		cdLog.WithError(err).Error("failed to fix up admin kubeconfig secret")
-		return reconcile.Result{}, err
-	}
-	if err := r.setAdminKubeconfigStatus(cd, adminKubeconfigSecret, cdLog); err != nil {
-		cdLog.WithError(err).Error("failed to set admin kubeconfig status")
+	cd.Spec.Installed = true
+	if err := r.Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set the Installed flag")
 		return reconcile.Result{}, err
 	}
 
-	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
-		return reconcile.Result{}, err
+	// jobDuration calculates the time elapsed since the first clusterprovision was created
+	startTime := cd.CreationTimestamp
+	if firstProvision := r.getFirstProvision(cd, cdLog); firstProvision != nil {
+		startTime = firstProvision.CreationTimestamp
 	}
+	jobDuration := time.Since(startTime.Time)
+	cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
+	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
+
+	// Report a metric for the total number of install restarts:
+	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
+		Observe(float64(cd.Status.InstallRestarts))
+
+	// Clear the install underway seconds metric. After this no-one should be reporting
+	// this metric for this cluster.
+	hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
+		cd.Name,
+		cd.Namespace,
+		hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+
+	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 
 	return reconcile.Result{}, nil
 }

@@ -30,10 +30,6 @@ const (
 	// ClusterDeploymentNameLabel is the label that is used to identify the installer pod of a particular cluster deployment
 	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 
-	// InstallFailureTestAnnotation is a ClusterDeployment label that can be used to trigger a failed
-	// installation during the bootstrapping phase.
-	InstallFailureTestAnnotation = "hive.openshift.io/install-failure-test"
-
 	// GlobalPullSecret is the environment variable for controllers to get the global pull secret
 	GlobalPullSecret = "GLOBAL_PULL_SECRET"
 

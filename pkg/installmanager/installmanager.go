@@ -72,14 +72,6 @@ const (
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
 	defaultManifestsMountPath           = "/manifests"
-
-	testFailureManifest = `apiVersion: v1
-kind: NotARealSecret
-metadata:
-  name: foo
-  namespace: bar
-type: TestFailResource
-`
 )
 
 var (
@@ -502,18 +494,6 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
-	}
-
-	// If the failure test annotation is set, write a bogus resource into the manifests which will
-	// cause a late failure in the install process, enough that we can gather logs from the cluster.
-	if b, err := strconv.ParseBool(provision.Annotations[constants.InstallFailureTestAnnotation]); b && err == nil {
-		m.log.Warnf("generating a late installation failure for testing due to %s annotation on cluster deployment", constants.InstallFailureTestAnnotation)
-		data := []byte(testFailureManifest)
-		err = ioutil.WriteFile(filepath.Join(m.WorkDir, "manifests", "failure-test.yaml"), data, 0644)
-		if err != nil {
-			m.log.WithError(err).Error("error writing failure manifest to disk")
-			return err
-		}
 	}
 
 	if src := m.ManifestsMountPath; isDirNonEmpty(src) {

@@ -30,7 +30,6 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -86,6 +85,14 @@ const (
 	cloudAWS                   = "aws"
 	cloudAzure                 = "azure"
 	cloudGCP                   = "gcp"
+
+	testFailureManifest = `apiVersion: v1
+kind: NotARealSecret
+metadata:
+  name: foo
+  namespace: bar
+type: TestFailResource
+`
 )
 
 var (
@@ -605,7 +612,7 @@ func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
 }
 
 func (o *Options) generateManifestsConfigMap() (*corev1.ConfigMap, error) {
-	if o.ManifestsDir == "" {
+	if o.ManifestsDir == "" && !o.SimulateBootstrapFailure {
 		return nil, nil
 	}
 	cm := &corev1.ConfigMap{
@@ -618,20 +625,27 @@ func (o *Options) generateManifestsConfigMap() (*corev1.ConfigMap, error) {
 			Namespace: o.Namespace,
 		},
 	}
-	files, err := ioutil.ReadDir(o.ManifestsDir)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read manifests directory")
-	}
-	cm.BinaryData = make(map[string][]byte, len(files))
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		data, err := ioutil.ReadFile(filepath.Join(o.ManifestsDir, file.Name()))
+	if o.ManifestsDir != "" {
+		files, err := ioutil.ReadDir(o.ManifestsDir)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not read manifest file %q", file.Name())
+			return nil, errors.Wrap(err, "could not read manifests directory")
 		}
-		cm.BinaryData[file.Name()] = data
+		cm.BinaryData = make(map[string][]byte, len(files))
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+			data, err := ioutil.ReadFile(filepath.Join(o.ManifestsDir, file.Name()))
+			if err != nil {
+				return nil, errors.Wrapf(err, "could not read manifest file %q", file.Name())
+			}
+			cm.BinaryData[file.Name()] = data
+		}
+	}
+	if o.SimulateBootstrapFailure {
+		cm.Data = map[string]string{
+			"failure-test.yaml": testFailureManifest,
+		}
 	}
 	return cm, nil
 }
@@ -672,9 +686,6 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.
 	}
 	if o.UninstallOnce {
 		cd.Annotations[tryUninstallOnceAnnotation] = "true"
-	}
-	if o.SimulateBootstrapFailure {
-		cd.Annotations[constants.InstallFailureTestAnnotation] = "true"
 	}
 	if pullSecret != nil {
 		cd.Spec.PullSecret = &corev1.LocalObjectReference{Name: pullSecret.Name}

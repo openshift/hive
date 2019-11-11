@@ -522,13 +522,6 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		},
 	}
 
-	if v, ok := cd.Annotations[constants.InstallFailureTestAnnotation]; ok {
-		if provision.Annotations == nil {
-			provision.Annotations = map[string]string{}
-		}
-		provision.Annotations[constants.InstallFailureTestAnnotation] = v
-	}
-
 	// Copy over the cluster ID and infra ID from previous provision so that a failed install can be removed.
 	if cd.Spec.ClusterMetadata != nil {
 		provision.Spec.PrevClusterID = &cd.Spec.ClusterMetadata.ClusterID

@@ -80,6 +80,8 @@ NEW_PROV_BASE=$(echo ${PROV} | jq \
 			"labels":{"hive.openshift.io/duplicated-from":.name}} |
 		.spec.stage="complete" |
 		del(.spec.podSpec) |
+		del(.spec.prevClusterID) |
+		del(.spec.prevInfraID) |
 		del(.spec.attempt)')
 		
 for (( i=0; i<${COUNT}; i++ ))

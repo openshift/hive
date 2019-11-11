@@ -389,7 +389,7 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 	if in.Provisioning != nil {
 		in, out := &in.Provisioning, &out.Provisioning
 		*out = new(Provisioning)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -1766,6 +1766,11 @@ func (in *ProvisionImages) DeepCopy() *ProvisionImages {
 func (in *Provisioning) DeepCopyInto(out *Provisioning) {
 	*out = *in
 	out.InstallConfigSecret = in.InstallConfigSecret
+	if in.ManifestsConfigMap != nil {
+		in, out := &in.ManifestsConfigMap, &out.ManifestsConfigMap
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	return
 }
 

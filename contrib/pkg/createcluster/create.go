@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -122,6 +123,7 @@ type Options struct {
 	UninstallOnce            bool
 	SimulateBootstrapFailure bool
 	WorkerNodes              int64
+	ManifestsDir             string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -199,6 +201,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
 	flags.BoolVar(&opt.SimulateBootstrapFailure, "simulate-bootstrap-failure", false, "Simulate an install bootstrap failure by injecting an invalid manifest.")
 	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
+	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
@@ -397,6 +400,17 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		InstallConfigSecret: corev1.LocalObjectReference{Name: installConfigSecret.Name},
 	}
 
+	manifestsConfigMap, err := o.generateManifestsConfigMap()
+	if err != nil {
+		return nil, err
+	}
+	if manifestsConfigMap != nil {
+		cd.Spec.Provisioning.ManifestsConfigMap = &corev1.LocalObjectReference{
+			Name: manifestsConfigMap.Name,
+		}
+		result = append(result, manifestsConfigMap)
+	}
+
 	imageSet, err := o.configureImages(cd)
 	if err != nil {
 		return nil, err
@@ -588,6 +602,38 @@ func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
 			"tls.key": string(servingCertKey),
 		},
 	}, nil
+}
+
+func (o *Options) generateManifestsConfigMap() (*corev1.ConfigMap, error) {
+	if o.ManifestsDir == "" {
+		return nil, nil
+	}
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-manifests", o.Name),
+			Namespace: o.Namespace,
+		},
+	}
+	files, err := ioutil.ReadDir(o.ManifestsDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not read manifests directory")
+	}
+	cm.BinaryData = make(map[string][]byte, len(files))
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		data, err := ioutil.ReadFile(filepath.Join(o.ManifestsDir, file.Name()))
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not read manifest file %q", file.Name())
+		}
+		cm.BinaryData[file.Name()] = data
+	}
+	return cm, nil
 }
 
 // GenerateClusterDeployment generates a new cluster deployment

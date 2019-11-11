@@ -71,6 +71,7 @@ const (
 	provisioningTransitionTimeout       = 5 * time.Minute
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
+	defaultManifestsMountPath           = "/manifests"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -98,6 +99,7 @@ type InstallManager struct {
 	ClusterProvisionName     string
 	Namespace                string
 	InstallConfigMountPath   string
+	ManifestsMountPath       string
 	DynamicClient            client.Client
 	cleanupFailedProvision   func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
@@ -129,6 +131,7 @@ func NewInstallManagerCommand() *cobra.Command {
 			// Parse the namespace/name for our cluster provision:
 			im.Namespace, im.ClusterProvisionName = args[0], args[1]
 			im.InstallConfigMountPath = defaultInstallConfigMountPath
+			im.ManifestsMountPath = defaultManifestsMountPath
 
 			if err := im.Validate(); err != nil {
 				log.WithError(err).Error("invalid command options")
@@ -511,6 +514,18 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 			m.log.WithError(err).Error("error writing failure manifest to disk")
 			return err
 		}
+	}
+
+	if src := m.ManifestsMountPath; isDirNonEmpty(src) {
+		m.log.Info("copying user-provided manifests")
+		dest := filepath.Join(m.WorkDir, "manifests")
+		out, err := exec.Command("bash", "-c", fmt.Sprintf("cp %s %s", filepath.Join(src, "*"), dest)).CombinedOutput()
+		fmt.Printf("%s\n", out)
+		if err != nil {
+			log.WithError(err).Errorf("error copying manifests from %s to %s", src, dest)
+			return err
+		}
+		m.log.Infof("copied %s to %s", src, dest)
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")
@@ -1184,4 +1199,16 @@ func cleanupLogOutput(fullLog string) string {
 	cleanedString = multiLineRedactLinesWithPassword.ReplaceAllString(fullLog, "REDACTED LINE OF OUTPUT")
 
 	return cleanedString
+}
+
+// isDirNonEmpty returns true if the directory exists and contains at least one file.
+func isDirNonEmpty(dir string) bool {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+	return err == nil
 }

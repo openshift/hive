@@ -272,28 +272,46 @@ func (c *awsClient) ChangeResourceRecordSets(input *route53.ChangeResourceRecord
 // Pass a nil client, and empty secret name and namespace to load credentials from the standard
 // AWS environment variables.
 func NewClient(kubeClient client.Client, secretName, namespace, region string) (Client, error) {
+
+	// Special case to not use a secret to gather credentials.
+	if secretName == "" {
+		return NewClientFromSecret(nil, region)
+	}
+
+	secret := &corev1.Secret{}
+	err := kubeClient.Get(context.TODO(),
+		types.NamespacedName{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		secret)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewClientFromSecret(secret, region)
+}
+
+// NewClientFromSecret creates our client wrapper object for the actual AWS clients we use.
+// For authentication the underlying clients will use either the cluster AWS credentials
+// secret if defined (i.e. in the root cluster),
+// otherwise the IAM profile of the master where the actuator will run. (target clusters)
+//
+// Pass a nil secret to load credentials from the standard AWS environment variables.
+func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 	awsConfig := &aws.Config{Region: aws.String(region)}
 
-	if secretName != "" {
-		secret := &corev1.Secret{}
-		err := kubeClient.Get(context.TODO(),
-			types.NamespacedName{
-				Name:      secretName,
-				Namespace: namespace,
-			},
-			secret)
-		if err != nil {
-			return nil, err
-		}
+	// Special case to not use a secret to gather credentials.
+	if secret != nil {
 		accessKeyID, ok := secret.Data[awsCredsSecretIDKey]
 		if !ok {
 			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secretName, awsCredsSecretIDKey)
+				secret.Name, awsCredsSecretIDKey)
 		}
 		secretAccessKey, ok := secret.Data[awsCredsSecretAccessKey]
 		if !ok {
 			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secretName, awsCredsSecretAccessKey)
+				secret.Name, awsCredsSecretAccessKey)
 		}
 
 		awsConfig.Credentials = credentials.NewStaticCredentials(

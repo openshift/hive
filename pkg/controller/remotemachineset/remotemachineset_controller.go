@@ -534,9 +534,9 @@ func (r *ReconcileRemoteMachineSet) getAWSClient(cd *hivev1.ClusterDeployment) (
 	// This allows for using host profiles for AWS auth.
 	var secretName, regionName string
 
-	if cd != nil && cd.Spec.AWS != nil && cd.Spec.PlatformSecrets.AWS != nil {
-		secretName = cd.Spec.PlatformSecrets.AWS.Credentials.Name
-		regionName = cd.Spec.AWS.Region
+	if cd != nil && cd.Spec.Platform.AWS != nil {
+		secretName = cd.Spec.Platform.AWS.CredentialsSecret.Name
+		regionName = cd.Spec.Platform.AWS.Region
 	}
 
 	awsClient, err := r.awsClientBuilder(r.Client, secretName, cd.Namespace, regionName)

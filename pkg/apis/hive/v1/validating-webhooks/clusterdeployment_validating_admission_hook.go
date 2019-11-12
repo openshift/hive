@@ -243,33 +243,28 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
-	if newObject.Spec.SSHKey.Name == "" {
-		allErrs = append(allErrs, field.Required(specPath.Child("sshKey", "name"), "must specify an SSH key to use"))
-	}
-
 	platformPath := specPath.Child("platform")
-	platformSecretsPath := specPath.Child("platformSecrets")
 	numberOfPlatforms := 0
 	canManageDNS := false
 	if newObject.Spec.Platform.AWS != nil {
 		numberOfPlatforms++
 		canManageDNS = true
-		if newObject.Spec.PlatformSecrets.AWS == nil {
-			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("aws"), "must specify secrets for AWS access"))
-		}
 		aws := newObject.Spec.Platform.AWS
 		awsPath := platformPath.Child("aws")
+		if aws.CredentialsSecret.Name == "" {
+			allErrs = append(allErrs, field.Required(awsPath.Child("credentials", "name"), "must specify secrets for AWS access"))
+		}
 		if aws.Region == "" {
 			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
 		}
 	}
 	if newObject.Spec.Platform.Azure != nil {
 		numberOfPlatforms++
-		if newObject.Spec.PlatformSecrets.Azure == nil {
-			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("azure"), "must specify secrets for Azure access"))
-		}
 		azure := newObject.Spec.Platform.Azure
 		azurePath := platformPath.Child("azure")
+		if azure.CredentialsSecret.Name == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("credentials", "name"), "must specify secrets for Azure access"))
+		}
 		if azure.Region == "" {
 			allErrs = append(allErrs, field.Required(azurePath.Child("region"), "must specify Azure region"))
 		}
@@ -279,11 +274,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 	if newObject.Spec.Platform.GCP != nil {
 		numberOfPlatforms++
-		if newObject.Spec.PlatformSecrets.GCP == nil {
-			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("gcp"), "must specify secrets for GCP access"))
-		}
 		gcp := newObject.Spec.Platform.GCP
 		gcpPath := platformPath.Child("gcp")
+		if gcp.CredentialsSecret.Name == "" {
+			allErrs = append(allErrs, field.Required(gcpPath.Child("credentials", "name"), "must specify secrets for GCP access"))
+		}
 		if gcp.ProjectID == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("projectID"), "must specify GCP project ID"))
 		}
@@ -299,6 +294,12 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 	if !canManageDNS && newObject.Spec.ManageDNS {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), newObject.Spec.ManageDNS, "cannot manage DNS for the selected platform"))
+	}
+
+	if newObject.Spec.Provisioning != nil {
+		if newObject.Spec.Provisioning.SSHPrivateKeySecret != nil && newObject.Spec.Provisioning.SSHPrivateKeySecret.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecret", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
+		}
 	}
 
 	if len(allErrs) > 0 {
@@ -689,7 +690,7 @@ func validateCertificateBundles(newObject *hivev1.ClusterDeployment, contextLogg
 				},
 			}
 		}
-		if certBundle.SecretRef.Name == "" {
+		if certBundle.CertificateSecret.Name == "" {
 			message := "Certificate bundle is missing a secret reference"
 			contextLogger.Infof("Failed validation: %v", message)
 			return &admissionv1beta1.AdmissionResponse{

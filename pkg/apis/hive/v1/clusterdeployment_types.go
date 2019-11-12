@@ -50,10 +50,6 @@ type ClusterDeploymentSpec struct {
 	// +required
 	ClusterName string `json:"clusterName"`
 
-	// SSHKey is the reference to the secret that contains a public key to use for access to compute instances.
-	// +required
-	SSHKey corev1.LocalObjectReference `json:"sshKey"`
-
 	// BaseDomain is the base domain to which the cluster should belong.
 	// +required
 	BaseDomain string `json:"baseDomain"`
@@ -65,17 +61,11 @@ type ClusterDeploymentSpec struct {
 	// Platform is the configuration for the specific platform upon which to
 	// perform the installation.
 	// +required
-	Platform `json:"platform"`
+	Platform Platform `json:"platform"`
 
 	// PullSecret is the reference to the secret to use when pulling images.
 	// +optional
 	PullSecret *corev1.LocalObjectReference `json:"pullSecret,omitempty"`
-
-	// TODO: Should PlatformSecrets be moved within each Platform for v1?
-
-	// PlatformSecrets contains credentials and secrets for the cluster infrastructure.
-	// +required
-	PlatformSecrets PlatformSecrets `json:"platformSecrets"`
 
 	// Images allows overriding the default images used to provision and manage the cluster.
 	Images ProvisionImages `json:"images,omitempty"`
@@ -119,6 +109,14 @@ type Provisioning struct {
 	// Any version of InstallConfig can be used, provided it can be parsed by the openshift-install
 	// version for the release you are provisioning.
 	InstallConfigSecret corev1.LocalObjectReference `json:"installConfigSecret,omitempty"`
+
+	// SSHPrivateKeySecret is the reference to the secret that contains the private SSH key to use
+	// for access to compute instances. This private key should correspond to the public key included
+	// in the InstallConfig. The private key is used by Hive to gather logs on the target cluster if
+	// there are install failures.
+	// The SSH private key is expected to be in the secret data under the "ssh-privatekey" key.
+	// +optional
+	SSHPrivateKeySecret *corev1.LocalObjectReference `json:"sshPrivateSecretKey,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.
@@ -142,16 +140,6 @@ type ClusterImageSetReference struct {
 	Name string `json:"name"`
 }
 
-// PlatformSecrets defines the secrets to be used by various clouds.
-type PlatformSecrets struct {
-	// +optional
-	AWS *aws.PlatformSecrets `json:"aws,omitempty"`
-	// +optional
-	Azure *azure.PlatformSecrets `json:"azure,omitempty"`
-	// +optional
-	GCP *gcp.PlatformSecrets `json:"gcp,omitempty"`
-}
-
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment
 type ClusterDeploymentStatus struct {
 
@@ -173,7 +161,7 @@ type ClusterDeploymentStatus struct {
 
 	// FederatedClusterRef is the reference to the federated cluster resource associated with
 	// this ClusterDeployment.
-	FederatedClusterRef *corev1.ObjectReference `json:"federatedClusterRef,omitempty"`
+	FederatedCluster *corev1.ObjectReference `json:"federatedCluster,omitempty"`
 
 	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
 	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
@@ -402,11 +390,11 @@ type CertificateBundleSpec struct {
 	// +optional
 	Generate bool `json:"generate,omitempty"`
 
-	// SecretRef is the reference to the secret that contains the certificate bundle. If
+	// CertificateSecret is the reference to the secret that contains the certificate bundle. If
 	// the certificate bundle is to be generated, it will be generated with the name in this
 	// reference. Otherwise, it is expected that the secret should exist in the same namespace
 	// as the ClusterDeployment
-	SecretRef corev1.LocalObjectReference `json:"secretRef"`
+	CertificateSecret corev1.LocalObjectReference `json:"certificateSecret"`
 }
 
 // CertificateBundleStatus specifies whether a certificate bundle was generated for this

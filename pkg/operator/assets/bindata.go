@@ -1708,6 +1708,13 @@ spec:
                 with this cluster
               items:
                 properties:
+                  certificateSecret:
+                    description: CertificateSecret is the reference to the secret
+                      that contains the certificate bundle. If the certificate bundle
+                      is to be generated, it will be generated with the name in this
+                      reference. Otherwise, it is expected that the secret should
+                      exist in the same namespace as the ClusterDeployment
+                    type: object
                   generate:
                     description: Generate indicates whether this bundle should have
                       real certificates generated for it.
@@ -1717,13 +1724,6 @@ spec:
                       the bundle and must be referenced by an ingress or by the control
                       plane serving certs
                     type: string
-                  secretRef:
-                    description: SecretRef is the reference to the secret that contains
-                      the certificate bundle. If the certificate bundle is to be generated,
-                      it will be generated with the name in this reference. Otherwise,
-                      it is expected that the secret should exist in the same namespace
-                      as the ClusterDeployment
-                    type: object
                 required:
                 - name
                 type: object
@@ -1941,6 +1941,10 @@ spec:
                 aws:
                   description: AWS is the configuration used when installing on AWS.
                   properties:
+                    credentialsSecret:
+                      description: CredentialsSecret refers to a secret that contains
+                        the AWS account access credentials.
+                      type: object
                     defaultMachinePlatform:
                       description: DefaultMachinePlatform is the default configuration
                         used when installing on AWS for machine pools which do not
@@ -1989,6 +1993,10 @@ spec:
                       description: BaseDomainResourceGroupName specifies the resource
                         group where the azure DNS zone for the base domain is found
                       type: string
+                    credentialsSecret:
+                      description: CredentialsSecret refers to a secret that contains
+                        the Azure account access credentials.
+                      type: object
                     defaultMachinePlatform:
                       description: DefaultMachinePlatform is the default configuration
                         used when installing on Azure for machine pools which do not
@@ -2023,6 +2031,10 @@ spec:
                   description: GCP is the configuration used when installing on Google
                     Cloud Platform.
                   properties:
+                    credentialsSecret:
+                      description: CredentialsSecret refers to a secret that contains
+                        the GCP account access credentials.
+                      type: object
                     defaultMachinePlatform:
                       description: DefaultMachinePlatform is the default configuration
                         used when installing on GCP for machine pools which do not
@@ -2049,32 +2061,6 @@ spec:
                       type: string
                   type: object
               type: object
-            platformSecrets:
-              description: PlatformSecrets contains credentials and secrets for the
-                cluster infrastructure.
-              properties:
-                aws:
-                  properties:
-                    credentials:
-                      description: Credentials refers to a secret that contains the
-                        AWS account access credentials.
-                      type: object
-                  type: object
-                azure:
-                  properties:
-                    credentials:
-                      description: Credentials refers to a secret that contains the
-                        Azure account access credentials.
-                      type: object
-                  type: object
-                gcp:
-                  properties:
-                    credentials:
-                      description: Credentials refers to a secret that contains the
-                        GCP account access credentials.
-                      type: object
-                  type: object
-              type: object
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
                 from Hive without deprovisioning it
@@ -2090,22 +2076,25 @@ spec:
                     can be used, provided it can be parsed by the openshift-install
                     version for the release you are provisioning.
                   type: object
+                sshPrivateSecretKey:
+                  description: SSHPrivateKeySecret is the reference to the secret
+                    that contains the private SSH key to use for access to compute
+                    instances. This private key should correspond to the public key
+                    included in the InstallConfig. The private key is used by Hive
+                    to gather logs on the target cluster if there are install failures.
+                    The SSH private key is expected to be in the secret data under
+                    the "ssh-privatekey" key.
+                  type: object
               type: object
             pullSecret:
               description: PullSecret is the reference to the secret to use when pulling
                 images.
               type: object
-            sshKey:
-              description: SSHKey is the reference to the secret that contains a public
-                key to use for access to compute instances.
-              type: object
           required:
           - clusterName
-          - sshKey
           - baseDomain
           - compute
           - platform
-          - platformSecrets
           type: object
         status:
           properties:
@@ -2339,7 +2328,7 @@ spec:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
               type: boolean
-            federatedClusterRef:
+            federatedCluster:
               description: FederatedClusterRef is the reference to the federated cluster
                 resource associated with this ClusterDeployment.
               type: object

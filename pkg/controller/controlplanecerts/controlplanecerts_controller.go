@@ -227,7 +227,7 @@ func getControlPlaneSecretNames(cd *hivev1.ClusterDeployment, cdLog log.FieldLog
 			// should not happen if clusterdeployment was validated
 			return nil, fmt.Errorf("no certificate bundle was found for %s", cert)
 		}
-		secretsNeeded.Insert(bundle.SecretRef.Name)
+		secretsNeeded.Insert(bundle.CertificateSecret.Name)
 	}
 	cdLog.WithField("secrets", secretsNeeded.List()).Debug("certificate secrets needed by the control plane")
 	return secretsNeeded.List(), nil
@@ -291,7 +291,7 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 		apiServerConfig.Spec.ServingCerts.NamedCertificates = append(apiServerConfig.Spec.ServingCerts.NamedCertificates, configv1.APIServerNamedServingCert{
 			Names: []string{additional.Domain},
 			ServingCertificate: configv1.SecretNameReference{
-				Name: remoteSecretName(bundle.SecretRef.Name, cd),
+				Name: remoteSecretName(bundle.CertificateSecret.Name, cd),
 			},
 		})
 	}

@@ -341,7 +341,12 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		return nil, err
 	}
 
-	cd, err := o.GenerateClusterDeployment(pullSecretSecret)
+	sshPrivateKeySecret, err := o.generateSSHPrivateKeySecret()
+	if err != nil {
+		return nil, err
+	}
+
+	cd, err := o.GenerateClusterDeployment(pullSecretSecret, sshPrivateKeySecret)
 	if err != nil {
 		return nil, err
 	}
@@ -393,9 +398,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	cd.Spec.Provisioning = &hivev1.Provisioning{
-		InstallConfigSecret: corev1.LocalObjectReference{Name: installConfigSecret.Name},
-	}
+	cd.Spec.Provisioning.InstallConfigSecret = corev1.LocalObjectReference{Name: installConfigSecret.Name}
 
 	imageSet, err := o.configureImages(cd)
 	if err != nil {
@@ -416,11 +419,11 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		result = append(result, creds)
 
-		sshSecret, err := o.generateSSHSecret()
+		sshPrivateKeySecret, err := o.generateSSHPrivateKeySecret()
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, sshSecret)
+		result = append(result, sshPrivateKeySecret)
 
 		servingCertSecret, err := o.generateServingCertSecret()
 		if err != nil {
@@ -533,12 +536,7 @@ func (o *Options) getSSHPrivateKey() (string, error) {
 	return "", nil
 }
 
-func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
-	sshPublicKey, err := o.getSSHPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
+func (o *Options) generateSSHPrivateKeySecret() (*corev1.Secret, error) {
 	sshPrivateKey, err := o.getSSHPrivateKey()
 	if err != nil {
 		return nil, err
@@ -550,12 +548,11 @@ func (o *Options) generateSSHSecret() (*corev1.Secret, error) {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-ssh-key", o.Name),
+			Name:      fmt.Sprintf("%s-ssh-private-key", o.Name),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"ssh-publickey":  sshPublicKey,
 			"ssh-privatekey": sshPrivateKey,
 		},
 	}, nil
@@ -591,7 +588,7 @@ func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
 }
 
 // GenerateClusterDeployment generates a new cluster deployment
-func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.ClusterDeployment, error) {
+func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivateKeySecret *corev1.Secret) (*hivev1.ClusterDeployment, error) {
 	cd := &hivev1.ClusterDeployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterDeployment",
@@ -603,9 +600,6 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			SSHKey: corev1.LocalObjectReference{
-				Name: fmt.Sprintf("%s-ssh-key", o.Name),
-			},
 			Images: hivev1.ProvisionImages{
 				InstallerImagePullPolicy: corev1.PullAlways,
 			},
@@ -617,8 +611,13 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.
 					Replicas: pointer.Int64Ptr(o.WorkerNodes),
 				},
 			},
-			ManageDNS: o.ManageDNS,
+			ManageDNS:    o.ManageDNS,
+			Provisioning: &hivev1.Provisioning{},
 		},
+	}
+
+	if sshPrivateKeySecret != nil {
+		cd.Spec.Provisioning.SSHPrivateKeySecret = &corev1.LocalObjectReference{Name: sshPrivateKeySecret.Name}
 	}
 
 	if o.InstallOnce {
@@ -637,7 +636,7 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.
 		cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 			{
 				Name: "serving-cert",
-				SecretRef: corev1.LocalObjectReference{
+				CertificateSecret: corev1.LocalObjectReference{
 					Name: fmt.Sprintf("%s-serving-cert", o.Name),
 				},
 			},

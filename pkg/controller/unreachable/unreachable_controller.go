@@ -139,6 +139,11 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
+	if cd.Spec.ClusterMetadata == nil {
+		cdLog.Error("installed cluster with no cluster metadata")
+		return reconcile.Result{}, nil
+	}
+
 	// Check if we're due for rechecking cluster's connectivity
 	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
 	if cond != nil {
@@ -151,7 +156,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		}
 	}
 
-	secretName := cd.Status.AdminKubeconfigSecret.Name
+	secretName := cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name
 	secretData, err := r.loadSecretData(secretName, cd.Namespace, adminKubeConfigKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load admin kubeconfig")

@@ -62,9 +62,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileRemoteMachineSet{
-		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:                        mgr.GetScheme(),
-		logger:                        log.WithField("controller", controllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme: mgr.GetScheme(),
+		logger: log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 		awsClientBuilder:              awsclient.NewClient,
 	}
@@ -154,6 +154,11 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
+	if cd.Spec.ClusterMetadata == nil {
+		cdLog.Error("installed cluster with no cluster metadata")
+		return reconcile.Result{}, nil
+	}
+
 	if cd.Spec.Platform.AWS == nil {
 		// TODO: add support for GCP and azure
 		cdLog.Warn("skipping machine set management for unsupported cloud platform")
@@ -161,7 +166,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	}
 
 	adminKubeconfigSecret := &kapi.Secret{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to fetch admin kubeconfig secret")
 		return reconcile.Result{}, err
@@ -220,7 +225,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 		amiID = *awsProviderSpec.AMI.ID
 		cdLog.WithFields(log.Fields{
 			"fromRemoteMachineSet": ms.Name,
-			"ami":                  amiID,
+			"ami": amiID,
 		}).Debug("resolved AMI to use for new machinesets")
 		break
 	}
@@ -374,7 +379,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				workerPool.Platform.AWS.Zones = azs
 			}
 
-			icMachineSets, err := awsmachines.MachineSets(cd.Status.InfraID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
+			icMachineSets, err := awsmachines.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, &workerPool, defaultAMI, workerPool.Name, "worker-user-data")
 			if err != nil {
 				return nil, err
 			}
@@ -392,7 +397,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSetsFromClusterDeployment(cd 
 				ms.Spec.Template.Spec.Taints = hivePool.Taints
 
 				// Re-use existing AWS resources for generated MachineSets.
-				updateMachineSetAWSMachineProviderConfig(ms, cd.Status.InfraID)
+				updateMachineSetAWSMachineProviderConfig(ms, cd.Spec.ClusterMetadata.InfraID)
 				installerMachineSets = append(installerMachineSets, *ms)
 			}
 		}

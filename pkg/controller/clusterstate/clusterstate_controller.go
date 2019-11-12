@@ -116,8 +116,13 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		logger.Debug("ClusterDeployment resource has been deleted")
 		return reconcile.Result{}, nil
 	}
-	if !cd.Spec.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if !cd.Spec.Installed {
 		logger.Debug("ClusterDeployment is not yet ready")
+		return reconcile.Result{}, nil
+	}
+
+	if cd.Spec.ClusterMetadata == nil {
+		logger.Error("installed cluster with no cluster metadata")
 		return reconcile.Result{}, nil
 	}
 
@@ -164,7 +169,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 	kubeconfigSecret := &corev1.Secret{}
-	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, kubeconfigSecret)
+	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name}, kubeconfigSecret)
 	if err != nil {
 		log.WithError(err).Error("could not get cluster's admin kubeconfig")
 		return reconcile.Result{}, err

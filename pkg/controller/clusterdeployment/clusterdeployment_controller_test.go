@@ -231,7 +231,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
-					assert.True(t, cd.Status.Installed, "expected Installed field in Status to be true")
 				}
 			},
 		},
@@ -908,7 +907,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd := testClusterDeploymentWithProvision()
 					now := metav1.Now()
 					cd.DeletionTimestamp = &now
-					cd.Status.InfraID = ""
+					cd.Spec.ClusterMetadata = nil
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -944,114 +943,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 				deprovision := getDeprovisionRequest(c)
 				assert.NotNil(t, deprovision, "missing deprovision request")
-			},
-		},
-		{
-			name: "Create dummy provision for legacy clusterdeployment",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					cd := testClusterDeployment()
-					cd.Spec.Installed = true
-					cd.Status.InfraID = "test-infra-id"
-					cd.Status.ClusterID = "test-cluster-id"
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: "test-kubeconfig"}
-					cd.Status.AdminPasswordSecret = corev1.LocalObjectReference{Name: "test-password"}
-					return cd
-				}(),
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo-lqmsh-install-log",
-						Namespace: testNamespace,
-					},
-					Data: map[string]string{
-						"log": "test-install-log",
-					},
-				},
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo-lqmsh-metadata",
-						Namespace: testNamespace,
-					},
-					Data: map[string]string{
-						"metadata.json": "\"test-metadata\"",
-					},
-				},
-			},
-			expectPendingCreation: true,
-			validate: func(c client.Client, t *testing.T) {
-				provisions := getProvisions(c)
-				if assert.Len(t, provisions, 1, "expected provision to exist") {
-					expectedSpec := hivev1.ClusterProvisionSpec{
-						ClusterDeployment:     corev1.LocalObjectReference{Name: testName},
-						Stage:                 hivev1.ClusterProvisionStageComplete,
-						InfraID:               pointer.StringPtr("test-infra-id"),
-						ClusterID:             pointer.StringPtr("test-cluster-id"),
-						InstallLog:            pointer.StringPtr("test-install-log"),
-						Metadata:              &runtime.RawExtension{Raw: []byte("\"test-metadata\"")},
-						AdminKubeconfigSecret: &corev1.LocalObjectReference{Name: "test-kubeconfig"},
-						AdminPasswordSecret:   &corev1.LocalObjectReference{Name: "test-password"},
-					}
-					assert.Equal(t, expectedSpec, provisions[0].Spec, "unexpected data in provision spec")
-					assert.True(t, metav1.IsControlledBy(provisions[0], getCD(c)), "expected provision to be owned by cd")
-				}
-			},
-		},
-		{
-			name: "Adopt dummy provision for legacy clusterdeployment",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					cd := testClusterDeployment()
-					cd.Spec.Installed = true
-					cd.Status.InfraID = testInfraID
-					return cd
-				}(),
-				testSuccessfulProvision(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing cluster deployment") {
-					if assert.NotNil(t, cd.Status.Provision, "expected reference to provision") {
-						assert.Equal(t, provisionName, cd.Status.Provision.Name, "unexpected name in provision reference")
-					}
-				}
-				provisions := getProvisions(c)
-				assert.Len(t, provisions, 1, "unexpected number of provisions")
-			},
-		},
-		{
-			name: "Dummy provision not created when pending create",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					cd := testClusterDeployment()
-					cd.Spec.Installed = true
-					cd.Status.InfraID = testInfraID
-					return cd
-				}(),
-			},
-			pendingCreation:       true,
-			expectPendingCreation: true,
-			validate: func(c client.Client, t *testing.T) {
-				provisions := getProvisions(c)
-				assert.Empty(t, provisions, "expected provision to not exist")
-			},
-		},
-		{
-			name: "Abort reconcile of installed clusterdeployment without clusterprovision",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					cd := testClusterDeployment()
-					cd.Spec.Installed = true
-					cd.Status.InfraID = ""
-					return cd
-				}(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing cluster deployment") {
-					assert.Nil(t, cd.Status.Provision, "expected no reference to provision")
-				}
-				provisions := getProvisions(c)
-				assert.Len(t, provisions, 0, "unexpected number of provisions")
 			},
 		},
 		{
@@ -1105,6 +996,59 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					if assert.NotNil(t, cd.Labels, "missing labels map") {
 						assert.Equal(t, cd.Labels[hivev1.HiveClusterPlatformLabel], getClusterPlatform(cd), "incorrect cluster platform label")
+					}
+				}
+			},
+		},
+		{
+			name: "Ensure cluster metadata set from provision",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					cd.Spec.ClusterMetadata = nil
+					return cd
+				}(),
+				testSuccessfulProvision(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					if assert.NotNil(t, cd.Spec.ClusterMetadata, "expected cluster metadata to be set") {
+						assert.Equal(t, testInfraID, cd.Spec.ClusterMetadata.InfraID, "unexpected infra ID")
+						assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID, "unexpected cluster ID")
+						assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name, "unexpected admin kubeconfig")
+						assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecret.Name, "unexpected admin password")
+					}
+				}
+			},
+		},
+		{
+			name: "Ensure cluster metadata overwrites from provision",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithProvision()
+					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						InfraID:               "old-infra-id",
+						ClusterID:             "old-cluster-id",
+						AdminKubeconfigSecret: corev1.LocalObjectReference{Name: "old-kubeconfig-secret"},
+						AdminPasswordSecret:   corev1.LocalObjectReference{Name: "old-password-secret"},
+					}
+					return cd
+				}(),
+				testSuccessfulProvision(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					if assert.NotNil(t, cd.Spec.ClusterMetadata, "expected cluster metadata to be set") {
+						assert.Equal(t, testInfraID, cd.Spec.ClusterMetadata.InfraID, "unexpected infra ID")
+						assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID, "unexpected cluster ID")
+						assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name, "unexpected admin kubeconfig")
+						assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecret.Name, "unexpected admin password")
 					}
 				}
 			},
@@ -1360,13 +1304,17 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		Provisioning: &hivev1.Provisioning{
 			InstallConfigSecret: corev1.LocalObjectReference{Name: "install-config-secret"},
 		},
+		ClusterMetadata: &hivev1.ClusterMetadata{
+			ClusterID:             testClusterID,
+			InfraID:               testInfraID,
+			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+			AdminPasswordSecret:   corev1.LocalObjectReference{Name: adminPasswordSecret},
+		},
 	}
 
 	cd.Labels[hivev1.HiveClusterPlatformLabel] = "aws"
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		ClusterID:      testClusterID,
-		InfraID:        testInfraID,
 		InstallerImage: pointer.StringPtr("installer-image:latest"),
 		CLIImage:       pointer.StringPtr("cli:latest"),
 	}
@@ -1378,8 +1326,6 @@ func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeploy
 	cd := testClusterDeployment()
 	cd.Spec.Installed = true
 	cd.Status.InstalledTimestamp = &metav1.Time{Time: installedAt}
-	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-	cd.Status.Provision = &corev1.LocalObjectReference{Name: provisionName}
 	return cd
 }
 
@@ -1619,7 +1565,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 			existingCD: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					cd.Spec.ClusterMetadata.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -1640,7 +1586,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 			existingCD: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
-					cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
+					cd.Spec.ClusterMetadata.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -1654,9 +1600,9 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existingCD...)
 			rcd := &ReconcileClusterDeployment{
-				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "clusterDeployment"),
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+				logger: log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
@@ -1704,13 +1650,15 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 				},
 			},
 		},
+		ClusterMetadata: &hivev1.ClusterMetadata{
+			ClusterID:             testClusterID,
+			InfraID:               testInfraID,
+			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+		},
 	}
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		ClusterID:      testClusterID,
-		InfraID:        testInfraID,
 		InstallerImage: pointer.StringPtr("installer-image:latest"),
 	}
-	cd.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{Name: adminKubeconfigSecret}
 	return cd
 }
 
@@ -1818,9 +1766,9 @@ func TestMergePullSecrets(t *testing.T) {
 			}
 			fakeClient := fake.NewFakeClient(test.existingObjs...)
 			rcd := &ReconcileClusterDeployment{
-				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "clusterDeployment"),
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+				logger: log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 

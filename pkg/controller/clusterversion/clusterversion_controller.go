@@ -2,7 +2,6 @@ package clusterversion
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"time"
 
@@ -120,14 +119,15 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	if len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if cd.Spec.ClusterMetadata == nil {
+		cdLog.Error("installed cluster with no cluster metadata")
 		return reconcile.Result{}, nil
 	}
 
 	adminKubeconfigSecret := &corev1.Secret{}
-	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Status.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
+	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
 	if err != nil {
-		cdLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", cd.Status.AdminKubeconfigSecret.Name, cd.Namespace)).Error("cannot read secret")
+		cdLog.WithError(err).WithField("secret", cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name).Error("cannot read secret")
 		return reconcile.Result{}, err
 	}
 	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)

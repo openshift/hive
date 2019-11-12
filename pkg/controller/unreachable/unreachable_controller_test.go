@@ -366,15 +366,15 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 					},
 				},
 			},
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterID: testClusterID,
-			AdminKubeconfigSecret: corev1.LocalObjectReference{
-				Name: "kubeconfig-secret",
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				ClusterID: testClusterID,
+				AdminKubeconfigSecret: corev1.LocalObjectReference{
+					Name: "kubeconfig-secret",
+				},
 			},
+			Installed: true,
 		},
 	}
-	cd.Spec.Installed = true
 	return cd
 }
 

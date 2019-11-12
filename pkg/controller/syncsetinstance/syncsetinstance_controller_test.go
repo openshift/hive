@@ -682,10 +682,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+			},
 			Installed: true,
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 		},
 	}
 

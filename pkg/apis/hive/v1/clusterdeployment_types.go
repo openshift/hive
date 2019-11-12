@@ -104,6 +104,9 @@ type ClusterDeploymentSpec struct {
 	// +optional
 	ManageDNS bool `json:"manageDNS,omitempty"`
 
+	// ClusterMetadata contains metadata information about the installed cluster.
+	ClusterMetadata *ClusterMetadata `json:"clusterMetadata,omitempty"`
+
 	// Installed is true if the cluster has been installed
 	Installed bool `json:"installed"`
 
@@ -152,18 +155,23 @@ type PlatformSecrets struct {
 	GCP *gcp.PlatformSecrets `json:"gcp,omitempty"`
 }
 
-// ClusterDeploymentStatus defines the observed state of ClusterDeployment
-type ClusterDeploymentStatus struct {
-
+// ClusterMetadata contains metadata information about the installed cluster.
+type ClusterMetadata struct {
 	// ClusterID is a globally unique identifier for this cluster generated during installation. Used for reporting metrics among other places.
-	ClusterID string `json:"clusterID,omitempty"`
+	ClusterID string `json:"clusterID"`
 
 	// InfraID is an identifier for this cluster generated during installation and used for tagging/naming resources in cloud providers.
-	InfraID string `json:"infraID,omitempty"`
+	InfraID string `json:"infraID"`
 
-	// Installed is true if the installer job has successfully completed for this cluster.
-	// Deprecated.
-	Installed bool `json:"installed"`
+	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
+	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret"`
+
+	// AdminPasswordSecret references the secret containing the admin username/password which can be used to login to this cluster.
+	AdminPasswordSecret corev1.LocalObjectReference `json:"adminPasswordSecret"`
+}
+
+// ClusterDeploymentStatus defines the observed state of ClusterDeployment
+type ClusterDeploymentStatus struct {
 
 	// Federated is true if the cluster deployment has been federated with the host cluster.
 	Federated bool `json:"federated,omitempty"`
@@ -174,12 +182,6 @@ type ClusterDeploymentStatus struct {
 	// FederatedClusterRef is the reference to the federated cluster resource associated with
 	// this ClusterDeployment.
 	FederatedClusterRef *corev1.ObjectReference `json:"federatedClusterRef,omitempty"`
-
-	// AdminKubeconfigSecret references the secret containing the admin kubeconfig for this cluster.
-	AdminKubeconfigSecret corev1.LocalObjectReference `json:"adminKubeconfigSecret,omitempty"`
-
-	// AdminPasswordSecret references the secret containing the admin username/password which can be used to login to this cluster.
-	AdminPasswordSecret corev1.LocalObjectReference `json:"adminPasswordSecret,omitempty"`
 
 	// ClusterVersionStatus will hold a copy of the remote cluster's ClusterVersion.Status
 	ClusterVersionStatus openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus,omitempty"`

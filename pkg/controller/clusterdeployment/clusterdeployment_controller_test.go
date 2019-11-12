@@ -1282,23 +1282,16 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		SSHKey: corev1.LocalObjectReference{
-			Name: sshKeySecret,
-		},
-		Compute: []hivev1.MachinePool{},
+		Compute:     []hivev1.MachinePool{},
 		PullSecret: &corev1.LocalObjectReference{
 			Name: pullSecretSecret,
 		},
 		Platform: hivev1.Platform{
 			AWS: &hivev1aws.Platform{
-				Region: "us-east-1",
-			},
-		},
-		PlatformSecrets: hivev1.PlatformSecrets{
-			AWS: &hivev1aws.PlatformSecrets{
-				Credentials: corev1.LocalObjectReference{
+				CredentialsSecret: corev1.LocalObjectReference{
 					Name: "aws-credentials",
 				},
+				Region: "us-east-1",
 			},
 		},
 		Provisioning: &hivev1.Provisioning{
@@ -1634,20 +1627,13 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		SSHKey: corev1.LocalObjectReference{
-			Name: sshKeySecret,
-		},
-		Compute: []hivev1.MachinePool{},
+		Compute:     []hivev1.MachinePool{},
 		Platform: hivev1.Platform{
 			AWS: &hivev1aws.Platform{
-				Region: "us-east-1",
-			},
-		},
-		PlatformSecrets: hivev1.PlatformSecrets{
-			AWS: &hivev1aws.PlatformSecrets{
-				Credentials: corev1.LocalObjectReference{
+				CredentialsSecret: corev1.LocalObjectReference{
 					Name: "aws-credentials",
 				},
+				Region: "us-east-1",
 			},
 		},
 		ClusterMetadata: &hivev1.ClusterMetadata{

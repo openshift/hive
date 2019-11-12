@@ -12,11 +12,11 @@ import (
 	fakekubeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	awsclient "github.com/openshift/hive/pkg/awsclient"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/golang/mock/gomock"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 				Zone: "blah.example.com",
 				AWS: &hivev1.AWSDNSZoneSpec{
 					AccountSecret: corev1.LocalObjectReference{
-						Name: "some secret",
+						Name: "somesecret",
 					},
 					Region: "us-east-1",
 					AdditionalTags: []hivev1.AWSResourceTag{
@@ -53,6 +53,19 @@ var (
 				AWS: &hivev1.AWSDNSZoneStatus{
 					ZoneID: aws.String("1234"),
 				},
+			},
+		}
+	}
+
+	validAWSSecret = func() *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "somesecret",
+				Namespace: "ns",
+			},
+			Data: map[string][]byte{
+				"aws_access_key_id":     []byte("notrealaccesskey"),
+				"aws_secret_access_key": []byte("notrealsecretaccesskey"),
 			},
 		}
 	}
@@ -113,16 +126,6 @@ type mocks struct {
 	mockAWSClient  *mockaws.MockClient
 }
 
-// assertErrorNilOrMessage allows for comparing an error against a string.
-// if string == "" the error must equal nil.
-func assertErrorNilOrMessage(t *testing.T, theError error, errString string) {
-	if errString == "" {
-		assert.Nil(t, theError)
-	} else {
-		assert.EqualError(t, theError, errString)
-	}
-}
-
 // setupDefaultMocks is an easy way to setup all of the default mocks
 func setupDefaultMocks(t *testing.T) *mocks {
 	mocks := &mocks{
@@ -133,6 +136,12 @@ func setupDefaultMocks(t *testing.T) *mocks {
 	mocks.mockAWSClient = mockaws.NewMockClient(mocks.mockCtrl)
 
 	return mocks
+}
+
+func fakeAWSClientBuilder(mockAWSClient *mockaws.MockClient) awsClientBuilderType {
+	return func(secret *corev1.Secret, region string) (awsclient.Client, error) {
+		return mockAWSClient, nil
+	}
 }
 
 // setFakeDNSZoneInKube is an easy way to register a dns zone object with kube.

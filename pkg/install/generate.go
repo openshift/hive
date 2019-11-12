@@ -51,6 +51,10 @@ func InstallerPodSpec(
 	skipGatherLogs bool,
 ) (*corev1.PodSpec, error) {
 
+	if cd.Spec.Provisioning == nil {
+		return nil, fmt.Errorf("ClusterDeployment.Provisioning not set")
+	}
+
 	pLog := log.WithFields(log.Fields{
 		"clusterProvision": provisionName,
 		"namespace":        cd.Namespace,
@@ -64,24 +68,6 @@ func InstallerPodSpec(
 			// (it is stored in the configmap openshift-config/openshift-install)
 			Name:  "OPENSHIFT_INSTALL_INVOKER",
 			Value: "hive",
-		},
-		{
-			Name: "PULL_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: constants.GetMergedPullSecretName(cd)},
-					Key:                  corev1.DockerConfigJsonKey,
-				},
-			},
-		},
-		{
-			Name: "SSH_PUB_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: cd.Spec.SSHKey,
-					Key:                  "ssh-publickey",
-				},
-			},
 		},
 		// ok when the private key isn't in the secret, as the installmanager
 		// will just gracefully handle the file not being present
@@ -105,6 +91,14 @@ func InstallerPodSpec(
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name: "installconfig",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Provisioning.InstallConfigSecret.Name,
+				},
+			},
+		},
 	}
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -114,6 +108,10 @@ func InstallerPodSpec(
 		{
 			Name:      "output",
 			MountPath: "/output",
+		},
+		{
+			Name:      "installconfig",
+			MountPath: "/installconfig",
 		},
 	}
 

@@ -24,8 +24,8 @@ func TestGenerateDeprovisionRequest(t *testing.T) {
 func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
 	return &hivev1.ClusterDeprovisionRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: testNamespace,
+			Name:      "foo",
+			Namespace: "default",
 		},
 		Spec: hivev1.ClusterDeprovisionRequestSpec{
 			InfraID:   "test-infra-id",

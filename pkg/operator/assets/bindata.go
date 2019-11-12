@@ -1836,105 +1836,6 @@ spec:
                     type: array
                 type: object
               type: array
-            controlPlane:
-              description: ControlPlane is the MachinePool containing control plane
-                nodes that need to be installed.
-              properties:
-                labels:
-                  description: Map of label string keys and values that will be applied
-                    to the created MachineSet's MachineSpec. This list will overwrite
-                    any modifications made to Node labels on an ongoing basis.
-                  type: object
-                name:
-                  description: Name is the name of the machine pool.
-                  type: string
-                platform:
-                  description: Platform is configuration for machine pool specific
-                    to the platform.
-                  properties:
-                    aws:
-                      description: AWS is the configuration used when installing on
-                        AWS.
-                      properties:
-                        rootVolume:
-                          description: EC2RootVolume defines the storage for ec2 instance.
-                          properties:
-                            iops:
-                              description: IOPS defines the iops for the storage.
-                              format: int64
-                              type: integer
-                            size:
-                              description: Size defines the size of the storage.
-                              format: int64
-                              type: integer
-                            type:
-                              description: Type defines the type of the storage.
-                              type: string
-                          type: object
-                        type:
-                          description: InstanceType defines the ec2 instance type.
-                            eg. m4-large
-                          type: string
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used.
-                          items:
-                            type: string
-                          type: array
-                      type: object
-                    azure:
-                      description: Azure is the configuration used when installing
-                        on Azure.
-                      properties:
-                        osDisk:
-                          description: OSDisk defines the storage for instance.
-                          properties:
-                            diskSizeGB:
-                              description: DiskSizeGB defines the size of disk in
-                                GB.
-                              format: int32
-                              type: integer
-                          type: object
-                        type:
-                          description: InstanceType defines the azure instance type.
-                            eg. Standard_DS_V2
-                          type: string
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used. eg. ["1", "2", "3"]
-                          items:
-                            type: string
-                          type: array
-                      type: object
-                    gcp:
-                      description: GCP is the configuration used when installing on
-                        GCP.
-                      properties:
-                        type:
-                          description: InstanceType defines the GCP instance type.
-                            eg. n1-standard-4
-                          type: string
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used.
-                          items:
-                            type: string
-                          type: array
-                      type: object
-                  type: object
-                replicas:
-                  description: Replicas is the count of machines for this machine
-                    pool. Default is 1.
-                  format: int64
-                  type: integer
-                taints:
-                  description: List of taints that will be applied to the created
-                    MachineSet's MachineSpec. This list will overwrite any modifications
-                    made to Node taints on an ongoing basis.
-                  items:
-                    type: object
-                  type: array
-              type: object
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
                 the target cluster's control plane
@@ -2033,33 +1934,6 @@ spec:
               description: ManageDNS specifies whether a DNSZone should be created
                 and managed automatically for this ClusterDeployment
               type: boolean
-            networking:
-              description: Networking defines the pod network provider in the cluster.
-              properties:
-                clusterNetworks:
-                  description: ClusterNetworks is the IP address space from which
-                    to assign pod IPs.
-                  items:
-                    properties:
-                      cidr:
-                        type: string
-                      hostSubnetLength:
-                        format: int32
-                        type: integer
-                    type: object
-                  type: array
-                machineCIDR:
-                  description: MachineCIDR is the IP address space from which to assign
-                    machine IPs.
-                  type: string
-                serviceCIDR:
-                  description: ServiceCIDR is the IP address space from which to assign
-                    service IPs.
-                  type: string
-                type:
-                  description: Type is the network type to install
-                  type: string
-              type: object
             platform:
               description: Platform is the configuration for the specific platform
                 upon which to perform the installation.
@@ -2205,6 +2079,18 @@ spec:
               description: PreserveOnDelete allows the user to disconnect a cluster
                 from Hive without deprovisioning it
               type: boolean
+            provisioning:
+              description: Provisioning contains settings used only for initial cluster
+                provisioning. May be unset in the case of adopted clusters.
+              properties:
+                installConfigSecret:
+                  description: InstallConfigSecret is the reference to a secret that
+                    contains an openshift-install InstallConfig. This file will be
+                    passed through directly to the installer. Any version of InstallConfig
+                    can be used, provided it can be parsed by the openshift-install
+                    version for the release you are provisioning.
+                  type: object
+              type: object
             pullSecret:
               description: PullSecret is the reference to the secret to use when pulling
                 images.
@@ -2217,8 +2103,6 @@ spec:
           - clusterName
           - sshKey
           - baseDomain
-          - networking
-          - controlPlane
           - compute
           - platform
           - platformSecrets

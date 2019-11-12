@@ -1,3 +1,32 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Developing Hive](#developing-hive)
+  - [Prerequisites](#prerequisites)
+  - [Build and run tests](#build-and-run-tests)
+  - [Setting up the development environment](#setting-up-the-development-environment)
+    - [Cloning the repository](#cloning-the-repository)
+  - [Deploying with Kubernetes In Docker (kind)](#deploying-with-kubernetes-in-docker-kind)
+  - [Writing/Testing Code](#writingtesting-code)
+    - [Run Hive Operator](#run-hive-operator)
+      - [Directly from source](#directly-from-source)
+      - [Run Hive Operator Using Custom Images](#run-hive-operator-using-custom-images)
+    - [Run Hive Controllers From Source](#run-hive-controllers-from-source)
+  - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
+  - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
+  - [Using Serving Certificates](#using-serving-certificates)
+    - [Generating a Certificate](#generating-a-certificate)
+    - [Using Generated Certificate](#using-generated-certificate)
+  - [Dependency management](#dependency-management)
+    - [Installing Dep](#installing-dep)
+    - [Updating Dependencies](#updating-dependencies)
+    - [Re-creating vendor Directory](#re-creating-vendor-directory)
+    - [Running the e2e test locally](#running-the-e2e-test-locally)
+    - [TIP](#tip)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Developing Hive
 
 ## Prerequisites
@@ -46,7 +75,7 @@ Deploy a local insecure registry container, and configure your host docker daemo
 
 Create a kind cluster named 'hive' to deploy to. You can create as many kind clusters as you need.:
 
-```ash
+```bash
 ./hack/create-kind-cluster.sh hive
 ```
 
@@ -65,6 +94,13 @@ Configure kubectl to talk to your new cluster:
 export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
 ```
 
+**NOTE:** If you do not have `cfssljson` and `cfssl` installed, run the following command to install, otherwise, ignore this.
+
+```bash
+go get -u github.com/cloudflare/cfssl/cmd/cfssljson
+go get -u github.com/cloudflare/cfssl/cmd/cfssl
+```
+
 You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
 
 ```bash
@@ -78,8 +114,8 @@ Hive should now be running.
 You can leave your registry container running indefinitely. The kind cluster can be replaced quickly as necessary:
 
 ```bash
-kind delete cluster --name cluster1
-CONFIGURE_INSECURE_REGISTRY_HOST=TRUE CONFIGURE_INSECURE_REGISTRY_CLUSTER=true NUM_CLUSTERS=1 hack/create-clusters.sh
+kind delete cluster --name hive
+./hack/create-kind-cluster.sh hive
 ```
 
 ## Writing/Testing Code

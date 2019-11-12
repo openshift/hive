@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 mkdir hiveadmission-certs
 pushd hiveadmission-certs

@@ -264,7 +264,29 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 	}
 
 	ssiLog.Info("done reconciling syncsetinstance")
-	return reconcile.Result{}, applyErr
+	if applyErr != nil {
+		return reconcile.Result{}, applyErr
+	}
+
+	reapplyDuration := r.ssiReApplyDuration(ssi)
+	return reconcile.Result{RequeueAfter: reapplyDuration}, nil
+}
+
+// ssiReApplyDuration returns the shortest time.Duration to meet reapplyInterval from successfully applied
+// resources, patches and secretReferences in the SyncSetInstance status.
+func (r *ReconcileSyncSetInstance) ssiReApplyDuration(ssi *hivev1.SyncSetInstance) time.Duration {
+	timeSinceOldestApply := time.Duration(0)
+	for _, statuses := range [][]hivev1.SyncStatus{ssi.Status.Resources, ssi.Status.Patches, ssi.Status.SecretReferences} {
+		for _, status := range statuses {
+			if applySuccessCondition := controllerutils.FindSyncCondition(status.Conditions, hivev1.ApplySuccessSyncCondition); applySuccessCondition != nil {
+				since := time.Since(applySuccessCondition.LastProbeTime.Time)
+				if since > timeSinceOldestApply {
+					timeSinceOldestApply = since
+				}
+			}
+		}
+	}
+	return reapplyInterval - timeSinceOldestApply
 }
 
 func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInstance, ssiLog log.FieldLogger) (*hivev1.ClusterDeployment, error) {

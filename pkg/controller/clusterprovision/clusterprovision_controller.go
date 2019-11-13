@@ -268,7 +268,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 			pLog.WithError(err).Error("could not get clusterdeployment")
 			return reconcile.Result{}, err
 		}
-		if cd.Spec.ClusterMetadata.InfraID == *instance.Spec.InfraID {
+		if cd.Spec.ClusterMetadata != nil && cd.Spec.ClusterMetadata.InfraID == *instance.Spec.InfraID {
 			return r.startProvisioning(instance, pLog)
 		}
 	}

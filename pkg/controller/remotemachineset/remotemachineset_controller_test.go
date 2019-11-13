@@ -13,10 +13,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -84,16 +84,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name: "Kubeconfig doesn't exist yet",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{}),
 			},
 			expectErr: true,
 		},
 		{
 			name: "No-op",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, []string{}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -116,9 +116,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name: "Update machine set replicas",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, []string{}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -141,9 +140,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name: "Create missing machine set",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -166,13 +164,12 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Skip create missing machine set when clusterDeployment has annotation hive.openshift.io/syncset-pause: true ",
 			localExisting: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment([]hivev1.MachinePool{
-						testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
-					})
+					cd := testClusterDeployment()
 					cd.Annotations = map[string]string{}
 					cd.Annotations[constants.SyncsetPauseAnnotation] = "true"
 					return cd
 				}(),
+				testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -186,13 +183,12 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Skip create missing machine set when cluster has unreachable condition",
 			localExisting: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment([]hivev1.MachinePool{
-						testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
-					})
+					cd := testClusterDeployment()
 					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions,
 						hivev1.UnreachableCondition, corev1.ConditionTrue, "", "", controllerutils.UpdateConditionAlways)
 					return cd
 				}(),
+				testMachinePool("worker", 3, []string{"us-east-1a", "us-east-1b", "us-east-1c"}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -205,9 +201,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name: "Delete extra machine set",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, []string{}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -229,49 +224,24 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}(),
 		},
 		{
-			name: "Multiple machineset noop",
+			name: "Other machinesets ignored",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, []string{"us-east-1a"}),
-					testMachinePool("beta", 3, []string{"us-east-1b"}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{"us-east-1a"}),
+				testMachinePool("other", 3, []string{"us-east-1b"}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 0),
-				testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 3, 0),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 3, 0),
+				testMachineSet("foo-12345-other-us-east-1b", "other", true, 3, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 0),
-						*testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 3, 0),
-					},
-				}
-			}(),
-		},
-		{
-			name: "Update multiple machineset replicas",
-			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, []string{"us-east-1a"}),
-					testMachinePool("beta", 3, []string{"us-east-1b"}),
-				}),
-				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
-				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
-				testSecret(sshKeySecret, sshKeySecretKey, testName),
-			},
-			remoteExisting: []runtime.Object{
-				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 4, 0),
-				testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 4, 0),
-			},
-			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
-				return &machineapi.MachineSetList{
-					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 3, 1),
-						*testMachineSet("foo-12345-beta-us-east-1b", "beta", true, 3, 1),
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 3, 0),
+						*testMachineSet("foo-12345-other-us-east-1b", "other", true, 3, 0),
 					},
 				}
 			}(),
@@ -279,56 +249,60 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name: "Create additional machinepool machinesets",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, []string{}),
-					testMachinePool("beta", 3, []string{}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{}),
+				testMachinePool("other", 3, []string{}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSetWithAMI("foo-12345-alpha-us-east-1a", "alpha", "ami2", true, 1, 0),
-				testMachineSetWithAMI("foo-12345-alpha-us-east-1b", "alpha", "ami2", true, 1, 0),
-				testMachineSetWithAMI("foo-12345-alpha-us-east-1c", "alpha", "ami2", true, 1, 0),
+				testMachineSetWithAMI("foo-12345-other-us-east-1a", "other", "ami2", true, 1, 0),
+				testMachineSetWithAMI("foo-12345-other-us-east-1b", "other", "ami2", true, 1, 0),
+				testMachineSetWithAMI("foo-12345-other-us-east-1c", "other", "ami2", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSetWithAMI("foo-12345-alpha-us-east-1a", "alpha", "ami2", true, 1, 0),
-						*testMachineSetWithAMI("foo-12345-alpha-us-east-1b", "alpha", "ami2", true, 1, 0),
-						*testMachineSetWithAMI("foo-12345-alpha-us-east-1c", "alpha", "ami2", true, 1, 0),
-						*testMachineSetWithAMI("foo-12345-beta-us-east-1a", "beta", "ami2", false, 1, 0),
-						*testMachineSetWithAMI("foo-12345-beta-us-east-1b", "beta", "ami2", false, 1, 0),
-						*testMachineSetWithAMI("foo-12345-beta-us-east-1c", "beta", "ami2", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-worker-us-east-1a", "worker", "ami2", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-worker-us-east-1b", "worker", "ami2", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-worker-us-east-1c", "worker", "ami2", false, 1, 0),
+						*testMachineSetWithAMI("foo-12345-other-us-east-1a", "other", "ami2", true, 1, 0),
+						*testMachineSetWithAMI("foo-12345-other-us-east-1b", "other", "ami2", true, 1, 0),
+						*testMachineSetWithAMI("foo-12345-other-us-east-1c", "other", "ami2", true, 1, 0),
 					},
 				}
 			}(),
 		},
 		{
-			name: "Delete additional machinepool machinesets",
+			name: "Delete machinepool machinesets",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("alpha", 3, []string{}),
-				}),
+				testClusterDeployment(),
+				func() runtime.Object {
+					mp := testMachinePool("worker", 3, []string{})
+					now := metav1.Now()
+					mp.DeletionTimestamp = &now
+					return mp
+				}(),
+				testMachinePool("other", 3, []string{}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
 			},
 			remoteExisting: []runtime.Object{
-				testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-beta-us-east-1a", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-beta-us-east-1b", "alpha", true, 1, 0),
-				testMachineSet("foo-12345-beta-us-east-1c", "alpha", true, 1, 0),
+				testMachineSet("foo-12345-other-us-east-1a", "other", true, 1, 0),
+				testMachineSet("foo-12345-other-us-east-1b", "other", true, 1, 0),
+				testMachineSet("foo-12345-other-us-east-1c", "other", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
-						*testMachineSet("foo-12345-alpha-us-east-1a", "alpha", true, 1, 0),
-						*testMachineSet("foo-12345-alpha-us-east-1b", "alpha", true, 1, 0),
-						*testMachineSet("foo-12345-alpha-us-east-1c", "alpha", true, 1, 0),
+						*testMachineSet("foo-12345-other-us-east-1a", "other", true, 1, 0),
+						*testMachineSet("foo-12345-other-us-east-1b", "other", true, 1, 0),
+						*testMachineSet("foo-12345-other-us-east-1c", "other", true, 1, 0),
 					},
 				}
 			}(),
@@ -337,9 +311,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			// Can't control what a user might do in their cluster.
 			name: "Nil ProviderSpec",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					testMachinePool("worker", 3, []string{}),
-				}),
+				testClusterDeployment(),
+				testMachinePool("worker", 3, []string{}),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -356,13 +329,12 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name: "Nil worker pool platform",
 			localExisting: []runtime.Object{
-				testClusterDeployment([]hivev1.MachinePool{
-					func() hivev1.MachinePool {
-						mp := testMachinePool("worker", 3, []string{})
-						mp.Platform.AWS = nil
-						return mp
-					}(),
-				}),
+				testClusterDeployment(),
+				func() runtime.Object {
+					mp := testMachinePool("worker", 3, []string{})
+					mp.Spec.Platform.AWS = nil
+					return mp
+				}(),
 				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
 				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
 				testSecret(sshKeySecret, sshKeySecretKey, testName),
@@ -400,7 +372,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}
 			_, err := rcd.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      testName,
+					Name:      fmt.Sprintf("%s-worker", testName),
 					Namespace: testNamespace,
 				},
 			})
@@ -474,36 +446,39 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	}
 }
 
-func testMachinePool(name string, replicas int, zones []string) hivev1.MachinePool {
-	mpReplicas := int64(replicas)
-
-	testMachinePool := hivev1.MachinePool{
-		Name:     name,
-		Replicas: &mpReplicas,
-		Platform: hivev1.MachinePoolPlatform{
-			AWS: &hivev1aws.MachinePoolPlatform{
-				InstanceType: "m4.large",
+func testMachinePool(name string, replicas int, zones []string) *hivev1.MachinePool {
+	return &hivev1.MachinePool{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  testNamespace,
+			Name:       fmt.Sprintf("%s-%s", testName, name),
+			Finalizers: []string{finalizer},
+		},
+		Spec: hivev1.MachinePoolSpec{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
+				Name: testName,
 			},
-		},
-		Labels: map[string]string{
-			"machine.openshift.io/cluster-api-cluster":      testInfraID,
-			"machine.openshift.io/cluster-api-machine-role": name,
-			"machine.openshift.io/cluster-api-machine-type": name,
-		},
-		Taints: []corev1.Taint{
-			{
-				Key:    "foo",
-				Value:  "bar",
-				Effect: corev1.TaintEffectNoSchedule,
+			Name:     name,
+			Replicas: pointer.Int64Ptr(int64(replicas)),
+			Platform: hivev1.MachinePoolPlatform{
+				AWS: &hivev1aws.MachinePoolPlatform{
+					InstanceType: "m4.large",
+					Zones:        zones,
+				},
+			},
+			Labels: map[string]string{
+				"machine.openshift.io/cluster-api-cluster":      testInfraID,
+				"machine.openshift.io/cluster-api-machine-role": name,
+				"machine.openshift.io/cluster-api-machine-type": name,
+			},
+			Taints: []corev1.Taint{
+				{
+					Key:    "foo",
+					Value:  "bar",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
 			},
 		},
 	}
-
-	if len(zones) != 0 {
-		testMachinePool.Platform.AWS.Zones = zones
-	}
-
-	return testMachinePool
 }
 
 func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
@@ -531,6 +506,7 @@ func testMachineSetWithAMI(name, machineType, ami string, unstompedAnnotation bo
 			Name:      name,
 			Namespace: machineAPINamespace,
 			Labels: map[string]string{
+				machinePoolNameLabel:                       machineType,
 				"machine.openshift.io/cluster-api-cluster": testInfraID,
 			},
 			Generation: int64(generation),
@@ -570,7 +546,7 @@ func testMachineSetWithAMI(name, machineType, ami string, unstompedAnnotation bo
 	return &ms
 }
 
-func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDeployment {
+func testClusterDeployment() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       testName,
@@ -580,7 +556,6 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testName,
-			Compute:     computePools,
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
 					CredentialsSecretRef: corev1.LocalObjectReference{

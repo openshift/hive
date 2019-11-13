@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/rest"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 
 	"github.com/openshift/hive/pkg/manageddns"
 )
@@ -36,7 +35,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "Compute", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
+	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -242,9 +241,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	// validate machinepools
-	allErrs = append(allErrs, validateMachinePools(newObject)...)
-
 	platformPath := specPath.Child("platform")
 	numberOfPlatforms := 0
 	canManageDNS := false
@@ -409,21 +405,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
-	// Check that existing machinepools aren't modifying the labels and/or taints fields
-	hasChangedImmutableMachinePoolFields, computePoolName := hasChangedImmutableMachinePoolFields(&oldObject.Spec, &newObject.Spec)
-	if hasChangedImmutableMachinePoolFields {
-		message := fmt.Sprintf("Detected attempt to change Labels or Taints on existing Compute object: %s", computePoolName)
-		contextLogger.Infof("Failed validation: %v", message)
-
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
-	}
-
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
@@ -440,9 +421,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 			allErrs = append(allErrs, field.Invalid(specPath.Child("installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
 		}
 	}
-
-	// validate machinepools
-	allErrs = append(allErrs, validateMachinePools(newObject)...)
 
 	if len(allErrs) > 0 {
 		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
@@ -504,42 +482,6 @@ func hasChangedImmutableControlPlaneConfigFields(origObject, newObject *hivev1.C
 	}
 
 	return false
-}
-
-func hasChangedImmutableMachinePoolFields(oldObject, newObject *hivev1.ClusterDeploymentSpec) (bool, string) {
-	// any pre-existing compute machinepool should not mutate the Labels or Taints fields
-
-	for _, newMP := range newObject.Compute {
-		origMP := getOriginalMachinePool(oldObject.Compute, newMP.Name)
-		if origMP == nil {
-			// no mutate checks needed for new compute machinepool
-			continue
-		}
-
-		// Check if labels are being changed
-		if !reflect.DeepEqual(origMP.Labels, newMP.Labels) {
-			return true, newMP.Name
-		}
-
-		// Check if taints are being changed
-		if !reflect.DeepEqual(origMP.Taints, newMP.Taints) {
-			return true, newMP.Name
-		}
-	}
-
-	return false, ""
-}
-
-func getOriginalMachinePool(origMachinePools []hivev1.MachinePool, name string) *hivev1.MachinePool {
-	var origMP *hivev1.MachinePool
-
-	for i, mp := range origMachinePools {
-		if mp.Name == name {
-			origMP = &origMachinePools[i]
-			break
-		}
-	}
-	return origMP
 }
 
 func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {
@@ -622,40 +564,6 @@ func validateDomain(domain string, validDomains []string) bool {
 		}
 	}
 	return false
-}
-
-func validateMachinePools(cd *hivev1.ClusterDeployment) field.ErrorList {
-	vErrs := field.ErrorList{}
-
-	for i, mp := range cd.Spec.Compute {
-		vErrs = append(vErrs, validateMachinePool(cd, &mp, field.NewPath("spec", "compute").Index(i))...)
-	}
-
-	return vErrs
-}
-
-func validateMachinePool(cd *hivev1.ClusterDeployment, mp *hivev1.MachinePool, parentPath *field.Path) field.ErrorList {
-	vErrs := field.ErrorList{}
-
-	if cd.Spec.Platform.GCP != nil {
-		path := parentPath.Child("platform", "gcp")
-		if mp.Platform.GCP == nil {
-			vErrs = append(vErrs, field.Invalid(path, mp.Platform.GCP, "platform must not be empty"))
-		} else {
-			vErrs = append(vErrs, validateGCPMachinePool(mp.Platform.GCP, path)...)
-		}
-	}
-
-	return vErrs
-}
-
-func validateGCPMachinePool(mpPlatform *hivev1gcp.MachinePool, parentPath *field.Path) field.ErrorList {
-	vErrors := field.ErrorList{}
-	if mpPlatform.InstanceType == "" {
-		vErrors = append(vErrors, field.Invalid(parentPath.Child("instanceType"), mpPlatform.InstanceType, "instanceType must be defined"))
-	}
-
-	return vErrors
 }
 
 func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {

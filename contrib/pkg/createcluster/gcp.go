@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	gcpCredFile         = "osServiceAccount.json"
-	defaultInstanceType = "n1-standard-4"
+	gcpCredFile     = "osServiceAccount.json"
+	gcpRegion       = "us-east1"
+	gcpInstanceType = "n1-standard-4"
 )
 
 var _ cloudProvider = (*gcpCloudProvider)(nil)
@@ -58,31 +59,36 @@ func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 	}, nil
 }
 
-func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment,
-	installConfig *installertypes.InstallConfig) error {
-
-	installConfig.Platform = installertypes.Platform{
-		GCP: &installergcp.Platform{
-			ProjectID: o.GCPProjectID,
-			Region:    "us-east1",
-		},
-	}
+func (p *gcpCloudProvider) addPlatformDetails(
+	o *Options,
+	cd *hivev1.ClusterDeployment,
+	machinePool *hivev1.MachinePool,
+	installConfig *installertypes.InstallConfig,
+) error {
 	cd.Spec.Platform = hivev1.Platform{
 		GCP: &hivev1gcp.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
 			ProjectID: o.GCPProjectID,
-			Region:    "us-east1",
+			Region:    gcpRegion,
 		},
 	}
-	cd.Spec.Compute[0].Platform.GCP = &hivev1gcp.MachinePool{
-		InstanceType: defaultInstanceType,
+
+	machinePool.Spec.Platform.GCP = &hivev1gcp.MachinePool{
+		InstanceType: gcpInstanceType,
+	}
+
+	installConfig.Platform = installertypes.Platform{
+		GCP: &installergcp.Platform{
+			ProjectID: o.GCPProjectID,
+			Region:    gcpRegion,
+		},
 	}
 
 	// Used for both control plane and workers.
 	mpp := &installergcp.MachinePool{
-		InstanceType: defaultInstanceType,
+		InstanceType: gcpInstanceType,
 	}
 	installConfig.ControlPlane.Platform.GCP = mpp
 	installConfig.Compute[0].Platform.GCP = mpp

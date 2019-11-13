@@ -75,6 +75,7 @@ rules:
   - clusterprovisions
   - dnszones
   - dnsendpoints
+  - machinepools
   - selectorsyncidentityproviders
   - selectorsyncsets
   - syncidentityproviders

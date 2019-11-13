@@ -32,6 +32,7 @@
 // config/crds/hive_v1_dnsendpoint.yaml
 // config/crds/hive_v1_dnszone.yaml
 // config/crds/hive_v1_hiveconfig.yaml
+// config/crds/hive_v1_machinepool.yaml
 // config/crds/hive_v1_selectorsyncidentityprovider.yaml
 // config/crds/hive_v1_selectorsyncset.yaml
 // config/crds/hive_v1_syncidentityprovider.yaml
@@ -745,6 +746,7 @@ rules:
   - clusterprovisions
   - dnszones
   - dnsendpoints
+  - machinepools
   - selectorsyncidentityproviders
   - syncidentityproviders
   - syncsets
@@ -995,6 +997,20 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - hive.openshift.io
+  resources:
+  - machinepools
+  - machinepools/status
+  - machinepools/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - batch
   resources:
   - jobs
@@ -1234,6 +1250,7 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
+  - machinepools
   - selectorsyncidentityproviders
   - syncidentityproviders
   - selectorsyncsets
@@ -1357,6 +1374,7 @@ rules:
   - clusterprovisions
   - dnszones
   - dnsendpoints
+  - machinepools
   - selectorsyncidentityproviders
   - selectorsyncsets
   - syncidentityproviders
@@ -1615,109 +1633,6 @@ spec:
                 used for subdomains, some resource tagging, and other instances where
                 a friendly name for the cluster is useful.
               type: string
-            compute:
-              description: Compute is the list of MachinePools containing compute
-                nodes that need to be installed.
-              items:
-                properties:
-                  labels:
-                    description: Map of label string keys and values that will be
-                      applied to the created MachineSet's MachineSpec. This list will
-                      overwrite any modifications made to Node labels on an ongoing
-                      basis.
-                    type: object
-                  name:
-                    description: Name is the name of the machine pool.
-                    type: string
-                  platform:
-                    description: Platform is configuration for machine pool specific
-                      to the platform.
-                    properties:
-                      aws:
-                        description: AWS is the configuration used when installing
-                          on AWS.
-                        properties:
-                          rootVolume:
-                            description: EC2RootVolume defines the storage for ec2
-                              instance.
-                            properties:
-                              iops:
-                                description: IOPS defines the iops for the storage.
-                                format: int64
-                                type: integer
-                              size:
-                                description: Size defines the size of the storage.
-                                format: int64
-                                type: integer
-                              type:
-                                description: Type defines the type of the storage.
-                                type: string
-                            type: object
-                          type:
-                            description: InstanceType defines the ec2 instance type.
-                              eg. m4-large
-                            type: string
-                          zones:
-                            description: Zones is list of availability zones that
-                              can be used.
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      azure:
-                        description: Azure is the configuration used when installing
-                          on Azure.
-                        properties:
-                          osDisk:
-                            description: OSDisk defines the storage for instance.
-                            properties:
-                              diskSizeGB:
-                                description: DiskSizeGB defines the size of disk in
-                                  GB.
-                                format: int32
-                                type: integer
-                            type: object
-                          type:
-                            description: InstanceType defines the azure instance type.
-                              eg. Standard_DS_V2
-                            type: string
-                          zones:
-                            description: Zones is list of availability zones that
-                              can be used. eg. ["1", "2", "3"]
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      gcp:
-                        description: GCP is the configuration used when installing
-                          on GCP.
-                        properties:
-                          type:
-                            description: InstanceType defines the GCP instance type.
-                              eg. n1-standard-4
-                            type: string
-                          zones:
-                            description: Zones is list of availability zones that
-                              can be used.
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                    type: object
-                  replicas:
-                    description: Replicas is the count of machines for this machine
-                      pool. Default is 1.
-                    format: int64
-                    type: integer
-                  taints:
-                    description: List of taints that will be applied to the created
-                      MachineSet's MachineSpec. This list will overwrite any modifications
-                      made to Node taints on an ongoing basis.
-                    items:
-                      type: object
-                    type: array
-                type: object
-              type: array
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
                 the target cluster's control plane
@@ -1980,7 +1895,6 @@ spec:
           required:
           - clusterName
           - baseDomain
-          - compute
           - platform
           type: object
         status:
@@ -3089,6 +3003,201 @@ func configCrdsHive_v1_hiveconfigYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/crds/hive_v1_hiveconfig.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHive_v1_machinepoolYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: machinepools.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.name
+    name: PoolName
+    type: string
+  - JSONPath: .spec.clusterDeploymentRef.name
+    name: ClusterDeployment
+    type: string
+  - JSONPath: .spec.replicas
+    name: Replicas
+    type: integer
+  group: hive.openshift.io
+  names:
+    kind: MachinePool
+    plural: machinepools
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            clusterDeploymentRef:
+              description: ClusterDeploymentRef references the cluster deployment
+                to which this machine pool belongs.
+              type: object
+            labels:
+              description: Map of label string keys and values that will be applied
+                to the created MachineSet's MachineSpec. This list will overwrite
+                any modifications made to Node labels on an ongoing basis.
+              type: object
+            name:
+              description: Name is the name of the machine pool.
+              type: string
+            platform:
+              description: Platform is configuration for machine pool specific to
+                the platform.
+              properties:
+                aws:
+                  description: AWS is the configuration used when installing on AWS.
+                  properties:
+                    rootVolume:
+                      description: EC2RootVolume defines the storage for ec2 instance.
+                      properties:
+                        iops:
+                          description: IOPS defines the iops for the storage.
+                          format: int64
+                          type: integer
+                        size:
+                          description: Size defines the size of the storage.
+                          format: int64
+                          type: integer
+                        type:
+                          description: Type defines the type of the storage.
+                          type: string
+                      type: object
+                    type:
+                      description: InstanceType defines the ec2 instance type. eg.
+                        m4-large
+                      type: string
+                    zones:
+                      description: Zones is list of availability zones that can be
+                        used.
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                azure:
+                  description: Azure is the configuration used when installing on
+                    Azure.
+                  properties:
+                    osDisk:
+                      description: OSDisk defines the storage for instance.
+                      properties:
+                        diskSizeGB:
+                          description: DiskSizeGB defines the size of disk in GB.
+                          format: int32
+                          type: integer
+                      type: object
+                    type:
+                      description: InstanceType defines the azure instance type. eg.
+                        Standard_DS_V2
+                      type: string
+                    zones:
+                      description: Zones is list of availability zones that can be
+                        used. eg. ["1", "2", "3"]
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                gcp:
+                  description: GCP is the configuration used when installing on GCP.
+                  properties:
+                    type:
+                      description: InstanceType defines the GCP instance type. eg.
+                        n1-standard-4
+                      type: string
+                    zones:
+                      description: Zones is list of availability zones that can be
+                        used.
+                      items:
+                        type: string
+                      type: array
+                  type: object
+              type: object
+            replicas:
+              description: Replicas is the count of machines for this machine pool.
+                Default is 1.
+              format: int64
+              type: integer
+            taints:
+              description: List of taints that will be applied to the created MachineSet's
+                MachineSpec. This list will overwrite any modifications made to Node
+                taints on an ongoing basis.
+              items:
+                type: object
+              type: array
+          type: object
+        status:
+          properties:
+            conditions:
+              description: Conditions includes more detailed status for the cluster
+                deployment
+              items:
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                type: object
+              type: array
+          type: object
+  version: v1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHive_v1_machinepoolYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_machinepoolYaml, nil
+}
+
+func configCrdsHive_v1_machinepoolYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_machinepoolYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive_v1_machinepool.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -4901,6 +5010,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive_v1_dnsendpoint.yaml":                      configCrdsHive_v1_dnsendpointYaml,
 	"config/crds/hive_v1_dnszone.yaml":                          configCrdsHive_v1_dnszoneYaml,
 	"config/crds/hive_v1_hiveconfig.yaml":                       configCrdsHive_v1_hiveconfigYaml,
+	"config/crds/hive_v1_machinepool.yaml":                      configCrdsHive_v1_machinepoolYaml,
 	"config/crds/hive_v1_selectorsyncidentityprovider.yaml":     configCrdsHive_v1_selectorsyncidentityproviderYaml,
 	"config/crds/hive_v1_selectorsyncset.yaml":                  configCrdsHive_v1_selectorsyncsetYaml,
 	"config/crds/hive_v1_syncidentityprovider.yaml":             configCrdsHive_v1_syncidentityproviderYaml,
@@ -4964,6 +5074,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_v1_dnsendpoint.yaml":                  {configCrdsHive_v1_dnsendpointYaml, map[string]*bintree{}},
 			"hive_v1_dnszone.yaml":                      {configCrdsHive_v1_dnszoneYaml, map[string]*bintree{}},
 			"hive_v1_hiveconfig.yaml":                   {configCrdsHive_v1_hiveconfigYaml, map[string]*bintree{}},
+			"hive_v1_machinepool.yaml":                  {configCrdsHive_v1_machinepoolYaml, map[string]*bintree{}},
 			"hive_v1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1_selectorsyncidentityproviderYaml, map[string]*bintree{}},
 			"hive_v1_selectorsyncset.yaml":              {configCrdsHive_v1_selectorsyncsetYaml, map[string]*bintree{}},
 			"hive_v1_syncidentityprovider.yaml":         {configCrdsHive_v1_syncidentityproviderYaml, map[string]*bintree{}},

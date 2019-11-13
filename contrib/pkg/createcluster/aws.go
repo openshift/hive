@@ -15,6 +15,14 @@ import (
 	awsinstallertypes "github.com/openshift/installer/pkg/types/aws"
 )
 
+const (
+	awsRegion       = "us-east-1"
+	awsInstanceType = "m4.xlarge"
+	volumeIOPS      = 100
+	volumeSize      = 22
+	volumeType      = "gp2"
+)
+
 var _ cloudProvider = (*awsCloudProvider)(nil)
 
 type awsCloudProvider struct {
@@ -43,8 +51,12 @@ func (p *awsCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 	}, nil
 }
 
-func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment,
-	installConfig *installertypes.InstallConfig) error {
+func (p *awsCloudProvider) addPlatformDetails(
+	o *Options,
+	cd *hivev1.ClusterDeployment,
+	machinePool *hivev1.MachinePool,
+	installConfig *installertypes.InstallConfig,
+) error {
 
 	// Inject platform details into ClusterDeployment:
 	cd.Spec.Platform = hivev1.Platform{
@@ -52,35 +64,33 @@ func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region: "us-east-1",
+			Region: awsRegion,
 		},
 	}
 
-	cd.Spec.Compute[0].Platform = hivev1.MachinePoolPlatform{
-		AWS: &hivev1aws.MachinePoolPlatform{
-			InstanceType: "m4.xlarge",
-			EC2RootVolume: hivev1aws.EC2RootVolume{
-				IOPS: 100,
-				Size: 22,
-				Type: "gp2",
-			},
+	machinePool.Spec.Platform.AWS = &hivev1aws.MachinePoolPlatform{
+		InstanceType: awsInstanceType,
+		EC2RootVolume: hivev1aws.EC2RootVolume{
+			IOPS: volumeIOPS,
+			Size: volumeSize,
+			Type: volumeType,
 		},
 	}
 
 	// Inject platform details into InstallConfig:
 	installConfig.Platform = installertypes.Platform{
 		AWS: &awsinstallertypes.Platform{
-			Region: "us-east-1",
+			Region: awsRegion,
 		},
 	}
 
 	// Used for both control plane and workers.
 	mpp := &awsinstallertypes.MachinePool{
-		InstanceType: "m4.xlarge",
+		InstanceType: awsInstanceType,
 		EC2RootVolume: awsinstallertypes.EC2RootVolume{
-			IOPS: 100,
-			Size: 22,
-			Type: "gp2",
+			IOPS: volumeIOPS,
+			Size: volumeSize,
+			Type: volumeType,
 		},
 	}
 	installConfig.ControlPlane.Platform.AWS = mpp

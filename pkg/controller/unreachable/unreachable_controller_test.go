@@ -347,12 +347,12 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
 			Compute:     []hivev1.MachinePool{},
-			PullSecret: &corev1.LocalObjectReference{
+			PullSecretRef: &corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
-					CredentialsSecret: corev1.LocalObjectReference{
+					CredentialsSecretRef: corev1.LocalObjectReference{
 						Name: "aws-credentials",
 					},
 					Region: "us-east-1",
@@ -360,7 +360,7 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			ClusterMetadata: &hivev1.ClusterMetadata{
 				ClusterID: testClusterID,
-				AdminKubeconfigSecret: corev1.LocalObjectReference{
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{
 					Name: "kubeconfig-secret",
 				},
 			},

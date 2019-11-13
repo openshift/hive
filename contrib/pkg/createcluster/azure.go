@@ -60,7 +60,7 @@ func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDe
 	installConfig *installertypes.InstallConfig) error {
 	cd.Spec.Platform = hivev1.Platform{
 		Azure: &hivev1azure.Platform{
-			CredentialsSecret: corev1.LocalObjectReference{
+			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
 			Region:                      "centralus",

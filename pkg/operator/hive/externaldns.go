@@ -28,7 +28,7 @@ func (r *ReconcileHiveConfig) deployExternalDNS(hLog log.FieldLogger, h *resourc
 		return fmt.Errorf("only AWS supported, AWS-specific external DNS configuration must be specified")
 	}
 
-	if len(instance.Spec.ExternalDNS.AWS.Credentials.Name) == 0 {
+	if len(instance.Spec.ExternalDNS.AWS.CredentialsSecretRef.Name) == 0 {
 		return fmt.Errorf("a secret reference must be specified for AWS credentials")
 	}
 
@@ -53,7 +53,7 @@ func (r *ReconcileHiveConfig) deployExternalDNS(hLog log.FieldLogger, h *resourc
 			Name: "AWS_ACCESS_KEY_ID",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: instance.Spec.ExternalDNS.AWS.Credentials,
+					LocalObjectReference: instance.Spec.ExternalDNS.AWS.CredentialsSecretRef,
 					Key:                  "aws_access_key_id",
 				},
 			},
@@ -62,7 +62,7 @@ func (r *ReconcileHiveConfig) deployExternalDNS(hLog log.FieldLogger, h *resourc
 			Name: "AWS_SECRET_ACCESS_KEY",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: instance.Spec.ExternalDNS.AWS.Credentials,
+					LocalObjectReference: instance.Spec.ExternalDNS.AWS.CredentialsSecretRef,
 					Key:                  "aws_secret_access_key",
 				},
 			},

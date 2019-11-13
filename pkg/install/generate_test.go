@@ -33,7 +33,7 @@ func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
 			Platform: hivev1.ClusterDeprovisionRequestPlatform{
 				AWS: &hivev1.AWSClusterDeprovisionRequest{
 					Region: "us-east-1",
-					Credentials: &corev1.LocalObjectReference{
+					CredentialsSecretRef: &corev1.LocalObjectReference{
 						Name: "aws-creds",
 					},
 				},

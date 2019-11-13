@@ -252,8 +252,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		canManageDNS = true
 		aws := newObject.Spec.Platform.AWS
 		awsPath := platformPath.Child("aws")
-		if aws.CredentialsSecret.Name == "" {
-			allErrs = append(allErrs, field.Required(awsPath.Child("credentials", "name"), "must specify secrets for AWS access"))
+		if aws.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsSecretRef", "name"), "must specify secrets for AWS access"))
 		}
 		if aws.Region == "" {
 			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
@@ -263,8 +263,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		numberOfPlatforms++
 		azure := newObject.Spec.Platform.Azure
 		azurePath := platformPath.Child("azure")
-		if azure.CredentialsSecret.Name == "" {
-			allErrs = append(allErrs, field.Required(azurePath.Child("credentials", "name"), "must specify secrets for Azure access"))
+		if azure.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("credentialsSecretRef", "name"), "must specify secrets for Azure access"))
 		}
 		if azure.Region == "" {
 			allErrs = append(allErrs, field.Required(azurePath.Child("region"), "must specify Azure region"))
@@ -277,8 +277,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		numberOfPlatforms++
 		gcp := newObject.Spec.Platform.GCP
 		gcpPath := platformPath.Child("gcp")
-		if gcp.CredentialsSecret.Name == "" {
-			allErrs = append(allErrs, field.Required(gcpPath.Child("credentials", "name"), "must specify secrets for GCP access"))
+		if gcp.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(gcpPath.Child("credentialsSecretRef", "name"), "must specify secrets for GCP access"))
 		}
 		if gcp.ProjectID == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("projectID"), "must specify GCP project ID"))
@@ -298,8 +298,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	if newObject.Spec.Provisioning != nil {
-		if newObject.Spec.Provisioning.SSHPrivateKeySecret != nil && newObject.Spec.Provisioning.SSHPrivateKeySecret.Name == "" {
-			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecret", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
+		if newObject.Spec.Provisioning.SSHPrivateKeySecretRef != nil && newObject.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
 		}
 	}
 
@@ -706,7 +706,7 @@ func validateCertificateBundles(newObject *hivev1.ClusterDeployment, contextLogg
 				},
 			}
 		}
-		if certBundle.CertificateSecret.Name == "" {
+		if certBundle.CertificateSecretRef.Name == "" {
 			message := "Certificate bundle is missing a secret reference"
 			contextLogger.Infof("Failed validation: %v", message)
 			return &admissionv1beta1.AdmissionResponse{

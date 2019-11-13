@@ -252,10 +252,10 @@ func testSyncSetInstanceForSyncSet(name string, applyMode ...hivev1.SyncSetResou
 				testClusterDeployment(), testMatchingSyncSet(name)),
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: testName,
 			},
-			SyncSet: &corev1.LocalObjectReference{
+			SyncSetRef: &corev1.LocalObjectReference{
 				Name: name,
 			},
 			ResourceApplyMode: getMode(applyMode),
@@ -272,10 +272,10 @@ func testSyncSetInstanceForSelectorSyncSet(name string, applyMode ...hivev1.Sync
 				testClusterDeployment(), testMatchingSelectorSyncSet(name)),
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: testName,
 			},
-			SelectorSyncSet: &hivev1.SelectorSyncSetReference{
+			SelectorSyncSetRef: &hivev1.SelectorSyncSetReference{
 				Name: name,
 			},
 			ResourceApplyMode: getMode(applyMode),

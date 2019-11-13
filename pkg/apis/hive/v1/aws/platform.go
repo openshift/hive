@@ -7,9 +7,9 @@ import (
 // Platform stores all the global configuration that
 // all machinesets use.
 type Platform struct {
-	// CredentialsSecret refers to a secret that contains the AWS account access
+	// CredentialsSecretRef refers to a secret that contains the AWS account access
 	// credentials.
-	CredentialsSecret corev1.LocalObjectReference `json:"credentialsSecret"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
 	// Region specifies the AWS region where the cluster will be created.
 	Region string `json:"region"`

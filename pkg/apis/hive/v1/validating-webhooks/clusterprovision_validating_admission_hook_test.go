@@ -123,7 +123,7 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 			name: "missing clusterdeployment name",
 			provision: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.ClusterDeployment.Name = ""
+				p.Spec.ClusterDeploymentRef.Name = ""
 				return p
 			}(),
 		},
@@ -217,7 +217,7 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 			name: "missing admin kubeconfig for pre-installed",
 			provision: func() *hivev1.ClusterProvision {
 				p := testPreInstalledClusterProvision()
-				p.Spec.AdminKubeconfigSecret = nil
+				p.Spec.AdminKubeconfigSecretRef = nil
 				return p
 			}(),
 		},
@@ -225,7 +225,7 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 			name: "missing admin password for pre-installed",
 			provision: func() *hivev1.ClusterProvision {
 				p := testPreInstalledClusterProvision()
-				p.Spec.AdminPasswordSecret = nil
+				p.Spec.AdminPasswordSecretRef = nil
 				return p
 			}(),
 		},
@@ -293,7 +293,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.ClusterDeployment.Name = "new-deployment"
+				p.Spec.ClusterDeploymentRef.Name = "new-deployment"
 				return p
 			}(),
 		},
@@ -407,7 +407,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{Name: "new-kubeconfig"}
+				p.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "new-kubeconfig"}
 				return p
 			}(),
 			expectAllowed: true,
@@ -417,7 +417,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{Name: "new-kubeconfig"}
+				p.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "new-kubeconfig"}
 				return p
 			}(),
 		},
@@ -426,7 +426,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{Name: "new-password"}
+				p.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "new-password"}
 				return p
 			}(),
 			expectAllowed: true,
@@ -436,7 +436,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{Name: "new-password"}
+				p.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "new-password"}
 				return p
 			}(),
 		},
@@ -576,7 +576,7 @@ func testClusterProvision() *hivev1.ClusterProvision {
 			Name: "test-provision",
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: "test-deployment",
 			},
 			PodSpec: corev1.PodSpec{
@@ -602,8 +602,8 @@ func testCompletedClusterProvision() *hivev1.ClusterProvision {
 	provision.Spec.InfraID = pointer.StringPtr("test-infra-id")
 	provision.Spec.InstallLog = pointer.StringPtr("test-install-log")
 	provision.Spec.Metadata = &runtime.RawExtension{Raw: []byte("\"test-metadata\"")}
-	provision.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"}
-	provision.Spec.AdminPasswordSecret = &corev1.LocalObjectReference{Name: "test-admin-password"}
+	provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"}
+	provision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{Name: "test-admin-password"}
 	provision.Spec.PrevClusterID = pointer.StringPtr("test-prev-cluster-id")
 	provision.Spec.PrevInfraID = pointer.StringPtr("test-prev-infra-id")
 	return provision
@@ -615,14 +615,14 @@ func testPreInstalledClusterProvision() *hivev1.ClusterProvision {
 			Name: "test-provision",
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: "test-deployment",
 			},
-			Stage:                 hivev1.ClusterProvisionStageComplete,
-			ClusterID:             pointer.StringPtr("test-prev-cluster-id"),
-			InfraID:               pointer.StringPtr("test-prev-infra-id"),
-			AdminKubeconfigSecret: &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"},
-			AdminPasswordSecret:   &corev1.LocalObjectReference{Name: "test-admin-password"},
+			Stage:                    hivev1.ClusterProvisionStageComplete,
+			ClusterID:                pointer.StringPtr("test-prev-cluster-id"),
+			InfraID:                  pointer.StringPtr("test-prev-infra-id"),
+			AdminKubeconfigSecretRef: &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"},
+			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "test-admin-password"},
 		},
 	}
 }

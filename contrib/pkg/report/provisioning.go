@@ -145,8 +145,8 @@ func (o *ProvisioningReportOptions) Run(dynClient client.Client) error {
 		fmt.Printf("Created: %s\n", cd.CreationTimestamp.Time)
 		fmt.Printf("Provisioning for: %.2f hours\n", provisioningFor)
 		fmt.Printf("Install Retries: %d\n", cd.Status.InstallRestarts)
-		if cd.Spec.ImageSet != nil {
-			fmt.Printf("ImageSet: %s\n", cd.Spec.ImageSet.Name)
+		if cd.Spec.ImageSetRef != nil {
+			fmt.Printf("ImageSet: %s\n", cd.Spec.ImageSetRef.Name)
 		}
 		cfgMap := &corev1.ConfigMap{}
 		cfgMapName := fmt.Sprintf("%s-install-log", cd.Name)

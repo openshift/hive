@@ -49,7 +49,7 @@ func (p *awsCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 	// Inject platform details into ClusterDeployment:
 	cd.Spec.Platform = hivev1.Platform{
 		AWS: &hivev1aws.Platform{
-			CredentialsSecret: corev1.LocalObjectReference{
+			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
 			Region: "us-east-1",

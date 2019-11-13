@@ -169,7 +169,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 	kubeconfigSecret := &corev1.Secret{}
-	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name}, kubeconfigSecret)
+	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name}, kubeconfigSecret)
 	if err != nil {
 		log.WithError(err).Error("could not get cluster's admin kubeconfig")
 		return reconcile.Result{}, err

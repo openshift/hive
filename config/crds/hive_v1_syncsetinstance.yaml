@@ -32,7 +32,7 @@ spec:
           type: object
         spec:
           properties:
-            clusterDeployment:
+            clusterDeploymentRef:
               description: ClusterDeployment is a reference to to the clusterdeployment
                 for this syncsetinstance.
               type: object
@@ -41,22 +41,22 @@ spec:
                 is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
                 and update. ApplyMode "sync" indicates create, update and delete.
               type: string
-            selectorSyncSet:
-              description: SelectorSyncSet is a reference to the selectorsyncset for
-                this syncsetinstance.
+            selectorSyncSetRef:
+              description: SelectorSyncSetRef is a reference to the selectorsyncset
+                for this syncsetinstance.
               properties:
                 name:
                   description: Name is the name of the SelectorSyncSet
                   type: string
-              type: object
-            syncSet:
-              description: SyncSet is a reference to the syncset for this syncsetinstance.
               type: object
             syncSetHash:
               description: SyncSetHash is a hash of the contents of the syncset or
                 selectorsyncset spec. Its purpose is to cause a syncset instance update
                 whenever there's a change in its source.
               type: string
+            syncSetRef:
+              description: SyncSet is a reference to the syncset for this syncsetinstance.
+              type: object
           type: object
         status:
           properties:

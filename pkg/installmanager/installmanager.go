@@ -297,10 +297,10 @@ func (m *InstallManager) Run() error {
 			provision.Spec.Metadata = &runtime.RawExtension{Raw: metadataBytes}
 			provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
 			provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
-			provision.Spec.AdminKubeconfigSecret = &corev1.LocalObjectReference{
+			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
 			}
-			provision.Spec.AdminPasswordSecret = &corev1.LocalObjectReference{
+			provision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{
 				Name: passwordSecret.Name,
 			}
 		},
@@ -658,7 +658,7 @@ func (m *InstallManager) loadClusterProvision(provision *hivev1.ClusterProvision
 
 func (m *InstallManager) loadClusterDeployment(provision *hivev1.ClusterProvision) (*hivev1.ClusterDeployment, error) {
 	cd := &hivev1.ClusterDeployment{}
-	if err := m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: provision.Spec.ClusterDeployment.Name}, cd); err != nil {
+	if err := m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: provision.Spec.ClusterDeploymentRef.Name}, cd); err != nil {
 		m.log.WithError(err).Error("error getting cluster deployment")
 		return nil, err
 	}

@@ -408,14 +408,14 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	cd.Spec.Provisioning.InstallConfigSecret = corev1.LocalObjectReference{Name: installConfigSecret.Name}
+	cd.Spec.Provisioning.InstallConfigSecretRef = corev1.LocalObjectReference{Name: installConfigSecret.Name}
 
 	manifestsConfigMap, err := o.generateManifestsConfigMap()
 	if err != nil {
 		return nil, err
 	}
 	if manifestsConfigMap != nil {
-		cd.Spec.Provisioning.ManifestsConfigMap = &corev1.LocalObjectReference{
+		cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{
 			Name: manifestsConfigMap.Name,
 		}
 		result = append(result, manifestsConfigMap)
@@ -677,7 +677,7 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 	}
 
 	if sshPrivateKeySecret != nil {
-		cd.Spec.Provisioning.SSHPrivateKeySecret = &corev1.LocalObjectReference{Name: sshPrivateKeySecret.Name}
+		cd.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{Name: sshPrivateKeySecret.Name}
 	}
 
 	if o.InstallOnce {
@@ -687,13 +687,13 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 		cd.Annotations[tryUninstallOnceAnnotation] = "true"
 	}
 	if pullSecret != nil {
-		cd.Spec.PullSecret = &corev1.LocalObjectReference{Name: pullSecret.Name}
+		cd.Spec.PullSecretRef = &corev1.LocalObjectReference{Name: pullSecret.Name}
 	}
 	if len(o.ServingCert) > 0 {
 		cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 			{
 				Name: "serving-cert",
-				CertificateSecret: corev1.LocalObjectReference{
+				CertificateSecretRef: corev1.LocalObjectReference{
 					Name: fmt.Sprintf("%s-serving-cert", o.Name),
 				},
 			},
@@ -717,7 +717,7 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 
 func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.ClusterImageSet, error) {
 	if len(o.ClusterImageSet) > 0 {
-		cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{
+		cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{
 			Name: o.ClusterImageSet,
 		}
 		return nil, nil
@@ -751,7 +751,7 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			InstallerImage: &o.InstallerImage,
 		},
 	}
-	cd.Spec.ImageSet = &hivev1.ClusterImageSetReference{
+	cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{
 		Name: imageSet.Name,
 	}
 

@@ -81,7 +81,7 @@ func InstallerPodSpec(
 			Name: "installconfig",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.Provisioning.InstallConfigSecret.Name,
+					SecretName: cd.Spec.Provisioning.InstallConfigSecretRef.Name,
 				},
 			},
 		},
@@ -105,7 +105,7 @@ func InstallerPodSpec(
 				Name: "AWS_ACCESS_KEY_ID",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecret,
+						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
 						Key:                  "aws_access_key_id",
 					},
 				},
@@ -114,7 +114,7 @@ func InstallerPodSpec(
 				Name: "AWS_SECRET_ACCESS_KEY",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecret,
+						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
 						Key:                  "aws_secret_access_key",
 					},
 				},
@@ -125,7 +125,7 @@ func InstallerPodSpec(
 			Name: "azure",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.Platform.Azure.CredentialsSecret.Name,
+					SecretName: cd.Spec.Platform.Azure.CredentialsSecretRef.Name,
 				},
 			},
 		})
@@ -142,7 +142,7 @@ func InstallerPodSpec(
 			Name: "gcp",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.Platform.GCP.CredentialsSecret.Name,
+					SecretName: cd.Spec.Platform.GCP.CredentialsSecretRef.Name,
 				},
 			},
 		})
@@ -166,7 +166,7 @@ func InstallerPodSpec(
 		)
 	}
 
-	if cd.Spec.Provisioning.ManifestsConfigMap != nil {
+	if cd.Spec.Provisioning.ManifestsConfigMapRef != nil {
 		volumes = append(
 			volumes,
 			corev1.Volume{
@@ -174,7 +174,7 @@ func InstallerPodSpec(
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: cd.Spec.Provisioning.ManifestsConfigMap.Name,
+							Name: cd.Spec.Provisioning.ManifestsConfigMapRef.Name,
 						},
 					},
 				},
@@ -204,12 +204,12 @@ func InstallerPodSpec(
 			Name:      "logs",
 			MountPath: "/logs",
 		})
-		if cd.Spec.Provisioning.SSHPrivateKeySecret != nil {
+		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
 			volumes = append(volumes, corev1.Volume{
 				Name: "sshkeys",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.Provisioning.SSHPrivateKeySecret.Name,
+						SecretName: cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name,
 					},
 				},
 			})
@@ -398,8 +398,8 @@ func GenerateUninstallerJobForDeprovisionRequest(
 
 func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
 	credentialsSecret := ""
-	if len(req.Spec.Platform.AWS.Credentials.Name) > 0 {
-		credentialsSecret = req.Spec.Platform.AWS.Credentials.Name
+	if len(req.Spec.Platform.AWS.CredentialsSecretRef.Name) > 0 {
+		credentialsSecret = req.Spec.Platform.AWS.CredentialsSecretRef.Name
 	}
 	env := []corev1.EnvVar{}
 	if len(credentialsSecret) > 0 {
@@ -457,7 +457,7 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *bat
 		Name: "azure",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: req.Spec.Platform.Azure.Credentials.Name,
+				SecretName: req.Spec.Platform.Azure.CredentialsSecretRef.Name,
 			},
 		},
 	})
@@ -499,7 +499,7 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batch
 		Name: "gcp",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: req.Spec.Platform.GCP.Credentials.Name,
+				SecretName: req.Spec.Platform.GCP.CredentialsSecretRef.Name,
 			},
 		},
 	})

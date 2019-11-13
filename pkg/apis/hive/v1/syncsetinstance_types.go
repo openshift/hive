@@ -36,15 +36,15 @@ const (
 // SyncSetInstanceSpec defines the desired state of SyncSetInstance
 type SyncSetInstanceSpec struct {
 	// ClusterDeployment is a reference to to the clusterdeployment for this syncsetinstance.
-	ClusterDeployment corev1.LocalObjectReference `json:"clusterDeployment"`
+	ClusterDeploymentRef corev1.LocalObjectReference `json:"clusterDeploymentRef"`
 
 	// SyncSet is a reference to the syncset for this syncsetinstance.
 	// +optional
-	SyncSet *corev1.LocalObjectReference `json:"syncSet,omitempty"`
+	SyncSetRef *corev1.LocalObjectReference `json:"syncSetRef,omitempty"`
 
-	// SelectorSyncSet is a reference to the selectorsyncset for this syncsetinstance.
+	// SelectorSyncSetRef is a reference to the selectorsyncset for this syncsetinstance.
 	// +optional
-	SelectorSyncSet *SelectorSyncSetReference `json:"selectorSyncSet,omitempty"`
+	SelectorSyncSetRef *SelectorSyncSetReference `json:"selectorSyncSetRef,omitempty"`
 
 	// ResourceApplyMode indicates if the resource apply mode is "upsert" (default) or "sync".
 	// ApplyMode "upsert" indicates create and update.

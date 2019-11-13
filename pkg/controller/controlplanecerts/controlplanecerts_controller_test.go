@@ -292,7 +292,7 @@ func (f *fakeClusterDeploymentWrapper) defaultCert(name, secretName string) *fak
 	f.cd.Spec.ControlPlaneConfig.ServingCertificates.Default = name
 	f.cd.Spec.CertificateBundles = append(f.cd.Spec.CertificateBundles, hivev1.CertificateBundleSpec{
 		Name: name,
-		CertificateSecret: corev1.LocalObjectReference{
+		CertificateSecretRef: corev1.LocalObjectReference{
 			Name: secretName,
 		},
 	})
@@ -306,7 +306,7 @@ func (f *fakeClusterDeploymentWrapper) namedCert(name, domain, secretName string
 	})
 	f.cd.Spec.CertificateBundles = append(f.cd.Spec.CertificateBundles, hivev1.CertificateBundleSpec{
 		Name: name,
-		CertificateSecret: corev1.LocalObjectReference{
+		CertificateSecretRef: corev1.LocalObjectReference{
 			Name: secretName,
 		},
 	})

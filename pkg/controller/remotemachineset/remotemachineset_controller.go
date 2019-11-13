@@ -166,7 +166,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	}
 
 	adminKubeconfigSecret := &kapi.Secret{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to fetch admin kubeconfig secret")
 		return reconcile.Result{}, err
@@ -540,7 +540,7 @@ func (r *ReconcileRemoteMachineSet) getAWSClient(cd *hivev1.ClusterDeployment) (
 	var secretName, regionName string
 
 	if cd != nil && cd.Spec.Platform.AWS != nil {
-		secretName = cd.Spec.Platform.AWS.CredentialsSecret.Name
+		secretName = cd.Spec.Platform.AWS.CredentialsSecretRef.Name
 		regionName = cd.Spec.Platform.AWS.Region
 	}
 

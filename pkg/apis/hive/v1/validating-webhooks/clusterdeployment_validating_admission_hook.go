@@ -244,6 +244,15 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
+	if !newObject.Spec.Installed {
+		if newObject.Spec.Provisioning == nil {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "provisioning is required if not installed"))
+
+		} else if newObject.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
+		}
+	}
+
 	platformPath := specPath.Child("platform")
 	numberOfPlatforms := 0
 	canManageDNS := false

@@ -1708,8 +1708,8 @@ spec:
                 with this cluster
               items:
                 properties:
-                  certificateSecret:
-                    description: CertificateSecret is the reference to the secret
+                  certificateSecretRef:
+                    description: CertificateSecretRef is the reference to the secret
                       that contains the certificate bundle. If the certificate bundle
                       is to be generated, it will be generated with the name in this
                       reference. Otherwise, it is expected that the secret should
@@ -1732,12 +1732,12 @@ spec:
               description: ClusterMetadata contains metadata information about the
                 installed cluster.
               properties:
-                adminKubeconfigSecret:
-                  description: AdminKubeconfigSecret references the secret containing
+                adminKubeconfigSecretRef:
+                  description: AdminKubeconfigSecretRef references the secret containing
                     the admin kubeconfig for this cluster.
                   type: object
-                adminPasswordSecret:
-                  description: AdminPasswordSecret references the secret containing
+                adminPasswordSecretRef:
+                  description: AdminPasswordSecretRef references the secret containing
                     the admin username/password which can be used to login to this
                     cluster.
                   type: object
@@ -1892,8 +1892,8 @@ spec:
                       type: string
                   type: object
               type: object
-            imageSet:
-              description: ImageSet is a reference to a ClusterImageSet. If values
+            imageSetRef:
+              description: ImageSetRef is a reference to a ClusterImageSet. If values
                 are specified for Images, those will take precedence over the ones
                 from the ClusterImageSet.
               properties:
@@ -1965,8 +1965,8 @@ spec:
                 aws:
                   description: AWS is the configuration used when installing on AWS.
                   properties:
-                    credentialsSecret:
-                      description: CredentialsSecret refers to a secret that contains
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
                         the AWS account access credentials.
                       type: object
                     defaultMachinePlatform:
@@ -2017,8 +2017,8 @@ spec:
                       description: BaseDomainResourceGroupName specifies the resource
                         group where the azure DNS zone for the base domain is found
                       type: string
-                    credentialsSecret:
-                      description: CredentialsSecret refers to a secret that contains
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
                         the Azure account access credentials.
                       type: object
                     defaultMachinePlatform:
@@ -2055,8 +2055,8 @@ spec:
                   description: GCP is the configuration used when installing on Google
                     Cloud Platform.
                   properties:
-                    credentialsSecret:
-                      description: CredentialsSecret refers to a secret that contains
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
                         the GCP account access credentials.
                       type: object
                     defaultMachinePlatform:
@@ -2093,20 +2093,20 @@ spec:
               description: Provisioning contains settings used only for initial cluster
                 provisioning. May be unset in the case of adopted clusters.
               properties:
-                installConfigSecret:
-                  description: InstallConfigSecret is the reference to a secret that
-                    contains an openshift-install InstallConfig. This file will be
-                    passed through directly to the installer. Any version of InstallConfig
+                installConfigSecretRef:
+                  description: InstallConfigSecretRef is the reference to a secret
+                    that contains an openshift-install InstallConfig. This file will
+                    be passed through directly to the installer. Any version of InstallConfig
                     can be used, provided it can be parsed by the openshift-install
                     version for the release you are provisioning.
                   type: object
-                manifestsConfigMap:
-                  description: ManifestsConfigMap is a reference to user-provided
+                manifestsConfigMapRef:
+                  description: ManifestsConfigMapRef is a reference to user-provided
                     manifests to add to or replace manifests that are generated by
                     the installer.
                   type: object
-                sshPrivateSecretKey:
-                  description: SSHPrivateKeySecret is the reference to the secret
+                sshPrivateSecretKeyRef:
+                  description: SSHPrivateKeySecretRef is the reference to the secret
                     that contains the private SSH key to use for access to compute
                     instances. This private key should correspond to the public key
                     included in the InstallConfig. The private key is used by Hive
@@ -2115,9 +2115,9 @@ spec:
                     the "ssh-privatekey" key.
                   type: object
               type: object
-            pullSecret:
-              description: PullSecret is the reference to the secret to use when pulling
-                images.
+            pullSecretRef:
+              description: PullSecretRef is the reference to the secret to use when
+                pulling images.
               type: object
           required:
           - clusterName
@@ -2344,7 +2344,7 @@ spec:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
               type: boolean
-            federatedCluster:
+            federatedClusterRef:
               description: FederatedClusterRef is the reference to the federated cluster
                 resource associated with this ClusterDeployment.
               type: object
@@ -2362,9 +2362,9 @@ spec:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
               type: string
-            provision:
-              description: Provision is a reference to the last ClusterProvision created
-                for the deployment
+            provisionRef:
+              description: ProvisionRef is a reference to the last ClusterProvision
+                created for the deployment
               type: object
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
@@ -2457,9 +2457,9 @@ spec:
                 aws:
                   description: AWS contains AWS-specific deprovision request settings
                   properties:
-                    credentials:
-                      description: Credentials is the AWS account credentials to use
-                        for deprovisioning the cluster
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the AWS account credentials
+                        to use for deprovisioning the cluster
                       type: object
                     region:
                       description: Region is the AWS region for this deprovisioning
@@ -2469,17 +2469,17 @@ spec:
                 azure:
                   description: Azure contains Azure-specific deprovision request settings
                   properties:
-                    credentials:
-                      description: Credentials is the Azure account credentials to
-                        use for deprovisioning the cluster
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the Azure account credentials
+                        to use for deprovisioning the cluster
                       type: object
                   type: object
                 gcp:
                   description: GCP contains GCP-specific deprovision request settings
                   properties:
-                    credentials:
-                      description: Credentials is the GCP account credentials to use
-                        for deprovisioning the cluster
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the GCP account credentials
+                        to use for deprovisioning the cluster
                       type: object
                     projectID:
                       description: ProjectID is the ID of the GCP project in which
@@ -2642,21 +2642,22 @@ spec:
           type: object
         spec:
           properties:
-            adminKubeconfigSecret:
-              description: AdminKubeconfigSecret references the secret containing
+            adminKubeconfigSecretRef:
+              description: AdminKubeconfigSecretRef references the secret containing
                 the admin kubeconfig for this cluster.
               type: object
-            adminPasswordSecret:
-              description: AdminPasswordSecret references the secret containing the
-                admin username/password which can be used to login to this cluster.
+            adminPasswordSecretRef:
+              description: AdminPasswordSecretRef references the secret containing
+                the admin username/password which can be used to login to this cluster.
               type: object
             attempt:
               description: Attempt is which attempt number of the cluster deployment
                 that this ClusterProvision is
               format: int64
               type: integer
-            clusterDeployment:
-              description: ClusterDeployment references the cluster deployment provisioned.
+            clusterDeploymentRef:
+              description: ClusterDeploymentRef references the cluster deployment
+                provisioned.
               type: object
             clusterID:
               description: ClusterID is a globally unique identifier for this cluster
@@ -2722,7 +2723,8 @@ spec:
                     type: string
                 type: object
               type: array
-            job:
+            jobRef:
+              description: JobRef is the reference to the job performing the provision.
               type: object
           type: object
   version: v1
@@ -2979,8 +2981,8 @@ spec:
             aws:
               description: AWS specifies AWS-specific cloud configuration
               properties:
-                accountSecret:
-                  description: AccountSecret contains a reference to a secret that
+                accountSecretRef:
+                  description: AccountSecretRef contains a reference to a secret that
                     contains AWS credentials for CRUD operations
                   type: object
                 additionalTags:
@@ -3122,12 +3124,12 @@ spec:
           type: object
         spec:
           properties:
-            additionalCertificateAuthorities:
-              description: AdditionalCertificateAuthorities is a list of references
-                to secrets in the 'hive' namespace that contain an additional Certificate
-                Authority to use when communicating with target clusters. These certificate
-                authorities will be used in addition to any self-signed CA generated
-                by each cluster on installation.
+            additionalCertificateAuthoritiesSecretRef:
+              description: AdditionalCertificateAuthoritiesSecretRef is a list of
+                references to secrets in the 'hive' namespace that contain an additional
+                Certificate Authority to use when communicating with target clusters.
+                These certificate authorities will be used in addition to any self-signed
+                CA generated by each cluster on installation.
               items:
                 type: object
               type: array
@@ -3162,9 +3164,9 @@ spec:
                 aws:
                   description: AWS contains AWS-specific settings for external DNS
                   properties:
-                    credentials:
-                      description: Credentials references a secret that will be used
-                        to authenticate with AWS Route53. It will need permission
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef references a secret that will
+                        be used to authenticate with AWS Route53. It will need permission
                         to manage entries in each of the managed domains for this
                         cluster. Secret should have AWS keys named 'aws_access_key_id'
                         and 'aws_secret_access_key'.
@@ -3187,8 +3189,8 @@ spec:
                     for up to 7 days.
                   type: boolean
               type: object
-            globalPullSecret:
-              description: GlobalPullSecret is used to specify a pull secret that
+            globalPullSecretRef:
+              description: GlobalPullSecretRef is used to specify a pull secret that
                 will be used globally by all of the cluster deployments. For each
                 cluster deployment, the contents of GlobalPullSecret will be merged
                 with the specific pull secret for a cluster deployment(if specified),
@@ -4642,7 +4644,7 @@ spec:
           type: object
         spec:
           properties:
-            clusterDeployment:
+            clusterDeploymentRef:
               description: ClusterDeployment is a reference to to the clusterdeployment
                 for this syncsetinstance.
               type: object
@@ -4651,22 +4653,22 @@ spec:
                 is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
                 and update. ApplyMode "sync" indicates create, update and delete.
               type: string
-            selectorSyncSet:
-              description: SelectorSyncSet is a reference to the selectorsyncset for
-                this syncsetinstance.
+            selectorSyncSetRef:
+              description: SelectorSyncSetRef is a reference to the selectorsyncset
+                for this syncsetinstance.
               properties:
                 name:
                   description: Name is the name of the SelectorSyncSet
                   type: string
-              type: object
-            syncSet:
-              description: SyncSet is a reference to the syncset for this syncsetinstance.
               type: object
             syncSetHash:
               description: SyncSetHash is a hash of the contents of the syncset or
                 selectorsyncset spec. Its purpose is to cause a syncset instance update
                 whenever there's a change in its source.
               type: string
+            syncSetRef:
+              description: SyncSet is a reference to the syncset for this syncsetinstance.
+              type: object
           type: object
         status:
           properties:

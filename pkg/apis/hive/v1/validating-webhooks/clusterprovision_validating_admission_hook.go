@@ -230,7 +230,7 @@ func validateClusterProvisionUpdate(old, new *hivev1.ClusterProvision) field.Err
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, validateClusterProvisionSpecInvariants(&new.Spec, specPath)...)
-	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.ClusterDeployment.Name, old.Spec.ClusterDeployment.Name, specPath.Child("clusterDeployment", "name"))...)
+	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.ClusterDeploymentRef.Name, old.Spec.ClusterDeploymentRef.Name, specPath.Child("clusterDeployment", "name"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.PodSpec, old.Spec.PodSpec, specPath.Child("podSpec"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Attempt, old.Spec.Attempt, specPath.Child("attempt"))...)
 	if old.Spec.Stage != new.Spec.Stage {
@@ -251,11 +251,11 @@ func validateClusterProvisionUpdate(old, new *hivev1.ClusterProvision) field.Err
 	if old.Spec.InfraID != nil {
 		allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.InfraID, old.Spec.InfraID, specPath.Child("infraID"))...)
 	}
-	if old.Spec.AdminKubeconfigSecret != nil {
-		allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.AdminKubeconfigSecret, old.Spec.AdminKubeconfigSecret, specPath.Child("adminKubeconfigSecret"))...)
+	if old.Spec.AdminKubeconfigSecretRef != nil {
+		allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.AdminKubeconfigSecretRef, old.Spec.AdminKubeconfigSecretRef, specPath.Child("adminKubeconfigSecretRef"))...)
 	}
-	if old.Spec.AdminPasswordSecret != nil {
-		allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.AdminPasswordSecret, old.Spec.AdminPasswordSecret, specPath.Child("adminPasswordSecret"))...)
+	if old.Spec.AdminPasswordSecretRef != nil {
+		allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.AdminPasswordSecretRef, old.Spec.AdminPasswordSecretRef, specPath.Child("adminPasswordSecretRef"))...)
 	}
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.PrevClusterID, old.Spec.PrevClusterID, specPath.Child("prevClusterID"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.PrevInfraID, old.Spec.PrevInfraID, specPath.Child("prevInfraID"))...)
@@ -264,7 +264,7 @@ func validateClusterProvisionUpdate(old, new *hivev1.ClusterProvision) field.Err
 
 func validateClusterProvisionSpecInvariants(spec *hivev1.ClusterProvisionSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if spec.ClusterDeployment.Name == "" {
+	if spec.ClusterDeploymentRef.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("clusterDeployment", "name"), "must have reference to clusterdeployment"))
 	}
 	if spec.Attempt < 0 {
@@ -293,10 +293,10 @@ func validateClusterProvisionSpecInvariants(spec *hivev1.ClusterProvisionSpec, f
 		}
 	}
 	if spec.Stage == hivev1.ClusterProvisionStageComplete {
-		if spec.AdminKubeconfigSecret == nil {
+		if spec.AdminKubeconfigSecretRef == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("adminKubeConfigSecret"), fmt.Sprintf("admin kubeconfig secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
 		}
-		if spec.AdminPasswordSecret == nil {
+		if spec.AdminPasswordSecretRef == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("adminPasswordSecret"), fmt.Sprintf("admin password secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
 		}
 	}
@@ -306,11 +306,11 @@ func validateClusterProvisionSpecInvariants(spec *hivev1.ClusterProvisionSpec, f
 	if spec.InfraID != nil && *spec.InfraID == "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("infraID"), spec.InfraID, "infra ID must not be an empty string"))
 	}
-	if spec.AdminKubeconfigSecret != nil && spec.AdminKubeconfigSecret.Name == "" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("adminKubeConfigSecret", "name"), spec.AdminKubeconfigSecret.Name, "admin kubeconfig secret must have a non-empty name"))
+	if spec.AdminKubeconfigSecretRef != nil && spec.AdminKubeconfigSecretRef.Name == "" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("adminKubeConfigSecretRef", "name"), spec.AdminKubeconfigSecretRef.Name, "admin kubeconfig secret must have a non-empty name"))
 	}
-	if spec.AdminPasswordSecret != nil && spec.AdminPasswordSecret.Name == "" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("adminPasswordSecret", "name"), spec.AdminPasswordSecret.Name, "admin password secret must have a non-empty name"))
+	if spec.AdminPasswordSecretRef != nil && spec.AdminPasswordSecretRef.Name == "" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("adminPasswordSecretRef", "name"), spec.AdminPasswordSecretRef.Name, "admin password secret must have a non-empty name"))
 	}
 	if spec.PrevClusterID != nil && *spec.PrevClusterID == "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("prevClusterID"), spec.PrevClusterID, "previous cluster ID must not be an empty string"))

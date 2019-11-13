@@ -60,8 +60,8 @@ spec:
                 with this cluster
               items:
                 properties:
-                  certificateSecret:
-                    description: CertificateSecret is the reference to the secret
+                  certificateSecretRef:
+                    description: CertificateSecretRef is the reference to the secret
                       that contains the certificate bundle. If the certificate bundle
                       is to be generated, it will be generated with the name in this
                       reference. Otherwise, it is expected that the secret should
@@ -84,12 +84,12 @@ spec:
               description: ClusterMetadata contains metadata information about the
                 installed cluster.
               properties:
-                adminKubeconfigSecret:
-                  description: AdminKubeconfigSecret references the secret containing
+                adminKubeconfigSecretRef:
+                  description: AdminKubeconfigSecretRef references the secret containing
                     the admin kubeconfig for this cluster.
                   type: object
-                adminPasswordSecret:
-                  description: AdminPasswordSecret references the secret containing
+                adminPasswordSecretRef:
+                  description: AdminPasswordSecretRef references the secret containing
                     the admin username/password which can be used to login to this
                     cluster.
                   type: object
@@ -244,8 +244,8 @@ spec:
                       type: string
                   type: object
               type: object
-            imageSet:
-              description: ImageSet is a reference to a ClusterImageSet. If values
+            imageSetRef:
+              description: ImageSetRef is a reference to a ClusterImageSet. If values
                 are specified for Images, those will take precedence over the ones
                 from the ClusterImageSet.
               properties:
@@ -317,8 +317,8 @@ spec:
                 aws:
                   description: AWS is the configuration used when installing on AWS.
                   properties:
-                    credentialsSecret:
-                      description: CredentialsSecret refers to a secret that contains
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
                         the AWS account access credentials.
                       type: object
                     defaultMachinePlatform:
@@ -369,8 +369,8 @@ spec:
                       description: BaseDomainResourceGroupName specifies the resource
                         group where the azure DNS zone for the base domain is found
                       type: string
-                    credentialsSecret:
-                      description: CredentialsSecret refers to a secret that contains
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
                         the Azure account access credentials.
                       type: object
                     defaultMachinePlatform:
@@ -407,8 +407,8 @@ spec:
                   description: GCP is the configuration used when installing on Google
                     Cloud Platform.
                   properties:
-                    credentialsSecret:
-                      description: CredentialsSecret refers to a secret that contains
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
                         the GCP account access credentials.
                       type: object
                     defaultMachinePlatform:
@@ -445,20 +445,20 @@ spec:
               description: Provisioning contains settings used only for initial cluster
                 provisioning. May be unset in the case of adopted clusters.
               properties:
-                installConfigSecret:
-                  description: InstallConfigSecret is the reference to a secret that
-                    contains an openshift-install InstallConfig. This file will be
-                    passed through directly to the installer. Any version of InstallConfig
+                installConfigSecretRef:
+                  description: InstallConfigSecretRef is the reference to a secret
+                    that contains an openshift-install InstallConfig. This file will
+                    be passed through directly to the installer. Any version of InstallConfig
                     can be used, provided it can be parsed by the openshift-install
                     version for the release you are provisioning.
                   type: object
-                manifestsConfigMap:
-                  description: ManifestsConfigMap is a reference to user-provided
+                manifestsConfigMapRef:
+                  description: ManifestsConfigMapRef is a reference to user-provided
                     manifests to add to or replace manifests that are generated by
                     the installer.
                   type: object
-                sshPrivateSecretKey:
-                  description: SSHPrivateKeySecret is the reference to the secret
+                sshPrivateSecretKeyRef:
+                  description: SSHPrivateKeySecretRef is the reference to the secret
                     that contains the private SSH key to use for access to compute
                     instances. This private key should correspond to the public key
                     included in the InstallConfig. The private key is used by Hive
@@ -467,9 +467,9 @@ spec:
                     the "ssh-privatekey" key.
                   type: object
               type: object
-            pullSecret:
-              description: PullSecret is the reference to the secret to use when pulling
-                images.
+            pullSecretRef:
+              description: PullSecretRef is the reference to the secret to use when
+                pulling images.
               type: object
           required:
           - clusterName
@@ -696,7 +696,7 @@ spec:
               description: Federated is true if the cluster deployment has been federated
                 with the host cluster.
               type: boolean
-            federatedCluster:
+            federatedClusterRef:
               description: FederatedClusterRef is the reference to the federated cluster
                 resource associated with this ClusterDeployment.
               type: object
@@ -714,9 +714,9 @@ spec:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
               type: string
-            provision:
-              description: Provision is a reference to the last ClusterProvision created
-                for the deployment
+            provisionRef:
+              description: ProvisionRef is a reference to the last ClusterProvision
+                created for the deployment
               type: object
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console

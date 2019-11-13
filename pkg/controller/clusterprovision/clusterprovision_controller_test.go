@@ -210,10 +210,10 @@ func TestClusterProvisionReconcile(t *testing.T) {
 					assert.Nil(t, failedCond, "expected not to find a Failed condition")
 				}
 				if test.expectNoJobReference {
-					assert.Nil(t, provision.Status.Job, "expected no job reference from provision")
+					assert.Nil(t, provision.Status.JobRef, "expected no job reference from provision")
 				} else {
-					if assert.NotNil(t, provision.Status.Job, "expected job reference from provision") {
-						assert.Equal(t, installJobName, provision.Status.Job.Name, "unexpected job name referenced from provision")
+					if assert.NotNil(t, provision.Status.JobRef, "expected job reference from provision") {
+						assert.Equal(t, installJobName, provision.Status.JobRef.Name, "unexpected job name referenced from provision")
 					}
 				}
 			}
@@ -247,7 +247,7 @@ func testProvision(opts ...provisionOption) *hivev1.ClusterProvision {
 			},
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: testDeploymentName,
 			},
 			Stage: hivev1.ClusterProvisionStageInitializing,
@@ -281,7 +281,7 @@ func failed() provisionOption {
 
 func withJob() provisionOption {
 	return func(p *hivev1.ClusterProvision) {
-		p.Status.Job = &corev1.LocalObjectReference{
+		p.Status.JobRef = &corev1.LocalObjectReference{
 			Name: installJobName,
 		}
 	}

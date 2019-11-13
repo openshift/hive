@@ -583,16 +583,16 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			Compute:     computePools,
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
-					CredentialsSecret: corev1.LocalObjectReference{
+					CredentialsSecretRef: corev1.LocalObjectReference{
 						Name: "aws-credentials",
 					},
 					Region: "us-east-1",
 				},
 			},
 			ClusterMetadata: &hivev1.ClusterMetadata{
-				AdminKubeconfigSecret: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
-				ClusterID:             testClusterID,
-				InfraID:               testInfraID,
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: fmt.Sprintf("%s-admin-kubeconfig", testName)},
+				ClusterID:                testClusterID,
+				InfraID:                  testInfraID,
 			},
 			Installed: true,
 		},

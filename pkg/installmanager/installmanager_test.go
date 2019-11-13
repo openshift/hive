@@ -290,16 +290,16 @@ func TestInstallManager(t *testing.T) {
 
 			if test.expectProvisionMetadataUpdate {
 				assert.NotNil(t, provision.Spec.Metadata, "expected metadata to be set")
-				if assert.NotNil(t, provision.Spec.AdminKubeconfigSecret, "expected kubeconfig secret reference to be set") {
-					assert.Equal(t, "test-provision-admin-kubeconfig", provision.Spec.AdminKubeconfigSecret.Name, "unexpected name for kubeconfig secret reference")
+				if assert.NotNil(t, provision.Spec.AdminKubeconfigSecretRef, "expected kubeconfig secret reference to be set") {
+					assert.Equal(t, "test-provision-admin-kubeconfig", provision.Spec.AdminKubeconfigSecretRef.Name, "unexpected name for kubeconfig secret reference")
 				}
-				if assert.NotNil(t, provision.Spec.AdminPasswordSecret, "expected password secret reference to be set") {
-					assert.Equal(t, "test-provision-admin-password", provision.Spec.AdminPasswordSecret.Name, "unexpected name for password secret reference")
+				if assert.NotNil(t, provision.Spec.AdminPasswordSecretRef, "expected password secret reference to be set") {
+					assert.Equal(t, "test-provision-admin-password", provision.Spec.AdminPasswordSecretRef.Name, "unexpected name for password secret reference")
 				}
 			} else {
 				assert.Nil(t, provision.Spec.Metadata, "expected metadata to be empty")
-				assert.Nil(t, provision.Spec.AdminKubeconfigSecret, "expected kubeconfig secret reference to be empty")
-				assert.Nil(t, provision.Spec.AdminPasswordSecret, "expected password secret reference to be empty")
+				assert.Nil(t, provision.Spec.AdminKubeconfigSecretRef, "expected kubeconfig secret reference to be empty")
+				assert.Nil(t, provision.Spec.AdminPasswordSecretRef, "expected password secret reference to be empty")
 			}
 
 			if test.expectProvisionLogUpdate {
@@ -335,7 +335,7 @@ func testClusterProvision() *hivev1.ClusterProvision {
 			Namespace: testNamespace,
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: testDeploymentName,
 			},
 			Stage: hivev1.ClusterProvisionStageProvisioning,

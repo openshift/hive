@@ -57,7 +57,7 @@ func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
-					CredentialsSecret: corev1.LocalObjectReference{
+					CredentialsSecretRef: corev1.LocalObjectReference{
 						Name: "fake-creds-secret",
 					},
 					Region: "test-region",
@@ -79,7 +79,7 @@ func validAzureClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			Platform: hivev1.Platform{
 				Azure: &hivev1azure.Platform{
-					CredentialsSecret:           corev1.LocalObjectReference{Name: "fake-creds-secret"},
+					CredentialsSecretRef:        corev1.LocalObjectReference{Name: "fake-creds-secret"},
 					Region:                      "test-region",
 					BaseDomainResourceGroupName: "os4-common",
 				},
@@ -330,7 +330,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validClusterDeploymentWithIngress()
 				cd.Spec.Provisioning = &hivev1.Provisioning{
-					SSHPrivateKeySecret: &corev1.LocalObjectReference{},
+					SSHPrivateKeySecretRef: &corev1.LocalObjectReference{},
 				}
 				return cd
 			}(),
@@ -391,7 +391,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					{
 						Name:     "testCertificateBundle",
 						Generate: false,
-						CertificateSecret: corev1.LocalObjectReference{
+						CertificateSecretRef: corev1.LocalObjectReference{
 							Name: "testCertBundle-Secret",
 						},
 					},
@@ -493,7 +493,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name: "Azure create missing credentials",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAzureClusterDeployment()
-				cd.Spec.Platform.Azure.CredentialsSecret.Name = ""
+				cd.Spec.Platform.Azure.CredentialsSecretRef.Name = ""
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
@@ -548,8 +548,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Ingress[0].ServingCertificate = "test-serving-cert"
 				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 					{
-						Name:              "test-serving-cert",
-						CertificateSecret: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+						Name:                 "test-serving-cert",
+						CertificateSecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
 					},
 				}
 				return cd
@@ -564,8 +564,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Ingress[0].ServingCertificate = "missing-serving-cert"
 				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 					{
-						Name:              "test-serving-cert",
-						CertificateSecret: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+						Name:                 "test-serving-cert",
+						CertificateSecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
 					},
 				}
 				return cd
@@ -579,8 +579,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd := validAWSClusterDeployment()
 				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 					{
-						Name:              "test-serving-cert",
-						CertificateSecret: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+						Name:                 "test-serving-cert",
+						CertificateSecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
 					},
 				}
 				return cd
@@ -594,7 +594,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd := validAWSClusterDeployment()
 				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
 					{
-						CertificateSecret: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
+						CertificateSecretRef: corev1.LocalObjectReference{Name: "test-serving-cert-secret"},
 					},
 				}
 				return cd

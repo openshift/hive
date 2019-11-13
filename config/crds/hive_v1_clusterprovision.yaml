@@ -40,21 +40,22 @@ spec:
           type: object
         spec:
           properties:
-            adminKubeconfigSecret:
-              description: AdminKubeconfigSecret references the secret containing
+            adminKubeconfigSecretRef:
+              description: AdminKubeconfigSecretRef references the secret containing
                 the admin kubeconfig for this cluster.
               type: object
-            adminPasswordSecret:
-              description: AdminPasswordSecret references the secret containing the
-                admin username/password which can be used to login to this cluster.
+            adminPasswordSecretRef:
+              description: AdminPasswordSecretRef references the secret containing
+                the admin username/password which can be used to login to this cluster.
               type: object
             attempt:
               description: Attempt is which attempt number of the cluster deployment
                 that this ClusterProvision is
               format: int64
               type: integer
-            clusterDeployment:
-              description: ClusterDeployment references the cluster deployment provisioned.
+            clusterDeploymentRef:
+              description: ClusterDeploymentRef references the cluster deployment
+                provisioned.
               type: object
             clusterID:
               description: ClusterID is a globally unique identifier for this cluster
@@ -120,7 +121,8 @@ spec:
                     type: string
                 type: object
               type: array
-            job:
+            jobRef:
+              description: JobRef is the reference to the job performing the provision.
               type: object
           type: object
   version: v1

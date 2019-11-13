@@ -197,7 +197,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) error {
 	additionalCA := &bytes.Buffer{}
-	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthorities {
+	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
 		caSecret := &corev1.Secret{}
 		err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.HiveNamespace, Name: clientCARef.Name}, caSecret)
 		if err != nil {
@@ -271,14 +271,14 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 }
 
 func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) {
-	if instance.Spec.GlobalPullSecret == nil || instance.Spec.GlobalPullSecret.Name == "" {
+	if instance.Spec.GlobalPullSecretRef == nil || instance.Spec.GlobalPullSecretRef.Name == "" {
 		hLog.Debug("GlobalPullSecret is not provided in HiveConfig, it will not be deployed")
 		return
 	}
 
 	globalPullSecretEnvVar := corev1.EnvVar{
 		Name:  hiveconstants.GlobalPullSecret,
-		Value: instance.Spec.GlobalPullSecret.Name,
+		Value: instance.Spec.GlobalPullSecretRef.Name,
 	}
 	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, globalPullSecretEnvVar)
 }

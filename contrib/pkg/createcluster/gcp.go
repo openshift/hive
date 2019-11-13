@@ -68,7 +68,7 @@ func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 	}
 	cd.Spec.Platform = hivev1.Platform{
 		GCP: &hivev1gcp.Platform{
-			CredentialsSecret: corev1.LocalObjectReference{
+			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
 			ProjectID: o.GCPProjectID,

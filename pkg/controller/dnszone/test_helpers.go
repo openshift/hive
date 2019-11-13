@@ -37,7 +37,7 @@ var (
 			Spec: hivev1.DNSZoneSpec{
 				Zone: "blah.example.com",
 				AWS: &hivev1.AWSDNSZoneSpec{
-					AccountSecret: corev1.LocalObjectReference{
+					AccountSecretRef: corev1.LocalObjectReference{
 						Name: "some secret",
 					},
 					Region: "us-east-1",

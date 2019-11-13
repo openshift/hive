@@ -125,9 +125,9 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	adminKubeconfigSecret := &corev1.Secret{}
-	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name}, adminKubeconfigSecret)
+	err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name}, adminKubeconfigSecret)
 	if err != nil {
-		cdLog.WithError(err).WithField("secret", cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name).Error("cannot read secret")
+		cdLog.WithError(err).WithField("secret", cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name).Error("cannot read secret")
 		return reconcile.Result{}, err
 	}
 	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)

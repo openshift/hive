@@ -129,7 +129,7 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 
 		hc.Spec.ExternalDNS = &hivev1.ExternalDNSConfig{
 			AWS: &hivev1.ExternalDNSAWSConfig{
-				Credentials: corev1.LocalObjectReference{Name: manageDNSCredentialsSecret},
+				CredentialsSecretRef: corev1.LocalObjectReference{Name: manageDNSCredentialsSecret},
 			},
 		}
 	}

@@ -683,7 +683,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterMetadata: &hivev1.ClusterMetadata{
-				AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			},
 			Installed: true,
 		},
@@ -1452,10 +1452,10 @@ func syncSetInstanceForSyncSet(cd *hivev1.ClusterDeployment, syncSet *hivev1.Syn
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
-			SyncSet: &corev1.LocalObjectReference{
+			SyncSetRef: &corev1.LocalObjectReference{
 				Name: syncSet.Name,
 			},
 			ResourceApplyMode: syncSet.Spec.ResourceApplyMode,
@@ -1474,10 +1474,10 @@ func syncSetInstanceForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyn
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
-			SelectorSyncSet: &hivev1.SelectorSyncSetReference{
+			SelectorSyncSetRef: &hivev1.SelectorSyncSetReference{
 				Name: selectorSyncSet.Name,
 			},
 			ResourceApplyMode: selectorSyncSet.Spec.ResourceApplyMode,

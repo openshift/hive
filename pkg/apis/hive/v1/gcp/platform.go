@@ -7,9 +7,9 @@ import (
 // Platform stores all the global configuration that all machinesets
 // use.
 type Platform struct {
-	// CredentialsSecret refers to a secret that contains the GCP account access
+	// CredentialsSecretRef refers to a secret that contains the GCP account access
 	// credentials.
-	CredentialsSecret corev1.LocalObjectReference `json:"credentialsSecret"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
 	// ProjectID is the the project that will be used for the cluster.
 	ProjectID string `json:"projectID"`

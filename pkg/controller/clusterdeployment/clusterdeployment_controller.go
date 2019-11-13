@@ -429,7 +429,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
-	if cd.Status.Provision == nil {
+	if cd.Status.ProvisionRef == nil {
 		if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
 			cdLog.Debug("not creating new provision since the deployment is set to try install only once")
 			return reconcile.Result{}, nil
@@ -513,7 +513,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			Labels:    labels,
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
 			PodSpec: *podSpec,
@@ -552,11 +552,11 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 }
 
 func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnedErr error) {
-	cdLog = cdLog.WithField("provision", cd.Status.Provision.Name)
+	cdLog = cdLog.WithField("provision", cd.Status.ProvisionRef.Name)
 	cdLog.Debug("reconciling existing provision")
 
 	provision := &hivev1.ClusterProvision{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.Provision.Name, Namespace: cd.Namespace}, provision); {
+	switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.ProvisionRef.Name, Namespace: cd.Namespace}, provision); {
 	case apierrors.IsNotFound(err):
 		cdLog.Warn("linked provision not found")
 		return r.clearOutCurrentProvision(cd, cdLog)
@@ -573,11 +573,11 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		if provision.Spec.ClusterID != nil {
 			clusterMetadata.ClusterID = *provision.Spec.ClusterID
 		}
-		if provision.Spec.AdminKubeconfigSecret != nil {
-			clusterMetadata.AdminKubeconfigSecret = *provision.Spec.AdminKubeconfigSecret
+		if provision.Spec.AdminKubeconfigSecretRef != nil {
+			clusterMetadata.AdminKubeconfigSecretRef = *provision.Spec.AdminKubeconfigSecretRef
 		}
-		if provision.Spec.AdminPasswordSecret != nil {
-			clusterMetadata.AdminPasswordSecret = *provision.Spec.AdminPasswordSecret
+		if provision.Spec.AdminPasswordSecretRef != nil {
+			clusterMetadata.AdminPasswordSecretRef = *provision.Spec.AdminPasswordSecretRef
 		}
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
@@ -665,10 +665,10 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		statusChange = true
 		cd.Status.Conditions = conds
 	}
-	if provision.Spec.AdminKubeconfigSecret != nil && (cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+	if provision.Spec.AdminKubeconfigSecretRef != nil && (cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
 		statusChange = true
 		adminKubeconfigSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: provision.Spec.AdminKubeconfigSecret.Name}, adminKubeconfigSecret); err != nil {
+		if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: provision.Spec.AdminKubeconfigSecretRef.Name}, adminKubeconfigSecret); err != nil {
 			cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
 			return reconcile.Result{}, err
 		}
@@ -725,7 +725,7 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 }
 
 func (r *ReconcileClusterDeployment) clearOutCurrentProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
-	cd.Status.Provision = nil
+	cd.Status.ProvisionRef = nil
 	cd.Status.InstallRestarts = cd.Status.InstallRestarts + 1
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not clear out current provision")
@@ -808,18 +808,18 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 }
 
 func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
-	if cd.Spec.ImageSet == nil || len(cd.Spec.ImageSet.Name) == 0 {
+	if cd.Spec.ImageSetRef == nil || len(cd.Spec.ImageSetRef.Name) == 0 {
 		return nil, nil
 	}
 	imageSet := &hivev1.ClusterImageSet{}
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSet.Name}, imageSet); err != nil {
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSetRef.Name}, imageSet); err != nil {
 		if apierrors.IsNotFound(err) {
-			cdLog.WithField("clusterimageset", cd.Spec.ImageSet.Name).Warning("clusterdeployment references non-existent clusterimageset")
+			cdLog.WithField("clusterimageset", cd.Spec.ImageSetRef.Name).Warning("clusterdeployment references non-existent clusterimageset")
 			if err := r.setImageSetNotFoundCondition(cd, false, cdLog); err != nil {
 				return nil, err
 			}
 		} else {
-			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSet.Name).Error("unexpected error retrieving clusterimageset")
+			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSetRef.Name).Error("unexpected error retrieving clusterimageset")
 		}
 		return nil, err
 	}
@@ -936,11 +936,11 @@ func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterD
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) error {
 	status := corev1.ConditionFalse
 	reason := clusterImageSetFoundReason
-	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.ImageSet.Name)
+	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.ImageSetRef.Name)
 	if isNotFound {
 		status = corev1.ConditionTrue
 		reason = clusterImageSetNotFoundReason
-		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.ImageSet.Name)
+		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.ImageSetRef.Name)
 	}
 	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
@@ -1065,9 +1065,9 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Wait for outstanding provision to be removed before creating deprovision request
-	if cd.Status.Provision != nil {
+	if cd.Status.ProvisionRef != nil {
 		provision := &hivev1.ClusterProvision{}
-		switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.Provision.Name, Namespace: cd.Namespace}, provision); {
+		switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.ProvisionRef.Name, Namespace: cd.Namespace}, provision); {
 		case apierrors.IsNotFound(err):
 			cdLog.Debug("linked provision removed")
 		case err != nil:
@@ -1292,8 +1292,8 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 			Zone:               cd.Spec.BaseDomain,
 			LinkToParentDomain: true,
 			AWS: &hivev1.AWSDNSZoneSpec{
-				AccountSecret: cd.Spec.Platform.AWS.CredentialsSecret,
-				Region:        cd.Spec.Platform.AWS.Region,
+				AccountSecretRef: cd.Spec.Platform.AWS.CredentialsSecretRef,
+				Region:           cd.Spec.Platform.AWS.Region,
 			},
 		},
 	}
@@ -1393,18 +1393,18 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDe
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovisionRequest{
-			Region:      cd.Spec.Platform.AWS.Region,
-			Credentials: &cd.Spec.Platform.AWS.CredentialsSecret,
+			Region:               cd.Spec.Platform.AWS.Region,
+			CredentialsSecretRef: &cd.Spec.Platform.AWS.CredentialsSecretRef,
 		}
 	case cd.Spec.Platform.Azure != nil:
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovisionRequest{
-			Credentials: &cd.Spec.Platform.Azure.CredentialsSecret,
+			CredentialsSecretRef: &cd.Spec.Platform.Azure.CredentialsSecretRef,
 		}
 	case cd.Spec.Platform.GCP != nil:
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovisionRequest{
-			Region:      cd.Spec.Platform.GCP.Region,
-			ProjectID:   cd.Spec.Platform.GCP.ProjectID,
-			Credentials: &cd.Spec.Platform.GCP.CredentialsSecret,
+			Region:               cd.Spec.Platform.GCP.Region,
+			ProjectID:            cd.Spec.Platform.GCP.ProjectID,
+			CredentialsSecretRef: &cd.Spec.Platform.GCP.CredentialsSecretRef,
 		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
@@ -1471,8 +1471,8 @@ func (r *ReconcileClusterDeployment) mergePullSecrets(cd *hivev1.ClusterDeployme
 	var err error
 
 	// For code readability let's call the pull secret in cluster deployment config as local pull secret
-	if cd.Spec.PullSecret != nil {
-		localPullSecret, err = controllerutils.LoadSecretData(r.Client, cd.Spec.PullSecret.Name, cd.Namespace, corev1.DockerConfigJsonKey)
+	if cd.Spec.PullSecretRef != nil {
+		localPullSecret, err = controllerutils.LoadSecretData(r.Client, cd.Spec.PullSecretRef.Name, cd.Namespace, corev1.DockerConfigJsonKey)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				return "", err
@@ -1612,7 +1612,7 @@ func (r *ReconcileClusterDeployment) getFirstProvision(cd *hivev1.ClusterDeploym
 
 func (r *ReconcileClusterDeployment) adoptProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) error {
 	pLog := cdLog.WithField("provision", provision.Name)
-	cd.Status.Provision = &corev1.LocalObjectReference{Name: provision.Name}
+	cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: provision.Name}
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
 		pLog.WithError(err).Log(controllerutils.LogLevel(err), "could not adopt provision")
 		return err
@@ -1651,7 +1651,7 @@ func (r *ReconcileClusterDeployment) getAllSyncSetInstances(cd *hivev1.ClusterDe
 
 	syncSetInstances := []*hivev1.SyncSetInstance{}
 	for i, syncSetInstance := range list.Items {
-		if syncSetInstance.Spec.ClusterDeployment.Name == cd.Name {
+		if syncSetInstance.Spec.ClusterDeploymentRef.Name == cd.Name {
 			syncSetInstances = append(syncSetInstances, &list.Items[i])
 		}
 	}

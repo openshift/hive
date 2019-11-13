@@ -127,8 +127,8 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	// where we must give up and remove the finalizer. A followup fix should prevent this problem from
 	// happening but we need to cleanup stuck DNSZones regardless.
 	if desiredState.DeletionTimestamp != nil && controllerutils.HasFinalizer(desiredState, hivev1.FinalizerDNSZone) {
-		if desiredState.Spec.AWS != nil && desiredState.Spec.AWS.AccountSecret.Name != "" {
-			secretName := desiredState.Spec.AWS.AccountSecret.Name
+		if desiredState.Spec.AWS != nil && desiredState.Spec.AWS.AccountSecretRef.Name != "" {
+			secretName := desiredState.Spec.AWS.AccountSecretRef.Name
 			secret := &corev1.Secret{}
 			err := r.Client.Get(context.TODO(),
 				types.NamespacedName{
@@ -242,7 +242,7 @@ func (r *ReconcileDNSZone) getAWSClient(dnsZone *hivev1.DNSZone, dnsLog log.Fiel
 	var secretName, regionName string
 
 	if dnsZone != nil && dnsZone.Spec.AWS != nil {
-		secretName = dnsZone.Spec.AWS.AccountSecret.Name
+		secretName = dnsZone.Spec.AWS.AccountSecretRef.Name
 		regionName = dnsZone.Spec.AWS.Region
 	}
 

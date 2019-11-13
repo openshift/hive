@@ -225,7 +225,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
-	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name) == 0 {
+	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name) == 0 {
 		ssiLog.Debug("admin kubeconfig secret name is not set on clusterdeployment")
 		return reconcile.Result{}, nil
 	}
@@ -274,7 +274,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 
 func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInstance, ssiLog log.FieldLogger) (*hivev1.ClusterDeployment, error) {
 	cd := &hivev1.ClusterDeployment{}
-	cdName := types.NamespacedName{Namespace: ssi.Namespace, Name: ssi.Spec.ClusterDeployment.Name}
+	cdName := types.NamespacedName{Namespace: ssi.Namespace, Name: ssi.Spec.ClusterDeploymentRef.Name}
 	ssiLog = ssiLog.WithField("clusterdeployment", cdName)
 	err := r.Get(context.TODO(), cdName, cd)
 	if err != nil {
@@ -285,11 +285,11 @@ func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInsta
 }
 
 func (r *ReconcileSyncSetInstance) getKubeconfigSecret(cd *hivev1.ClusterDeployment, ssiLog log.FieldLogger) (*corev1.Secret, error) {
-	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name) == 0 {
+	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name) == 0 {
 		return nil, fmt.Errorf("no kubeconfigconfig secret is set on clusterdeployment")
 	}
 	secret := &corev1.Secret{}
-	secretName := types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}
+	secretName := types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, Namespace: cd.Namespace}
 	err := r.Get(context.TODO(), secretName, secret)
 	if err != nil {
 		ssiLog.WithError(err).WithField("secret", secretName).Error("unable to load admin kubeconfig secret")
@@ -460,9 +460,9 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetSecretReferences(ssi *hivev1.Syn
 // getSyncSetCommonSpec returns the common spec of the associated syncset or selectorsyncset. It returns a boolean indicating
 // whether the source object (syncset or selectorsyncset) has been deleted or is in the process of being deleted.
 func (r *ReconcileSyncSetInstance) getSyncSetCommonSpec(ssi *hivev1.SyncSetInstance, ssiLog log.FieldLogger) (*hivev1.SyncSetCommonSpec, bool, error) {
-	if ssi.Spec.SyncSet != nil {
+	if ssi.Spec.SyncSetRef != nil {
 		syncSet := &hivev1.SyncSet{}
-		syncSetName := types.NamespacedName{Namespace: ssi.Namespace, Name: ssi.Spec.SyncSet.Name}
+		syncSetName := types.NamespacedName{Namespace: ssi.Namespace, Name: ssi.Spec.SyncSetRef.Name}
 		err := r.Get(context.TODO(), syncSetName, syncSet)
 		if errors.IsNotFound(err) || !syncSet.DeletionTimestamp.IsZero() {
 			ssiLog.WithError(err).WithField("syncset", syncSetName).Warning("syncset is being deleted")
@@ -473,9 +473,9 @@ func (r *ReconcileSyncSetInstance) getSyncSetCommonSpec(ssi *hivev1.SyncSetInsta
 			return nil, false, err
 		}
 		return &syncSet.Spec.SyncSetCommonSpec, false, nil
-	} else if ssi.Spec.SelectorSyncSet != nil {
+	} else if ssi.Spec.SelectorSyncSetRef != nil {
 		selectorSyncSet := &hivev1.SelectorSyncSet{}
-		selectorSyncSetName := types.NamespacedName{Name: ssi.Spec.SelectorSyncSet.Name}
+		selectorSyncSetName := types.NamespacedName{Name: ssi.Spec.SelectorSyncSetRef.Name}
 		err := r.Get(context.TODO(), selectorSyncSetName, selectorSyncSet)
 		if errors.IsNotFound(err) || !selectorSyncSet.DeletionTimestamp.IsZero() {
 			ssiLog.WithField("selectorsyncset", selectorSyncSetName).Warning("selectorsyncset is being deleted")

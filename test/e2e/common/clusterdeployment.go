@@ -36,7 +36,7 @@ func MustGetClusterDeployment() *hivev1.ClusterDeployment {
 
 func MustGetInstalledClusterDeployment() *hivev1.ClusterDeployment {
 	cd := MustGetClusterDeployment()
-	if !cd.Spec.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if !cd.Spec.Installed || len(cd.Status.AdminKubeconfigSecretRef.Name) == 0 {
 		log.WithField("clusterdeployment", fmt.Sprintf("%s/%s", cd.Namespace, cd.Name)).Fatalf("cluster deployment is not installed")
 	}
 	return cd
@@ -46,7 +46,7 @@ func MustGetClusterDeploymentClientConfig() *rest.Config {
 	cd := MustGetInstalledClusterDeployment()
 	c := MustGetClient()
 	adminKubeconfigSecret := &corev1.Secret{}
-	err := c.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
+	err := c.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecretRef.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
 	if err != nil {
 		log.WithError(err).Fatal("unable to fetch admin kubeconfig secret")
 		return nil

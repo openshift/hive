@@ -582,7 +582,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
 			cdLog.Infof("Saving infra ID %q for cluster", cd.Spec.ClusterMetadata.InfraID)
-			err := r.Status().Update(context.TODO(), cd)
+			err := r.Update(context.TODO(), cd)
 			if err != nil {
 				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterdeployment status with infra ID")
 			}

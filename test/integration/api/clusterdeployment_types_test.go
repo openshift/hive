@@ -17,9 +17,6 @@ func TestStorageClusterDeployment(t *testing.T) {
 	created := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
 		Spec: hivev1.ClusterDeploymentSpec{
-			ControlPlane: hivev1.MachinePool{
-				Replicas: &replicas,
-			},
 			Compute: []hivev1.MachinePool{
 				{
 					Replicas: &replicas,

@@ -230,7 +230,7 @@ func validateClusterProvisionUpdate(old, new *hivev1.ClusterProvision) field.Err
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, validateClusterProvisionSpecInvariants(&new.Spec, specPath)...)
-	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.ClusterDeploymentRef.Name, old.Spec.ClusterDeploymentRef.Name, specPath.Child("clusterDeployment", "name"))...)
+	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.ClusterDeploymentRef.Name, old.Spec.ClusterDeploymentRef.Name, specPath.Child("clusterDeploymentRef", "name"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.PodSpec, old.Spec.PodSpec, specPath.Child("podSpec"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Attempt, old.Spec.Attempt, specPath.Child("attempt"))...)
 	if old.Spec.Stage != new.Spec.Stage {
@@ -265,7 +265,7 @@ func validateClusterProvisionUpdate(old, new *hivev1.ClusterProvision) field.Err
 func validateClusterProvisionSpecInvariants(spec *hivev1.ClusterProvisionSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if spec.ClusterDeploymentRef.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("clusterDeployment", "name"), "must have reference to clusterdeployment"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("clusterDeploymentRef", "name"), "must have reference to clusterdeployment"))
 	}
 	if spec.Attempt < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("attempt"), spec.Attempt, "attempt number must not be negative"))
@@ -294,10 +294,10 @@ func validateClusterProvisionSpecInvariants(spec *hivev1.ClusterProvisionSpec, f
 	}
 	if spec.Stage == hivev1.ClusterProvisionStageComplete {
 		if spec.AdminKubeconfigSecretRef == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("adminKubeConfigSecret"), fmt.Sprintf("admin kubeconfig secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
+			allErrs = append(allErrs, field.Required(fldPath.Child("adminKubeConfigSecretRef"), fmt.Sprintf("admin kubeconfig secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
 		}
 		if spec.AdminPasswordSecretRef == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("adminPasswordSecret"), fmt.Sprintf("admin password secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
+			allErrs = append(allErrs, field.Required(fldPath.Child("adminPasswordSecretRef"), fmt.Sprintf("admin password secret must be set for %s cluster", hivev1.ClusterProvisionStageComplete)))
 		}
 	}
 	if spec.ClusterID != nil && *spec.ClusterID == "" {

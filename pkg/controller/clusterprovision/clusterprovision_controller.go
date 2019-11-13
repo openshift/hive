@@ -363,7 +363,7 @@ func (r *ReconcileClusterProvision) setCondition(
 		message,
 		controllerutils.UpdateConditionAlways,
 	)
-	if err := r.Update(context.TODO(), instance); err != nil {
+	if err := r.Status().Update(context.TODO(), instance); err != nil {
 		pLog.WithError(err).Error("cannot update status conditions")
 		return err
 	}

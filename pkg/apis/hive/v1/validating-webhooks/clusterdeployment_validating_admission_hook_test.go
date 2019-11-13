@@ -63,6 +63,11 @@ func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 					Region: "test-region",
 				},
 			},
+			Provisioning: &hivev1.Provisioning{
+				InstallConfigSecretRef: corev1.LocalObjectReference{
+					Name: "test-install-config",
+				},
+			},
 		},
 	}
 }
@@ -82,6 +87,11 @@ func validAzureClusterDeployment() *hivev1.ClusterDeployment {
 					CredentialsSecretRef:        corev1.LocalObjectReference{Name: "fake-creds-secret"},
 					Region:                      "test-region",
 					BaseDomainResourceGroupName: "os4-common",
+				},
+			},
+			Provisioning: &hivev1.Provisioning{
+				InstallConfigSecretRef: corev1.LocalObjectReference{
+					Name: "test-install-config",
 				},
 			},
 		},
@@ -611,6 +621,26 @@ func TestClusterDeploymentValidate(t *testing.T) {
 						Name: "test-serving-cert",
 					},
 				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "InstallConfig is missing",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning.InstallConfigSecretRef.Name = ""
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Provisioning is missing",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning = nil
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

@@ -69,22 +69,8 @@ func InstallerPodSpec(
 			Name:  "OPENSHIFT_INSTALL_INVOKER",
 			Value: "hive",
 		},
-		// ok when the private key isn't in the secret, as the installmanager
-		// will just gracefully handle the file not being present
-		{
-			Name:  "SSH_PRIV_KEY_PATH",
-			Value: SSHPrivateKeyFilePath,
-		},
 	}
 	volumes := []corev1.Volume{
-		{
-			Name: "sshkeys",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.SSHKey.Name,
-				},
-			},
-		},
 		{
 			Name: "output",
 			VolumeSource: corev1.VolumeSource{
@@ -102,10 +88,6 @@ func InstallerPodSpec(
 	}
 	volumeMounts := []corev1.VolumeMount{
 		{
-			Name:      "sshkeys",
-			MountPath: SSHPrivateKeyDir,
-		},
-		{
 			Name:      "output",
 			MountPath: "/output",
 		},
@@ -116,68 +98,62 @@ func InstallerPodSpec(
 	}
 
 	switch {
-	case cd.Spec.PlatformSecrets.AWS != nil:
-		if len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
-			env = append(
-				env,
-				corev1.EnvVar{
-					Name: "AWS_ACCESS_KEY_ID",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-							Key:                  "aws_access_key_id",
-						},
+	case cd.Spec.Platform.AWS != nil:
+		env = append(
+			env,
+			corev1.EnvVar{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecret,
+						Key:                  "aws_access_key_id",
 					},
 				},
-				corev1.EnvVar{
-					Name: "AWS_SECRET_ACCESS_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-							Key:                  "aws_secret_access_key",
-						},
+			},
+			corev1.EnvVar{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecret,
+						Key:                  "aws_secret_access_key",
 					},
 				},
-			)
-		}
-	case cd.Spec.PlatformSecrets.Azure != nil:
-		if len(cd.Spec.PlatformSecrets.Azure.Credentials.Name) > 0 {
-			volumes = append(volumes, corev1.Volume{
-				Name: "azure",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.PlatformSecrets.Azure.Credentials.Name,
-					},
+			},
+		)
+	case cd.Spec.Platform.Azure != nil:
+		volumes = append(volumes, corev1.Volume{
+			Name: "azure",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.Azure.CredentialsSecret.Name,
 				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "azure",
-				MountPath: azureAuthDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  "AZURE_AUTH_LOCATION",
-				Value: azureAuthFile,
-			})
-		}
-	case cd.Spec.PlatformSecrets.GCP != nil:
-		if len(cd.Spec.PlatformSecrets.GCP.Credentials.Name) > 0 {
-			volumes = append(volumes, corev1.Volume{
-				Name: "gcp",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.PlatformSecrets.GCP.Credentials.Name,
-					},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "azure",
+			MountPath: azureAuthDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "AZURE_AUTH_LOCATION",
+			Value: azureAuthFile,
+		})
+	case cd.Spec.Platform.GCP != nil:
+		volumes = append(volumes, corev1.Volume{
+			Name: "gcp",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.GCP.CredentialsSecret.Name,
 				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "gcp",
-				MountPath: gcpAuthDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  "GOOGLE_CREDENTIALS",
-				Value: gcpAuthFile,
-			})
-		}
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "gcp",
+			MountPath: gcpAuthDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "GOOGLE_CREDENTIALS",
+			Value: gcpAuthFile,
+		})
 	}
 
 	if releaseImage != "" {
@@ -228,6 +204,24 @@ func InstallerPodSpec(
 			Name:      "logs",
 			MountPath: "/logs",
 		})
+		if cd.Spec.Provisioning.SSHPrivateKeySecret != nil {
+			volumes = append(volumes, corev1.Volume{
+				Name: "sshkeys",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.Provisioning.SSHPrivateKeySecret.Name,
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "sshkeys",
+				MountPath: SSHPrivateKeyDir,
+			})
+			env = append(env, corev1.EnvVar{
+				Name:  "SSH_PRIV_KEY_PATH",
+				Value: SSHPrivateKeyFilePath,
+			})
+		}
 	} else {
 		env = append(env, corev1.EnvVar{
 			Name:  constants.SkipGatherLogsEnvVar,

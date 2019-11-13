@@ -579,21 +579,14 @@ func testClusterDeployment(computePools []hivev1.MachinePool) *hivev1.ClusterDep
 			UID:        types.UID("1234"),
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			SSHKey: corev1.LocalObjectReference{
-				Name: sshKeySecret,
-			},
 			ClusterName: testName,
 			Compute:     computePools,
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
-					Region: "us-east-1",
-				},
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
+					CredentialsSecret: corev1.LocalObjectReference{
 						Name: "aws-credentials",
 					},
+					Region: "us-east-1",
 				},
 			},
 			ClusterMetadata: &hivev1.ClusterMetadata{

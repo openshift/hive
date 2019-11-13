@@ -521,9 +521,9 @@ func testClusterDeploymentWithoutIngress() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
+			Platform: hivev1.Platform{
+				AWS: &hivev1aws.Platform{
+					CredentialsSecret: corev1.LocalObjectReference{
 						Name: "aws-credentials",
 					},
 				},
@@ -546,7 +546,7 @@ func testSecretsForClusterDeployment(cd *hivev1.ClusterDeployment) []corev1.Secr
 func testSecretForCertificateBundle(cb hivev1.CertificateBundleSpec) corev1.Secret {
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cb.SecretRef.Name,
+			Name:      cb.CertificateSecret.Name,
 			Namespace: testNamespace,
 		},
 		TypeMeta: metav1.TypeMeta{
@@ -570,7 +570,7 @@ func addCertificateBundlesForIngressList(cd *hivev1.ClusterDeployment) []hivev1.
 		}
 		cb := hivev1.CertificateBundleSpec{
 			Name: ingress.ServingCertificate,
-			SecretRef: corev1.LocalObjectReference{
+			CertificateSecret: corev1.LocalObjectReference{
 				Name: fmt.Sprintf("%s-secret", ingress.ServingCertificate),
 			},
 		}

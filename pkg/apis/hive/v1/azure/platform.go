@@ -9,6 +9,10 @@ import (
 // Platform stores all the global configuration that all machinesets
 // use.
 type Platform struct {
+	// CredentialsSecret refers to a secret that contains the Azure account access
+	// credentials.
+	CredentialsSecret corev1.LocalObjectReference `json:"credentialsSecret"`
+
 	// Region specifies the Azure region where the cluster will be created.
 	Region string `json:"region"`
 
@@ -26,11 +30,4 @@ func (p *Platform) SetBaseDomain(baseDomainID string) error {
 	parts := strings.Split(baseDomainID, "/")
 	p.BaseDomainResourceGroupName = parts[4]
 	return nil
-}
-
-// PlatformSecrets contains secrets for clusters on the Azure platform.
-type PlatformSecrets struct {
-	// Credentials refers to a secret that contains the Azure account access
-	// credentials.
-	Credentials corev1.LocalObjectReference `json:"credentials"`
 }

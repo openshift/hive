@@ -1233,7 +1233,7 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.DNSZone, error) {
 	// for now we only support AWS
-	if cd.Spec.AWS == nil || cd.Spec.PlatformSecrets.AWS == nil {
+	if cd.Spec.Platform.AWS == nil {
 		cdLog.Error("cluster deployment platform is not AWS, cannot manage DNS zone")
 		if err := r.setDNSNotReadyCondition(cd, false, "Managed DNS is only supported on AWS", cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
@@ -1292,13 +1292,13 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 			Zone:               cd.Spec.BaseDomain,
 			LinkToParentDomain: true,
 			AWS: &hivev1.AWSDNSZoneSpec{
-				AccountSecret: cd.Spec.PlatformSecrets.AWS.Credentials,
-				Region:        cd.Spec.AWS.Region,
+				AccountSecret: cd.Spec.Platform.AWS.CredentialsSecret,
+				Region:        cd.Spec.Platform.AWS.Region,
 			},
 		},
 	}
 
-	for k, v := range cd.Spec.AWS.UserTags {
+	for k, v := range cd.Spec.Platform.AWS.UserTags {
 		dnsZone.Spec.AWS.AdditionalTags = append(dnsZone.Spec.AWS.AdditionalTags, hivev1.AWSResourceTag{Key: k, Value: v})
 	}
 
@@ -1392,28 +1392,19 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDe
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		if cd.Spec.PlatformSecrets.AWS == nil {
-			return nil, errors.New("missing AWS platform secrets")
-		}
 		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovisionRequest{
 			Region:      cd.Spec.Platform.AWS.Region,
-			Credentials: &cd.Spec.PlatformSecrets.AWS.Credentials,
+			Credentials: &cd.Spec.Platform.AWS.CredentialsSecret,
 		}
 	case cd.Spec.Platform.Azure != nil:
-		if cd.Spec.PlatformSecrets.Azure == nil {
-			return nil, errors.New("missing Azure platform secrets")
-		}
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovisionRequest{
-			Credentials: &cd.Spec.PlatformSecrets.Azure.Credentials,
+			Credentials: &cd.Spec.Platform.Azure.CredentialsSecret,
 		}
 	case cd.Spec.Platform.GCP != nil:
-		if cd.Spec.PlatformSecrets.GCP == nil {
-			return nil, errors.New("missing GCP platform secrets")
-		}
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovisionRequest{
 			Region:      cd.Spec.Platform.GCP.Region,
 			ProjectID:   cd.Spec.Platform.GCP.ProjectID,
-			Credentials: &cd.Spec.PlatformSecrets.GCP.Credentials,
+			Credentials: &cd.Spec.Platform.GCP.CredentialsSecret,
 		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")

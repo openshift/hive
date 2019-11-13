@@ -18,6 +18,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -28,6 +29,22 @@ var validTestManagedDomains = []string{
 	"ccc.com",
 }
 
+func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
+		Spec: hivev1.ClusterDeploymentSpec{
+			BaseDomain:  "example.com",
+			ClusterName: "SameClusterName",
+			Compute: []hivev1.MachinePool{
+				{
+					Name: "SameMachinePoolName",
+				},
+			},
+			SSHKey: corev1.LocalObjectReference{
+				Name: "test-sshkey",
+			},
+		},
+	}
+}
 func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
 	cd := validAWSClusterDeployment()
 	cd.Spec.Ingress = []hivev1.ClusterIngress{
@@ -46,57 +63,77 @@ func clusterDeploymentWithManagedDomain(domain string) *hivev1.ClusterDeployment
 	return cd
 }
 
-func validAWSClusterDeployment() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			BaseDomain:  "example.com",
-			ClusterName: "SameClusterName",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
-			SSHKey: corev1.LocalObjectReference{
-				Name: "test-sshkey",
-			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1aws.Platform{
-					Region: "test-region",
-				},
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{},
+func validGCPClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.ControlPlane = hivev1.MachinePool{
+		Name: "master",
+		Platform: hivev1.MachinePoolPlatform{
+			GCP: &hivev1gcp.MachinePool{
+				InstanceType: "n1-standard",
 			},
 		},
 	}
+	cd.Spec.Compute = []hivev1.MachinePool{
+		{
+			Name: "SameMachinePoolName",
+			Platform: hivev1.MachinePoolPlatform{
+				GCP: &hivev1gcp.MachinePool{
+					InstanceType: "n1-standard",
+				},
+			},
+		},
+	}
+	cd.Spec.Platform = hivev1.Platform{
+		GCP: &hivev1gcp.Platform{
+			ProjectID: "my-test-project",
+			Region:    "us-central1",
+		},
+	}
+
+	cd.Spec.PlatformSecrets = hivev1.PlatformSecrets{
+		GCP: &hivev1gcp.PlatformSecrets{},
+	}
+
+	return cd
+}
+
+func validAWSClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Compute = []hivev1.MachinePool{
+		{
+			Name: "SameMachinePoolName",
+		},
+	}
+	cd.Spec.Platform = hivev1.Platform{
+		AWS: &hivev1aws.Platform{
+			Region: "test-region",
+		},
+	}
+	cd.Spec.PlatformSecrets = hivev1.PlatformSecrets{
+		AWS: &hivev1aws.PlatformSecrets{},
+	}
+	return cd
 }
 
 func validAzureClusterDeployment() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			BaseDomain:  "azure.example.com",
-			ClusterName: "AzureCluster",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
-			SSHKey: corev1.LocalObjectReference{
-				Name: "test-sshkey",
-			},
-			Platform: hivev1.Platform{
-				Azure: &hivev1azure.Platform{
-					Region:                      "test-region",
-					BaseDomainResourceGroupName: "os4-common",
-				},
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				Azure: &hivev1azure.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{Name: "fake-creds-secret"},
-				},
-			},
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Compute = []hivev1.MachinePool{
+		{
+			Name: "SameMachinePoolName",
 		},
 	}
+	cd.Spec.Platform = hivev1.Platform{
+		Azure: &hivev1azure.Platform{
+			Region:                      "test-region",
+			BaseDomainResourceGroupName: "os4-common",
+		},
+	}
+	cd.Spec.PlatformSecrets = hivev1.PlatformSecrets{
+		Azure: &hivev1azure.PlatformSecrets{
+			Credentials: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		},
+	}
+	return cd
 }
 
 // Meant to be used to compare new and old as the same values.
@@ -496,6 +533,27 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
+		// TODO: ensure Azure clusterDeployments have necessary info for
+		// machine sets
+		// {
+		// 	name: "not setting instance type on Azure machine pool",
+		// 	newObject: func() *hivev1.ClusterDeployment {
+		// 		cd := validAzureClusterDeployment()
+		// 		cd.Spec.Compute = []hivev1.MachinePool{
+		// 			{
+		// 				Name: "testmachinepool",
+		// 				Platform: hivev1.MachinePoolPlatform{
+		// 					Azure: &hivev1azure.MachinePool{
+		// 						InstanceType: "",
+		// 					},
+		// 				},
+		// 			},
+		// 		}
+		// 		return cd
+		// 	}(),
+		// 	operation:       admissionv1beta1.Create,
+		// 	expectedAllowed: false,
+		// },
 		{
 			name: "create with two cloud platforms",
 			newObject: func() *hivev1.ClusterDeployment {
@@ -590,6 +648,94 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		// TODO: ensure AWS clusterDeployments provide necessary info
+		// for machinesets
+		// {
+		// 	name: "not setting instance type on AWS machine pool",
+		// 	newObject: func() *hivev1.ClusterDeployment {
+		// 		cd := validAWSClusterDeployment()
+		// 		cd.Spec.Compute = []hivev1.MachinePool{
+		// 			{
+		// 				Name: "testmachinepool",
+		// 				Platform: hivev1.MachinePoolPlatform{
+		// 					AWS: &hivev1aws.MachinePoolPlatform{
+		// 						InstanceType: "",
+		// 					},
+		// 				},
+		// 			},
+		// 		}
+		// 		return cd
+		// 	}(),
+		// 	operation:       admissionv1beta1.Create,
+		// 	expectedAllowed: false,
+		// },
+		{
+			name:            "valid GCP clusterdeployment",
+			newObject:       validGCPClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "GCP clusterdeployment with empty controlplane",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.ControlPlane = hivev1.MachinePool{}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "GCP clusterdeployment with empty controlplane machinepool platform",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.ControlPlane = hivev1.MachinePool{
+					Name: "master",
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "not setting instance type on GCP machine pool platform",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Compute = []hivev1.MachinePool{
+					{
+						Name: "badmachinepool",
+						Platform: hivev1.MachinePoolPlatform{
+							GCP: &hivev1gcp.MachinePool{
+								InstanceType: "",
+							},
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "update from valid to invalid machine pool",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Compute = []hivev1.MachinePool{
+					{
+						Name: "badmachinepool",
+						Platform: hivev1.MachinePoolPlatform{
+							GCP: &hivev1gcp.MachinePool{
+								InstanceType: "",
+							},
+						},
+					},
+				}
+				return cd
+			}(),
+			oldObject:       validGCPClusterDeployment(),
+			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
 	}

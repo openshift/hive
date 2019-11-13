@@ -1667,7 +1667,7 @@ spec:
   - JSONPath: .spec.installed
     name: Installed
     type: boolean
-  - JSONPath: .status.infraID
+  - JSONPath: .spec.clusterMetadata.infraID
     name: InfraID
     type: string
   - JSONPath: .metadata.creationTimestamp
@@ -2340,14 +2340,6 @@ spec:
                     type: string
                 type: object
               type: array
-            federated:
-              description: Federated is true if the cluster deployment has been federated
-                with the host cluster.
-              type: boolean
-            federatedClusterRef:
-              description: FederatedClusterRef is the reference to the federated cluster
-                resource associated with this ClusterDeployment.
-              type: object
             installRestarts:
               description: InstallRestarts is the total count of container restarts
                 on the clusters install job.

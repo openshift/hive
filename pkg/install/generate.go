@@ -190,6 +190,29 @@ func InstallerPodSpec(
 		)
 	}
 
+	if cd.Spec.Provisioning.ManifestsConfigMap != nil {
+		volumes = append(
+			volumes,
+			corev1.Volume{
+				Name: "manifests",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: cd.Spec.Provisioning.ManifestsConfigMap.Name,
+						},
+					},
+				},
+			},
+		)
+		volumeMounts = append(
+			volumeMounts,
+			corev1.VolumeMount{
+				Name:      "manifests",
+				MountPath: "/manifests",
+			},
+		)
+	}
+
 	if !skipGatherLogs {
 		// Add a volume where we will store full logs from both the installer, and the
 		// cluster itself (assuming we made it far enough).

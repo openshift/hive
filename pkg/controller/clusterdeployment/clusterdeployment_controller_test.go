@@ -1600,9 +1600,9 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existingCD...)
 			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
-				logger: log.WithField("controller", "clusterDeployment"),
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 
@@ -1766,9 +1766,9 @@ func TestMergePullSecrets(t *testing.T) {
 			}
 			fakeClient := fake.NewFakeClient(test.existingObjs...)
 			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
-				logger: log.WithField("controller", "clusterDeployment"),
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
 			}
 

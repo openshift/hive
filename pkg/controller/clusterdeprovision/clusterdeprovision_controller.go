@@ -1,4 +1,4 @@
-package clusterdeprovisionrequest
+package clusterdeprovision
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	controllerName    = "clusterDeprovisionRequest"
+	controllerName    = "clusterDeprovision"
 	jobHashAnnotation = "hive.openshift.io/jobhash"
 )
 
@@ -47,7 +47,7 @@ func init() {
 	metrics.Registry.MustRegister(metricUninstallJobDuration)
 }
 
-// Add creates a new ClusterDeprovisionRequest Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// Add creates a new ClusterDeprovision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -55,29 +55,29 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterDeprovisionRequest{Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName), scheme: mgr.GetScheme()}
+	return &ReconcileClusterDeprovision{Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("clusterdeprovisionrequest-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("clusterdeprovision-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error getting new clusterdeprovisionrequest-controller")
+		log.WithField("controller", controllerName).WithError(err).Error("Error getting new clusterdeprovision-controller")
 		return err
 	}
 
-	// Watch for changes to ClusterDeprovisionRequest
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovisionRequest{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to ClusterDeprovision
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching changes to clusterdeprovisionrequest")
+		log.WithField("controller", controllerName).WithError(err).Error("Error watching changes to clusterdeprovision")
 		return err
 	}
 
-	// Watch for uninstall jobs created for ClusterDeprovisionRequests
+	// Watch for uninstall jobs created for ClusterDeprovisions
 	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &hivev1.ClusterDeprovisionRequest{},
+		OwnerType:    &hivev1.ClusterDeprovision{},
 	})
 	if err != nil {
 		log.WithField("controller", controllerName).WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
@@ -87,17 +87,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileClusterDeprovisionRequest{}
+var _ reconcile.Reconciler = &ReconcileClusterDeprovision{}
 
-// ReconcileClusterDeprovisionRequest reconciles a ClusterDeprovisionRequest object
-type ReconcileClusterDeprovisionRequest struct {
+// ReconcileClusterDeprovision reconciles a ClusterDeprovision object
+type ReconcileClusterDeprovision struct {
 	client.Client
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a ClusterDeprovisionRequest object and makes changes based on the state read
-// and what is in the ClusterDeprovisionRequest.Spec
-func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+// Reconcile reads that state of the cluster for a ClusterDeprovision object and makes changes based on the state read
+// and what is in the ClusterDeprovision.Spec
+func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	rLog := log.WithFields(log.Fields{
 		"name":       request.NamespacedName.String(),
@@ -110,34 +110,34 @@ func (r *ReconcileClusterDeprovisionRequest) Reconcile(request reconcile.Request
 		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 		rLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
-	// Fetch the ClusterDeprovisionRequest instance
-	instance := &hivev1.ClusterDeprovisionRequest{}
+	// Fetch the ClusterDeprovision instance
+	instance := &hivev1.ClusterDeprovision{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
-			rLog.Debug("clusterdeprovisionrequest not found, skipping")
+			rLog.Debug("clusterdeprovision not found, skipping")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		rLog.WithError(err).Error("cannot get clusterdeprovisionrequest")
+		rLog.WithError(err).Error("cannot get clusterdeprovision")
 		return reconcile.Result{}, err
 	}
 
 	if !instance.DeletionTimestamp.IsZero() {
-		rLog.Debug("clusterdeprovisionrequest being deleted, skipping")
+		rLog.Debug("clusterdeprovision being deleted, skipping")
 		return reconcile.Result{}, nil
 	}
 
 	if instance.Status.Completed {
-		rLog.Debug("clusterdeprovisionrequest is complete, skipping")
+		rLog.Debug("clusterdeprovision is complete, skipping")
 		return reconcile.Result{}, nil
 	}
 
 	// Generate an uninstall job
 	rLog.Debug("generating uninstall job")
-	uninstallJob, err := install.GenerateUninstallerJobForDeprovisionRequest(instance)
+	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

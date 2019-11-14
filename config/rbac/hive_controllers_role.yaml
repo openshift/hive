@@ -100,8 +100,8 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
-  - clusterdeprovisionrequests
-  - clusterdeprovisionrequests/finalizers
+  - clusterdeprovisions
+  - clusterdeprovisions/finalizers
   verbs:
   - get
   - list
@@ -113,7 +113,7 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
-  - clusterdeprovisionrequests/status
+  - clusterdeprovisions/status
   verbs:
   - get
   - update

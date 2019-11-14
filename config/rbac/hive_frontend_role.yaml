@@ -49,7 +49,7 @@ rules:
   - syncidentityproviders
   - selectorsyncsets
   - syncsets
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   verbs:
   - get

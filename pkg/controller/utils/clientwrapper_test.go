@@ -55,8 +55,8 @@ func TestPathParse(t *testing.T) {
 		},
 		{
 			name:     "hive namespaced crd create",
-			path:     "/apis/hive.openshift.io/v1/namespaces/hive/clusterdeprovisionrequests",
-			expected: "hive.openshift.io/v1/clusterdeprovisionrequests",
+			path:     "/apis/hive.openshift.io/v1/namespaces/hive/clusterdeprovisions",
+			expected: "hive.openshift.io/v1/clusterdeprovisions",
 		},
 		{
 			name:     "hive namespaced crd update",

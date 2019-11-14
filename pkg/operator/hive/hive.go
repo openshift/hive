@@ -124,7 +124,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
 		// the latest in the operator to ensure updates roll out.
 		"config/crds/hive_v1_clusterdeployment.yaml",
-		"config/crds/hive_v1_clusterdeprovisionrequest.yaml",
+		"config/crds/hive_v1_clusterdeprovision.yaml",
 		"config/crds/hive_v1_clusterimageset.yaml",
 		"config/crds/hive_v1_dnsendpoint.yaml",
 		"config/crds/hive_v1_dnszone.yaml",

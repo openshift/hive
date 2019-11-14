@@ -1,12 +1,10 @@
-package clusterdeprovisionrequest
+package clusterdeprovision
 
 import (
 	"context"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
-
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +20,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
 
@@ -34,7 +33,7 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func TestClusterDeprovisionRequestReconcile(t *testing.T) {
+func TestClusterDeprovisionReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
@@ -46,7 +45,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 			name: "no-op deleting",
 			existing: []runtime.Object{
 				func() runtime.Object {
-					req := testClusterDeprovisionRequest()
+					req := testClusterDeprovision()
 					now := metav1.Now()
 					req.DeletionTimestamp = &now
 					return req
@@ -60,7 +59,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 			name: "no-op completed",
 			existing: []runtime.Object{
 				func() runtime.Object {
-					req := testClusterDeprovisionRequest()
+					req := testClusterDeprovision()
 					req.Status.Completed = true
 					return req
 				}(),
@@ -72,7 +71,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 		{
 			name: "create uninstall job",
 			existing: []runtime.Object{
-				testClusterDeprovisionRequest(),
+				testClusterDeprovision(),
 			},
 			validate: func(t *testing.T, c client.Client) {
 				validateJobExists(t, c)
@@ -81,7 +80,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 		{
 			name: "no-op when job in progress",
 			existing: []runtime.Object{
-				testClusterDeprovisionRequest(),
+				testClusterDeprovision(),
 				testUninstallJob(),
 			},
 			validate: func(t *testing.T, c client.Client) {
@@ -91,7 +90,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 		{
 			name: "completed when job is successful",
 			existing: []runtime.Object{
-				testClusterDeprovisionRequest(),
+				testClusterDeprovision(),
 				func() runtime.Object {
 					job := testUninstallJob()
 					job.Status.Conditions = []batchv1.JobCondition{
@@ -113,7 +112,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 		{
 			name: "regenerate job when hash missing",
 			existing: []runtime.Object{
-				testClusterDeprovisionRequest(),
+				testClusterDeprovision(),
 				func() *batchv1.Job {
 					job := testUninstallJob()
 					delete(job.Annotations, jobHashAnnotation)
@@ -127,7 +126,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 		{
 			name: "regenerate job when hash changed",
 			existing: []runtime.Object{
-				testClusterDeprovisionRequest(),
+				testClusterDeprovision(),
 				func() *batchv1.Job {
 					job := testUninstallJob()
 					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
@@ -143,7 +142,7 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
-			r := &ReconcileClusterDeprovisionRequest{
+			r := &ReconcileClusterDeprovision{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
 			}
@@ -166,17 +165,17 @@ func TestClusterDeprovisionRequestReconcile(t *testing.T) {
 	}
 }
 
-func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
-	return &hivev1.ClusterDeprovisionRequest{
+func testClusterDeprovision() *hivev1.ClusterDeprovision {
+	return &hivev1.ClusterDeprovision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: testNamespace,
 		},
-		Spec: hivev1.ClusterDeprovisionRequestSpec{
+		Spec: hivev1.ClusterDeprovisionSpec{
 			InfraID:   "test-infra-id",
 			ClusterID: "test-cluster-id",
-			Platform: hivev1.ClusterDeprovisionRequestPlatform{
-				AWS: &hivev1.AWSClusterDeprovisionRequest{
+			Platform: hivev1.ClusterDeprovisionPlatform{
+				AWS: &hivev1.AWSClusterDeprovision{
 					Region: "us-east-1",
 					CredentialsSecretRef: &corev1.LocalObjectReference{
 						Name: "aws-creds",
@@ -188,7 +187,7 @@ func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
 }
 
 func testUninstallJob() *batchv1.Job {
-	uninstallJob, _ := install.GenerateUninstallerJobForDeprovisionRequest(testClusterDeprovisionRequest())
+	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision())
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
 		panic("should never get error calculating job spec hash")
@@ -219,7 +218,7 @@ func validateJobExists(t *testing.T, c client.Client) {
 }
 
 func validateNotCompleted(t *testing.T, c client.Client) {
-	req := &hivev1.ClusterDeprovisionRequest{}
+	req := &hivev1.ClusterDeprovision{}
 	err := c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testName}, req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -230,7 +229,7 @@ func validateNotCompleted(t *testing.T, c client.Client) {
 }
 
 func validateCompleted(t *testing.T, c client.Client) {
-	req := &hivev1.ClusterDeprovisionRequest{}
+	req := &hivev1.ClusterDeprovision{}
 	err := c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testName}, req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

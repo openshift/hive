@@ -29,7 +29,7 @@
 // config/rbac/hive_reader_role_binding.yaml
 // config/crds/hive_v1_checkpoint.yaml
 // config/crds/hive_v1_clusterdeployment.yaml
-// config/crds/hive_v1_clusterdeprovisionrequest.yaml
+// config/crds/hive_v1_clusterdeprovision.yaml
 // config/crds/hive_v1_clusterimageset.yaml
 // config/crds/hive_v1_clusterprovision.yaml
 // config/crds/hive_v1_clusterstate.yaml
@@ -891,7 +891,7 @@ rules:
   - syncidentityproviders
   - syncsets
   - syncsetinstances
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   verbs:
   - get
@@ -1104,8 +1104,8 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
-  - clusterdeprovisionrequests
-  - clusterdeprovisionrequests/finalizers
+  - clusterdeprovisions
+  - clusterdeprovisions/finalizers
   verbs:
   - get
   - list
@@ -1117,7 +1117,7 @@ rules:
 - apiGroups:
   - hive.openshift.io
   resources:
-  - clusterdeprovisionrequests/status
+  - clusterdeprovisions/status
   verbs:
   - get
   - update
@@ -1380,7 +1380,7 @@ rules:
   - syncidentityproviders
   - selectorsyncsets
   - syncsets
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   verbs:
   - get
@@ -1504,7 +1504,7 @@ rules:
   - syncidentityproviders
   - syncsets
   - syncsetinstances
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   verbs:
   - get
@@ -2387,13 +2387,13 @@ func configCrdsHive_v1_clusterdeploymentYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterdeprovisionrequestYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHive_v1_clusterdeprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: clusterdeprovisionrequests.hive.openshift.io
+  name: clusterdeprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
   - JSONPath: .spec.infraID
@@ -2410,8 +2410,8 @@ spec:
     type: date
   group: hive.openshift.io
   names:
-    kind: ClusterDeprovisionRequest
-    plural: clusterdeprovisionrequests
+    kind: ClusterDeprovision
+    plural: clusterdeprovisions
     shortNames:
     - cdr
   scope: Namespaced
@@ -2444,10 +2444,10 @@ spec:
               type: string
             platform:
               description: Platform contains platform-specific configuration for a
-                ClusterDeprovisionRequest
+                ClusterDeprovision
               properties:
                 aws:
-                  description: AWS contains AWS-specific deprovision request settings
+                  description: AWS contains AWS-specific deprovision settings
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the AWS account credentials
@@ -2455,11 +2455,10 @@ spec:
                       type: object
                     region:
                       description: Region is the AWS region for this deprovisioning
-                        request
                       type: string
                   type: object
                 azure:
-                  description: Azure contains Azure-specific deprovision request settings
+                  description: Azure contains Azure-specific deprovision settings
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the Azure account credentials
@@ -2467,7 +2466,7 @@ spec:
                       type: object
                   type: object
                 gcp:
-                  description: GCP contains GCP-specific deprovision request settings
+                  description: GCP contains GCP-specific deprovision settings
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the GCP account credentials
@@ -2478,8 +2477,7 @@ spec:
                         the cluster exists
                       type: string
                     region:
-                      description: Region is the GCP region for this deprovisioning
-                        request
+                      description: Region is the GCP region for this deprovision
                       type: string
                   type: object
               type: object
@@ -2499,17 +2497,17 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterdeprovisionrequestYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterdeprovisionrequestYaml, nil
+func configCrdsHive_v1_clusterdeprovisionYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_clusterdeprovisionYaml, nil
 }
 
-func configCrdsHive_v1_clusterdeprovisionrequestYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterdeprovisionrequestYamlBytes()
+func configCrdsHive_v1_clusterdeprovisionYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_clusterdeprovisionYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeprovisionrequest.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5036,7 +5034,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
 	"config/crds/hive_v1_checkpoint.yaml":                       configCrdsHive_v1_checkpointYaml,
 	"config/crds/hive_v1_clusterdeployment.yaml":                configCrdsHive_v1_clusterdeploymentYaml,
-	"config/crds/hive_v1_clusterdeprovisionrequest.yaml":        configCrdsHive_v1_clusterdeprovisionrequestYaml,
+	"config/crds/hive_v1_clusterdeprovision.yaml":               configCrdsHive_v1_clusterdeprovisionYaml,
 	"config/crds/hive_v1_clusterimageset.yaml":                  configCrdsHive_v1_clusterimagesetYaml,
 	"config/crds/hive_v1_clusterprovision.yaml":                 configCrdsHive_v1_clusterprovisionYaml,
 	"config/crds/hive_v1_clusterstate.yaml":                     configCrdsHive_v1_clusterstateYaml,
@@ -5099,7 +5097,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"crds": {nil, map[string]*bintree{
 			"hive_v1_checkpoint.yaml":                   {configCrdsHive_v1_checkpointYaml, map[string]*bintree{}},
 			"hive_v1_clusterdeployment.yaml":            {configCrdsHive_v1_clusterdeploymentYaml, map[string]*bintree{}},
-			"hive_v1_clusterdeprovisionrequest.yaml":    {configCrdsHive_v1_clusterdeprovisionrequestYaml, map[string]*bintree{}},
+			"hive_v1_clusterdeprovision.yaml":           {configCrdsHive_v1_clusterdeprovisionYaml, map[string]*bintree{}},
 			"hive_v1_clusterimageset.yaml":              {configCrdsHive_v1_clusterimagesetYaml, map[string]*bintree{}},
 			"hive_v1_clusterprovision.yaml":             {configCrdsHive_v1_clusterprovisionYaml, map[string]*bintree{}},
 			"hive_v1_clusterstate.yaml":                 {configCrdsHive_v1_clusterstateYaml, map[string]*bintree{}},

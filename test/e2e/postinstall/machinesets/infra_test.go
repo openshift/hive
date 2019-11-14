@@ -74,7 +74,7 @@ func TestManageMachineSets(t *testing.T) {
 	err = common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
 		count := 0
 		for _, m := range machines {
-			if strings.HasPrefix(m.Name, fmt.Sprintf("%s-%s", cd.Status.InfraID, "infra")) {
+			if strings.HasPrefix(m.Name, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
 				count++
 			}
 		}
@@ -98,7 +98,7 @@ func TestManageMachineSets(t *testing.T) {
 				continue
 			}
 			machineName := name[1]
-			if strings.HasPrefix(machineName, fmt.Sprintf("%s-%s", cd.Status.InfraID, "infra")) {
+			if strings.HasPrefix(machineName, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
 				infraNodes = append(infraNodes, n)
 			}
 		}
@@ -149,7 +149,7 @@ func TestManageMachineSets(t *testing.T) {
 	common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
 		count := 0
 		for _, m := range machines {
-			if strings.HasPrefix(m.Name, fmt.Sprintf("%s-%s", cd.Status.InfraID, "infra")) {
+			if strings.HasPrefix(m.Name, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
 				count++
 			}
 		}
@@ -178,7 +178,7 @@ func TestManageMachineSets(t *testing.T) {
 	common.WaitForMachineSets(cfg, func(machineSets []*machinev1.MachineSet) bool {
 		count := 0
 		for _, ms := range machineSets {
-			if strings.HasPrefix(ms.Name, fmt.Sprintf("%s-%s", cd.Status.InfraID, "infra")) {
+			if strings.HasPrefix(ms.Name, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
 				count++
 			}
 		}

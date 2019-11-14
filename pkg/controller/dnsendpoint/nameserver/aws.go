@@ -112,9 +112,7 @@ func (q *awsQuery) Delete(rootDomain string, domain string, values sets.String) 
 // queryZoneID queries AWS for the public hosted zone for the specified domain.
 func (q *awsQuery) queryZoneID(awsClient awsclient.Client, domain string) (*string, error) {
 	maxItems := "5"
-	if !strings.HasSuffix(domain, ".") {
-		domain = domain + "."
-	}
+	domain = dotted(domain)
 	listInput := &route53.ListHostedZonesByNameInput{
 		DNSName:  &domain,
 		MaxItems: &maxItems,
@@ -158,10 +156,6 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 			if recordSet.Name == nil {
 				continue
 			}
-			name := *recordSet.Name
-			if strings.HasSuffix(name, ".") {
-				name = name[:len(name)-1]
-			}
 			if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {
 				continue
 			}
@@ -169,7 +163,7 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 			for _, record := range recordSet.ResourceRecords {
 				values.Insert(*record.Value)
 			}
-			nameServers[name] = values
+			nameServers[undotted(*recordSet.Name)] = values
 		}
 		if listOutput.IsTruncated == nil || !*listOutput.IsTruncated {
 			return nameServers, nil
@@ -200,11 +194,7 @@ func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID stri
 	if recordSet.Name == nil {
 		return nil, nil
 	}
-	name := *recordSet.Name
-	if strings.HasSuffix(name, ".") {
-		name = name[:len(name)-1]
-	}
-	if name != domain {
+	if undotted(*recordSet.Name) != domain {
 		return nil, nil
 	}
 	if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {

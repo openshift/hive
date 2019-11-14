@@ -562,6 +562,9 @@ func (o *Options) generateSSHPrivateKeySecret() (*corev1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
+	if sshPrivateKey == "" {
+		return nil, nil
+	}
 
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

@@ -27,3 +27,4 @@ In the future Hive will support more cloud providers.
   * [Hive Architecture](./docs/architecture.md)
   * [SyncSet](./docs/syncset.md)
   * [SyncIdentityProvider](./docs/syncidentityprovider.md)
+ 

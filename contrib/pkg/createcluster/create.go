@@ -440,11 +440,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		result = append(result, creds)
 
-		sshPrivateKeySecret, err := o.generateSSHPrivateKeySecret()
-		if err != nil {
-			return nil, err
+		if sshPrivateKeySecret != nil {
+			result = append(result, sshPrivateKeySecret)
 		}
-		result = append(result, sshPrivateKeySecret)
 
 		servingCertSecret, err := o.generateServingCertSecret()
 		if err != nil {

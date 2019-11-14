@@ -132,14 +132,14 @@ func TestHiveConfig(t *testing.T) {
 		t.Errorf("external DNS is configured, but no managed domains are")
 	}
 	if hiveConfig.Spec.ExternalDNS != nil && hiveConfig.Spec.ExternalDNS.AWS != nil {
-		if len(hiveConfig.Spec.ExternalDNS.AWS.Credentials.Name) == 0 {
+		if len(hiveConfig.Spec.ExternalDNS.AWS.CredentialsSecretRef.Name) == 0 {
 			t.Errorf("AWS external DNS configured, but no credentials secret specified")
 			return
 		}
 		secret := &corev1.Secret{}
 		secretName := types.NamespacedName{
 			Namespace: hiveNamespace,
-			Name:      hiveConfig.Spec.ExternalDNS.AWS.Credentials.Name,
+			Name:      hiveConfig.Spec.ExternalDNS.AWS.CredentialsSecretRef.Name,
 		}
 		err := c.Get(context.TODO(), secretName, secret)
 		if err != nil {

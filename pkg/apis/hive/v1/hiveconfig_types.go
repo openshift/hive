@@ -83,13 +83,13 @@ type FailedProvisionConfig struct {
 // environment.
 type ExternalDNSConfig struct {
 
-	// Image is a reference to the image that will run the external-dns controller.
-	// If not specified, a default image will be used.
-	Image string `json:"image,omitempty"`
-
 	// AWS contains AWS-specific settings for external DNS
 	// +optional
 	AWS *ExternalDNSAWSConfig `json:"aws,omitempty"`
+
+	// GCP contains GCP-specific settings for external DNS
+	// +optional
+	GCP *ExternalDNSGCPConfig `json:"gcp,omitempty"`
 
 	// As other cloud providers are supported, additional fields will be
 	// added for each of those cloud providers. Only a single cloud provider
@@ -104,6 +104,17 @@ type ExternalDNSAWSConfig struct {
 	// Secret should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
 	// +optional
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+}
+
+// ExternalDNSGCPConfig contains GCP-specific settings for external DNS
+type ExternalDNSGCPConfig struct {
+	// Credentials references a secret that will be used to authenticate with
+	// GCP DNS. It will need permission to manage entries in each of the
+	// managed domains for this cluster.
+	// Secret should have a key names 'osServiceAccount.json'.
+	// The credentials must specify the project to use.
+	// +optional
+	Credentials corev1.LocalObjectReference `json:"credentials,omitempty"`
 }
 
 // +genclient:nonNamespaced

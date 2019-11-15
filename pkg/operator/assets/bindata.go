@@ -14,10 +14,6 @@
 // config/hiveadmission/syncset-webhook.yaml
 // config/manager/deployment.yaml
 // config/manager/service.yaml
-// config/external-dns/deployment.yaml
-// config/external-dns/rbac_role.yaml
-// config/external-dns/rbac_role_binding.yaml
-// config/external-dns/service_account.yaml
 // config/rbac/hive_admin_role.yaml
 // config/rbac/hive_admin_role_binding.yaml
 // config/rbac/hive_controllers_role.yaml
@@ -714,144 +710,6 @@ func configManagerServiceYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/manager/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configExternalDnsDeploymentYaml = []byte(`apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: external-dns
-  namespace: hive
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      name: external-dns
-  template:
-    metadata:
-      labels:
-        name: external-dns
-    spec:
-      strategy:
-        type: Recreate
-      serviceAccountName: external-dns
-      containers:
-      - name: external-dns
-        image: registry.svc.ci.openshift.org/openshift/hive-v4.0:external-dns
-        args:
-        - --source=crd
-        - --crd-source-apiversion=hive.openshift.io/v1
-        - --crd-source-kind=DNSEndpoint
-        - --registry=txt
-        - --policy=sync
-`)
-
-func configExternalDnsDeploymentYamlBytes() ([]byte, error) {
-	return _configExternalDnsDeploymentYaml, nil
-}
-
-func configExternalDnsDeploymentYaml() (*asset, error) {
-	bytes, err := configExternalDnsDeploymentYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/external-dns/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configExternalDnsRbac_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: external-dns
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - get
-  - watch
-  - list
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - dnsendpoints
-  - dnsendpoints/status
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-`)
-
-func configExternalDnsRbac_roleYamlBytes() ([]byte, error) {
-	return _configExternalDnsRbac_roleYaml, nil
-}
-
-func configExternalDnsRbac_roleYaml() (*asset, error) {
-	bytes, err := configExternalDnsRbac_roleYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/external-dns/rbac_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configExternalDnsRbac_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: external-dns
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: external-dns
-subjects:
-- kind: ServiceAccount
-  name: external-dns
-  namespace: hive
-`)
-
-func configExternalDnsRbac_role_bindingYamlBytes() ([]byte, error) {
-	return _configExternalDnsRbac_role_bindingYaml, nil
-}
-
-func configExternalDnsRbac_role_bindingYaml() (*asset, error) {
-	bytes, err := configExternalDnsRbac_role_bindingYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/external-dns/rbac_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configExternalDnsService_accountYaml = []byte(`apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: external-dns
-  namespace: hive
-`)
-
-func configExternalDnsService_accountYamlBytes() ([]byte, error) {
-	return _configExternalDnsService_accountYaml, nil
-}
-
-func configExternalDnsService_accountYaml() (*asset, error) {
-	bytes, err := configExternalDnsService_accountYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/external-dns/service_account.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3162,11 +3020,17 @@ spec:
                         and 'aws_secret_access_key'.
                       type: object
                   type: object
-                image:
-                  description: Image is a reference to the image that will run the
-                    external-dns controller. If not specified, a default image will
-                    be used.
-                  type: string
+                gcp:
+                  description: GCP contains GCP-specific settings for external DNS
+                  properties:
+                    credentials:
+                      description: Credentials references a secret that will be used
+                        to authenticate with GCP DNS. It will need permission to manage
+                        entries in each of the managed domains for this cluster. Secret
+                        should have a key names 'osServiceAccount.json'. The credentials
+                        must specify the project to use.
+                      type: object
+                  type: object
               type: object
             failedProvisionConfig:
               description: FailedProvisionConfig is used to configure settings related
@@ -5019,10 +4883,6 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
 	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
 	"config/manager/service.yaml":                               configManagerServiceYaml,
-	"config/external-dns/deployment.yaml":                       configExternalDnsDeploymentYaml,
-	"config/external-dns/rbac_role.yaml":                        configExternalDnsRbac_roleYaml,
-	"config/external-dns/rbac_role_binding.yaml":                configExternalDnsRbac_role_bindingYaml,
-	"config/external-dns/service_account.yaml":                  configExternalDnsService_accountYaml,
 	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
 	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
 	"config/rbac/hive_controllers_role.yaml":                    configRbacHive_controllers_roleYaml,
@@ -5109,12 +4969,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_v1_syncidentityprovider.yaml":         {configCrdsHive_v1_syncidentityproviderYaml, map[string]*bintree{}},
 			"hive_v1_syncset.yaml":                      {configCrdsHive_v1_syncsetYaml, map[string]*bintree{}},
 			"hive_v1_syncsetinstance.yaml":              {configCrdsHive_v1_syncsetinstanceYaml, map[string]*bintree{}},
-		}},
-		"external-dns": {nil, map[string]*bintree{
-			"deployment.yaml":        {configExternalDnsDeploymentYaml, map[string]*bintree{}},
-			"rbac_role.yaml":         {configExternalDnsRbac_roleYaml, map[string]*bintree{}},
-			"rbac_role_binding.yaml": {configExternalDnsRbac_role_bindingYaml, map[string]*bintree{}},
-			"service_account.yaml":   {configExternalDnsService_accountYaml, map[string]*bintree{}},
 		}},
 		"hiveadmission": {nil, map[string]*bintree{
 			"apiservice.yaml":                      {configHiveadmissionApiserviceYaml, map[string]*bintree{}},

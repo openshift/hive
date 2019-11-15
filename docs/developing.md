@@ -1,3 +1,32 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Developing Hive](#developing-hive)
+  - [Prerequisites](#prerequisites)
+  - [Build and run tests](#build-and-run-tests)
+  - [Setting up the development environment](#setting-up-the-development-environment)
+    - [Cloning the repository](#cloning-the-repository)
+  - [Deploying with Kubernetes In Docker (kind)](#deploying-with-kubernetes-in-docker-kind)
+  - [Writing/Testing Code](#writingtesting-code)
+    - [Run Hive Operator](#run-hive-operator)
+      - [Directly from source](#directly-from-source)
+      - [Run Hive Operator Using Custom Images](#run-hive-operator-using-custom-images)
+    - [Run Hive Controllers From Source](#run-hive-controllers-from-source)
+  - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
+  - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
+  - [Using Serving Certificates](#using-serving-certificates)
+    - [Generating a Certificate](#generating-a-certificate)
+    - [Using Generated Certificate](#using-generated-certificate)
+  - [Dependency management](#dependency-management)
+    - [Installing Dep](#installing-dep)
+    - [Updating Dependencies](#updating-dependencies)
+    - [Re-creating vendor Directory](#re-creating-vendor-directory)
+    - [Running the e2e test locally](#running-the-e2e-test-locally)
+    - [TIP](#tip)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Developing Hive
 
 ## Prerequisites
@@ -30,6 +59,63 @@ Get the sources from GitHub:
 ```bash
 cd $GOPATH/src/openshift
 git clone https://github.com/openshift/hive.git
+```
+
+## Deploying with Kubernetes In Docker (kind)
+
+[Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
+
+This approach requires [Docker](https://docs.docker.com/install). At present we do not have kind working with podman.
+
+Deploy a local insecure registry container, and configure your host docker daemon to be able to use it:
+
+```bash
+./hack/create-insecure-registry.sh
+```
+
+Create a kind cluster named 'hive' to deploy to. You can create as many kind clusters as you need.:
+
+```bash
+./hack/create-kind-cluster.sh hive
+```
+
+`docker ps` should now show you a "registry" and a "hive" container running.
+
+```bash
+$ docker ps
+CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                                  NAMES
+2756e565065a        kindest/node:v1.15.3   "/usr/local/bin/entr…"   29 hours ago        Up 29 hours         40393/tcp, 127.0.0.1:40393->6443/tcp   hive-control-plane
+1dc8a3c59d84        registry:2             "/entrypoint.sh /etc…"   2 weeks ago         Up 8 days           0.0.0.0:5000->5000/tcp                 registry
+```
+
+Configure kubectl to talk to your new cluster:
+
+```bash
+export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
+```
+
+**NOTE:** If you do not have `cfssljson` and `cfssl` installed, run the following command to install, otherwise, ignore this.
+
+```bash
+go get -u github.com/cloudflare/cfssl/cmd/cfssljson
+go get -u github.com/cloudflare/cfssl/cmd/cfssl
+```
+
+You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
+
+```bash
+IMG=172.17.0.1:5000/hive:latest make docker-dev-push
+DEPLOY_IMAGE=172.17.0.1:5000/hive:latest make deploy
+./hack/hiveadmission-dev-cert.sh
+```
+
+Hive should now be running.
+
+You can leave your registry container running indefinitely. The kind cluster can be replaced quickly as necessary:
+
+```bash
+kind delete cluster --name hive
+./hack/create-kind-cluster.sh hive
 ```
 
 ## Writing/Testing Code
@@ -116,7 +202,7 @@ Prerequisites:
 ### Generating a Certificate
 
 1. Ensure that the `hiveutil` binary is available (`make hiveutil`)
-2. Run: `hiveutil certificate create ${CLUSTER_NAME} --base-domain ${BASE_DOMAIN}` 
+2. Run: `hiveutil certificate create ${CLUSTER_NAME} --base-domain ${BASE_DOMAIN}`
    where CLUSTER_NAME is the name of your cluster and BASE_DOMAIN is the public DNS domain for your cluster (Defaults to `new-installer.openshift.com`)
 
 ### Using Generated Certificate
@@ -178,23 +264,23 @@ dep ensure -v
 ### Running the e2e test locally
 
 The e2e test deploys Hive on a cluster, tests that all Hive components are working properly, then creates a cluster
-with Hive and ensures that Hive works properly with the installed cluster. It finally tears down the created cluster. It finally tears down the created cluster.
+with Hive and ensures that Hive works properly with the installed cluster. It finally tears down the created cluster.
 
 You can run the e2e test by pointing to your own cluster (via the `KUBECONFIG` environment variable).
 
 Ensure that the following environment variables are set:
 
-`KUBECONFIG` - Must point to a valid Kubernetes configuration file that allows communicating with your cluster.
-`AWS_ACCESS_KEY_ID` - AWS access key for your AWS account
-`AWS_SECRET_ACCESS_KEY` - AWS secret access key for your AWS account
+- `KUBECONFIG` - Must point to a valid Kubernetes configuration file that allows communicating with your cluster.
+- `AWS_ACCESS_KEY_ID` - AWS access key for your AWS account
+- `AWS_SECRET_ACCESS_KEY` - AWS secret access key for your AWS account
 
-`HIVE_IMAGE` - Hive image to deploy to the cluster
-`RELEASE_IMAGE` - OpenShift release image to use for the e2e test cluster
-`CLUSTER_NAMESPACE` - Namespace where clusterdeployment will be created for the e2e test
-`BASE_DOMAIN` - DNS domain to use for the test cluster (a corresponding Route53 public zone must exist on your account).
-`ARTIFACT_DIR` - Directory where logs will be placed by the e2e test
-`SSH_PUBLIC_KEY_FILE` - Path to a public ssh key to use for the test cluster
-`PULL_SECRET_FILE` - Path to file containing a pull secret for the test cluster
+- `HIVE_IMAGE` - Hive image to deploy to the cluster
+- `RELEASE_IMAGE` - OpenShift release image to use for the e2e test cluster
+- `CLUSTER_NAMESPACE` - Namespace where clusterdeployment will be created for the e2e test
+- `BASE_DOMAIN` - DNS domain to use for the test cluster (a corresponding Route53 public zone must exist on your account)
+- `ARTIFACT_DIR` - Directory where logs will be placed by the e2e test
+- `SSH_PUBLIC_KEY_FILE` - Path to a public ssh key to use for the test cluster
+- `PULL_SECRET_FILE` - Path to file containing a pull secret for the test cluster
 
 For example values for these variables, see `hack/local-e2e-test.sh`
 

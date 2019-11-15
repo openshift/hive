@@ -6,6 +6,7 @@ package mock
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 	v1 "google.golang.org/api/dns/v1"
 	reflect "reflect"
 )
@@ -34,16 +35,59 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // ListManagedZones mocks base method
-func (m *MockClient) ListManagedZones() (*v1.ManagedZonesListResponse, error) {
+func (m *MockClient) ListManagedZones(opts gcpclient.ListManagedZonesOptions) (*v1.ManagedZonesListResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListManagedZones")
+	ret := m.ctrl.Call(m, "ListManagedZones", opts)
 	ret0, _ := ret[0].(*v1.ManagedZonesListResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListManagedZones indicates an expected call of ListManagedZones
-func (mr *MockClientMockRecorder) ListManagedZones() *gomock.Call {
+func (mr *MockClientMockRecorder) ListManagedZones(opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedZones", reflect.TypeOf((*MockClient)(nil).ListManagedZones))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListManagedZones", reflect.TypeOf((*MockClient)(nil).ListManagedZones), opts)
+}
+
+// ListResourceRecordSets mocks base method
+func (m *MockClient) ListResourceRecordSets(managedZone string, opts gcpclient.ListResourceRecordSetsOptions) (*v1.ResourceRecordSetsListResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListResourceRecordSets", managedZone, opts)
+	ret0, _ := ret[0].(*v1.ResourceRecordSetsListResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListResourceRecordSets indicates an expected call of ListResourceRecordSets
+func (mr *MockClientMockRecorder) ListResourceRecordSets(managedZone, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListResourceRecordSets", reflect.TypeOf((*MockClient)(nil).ListResourceRecordSets), managedZone, opts)
+}
+
+// AddResourceRecordSet mocks base method
+func (m *MockClient) AddResourceRecordSet(managedZone string, recordSet *v1.ResourceRecordSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddResourceRecordSet", managedZone, recordSet)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddResourceRecordSet indicates an expected call of AddResourceRecordSet
+func (mr *MockClientMockRecorder) AddResourceRecordSet(managedZone, recordSet interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddResourceRecordSet", reflect.TypeOf((*MockClient)(nil).AddResourceRecordSet), managedZone, recordSet)
+}
+
+// DeleteResourceRecordSet mocks base method
+func (m *MockClient) DeleteResourceRecordSet(managedZone string, recordSet *v1.ResourceRecordSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteResourceRecordSet", managedZone, recordSet)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteResourceRecordSet indicates an expected call of DeleteResourceRecordSet
+func (mr *MockClientMockRecorder) DeleteResourceRecordSet(managedZone, recordSet interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteResourceRecordSet", reflect.TypeOf((*MockClient)(nil).DeleteResourceRecordSet), managedZone, recordSet)
 }

@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	gcpCredFile = "osServiceAccount.json"
+	gcpCredFile         = "osServiceAccount.json"
+	defaultInstanceType = "n1-standard-4"
 )
 
 var _ cloudProvider = (*gcpCloudProvider)(nil)
@@ -75,6 +76,17 @@ func (p *gcpCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDepl
 			Region:    "us-east1",
 		},
 	}
+	cd.Spec.Compute[0].Platform.GCP = &hivev1gcp.MachinePool{
+		InstanceType: defaultInstanceType,
+	}
+
+	// Used for both control plane and workers.
+	mpp := &installergcp.MachinePool{
+		InstanceType: defaultInstanceType,
+	}
+	installConfig.ControlPlane.Platform.GCP = mpp
+	installConfig.Compute[0].Platform.GCP = mpp
+
 	return nil
 }
 

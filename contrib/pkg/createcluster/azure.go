@@ -15,6 +15,7 @@ import (
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 
 	installertypes "github.com/openshift/installer/pkg/types"
+	azureinstallertypes "github.com/openshift/installer/pkg/types/azure"
 )
 
 const (
@@ -67,6 +68,24 @@ func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDe
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 		},
 	}
+
+	cd.Spec.Compute[0].Platform = hivev1.MachinePoolPlatform{
+		Azure: &hivev1azure.MachinePool{},
+	}
+
+	// Inject platform details into InstallConfig:
+	installConfig.Platform = installertypes.Platform{
+		Azure: &azureinstallertypes.Platform{
+			Region:                      "centralus",
+			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
+		},
+	}
+
+	// Used for both control plane and workers.
+	mpp := &azureinstallertypes.MachinePool{}
+	installConfig.ControlPlane.Platform.Azure = mpp
+	installConfig.Compute[0].Platform.Azure = mpp
+
 	return nil
 }
 

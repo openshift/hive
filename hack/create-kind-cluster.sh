@@ -70,7 +70,7 @@ function fixup-cluster() {
   local cluster_name=${1} # cluster num
 
   local kubeconfig_path="$(kind get kubeconfig-path --name ${cluster_name})"
-  export KUBECONFIG="${KUBECONFIG:-}:${kubeconfig_path}"
+  export KUBECONFIG="${kubeconfig_path}"
 
   if [ "$OS" != "Darwin" ];then
     # Set container IP address as kube API endpoint in order for clusters to reach kube API servers in other clusters.
@@ -79,6 +79,7 @@ function fixup-cluster() {
 
   # Simplify context name
   kubectl config rename-context "kubernetes-admin@${cluster_name}" "${cluster_name}-context"
+  kubectl config use-context "${cluster_name}-context"
 
   # TODO(font): Need to rename auth user name to avoid conflicts when using
   # multiple cluster kubeconfigs. Remove once

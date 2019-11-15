@@ -131,6 +131,12 @@ type Options struct {
 	SimulateBootstrapFailure bool
 	WorkerNodes              int64
 	ManifestsDir             string
+	Adopt                    bool
+	AdoptAdminKubeConfig     string
+	AdoptInfraID             string
+	AdoptClusterID           string
+	AdoptAdminUsername       string
+	AdoptAdminPassword       string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -210,6 +216,14 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 
+	// Flags related to adoption.
+	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
+	flags.StringVar(&opt.AdoptAdminKubeConfig, "adopt-admin-kubeconfig", "", "Path to a cluster admin kubeconfig file for a cluster being adopted. (required if using --adopt)")
+	flags.StringVar(&opt.AdoptInfraID, "adopt-infra-id", "", "Infrastructure ID for this cluster's cloud provider. (required if using --adopt)")
+	flags.StringVar(&opt.AdoptClusterID, "adopt-cluster-id", "", "Cluster UUID used for telemetry. (required if using --adopt)")
+	flags.StringVar(&opt.AdoptAdminUsername, "adopt-admin-username", "", "Username for cluster web console administrator. (optional)")
+	flags.StringVar(&opt.AdoptAdminPassword, "adopt-admin-password", "", "Password for cluster web console administrator. (optional)")
+
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
 
@@ -254,6 +268,25 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			log.Infof("Must specify the GCP project ID when installing on GCP. Use the --gcp-project-id flag.")
 			return fmt.Errorf("gcp requires gcp-project-id flag")
 
+		}
+	}
+
+	if o.Adopt {
+		if o.AdoptAdminKubeConfig == "" || o.AdoptInfraID == "" || o.AdoptClusterID == "" {
+			return fmt.Errorf("Must specify the following options when using --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id")
+		}
+
+		if _, err := os.Stat(o.AdoptAdminKubeConfig); os.IsNotExist(err) {
+			return fmt.Errorf("--adopt-admin-kubeconfig does not exist: %s", o.AdoptAdminKubeConfig)
+		}
+
+		// Admin username and password must both be specified if either are.
+		if (o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "") && !(o.AdoptAdminUsername != "" && o.AdoptAdminPassword != "") {
+			return fmt.Errorf("--adopt-admin-username and --adopt-admin-password must be used together")
+		}
+	} else {
+		if o.AdoptAdminKubeConfig != "" || o.AdoptInfraID != "" || o.AdoptClusterID != "" || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
+			return fmt.Errorf("Cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-admin-username, --adopt-admin-password")
 		}
 	}
 	return nil
@@ -361,6 +394,14 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		return nil, err
 	}
 
+	if o.Adopt {
+		newObjects, err := o.addAdoptionInfo(cd)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, newObjects...)
+	}
+
 	sshPublicKey, err := o.getSSHPublicKey()
 	if err != nil {
 		return nil, err
@@ -456,6 +497,52 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	result = append(result, installConfigSecret, cd)
 
 	return result, err
+}
+
+func (o *Options) addAdoptionInfo(cd *hivev1.ClusterDeployment) ([]runtime.Object, error) {
+	objectsToCreate := []runtime.Object{}
+	cd.Spec.Installed = true
+
+	kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
+	if err != nil {
+		return objectsToCreate, err
+	}
+
+	adminKubeconfigSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-adopted-admin-kubeconfig", cd.Name),
+			Namespace: cd.Namespace,
+		},
+		Data: map[string][]byte{
+			"kubeconfig":     kubeconfigBytes,
+			"raw-kubeconfig": kubeconfigBytes,
+		},
+	}
+	objectsToCreate = append(objectsToCreate, adminKubeconfigSecret)
+	cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+		ClusterID:                o.AdoptClusterID,
+		InfraID:                  o.AdoptInfraID,
+		AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret.Name},
+	}
+
+	if o.AdoptAdminUsername != "" {
+		adminPasswordSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-adopted-admin-password", cd.Name),
+				Namespace: cd.Namespace,
+			},
+			StringData: map[string]string{
+				"username": o.AdoptAdminUsername,
+				"password": o.AdoptAdminPassword,
+			},
+		}
+		objectsToCreate = append(objectsToCreate, adminPasswordSecret)
+		cd.Spec.ClusterMetadata.AdminPasswordSecretRef = corev1.LocalObjectReference{
+			Name: adminPasswordSecret.Name,
+		}
+	}
+
+	return objectsToCreate, nil
 }
 
 func (o *Options) generateInstallConfigSecret(ic *installertypes.InstallConfig) (*corev1.Secret, error) {

@@ -4,7 +4,7 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: clusterdeprovisionrequests.hive.openshift.io
+  name: clusterdeprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
   - JSONPath: .spec.infraID
@@ -21,8 +21,8 @@ spec:
     type: date
   group: hive.openshift.io
   names:
-    kind: ClusterDeprovisionRequest
-    plural: clusterdeprovisionrequests
+    kind: ClusterDeprovision
+    plural: clusterdeprovisions
     shortNames:
     - cdr
   scope: Namespaced
@@ -55,10 +55,10 @@ spec:
               type: string
             platform:
               description: Platform contains platform-specific configuration for a
-                ClusterDeprovisionRequest
+                ClusterDeprovision
               properties:
                 aws:
-                  description: AWS contains AWS-specific deprovision request settings
+                  description: AWS contains AWS-specific deprovision settings
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the AWS account credentials
@@ -66,11 +66,10 @@ spec:
                       type: object
                     region:
                       description: Region is the AWS region for this deprovisioning
-                        request
                       type: string
                   type: object
                 azure:
-                  description: Azure contains Azure-specific deprovision request settings
+                  description: Azure contains Azure-specific deprovision settings
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the Azure account credentials
@@ -78,7 +77,7 @@ spec:
                       type: object
                   type: object
                 gcp:
-                  description: GCP contains GCP-specific deprovision request settings
+                  description: GCP contains GCP-specific deprovision settings
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the GCP account credentials
@@ -89,8 +88,7 @@ spec:
                         the cluster exists
                       type: string
                     region:
-                      description: Region is the GCP region for this deprovisioning
-                        request
+                      description: Region is the GCP region for this deprovision
                       type: string
                   type: object
               type: object

@@ -82,7 +82,7 @@ rules:
   - syncsetinstances/status
   - syncsets
   - clusterimagesets
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   - clusterstates/status
   verbs:

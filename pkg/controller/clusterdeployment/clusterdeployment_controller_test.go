@@ -93,8 +93,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		return nil
 	}
 
-	getDeprovisionRequest := func(c client.Client) *hivev1.ClusterDeprovisionRequest {
-		req := &hivev1.ClusterDeprovisionRequest{}
+	getDeprovision := func(c client.Client) *hivev1.ClusterDeprovision {
+		req := &hivev1.ClusterDeprovision{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, req)
 		if err == nil {
 			return req
@@ -328,7 +328,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovisionRequest(c)
+				deprovision := getDeprovision(c)
 				if deprovision != nil {
 					t.Errorf("got unexpected deprovision request")
 				}
@@ -367,7 +367,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
 				}
-				deprovision := getDeprovisionRequest(c)
+				deprovision := getDeprovision(c)
 				assert.Nil(t, deprovision, "expected no deprovision request")
 			},
 		},
@@ -385,7 +385,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovisionRequest(c)
+				deprovision := getDeprovision(c)
 				assert.NotNil(t, deprovision, "expected deprovision request")
 			},
 		},
@@ -751,7 +751,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovisionRequest(c)
+				deprovision := getDeprovision(c)
 				assert.NotNil(t, deprovision, "expected deprovision request to be created")
 			},
 		},
@@ -896,7 +896,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Empty(t, provisions, "expected provision to be deleted")
-				deprovision := getDeprovisionRequest(c)
+				deprovision := getDeprovision(c)
 				assert.Nil(t, deprovision, "expect not to create deprovision request until provision removed")
 			},
 		},
@@ -941,7 +941,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected hive finalizer")
 				}
-				deprovision := getDeprovisionRequest(c)
+				deprovision := getDeprovision(c)
 				assert.NotNil(t, deprovision, "missing deprovision request")
 			},
 		},

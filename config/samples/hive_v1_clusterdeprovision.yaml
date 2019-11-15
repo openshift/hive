@@ -1,9 +1,9 @@
 apiVersion: hive.openshift.io/v1
-kind: ClusterDeprovisionRequest
+kind: ClusterDeprovision
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: clusterdeprovisionrequest-sample
+  name: clusterdeprovision-sample
 spec:
   infraID: cluster-infra-id
   platform:

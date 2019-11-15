@@ -196,7 +196,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for deprovision requests created by a ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovisionRequest{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
@@ -1114,7 +1114,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Generate a deprovision request
-	request, err := generateDeprovisionRequest(cd)
+	request, err := generateDeprovision(cd)
 	if err != nil {
 		cdLog.WithError(err).Error("error generating deprovision request")
 		return reconcile.Result{}, err
@@ -1126,7 +1126,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	// Check if deprovision request already exists:
-	existingRequest := &hivev1.ClusterDeprovisionRequest{}
+	existingRequest := &hivev1.ClusterDeprovision{}
 	switch err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Name, Namespace: cd.Namespace}, existingRequest); {
 	case apierrors.IsNotFound(err):
 		cdLog.Info("creating deprovision request for cluster deployment")
@@ -1378,13 +1378,13 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 	return nil
 }
 
-func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisionRequest, error) {
-	req := &hivev1.ClusterDeprovisionRequest{
+func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovision, error) {
+	req := &hivev1.ClusterDeprovision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cd.Name,
 			Namespace: cd.Namespace,
 		},
-		Spec: hivev1.ClusterDeprovisionRequestSpec{
+		Spec: hivev1.ClusterDeprovisionSpec{
 			InfraID:   cd.Spec.ClusterMetadata.InfraID,
 			ClusterID: cd.Spec.ClusterMetadata.ClusterID,
 		},
@@ -1392,16 +1392,16 @@ func generateDeprovisionRequest(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDe
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovisionRequest{
+		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovision{
 			Region:               cd.Spec.Platform.AWS.Region,
 			CredentialsSecretRef: &cd.Spec.Platform.AWS.CredentialsSecretRef,
 		}
 	case cd.Spec.Platform.Azure != nil:
-		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovisionRequest{
+		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
 			CredentialsSecretRef: &cd.Spec.Platform.Azure.CredentialsSecretRef,
 		}
 	case cd.Spec.Platform.GCP != nil:
-		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovisionRequest{
+		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{
 			Region:               cd.Spec.Platform.GCP.Region,
 			ProjectID:            cd.Spec.Platform.GCP.ProjectID,
 			CredentialsSecretRef: &cd.Spec.Platform.GCP.CredentialsSecretRef,

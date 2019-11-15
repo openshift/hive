@@ -342,9 +342,9 @@ func GetUninstallJobName(name string) string {
 	return apihelpers.GetResourceName(name, "uninstall")
 }
 
-// GenerateUninstallerJobForDeprovisionRequest generates an uninstaller job for a given deprovision request
-func GenerateUninstallerJobForDeprovisionRequest(
-	req *hivev1.ClusterDeprovisionRequest) (*batchv1.Job, error) {
+// GenerateUninstallerJobForDeprovision generates an uninstaller job for a given deprovision request
+func GenerateUninstallerJobForDeprovision(
+	req *hivev1.ClusterDeprovision) (*batchv1.Job, error) {
 
 	tryOnce := false
 	if req.Annotations != nil {
@@ -396,7 +396,7 @@ func GenerateUninstallerJobForDeprovisionRequest(
 	return job, nil
 }
 
-func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	credentialsSecret := ""
 	if len(req.Spec.Platform.AWS.CredentialsSecretRef.Name) > 0 {
 		credentialsSecret = req.Spec.Platform.AWS.CredentialsSecretRef.Name
@@ -449,7 +449,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batch
 	job.Spec.Template.Spec.Containers = containers
 }
 
-func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 	env := []corev1.EnvVar{}
@@ -491,7 +491,7 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *bat
 
 }
 
-func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 	env := []corev1.EnvVar{}

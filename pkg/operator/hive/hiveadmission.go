@@ -1,14 +1,12 @@
 package hive
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	webhooks "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
 	"github.com/openshift/hive/pkg/constants"
 
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -33,8 +31,7 @@ import (
 )
 
 const (
-	clusterVersionCRDName       = "clusterversions.config.openshift.io"
-	managedDomainsConfigMapName = "managed-domains"
+	clusterVersionCRDName = "clusterversions.config.openshift.io"
 )
 
 const (
@@ -81,29 +78,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 
 	if len(instance.Spec.ManagedDomains) > 0 {
-		configMap := managedDomainsConfigMap(hiveAdmDeployment.Namespace, instance.Spec.ManagedDomains)
-		_, err = h.ApplyRuntimeObject(configMap, scheme.Scheme)
-		if err != nil {
-			hLog.WithError(err).Error("error applying managed domains configmap")
-		}
-		volume := corev1.Volume{}
-		volume.Name = "managed-domains"
-		volume.ConfigMap = &corev1.ConfigMapVolumeSource{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: managedDomainsConfigMapName,
-			},
-		}
-		volumeMount := corev1.VolumeMount{
-			Name:      "managed-domains",
-			MountPath: "/data/config",
-		}
-		envVar := corev1.EnvVar{
-			Name:  webhooks.ManagedDomainsFileEnvVar,
-			Value: "/data/config/domains",
-		}
-		hiveAdmDeployment.Spec.Template.Spec.Volumes = append(hiveAdmDeployment.Spec.Template.Spec.Volumes, volume)
-		hiveAdmDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(hiveAdmDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
-		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveAdmDeployment.Spec.Template.Spec.Containers[0].Env, envVar)
+		addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec)
 	}
 
 	result, err := h.ApplyRuntimeObject(hiveAdmDeployment, scheme.Scheme)
@@ -139,8 +114,13 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		hLog.Error("error detecting 3.11 cluster")
 		return err
 	}
-	if is311 {
-		hLog.Debug("3.11 cluster detected, modifying objects for CA certs")
+	// If we're running on vanilla Kube (mostly devs using kind), or OpenShift 3.x, we
+	// will not have access to the service cert injection we normally use. Lookup
+	// the cluster CA and inject into the webhooks.
+	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
+	// secret, see hack/hiveadmission-dev-cert.sh.
+	if !r.runningOnOpenShift(hLog) || is311 {
+		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
 		err = r.injectCerts(apiService, validatingWebhooks, nil, hLog)
 		if err != nil {
 			hLog.WithError(err).Error("error injecting certs")
@@ -234,7 +214,8 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	// Load the service CA:
 	serviceCA, ok := firstSATokenSecret.Data["service-ca.crt"]
 	if !ok {
-		return fmt.Errorf("secret %s did not contain key service-ca.crt", firstSATokenSecret.Name)
+		hLog.Warnf("secret %s did not contain key service-ca.crt, likely not running on OpenShift, using ca.crt instead", firstSATokenSecret.Name)
+		serviceCA = kubeCA
 	}
 	hLog.Debugf("found service CA: %s", string(serviceCA))
 
@@ -271,18 +252,4 @@ func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 		return false, err
 	}
 	return false, nil
-}
-
-func managedDomainsConfigMap(namespace string, domains []string) *corev1.ConfigMap {
-	cm := &corev1.ConfigMap{}
-	cm.Kind = "ConfigMap"
-	cm.APIVersion = "v1"
-	cm.Name = managedDomainsConfigMapName
-	cm.Namespace = namespace
-	domainsData := &bytes.Buffer{}
-	for _, domain := range domains {
-		fmt.Fprintf(domainsData, "%s\n", domain)
-	}
-	cm.Data = map[string]string{"domains": domainsData.String()}
-	return cm
 }

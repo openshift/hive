@@ -79,15 +79,6 @@ with open('config/hiveadmission/hiveadmission_rbac_role.yaml', 'r') as stream:
             'serviceAccountName': 'hiveadmission',
         })
 
-# Add the external-dns role to the CSV:
-with open('config/external-dns/rbac_role.yaml', 'r') as stream:
-    externaldns_role = yaml.load(stream, Loader=yaml.SafeLoader)
-    csv['spec']['install']['spec']['clusterPermissions'].append(
-        {
-            'rules': externaldns_role['rules'],
-            'serviceAccountName': 'external-dns',
-        })
-
 # Add our deployment spec for the hive operator:
 with open('config/operator/operator_deployment.yaml', 'r') as stream:
     operator_components = []

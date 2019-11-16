@@ -18,6 +18,8 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 var validTestManagedDomains = []string{
@@ -27,6 +29,24 @@ var validTestManagedDomains = []string{
 	"ccc.com",
 }
 
+func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
+		Spec: hivev1.ClusterDeploymentSpec{
+			BaseDomain:  "example.com",
+			ClusterName: "SameClusterName",
+			Compute: []hivev1.MachinePool{
+				{
+					Name: "SameMachinePoolName",
+				},
+			},
+			Provisioning: &hivev1.Provisioning{
+				InstallConfigSecretRef: corev1.LocalObjectReference{
+					Name: "test-install-config",
+				},
+			},
+		},
+	}
+}
 func validClusterDeploymentWithIngress() *hivev1.ClusterDeployment {
 	cd := validAWSClusterDeployment()
 	cd.Spec.Ingress = []hivev1.ClusterIngress{
@@ -45,57 +65,43 @@ func clusterDeploymentWithManagedDomain(domain string) *hivev1.ClusterDeployment
 	return cd
 }
 
-func validAWSClusterDeployment() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			BaseDomain:  "example.com",
-			ClusterName: "SameClusterName",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1aws.Platform{
-					CredentialsSecretRef: corev1.LocalObjectReference{
-						Name: "fake-creds-secret",
-					},
-					Region: "test-region",
-				},
-			},
-			Provisioning: &hivev1.Provisioning{
-				InstallConfigSecretRef: corev1.LocalObjectReference{
-					Name: "test-install-config",
+func validGCPClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.GCP = &hivev1gcp.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		ProjectID:            "my-test-project",
+		Region:               "us-central1",
+	}
+	cd.Spec.Compute = []hivev1.MachinePool{
+		{
+			Name: "SameMachinePoolName",
+			Platform: hivev1.MachinePoolPlatform{
+				GCP: &hivev1gcp.MachinePool{
+					InstanceType: "n1-standard",
 				},
 			},
 		},
 	}
+	return cd
+}
+
+func validAWSClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.AWS = &hivev1aws.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		Region:               "test-region",
+	}
+	return cd
 }
 
 func validAzureClusterDeployment() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			BaseDomain:  "azure.example.com",
-			ClusterName: "AzureCluster",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
-			Platform: hivev1.Platform{
-				Azure: &hivev1azure.Platform{
-					CredentialsSecretRef:        corev1.LocalObjectReference{Name: "fake-creds-secret"},
-					Region:                      "test-region",
-					BaseDomainResourceGroupName: "os4-common",
-				},
-			},
-			Provisioning: &hivev1.Provisioning{
-				InstallConfigSecretRef: corev1.LocalObjectReference{
-					Name: "test-install-config",
-				},
-			},
-		},
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.Azure = &hivev1azure.Platform{
+		CredentialsSecretRef:        corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		Region:                      "test-region",
+		BaseDomainResourceGroupName: "os4-common",
 	}
+	return cd
 }
 
 // Meant to be used to compare new and old as the same values.
@@ -530,6 +536,27 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
+		// TODO: ensure Azure clusterDeployments have necessary info for
+		// machine sets
+		// {
+		// 	name: "not setting instance type on Azure machine pool",
+		// 	newObject: func() *hivev1.ClusterDeployment {
+		// 		cd := validAzureClusterDeployment()
+		// 		cd.Spec.Compute = []hivev1.MachinePool{
+		// 			{
+		// 				Name: "testmachinepool",
+		// 				Platform: hivev1.MachinePoolPlatform{
+		// 					Azure: &hivev1azure.MachinePool{
+		// 						InstanceType: "",
+		// 					},
+		// 				},
+		// 			},
+		// 		}
+		// 		return cd
+		// 	}(),
+		// 	operation:       admissionv1beta1.Create,
+		// 	expectedAllowed: false,
+		// },
 		{
 			name: "create with two cloud platforms",
 			newObject: func() *hivev1.ClusterDeployment {
@@ -637,6 +664,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name:            "valid GCP clusterdeployment",
+			newObject:       validGCPClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name: "Provisioning is missing",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
@@ -711,7 +744,7 @@ func TestNewClusterDeploymentValidatingAdmissionHook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	os.Setenv(ManagedDomainsFileEnvVar, tempFile.Name())
+	os.Setenv(constants.ManagedDomainsFileEnvVar, tempFile.Name())
 	webhook := NewClusterDeploymentValidatingAdmissionHook()
 	assert.Equal(t, webhook.validManagedDomains, domains, "valid domains must match expected")
 }

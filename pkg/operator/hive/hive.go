@@ -45,22 +45,23 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	asset := assets.MustAsset("config/manager/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
+	hiveContainer := &hiveDeployment.Spec.Template.Spec.Containers[0]
 
 	if r.hiveImage != "" {
-		hiveDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
+		hiveContainer.Image = r.hiveImage
 		hiveImageEnvVar := corev1.EnvVar{
 			Name:  images.HiveImageEnvVar,
 			Value: r.hiveImage,
 		}
 
-		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, hiveImageEnvVar)
+		hiveContainer.Env = append(hiveContainer.Env, hiveImageEnvVar)
 	}
 
 	if r.hiveImagePullPolicy != "" {
-		hiveDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = r.hiveImagePullPolicy
+		hiveContainer.ImagePullPolicy = r.hiveImagePullPolicy
 
-		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(
-			hiveDeployment.Spec.Template.Spec.Containers[0].Env,
+		hiveContainer.Env = append(
+			hiveContainer.Env,
 			corev1.EnvVar{
 				Name:  images.HiveImagePullPolicyEnvVar,
 				Value: string(r.hiveImagePullPolicy),
@@ -68,19 +69,41 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		)
 	}
 
+	if e := instance.Spec.ExternalDNS; e != nil {
+		switch {
+		case e.AWS != nil:
+			hiveContainer.Env = append(
+				hiveContainer.Env,
+				corev1.EnvVar{
+					Name:  constants.ExternalDNSAWSCredsEnvVar,
+					Value: e.AWS.CredentialsSecretRef.Name,
+				},
+			)
+		case e.GCP != nil:
+			hiveContainer.Env = append(
+				hiveContainer.Env,
+				corev1.EnvVar{
+					Name:  constants.ExternalDNSGCPCredsEnvVar,
+					Value: e.GCP.Credentials.Name,
+				},
+			)
+		}
+		addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec)
+	}
+
 	// By default we will try to gather logs on failed installs:
 	logsEnvVar := corev1.EnvVar{
 		Name:  constants.SkipGatherLogsEnvVar,
 		Value: strconv.FormatBool(instance.Spec.FailedProvisionConfig.SkipGatherLogs),
 	}
-	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, logsEnvVar)
+	hiveContainer.Env = append(hiveContainer.Env, logsEnvVar)
 
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{
 			Name:  dnsServersEnvVar,
 			Value: zoneCheckDNSServers,
 		}
-		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, dnsServersEnvVar)
+		hiveContainer.Env = append(hiveContainer.Env, dnsServersEnvVar)
 	}
 
 	if instance.Spec.Backup.Velero.Enabled {
@@ -89,7 +112,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			Name:  hiveconstants.VeleroBackupEnvVar,
 			Value: "true",
 		}
-		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, tmpEnvVar)
+		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
 	}
 
 	if instance.Spec.Backup.MinBackupPeriodSeconds != nil {
@@ -98,7 +121,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			Name:  hiveconstants.MinBackupPeriodSecondsEnvVar,
 			Value: strconv.Itoa(*instance.Spec.Backup.MinBackupPeriodSeconds),
 		}
-		hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, tmpEnvVar)
+		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
 	}
 
 	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {

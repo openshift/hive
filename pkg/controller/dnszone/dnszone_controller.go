@@ -2,8 +2,13 @@ package dnszone
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"reflect"
+	"strings"
 	"time"
 
+	"github.com/miekg/dns"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -11,12 +16,15 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -24,8 +32,13 @@ import (
 )
 
 const (
-	controllerName     = "dnszone"
-	zoneResyncDuration = 2 * time.Hour
+	controllerName                  = "dnszone"
+	zoneResyncDuration              = 2 * time.Hour
+	domainAvailabilityCheckInterval = 30 * time.Second
+	defaultNSRecordTTL              = hivev1.TTL(60)
+	dnsClientTimeout                = 30 * time.Second
+	resolverConfigFile              = "/etc/resolv.conf"
+	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
 )
 
 // Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -41,6 +54,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme:           mgr.GetScheme(),
 		logger:           log.WithField("controller", controllerName),
 		awsClientBuilder: awsclient.NewClient,
+		soaLookup:        lookupSOARecord,
 	}
 }
 
@@ -72,26 +86,13 @@ type ReconcileDNSZone struct {
 
 	// awsClientBuilder is a function pointer to the function that builds the aws client.
 	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
-}
 
-// NewReconcileDNSZone creates a new reconciler for testing purposes
-func NewReconcileDNSZone(client client.Client, scheme *runtime.Scheme, logger log.FieldLogger, awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)) *ReconcileDNSZone {
-	return &ReconcileDNSZone{
-		Client:           client,
-		scheme:           scheme,
-		logger:           logger,
-		awsClientBuilder: awsClientBuilder,
-	}
-}
-
-// SetAWSClientBuilder sets the AWS client builder for testing purposes
-func (r *ReconcileDNSZone) SetAWSClientBuilder(awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)) {
-	r.awsClientBuilder = awsClientBuilder
+	// soaLookup is a function that looks up a zone's SOA record
+	soaLookup func(string, log.FieldLogger) (bool, error)
 }
 
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
 // and what is in the DNSZone.Spec
-// Automatically generate RBAC rules to allow the Controller to read and write DNSZones
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	dnsLog := r.logger.WithFields(log.Fields{
@@ -122,47 +123,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// Handle an edge case here where if the DNSZone has been deleted, it has it's finalizer, our AWS
-	// creds secret is missing, and our namespace is terminated, we know we've entered a bad state
-	// where we must give up and remove the finalizer. A followup fix should prevent this problem from
-	// happening but we need to cleanup stuck DNSZones regardless.
-	if desiredState.DeletionTimestamp != nil && controllerutils.HasFinalizer(desiredState, hivev1.FinalizerDNSZone) {
-		if desiredState.Spec.AWS != nil && desiredState.Spec.AWS.AccountSecretRef.Name != "" {
-			secretName := desiredState.Spec.AWS.AccountSecretRef.Name
-			secret := &corev1.Secret{}
-			err := r.Client.Get(context.TODO(),
-				types.NamespacedName{
-					Name:      secretName,
-					Namespace: desiredState.Namespace,
-				},
-				secret)
-			if err != nil && errors.IsNotFound(err) {
-				// Check if our namespace is deleted, if so we need to give up and remove our finalizer:
-				ns := &corev1.Namespace{}
-				err = r.Get(context.TODO(), types.NamespacedName{Name: desiredState.Namespace}, ns)
-				if err != nil {
-					dnsLog.WithError(err).Error("error checking for deletionTimestamp on namespace")
-					return reconcile.Result{}, err
-				}
-				if ns.DeletionTimestamp != nil {
-					dnsLog.Warn("detected a namespace deleted before dnszone could be cleaned up, giving up and removing finalizer")
-					// Remove the finalizer from the DNSZone. It will be persisted when we persist status
-					dnsLog.Debug("Removing DNSZone finalizer")
-					controllerutils.DeleteFinalizer(desiredState, hivev1.FinalizerDNSZone)
-					err := r.Client.Update(context.TODO(), desiredState)
-					if err != nil {
-						dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
-					}
-				}
-				return reconcile.Result{}, err
-			} else if err != nil {
-				dnsLog.WithError(err).Error("error loading AWS creds secret")
-				return reconcile.Result{}, err
-			}
-		}
-	}
-
-	// See if we need to sync. This is what rate limits our AWS API usage, but allows for immediate syncing
+	// See if we need to sync. This is what rate limits our dns provider API usage, but allows for immediate syncing
 	// on spec changes and deletes.
 	shouldSync, delta := shouldSync(desiredState)
 	if !shouldSync {
@@ -175,21 +136,38 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
-	awsClient, err := r.getAWSClient(desiredState, dnsLog)
+	actuator, err := r.getActuator(desiredState, dnsLog)
 	if err != nil {
-		dnsLog.WithError(err).Error("Error creating aws client")
-		return reconcile.Result{}, err
-	}
+		// Handle an edge case here where if the DNSZone has been deleted, it has its finalizer, the actuator couldn't be
+		// created (presumably because creds secret is absent), and our namespace is terminated, we know we've entered a bad state
+		// where we must give up and remove the finalizer. A followup fix should prevent this problem from
+		// happening but we need to cleanup stuck DNSZones regardless.
+		if desiredState.DeletionTimestamp != nil && controllerutils.HasFinalizer(desiredState, hivev1.FinalizerDNSZone) {
+			// Check if our namespace is deleted, if so we need to give up and remove our finalizer:
+			ns := &corev1.Namespace{}
+			err = r.Get(context.TODO(), types.NamespacedName{Name: desiredState.Namespace}, ns)
+			if err != nil {
+				dnsLog.WithError(err).Error("error checking for deletionTimestamp on namespace")
+				return reconcile.Result{}, err
+			}
+			if ns.DeletionTimestamp != nil {
+				dnsLog.Warn("detected a namespace deleted before dnszone could be cleaned up, giving up and removing finalizer")
+				// Remove the finalizer from the DNSZone. It will be persisted when we persist status
+				dnsLog.Debug("Removing DNSZone finalizer")
+				controllerutils.DeleteFinalizer(desiredState, hivev1.FinalizerDNSZone)
+				err := r.Client.Update(context.TODO(), desiredState)
+				if err != nil {
+					dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
+				}
 
-	zr, err := NewZoneReconciler(
-		desiredState,
-		r.Client,
-		dnsLog,
-		awsClient,
-		r.scheme,
-	)
-	if err != nil {
-		dnsLog.WithError(err).Error("Error creating zone reconciler")
+				// This returns whether there was an error or not.
+				// This is desired so that on success, this dnszone is NOT requeued. Falling through
+				// would cause a requeue because of the actuator erroring.
+				return reconcile.Result{}, err
+			}
+		}
+
+		dnsLog.WithError(err).Error("error instantiating actuator")
 		return reconcile.Result{}, err
 	}
 
@@ -199,14 +177,114 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		"currentGeneration":  desiredState.Generation,
 		"lastSyncGeneration": desiredState.Status.LastSyncGeneration,
 	}).Info("Syncing DNS Zone")
-	result, err := zr.Reconcile()
+	result, err := r.reconcileDNSProvider(actuator, desiredState)
 	if err != nil {
 		dnsLog.WithError(err).Error("Encountered error while attempting to reconcile")
 	}
 	return result, err
 }
 
+// ReconcileDNSProvider attempts to make the current state reflect the desired state. It does this idempotently.
+func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone) (reconcile.Result, error) {
+	r.logger.Debug("Retrieving current state")
+	err := actuator.Refresh()
+	if err != nil {
+		r.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
+		return reconcile.Result{}, err
+	}
+
+	zoneFound, err := actuator.Exists()
+	if err != nil {
+		r.logger.WithError(err).Error("Failed while checking if hosted zone exists")
+		return reconcile.Result{}, err
+	}
+
+	if dnsZone.DeletionTimestamp != nil {
+		if zoneFound {
+			r.logger.Debug("DNSZone resource is deleted, deleting hosted zone")
+			err := actuator.Delete()
+			if err != nil {
+				r.logger.WithError(err).Error("Failed to delete hosted zone")
+				return reconcile.Result{}, err
+			}
+		}
+		if controllerutils.HasFinalizer(dnsZone, hivev1.FinalizerDNSZone) {
+			// Remove the finalizer from the DNSZone. It will be persisted when we persist status
+			r.logger.Info("Removing DNSZone finalizer")
+			controllerutils.DeleteFinalizer(dnsZone, hivev1.FinalizerDNSZone)
+			err := r.Client.Update(context.TODO(), dnsZone)
+			if err != nil {
+				r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
+			}
+		}
+		return reconcile.Result{}, err
+	}
+	if !controllerutils.HasFinalizer(dnsZone, hivev1.FinalizerDNSZone) {
+		r.logger.Info("DNSZone does not have a finalizer. Adding one.")
+		controllerutils.AddFinalizer(dnsZone, hivev1.FinalizerDNSZone)
+		err := r.Client.Update(context.TODO(), dnsZone)
+		if err != nil {
+			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to add finalizer to DNSZone")
+		}
+		return reconcile.Result{}, err
+	}
+	if !zoneFound {
+		r.logger.Info("No corresponding hosted zone found on cloud provider, creating one")
+		err := actuator.Create()
+		if err != nil {
+			r.logger.WithError(err).Error("Failed to create hosted zone")
+			return reconcile.Result{}, err
+		}
+	} else {
+		r.logger.Info("Existing hosted zone found. Syncing with DNSZone resource")
+		err := actuator.UpdateMetadata()
+		if err != nil {
+			r.logger.WithError(err).Error("failed to sync tags for hosted zone")
+			return reconcile.Result{}, err
+		}
+	}
+
+	nameServers, err := actuator.GetNameServers()
+	if err != nil {
+		r.logger.WithError(err).Error("Failed to get hosted zone name servers")
+		return reconcile.Result{}, err
+	}
+
+	if dnsZone.Spec.LinkToParentDomain {
+		err := r.syncParentDomainLink(nameServers, dnsZone)
+		if err != nil {
+			r.logger.WithError(err).Error("failed syncing parent domain link")
+			return reconcile.Result{}, err
+		}
+	}
+
+	isZoneSOAAvailable, err := r.soaLookup(dnsZone.Spec.Zone, r.logger)
+	if err != nil {
+		r.logger.WithError(err).Error("error looking up SOA record for zone")
+	}
+
+	reconcileResult := reconcile.Result{}
+	if !isZoneSOAAvailable {
+		r.logger.Info("SOA record for DNS zone not available")
+		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
+	}
+
+	r.logger.Debug("Letting the actuator modify the DNSZone status before sending it to kube.")
+	err = actuator.ModifyStatus()
+	if err != nil {
+		r.logger.WithError(err).Error("error modifying DNSZone status")
+		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
+		return reconcileResult, err
+	}
+
+	return reconcileResult, r.updateStatus(nameServers, isZoneSOAAvailable, dnsZone)
+}
+
 func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
+	if desiredState.DeletionTimestamp != nil && !controllerutils.HasFinalizer(desiredState, hivev1.FinalizerDNSZone) {
+		return false, 0 // No finalizer means our cleanup has been completed. There's nothing left to do.
+	}
+
 	if desiredState.DeletionTimestamp != nil {
 		return true, 0 // We're in a deleting state, sync now.
 	}
@@ -236,21 +314,191 @@ func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
 	return false, delta
 }
 
-// getAWSClient generates an awsclient
-func (r *ReconcileDNSZone) getAWSClient(dnsZone *hivev1.DNSZone, dnsLog log.FieldLogger) (awsclient.Client, error) {
-	// This allows for using host profiles for AWS auth.
-	var secretName, regionName string
+func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.FieldLogger) (Actuator, error) {
+	if dnsZone.Spec.AWS != nil {
+		secret := &corev1.Secret{}
+		err := r.Get(context.TODO(),
+			types.NamespacedName{
+				Name:      dnsZone.Spec.AWS.AccountSecretRef.Name,
+				Namespace: dnsZone.Namespace,
+			},
+			secret)
+		if err != nil {
+			return nil, err
+		}
 
-	if dnsZone != nil && dnsZone.Spec.AWS != nil {
-		secretName = dnsZone.Spec.AWS.AccountSecretRef.Name
-		regionName = dnsZone.Spec.AWS.Region
+		return NewAWSActuator(dnsLog, secret, dnsZone, awsclient.NewClientFromSecret)
 	}
 
-	awsClient, err := r.awsClientBuilder(r.Client, secretName, dnsZone.Namespace, regionName)
+	return nil, fmt.Errorf("unable to determine which actuator to use")
+}
+
+func (r *ReconcileDNSZone) syncParentDomainLink(nameServers []string, dnsZone *hivev1.DNSZone) error {
+	existingLinkRecord := &hivev1.DNSEndpoint{}
+	existingLinkRecordName := types.NamespacedName{
+		Namespace: dnsZone.Namespace,
+		Name:      parentLinkRecordName(dnsZone.Name),
+	}
+	err := r.Client.Get(context.TODO(), existingLinkRecordName, existingLinkRecord)
+	if err != nil && !errors.IsNotFound(err) {
+		r.logger.WithError(err).Error("failed retrieving existing DNSEndpoint")
+		return err
+	}
+	dnsEndpointNotFound := err != nil
+
+	linkRecord, err := r.parentLinkRecord(nameServers, dnsZone)
 	if err != nil {
-		dnsLog.WithError(err).Error("Error creating AWSClient")
+		r.logger.WithError(err).Error("failed to create parent link DNSEndpoint")
+		return err
+	}
+
+	if dnsEndpointNotFound {
+		if err = r.Client.Create(context.TODO(), linkRecord); err != nil {
+			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "failed creating DNSEndpoint")
+			return err
+		}
+		return nil
+	}
+
+	if !reflect.DeepEqual(existingLinkRecord.Spec, linkRecord.Spec) {
+		existingLinkRecord.Spec = linkRecord.Spec
+		if err = r.Client.Update(context.TODO(), existingLinkRecord); err != nil {
+			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update existing DNSEndpoint")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *ReconcileDNSZone) parentLinkRecord(nameServers []string, dnsZone *hivev1.DNSZone) (*hivev1.DNSEndpoint, error) {
+	targets := hivev1.Targets{}
+	for _, nameServer := range nameServers {
+		// external-dns will compare the NS record values without the
+		// dot at the end. If a dot is present, an update happens every sync.
+		targets = append(targets, strings.TrimSuffix(nameServer, "."))
+	}
+	endpoint := &hivev1.DNSEndpoint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      parentLinkRecordName(dnsZone.Name),
+			Namespace: dnsZone.Namespace,
+		},
+		Spec: hivev1.DNSEndpointSpec{
+			Endpoints: []*hivev1.Endpoint{
+				{
+					DNSName:    dnsZone.Spec.Zone,
+					Targets:    targets,
+					RecordType: "NS",
+					RecordTTL:  defaultNSRecordTTL,
+				},
+			},
+		},
+	}
+	if err := controllerutil.SetControllerReference(dnsZone, endpoint, r.scheme); err != nil {
 		return nil, err
 	}
+	return endpoint, nil
+}
 
-	return awsClient, nil
+func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable bool, dnsZone *hivev1.DNSZone) error {
+	orig := dnsZone.DeepCopy()
+	r.logger.Debug("Updating DNSZone status")
+
+	dnsZone.Status.NameServers = nameServers
+
+	var availableStatus corev1.ConditionStatus
+	var availableReason, availableMessage string
+	if isSOAAvailable {
+		// We need to keep track of the last time we synced to rate limit our dns provider calls.
+		tmpTime := metav1.Now()
+		dnsZone.Status.LastSyncTimestamp = &tmpTime
+
+		availableStatus = corev1.ConditionTrue
+		availableReason = "ZoneAvailable"
+		availableMessage = "DNS SOA record for zone is reachable"
+	} else {
+		availableStatus = corev1.ConditionFalse
+		availableReason = "ZoneUnavailable"
+		availableMessage = "DNS SOA record for zone is not reachable"
+	}
+	dnsZone.Status.LastSyncGeneration = dnsZone.ObjectMeta.Generation
+	dnsZone.Status.Conditions = controllerutils.SetDNSZoneCondition(
+		dnsZone.Status.Conditions,
+		hivev1.ZoneAvailableDNSZoneCondition,
+		availableStatus,
+		availableReason,
+		availableMessage,
+		controllerutils.UpdateConditionNever)
+
+	if !reflect.DeepEqual(orig.Status, dnsZone.Status) {
+		err := r.Client.Status().Update(context.TODO(), dnsZone)
+		if err != nil {
+			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Cannot update DNSZone status")
+		}
+		return err
+	}
+	return nil
+}
+
+func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
+	// TODO: determine if there's a better way to obtain resolver endpoints
+	clientConfig, _ := dns.ClientConfigFromFile(resolverConfigFile)
+	client := dns.Client{Timeout: dnsClientTimeout}
+
+	dnsServers := []string{}
+	serversFromEnv := os.Getenv(zoneCheckDNSServersEnvVar)
+	if len(serversFromEnv) > 0 {
+		dnsServers = strings.Split(serversFromEnv, ",")
+		// Add port to servers with unspecified port
+		for i := range dnsServers {
+			if !strings.Contains(dnsServers[i], ":") {
+				dnsServers[i] = dnsServers[i] + ":53"
+			}
+		}
+	} else {
+		for _, s := range clientConfig.Servers {
+			dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
+		}
+	}
+	logger.WithField("servers", dnsServers).Info("looking up domain SOA record")
+
+	m := &dns.Msg{}
+	m.SetQuestion(zone+".", dns.TypeSOA)
+	for _, s := range dnsServers {
+		in, rtt, err := client.Exchange(m, s)
+		if err != nil {
+			logger.WithError(err).WithField("server", s).Info("query for SOA record failed")
+			continue
+		}
+		log.WithField("server", s).Infof("SOA query duration: %v", rtt)
+		if len(in.Answer) > 0 {
+			for _, rr := range in.Answer {
+				soa, ok := rr.(*dns.SOA)
+				if !ok {
+					logger.Info("Record returned is not an SOA record: %#v", rr)
+					continue
+				}
+				if soa.Hdr.Name != appendPeriod(zone) {
+					logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned but it does not match the lookup zone")
+					return false, nil
+				}
+				logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned, zone is reachable")
+				return true, nil
+			}
+		}
+		logger.WithField("server", s).Info("no answer for SOA record returned")
+		return false, nil
+	}
+	return false, nil
+}
+
+func parentLinkRecordName(dnsZoneName string) string {
+	return apihelpers.GetResourceName(dnsZoneName, "ns")
+}
+
+func appendPeriod(name string) string {
+	if !strings.HasSuffix(name, ".") {
+		return name + "."
+	}
+	return name
 }

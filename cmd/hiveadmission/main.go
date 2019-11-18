@@ -18,6 +18,7 @@ func main() {
 		hivevalidatingwebhooks.NewClusterDeploymentValidatingAdmissionHook(),
 		&hivevalidatingwebhooks.ClusterImageSetValidatingAdmissionHook{},
 		&hivevalidatingwebhooks.ClusterProvisionValidatingAdmissionHook{},
+		&hivevalidatingwebhooks.MachinePoolValidatingAdmissionHook{},
 		&hivevalidatingwebhooks.SyncSetValidatingAdmissionHook{},
 		&hivevalidatingwebhooks.SelectorSyncSetValidatingAdmissionHook{},
 	)

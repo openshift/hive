@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -37,50 +38,60 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name     string
-		existing []runtime.Object
-		validate func(t *testing.T, c client.Client)
+		name        string
+		deployment  *hivev1.ClusterDeployment
+		deprovision *hivev1.ClusterDeprovision
+		existing    []runtime.Object
+		validate    func(t *testing.T, c client.Client)
+		expectErr   bool
 	}{
 		{
 			name: "no-op deleting",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					req := testClusterDeprovision()
-					now := metav1.Now()
-					req.DeletionTimestamp = &now
-					return req
-				}(),
-			},
+			deprovision: func() *hivev1.ClusterDeprovision {
+				req := testClusterDeprovision()
+				now := metav1.Now()
+				req.DeletionTimestamp = &now
+				return req
+			}(),
+			deployment: testDeletedClusterDeployment(),
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
 		},
 		{
 			name: "no-op completed",
-			existing: []runtime.Object{
-				func() runtime.Object {
-					req := testClusterDeprovision()
-					req.Status.Completed = true
-					return req
-				}(),
-			},
+			deprovision: func() *hivev1.ClusterDeprovision {
+				req := testClusterDeprovision()
+				req.Status.Completed = true
+				return req
+			}(),
+			deployment: testDeletedClusterDeployment(),
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
 		},
 		{
-			name: "create uninstall job",
-			existing: []runtime.Object{
-				testClusterDeprovision(),
+			name:        "no-op if cluster deployment not deleted",
+			deprovision: testClusterDeprovision(),
+			deployment:  testClusterDeployment(),
+			validate: func(t *testing.T, c client.Client) {
+				validateNoJobExists(t, c)
 			},
+			expectErr: true,
+		},
+		{
+			name:        "create uninstall job",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
 			validate: func(t *testing.T, c client.Client) {
 				validateJobExists(t, c)
 			},
 		},
 		{
-			name: "no-op when job in progress",
+			name:        "no-op when job in progress",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				testClusterDeprovision(),
 				testUninstallJob(),
 			},
 			validate: func(t *testing.T, c client.Client) {
@@ -88,9 +99,10 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "completed when job is successful",
+			name:        "completed when job is successful",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				testClusterDeprovision(),
 				func() runtime.Object {
 					job := testUninstallJob()
 					job.Status.Conditions = []batchv1.JobCondition{
@@ -110,9 +122,10 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "regenerate job when hash missing",
+			name:        "regenerate job when hash missing",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				testClusterDeprovision(),
 				func() *batchv1.Job {
 					job := testUninstallJob()
 					delete(job.Annotations, jobHashAnnotation)
@@ -124,9 +137,10 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "regenerate job when hash changed",
+			name:        "regenerate job when hash changed",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				testClusterDeprovision(),
 				func() *batchv1.Job {
 					job := testUninstallJob()
 					job.Annotations[jobHashAnnotation] = "DIFFERENTHASH"
@@ -141,7 +155,18 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existing...)
+
+			if test.deployment != nil {
+				// Associate the cluster deployment as the owner of the provision to match real world:
+				err := controllerutil.SetControllerReference(test.deployment, test.deprovision, scheme.Scheme)
+				if err != nil {
+					t.Errorf("unable to set owner reference on deprovision: %v", err)
+					return
+				}
+			}
+			existing := append(test.existing, test.deprovision, test.deployment)
+
+			fakeClient := fake.NewFakeClient(existing...)
 			r := &ReconcileClusterDeprovision{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
@@ -158,7 +183,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				test.validate(t, fakeClient)
 			}
 
-			if err != nil {
+			if !test.expectErr && err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
 		})
@@ -182,6 +207,25 @@ func testClusterDeprovision() *hivev1.ClusterDeprovision {
 					},
 				},
 			},
+		},
+	}
+}
+
+func testDeletedClusterDeployment() *hivev1.ClusterDeployment {
+	now := metav1.Now()
+	cd := testClusterDeployment()
+	cd.ObjectMeta.DeletionTimestamp = &now
+	return cd
+}
+
+func testClusterDeployment() *hivev1.ClusterDeployment {
+	return &hivev1.ClusterDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: testNamespace,
+			Name:      testName,
+		},
+		Spec: hivev1.ClusterDeploymentSpec{
+			Installed: true,
 		},
 	}
 }

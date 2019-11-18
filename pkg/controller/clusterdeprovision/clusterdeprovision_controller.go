@@ -2,6 +2,8 @@ package clusterdeprovision
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -132,6 +134,30 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 
 	if instance.Status.Completed {
 		rLog.Debug("clusterdeprovision is complete, skipping")
+		return reconcile.Result{}, nil
+	}
+
+	// Check if there is a ClusterDeployment owning this Deprovision, if so look it up and
+	// make sure it has a deletion timestamp. Otherwise bail out as a safety check.
+	oRef := metav1.GetControllerOf(instance)
+	if oRef == nil {
+		// TODO: this was once supported to cleanup self-managed "preserveOnDelete" clusters,
+		// but the feature was killed off. For now we'd rather not open the door to dangling
+		// ClusterDeprovisions with no associated cluster.
+		rLog.Warn("ClusterDeprovision does not have an owning ClusterDeployment")
+		return reconcile.Result{}, nil
+	}
+	if oRef.Kind != "ClusterDeployment" || !strings.HasPrefix(oRef.APIVersion, "hive.openshift.io") {
+		rLog.Warnf("ClusterDeprovision has a non-ClusterDeployment owner: %v", oRef)
+		return reconcile.Result{}, nil
+	}
+	cd := &hivev1.ClusterDeployment{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: instance.Namespace, Name: oRef.Name}, cd); err != nil {
+		rLog.Error("error looking up ClusterDeployment that owns ClusterDeprovision")
+		return reconcile.Result{}, fmt.Errorf("error looking up ClusterDeployment that owns ClusterDeprovision")
+	}
+	if cd.DeletionTimestamp == nil {
+		rLog.Error("ClusterDeprovision created for ClusterDeployment that has not been deleted")
 		return reconcile.Result{}, nil
 	}
 

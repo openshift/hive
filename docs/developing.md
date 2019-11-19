@@ -118,6 +118,24 @@ kind delete cluster --name hive
 ./hack/create-kind-cluster.sh hive
 ```
 
+## Adopting ClusterDeployments
+
+It is possible to adopt cluster deployments into Hive, potentially even fake or kind clusters. This can be useful for developers who would like to work on functionality separate from actual provisioning.
+
+To create a kind cluster and adopt:
+
+```bash
+./hack/create-kind-cluster.sh cluster1
+bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=$(kind get kubeconfig-path --name="cluster1") --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
+```
+
+NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)
+
+Alternatively you can use any valid kubeconfig for live or since deleted clusters.
+
+Deprovision will run but find nothing to delete if no resources are tagged with your fake infrastructure ID.
+
+
 ## Writing/Testing Code
 
 Our typical approach to manually testing code is to deploy Hive into your current cluster as defined by kubeconfig, scale down the relevant component you wish to test, and then run its code locally.

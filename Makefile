@@ -66,17 +66,21 @@ build: $(GOPATH)/bin/mockgen manager hiveutil hiveadmission operator
 
 
 # Build manager binary
+.PHONY: manager
 manager: generate
 	go build -o bin/manager github.com/openshift/hive/cmd/manager
 
+.PHONY: operator
 operator: generate
 	go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
 
 # Build hiveutil binary
+.PHONY: hiveutil
 hiveutil: generate
 	go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
 
 # Build hiveadmission binary
+.PHONY: hiveadmission
 hiveadmission:
 	go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
 

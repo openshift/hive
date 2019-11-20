@@ -57,6 +57,17 @@ spec:
                     use
                   type: string
               type: object
+            gcp:
+              description: GCP specifies GCP-specific cloud configuration
+              properties:
+                credentialsSecretRef:
+                  description: CredentialsSecretRef references a secret that will
+                    be used to authenticate with GCP CloudDNS. It will need permission
+                    to create and manage CloudDNS Hosted Zones. Secret should have
+                    a key named 'osServiceAccount.json'. The credentials must specify
+                    the project to use.
+                  type: object
+              type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
                 be automatically created to link this DNSZone with a parent domain.
@@ -104,6 +115,14 @@ spec:
                     type: string
                 type: object
               type: array
+            gcp:
+              description: GCPDNSZoneStatus contains status information specific to
+                GCP
+              properties:
+                zoneName:
+                  description: ZoneName is the name of the zone in GCP Cloud DNS
+                  type: string
+              type: object
             lastSyncGeneration:
               description: LastSyncGeneration is the generation of the zone resource
                 that was last sync'd. This is used to know if the Object has changed

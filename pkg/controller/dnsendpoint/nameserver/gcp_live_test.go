@@ -14,6 +14,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
 )
 
@@ -132,7 +133,7 @@ func (s *LiveGCPTestSuite) getCUT() *gcpQuery {
 	if err != nil {
 		s.T().Fatalf("could not get the current user: %v", err)
 	}
-	authJSON, err := ioutil.ReadFile(filepath.Join(usr.HomeDir, ".gcp/osServiceAccount.json"))
+	authJSON, err := ioutil.ReadFile(filepath.Join(usr.HomeDir, ".gcp", constants.GCPCredentialsName))
 	if err != nil {
 		s.T().Fatalf("could not read gcp creds: %v", err)
 	}

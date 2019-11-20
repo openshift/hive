@@ -346,7 +346,6 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
-			Compute:     []hivev1.MachinePool{},
 			PullSecretRef: &corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},

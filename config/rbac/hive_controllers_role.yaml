@@ -133,6 +133,20 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - hive.openshift.io
+  resources:
+  - machinepools
+  - machinepools/status
+  - machinepools/finalizers
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - batch
   resources:
   - jobs

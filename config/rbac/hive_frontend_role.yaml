@@ -45,6 +45,7 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
+  - machinepools
   - selectorsyncidentityproviders
   - syncidentityproviders
   - selectorsyncsets

@@ -54,10 +54,6 @@ type ClusterDeploymentSpec struct {
 	// +required
 	BaseDomain string `json:"baseDomain"`
 
-	// Compute is the list of MachinePools containing compute nodes that need to be installed.
-	// +required
-	Compute []MachinePool `json:"compute"`
-
 	// Platform is the configuration for the specific platform upon which to
 	// perform the installation.
 	// +required

@@ -13,16 +13,8 @@ import (
 
 func TestStorageClusterDeployment(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
-	replicas := int64(3)
 	created := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-		Spec: hivev1.ClusterDeploymentSpec{
-			Compute: []hivev1.MachinePool{
-				{
-					Replicas: &replicas,
-				},
-			},
-		},
 	}
 	g := gomega.NewGomegaWithT(t)
 

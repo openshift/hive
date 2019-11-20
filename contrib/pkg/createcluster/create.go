@@ -298,7 +298,9 @@ type cloudProvider interface {
 	addPlatformDetails(
 		o *Options,
 		cd *hivev1.ClusterDeployment,
-		installConfig *installertypes.InstallConfig) error
+		machinePool *hivev1.MachinePool,
+		installConfig *installertypes.InstallConfig,
+	) error
 }
 
 // Run executes the command
@@ -441,7 +443,25 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		},
 	}
 
-	if err := o.cloudProvider.addPlatformDetails(o, cd, installConfig); err != nil {
+	computePool := &hivev1.MachinePool{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MachinePool",
+			APIVersion: hivev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-worker", o.Name),
+			Namespace: o.Namespace,
+		},
+		Spec: hivev1.MachinePoolSpec{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
+				Name: o.Name,
+			},
+			Name:     "worker",
+			Replicas: pointer.Int64Ptr(o.WorkerNodes),
+		},
+	}
+
+	if err := o.cloudProvider.addPlatformDetails(o, cd, computePool, installConfig); err != nil {
 		return nil, err
 	}
 
@@ -494,7 +514,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 	}
 
-	result = append(result, installConfigSecret, cd)
+	result = append(result, installConfigSecret, cd, computePool)
 
 	return result, err
 }
@@ -751,14 +771,8 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 			Images: hivev1.ProvisionImages{
 				InstallerImagePullPolicy: corev1.PullAlways,
 			},
-			ClusterName: o.Name,
-			BaseDomain:  o.BaseDomain,
-			Compute: []hivev1.MachinePool{
-				{
-					Name:     "worker",
-					Replicas: pointer.Int64Ptr(o.WorkerNodes),
-				},
-			},
+			ClusterName:  o.Name,
+			BaseDomain:   o.BaseDomain,
 			ManageDNS:    o.ManageDNS,
 			Provisioning: &hivev1.Provisioning{},
 		},

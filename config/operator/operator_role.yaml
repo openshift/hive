@@ -75,6 +75,7 @@ rules:
   - clusterprovisions
   - dnszones
   - dnsendpoints
+  - machinepools
   - selectorsyncidentityproviders
   - selectorsyncsets
   - syncidentityproviders
@@ -167,6 +168,7 @@ rules:
   - clusterimagesets
   - clusterprovisions
   - dnszones
+  - machinepools
   - selectorsyncsets
   - syncsets
   verbs:

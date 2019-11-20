@@ -1282,7 +1282,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		Compute:     []hivev1.MachinePool{},
 		PullSecretRef: &corev1.LocalObjectReference{
 			Name: pullSecretSecret,
 		},
@@ -1627,7 +1626,6 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
-		Compute:     []hivev1.MachinePool{},
 		Platform: hivev1.Platform{
 			AWS: &hivev1aws.Platform{
 				CredentialsSecretRef: corev1.LocalObjectReference{

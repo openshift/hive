@@ -19,7 +19,9 @@ import (
 )
 
 const (
-	azureCredFile = "osServicePrincipal.json"
+	azureCredFile     = "osServicePrincipal.json"
+	azureRegion       = "centralus"
+	azureInstanceType = "Standard_D2s_v3"
 )
 
 var _ cloudProvider = (*azureCloudProvider)(nil)
@@ -57,26 +59,33 @@ func (p *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secr
 	}, nil
 }
 
-func (p *azureCloudProvider) addPlatformDetails(o *Options, cd *hivev1.ClusterDeployment,
-	installConfig *installertypes.InstallConfig) error {
+func (p *azureCloudProvider) addPlatformDetails(
+	o *Options,
+	cd *hivev1.ClusterDeployment,
+	machinePool *hivev1.MachinePool,
+	installConfig *installertypes.InstallConfig,
+) error {
 	cd.Spec.Platform = hivev1.Platform{
 		Azure: &hivev1azure.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region:                      "centralus",
+			Region:                      azureRegion,
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 		},
 	}
 
-	cd.Spec.Compute[0].Platform = hivev1.MachinePoolPlatform{
-		Azure: &hivev1azure.MachinePool{},
+	machinePool.Spec.Platform.Azure = &hivev1azure.MachinePool{
+		InstanceType: azureInstanceType,
+		OSDisk: hivev1azure.OSDisk{
+			DiskSizeGB: 128,
+		},
 	}
 
 	// Inject platform details into InstallConfig:
 	installConfig.Platform = installertypes.Platform{
 		Azure: &azureinstallertypes.Platform{
-			Region:                      "centralus",
+			Region:                      azureRegion,
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 		},
 	}

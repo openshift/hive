@@ -9,6 +9,8 @@ import (
 
 	"github.com/openshift/hive/test/e2e/common"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -24,48 +26,46 @@ func TestManageMachineSets(t *testing.T) {
 	}
 
 	c := common.MustGetClient()
-	found := -1
-	for i, machinePool := range cd.Spec.Compute {
-		if machinePool.Name == "infra" {
-			found = i
-			break
-		}
+
+	if pool := common.GetMachinePool(cd, "infra"); pool != nil {
+		t.Fatal("infra machine pool already exists")
 	}
 
-	infraMachinePool := hivev1.MachinePool{
-		Name:     "infra",
-		Replicas: int64ptr(3),
-		Platform: hivev1.MachinePoolPlatform{
-			AWS: &hivev1aws.MachinePoolPlatform{
-				InstanceType: "m4.large",
-				EC2RootVolume: hivev1aws.EC2RootVolume{
-					IOPS: 100,
-					Size: 22,
-					Type: "gp2",
+	infraMachinePool := &hivev1.MachinePool{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cd.Namespace,
+			Name:      fmt.Sprintf("%s-%s", cd.Name, "infra"),
+		},
+		Spec: hivev1.MachinePoolSpec{
+			ClusterDeploymentRef: corev1.LocalObjectReference{Name: cd.Name},
+			Name:                 "infra",
+			Replicas:             pointer.Int64Ptr(3),
+			Platform: hivev1.MachinePoolPlatform{
+				AWS: &hivev1aws.MachinePoolPlatform{
+					InstanceType: "m4.large",
+					EC2RootVolume: hivev1aws.EC2RootVolume{
+						IOPS: 100,
+						Size: 22,
+						Type: "gp2",
+					},
+				},
+			},
+			Labels: map[string]string{
+				"openshift.io/machine-type": "infra",
+			},
+			Taints: []corev1.Taint{
+				{
+					Key:    "openshift.io/compute",
+					Value:  "true",
+					Effect: corev1.TaintEffectPreferNoSchedule,
 				},
 			},
 		},
-		Labels: map[string]string{
-			"openshift.io/machine-type": "infra",
-		},
-		Taints: []corev1.Taint{
-			{
-				Key:    "openshift.io/compute",
-				Value:  "true",
-				Effect: corev1.TaintEffectPreferNoSchedule,
-			},
-		},
 	}
 
-	if found >= 0 {
-		cd.Spec.Compute[found] = infraMachinePool
-	} else {
-		cd.Spec.Compute = append(cd.Spec.Compute, infraMachinePool)
-	}
-
-	err := c.Update(context.TODO(), cd)
+	err := c.Create(context.TODO(), infraMachinePool)
 	if err != nil {
-		t.Fatalf("cannot update clusterdeployment to add infra machineset: %v", err)
+		t.Fatalf("cannot create infra machine pool: %v", err)
 	}
 
 	// Wait for machines to be created
@@ -134,16 +134,13 @@ func TestManageMachineSets(t *testing.T) {
 	}
 
 	// Now reduce the number of machines to 1 in the machine pool and wait for there to be only one machine
-	for i, compute := range cd.Spec.Compute {
-		if compute.Name == "infra" {
-			cd.Spec.Compute[i].Replicas = int64ptr(1)
-			break
-		}
+	infraMachinePool = common.GetMachinePool(cd, "infra")
+	if infraMachinePool == nil {
+		t.Fatal("could not find infra machine pool")
 	}
-
-	err = c.Update(context.TODO(), cd)
-	if err != nil {
-		t.Fatalf("cannot update clusterdeployment to reduce infra machineset: %v", err)
+	infraMachinePool.Spec.Replicas = pointer.Int64Ptr(1)
+	if err := c.Update(context.TODO(), infraMachinePool); err != nil {
+		t.Fatalf("cannot update infra machine pool to reduce replicas: %v", err)
 	}
 
 	common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
@@ -158,21 +155,12 @@ func TestManageMachineSets(t *testing.T) {
 
 	// Now remove the infra machinepool and make sure that any machinesets associated
 	// with it are removed
-	found = -1
-	for i, compute := range cd.Spec.Compute {
-		if compute.Name == "infra" {
-			found = i
-			break
-		}
+	infraMachinePool = common.GetMachinePool(cd, "infra")
+	if infraMachinePool == nil {
+		t.Fatalf("could not find infra machine pool")
 	}
-
-	if found == -1 {
-		t.Fatalf("did not find infra machine pool")
-	}
-	cd.Spec.Compute = append(cd.Spec.Compute[:found], cd.Spec.Compute[found+1:]...)
-	err = c.Update(context.TODO(), cd)
-	if err != nil {
-		t.Fatalf("cannot update clusterdeployment to reduce infra machineset: %v", err)
+	if err := c.Delete(context.TODO(), infraMachinePool); err != nil {
+		t.Fatalf("cannot delete infra machine pool: %v", err)
 	}
 
 	common.WaitForMachineSets(cfg, func(machineSets []*machinev1.MachineSet) bool {
@@ -184,8 +172,4 @@ func TestManageMachineSets(t *testing.T) {
 		}
 		return count == 0
 	}, 5*time.Minute)
-}
-
-func int64ptr(n int64) *int64 {
-	return &n
 }

@@ -34,11 +34,6 @@ func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 		Spec: hivev1.ClusterDeploymentSpec{
 			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
 			Provisioning: &hivev1.Provisioning{
 				InstallConfigSecretRef: corev1.LocalObjectReference{
 					Name: "test-install-config",
@@ -72,16 +67,6 @@ func validGCPClusterDeployment() *hivev1.ClusterDeployment {
 		ProjectID:            "my-test-project",
 		Region:               "us-central1",
 	}
-	cd.Spec.Compute = []hivev1.MachinePool{
-		{
-			Name: "SameMachinePoolName",
-			Platform: hivev1.MachinePoolPlatform{
-				GCP: &hivev1gcp.MachinePool{
-					InstanceType: "n1-standard",
-				},
-			},
-		},
-	}
 	return cd
 }
 
@@ -110,25 +95,14 @@ func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
 }
 
 func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
-	return &hivev1.ClusterDeployment{
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: "DifferentClusterName",
-			Compute: []hivev1.MachinePool{
-				{
-					Name: "SameMachinePoolName",
-				},
-			},
-		},
-	}
+	cd := validAWSClusterDeployment()
+	cd.Spec.ClusterName = "DifferentClusterName"
+	return cd
 }
 
 func validClusterDeploymentDifferentMutableValue() *hivev1.ClusterDeployment {
 	cd := validAWSClusterDeployment()
-	cd.Spec.Compute = []hivev1.MachinePool{
-		{
-			Name: "DifferentMachinePoolName",
-		},
-	}
+	cd.Spec.PreserveOnDelete = true
 	return cd
 }
 
@@ -417,37 +391,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			}(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
-		},
-		{
-			name:      "Test unallowed update of existing machinepool labels",
-			oldObject: validAWSClusterDeployment(),
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAWSClusterDeployment()
-				cd.Spec.Compute[0].Labels = map[string]string{
-					"newlabel": "newvalue",
-				}
-
-				return cd
-			}(),
-			operation:       admissionv1beta1.Update,
-			expectedAllowed: false,
-		},
-		{
-			name:      "Test unallowed update of existing machinepool taints",
-			oldObject: validAWSClusterDeployment(),
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAWSClusterDeployment()
-				cd.Spec.Compute[0].Taints = []corev1.Taint{
-					{
-						Key:   "testTaint",
-						Value: "testTaintVal",
-					},
-				}
-
-				return cd
-			}(),
-			operation:       admissionv1beta1.Update,
-			expectedAllowed: false,
 		},
 		{
 			name: "Test invalid wildcard ingress domain",

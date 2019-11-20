@@ -145,6 +145,10 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, r.syncDeletedEndpoint(instance, dnsLog)
 	}
 
+	if !r.nameServerScraper.HasBeenScraped(domain) {
+		return reconcile.Result{}, errors.New("name servers have not yet been scraped")
+	}
+
 	if !controllerutils.HasFinalizer(instance, hivev1.FinalizerDNSEndpoint) {
 		controllerutils.AddFinalizer(instance, hivev1.FinalizerDNSEndpoint)
 		if err := r.Update(context.TODO(), instance); err != nil {

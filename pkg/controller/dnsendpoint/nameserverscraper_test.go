@@ -302,6 +302,53 @@ func TestRemoveEndpoint(t *testing.T) {
 	}
 }
 
+func TestHasBeenScraped(t *testing.T) {
+	rootDomain := "domain.com"
+	domain := "test.domain.com"
+	cases := []struct {
+		name               string
+		rootDomains        []string
+		rootDomainToScrape string
+		expectedResult     bool
+	}{
+		{
+			name:        "no scrape",
+			rootDomains: []string{rootDomain},
+		},
+		{
+			name:               "scrape",
+			rootDomains:        []string{rootDomain},
+			rootDomainToScrape: rootDomain,
+			expectedResult:     true,
+		},
+		{
+			name:               "scrape other domain",
+			rootDomains:        []string{rootDomain, "other-domain"},
+			rootDomainToScrape: "other-domain",
+		},
+		{
+			name:               "scrape with multiple domains",
+			rootDomains:        []string{rootDomain, "other-domain"},
+			rootDomainToScrape: rootDomain,
+			expectedResult:     true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockQuery := mock.NewMockQuery(mockCtrl)
+			mockQuery.EXPECT().Get(tc.rootDomainToScrape).Return(nil, nil)
+			cut := newNameServerScraper(log.StandardLogger(), mockQuery, tc.rootDomains, nil)
+			if err := cut.scrape(tc.rootDomainToScrape); !assert.NoError(t, err, "error scraping") {
+				return
+			}
+			actualResult := cut.HasBeenScraped(domain)
+			assert.Equal(t, tc.expectedResult, actualResult, "unexpected result from HasBeenScraped")
+		})
+	}
+}
+
 func TestScrape(t *testing.T) {
 	cases := []struct {
 		name                string

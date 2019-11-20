@@ -33,8 +33,8 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "DNSZone without finalizer",
 			dnsZone: validDNSZoneWithoutFinalizer(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneExists(expect, validDNSZoneWithoutFinalizer())
-				mockExistingTags(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithoutFinalizer())
+				mockExistingAWSTags(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.True(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
@@ -44,11 +44,11 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Create Hosted Zone, No ID Set",
 			dnsZone: validDNSZoneWithoutID(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneDoesntExist(expect, validDNSZoneWithoutID())
-				mockCreateZone(expect)
-				mockNoExistingTags(expect)
-				mockSyncTags(expect)
-				mockGetNSRecord(expect)
+				mockAWSZoneDoesntExist(expect, validDNSZoneWithoutID())
+				mockCreateAWSZone(expect)
+				mockNoExistingAWSTags(expect)
+				mockSyncAWSTags(expect)
+				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.NotNil(t, zone.Status.AWS)
@@ -61,9 +61,9 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Adopt existing zone, No ID Set",
 			dnsZone: validDNSZoneWithoutID(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneExists(expect, validDNSZoneWithoutID())
-				mockExistingTags(expect)
-				mockGetNSRecord(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithoutID())
+				mockExistingAWSTags(expect)
+				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.NotNil(t, zone.Status.AWS)
@@ -76,12 +76,12 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Adopt existing zone, No ID Set, No Tags Set",
 			dnsZone: validDNSZoneWithoutID(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneDoesntExist(expect, validDNSZoneWithoutID())
-				mockCreateZoneDuplicateFailure(expect)
-				mockListZonesByNameFound(expect, validDNSZoneWithoutID())
-				mockNoExistingTags(expect)
-				mockSyncTags(expect)
-				mockGetNSRecord(expect)
+				mockAWSZoneDoesntExist(expect, validDNSZoneWithoutID())
+				mockCreateAWSZoneDuplicateFailure(expect)
+				mockListAWSZonesByNameFound(expect, validDNSZoneWithoutID())
+				mockNoExistingAWSTags(expect)
+				mockSyncAWSTags(expect)
+				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.NotNil(t, zone.Status.AWS)
@@ -94,10 +94,10 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Existing zone, sync tags",
 			dnsZone: validDNSZoneWithAdditionalTags(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
-				mockExistingTags(expect)
-				mockSyncTags(expect)
-				mockGetNSRecord(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingAWSTags(expect)
+				mockSyncAWSTags(expect)
+				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.Equal(t, zone.Status.LastSyncGeneration, int64(6))
@@ -107,9 +107,9 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Delete hosted zone",
 			dnsZone: validDNSZoneBeingDeleted(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
-				mockExistingTags(expect)
-				mockDeleteZone(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingAWSTags(expect)
+				mockDeleteAWSZone(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
@@ -119,7 +119,7 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Delete non-existent hosted zone",
 			dnsZone: validDNSZoneBeingDeleted(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneDoesntExist(expect, validDNSZoneBeingDeleted())
+				mockAWSZoneDoesntExist(expect, validDNSZoneBeingDeleted())
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
@@ -129,9 +129,9 @@ func TestReconcileDNSProvider(t *testing.T) {
 			name:    "Existing zone, link to parent, create DNSEndpoint",
 			dnsZone: validDNSZoneWithLinkToParent(),
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
-				mockExistingTags(expect)
-				mockGetNSRecord(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingAWSTags(expect)
+				mockAWSGetNSRecord(expect)
 			},
 			validateDNSEndpoint: func(t *testing.T, endpoint *hivev1.DNSEndpoint) {
 				assert.NotNil(t, endpoint, "endpoint record should exist")
@@ -143,9 +143,9 @@ func TestReconcileDNSProvider(t *testing.T) {
 			dnsEndpoint:     validDNSEndpoint(),
 			soaLookupResult: true,
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockZoneExists(expect, validDNSZoneWithAdditionalTags())
-				mockExistingTags(expect)
-				mockGetNSRecord(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingAWSTags(expect)
+				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)

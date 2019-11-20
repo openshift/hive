@@ -158,7 +158,11 @@ func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone stri
 			if recordSet.Type != "NS" {
 				continue
 			}
-			nameServers[undotted(recordSet.Name)] = sets.NewString(recordSet.Rrdatas...)
+			values := sets.NewString()
+			for _, v := range recordSet.Rrdatas {
+				values.Insert(undotted(v))
+			}
+			nameServers[undotted(recordSet.Name)] = values
 		}
 		if listOutput.NextPageToken == "" {
 			return nameServers, nil
@@ -183,8 +187,11 @@ func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone strin
 	if len(listOutput.Rrsets) == 0 {
 		return nil, nil
 	}
-	recordSet := listOutput.Rrsets[0]
-	return sets.NewString(recordSet.Rrdatas...), nil
+	values := sets.NewString()
+	for _, v := range listOutput.Rrsets[0].Rrdatas {
+		values.Insert(undotted(v))
+	}
+	return values, nil
 }
 
 // createNameServers creates the name servers for the specified domain in the specified managed zone.
@@ -198,9 +205,13 @@ func (q *gcpQuery) deleteNameServers(gcpClient gcpclient.Client, managedZone str
 }
 
 func (q *gcpQuery) resourceRecordSet(domain string, values sets.String) *dns.ResourceRecordSet {
+	dottedValues := make([]string, len(values))
+	for i, v := range values.List() {
+		dottedValues[i] = dotted(v)
+	}
 	return &dns.ResourceRecordSet{
 		Name:    dotted(domain),
-		Rrdatas: values.List(),
+		Rrdatas: dottedValues,
 		Ttl:     int64(60),
 		Type:    "NS",
 	}

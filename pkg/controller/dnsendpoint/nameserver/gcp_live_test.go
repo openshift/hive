@@ -51,35 +51,35 @@ func (s *LiveGCPTestSuite) TestGetForExistentZone() {
 
 func (s *LiveGCPTestSuite) TestCreateAndDelete_SingleValue() {
 	s.testCreateAndDelete(&testCreateAndDeleteCase{
-		createValues: []string{"test-value."},
-		deleteValues: []string{"test-value."},
+		createValues: []string{"test-value"},
+		deleteValues: []string{"test-value"},
 	})
 }
 
 func (s *LiveGCPTestSuite) TestCreateAndDelete_SingleValueOutdatedDelete() {
 	s.testCreateAndDelete(&testCreateAndDeleteCase{
-		createValues: []string{"test-value."},
-		deleteValues: []string{"bad-value."},
+		createValues: []string{"test-value"},
+		deleteValues: []string{"bad-value"},
 	})
 }
 
 func (s *LiveGCPTestSuite) TestCreateAndDelete_MultipleValues() {
 	s.testCreateAndDelete(&testCreateAndDeleteCase{
-		createValues: []string{"test-value-1.", "test-value-2.", "test-value-3."},
-		deleteValues: []string{"test-value-1.", "test-value-2.", "test-value-3."},
+		createValues: []string{"test-value-1", "test-value-2", "test-value-3"},
+		deleteValues: []string{"test-value-1", "test-value-2", "test-value-3"},
 	})
 }
 
 func (s *LiveGCPTestSuite) TestCreateAndDelete_MultipleValuesOutdatedDelete() {
 	s.testCreateAndDelete(&testCreateAndDeleteCase{
-		createValues: []string{"test-value-1.", "test-value-2.", "test-value-3."},
-		deleteValues: []string{"test-value-1.", "test-value-2."},
+		createValues: []string{"test-value-1", "test-value-2", "test-value-3"},
+		deleteValues: []string{"test-value-1", "test-value-2"},
 	})
 }
 
 func (s *LiveGCPTestSuite) TestCreateAndDelete_UnknownDeleteValues() {
 	s.testCreateAndDelete(&testCreateAndDeleteCase{
-		createValues: []string{"test-value."},
+		createValues: []string{"test-value"},
 	})
 }
 

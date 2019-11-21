@@ -12,7 +12,7 @@ DOCKER_CMD ?= docker
 IMG ?= hive-controller:latest
 
 # Image to use when deploying
-DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hivev1:hive
 
 # Look up distro name (e.g. Fedora)
 DISTRO ?= $(shell if which lsb_release &> /dev/null; then lsb_release -si; else echo "Unknown"; fi)

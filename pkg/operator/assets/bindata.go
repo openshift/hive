@@ -30,7 +30,6 @@
 // config/crds/hive_v1_clusterimageset.yaml
 // config/crds/hive_v1_clusterprovision.yaml
 // config/crds/hive_v1_clusterstate.yaml
-// config/crds/hive_v1_dnsendpoint.yaml
 // config/crds/hive_v1_dnszone.yaml
 // config/crds/hive_v1_hiveconfig.yaml
 // config/crds/hive_v1_machinepool.yaml
@@ -787,7 +786,6 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
-  - dnsendpoints
   - machinepools
   - selectorsyncidentityproviders
   - syncidentityproviders
@@ -1084,7 +1082,6 @@ rules:
   - dnszones
   - dnszones/status
   - dnszones/finalizers
-  - dnsendpoints
   verbs:
   - get
   - list
@@ -1420,7 +1417,6 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
-  - dnsendpoints
   - machinepools
   - selectorsyncidentityproviders
   - selectorsyncsets
@@ -2662,99 +2658,6 @@ func configCrdsHive_v1_clusterstateYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/crds/hive_v1_clusterstate.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configCrdsHive_v1_dnsendpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: dnsendpoints.hive.openshift.io
-spec:
-  group: hive.openshift.io
-  names:
-    kind: DNSEndpoint
-    plural: dnsendpoints
-  scope: Namespaced
-  subresources:
-    status: {}
-  validation:
-    openAPIV3Schema:
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          properties:
-            endpoints:
-              description: Endpoints is the list of DNS records to create/update
-              items:
-                properties:
-                  dnsName:
-                    description: The hostname of the DNS record
-                    type: string
-                  labels:
-                    description: Labels stores labels defined for the Endpoint
-                    type: object
-                  providerSpecific:
-                    description: ProviderSpecific stores provider specific config
-                    type: object
-                  recordTTL:
-                    description: TTL for the record
-                    format: int64
-                    type: integer
-                  recordType:
-                    description: RecordType type of record, e.g. CNAME, A, SRV, TXT
-                      etc
-                    type: string
-                  targets:
-                    description: The targets the DNS record points to
-                    items:
-                      type: string
-                    type: array
-                type: object
-              type: array
-          type: object
-        status:
-          properties:
-            observedGeneration:
-              description: ObservedGeneration is the generation observed by the external-dns
-                controller.
-              format: int64
-              type: integer
-          type: object
-  version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-`)
-
-func configCrdsHive_v1_dnsendpointYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_dnsendpointYaml, nil
-}
-
-func configCrdsHive_v1_dnsendpointYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_dnsendpointYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/crds/hive_v1_dnsendpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -5060,7 +4963,6 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive_v1_clusterimageset.yaml":                  configCrdsHive_v1_clusterimagesetYaml,
 	"config/crds/hive_v1_clusterprovision.yaml":                 configCrdsHive_v1_clusterprovisionYaml,
 	"config/crds/hive_v1_clusterstate.yaml":                     configCrdsHive_v1_clusterstateYaml,
-	"config/crds/hive_v1_dnsendpoint.yaml":                      configCrdsHive_v1_dnsendpointYaml,
 	"config/crds/hive_v1_dnszone.yaml":                          configCrdsHive_v1_dnszoneYaml,
 	"config/crds/hive_v1_hiveconfig.yaml":                       configCrdsHive_v1_hiveconfigYaml,
 	"config/crds/hive_v1_machinepool.yaml":                      configCrdsHive_v1_machinepoolYaml,
@@ -5124,7 +5026,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_v1_clusterimageset.yaml":              {configCrdsHive_v1_clusterimagesetYaml, map[string]*bintree{}},
 			"hive_v1_clusterprovision.yaml":             {configCrdsHive_v1_clusterprovisionYaml, map[string]*bintree{}},
 			"hive_v1_clusterstate.yaml":                 {configCrdsHive_v1_clusterstateYaml, map[string]*bintree{}},
-			"hive_v1_dnsendpoint.yaml":                  {configCrdsHive_v1_dnsendpointYaml, map[string]*bintree{}},
 			"hive_v1_dnszone.yaml":                      {configCrdsHive_v1_dnszoneYaml, map[string]*bintree{}},
 			"hive_v1_hiveconfig.yaml":                   {configCrdsHive_v1_hiveconfigYaml, map[string]*bintree{}},
 			"hive_v1_machinepool.yaml":                  {configCrdsHive_v1_machinepoolYaml, map[string]*bintree{}},

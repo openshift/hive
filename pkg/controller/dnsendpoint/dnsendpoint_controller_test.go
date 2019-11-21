@@ -1,6 +1,7 @@
 package dnsendpoint
 
 import (
+	"context"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -8,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -18,6 +20,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver/mock"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -37,16 +40,17 @@ func TestDNSEndpointReconcile(t *testing.T) {
 	objectKey := client.ObjectKey{Namespace: testNamespace, Name: testName}
 
 	cases := []struct {
-		name                string
-		dnsEndpoint         *hivev1.DNSEndpoint
-		nameServers         rootDomainsMap
-		configureQuery      func(*mock.MockQuery)
-		expectErr           bool
-		expectedNameServers rootDomainsMap
+		name                     string
+		dnsZone                  *hivev1.DNSZone
+		nameServers              rootDomainsMap
+		configureQuery           func(*mock.MockQuery)
+		expectErr                bool
+		expectedNameServers      rootDomainsMap
+		expectedCreatedCondition bool
 	}{
 		{
-			name:        "new name server",
-			dnsEndpoint: testDNSEndpoint(),
+			name:    "new name server",
+			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{},
 			},
@@ -61,10 +65,11 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					},
 				},
 			},
+			expectedCreatedCondition: true,
 		},
 		{
-			name:        "up-to-date name server",
-			dnsEndpoint: testDNSEndpoint(),
+			name:    "up-to-date name server",
+			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
@@ -81,10 +86,11 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					},
 				},
 			},
+			expectedCreatedCondition: true,
 		},
 		{
-			name:        "out-of-date name server",
-			dnsEndpoint: testDNSEndpoint(),
+			name:    "out-of-date name server",
+			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
@@ -104,10 +110,11 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					},
 				},
 			},
+			expectedCreatedCondition: true,
 		},
 		{
-			name:        "delete name server",
-			dnsEndpoint: testDeletedDNSEndpoint(),
+			name:    "delete name server",
+			dnsZone: testDeletedDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
@@ -124,8 +131,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:        "delete untracked name server",
-			dnsEndpoint: testDeletedDNSEndpoint(),
+			name:    "delete untracked name server",
+			dnsZone: testDeletedDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{},
 			},
@@ -137,8 +144,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:        "create error",
-			dnsEndpoint: testDNSEndpoint(),
+			name:    "create error",
+			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{},
 			},
@@ -152,8 +159,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:        "delete error",
-			dnsEndpoint: testDeletedDNSEndpoint(),
+			name:    "delete error",
+			dnsZone: testDeletedDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{},
 			},
@@ -167,8 +174,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:        "name servers not yet scraped",
-			dnsEndpoint: testDNSEndpoint(),
+			name:    "name servers not yet scraped",
+			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
 				rootDomain: nil,
 			},
@@ -177,13 +184,67 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				rootDomain: nil,
 			},
 		},
+		{
+			name: "no link to parent domain",
+			dnsZone: func() *hivev1.DNSZone {
+				z := testDNSZone()
+				z.Spec.LinkToParentDomain = false
+				return z
+			}(),
+			nameServers: rootDomainsMap{
+				rootDomain: nameServersMap{},
+			},
+			expectedNameServers: rootDomainsMap{
+				rootDomain: nameServersMap{},
+			},
+		},
+		{
+			name: "deleted with no finalizer",
+			dnsZone: func() *hivev1.DNSZone {
+				z := testDeletedDNSZone()
+				z.Finalizers = nil
+				return z
+			}(),
+			nameServers: rootDomainsMap{
+				rootDomain: nameServersMap{},
+			},
+			expectedNameServers: rootDomainsMap{
+				rootDomain: nameServersMap{},
+			},
+		},
+		{
+			name: "emptied name server",
+			dnsZone: func() *hivev1.DNSZone {
+				z := testDNSZone()
+				z.Status.NameServers = nil
+				z.Status.Conditions = []hivev1.DNSZoneCondition{{
+					Type:   hivev1.ParentLinkCreatedCondition,
+					Status: corev1.ConditionTrue,
+				}}
+				return z
+			}(),
+			nameServers: rootDomainsMap{
+				rootDomain: nameServersMap{
+					dnsName: endpointState{
+						objectKey: objectKey,
+						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+					},
+				},
+			},
+			configureQuery: func(mockQuery *mock.MockQuery) {
+				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.NewString("test-value-1", "test-value-2", "test-value-3")).Return(nil)
+			},
+			expectedNameServers: rootDomainsMap{
+				rootDomain: nameServersMap{},
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			logger := log.WithField("controller", controllerName)
-			fakeClient := fake.NewFakeClient(tc.dnsEndpoint)
+			fakeClient := fake.NewFakeClient(tc.dnsZone)
 			mockQuery := mock.NewMockQuery(mockCtrl)
 			if tc.configureQuery != nil {
 				tc.configureQuery(mockQuery)
@@ -209,33 +270,44 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			}
 			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
 			assert.Equal(t, tc.expectedNameServers, scraper.nameServers, "unexpected name servers in scraper")
+			dnsZone := &hivev1.DNSZone{}
+			if err := fakeClient.Get(context.Background(), objectKey, dnsZone); assert.NoError(t, err, "unexpected error getting DNSZone") {
+				cond := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ParentLinkCreatedCondition)
+				if tc.expectedCreatedCondition {
+					if assert.NotNil(t, cond, "expected to find ParentLinkCreated condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ParentLinkCreated condition to be True")
+					}
+				} else {
+					assert.True(t, cond == nil || cond.Status == corev1.ConditionFalse, "expected ParentLinkCreated condition to not be True")
+				}
+			}
 		})
 	}
 }
 
-func testDNSEndpoint() *hivev1.DNSEndpoint {
-	return &hivev1.DNSEndpoint{
+func testDNSZone() *hivev1.DNSZone {
+	return &hivev1.DNSZone{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:  testNamespace,
 			Name:       testName,
 			Finalizers: []string{hivev1.FinalizerDNSEndpoint},
 		},
-		Spec: hivev1.DNSEndpointSpec{
-			Endpoints: []*hivev1.Endpoint{{
-				DNSName:    dnsName,
-				RecordType: "NS",
-				Targets: []string{
-					"test-value-1",
-					"test-value-2",
-					"test-value-3",
-				},
-			}},
+		Spec: hivev1.DNSZoneSpec{
+			Zone:               dnsName,
+			LinkToParentDomain: true,
+		},
+		Status: hivev1.DNSZoneStatus{
+			NameServers: []string{
+				"test-value-1",
+				"test-value-2",
+				"test-value-3",
+			},
 		},
 	}
 }
 
-func testDeletedDNSEndpoint() *hivev1.DNSEndpoint {
-	e := testDNSEndpoint()
+func testDeletedDNSZone() *hivev1.DNSZone {
+	e := testDNSZone()
 	now := metav1.Now()
 	e.DeletionTimestamp = &now
 	return e

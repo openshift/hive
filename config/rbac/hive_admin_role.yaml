@@ -28,7 +28,6 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
-  - dnsendpoints
   - machinepools
   - selectorsyncidentityproviders
   - syncidentityproviders

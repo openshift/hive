@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -149,7 +150,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/crds/hive_v1_clusterdeployment.yaml",
 		"config/crds/hive_v1_clusterdeprovision.yaml",
 		"config/crds/hive_v1_clusterimageset.yaml",
-		"config/crds/hive_v1_dnsendpoint.yaml",
 		"config/crds/hive_v1_dnszone.yaml",
 		"config/crds/hive_v1_hiveconfig.yaml",
 		"config/crds/hive_v1_selectorsyncidentityprovider.yaml",
@@ -212,6 +212,17 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			hLog.WithField("clusterImageSet", isName).Info("deleted outdated ClusterImageSet")
 		}
 
+	}
+
+	// Delete the legacy DNSEndpoints CRD. Its functionality has been included in the DNSZones CRD.
+	if err := resource.DeleteAnyExistingObject(
+		r,
+		client.ObjectKey{Name: "dnsendpoints.hive.openshift.io"},
+		&apiextensionsv1beta1.CustomResourceDefinition{},
+		hLog,
+	); err != nil {
+		hLog.WithError(err).Error("could not delete DNSEndpoint CRD")
+		return err
 	}
 
 	hLog.Info("all hive components successfully reconciled")

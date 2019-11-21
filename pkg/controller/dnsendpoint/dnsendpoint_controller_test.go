@@ -166,6 +166,17 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				rootDomain: nameServersMap{},
 			},
 		},
+		{
+			name:        "name servers not yet scraped",
+			dnsEndpoint: testDNSEndpoint(),
+			nameServers: rootDomainsMap{
+				rootDomain: nil,
+			},
+			expectErr: true,
+			expectedNameServers: rootDomainsMap{
+				rootDomain: nil,
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

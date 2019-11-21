@@ -46,7 +46,7 @@ func newNameServerScraper(logger log.FieldLogger, nameServerQuery nameserver.Que
 	nameServers := make(rootDomainsMap, len(domains))
 	for _, domain := range domains {
 		queue.Add(domain)
-		nameServers[domain] = nameServersMap{}
+		nameServers[domain] = nil
 	}
 	return &nameServerScraper{
 		logger:          logger.WithField("scraper", "nameServer"),
@@ -86,6 +86,13 @@ func (s *nameServerScraper) RemoveEndpoint(domain string) {
 	defer s.mux.Unlock()
 	_, nsMap := s.rootDomainNameServers(domain)
 	delete(nsMap, domain)
+}
+
+func (s *nameServerScraper) HasBeenScraped(domain string) bool {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	_, nsMap := s.rootDomainNameServers(domain)
+	return nsMap != nil
 }
 
 // Start starts the name server scraper.
@@ -129,10 +136,14 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 	func() {
 		s.mux.Lock()
 		defer s.mux.Unlock()
-		oldNameServers := s.nameServers[rootDomain]
-		if oldNameServers == nil {
+		oldNameServers, ok := s.nameServers[rootDomain]
+		if !ok {
 			s.logger.WithField("domain", rootDomain).Error("domain is not a root domain")
 			return
+		}
+		if oldNameServers == nil {
+			oldNameServers = nameServersMap{}
+			s.nameServers[rootDomain] = oldNameServers
 		}
 		for domain, oldNameServer := range oldNameServers {
 			currentNameServer, ok := currentNameServers[domain]

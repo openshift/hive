@@ -3,9 +3,13 @@ package dnszone
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/gcpclient/mock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	dns "google.golang.org/api/dns/v1"
+	"google.golang.org/api/googleapi"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -32,14 +36,13 @@ func TestNewGCPActuator(t *testing.T) {
 				dnsZone: tc.dnsZone,
 			}
 
+			// Act
 			zr, err := NewGCPActuator(
 				expectedGCPActuator.logger,
 				tc.secret,
 				tc.dnsZone,
 				fakeGCPClientBuilder(mocks.mockGCPClient),
 			)
-
-			// Act
 			expectedGCPActuator.gcpClient = zr.gcpClient // Function pointers can't be compared reliably. Don't compare.
 
 			// Assert
@@ -48,4 +51,30 @@ func TestNewGCPActuator(t *testing.T) {
 			assert.Equal(t, expectedGCPActuator, zr)
 		})
 	}
+}
+
+func mockGCPZoneExists(expect *mock.MockClientMockRecorder) {
+	expect.GetManagedZone(gomock.Any()).Return(&dns.ManagedZone{
+		DnsName:     "blah.example.com",
+		Name:        "hive-blah-example-com",
+		NameServers: []string{"ns1.example.com", "ns2.example.com"},
+	}, nil).Times(1)
+}
+
+func mockGCPZoneDoesntExist(expect *mock.MockClientMockRecorder) {
+	expect.GetManagedZone(gomock.Any()).
+		Return(nil, &googleapi.Error{Code: 404}).
+		Times(1)
+}
+
+func mockCreateGCPZone(expect *mock.MockClientMockRecorder) {
+	expect.CreateManagedZone(gomock.Any()).Return(&dns.ManagedZone{
+		DnsName:     "blah.example.com",
+		Name:        "hive-blah-example-com",
+		NameServers: []string{"ns1.example.com", "ns2.example.com"},
+	}, nil).Times(1)
+}
+
+func mockDeleteGCPZone(expect *mock.MockClientMockRecorder) {
+	expect.DeleteManagedZone(gomock.Any()).Return(nil).Times(1)
 }

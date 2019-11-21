@@ -8,14 +8,16 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	"github.com/openshift/hive/pkg/awsclient/mock"
+	awsmock "github.com/openshift/hive/pkg/awsclient/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	gcpmock "github.com/openshift/hive/pkg/gcpclient/mock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-// TestReconcileDNSProvider tests that ReconcileDNSProvider reacts properly under different reconciliation states.
-func TestReconcileDNSProvider(t *testing.T) {
+// TestReconcileDNSProviderForAWS tests that ReconcileDNSProvider reacts properly under different reconciliation states on AWS.
+func TestReconcileDNSProviderForAWS(t *testing.T) {
 
 	log.SetLevel(log.DebugLevel)
 
@@ -23,7 +25,7 @@ func TestReconcileDNSProvider(t *testing.T) {
 		name                string
 		dnsZone             *hivev1.DNSZone
 		dnsEndpoint         *hivev1.DNSEndpoint
-		setupAWSMock        func(*mock.MockClientMockRecorder)
+		setupAWSMock        func(*awsmock.MockClientMockRecorder)
 		validateZone        func(*testing.T, *hivev1.DNSZone)
 		validateDNSEndpoint func(*testing.T, *hivev1.DNSEndpoint)
 		errorExpected       bool
@@ -32,7 +34,7 @@ func TestReconcileDNSProvider(t *testing.T) {
 		{
 			name:    "DNSZone without finalizer",
 			dnsZone: validDNSZoneWithoutFinalizer(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneExists(expect, validDNSZoneWithoutFinalizer())
 				mockExistingAWSTags(expect)
 			},
@@ -43,7 +45,7 @@ func TestReconcileDNSProvider(t *testing.T) {
 		{
 			name:    "Create Hosted Zone, No ID Set",
 			dnsZone: validDNSZoneWithoutID(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneDoesntExist(expect, validDNSZoneWithoutID())
 				mockCreateAWSZone(expect)
 				mockNoExistingAWSTags(expect)
@@ -186,6 +188,169 @@ func TestReconcileDNSProvider(t *testing.T) {
 
 			if tc.setupAWSMock != nil {
 				tc.setupAWSMock(mocks.mockAWSClient.EXPECT())
+			}
+
+			// Act
+			_, err := r.reconcileDNSProvider(zr, tc.dnsZone)
+
+			// Assert
+			if tc.errorExpected {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Validate
+			zone := &hivev1.DNSZone{}
+			err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name}, zone)
+			if err != nil {
+				t.Fatalf("unexpected: %v", err)
+			}
+			if tc.validateZone != nil {
+				tc.validateZone(t, zone)
+			}
+			if tc.validateDNSEndpoint != nil {
+				endpoint := &hivev1.DNSEndpoint{}
+				err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name + "-ns"}, endpoint)
+				if err != nil {
+					endpoint = nil
+				}
+				tc.validateDNSEndpoint(t, endpoint)
+			}
+		})
+	}
+}
+
+// TestReconcileDNSProviderForGCP tests that ReconcileDNSProvider reacts properly under different reconciliation states on GCP.
+func TestReconcileDNSProviderForGCP(t *testing.T) {
+
+	log.SetLevel(log.DebugLevel)
+
+	cases := []struct {
+		name                string
+		dnsZone             *hivev1.DNSZone
+		dnsEndpoint         *hivev1.DNSEndpoint
+		setupGCPMock        func(*gcpmock.MockClientMockRecorder)
+		validateZone        func(*testing.T, *hivev1.DNSZone)
+		validateDNSEndpoint func(*testing.T, *hivev1.DNSEndpoint)
+		errorExpected       bool
+		soaLookupResult     bool
+	}{
+		{
+			name:    "DNSZone without finalizer",
+			dnsZone: validDNSZoneWithoutFinalizer(),
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneExists(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.True(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
+		},
+		{
+			name:    "Create Managed Zone, No ZoneName Set",
+			dnsZone: validDNSZoneWithoutID(),
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneDoesntExist(expect)
+				mockCreateGCPZone(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.NotNil(t, zone.Status.GCP)
+				assert.NotNil(t, zone.Status.GCP.ZoneName)
+				assert.Equal(t, *zone.Status.GCP.ZoneName, "hive-blah-example-com")
+				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
+			},
+		},
+		{
+			name:    "Adopt existing zone, No ZoneName Set",
+			dnsZone: validDNSZoneWithoutID(),
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneExists(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.NotNil(t, zone.Status.GCP)
+				assert.NotNil(t, zone.Status.GCP.ZoneName)
+				assert.Equal(t, *zone.Status.GCP.ZoneName, "hive-blah-example-com")
+				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
+			},
+		},
+		{
+			name:    "Delete managed zone",
+			dnsZone: validDNSZoneBeingDeleted(),
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneExists(expect)
+				mockDeleteGCPZone(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
+		},
+		{
+			name:    "Delete non-existent managed zone",
+			dnsZone: validDNSZoneBeingDeleted(),
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneDoesntExist(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
+		},
+		{
+			name:    "Existing zone, link to parent, create DNSEndpoint",
+			dnsZone: validDNSZoneWithLinkToParent(),
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneExists(expect)
+			},
+			validateDNSEndpoint: func(t *testing.T, endpoint *hivev1.DNSEndpoint) {
+				assert.NotNil(t, endpoint, "endpoint record should exist")
+			},
+		},
+		{
+			name:            "Existing zone, link to parent, reachable SOA",
+			dnsZone:         validDNSZoneWithLinkToParent(),
+			dnsEndpoint:     validDNSEndpoint(),
+			soaLookupResult: true,
+			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
+				mockGCPZoneExists(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			mocks := setupDefaultMocks(t)
+
+			zr, _ := NewGCPActuator(
+				log.WithField("controller", controllerName),
+				validGCPSecret(),
+				tc.dnsZone,
+				fakeGCPClientBuilder(mocks.mockGCPClient),
+			)
+
+			r := ReconcileDNSZone{
+				Client: mocks.fakeKubeClient,
+				logger: zr.logger,
+				scheme: scheme.Scheme,
+			}
+
+			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.soaLookupResult, nil
+			}
+
+			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
+			defer mocks.mockCtrl.Finish()
+
+			setFakeDNSZoneInKube(mocks, tc.dnsZone)
+			if tc.dnsEndpoint != nil {
+				setFakeDNSEndpointInKube(mocks, tc.dnsEndpoint)
+			}
+
+			if tc.setupGCPMock != nil {
+				tc.setupGCPMock(mocks.mockGCPClient.EXPECT())
 			}
 
 			// Act

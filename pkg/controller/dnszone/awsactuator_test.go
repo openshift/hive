@@ -47,14 +47,13 @@ func TestNewAWSActuator(t *testing.T) {
 				dnsZone: tc.dnsZone,
 			}
 
+			// Act
 			zr, err := NewAWSActuator(
 				expectedAWSActuator.logger,
 				tc.secret,
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
 			)
-
-			// Act
 			expectedAWSActuator.awsClient = zr.awsClient // Function pointers can't be compared reliably. Don't compare.
 
 			// Assert

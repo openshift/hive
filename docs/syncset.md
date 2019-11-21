@@ -121,7 +121,8 @@ spec:
     users:
     - abutcher
   clusterDeploymentSelector:
-    cluster-group: abutcher
+    matchLabels:
+      cluster-group: abutcher
 ```
 
 | Field | Usage |

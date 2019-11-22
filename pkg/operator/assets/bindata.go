@@ -3115,6 +3115,21 @@ spec:
           type: object
         spec:
           properties:
+            autoscaling:
+              description: Autoscaling is the details for auto-scaling the machine
+                pool. Replicas and autoscaling cannot be used together.
+              properties:
+                maxReplicas:
+                  description: MaxReplicas is the maximum number of replicas for the
+                    machine pool.
+                  format: int32
+                  type: integer
+                minReplicas:
+                  description: MinReplicas is the minimum number of replicas for the
+                    machine pool.
+                  format: int32
+                  type: integer
+              type: object
             clusterDeploymentRef:
               description: ClusterDeploymentRef references the cluster deployment
                 to which this machine pool belongs.
@@ -3200,7 +3215,8 @@ spec:
               type: object
             replicas:
               description: Replicas is the count of machines for this machine pool.
-                Default is 1.
+                Replicas and autoscaling cannot be used together. Default is 1, if
+                autoscaling is not used.
               format: int64
               type: integer
             taints:

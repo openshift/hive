@@ -607,8 +607,26 @@ func validateMachinePools(cd *hivev1.ClusterDeployment) field.ErrorList {
 
 	vErrs = append(vErrs, validateMachinePool(cd, &cd.Spec.ControlPlane, field.NewPath("spec", "controlPlane"))...)
 
+	vErrs = append(vErrs, validateComputeMachinePoolLength(cd)...)
+
 	for i, mp := range cd.Spec.Compute {
 		vErrs = append(vErrs, validateMachinePool(cd, &mp, field.NewPath("spec", "compute").Index(i))...)
+	}
+
+	return vErrs
+}
+
+func validateComputeMachinePoolLength(cd *hivev1.ClusterDeployment) field.ErrorList {
+	vErrs := field.ErrorList{}
+
+	if cd.Spec.Platform.GCP != nil {
+		// Only restrict the length of compute machine pools on GCP.
+		// Restriction can be removed once proper handling of reuse or creation
+		// of necessary subnets is resolved.
+		if len(cd.Spec.Compute) > 1 {
+			path := field.NewPath("spec")
+			vErrs = append(vErrs, field.Invalid(path, cd.Spec.Compute, "length of compute machine pools must not be greather than 1"))
+		}
 	}
 
 	return vErrs

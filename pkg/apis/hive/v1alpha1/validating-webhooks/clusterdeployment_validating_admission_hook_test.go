@@ -738,6 +738,40 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
+		{
+			name: "only one compute machine pool for GCP",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Compute = append(cd.Spec.Compute, hivev1.MachinePool{
+					Name: "extramachinepool",
+					Platform: hivev1.MachinePoolPlatform{
+						GCP: &hivev1gcp.MachinePool{
+							InstanceType: "someinstancetype",
+						},
+					},
+				})
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "no update to multiple machine pools for GCP",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Compute = append(cd.Spec.Compute, hivev1.MachinePool{
+					Name: "extramachinepool",
+					Platform: hivev1.MachinePoolPlatform{
+						GCP: &hivev1gcp.MachinePool{
+							InstanceType: "someinstancetype",
+						},
+					},
+				})
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
 	}
 
 	for _, tc := range cases {

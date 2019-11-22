@@ -607,7 +607,7 @@ func validateMachinePools(cd *hivev1.ClusterDeployment) field.ErrorList {
 
 	vErrs = append(vErrs, validateMachinePool(cd, &cd.Spec.ControlPlane, field.NewPath("spec", "controlPlane"))...)
 
-	vErrs = append(vErrs, validateComputeMachinePoolRequirements(cd)...)
+	vErrs = append(vErrs, validateComputeMachinePoolRequirements(cd, field.NewPath("spec", "compute"))...)
 
 	for i, mp := range cd.Spec.Compute {
 		vErrs = append(vErrs, validateMachinePool(cd, &mp, field.NewPath("spec", "compute").Index(i))...)
@@ -616,43 +616,28 @@ func validateMachinePools(cd *hivev1.ClusterDeployment) field.ErrorList {
 	return vErrs
 }
 
-func validateComputeMachinePoolRequirements(cd *hivev1.ClusterDeployment) field.ErrorList {
+func validateComputeMachinePoolRequirements(cd *hivev1.ClusterDeployment, path *field.Path) field.ErrorList {
 	vErrs := field.ErrorList{}
-	path := field.NewPath("spec")
 
 	if cd.Spec.Platform.GCP != nil {
-		// Only restrict the length of compute machine pools on GCP.
+		// Only restrict the name of compute machine pools on GCP.
 		// Restriction can be removed once proper handling of reuse or creation
 		// of necessary subnets is resolved.
-		if len(cd.Spec.Compute) > 1 {
-			vErrs = append(vErrs, field.Invalid(path, cd.Spec.Compute, "length of compute machine pools must not be greather than 1"))
-		}
-
-		if len(cd.Spec.Compute) > 0 {
-			// make sure we have a compute pool named 'worker'
-			foundWorkerPool := false
-			for _, mp := range cd.Spec.Compute {
-				if mp.Name == "worker" {
-					foundWorkerPool = true
-					break
-				}
-			}
-			if !foundWorkerPool {
-				vErrs = append(vErrs, field.Invalid(path, cd.Spec.Compute, "must have one compute pool named 'worker'"))
+		for i, mp := range cd.Spec.Compute {
+			if mp.Name != "worker" {
+				vErrs = append(vErrs, field.Invalid(path.Index(i).Child("name"), mp.Name,
+					"name of compute pool must be \"worker\""))
 			}
 		}
 	}
 
 	// ensure machinePool names are unique
-	names := map[string]int{}
-	for _, mp := range cd.Spec.Compute {
-		names[mp.Name]++
-	}
-	for k, v := range names {
-		if v > 1 {
-			validationMsg := fmt.Sprintf("compute pool with name %s used more than once", k)
-			vErrs = append(vErrs, field.Invalid(path, cd.Spec.Compute, validationMsg))
+	names := map[string]bool{}
+	for i, mp := range cd.Spec.Compute {
+		if names[mp.Name] {
+			vErrs = append(vErrs, field.Invalid(path.Index(i).Child("name"), mp.Name, "name must be unique"))
 		}
+		names[mp.Name] = true
 	}
 
 	return vErrs

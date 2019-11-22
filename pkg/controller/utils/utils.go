@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,16 +15,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
-
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
+	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 // BuildClusterAPIClientFromKubeconfig will return a kubeclient with metrics using the provided kubeconfig.
@@ -44,6 +45,9 @@ func BuildClusterAPIClientFromKubeconfig(kubeconfigData, controllerName string) 
 	if err != nil {
 		return nil, err
 	}
+
+	autoscalingv1.SchemeBuilder.AddToScheme(scheme)
+	autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme)
 
 	if err := openshiftapiv1.Install(scheme); err != nil {
 		return nil, err

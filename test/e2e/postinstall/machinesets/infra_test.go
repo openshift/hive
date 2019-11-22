@@ -9,6 +9,8 @@ import (
 
 	"github.com/openshift/hive/test/e2e/common"
 	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/pointer"
@@ -164,6 +166,105 @@ func TestNewMachinePool(t *testing.T) {
 		}
 		return count == 0
 	}, 5*time.Minute)
+}
+
+func TestAutoscalingMachinePool(t *testing.T) {
+	cd := common.MustGetInstalledClusterDeployment()
+	cfg := common.MustGetClusterDeploymentClientConfig()
+
+	switch p := cd.Spec.Platform; {
+	case p.AWS == nil:
+	case p.GCP == nil:
+	default:
+		t.Log("Scaling the machine pool is only implemented for AWS and GCP")
+	}
+
+	c := common.MustGetClient()
+
+	// Scale up
+	pool := common.GetMachinePool(cd, "worker")
+	if pool == nil {
+		t.Fatal("worker machine pool does not exist")
+	}
+	pool.Spec.Replicas = nil
+	pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+		MinReplicas: 10,
+		MaxReplicas: 12,
+	}
+	if err := c.Update(context.TODO(), pool); err != nil {
+		t.Fatalf("cannot update worker machine pool to reduce replicas: %v", err)
+	}
+
+	busyboxDeployment := &extensionsv1beta1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "busybox",
+		},
+		Spec: extensionsv1beta1.DeploymentSpec{
+			Replicas: pointer.Int32Ptr(50),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:    "sleep",
+						Image:   "busybox",
+						Command: []string{"sleep", "3600"},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU: func() resource.Quantity {
+									q, err := resource.ParseQuantity("2")
+									if err != nil {
+										t.Fatalf("could not parse quantity")
+									}
+									return q
+								}(),
+							},
+						},
+					}},
+				},
+			},
+		},
+	}
+	if err := c.Create(context.TODO(), busyboxDeployment); err != nil {
+		t.Fatalf("cannot create busybox deployment: %v", err)
+	}
+
+	if err := waitForMachines(cfg, cd, "worker", 12); err != nil {
+		t.Errorf("timed out waiting for machines to be created")
+	}
+	if err := waitForNodes(cfg, cd, "worker", 12); err != nil {
+		t.Errorf("timed out waiting for nodes to be created")
+	}
+
+	// Scale down
+	if err := c.Get(context.TODO(), client.ObjectKey{Name: "busybox"}, busyboxDeployment); err != nil {
+		t.Fatalf("could not get busybox deployment: %v", err)
+	}
+	busyboxDeployment.Spec.Replicas = pointer.Int32Ptr(0)
+	if err := c.Update(context.TODO(), busyboxDeployment); err != nil {
+		t.Fatalf("could not update busybox deployment to scale down replicas: %v", err)
+	}
+	if err := waitForMachines(cfg, cd, "worker", 10); err != nil {
+		t.Errorf("timed out waiting for machines to be created")
+	}
+	if err := waitForNodes(cfg, cd, "worker", 10); err != nil {
+		t.Errorf("timed out waiting for nodes to be created")
+	}
+
+	// Disable auto-scaling
+	pool = common.GetMachinePool(cd, "worker")
+	if pool == nil {
+		t.Fatal("worker machine pool does not exist")
+	}
+	pool.Spec.Replicas = pointer.Int64Ptr(3)
+	pool.Spec.Autoscaling = nil
+	if err := c.Update(context.TODO(), pool); err != nil {
+		t.Fatalf("cannot update worker machine pool to turn off auto-scaling: %v", err)
+	}
+	if err := waitForMachines(cfg, cd, "worker", 3); err != nil {
+		t.Errorf("timed out waiting for machines to be created")
+	}
+	if err := waitForNodes(cfg, cd, "worker", 3); err != nil {
+		t.Errorf("timed out waiting for nodes to be created")
+	}
 }
 
 func waitForMachines(cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string, expectedReplicas int) error {

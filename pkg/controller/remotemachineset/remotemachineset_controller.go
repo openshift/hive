@@ -2,6 +2,7 @@ package remotemachineset
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -22,11 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
-
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-
+	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
+	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 	installertypes "github.com/openshift/installer/pkg/types"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -50,8 +51,8 @@ func Add(mgr manager.Manager) error {
 		logger:                        log.WithField("controller", controllerName),
 		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
 	}
-	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
-		return r.createActuator(cd, remoteMachineSets, cdLog)
+	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
+		return r.createActuator(cd, remoteMachineSets, logger)
 	}
 
 	// Create a new controller
@@ -83,7 +84,7 @@ func (r *ReconcileRemoteMachineSet) clusterDeploymentWatchHandler(a handler.MapO
 	cd := a.Object.(*hivev1.ClusterDeployment)
 	if cd == nil {
 		// Wasn't a clusterdeployment, bail out. This should not happen.
-		log.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a.Object)
+		r.logger.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a.Object)
 		return retval
 	}
 
@@ -91,7 +92,7 @@ func (r *ReconcileRemoteMachineSet) clusterDeploymentWatchHandler(a handler.MapO
 	err := r.List(context.TODO(), pools)
 	if err != nil {
 		// Could not list machine pools
-		log.Errorf("Error listing machine pools. Value: %+v", a.Object)
+		r.logger.Errorf("Error listing machine pools. Value: %+v", a.Object)
 		return retval
 	}
 
@@ -120,23 +121,23 @@ type ReconcileRemoteMachineSet struct {
 	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
 
 	// actuatorBuilder is a function pointer to the function that builds the actuator
-	actuatorBuilder func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error)
+	actuatorBuilder func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error)
 }
 
 // Reconcile reads that state of the cluster for a MachinePool object and makes changes to the
 // remote cluster MachineSets based on the state read
 func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	cdLog := r.logger.WithFields(log.Fields{
+	logger := r.logger.WithFields(log.Fields{
 		"machinePool": request.Name,
 		"namespace":   request.Namespace,
 	})
-	cdLog.Info("reconciling machine pool")
+	logger.Info("reconciling machine pool")
 
 	defer func() {
 		dur := time.Since(start)
 		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
-		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 
 	// Fetch the MachinePool instance
@@ -147,7 +148,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request
-		log.WithError(err).Error("error looking up machine pool")
+		logger.WithError(err).Error("error looking up machine pool")
 		return reconcile.Result{}, err
 	}
 
@@ -164,37 +165,37 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		cd,
 	); {
 	case apierrors.IsNotFound(err):
-		log.Debug("clusterdeployment does not exist")
-		return r.removeFinalizer(pool)
+		logger.Debug("clusterdeployment does not exist")
+		return r.removeFinalizer(pool, logger)
 	case err != nil:
-		log.WithError(err).Error("error looking up cluster deploymnet")
+		logger.WithError(err).Error("error looking up cluster deploymnet")
 		return reconcile.Result{}, err
 	}
 
 	if cd.Annotations[constants.SyncsetPauseAnnotation] == "true" {
-		log.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
+		logger.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
 		return reconcile.Result{}, nil
 	}
 
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
-		return r.removeFinalizer(pool)
+		return r.removeFinalizer(pool, logger)
 	}
 
 	// If the cluster is unreachable, do not reconcile.
 	if controllerutils.HasUnreachableCondition(cd) {
-		cdLog.Debug("skipping cluster with unreachable condition")
+		logger.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
 
 	if !cd.Spec.Installed {
 		// Cluster isn't installed yet, return
-		cdLog.Debug("cluster installation is not complete")
+		logger.Debug("cluster installation is not complete")
 		return reconcile.Result{}, nil
 	}
 
 	if cd.Spec.ClusterMetadata == nil {
-		cdLog.Error("installed cluster with no cluster metadata")
+		logger.Error("installed cluster with no cluster metadata")
 		return reconcile.Result{}, nil
 	}
 
@@ -202,7 +203,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		controllerutils.AddFinalizer(pool, finalizer)
 		err := r.Update(context.Background(), pool)
 		if err != nil {
-			log.WithError(err).Log(controllerutils.LogLevel(err), "could not add finalizer")
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not add finalizer")
 		}
 		return reconcile.Result{}, err
 	}
@@ -213,85 +214,194 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, Namespace: cd.Namespace},
 		adminKubeconfigSecret,
 	); err != nil {
-		cdLog.WithError(err).Error("unable to fetch admin kubeconfig secret")
+		logger.WithError(err).Error("unable to fetch admin kubeconfig secret")
 		return reconcile.Result{}, err
 	}
 	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
 	if err != nil {
-		cdLog.WithError(err).Error("unable to fixup admin kubeconfig")
+		logger.WithError(err).Error("unable to fixup admin kubeconfig")
 		return reconcile.Result{}, err
 	}
 
 	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig), controllerName)
 	if err != nil {
-		cdLog.WithError(err).Error("error building remote cluster-api client connection")
+		logger.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err
 	}
 
-	if err := r.syncMachineSets(pool, cd, remoteClusterAPIClient, cdLog); err != nil {
+	logger.Info("reconciling machine pool for cluster deployment")
+
+	remoteMachineSets, err := r.getRemoteMachineSets(cd, remoteClusterAPIClient, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	generatedMachineSets, err := r.generateMachineSets(pool, cd, remoteMachineSets, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	switch result, err := r.ensureEnoughReplicas(pool, generatedMachineSets, logger); {
+	case err != nil:
+		return reconcile.Result{}, err
+	case result != nil:
+		return *result, nil
+	}
+
+	if err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if err := r.syncMachineAutoscalers(pool, cd, generatedMachineSets, remoteClusterAPIClient, logger); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if err := r.syncClusterAutoscaler(pool, cd, remoteClusterAPIClient, logger); err != nil {
 		return reconcile.Result{}, err
 	}
 
 	if pool.DeletionTimestamp != nil {
-		return r.removeFinalizer(pool)
+		return r.removeFinalizer(pool, logger)
 	}
 
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileRemoteMachineSet) syncMachineSets(
-	pool *hivev1.MachinePool,
+func (r *ReconcileRemoteMachineSet) getRemoteMachineSets(
 	cd *hivev1.ClusterDeployment,
 	remoteClusterAPIClient client.Client,
-	cdLog log.FieldLogger) error {
-
-	cdLog.Info("reconciling machine pool for cluster deployment")
-
-	// List MachineSets from remote cluster
+	logger log.FieldLogger,
+) (*machineapi.MachineSetList, error) {
 	remoteMachineSets := &machineapi.MachineSetList{}
 	tm := metav1.TypeMeta{}
 	tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("MachineSet"))
-	err := remoteClusterAPIClient.List(context.Background(), remoteMachineSets, client.UseListOptions(&client.ListOptions{
-		Raw: &metav1.ListOptions{TypeMeta: tm},
-	}))
-	if err != nil {
-		cdLog.WithError(err).Error("unable to fetch remote machine sets")
-		return err
+	if err := remoteClusterAPIClient.List(
+		context.Background(),
+		remoteMachineSets,
+		client.UseListOptions(&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}}),
+	); err != nil {
+		logger.WithError(err).Error("unable to fetch remote machine sets")
+		return nil, err
 	}
-	cdLog.Infof("found %v remote machine sets", len(remoteMachineSets.Items))
+	logger.Infof("found %v remote machine sets", len(remoteMachineSets.Items))
+	return remoteMachineSets, nil
+}
 
-	generatedMachineSets := []*machineapi.MachineSet{}
+func (r *ReconcileRemoteMachineSet) generateMachineSets(
+	pool *hivev1.MachinePool,
+	cd *hivev1.ClusterDeployment,
+	remoteMachineSets *machineapi.MachineSetList,
+	logger log.FieldLogger,
+) ([]*machineapi.MachineSet, error) {
+	if pool.DeletionTimestamp != nil {
+		return nil, nil
+	}
+
+	actuator, err := r.actuatorBuilder(cd, remoteMachineSets.Items, logger)
+	if err != nil {
+		logger.WithError(err).Error("unable to create actuator")
+		return nil, err
+	}
+
+	// Generate expected MachineSets for Platform from InstallConfig
+	generatedMachineSets, err := actuator.GenerateMachineSets(cd, pool, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not generate machinesets")
+	}
+
+	for _, ms := range generatedMachineSets {
+		if ms.Labels == nil {
+			ms.Labels = map[string]string{}
+		}
+		ms.Labels[machinePoolNameLabel] = pool.Spec.Name
+
+		// Apply hive MachinePool labels to MachineSet MachineSpec.
+		ms.Spec.Template.Spec.ObjectMeta.Labels = make(map[string]string, len(pool.Spec.Labels))
+		for key, value := range pool.Spec.Labels {
+			ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
+		}
+
+		// Apply hive MachinePool taints to MachineSet MachineSpec.
+		ms.Spec.Template.Spec.Taints = pool.Spec.Taints
+	}
+
+	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
+
+	return generatedMachineSets, nil
+}
+
+func (r *ReconcileRemoteMachineSet) ensureEnoughReplicas(
+	pool *hivev1.MachinePool,
+	generatedMachineSets []*machineapi.MachineSet,
+	logger log.FieldLogger,
+) (*reconcile.Result, error) {
+	if pool.Spec.Autoscaling == nil {
+		return nil, nil
+	}
+	if pool.Spec.Autoscaling.MinReplicas < int32(len(generatedMachineSets)) {
+		logger.WithField("machinesets", len(generatedMachineSets)).
+			WithField("minReplicas", pool.Spec.Autoscaling.MinReplicas).
+			Warning("when auto-scaling, the MachinePool must have at least one replica for each MachineSet")
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.NotEnoughReplicasMachinePoolCondition,
+			corev1.ConditionTrue,
+			"MinReplicasTooSmall",
+			fmt.Sprintf("When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least %d", len(generatedMachineSets)),
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			if err := r.Status().Update(context.Background(), pool); err != nil {
+				logger.WithError(err).Error("failed to update MachinePool conditions")
+				return &reconcile.Result{}, err
+			}
+		}
+		return &reconcile.Result{}, nil
+	}
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.NotEnoughReplicasMachinePoolCondition,
+		corev1.ConditionFalse,
+		"EnoughReplicas",
+		"The MachinePool has at least one replica for each MachineSet",
+		controllerutils.UpdateConditionNever,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		err := r.Status().Update(context.Background(), pool)
+		if err != nil {
+			logger.WithError(err).Error("failed to update MachinePool conditions")
+		}
+		return &reconcile.Result{}, err
+	}
+	return nil, nil
+}
+
+func (r *ReconcileRemoteMachineSet) syncMachineSets(
+	pool *hivev1.MachinePool,
+	cd *hivev1.ClusterDeployment,
+	generatedMachineSets []*machineapi.MachineSet,
+	remoteMachineSets *machineapi.MachineSetList,
+	remoteClusterAPIClient client.Client,
+	logger log.FieldLogger,
+) error {
 	machineSetsToDelete := []*machineapi.MachineSet{}
 	machineSetsToCreate := []*machineapi.MachineSet{}
 	machineSetsToUpdate := []*machineapi.MachineSet{}
 
-	if pool.DeletionTimestamp == nil {
-		actuator, err := r.actuatorBuilder(cd, remoteMachineSets.Items, cdLog)
-		if err != nil {
-			cdLog.WithError(err).Error("unable to create actuator")
-			return err
-		}
+	// Find MachineSets that need updating/creating
+	for _, ms := range generatedMachineSets {
+		found := false
+		for _, rMS := range remoteMachineSets.Items {
+			if ms.Name == rMS.Name {
+				found = true
+				objectModified := false
+				objectMetaModified := false
+				resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
+				msLog := logger.WithField("machineset", rMS.Name)
 
-		// Generate expected MachineSets for machine pool
-		generatedMachineSets, err = r.generateMachineSetsForMachinePool(cd, pool, actuator, cdLog)
-		if err != nil {
-			cdLog.WithError(err).Error("unable to generate machine sets for machine pool")
-			return err
-		}
-
-		cdLog.Infof("generated %v worker machine sets", len(generatedMachineSets))
-
-		// Find MachineSets that need updating/creating
-		for _, ms := range generatedMachineSets {
-			found := false
-			for _, rMS := range remoteMachineSets.Items {
-				if ms.Name == rMS.Name {
-					found = true
-					objectModified := false
-					objectMetaModified := false
-					resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
-					msLog := cdLog.WithField("machineset", rMS.Name)
-
+				if pool.Spec.Autoscaling == nil {
 					if *rMS.Spec.Replicas != *ms.Spec.Replicas {
 						msLog.WithFields(log.Fields{
 							"desired":  *ms.Spec.Replicas,
@@ -300,41 +410,46 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 						rMS.Spec.Replicas = ms.Spec.Replicas
 						objectModified = true
 					}
-
-					// Update if the labels on the remote machineset are different than the labels on the generated machineset.
-					// If the length of both labels is zero, then they match, even if one is a nil map and the other is an empty map.
-					if rl, l := rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels; (len(rl) != 0 || len(l) != 0) && !reflect.DeepEqual(rl, l) {
-						msLog.WithField("desired", l).WithField("observed", rl).Info("labels out of sync")
-						rMS.Spec.Template.Spec.Labels = l
+				} else {
+					if rMS.Spec.Replicas == nil || *rMS.Spec.Replicas < 1 {
+						msLog.WithField("observed", rMS.Spec.Replicas).Info("replicas not set to at least 1")
+						rMS.Spec.Replicas = pointer.Int32Ptr(1)
 						objectModified = true
 					}
-
-					// Update if the taints on the remote machineset are different than the taints on the generated machineset.
-					// If the length of both taints is zero, then they match, even if one is a nil slice and the other is an empty slice.
-					if rt, t := rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints; (len(rt) != 0 || len(t) != 0) && !reflect.DeepEqual(rt, t) {
-						msLog.WithField("desired", t).WithField("observed", rt).Info("taints out of sync")
-						rMS.Spec.Template.Spec.Taints = t
-						objectModified = true
-					}
-
-					if objectMetaModified || objectModified {
-						rMS.Generation++
-						machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
-					}
-					break
 				}
-			}
 
-			if !found {
-				machineSetsToCreate = append(machineSetsToCreate, ms)
-			}
+				// Update if the labels on the remote machineset are different than the labels on the generated machineset.
+				// If the length of both labels is zero, then they match, even if one is a nil map and the other is an empty map.
+				if rl, l := rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels; (len(rl) != 0 || len(l) != 0) && !reflect.DeepEqual(rl, l) {
+					msLog.WithField("desired", l).WithField("observed", rl).Info("labels out of sync")
+					rMS.Spec.Template.Spec.Labels = l
+					objectModified = true
+				}
 
+				// Update if the taints on the remote machineset are different than the taints on the generated machineset.
+				// If the length of both taints is zero, then they match, even if one is a nil slice and the other is an empty slice.
+				if rt, t := rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints; (len(rt) != 0 || len(t) != 0) && !reflect.DeepEqual(rt, t) {
+					msLog.WithField("desired", t).WithField("observed", rt).Info("taints out of sync")
+					rMS.Spec.Template.Spec.Taints = t
+					objectModified = true
+				}
+
+				if objectMetaModified || objectModified {
+					rMS.Generation++
+					machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
+				}
+				break
+			}
+		}
+
+		if !found {
+			machineSetsToCreate = append(machineSetsToCreate, ms)
 		}
 	}
 
 	// Find MachineSets that need deleting
 	for i, rMS := range remoteMachineSets.Items {
-		if !isMachineSetControlledByMachinePool(cd, pool, &rMS) {
+		if !isControlledByMachinePool(cd, pool, &rMS) {
 			continue
 		}
 		delete := true
@@ -352,65 +467,236 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 	}
 
 	for _, ms := range machineSetsToCreate {
-		cdLog.WithField("machineset", ms.Name).Info("creating machineset")
-		err = remoteClusterAPIClient.Create(context.Background(), ms)
-		if err != nil {
-			cdLog.WithError(err).Error("unable to create machine set")
+		logger.WithField("machineset", ms.Name).Info("creating machineset")
+		if err := remoteClusterAPIClient.Create(context.Background(), ms); err != nil {
+			logger.WithError(err).Error("unable to create machine set")
 			return err
 		}
 	}
 
 	for _, ms := range machineSetsToUpdate {
-		cdLog.WithField("machineset", ms.Name).Info("updating machineset")
-		err = remoteClusterAPIClient.Update(context.Background(), ms)
-		if err != nil {
-			cdLog.WithError(err).Error("unable to update machine set")
+		logger.WithField("machineset", ms.Name).Info("updating machineset")
+		if err := remoteClusterAPIClient.Update(context.Background(), ms); err != nil {
+			logger.WithError(err).Error("unable to update machine set")
 			return err
 		}
 	}
 
 	for _, ms := range machineSetsToDelete {
-		cdLog.WithField("machineset", ms.Name).Info("deleting machineset: ", ms)
-		err = remoteClusterAPIClient.Delete(context.Background(), ms)
-		if err != nil {
-			cdLog.WithError(err).Error("unable to delete machine set")
+		logger.WithField("machineset", ms.Name).Info("deleting machineset")
+		if err := remoteClusterAPIClient.Delete(context.Background(), ms); err != nil {
+			logger.WithError(err).Error("unable to delete machine set")
 			return err
 		}
 	}
 
-	cdLog.Info("done reconciling machine sets for cluster deployment")
+	logger.Info("done reconciling machine sets for machine pool")
 	return nil
 }
 
-// generateMachineSetsForMachinePool generates expected MachineSets for a machine pool
-// using the installer MachineSets API for the MachinePool Platform.
-func (r *ReconcileRemoteMachineSet) generateMachineSetsForMachinePool(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, actuator Actuator, cdLog log.FieldLogger) ([]*machineapi.MachineSet, error) {
-	// Generate expected MachineSets for Platform from InstallConfig
-	machineSets, err := actuator.GenerateMachineSets(cd, pool, cdLog)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not generate machinesets")
+func (r *ReconcileRemoteMachineSet) syncMachineAutoscalers(
+	pool *hivev1.MachinePool,
+	cd *hivev1.ClusterDeployment,
+	machineSets []*machineapi.MachineSet,
+	remoteClusterAPIClient client.Client,
+	logger log.FieldLogger,
+) error {
+	// List MachineAutoscalers from remote cluster
+	remoteMachineAutoscalers := &autoscalingv1beta1.MachineAutoscalerList{}
+	tm := metav1.TypeMeta{}
+	tm.SetGroupVersionKind(autoscalingv1beta1.SchemeGroupVersion.WithKind("MachineAutoscaler"))
+	if err := remoteClusterAPIClient.List(
+		context.Background(),
+		remoteMachineAutoscalers,
+		client.UseListOptions(&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}}),
+	); err != nil {
+		logger.WithError(err).Error("unable to fetch remote machine autoscalers")
+		return err
+	}
+	logger.Infof("found %v remote machine autoscalers", len(remoteMachineAutoscalers.Items))
+
+	machineAutoscalersToDelete := []*autoscalingv1beta1.MachineAutoscaler{}
+	machineAutoscalersToCreate := []*autoscalingv1beta1.MachineAutoscaler{}
+	machineAutoscalersToUpdate := []*autoscalingv1beta1.MachineAutoscaler{}
+
+	if pool.DeletionTimestamp == nil && pool.Spec.Autoscaling != nil {
+		// Find MachineAutoscalers that need updating/creating
+		for i, ms := range machineSets {
+			found := false
+			noOfMachineSets := int32(len(machineSets))
+			minReplicas := pool.Spec.Autoscaling.MinReplicas / noOfMachineSets
+			if int32(i) < pool.Spec.Autoscaling.MinReplicas%noOfMachineSets {
+				minReplicas = minReplicas + 1
+			}
+			maxReplicas := pool.Spec.Autoscaling.MaxReplicas / noOfMachineSets
+			if int32(i) < pool.Spec.Autoscaling.MaxReplicas%noOfMachineSets {
+				maxReplicas = maxReplicas + 1
+			}
+			if maxReplicas < 1 {
+				maxReplicas = 1
+			}
+			for _, rMA := range remoteMachineAutoscalers.Items {
+				if ms.Name == rMA.Name {
+					found = true
+					objectModified := false
+					maLog := logger.WithField("machineautoscaler", rMA.Name)
+
+					if rMA.Spec.MinReplicas != minReplicas {
+						maLog.WithField("desired", minReplicas).
+							WithField("observed", rMA.Spec.MinReplicas).
+							Info("min replicas out of sync")
+						rMA.Spec.MinReplicas = minReplicas
+						objectModified = true
+					}
+
+					if rMA.Spec.MaxReplicas != maxReplicas {
+						maLog.WithField("desired", maxReplicas).
+							WithField("observed", rMA.Spec.MaxReplicas).
+							Info("max replicas out of sync")
+						rMA.Spec.MaxReplicas = maxReplicas
+						objectModified = true
+					}
+
+					if objectModified {
+						machineAutoscalersToUpdate = append(machineAutoscalersToUpdate, &rMA)
+					}
+					break
+				}
+			}
+
+			if !found {
+				ma := &autoscalingv1beta1.MachineAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: ms.Namespace,
+						Name:      ms.Name,
+						Labels: map[string]string{
+							machinePoolNameLabel: pool.Spec.Name,
+						},
+					},
+					Spec: autoscalingv1beta1.MachineAutoscalerSpec{
+						MinReplicas: minReplicas,
+						MaxReplicas: maxReplicas,
+						ScaleTargetRef: autoscalingv1beta1.CrossVersionObjectReference{
+							APIVersion: ms.APIVersion,
+							Kind:       ms.Kind,
+							Name:       ms.Name,
+						},
+					},
+				}
+				machineAutoscalersToCreate = append(machineAutoscalersToCreate, ma)
+			}
+
+		}
 	}
 
-	for _, ms := range machineSets {
-		if ms.Labels == nil {
-			ms.Labels = map[string]string{}
+	// Find MachineAutoscalers that need deleting
+	for i, rMA := range remoteMachineAutoscalers.Items {
+		if !isControlledByMachinePool(cd, pool, &rMA) {
+			continue
 		}
-		ms.Labels[machinePoolNameLabel] = pool.Spec.Name
-
-		// Apply hive MachinePool labels to MachineSet MachineSpec.
-		ms.Spec.Template.Spec.ObjectMeta.Labels = make(map[string]string, len(pool.Spec.Labels))
-		for key, value := range pool.Spec.Labels {
-			ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
+		delete := true
+		if pool.DeletionTimestamp == nil {
+			for _, ms := range machineSets {
+				if rMA.Name == ms.Name {
+					delete = false
+					break
+				}
+			}
 		}
-
-		// Apply hive MachinePool taints to MachineSet MachineSpec.
-		ms.Spec.Template.Spec.Taints = pool.Spec.Taints
+		if delete {
+			machineAutoscalersToDelete = append(machineAutoscalersToDelete, &remoteMachineAutoscalers.Items[i])
+		}
 	}
 
-	return machineSets, nil
+	for _, ma := range machineAutoscalersToCreate {
+		logger.WithField("machineautoscaler", ma.Name).Info("creating machineautoscaler")
+		if err := remoteClusterAPIClient.Create(context.Background(), ma); err != nil {
+			logger.WithError(err).Error("unable to create machine autoscaler")
+			return err
+		}
+	}
+
+	for _, ma := range machineAutoscalersToUpdate {
+		logger.WithField("machineautoscaler", ma.Name).Info("updating machineautoscaler")
+		if err := remoteClusterAPIClient.Update(context.Background(), ma); err != nil {
+			logger.WithError(err).Error("unable to update machine autoscaler")
+			return err
+		}
+	}
+
+	for _, ma := range machineAutoscalersToDelete {
+		logger.WithField("machineautoscaler", ma.Name).Info("deleting machineautoscaler")
+		if err := remoteClusterAPIClient.Delete(context.Background(), ma); err != nil {
+			logger.WithError(err).Error("unable to delete machine autoscaler")
+			return err
+		}
+	}
+
+	logger.Info("done reconciling machine autoscalers for cluster deployment")
+	return nil
 }
 
-func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
+func (r *ReconcileRemoteMachineSet) syncClusterAutoscaler(
+	pool *hivev1.MachinePool,
+	cd *hivev1.ClusterDeployment,
+	remoteClusterAPIClient client.Client,
+	logger log.FieldLogger,
+) error {
+	if pool.Spec.Autoscaling == nil {
+		return nil
+	}
+	remoteClusterAutoscalers := &autoscalingv1.ClusterAutoscalerList{}
+	tm := metav1.TypeMeta{}
+	tm.SetGroupVersionKind(autoscalingv1.SchemeGroupVersion.WithKind("ClusterAutoscaler"))
+	if err := remoteClusterAPIClient.List(
+		context.Background(),
+		remoteClusterAutoscalers,
+		client.UseListOptions(&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}}),
+	); err != nil {
+		logger.WithError(err).Error("unable to fetch remote cluster autoscalers")
+		return err
+	}
+	logger.Infof("found %v remote cluster autoscalers", len(remoteClusterAutoscalers.Items))
+	var defaultClusterAutoscaler *autoscalingv1.ClusterAutoscaler
+	for i, rCA := range remoteClusterAutoscalers.Items {
+		if rCA.Name == "default" {
+			defaultClusterAutoscaler = &remoteClusterAutoscalers.Items[i]
+			break
+		}
+	}
+	if defaultClusterAutoscaler != nil {
+		if spec := &defaultClusterAutoscaler.Spec; spec.ScaleDown == nil || !spec.ScaleDown.Enabled {
+			logger.Info("updaing cluster autoscaler")
+			if spec.ScaleDown == nil {
+				spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}
+			}
+			spec.ScaleDown.Enabled = true
+			if err := remoteClusterAPIClient.Update(context.Background(), defaultClusterAutoscaler); err != nil {
+				logger.WithError(err).Error("could not update cluster autoscaler")
+				return err
+			}
+		}
+	} else {
+		logger.Info("creating cluster autoscaler")
+		defaultClusterAutoscaler = &autoscalingv1.ClusterAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "default",
+			},
+			Spec: autoscalingv1.ClusterAutoscalerSpec{
+				ScaleDown: &autoscalingv1.ScaleDownConfig{
+					Enabled: true,
+				},
+			},
+		}
+		if err := remoteClusterAPIClient.Create(context.Background(), defaultClusterAutoscaler); err != nil {
+			logger.WithError(err).Error("could not create cluster autoscaler")
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		creds := &corev1.Secret{}
@@ -424,7 +710,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewAWSActuator(creds, cd.Spec.Platform.AWS.Region, remoteMachineSets, r.scheme, cdLog)
+		return NewAWSActuator(creds, cd.Spec.Platform.AWS.Region, remoteMachineSets, r.scheme, logger)
 	case cd.Spec.Platform.GCP != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -437,7 +723,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewGCPActuator(creds, cdLog)
+		return NewGCPActuator(creds, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}
@@ -450,22 +736,20 @@ func baseMachinePool(pool *hivev1.MachinePool) *installertypes.MachinePool {
 	}
 }
 
-func isMachineSetControlledByMachinePool(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, machineSet *machineapi.MachineSet) bool {
-	return strings.HasPrefix(
-		machineSet.Name,
-		strings.Join([]string{cd.Spec.ClusterName, pool.Spec.Name, ""}, "-"),
-	) ||
-		machineSet.Labels[machinePoolNameLabel] == pool.Spec.Name
+func isControlledByMachinePool(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, obj metav1.Object) bool {
+	prefix := strings.Join([]string{cd.Spec.ClusterName, pool.Spec.Name, ""}, "-")
+	return strings.HasPrefix(obj.GetName(), prefix) ||
+		obj.GetLabels()[machinePoolNameLabel] == pool.Spec.Name
 }
 
-func (r *ReconcileRemoteMachineSet) removeFinalizer(pool *hivev1.MachinePool) (reconcile.Result, error) {
+func (r *ReconcileRemoteMachineSet) removeFinalizer(pool *hivev1.MachinePool, logger log.FieldLogger) (reconcile.Result, error) {
 	if !controllerutils.HasFinalizer(pool, finalizer) {
 		return reconcile.Result{}, nil
 	}
 	controllerutils.DeleteFinalizer(pool, finalizer)
-	err := r.Status().Update(context.Background(), pool)
+	err := r.Update(context.Background(), pool)
 	if err != nil {
-		log.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer")
 	}
 	return reconcile.Result{}, err
 }

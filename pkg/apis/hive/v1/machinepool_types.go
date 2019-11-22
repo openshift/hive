@@ -20,8 +20,15 @@ type MachinePoolSpec struct {
 	Name string `json:"name"`
 
 	// Replicas is the count of machines for this machine pool.
-	// Default is 1.
-	Replicas *int64 `json:"replicas"`
+	// Replicas and autoscaling cannot be used together.
+	// Default is 1, if autoscaling is not used.
+	// +optional
+	Replicas *int64 `json:"replicas,omitempty"`
+
+	// Autoscaling is the details for auto-scaling the machine pool.
+	// Replicas and autoscaling cannot be used together.
+	// +optional
+	Autoscaling *MachinePoolAutoscaling `json:"autoscaling,omitempty"`
 
 	// Platform is configuration for machine pool specific to the platform.
 	Platform MachinePoolPlatform `json:"platform"`
@@ -36,6 +43,15 @@ type MachinePoolSpec struct {
 	// This list will overwrite any modifications made to Node taints on an ongoing basis.
 	// +optional
 	Taints []corev1.Taint `json:"taints,omitempty"`
+}
+
+// MachinePoolAutoscaling details how the machine pool is to be auto-scaled.
+type MachinePoolAutoscaling struct {
+	// MinReplicas is the minimum number of replicas for the machine pool.
+	MinReplicas int32 `json:"minReplicas"`
+
+	// MaxReplicas is the maximum number of replicas for the machine pool.
+	MaxReplicas int32 `json:"maxReplicas"`
 }
 
 // MachinePoolPlatform is the platform-specific configuration for a machine
@@ -79,6 +95,12 @@ type MachinePoolCondition struct {
 
 // MachinePoolConditionType is a valid value for MachinePoolCondition.Type
 type MachinePoolConditionType string
+
+const (
+	// NotEnoughReplicasMachinePoolCondition is true when the minReplicas field
+	// is set too low for the number of machinesets for the machine pool.
+	NotEnoughReplicasMachinePoolCondition MachinePoolConditionType = "NotEnoughReplicas"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

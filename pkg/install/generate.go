@@ -27,7 +27,7 @@ const (
 	azureAuthDir                    = "/.azure"
 	azureAuthFile                   = azureAuthDir + "/osServicePrincipal.json"
 	gcpAuthDir                      = "/.gcp"
-	gcpAuthFile                     = gcpAuthDir + "/osServiceAccount.json"
+	gcpAuthFile                     = gcpAuthDir + "/" + constants.GCPCredentialsName
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"

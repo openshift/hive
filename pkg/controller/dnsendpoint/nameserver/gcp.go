@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 )
 
@@ -27,9 +28,9 @@ func NewGCPQuery(c client.Client, credsSecretName string) Query {
 			); err != nil {
 				return nil, errors.Wrap(err, "could not get the creds secret")
 			}
-			authJSON, ok := secret.Data["osServiceAccount.json"]
+			authJSON, ok := secret.Data[constants.GCPCredentialsName]
 			if !ok {
-				return nil, errors.New("creds secret does not contain \"osServiceAccount.json\" data")
+				return nil, errors.New("creds secret does not contain \"" + constants.GCPCredentialsName + "\" data")
 			}
 			gcpClient, err := gcpclient.NewClientWithDefaultProject(authJSON)
 			return gcpClient, errors.Wrap(err, "error creating GCP client")
@@ -100,7 +101,7 @@ func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.String) 
 		if !ok {
 			return errors.Wrap(err, "error deleting the name server")
 		}
-		if gcpErr.Code == 404 {
+		if gcpErr.Code == gcpclient.ErrCodeNotFound {
 			return nil
 		}
 		if gcpErr.Code != 412 {
@@ -125,7 +126,7 @@ func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.String) 
 // queryZoneName queries GCP for the public managed zone for the specified domain.
 func (q *gcpQuery) queryZoneName(gcpClient gcpclient.Client, domain string) (string, error) {
 	listOpts := gcpclient.ListManagedZonesOptions{
-		DNSName: dotted(domain),
+		DNSName: controllerutils.Dotted(domain),
 	}
 	for {
 		listOutput, err := gcpClient.ListManagedZones(listOpts)
@@ -160,9 +161,9 @@ func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone stri
 			}
 			values := sets.NewString()
 			for _, v := range recordSet.Rrdatas {
-				values.Insert(undotted(v))
+				values.Insert(controllerutils.Undotted(v))
 			}
-			nameServers[undotted(recordSet.Name)] = values
+			nameServers[controllerutils.Undotted(recordSet.Name)] = values
 		}
 		if listOutput.NextPageToken == "" {
 			return nameServers, nil
@@ -177,7 +178,7 @@ func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone strin
 		managedZone,
 		gcpclient.ListResourceRecordSetsOptions{
 			MaxResults: 1,
-			Name:       dotted(domain),
+			Name:       controllerutils.Dotted(domain),
 			Type:       "NS",
 		},
 	)
@@ -189,7 +190,7 @@ func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone strin
 	}
 	values := sets.NewString()
 	for _, v := range listOutput.Rrsets[0].Rrdatas {
-		values.Insert(undotted(v))
+		values.Insert(controllerutils.Undotted(v))
 	}
 	return values, nil
 }
@@ -207,10 +208,10 @@ func (q *gcpQuery) deleteNameServers(gcpClient gcpclient.Client, managedZone str
 func (q *gcpQuery) resourceRecordSet(domain string, values sets.String) *dns.ResourceRecordSet {
 	dottedValues := make([]string, len(values))
 	for i, v := range values.List() {
-		dottedValues[i] = dotted(v)
+		dottedValues[i] = controllerutils.Undotted(v)
 	}
 	return &dns.ResourceRecordSet{
-		Name:    dotted(domain),
+		Name:    controllerutils.Undotted(domain),
 		Rrdatas: dottedValues,
 		Ttl:     int64(60),
 		Type:    "NS",

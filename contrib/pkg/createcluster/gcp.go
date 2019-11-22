@@ -13,10 +13,10 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
-	gcpCredFile         = "osServiceAccount.json"
 	defaultInstanceType = "n1-standard-4"
 )
 
@@ -26,7 +26,7 @@ type gcpCloudProvider struct {
 }
 
 func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", gcpCredFile)
+	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", constants.GCPCredentialsName)
 	if l := os.Getenv("GCP_SHARED_CREDENTIALS_FILE"); l != "" {
 		credsFilePath = l
 	}
@@ -50,7 +50,7 @@ func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			gcpCredFile: saFileContents,
+			constants.GCPCredentialsName: saFileContents,
 		},
 	}, nil
 }

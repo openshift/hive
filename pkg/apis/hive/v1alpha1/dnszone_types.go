@@ -25,6 +25,10 @@ type DNSZoneSpec struct {
 	// AWS specifies AWS-specific cloud configuration
 	// +optional
 	AWS *AWSDNSZoneSpec `json:"aws,omitempty"`
+
+	// GCP specifies GCP-specific cloud configuration
+	// +optional
+	GCP *GCPDNSZoneSpec `json:"gcp,omitempty"`
 }
 
 // AWSDNSZoneSpec contains AWS-specific DNSZone specifications
@@ -50,6 +54,15 @@ type AWSResourceTag struct {
 	Value string `json:"value"`
 }
 
+// GCPDNSZoneSpec contains GCP-specific DNSZone specifications
+type GCPDNSZoneSpec struct {
+	// CredentialsSecretRef references a secret that will be used to authenticate with
+	// GCP CloudDNS. It will need permission to create and manage CloudDNS Hosted Zones.
+	// Secret should have a key named 'osServiceAccount.json'.
+	// The credentials must specify the project to use.
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+}
+
 // DNSZoneStatus defines the observed state of DNSZone
 type DNSZoneStatus struct {
 	// LastSyncTimestamp is the time that the zone was last sync'd.
@@ -68,6 +81,10 @@ type DNSZoneStatus struct {
 	// +optional
 	AWS *AWSDNSZoneStatus `json:"aws,omitempty"`
 
+	// GCPDNSZoneStatus contains status information specific to GCP
+	// +optional
+	GCP *GCPDNSZoneStatus `json:"gcp,omitempty"`
+
 	// Conditions includes more detailed status for the DNSZone
 	// +optional
 	Conditions []DNSZoneCondition `json:"conditions,omitempty"`
@@ -78,6 +95,13 @@ type AWSDNSZoneStatus struct {
 	// ZoneID is the ID of the zone in AWS
 	// +optional
 	ZoneID *string `json:"zoneID,omitempty"`
+}
+
+// GCPDNSZoneStatus contains status information specific to GCP Cloud DNS zones
+type GCPDNSZoneStatus struct {
+	// ZoneName is the name of the zone in GCP Cloud DNS
+	// +optional
+	ZoneName *string `json:"zoneName,omitempty"`
 }
 
 // DNSZoneCondition contains details for the current condition of a DNSZone

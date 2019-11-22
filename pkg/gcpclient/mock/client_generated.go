@@ -91,3 +91,47 @@ func (mr *MockClientMockRecorder) DeleteResourceRecordSet(managedZone, recordSet
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteResourceRecordSet", reflect.TypeOf((*MockClient)(nil).DeleteResourceRecordSet), managedZone, recordSet)
 }
+
+// GetManagedZone mocks base method
+func (m *MockClient) GetManagedZone(managedZone string) (*v1.ManagedZone, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetManagedZone", managedZone)
+	ret0, _ := ret[0].(*v1.ManagedZone)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetManagedZone indicates an expected call of GetManagedZone
+func (mr *MockClientMockRecorder) GetManagedZone(managedZone interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetManagedZone", reflect.TypeOf((*MockClient)(nil).GetManagedZone), managedZone)
+}
+
+// CreateManagedZone mocks base method
+func (m *MockClient) CreateManagedZone(managedZone *v1.ManagedZone) (*v1.ManagedZone, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateManagedZone", managedZone)
+	ret0, _ := ret[0].(*v1.ManagedZone)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateManagedZone indicates an expected call of CreateManagedZone
+func (mr *MockClientMockRecorder) CreateManagedZone(managedZone interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateManagedZone", reflect.TypeOf((*MockClient)(nil).CreateManagedZone), managedZone)
+}
+
+// DeleteManagedZone mocks base method
+func (m *MockClient) DeleteManagedZone(managedZone string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteManagedZone", managedZone)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteManagedZone indicates an expected call of DeleteManagedZone
+func (mr *MockClientMockRecorder) DeleteManagedZone(managedZone interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteManagedZone", reflect.TypeOf((*MockClient)(nil).DeleteManagedZone), managedZone)
+}

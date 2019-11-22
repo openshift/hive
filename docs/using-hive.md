@@ -40,7 +40,7 @@ Edit the HiveConfig to add global pull secret.
 oc edit hiveconfig hive
 ```
 
-The global pull secret name must be configured in the HiveConfig CRD.
+The global pull secret name must be configured in the HiveConfig CR.
 
 ```yaml
 spec:
@@ -65,7 +65,7 @@ spec:
 
 Alternatively you can specify release image overrides directly on your ClusterDeployment when you create one.
 
-Cluster provisioning begins when a caller creates a ClusterDeployment CRD, which is the core Hive resource to control the lifecycle of a cluster.
+Cluster provisioning begins when a caller creates a ClusterDeployment CR, which is the core Hive resource to control the lifecycle of a cluster.
 
 An example ClusterDeployment:
 

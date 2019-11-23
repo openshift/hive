@@ -14,12 +14,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
 	"github.com/openshift/hive/pkg/constants"
+)
+
+const (
+	defaultWorkerPoolName = "worker"
 )
 
 var validTestManagedDomains = []string{
@@ -36,7 +41,7 @@ func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 			ClusterName: "SameClusterName",
 			Compute: []hivev1.MachinePool{
 				{
-					Name: "SameMachinePoolName",
+					Name: defaultWorkerPoolName,
 				},
 			},
 			SSHKey: corev1.LocalObjectReference{
@@ -75,7 +80,7 @@ func validGCPClusterDeployment() *hivev1.ClusterDeployment {
 	}
 	cd.Spec.Compute = []hivev1.MachinePool{
 		{
-			Name: "SameMachinePoolName",
+			Name: defaultWorkerPoolName,
 			Platform: hivev1.MachinePoolPlatform{
 				GCP: &hivev1gcp.MachinePool{
 					InstanceType: "n1-standard",
@@ -99,11 +104,6 @@ func validGCPClusterDeployment() *hivev1.ClusterDeployment {
 
 func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
-	cd.Spec.Compute = []hivev1.MachinePool{
-		{
-			Name: "SameMachinePoolName",
-		},
-	}
 	cd.Spec.Platform = hivev1.Platform{
 		AWS: &hivev1aws.Platform{
 			Region: "test-region",
@@ -117,11 +117,6 @@ func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 
 func validAzureClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
-	cd.Spec.Compute = []hivev1.MachinePool{
-		{
-			Name: "SameMachinePoolName",
-		},
-	}
 	cd.Spec.Platform = hivev1.Platform{
 		Azure: &hivev1azure.Platform{
 			Region:                      "test-region",
@@ -158,7 +153,8 @@ func validClusterDeploymentDifferentMutableValue() *hivev1.ClusterDeployment {
 	cd := validAWSClusterDeployment()
 	cd.Spec.Compute = []hivev1.MachinePool{
 		{
-			Name: "DifferentMachinePoolName",
+			Name:     defaultWorkerPoolName,
+			Replicas: pointer.Int64Ptr(100),
 		},
 	}
 	return cd
@@ -736,6 +732,61 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			}(),
 			oldObject:       validGCPClusterDeployment(),
 			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "only allow one compute machine pool for GCP",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Compute = append(cd.Spec.Compute, hivev1.MachinePool{
+					Name: "extramachinepool",
+					Platform: hivev1.MachinePoolPlatform{
+						GCP: &hivev1gcp.MachinePool{
+							InstanceType: "someinstancetype",
+						},
+					},
+				})
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "no update to multiple machine pools for GCP",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Compute = append(cd.Spec.Compute, hivev1.MachinePool{
+					Name: "extramachinepool",
+					Platform: hivev1.MachinePoolPlatform{
+						GCP: &hivev1gcp.MachinePool{
+							InstanceType: "someinstancetype",
+						},
+					},
+				})
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "ensure unique compute machine pool names",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Compute = append(cd.Spec.Compute, hivev1.MachinePool{
+					Name: "extramachinepool",
+					Platform: hivev1.MachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{},
+					},
+				})
+				cd.Spec.Compute = append(cd.Spec.Compute, hivev1.MachinePool{
+					Name: "extramachinepool",
+					Platform: hivev1.MachinePoolPlatform{
+						AWS: &hivev1aws.MachinePoolPlatform{},
+					},
+				})
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
 		},
 	}

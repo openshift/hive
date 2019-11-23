@@ -607,8 +607,37 @@ func validateMachinePools(cd *hivev1.ClusterDeployment) field.ErrorList {
 
 	vErrs = append(vErrs, validateMachinePool(cd, &cd.Spec.ControlPlane, field.NewPath("spec", "controlPlane"))...)
 
+	vErrs = append(vErrs, validateComputeMachinePoolRequirements(cd, field.NewPath("spec", "compute"))...)
+
 	for i, mp := range cd.Spec.Compute {
 		vErrs = append(vErrs, validateMachinePool(cd, &mp, field.NewPath("spec", "compute").Index(i))...)
+	}
+
+	return vErrs
+}
+
+func validateComputeMachinePoolRequirements(cd *hivev1.ClusterDeployment, path *field.Path) field.ErrorList {
+	vErrs := field.ErrorList{}
+
+	if cd.Spec.Platform.GCP != nil {
+		// Only restrict the name of compute machine pools on GCP.
+		// Restriction can be removed once proper handling of reuse or creation
+		// of necessary subnets is resolved.
+		for i, mp := range cd.Spec.Compute {
+			if mp.Name != "worker" {
+				vErrs = append(vErrs, field.Invalid(path.Index(i).Child("name"), mp.Name,
+					"name of compute pool must be \"worker\""))
+			}
+		}
+	}
+
+	// ensure machinePool names are unique
+	names := map[string]bool{}
+	for i, mp := range cd.Spec.Compute {
+		if names[mp.Name] {
+			vErrs = append(vErrs, field.Invalid(path.Index(i).Child("name"), mp.Name, "name must be unique"))
+		}
+		names[mp.Name] = true
 	}
 
 	return vErrs

@@ -319,7 +319,7 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 		secret := &corev1.Secret{}
 		err := r.Get(context.TODO(),
 			types.NamespacedName{
-				Name:      dnsZone.Spec.AWS.AccountSecretRef.Name,
+				Name:      dnsZone.Spec.AWS.CredentialsSecretRef.Name,
 				Namespace: dnsZone.Namespace,
 			},
 			secret)

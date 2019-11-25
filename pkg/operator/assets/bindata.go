@@ -2786,10 +2786,6 @@ spec:
             aws:
               description: AWS specifies AWS-specific cloud configuration
               properties:
-                accountSecretRef:
-                  description: AccountSecretRef contains a reference to a secret that
-                    contains AWS credentials for CRUD operations
-                  type: object
                 additionalTags:
                   description: AdditionalTags is a set of additional tags to set on
                     the DNS hosted zone. In addition to these tags,the DNS Zone controller
@@ -2805,10 +2801,10 @@ spec:
                         type: string
                     type: object
                   type: array
-                region:
-                  description: Region specifies the region-specific API endpoint to
-                    use
-                  type: string
+                credentialsSecretRef:
+                  description: CredentialsSecretRef contains a reference to a secret
+                    that contains AWS credentials for CRUD operations
+                  type: object
               type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
@@ -2981,11 +2977,11 @@ spec:
                   description: GCP contains GCP-specific settings for external DNS
                   properties:
                     credentials:
-                      description: Credentials references a secret that will be used
-                        to authenticate with GCP DNS. It will need permission to manage
-                        entries in each of the managed domains for this cluster. Secret
-                        should have a key names 'osServiceAccount.json'. The credentials
-                        must specify the project to use.
+                      description: CredentialsSecretRef references a secret that will
+                        be used to authenticate with GCP DNS. It will need permission
+                        to manage entries in each of the managed domains for this
+                        cluster. Secret should have a key named 'osServiceAccount.json'.
+                        The credentials must specify the project to use.
                       type: object
                   type: object
               type: object

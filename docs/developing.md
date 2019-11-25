@@ -88,7 +88,7 @@ CONTAINER ID        IMAGE                  COMMAND                  CREATED     
 1dc8a3c59d84        registry:2             "/entrypoint.sh /etc…"   2 weeks ago         Up 8 days           0.0.0.0:5000->5000/tcp                 registry
 ```
 
-Configure kubectl to talk to your new cluster:
+Configure kubectl/oc to talk to your new cluster:
 
 ```bash
 export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
@@ -279,7 +279,12 @@ Alternatively, you can run the Dep command directly.
 dep ensure -v
 ```
 
-### Running the e2e test locally
+### TIP
+
+* The Dep cache located under *_$GOPATH/pkg/dep_*.
+* If you see any Dep errors during `make vendor`, you can remove local cached directory and try again.
+
+## Running the e2e test locally
 
 The e2e test deploys Hive on a cluster, tests that all Hive components are working properly, then creates a cluster
 with Hive and ensures that Hive works properly with the installed cluster. It finally tears down the created cluster.
@@ -306,8 +311,17 @@ Run the Hive e2e script:
 
 `hack/e2e-test.sh`
 
-### TIP
+## Viewing Metrics with Prometheus
 
-* The Dep cache located under *_$GOPATH/pkg/dep_*.
-* If you see any Dep errors during `make vendor`, you can remove local cached directory and try again.
+Hive publishes a number of metrics that can be scraped by prometheus. If you do not have an in-cluster prometheus that can scrape hive's endpoint, you can deploy a stateless prometheus pod in the hive namespace with:
 
+```
+oc apply -f config/prometheus
+oc port-forward svc/prometheus -n hive 9090:9090
+```
+
+Once the pods come up you should be able to view prometheus at http://localhost:9090.
+
+Hive metrics have a hive_ or controller_runtime_ prefix.
+
+Note that this prometheus uses an emptyDir volume and all data is lost on pod restart.

@@ -2,15 +2,11 @@ package createcluster
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-
-	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
 	"github.com/openshift/hive/pkg/constants"
@@ -26,19 +22,10 @@ type gcpCloudProvider struct {
 }
 
 func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", constants.GCPCredentialsName)
-	if l := os.Getenv("GCP_SHARED_CREDENTIALS_FILE"); l != "" {
-		credsFilePath = l
-	}
-	if o.CredsFile != "" {
-		credsFilePath = o.CredsFile
-	}
-	log.Infof("Loading gcp service account from: %s", credsFilePath)
-	saFileContents, err := ioutil.ReadFile(credsFilePath)
+	saFileContents, err := gcputils.GetCreds(o.CredsFile)
 	if err != nil {
 		return nil, err
 	}
-
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",

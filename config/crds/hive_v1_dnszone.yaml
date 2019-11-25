@@ -33,10 +33,6 @@ spec:
             aws:
               description: AWS specifies AWS-specific cloud configuration
               properties:
-                accountSecretRef:
-                  description: AccountSecretRef contains a reference to a secret that
-                    contains AWS credentials for CRUD operations
-                  type: object
                 additionalTags:
                   description: AdditionalTags is a set of additional tags to set on
                     the DNS hosted zone. In addition to these tags,the DNS Zone controller
@@ -52,6 +48,10 @@ spec:
                         type: string
                     type: object
                   type: array
+                credentialsSecretRef:
+                  description: CredentialsSecretRef contains a reference to a secret
+                    that contains AWS credentials for CRUD operations
+                  type: object
                 region:
                   description: Region specifies the region-specific API endpoint to
                     use

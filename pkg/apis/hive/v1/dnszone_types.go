@@ -29,9 +29,9 @@ type DNSZoneSpec struct {
 
 // AWSDNSZoneSpec contains AWS-specific DNSZone specifications
 type AWSDNSZoneSpec struct {
-	// AccountSecretRef contains a reference to a secret that contains AWS credentials
+	// CredentialsSecretRef contains a reference to a secret that contains AWS credentials
 	// for CRUD operations
-	AccountSecretRef corev1.LocalObjectReference `json:"accountSecretRef"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
 	// Region specifies the region-specific API endpoint to use
 	Region string `json:"region"`

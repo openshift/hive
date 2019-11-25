@@ -2805,10 +2805,6 @@ spec:
                   description: CredentialsSecretRef contains a reference to a secret
                     that contains AWS credentials for CRUD operations
                   type: object
-                region:
-                  description: Region specifies the region-specific API endpoint to
-                    use
-                  type: string
               type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should

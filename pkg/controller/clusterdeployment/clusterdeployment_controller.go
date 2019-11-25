@@ -1293,7 +1293,6 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 			LinkToParentDomain: true,
 			AWS: &hivev1.AWSDNSZoneSpec{
 				CredentialsSecretRef: cd.Spec.Platform.AWS.CredentialsSecretRef,
-				Region:               cd.Spec.Platform.AWS.Region,
 			},
 		},
 	}

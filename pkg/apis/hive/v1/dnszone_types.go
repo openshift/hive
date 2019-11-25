@@ -33,9 +33,6 @@ type AWSDNSZoneSpec struct {
 	// for CRUD operations
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
-	// Region specifies the region-specific API endpoint to use
-	Region string `json:"region"`
-
 	// AdditionalTags is a set of additional tags to set on the DNS hosted zone. In addition
 	// to these tags,the DNS Zone controller will set a hive.openhsift.io/hostedzone tag
 	// identifying the HostedZone record that it belongs to.

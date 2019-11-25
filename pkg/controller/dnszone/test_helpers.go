@@ -40,7 +40,6 @@ var (
 					CredentialsSecretRef: corev1.LocalObjectReference{
 						Name: "somesecret",
 					},
-					Region: "us-east-1",
 					AdditionalTags: []hivev1.AWSResourceTag{
 						{
 							Key:   "foo",

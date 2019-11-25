@@ -760,6 +760,14 @@
   revision = "046d74a3bd9143fb650cb894ece0f088a3b26de3"
 
 [[projects]]
+  branch = "master"
+  digest = "1:082472cbd1b8f704cd9a33f94a4855b852ba5d5d0ca203d9c5f6e508e12e9262"
+  name = "github.com/openshift/cluster-api-provider-gcp"
+  packages = ["pkg/apis/gcpprovider/v1beta1"]
+  pruneopts = "NUT"
+  revision = "093a944a412b3d8cb269716553eb7f9e1fb80b1a"
+
+[[projects]]
   digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
   name = "github.com/openshift/cluster-network-operator"
   packages = ["pkg/apis/networkoperator/v1"]
@@ -780,13 +788,14 @@
   version = "v1.14.0"
 
 [[projects]]
-  digest = "1:b312cf984ba7c8e95540f3274c2cd4cf5189215c60a567df75a5529028ec6c65"
+  digest = "1:bbd46e400a1c01199ba665df8f9f8f03855b0d1a0a1c72130fed3fffb98a99b8"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
     "pkg/asset/installconfig/azure",
     "pkg/asset/installconfig/gcp",
     "pkg/asset/machines/aws",
+    "pkg/asset/machines/gcp",
     "pkg/destroy/aws",
     "pkg/destroy/azure",
     "pkg/destroy/gcp",
@@ -2021,11 +2030,13 @@
     "github.com/openshift/api/config/v1",
     "github.com/openshift/api/operator/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1",
     "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
     "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/installconfig/azure",
     "github.com/openshift/installer/pkg/asset/machines/aws",
+    "github.com/openshift/installer/pkg/asset/machines/gcp",
     "github.com/openshift/installer/pkg/destroy/aws",
     "github.com/openshift/installer/pkg/destroy/azure",
     "github.com/openshift/installer/pkg/destroy/gcp",
@@ -2047,7 +2058,9 @@
     "golang.org/x/net/context",
     "golang.org/x/oauth2/google",
     "google.golang.org/api/cloudresourcemanager/v1",
+    "google.golang.org/api/compute/v1",
     "google.golang.org/api/dns/v1",
+    "google.golang.org/api/googleapi",
     "google.golang.org/api/option",
     "google.golang.org/api/serviceusage/v1",
     "gopkg.in/ini.v1",

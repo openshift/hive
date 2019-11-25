@@ -84,7 +84,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 				hiveContainer.Env,
 				corev1.EnvVar{
 					Name:  constants.ExternalDNSGCPCredsEnvVar,
-					Value: e.GCP.Credentials.Name,
+					Value: e.GCP.CredentialsSecretRef.Name,
 				},
 			)
 		}

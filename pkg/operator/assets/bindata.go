@@ -2977,11 +2977,11 @@ spec:
                   description: GCP contains GCP-specific settings for external DNS
                   properties:
                     credentials:
-                      description: Credentials references a secret that will be used
-                        to authenticate with GCP DNS. It will need permission to manage
-                        entries in each of the managed domains for this cluster. Secret
-                        should have a key names 'osServiceAccount.json'. The credentials
-                        must specify the project to use.
+                      description: CredentialsSecretRef references a secret that will
+                        be used to authenticate with GCP DNS. It will need permission
+                        to manage entries in each of the managed domains for this
+                        cluster. Secret should have a key named 'osServiceAccount.json'.
+                        The credentials must specify the project to use.
                       type: object
                   type: object
               type: object

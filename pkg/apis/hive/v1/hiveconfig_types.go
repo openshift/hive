@@ -108,13 +108,13 @@ type ExternalDNSAWSConfig struct {
 
 // ExternalDNSGCPConfig contains GCP-specific settings for external DNS
 type ExternalDNSGCPConfig struct {
-	// Credentials references a secret that will be used to authenticate with
+	// CredentialsSecretRef references a secret that will be used to authenticate with
 	// GCP DNS. It will need permission to manage entries in each of the
 	// managed domains for this cluster.
-	// Secret should have a key names 'osServiceAccount.json'.
+	// Secret should have a key named 'osServiceAccount.json'.
 	// The credentials must specify the project to use.
 	// +optional
-	Credentials corev1.LocalObjectReference `json:"credentials,omitempty"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentials,omitempty"`
 }
 
 // +genclient:nonNamespaced

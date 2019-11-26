@@ -8,6 +8,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	baremetal "github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1790,6 +1791,11 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 		in, out := &in.GCP, &out.GCP
 		*out = new(gcp.Platform)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.BareMetal != nil {
+		in, out := &in.BareMetal, &out.BareMetal
+		*out = new(baremetal.Platform)
+		**out = **in
 	}
 	return
 }

@@ -208,10 +208,10 @@ func (q *gcpQuery) deleteNameServers(gcpClient gcpclient.Client, managedZone str
 func (q *gcpQuery) resourceRecordSet(domain string, values sets.String) *dns.ResourceRecordSet {
 	dottedValues := make([]string, len(values))
 	for i, v := range values.List() {
-		dottedValues[i] = controllerutils.Undotted(v)
+		dottedValues[i] = controllerutils.Dotted(v)
 	}
 	return &dns.ResourceRecordSet{
-		Name:    controllerutils.Undotted(domain),
+		Name:    controllerutils.Dotted(domain),
 		Rrdatas: dottedValues,
 		Ttl:     int64(60),
 		Type:    "NS",

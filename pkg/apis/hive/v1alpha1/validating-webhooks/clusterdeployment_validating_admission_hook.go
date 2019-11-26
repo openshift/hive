@@ -268,6 +268,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 	if newObject.Spec.Platform.GCP != nil {
 		numberOfPlatforms++
+		canManageDNS = true
 		if newObject.Spec.PlatformSecrets.GCP == nil {
 			allErrs = append(allErrs, field.Required(platformSecretsPath.Child("gcp"), "must specify secrets for GCP access"))
 		}

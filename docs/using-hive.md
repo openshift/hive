@@ -4,7 +4,7 @@
 
 ### Prerequisites
 
-  1. You will need a live and functioning Route53 DNS zone in the AWS account you will be installing the new cluster(s) into. For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
+  1. You will need a live and functioning DNS zone in the cloud account into which you will be installing the new cluster(s). For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
     * Note that there is an additional mode of DNS management where Hive can automatically create delegated zones for approved base domains. i.e. if hive.example.com exists already, you can specify a base domain of cluster1.hive.example.com on your ClusterDeployment, and Hive will create this zone for you, wait for it to resolve, and then proceed with installation. See below for additional info.
   1. Determine what OpenShift release image you wish to install.
   1. Create a Kubernetes secret containing a docker registry pull secret (typically obtained from [try.openshift.com](https://try.openshift.com)).
@@ -203,38 +203,64 @@ oc get nodes
 
 ## DNS Management
 
-Hive can optionally create delegated Route53 DNS zones for each cluster.
+Hive can optionally create delegated DNS zones for each cluster.
 
-NOTE: This feature is not yet available for GCP and Azure clusters.
+NOTE: This feature is only currently available for AWS and GCP clusters.
 
 To use this feature:
 
-  1. Manually create a Route53 hosted zone for your "root" domain (i.e. hive.example.com in the example below) and ensure your DNS is operational.
-  1. Create a secret in the "hive" namespace with AWS credentials with permissions to manage the root hosted zone.
-     ```yaml
-     apiVersion: v1
-     data:
-       aws_access_key_id: REDACTED
-       aws_secret_access_key: REDACTED
-     kind: Secret
-     metadata:
-       name: route53-aws-creds
-     type: Opaque
-     ```
+  1. Manually create a DNS zone for your "root" domain (i.e. hive.example.com in the example below) and ensure your DNS is operational.
+  1. Create a secret in the "hive" namespace with your cloud credentials with permissions to manage the root zone.
+     - AWS
+       ```yaml
+       apiVersion: v1
+       data:
+         aws_access_key_id: REDACTED
+         aws_secret_access_key: REDACTED
+       kind: Secret
+       metadata:
+         name: route53-aws-creds
+       type: Opaque
+       ```
+     - GCP
+       ```yaml
+       apiVersion: v1
+       data:
+         osServiceAccount.json: REDACTED
+       kind: Secret
+       metadata:
+         name: gcp-creds
+       type: Opaque
+       ```
   1. Update your HiveConfig to enable externalDNS and set the list of managed domains:
-     ```yaml
-     apiVersion: hive.openshift.io/v1alpha1
-     kind: HiveConfig
-     metadata:
-       name: hive
-     spec:
-       managedDomains:
-       - hive.example.com
-       externalDNS:
-         aws:
-           credentials:
-             name: route53-aws-creds
-     ```
+     - AWS
+       ```yaml
+       apiVersion: hive.openshift.io/v1alpha1
+       kind: HiveConfig
+       metadata:
+         name: hive
+       spec:
+         managedDomains:
+         - hive.example.com
+         externalDNS:
+           aws:
+             credentials:
+               name: route53-aws-creds
+       ```
+     - GCP
+       ```yaml
+       apiVersion: hive.openshift.io/v1alpha1
+       kind: HiveConfig
+       metadata:
+         name: hive
+       spec:
+         managedDomains:
+         - hive.example.com
+         externalDNS:
+           gcp:
+             credentials:
+               name: gcp-creds
+       ```
 
 You can now create clusters with manageDNS enabled and a basedomain of mydomain.hive.example.com.
 
@@ -244,10 +270,10 @@ bin/hiveutil create-cluster --base-domain=mydomain.hive.example.com mycluster --
 
 Hive will then:
 
-  1. Create a mydomain.hive.example.com Route53 hosted zone.
-  1. Create NS records in the hive.example.com to forward DNS to the new mydomain.hive.example.com hosted zone.
+  1. Create a mydomain.hive.example.com DNS zone.
+  1. Create NS records in the hive.example.com to forward DNS to the new mydomain.hive.example.com DNS zone.
   1. Wait for the SOA record for the new domain to be resolvable, indicating that DNS is functioning.
-  1. Launch the install, which will create DNS entries for the new cluster ("\*.apps.mycluster.mydomain.hive.example.com", "api.mycluster.mydomain.hive.example.com", etc) in the new mydomain.hive.example.com hosted zone.
+  1. Launch the install, which will create DNS entries for the new cluster ("\*.apps.mycluster.mydomain.hive.example.com", "api.mycluster.mydomain.hive.example.com", etc) in the new mydomain.hive.example.com DNS zone.
 
 
 ## Configuration Management

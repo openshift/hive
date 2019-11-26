@@ -19,8 +19,10 @@ import (
 
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -35,6 +37,7 @@ the ExternalDNS section of HiveConfig.
 `
 const (
 	cloudAWS                   = "aws"
+	cloudGCP                   = "gcp"
 	hiveNamespace              = "hive"
 	manageDNSCredentialsSecret = "manage-dns-creds"
 )
@@ -117,22 +120,38 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 
 	hc.Spec.ManagedDomains = args
 
-	if o.Cloud == cloudAWS {
+	var credsSecret *corev1.Secret
+
+	switch o.Cloud {
+	case cloudAWS:
 		// Apply a secret for credentials to manage the root domain:
-		credsSecret, err := o.generateAWSCredentialsSecret()
+		credsSecret, err = o.generateAWSCredentialsSecret()
 		if err != nil {
 			log.WithError(err).Fatal("error generating manageDNS credentials secret")
 		}
-		log.Infof("created Route53 credentials secret: %s", credsSecret.Name)
-		credsSecret.Namespace = hiveNamespace
-		rh.ApplyRuntimeObject(credsSecret, scheme.Scheme)
-
 		hc.Spec.ExternalDNS = &hivev1.ExternalDNSConfig{
 			AWS: &hivev1.ExternalDNSAWSConfig{
 				Credentials: corev1.LocalObjectReference{Name: manageDNSCredentialsSecret},
 			},
 		}
+	case cloudGCP:
+		// Apply a secret for credentials to manage the root domain:
+		credsSecret, err = o.generateGCPCredentialsSecret()
+		if err != nil {
+			log.WithError(err).Fatal("error generating manageDNS credentials secret")
+		}
+		hc.Spec.ExternalDNS = &hivev1.ExternalDNSConfig{
+			GCP: &hivev1.ExternalDNSGCPConfig{
+				Credentials: corev1.LocalObjectReference{Name: manageDNSCredentialsSecret},
+			},
+		}
+	default:
+		log.WithField("cloud", o.Cloud).Fatal("unsupported cloud")
 	}
+
+	log.Infof("created cloud credentials secret: %s", credsSecret.Name)
+	credsSecret.Namespace = hiveNamespace
+	rh.ApplyRuntimeObject(credsSecret, scheme.Scheme)
 
 	err = dynClient.Update(context.Background(), hc)
 	if err != nil {
@@ -200,6 +219,26 @@ func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
 	}, nil
 }
 
+func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {
+	saFileContents, err := gcputils.GetCreds(o.CredsFile)
+	if err != nil {
+		return nil, err
+	}
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      manageDNSCredentialsSecret,
+			Namespace: hiveNamespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			constants.GCPCredentialsName: saFileContents,
+		},
+	}, nil
+}
 func (o *Options) getResourceHelper() (*resource.Helper, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {

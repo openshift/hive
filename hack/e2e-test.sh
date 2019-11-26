@@ -85,31 +85,22 @@ make test-e2e-postdeploy
 
 SRC_ROOT=$(git rev-parse --show-toplevel)
 
+USE_MANAGED_DNS=true
+
 case "${CLOUD}" in
 "aws")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/.awscred"
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
-	# Generate a short random shard string for this cluster similar to OSD prod.
-	# This is to prevent name conflicts across customer clusters.
-	CLUSTER_SHARD=$(cat /dev/urandom | tr -dc 'a-z' | fold -w 8 | head -n 1)
-	CLUSTER_DOMAIN="${CLUSTER_SHARD}.${BASE_DOMAIN}"
-	echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
-	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
-		--creds-file="${CREDS_FILE}"
-	EXTRA_CREATE_CLUSTER_ARGS=" --manage-dns"
 	;;
 "azure")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/osServicePrincipal.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
-	# NOTE: No plans to implement DNS management for Azure at this time, so the cluster
-	# will use the root base domain.
-	CLUSTER_DOMAIN="${BASE_DOMAIN}"
+	# NOTE: No plans to implement DNS management for Azure at this time
+	USE_MANAGED_DNS=false
 	;;
 "gcp")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/gce.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
-	# TODO: Use a sharded base domain and --manage-dns as we do for AWS above
-	CLUSTER_DOMAIN="${BASE_DOMAIN}"
 	EXTRA_CREATE_CLUSTER_ARGS=" --gcp-project-id=openshift-gce-devel-ci"
 	;;
 *)
@@ -118,6 +109,20 @@ case "${CLOUD}" in
 	;;
 esac
 
+if $USE_MANAGED_DNS; then
+	# Generate a short random shard string for this cluster similar to OSD prod.
+	# This is to prevent name conflicts across customer clusters.
+	CLUSTER_SHARD=$(cat /dev/urandom | tr -dc 'a-z' | fold -w 8 | head -n 1)
+	CLUSTER_DOMAIN="${CLUSTER_SHARD}.${BASE_DOMAIN}"
+	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
+		--creds-file="${CREDS_FILE}" --cloud="${CLOUD}"
+	MANAGED_DNS_ARG=" --manage-dns"
+else
+	CLUSTER_DOMAIN="${BASE_DOMAIN}"
+fi
+
+
+echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
 echo "Creating cluster deployment"
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
 	--cloud="${CLOUD}" \
@@ -128,6 +133,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true \
+	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS}
 
 # NOTE: This is needed in order for the short form (cd) to work

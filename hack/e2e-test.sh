@@ -29,8 +29,8 @@ while [ $i -le ${max_tries} ]; do
     sleep ${sleep_between_tries}
   fi
 
-  echo -n "Creating project ${CLUSTER_NAMESPACE}. Try #${i}/${max_tries}... "
-  if oc new-project "${CLUSTER_NAMESPACE}"; then
+  echo -n "Creating namespace ${CLUSTER_NAMESPACE}. Try #${i}/${max_tries}... "
+  if oc create namespace "${CLUSTER_NAMESPACE}"; then
     echo "Success"
     break
   else
@@ -39,6 +39,20 @@ while [ $i -le ${max_tries} ]; do
 
   i=$((i + 1))
 done
+
+ORIGINAL_NAMESPACE=$(oc config view -o json | jq -er 'select(.contexts[].name == ."current-context") | .contexts[]?.context.namespace // ""')
+echo Original default namespace is ${ORIGINAL_NAMESPACE}
+echo Setting default namespace to ${CLUSTER_NAMESPACE}
+if ! oc config set-context --current --namespace=${CLUSTER_NAMESPACE}; then
+	echo "Failed to set the default namespace"
+	exit 1
+fi
+
+function restore_default_namespace() {
+	echo Restoring default namespace to ${ORIGINAL_NAMESPACE}
+	oc config set-context --current --namespace=${ORIGINAL_NAMESPACE}
+}
+trap 'restore_default_namespace' EXIT
 
 if [ $i -ge ${max_tries} ] ; then
   # Failed the maximum amount of times.

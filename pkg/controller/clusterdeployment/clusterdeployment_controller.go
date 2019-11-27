@@ -1232,15 +1232,15 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 }
 
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.DNSZone, error) {
-	// for now we only support AWS
-	if cd.Spec.Platform.AWS == nil {
-		cdLog.Error("cluster deployment platform is not AWS, cannot manage DNS zone")
-		if err := r.setDNSNotReadyCondition(cd, false, "Managed DNS is only supported on AWS", cdLog); err != nil {
+	if cd.Spec.Platform.AWS == nil && cd.Spec.Platform.GCP == nil {
+		cdLog.Error("cluster deployment platform does not support managed DNS")
+		if err := r.setDNSNotReadyCondition(cd, false, "Managed DNS is not supported for platform", cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return nil, err
 		}
-		return nil, errors.New("only AWS managed DNS is supported")
+		return nil, errors.New("managed DNS not supported on platform")
 	}
+
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
@@ -1291,14 +1291,23 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 		Spec: hivev1.DNSZoneSpec{
 			Zone:               cd.Spec.BaseDomain,
 			LinkToParentDomain: true,
-			AWS: &hivev1.AWSDNSZoneSpec{
-				CredentialsSecretRef: cd.Spec.Platform.AWS.CredentialsSecretRef,
-			},
 		},
 	}
 
-	for k, v := range cd.Spec.Platform.AWS.UserTags {
-		dnsZone.Spec.AWS.AdditionalTags = append(dnsZone.Spec.AWS.AdditionalTags, hivev1.AWSResourceTag{Key: k, Value: v})
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		additionalTags := make([]hivev1.AWSResourceTag, 0, len(cd.Spec.Platform.AWS.UserTags))
+		for k, v := range cd.Spec.Platform.AWS.UserTags {
+			additionalTags = append(additionalTags, hivev1.AWSResourceTag{Key: k, Value: v})
+		}
+		dnsZone.Spec.AWS = &hivev1.AWSDNSZoneSpec{
+			CredentialsSecretRef: cd.Spec.Platform.AWS.CredentialsSecretRef,
+			AdditionalTags:       additionalTags,
+		}
+	case cd.Spec.Platform.GCP != nil:
+		dnsZone.Spec.GCP = &hivev1.GCPDNSZoneSpec{
+			CredentialsSecretRef: cd.Spec.Platform.GCP.CredentialsSecretRef,
+		}
 	}
 
 	if err := controllerutil.SetControllerReference(cd, dnsZone, r.scheme); err != nil {

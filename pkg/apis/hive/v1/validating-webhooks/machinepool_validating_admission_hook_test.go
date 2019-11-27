@@ -2,6 +2,7 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -237,6 +238,15 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			}(),
 		},
 		{
+			name: "non-default GCP pool",
+			provision: func() *hivev1.MachinePool {
+				pool := testGCPMachinePool()
+				pool.Spec.Name = "other-name"
+				pool.Name = fmt.Sprintf("%s-%s", pool.Name, pool.Spec.Name)
+				return pool
+			}(),
+		},
+		{
 			name: "explicit GCP zones",
 			provision: func() *hivev1.MachinePool {
 				pool := testGCPMachinePool()
@@ -418,15 +428,16 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 }
 
 func testMachinePool() *hivev1.MachinePool {
+	cdName := "test-deployment"
 	return &hivev1.MachinePool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-deployment-test-pool",
+			Name: fmt.Sprintf("%s-%s", cdName, defaultWorkerPoolName),
 		},
 		Spec: hivev1.MachinePoolSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{
-				Name: "test-deployment",
+				Name: cdName,
 			},
-			Name: "test-pool",
+			Name: defaultWorkerPoolName,
 			Platform: hivev1.MachinePoolPlatform{
 				AWS: validAWSMachinePoolPlatform(),
 			},

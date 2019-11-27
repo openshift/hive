@@ -55,6 +55,9 @@ const (
 	// requesting that their domains be managed must have a base domain
 	// that is a direct child of one of the valid domains.
 	ManagedDomainsFileEnvVar = "MANAGED_DOMAINS_FILE"
+
+	// GCPCredentialsName is the name of the GCP credentials file or secret key.
+	GCPCredentialsName = "osServiceAccount.json"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

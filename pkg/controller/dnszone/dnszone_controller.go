@@ -9,16 +9,18 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,11 +52,10 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDNSZone{
-		Client:           controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:           mgr.GetScheme(),
-		logger:           log.WithField("controller", controllerName),
-		awsClientBuilder: awsclient.NewClient,
-		soaLookup:        lookupSOARecord,
+		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:    mgr.GetScheme(),
+		logger:    log.WithField("controller", controllerName),
+		soaLookup: lookupSOARecord,
 	}
 }
 
@@ -84,9 +85,6 @@ type ReconcileDNSZone struct {
 
 	logger log.FieldLogger
 
-	// awsClientBuilder is a function pointer to the function that builds the aws client.
-	awsClientBuilder func(kClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
-
 	// soaLookup is a function that looks up a zone's SOA record
 	soaLookup func(string, log.FieldLogger) (bool, error)
 }
@@ -113,7 +111,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	desiredState := &hivev1.DNSZone{}
 	err := r.Get(context.TODO(), request.NamespacedName, desiredState)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
@@ -330,7 +328,22 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 		return NewAWSActuator(dnsLog, secret, dnsZone, awsclient.NewClientFromSecret)
 	}
 
-	return nil, fmt.Errorf("unable to determine which actuator to use")
+	if dnsZone.Spec.GCP != nil {
+		secret := &corev1.Secret{}
+		err := r.Get(context.TODO(),
+			types.NamespacedName{
+				Name:      dnsZone.Spec.GCP.CredentialsSecretRef.Name,
+				Namespace: dnsZone.Namespace,
+			},
+			secret)
+		if err != nil {
+			return nil, err
+		}
+
+		return NewGCPActuator(dnsLog, secret, dnsZone, gcpclient.NewClientFromSecret)
+	}
+
+	return nil, errors.New("unable to determine which actuator to use")
 }
 
 func (r *ReconcileDNSZone) syncParentDomainLink(nameServers []string, dnsZone *hivev1.DNSZone) error {
@@ -340,7 +353,7 @@ func (r *ReconcileDNSZone) syncParentDomainLink(nameServers []string, dnsZone *h
 		Name:      parentLinkRecordName(dnsZone.Name),
 	}
 	err := r.Client.Get(context.TODO(), existingLinkRecordName, existingLinkRecord)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		r.logger.WithError(err).Error("failed retrieving existing DNSEndpoint")
 		return err
 	}
@@ -376,7 +389,7 @@ func (r *ReconcileDNSZone) parentLinkRecord(nameServers []string, dnsZone *hivev
 	for _, nameServer := range nameServers {
 		// external-dns will compare the NS record values without the
 		// dot at the end. If a dot is present, an update happens every sync.
-		targets = append(targets, strings.TrimSuffix(nameServer, "."))
+		targets = append(targets, controllerutils.Undotted(nameServer))
 	}
 	endpoint := &hivev1.DNSEndpoint{
 		ObjectMeta: metav1.ObjectMeta{
@@ -478,7 +491,7 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 					logger.Info("Record returned is not an SOA record: %#v", rr)
 					continue
 				}
-				if soa.Hdr.Name != appendPeriod(zone) {
+				if soa.Hdr.Name != controllerutils.Dotted(zone) {
 					logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned but it does not match the lookup zone")
 					return false, nil
 				}
@@ -494,11 +507,4 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 
 func parentLinkRecordName(dnsZoneName string) string {
 	return apihelpers.GetResourceName(dnsZoneName, "ns")
-}
-
-func appendPeriod(name string) string {
-	if !strings.HasSuffix(name, ".") {
-		return name + "."
-	}
-	return name
 }

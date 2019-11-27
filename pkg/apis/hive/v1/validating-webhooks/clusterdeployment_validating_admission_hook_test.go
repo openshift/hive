@@ -358,6 +358,28 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "Test managed DNS is valid on GCP",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.ManageDNS = true
+				cd.Spec.BaseDomain = "bar.foo.aaa.com"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "Test managed DNS is invalid on Azure",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.ManageDNS = true
+				cd.Spec.BaseDomain = "bar.foo.aaa.com"
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
 			name:      "Test allow modifying controlPlaneConfig",
 			oldObject: validAWSClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {

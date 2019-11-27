@@ -1343,10 +1343,14 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: hive-frontend
+groupNames:
+- hive-frontend
 subjects:
 - kind: ServiceAccount
   name: hive-frontend
   namespace: hive
+- kind: Group
+  name: hive-frontend
 `)
 
 func configRbacHive_frontend_role_bindingYamlBytes() ([]byte, error) {
@@ -2806,6 +2810,17 @@ spec:
                     that contains AWS credentials for CRUD operations
                   type: object
               type: object
+            gcp:
+              description: GCP specifies GCP-specific cloud configuration
+              properties:
+                credentialsSecretRef:
+                  description: CredentialsSecretRef references a secret that will
+                    be used to authenticate with GCP CloudDNS. It will need permission
+                    to create and manage CloudDNS Hosted Zones. Secret should have
+                    a key named 'osServiceAccount.json'. The credentials must specify
+                    the project to use.
+                  type: object
+              type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
                 be automatically created to link this DNSZone with a parent domain.
@@ -2853,6 +2868,14 @@ spec:
                     type: string
                 type: object
               type: array
+            gcp:
+              description: GCPDNSZoneStatus contains status information specific to
+                GCP
+              properties:
+                zoneName:
+                  description: ZoneName is the name of the zone in GCP Cloud DNS
+                  type: string
+              type: object
             lastSyncGeneration:
               description: LastSyncGeneration is the generation of the zone resource
                 that was last sync'd. This is used to know if the Object has changed

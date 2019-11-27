@@ -1283,6 +1283,8 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: hive-frontend
+groupNames:
+- hive-frontend
 subjects:
 - kind: ServiceAccount
   name: hive-frontend

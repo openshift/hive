@@ -60,6 +60,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
 	awsprovider.SchemeBuilder.AddToScheme(scheme.Scheme)
 
+	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {
+		pool := &hivev1.MachinePool{}
+		if err := c.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: fmt.Sprintf("%s-%s", testName, poolName)}, pool); err != nil {
+			return nil
+		}
+		return pool
+	}
+
 	// Utility function to list test MachineSets from the fake client
 	getRMSL := func(rc client.Client) (*machineapi.MachineSetList, error) {
 		rMSL := &machineapi.MachineSetList{}
@@ -79,6 +87,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		localExisting             []runtime.Object
 		remoteExisting            []runtime.Object
 		expectErr                 bool
+		expectNoFinalizer         bool
 		expectedRemoteMachineSets *machineapi.MachineSetList
 	}{
 		{
@@ -297,6 +306,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
 				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
+			expectNoFinalizer: true,
 			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
 				return &machineapi.MachineSetList{
 					Items: []machineapi.MachineSet{
@@ -345,6 +355,60 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
 		},
+		{
+			name: "No cluster deployment",
+			localExisting: []runtime.Object{
+				testMachinePool("worker", 3, []string{}),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectNoFinalizer: true,
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+					},
+				}
+			}(),
+		},
+		{
+			name: "Deleted cluster deployment",
+			localExisting: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testMachinePool("worker", 3, []string{}),
+				testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName),
+				testSecret(adminPasswordSecret, adminPasswordSecretKey, testName),
+				testSecret(sshKeySecret, sshKeySecretKey, testName),
+			},
+			remoteExisting: []runtime.Object{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectNoFinalizer: true,
+			expectedRemoteMachineSets: func() *machineapi.MachineSetList {
+				return &machineapi.MachineSetList{
+					Items: []machineapi.MachineSet{
+						*testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+						*testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+					},
+				}
+			}(),
+		},
 	}
 
 	for _, test := range tests {
@@ -387,6 +451,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if err != nil && !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
 				return
+			}
+
+			if pool := getPool(fakeClient, "worker"); assert.NotNil(t, pool, "missing machinepool") {
+				if test.expectNoFinalizer {
+					assert.NotContains(t, pool.Finalizers, finalizer, "unexpected finalizer")
+				} else {
+					assert.Contains(t, pool.Finalizers, finalizer, "missing finalizer")
+				}
 			}
 
 			if test.expectedRemoteMachineSets != nil {

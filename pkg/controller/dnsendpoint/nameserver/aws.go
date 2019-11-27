@@ -12,6 +12,8 @@ import (
 
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 // NewAWSQuery creates a new name server query for AWS.
@@ -112,7 +114,7 @@ func (q *awsQuery) Delete(rootDomain string, domain string, values sets.String) 
 // queryZoneID queries AWS for the public hosted zone for the specified domain.
 func (q *awsQuery) queryZoneID(awsClient awsclient.Client, domain string) (*string, error) {
 	maxItems := "5"
-	domain = dotted(domain)
+	domain = controllerutils.Dotted(domain)
 	listInput := &route53.ListHostedZonesByNameInput{
 		DNSName:  &domain,
 		MaxItems: &maxItems,
@@ -163,7 +165,7 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 			for _, record := range recordSet.ResourceRecords {
 				values.Insert(*record.Value)
 			}
-			nameServers[undotted(*recordSet.Name)] = values
+			nameServers[controllerutils.Undotted(*recordSet.Name)] = values
 		}
 		if listOutput.IsTruncated == nil || !*listOutput.IsTruncated {
 			return nameServers, nil
@@ -194,7 +196,7 @@ func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID stri
 	if recordSet.Name == nil {
 		return nil, nil
 	}
-	if undotted(*recordSet.Name) != domain {
+	if controllerutils.Undotted(*recordSet.Name) != domain {
 		return nil, nil
 	}
 	if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {

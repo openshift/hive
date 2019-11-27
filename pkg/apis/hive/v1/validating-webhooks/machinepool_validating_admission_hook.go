@@ -28,6 +28,8 @@ const (
 	machinePoolGroup    = "hive.openshift.io"
 	machinePoolVersion  = "v1"
 	machinePoolResource = "machinePools"
+
+	defaultWorkerPoolName = "worker"
 )
 
 // MachinePoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -256,6 +258,9 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	}
 	if spec.Platform.GCP != nil {
 		platforms = append(platforms, "gcp")
+		if spec.Name != defaultWorkerPoolName {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("name"), spec.Name, []string{defaultWorkerPoolName}))
+		}
 		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(spec.Platform.GCP, platformPath.Child("gcp"))...)
 	}
 	if spec.Platform.Azure != nil {

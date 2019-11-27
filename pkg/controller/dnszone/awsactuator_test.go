@@ -47,14 +47,13 @@ func TestNewAWSActuator(t *testing.T) {
 				dnsZone: tc.dnsZone,
 			}
 
+			// Act
 			zr, err := NewAWSActuator(
 				expectedAWSActuator.logger,
 				tc.secret,
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
 			)
-
-			// Act
 			expectedAWSActuator.awsClient = zr.awsClient // Function pointers can't be compared reliably. Don't compare.
 
 			// Assert
@@ -65,7 +64,7 @@ func TestNewAWSActuator(t *testing.T) {
 	}
 }
 
-func mockZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+func mockAWSZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
 
 	if zone.Status.AWS == nil || aws.StringValue(zone.Status.AWS.ZoneID) == "" {
 		expect.GetResourcesPages(gomock.Any(), gomock.Any()).
@@ -87,7 +86,7 @@ func mockZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
 	}, nil).Times(1)
 }
 
-func mockZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
 	if zone.Status.AWS != nil && aws.StringValue(zone.Status.AWS.ZoneID) != "" {
 		expect.GetHostedZone(gomock.Any()).
 			Return(nil, awserr.New(route53.ErrCodeNoSuchHostedZone, "doesnt exist", fmt.Errorf("doesnt exist"))).Times(1)
@@ -96,7 +95,7 @@ func mockZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZo
 	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 }
 
-func mockCreateZone(expect *mock.MockClientMockRecorder) {
+func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).Return(&route53.CreateHostedZoneOutput{
 		HostedZone: &route53.HostedZone{
 			Id:   aws.String("1234"),
@@ -105,11 +104,11 @@ func mockCreateZone(expect *mock.MockClientMockRecorder) {
 	}, nil).Times(1)
 }
 
-func mockCreateZoneDuplicateFailure(expect *mock.MockClientMockRecorder) {
+func mockCreateAWSZoneDuplicateFailure(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).Return(nil, awserr.New(route53.ErrCodeHostedZoneAlreadyExists, "already exists", fmt.Errorf("already exists"))).Times(1)
 }
 
-func mockNoExistingTags(expect *mock.MockClientMockRecorder) {
+func mockNoExistingAWSTags(expect *mock.MockClientMockRecorder) {
 	expect.ListTagsForResource(gomock.Any()).Return(&route53.ListTagsForResourceOutput{
 		ResourceTagSet: &route53.ResourceTagSet{
 			ResourceId: aws.String("1234"),
@@ -118,7 +117,7 @@ func mockNoExistingTags(expect *mock.MockClientMockRecorder) {
 	}, nil).Times(1)
 }
 
-func mockExistingTags(expect *mock.MockClientMockRecorder) {
+func mockExistingAWSTags(expect *mock.MockClientMockRecorder) {
 	expect.ListTagsForResource(gomock.Any()).Return(&route53.ListTagsForResourceOutput{
 		ResourceTagSet: &route53.ResourceTagSet{
 			ResourceId: aws.String("1234"),
@@ -136,11 +135,11 @@ func mockExistingTags(expect *mock.MockClientMockRecorder) {
 	}, nil).Times(1)
 }
 
-func mockSyncTags(expect *mock.MockClientMockRecorder) {
+func mockSyncAWSTags(expect *mock.MockClientMockRecorder) {
 	expect.ChangeTagsForResource(gomock.Any()).Return(&route53.ChangeTagsForResourceOutput{}, nil).AnyTimes()
 }
 
-func mockGetNSRecord(expect *mock.MockClientMockRecorder) {
+func mockAWSGetNSRecord(expect *mock.MockClientMockRecorder) {
 	expect.ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
 		ResourceRecordSets: []*route53.ResourceRecordSet{
 			{
@@ -159,7 +158,7 @@ func mockGetNSRecord(expect *mock.MockClientMockRecorder) {
 	}, nil)
 }
 
-func mockListZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+func mockListAWSZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
 	expect.ListHostedZonesByName(gomock.Any()).Return(&route53.ListHostedZonesByNameOutput{
 		HostedZones: []*route53.HostedZone{
 			{
@@ -171,6 +170,6 @@ func mockListZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hivev1.
 	}, nil).Times(1)
 }
 
-func mockDeleteZone(expect *mock.MockClientMockRecorder) {
+func mockDeleteAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.DeleteHostedZone(gomock.Any()).Return(nil, nil).Times(1)
 }

@@ -272,6 +272,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 	if newObject.Spec.Platform.GCP != nil {
 		numberOfPlatforms++
+		canManageDNS = true
 		gcp := newObject.Spec.Platform.GCP
 		gcpPath := platformPath.Child("gcp")
 		if gcp.CredentialsSecretRef.Name == "" {

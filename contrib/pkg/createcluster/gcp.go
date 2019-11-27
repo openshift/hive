@@ -2,24 +2,20 @@ package createcluster
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-
-	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
-
 	installertypes "github.com/openshift/installer/pkg/types"
 	installergcp "github.com/openshift/installer/pkg/types/gcp"
+
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
-	gcpCredFile     = "osServiceAccount.json"
 	gcpRegion       = "us-east1"
 	gcpInstanceType = "n1-standard-4"
 )
@@ -30,19 +26,10 @@ type gcpCloudProvider struct {
 }
 
 func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", gcpCredFile)
-	if l := os.Getenv("GCP_SHARED_CREDENTIALS_FILE"); l != "" {
-		credsFilePath = l
-	}
-	if o.CredsFile != "" {
-		credsFilePath = o.CredsFile
-	}
-	log.Infof("Loading gcp service account from: %s", credsFilePath)
-	saFileContents, err := ioutil.ReadFile(credsFilePath)
+	saFileContents, err := gcputils.GetCreds(o.CredsFile)
 	if err != nil {
 		return nil, err
 	}
-
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -54,7 +41,7 @@ func (p *gcpCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			gcpCredFile: saFileContents,
+			constants.GCPCredentialsName: saFileContents,
 		},
 	}, nil
 }

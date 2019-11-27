@@ -15,6 +15,9 @@ bin/**
 *.out
 DONT_COMMIT
 
+# Certs for deploying locally to kind
+hiveadmission-certs/**
+
 # Do not skip generated files so we can be vendored from other projects
 # Kubernetes Generated files - skip generated files, except for vendored files
 # zz_generated.*

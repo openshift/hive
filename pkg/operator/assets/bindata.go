@@ -1287,6 +1287,8 @@ subjects:
 - kind: ServiceAccount
   name: hive-frontend
   namespace: hive
+- kind: Group
+  name: hive-frontend
 `)
 
 func configRbacHive_frontend_role_bindingYamlBytes() ([]byte, error) {

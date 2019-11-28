@@ -4622,6 +4622,10 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: syncsetinstances.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.applied
+    name: Applied
+    type: boolean
   group: hive.openshift.io
   names:
     kind: SyncSetInstance
@@ -4676,6 +4680,10 @@ spec:
           type: object
         status:
           properties:
+            applied:
+              description: Applied will be true if all resources, patches, or secrets
+                have successfully been applied on last attempt.
+              type: boolean
             conditions:
               description: Conditions is the list of SyncConditions used to indicate
                 UnknownObject when a resource type cannot be determined from a SyncSet

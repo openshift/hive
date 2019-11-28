@@ -61,6 +61,22 @@ var (
 		Name: "hive_imageset_jobs",
 		Help: "Total number of imageset jobs running by cluster type and state.",
 	}, []string{"cluster_type", "state"})
+	metricSelectorSyncSetClustersTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_selectorsyncset_clusters_total",
+		Help: "Total number of SyncSetInstances that match the label selector for each SelectorSyncSet.",
+	}, []string{"name"})
+	metricSelectorSyncSetClustersUnappliedTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_selectorsyncset_clusters_unapplied_total",
+		Help: "Total number of SyncSetInstances that match the label selector for each SelectorSyncSet but have not successfully applied all resources/patches/secrets.",
+	}, []string{"name"})
+	metricSyncSetsTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_syncsets_total",
+		Help: "Total number of SyncSetInstances referencing non-selector SyncSets.",
+	})
+	metricSyncSetsUnappliedTotal = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "hive_syncsets_unapplied_total",
+		Help: "Total number of SyncSetsInstances referencing non-selector SyncSets that have not successfully applied all resources/patches/secrets.",
+	})
 
 	// MetricClusterDeploymentProvisionUnderwaySeconds is a prometheus metric for the number of seconds
 	// between when a still provisioning cluster was created and now.
@@ -103,6 +119,10 @@ func init() {
 	metrics.Registry.MustRegister(metricInstallJobsTotal)
 	metrics.Registry.MustRegister(metricUninstallJobsTotal)
 	metrics.Registry.MustRegister(metricImagesetJobsTotal)
+	metrics.Registry.MustRegister(metricSelectorSyncSetClustersTotal)
+	metrics.Registry.MustRegister(metricSelectorSyncSetClustersUnappliedTotal)
+	metrics.Registry.MustRegister(metricSyncSetsTotal)
+	metrics.Registry.MustRegister(metricSyncSetsUnappliedTotal)
 	metrics.Registry.MustRegister(MetricControllerReconcileTime)
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentProvisionUnderwaySeconds)
@@ -265,11 +285,52 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			}
 		}
 
+		mc.calculateSelectorSyncSetMetrics(mcLog)
+
 		elapsed := time.Since(start)
 		mcLog.WithField("elapsed", elapsed).Info("metrics calculation complete")
 	}, mc.Interval, stopCh)
 
 	return nil
+}
+
+func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
+	mcLog.Debug("calculating metrics across all SyncSetInstances")
+	ssis := &hivev1.SyncSetInstanceList{}
+	err := mc.Client.List(context.Background(), ssis)
+	if err != nil {
+		mcLog.WithError(err).Error("error listing all SyncSetInstances")
+		return
+	}
+
+	sssInstancesTotal := map[string]int{}
+	sssInstancesUnappliedTotal := map[string]int{}
+
+	ssInstancesTotal := 0
+	ssInstancesUnappliedTotal := 0
+	for _, ssi := range ssis.Items {
+		if sss := ssi.Spec.SelectorSyncSet; sss != nil {
+			// Process SyncSetInstances with a SelectorSyncSet reference:
+			sssInstancesTotal[sss.Name]++
+			if !ssi.Status.Applied {
+				sssInstancesUnappliedTotal[sss.Name]++
+			}
+		} else {
+			// Process SyncSetInstances with a non-selector SyncSet reference:
+			ssInstancesTotal++
+			if !ssi.Status.Applied {
+				ssInstancesUnappliedTotal++
+			}
+		}
+	}
+	for k, v := range sssInstancesTotal {
+		metricSelectorSyncSetClustersTotal.WithLabelValues(k).Set(float64(v))
+	}
+	for k, v := range sssInstancesUnappliedTotal {
+		metricSelectorSyncSetClustersUnappliedTotal.WithLabelValues(k).Set(float64(v))
+	}
+	metricSyncSetsTotal.Set(float64(ssInstancesTotal))
+	metricSyncSetsUnappliedTotal.Set(float64(ssInstancesUnappliedTotal))
 }
 
 func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal map[string]int) {

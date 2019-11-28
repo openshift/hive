@@ -146,9 +146,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 		// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
 		// the latest in the operator to ensure updates roll out.
+		// TODO: Attempt removing this once Hive is running purely on 4.x,
+		// as it requires a significant privilege escalation we would rather
+		// leave in the hands of OLM.
+		"config/crds/hive_v1alpha1_checkpoint.yaml",
 		"config/crds/hive_v1alpha1_clusterdeployment.yaml",
 		"config/crds/hive_v1alpha1_clusterdeprovisionrequest.yaml",
 		"config/crds/hive_v1alpha1_clusterimageset.yaml",
+		"config/crds/hive_v1alpha1_clusterprovision.yaml",
+		"config/crds/hive_v1alpha1_clusterstate.yaml",
 		"config/crds/hive_v1alpha1_dnsendpoint.yaml",
 		"config/crds/hive_v1alpha1_dnszone.yaml",
 		"config/crds/hive_v1alpha1_hiveconfig.yaml",
@@ -156,6 +162,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/crds/hive_v1alpha1_selectorsyncset.yaml",
 		"config/crds/hive_v1alpha1_syncidentityprovider.yaml",
 		"config/crds/hive_v1alpha1_syncset.yaml",
+		"config/crds/hive_v1alpha1_syncsetinstance.yaml",
 
 		"config/configmaps/install-log-regexes-configmap.yaml",
 	}

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -80,6 +81,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		expectDeleted          []deletedItemInfo
 		expectSSIDeleted       bool
 		expectErr              bool
+		expectApplied          bool
 	}{
 		{
 			name:    "Create single resource successfully",
@@ -88,6 +90,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulResourceStatus(testCM("cm1", "foo", "bar")))
 			},
+			expectApplied: true,
 		},
 		{
 			name:    "Create multiple resources successfully",
@@ -96,6 +99,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulResourceStatus(testCMs("bar", 5)...))
 			},
+			expectApplied: true,
 		},
 		{
 			name:    "Update single resource",
@@ -105,6 +109,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulResourceStatus(testCM("cm1", "key1", "value***changed")))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Update only resources that have changed",
@@ -147,6 +152,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					t.Errorf("unexpected condition last transition time for resource %s/%s. Got: %v, Expected: %v", changed.Namespace, changed.Name, changed.Conditions[0].LastTransitionTime.Time, tenMinutesAgo)
 				}
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Check for failed info call, set condition",
@@ -207,6 +213,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					testCM("cm1", "key1", "value1"),
 				))
 			},
+			expectApplied: true,
 		},
 		{
 			name:    "Apply single patch successfully",
@@ -217,6 +224,7 @@ func TestSyncSetReconcile(t *testing.T) {
 						testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
 					}))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Apply multiple patches successfully",
@@ -232,6 +240,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					},
 				))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Reapply single patch",
@@ -248,6 +257,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					},
 				))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Stop applying patches when error occurs",
@@ -314,6 +324,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				deletedItem("cm2", "ConfigMap"),
 				deletedItem("cm4", "ConfigMap"),
 			},
+			expectApplied: true,
 		},
 		{
 			name: "delete syncset instance when syncset doesn't exist",
@@ -359,6 +370,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulSecretReferenceStatus(testSecret("foo", "bar")))
 			},
+			expectApplied: true,
 		},
 		{
 			name:      "Local SecretReference secret does not exist",
@@ -384,6 +396,7 @@ func TestSyncSetReconcile(t *testing.T) {
 						testSecret("foo", "bar"),
 					))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Apply multiple SecretReferences successfully",
@@ -399,6 +412,7 @@ func TestSyncSetReconcile(t *testing.T) {
 						testSecret("baz", "bar"),
 					))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Update single secret",
@@ -411,6 +425,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulSecretReferenceStatus(testSecret("foo", "data_value***changed")))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "Update only secrets that have changed",
@@ -458,6 +473,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					t.Errorf("unexpected condition last transition time for resource %s/%s. Got: %v, Expected: %v", changed.Namespace, changed.Name, changed.Conditions[0].LastTransitionTime.Time, tenMinutesAgo)
 				}
 			},
+			expectApplied: true,
 		},
 		{
 			name: "resource sync mode, remove secrets",
@@ -485,6 +501,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				deletedItem("foo2", secretsResource),
 				deletedItem("foo4", secretsResource),
 			},
+			expectApplied: true,
 		},
 		{
 			name: "selectorsyncset: apply single secret",
@@ -499,6 +516,7 @@ func TestSyncSetReconcile(t *testing.T) {
 					testSecret("s1", "value1"),
 				))
 			},
+			expectApplied: true,
 		},
 		{
 			name: "syncset: fail to delete resource",
@@ -520,6 +538,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				).Resources...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
+			expectApplied: true,
 		},
 		{
 			name: "syncset: fail to delete secret reference secret",
@@ -542,6 +561,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				).SecretReferences...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
+			expectApplied: true,
 		},
 		{
 			name: "cleanup deleted syncset secrets",
@@ -630,14 +650,18 @@ func TestSyncSetReconcile(t *testing.T) {
 				}
 				return
 			}
+
+			result := &hivev1.SyncSetInstance{}
+			err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: ssi.Name, Namespace: ssi.Namespace}, result)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
 			if test.validate != nil {
-				result := &hivev1.SyncSetInstance{}
-				err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: ssi.Name, Namespace: ssi.Namespace}, result)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
 				test.validate(t, result)
 			}
+
+			assert.Equal(t, test.expectApplied, result.Status.Applied)
 		})
 	}
 }

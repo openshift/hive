@@ -169,12 +169,6 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		if pool.DeletionTimestamp != nil {
 			return reconcile.Result{}, nil
 		}
-		controllerutils.AddFinalizer(pool, finalizer)
-		err := r.Update(context.Background(), pool)
-		if err != nil {
-			log.WithError(err).Log(controllerutils.LogLevel(err), "could not add finalizer")
-		}
-		return reconcile.Result{}, err
 	}
 
 	cd := &hivev1.ClusterDeployment{}
@@ -185,7 +179,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	); {
 	case errors.IsNotFound(err):
 		log.Debug("clusterdeployment does not exist")
-		return reconcile.Result{}, nil
+		return r.removeFinalizer(pool)
 	case err != nil:
 		log.WithError(err).Error("error looking up cluster deploymnet")
 		return reconcile.Result{}, err
@@ -196,13 +190,14 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, nil
 	}
 
+	// If the clusterdeployment is deleted, do not reconcile.
+	if cd.DeletionTimestamp != nil {
+		return r.removeFinalizer(pool)
+	}
+
 	// If the cluster is unreachable, do not reconcile.
 	if controllerutils.HasUnreachableCondition(cd) {
 		cdLog.Debug("skipping cluster with unreachable condition")
-		return reconcile.Result{}, nil
-	}
-	// If the clusterdeployment is deleted, do not reconcile.
-	if cd.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil
 	}
 
@@ -221,6 +216,15 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		// TODO: add support for GCP and azure
 		cdLog.Warn("skipping machine set management for unsupported cloud platform")
 		return reconcile.Result{}, nil
+	}
+
+	if !controllerutils.HasFinalizer(pool, finalizer) {
+		controllerutils.AddFinalizer(pool, finalizer)
+		err := r.Update(context.Background(), pool)
+		if err != nil {
+			log.WithError(err).Log(controllerutils.LogLevel(err), "could not add finalizer")
+		}
+		return reconcile.Result{}, err
 	}
 
 	adminKubeconfigSecret := &kapi.Secret{}
@@ -249,12 +253,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	}
 
 	if pool.DeletionTimestamp != nil {
-		controllerutils.DeleteFinalizer(pool, finalizer)
-		err = r.Status().Update(context.Background(), pool)
-		if err != nil {
-			log.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer")
-		}
-		return reconcile.Result{}, err
+		return r.removeFinalizer(pool)
 	}
 
 	return reconcile.Result{}, nil
@@ -676,4 +675,16 @@ func isMachineSetControlledByMachinePool(cd *hivev1.ClusterDeployment, pool *hiv
 		strings.Join([]string{cd.Spec.ClusterName, pool.Spec.Name, ""}, "-"),
 	) ||
 		machineSet.Labels[machinePoolNameLabel] == pool.Spec.Name
+}
+
+func (r *ReconcileRemoteMachineSet) removeFinalizer(pool *hivev1.MachinePool) (reconcile.Result, error) {
+	if !controllerutils.HasFinalizer(pool, finalizer) {
+		return reconcile.Result{}, nil
+	}
+	controllerutils.DeleteFinalizer(pool, finalizer)
+	err := r.Status().Update(context.Background(), pool)
+	if err != nil {
+		log.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer")
+	}
+	return reconcile.Result{}, err
 }

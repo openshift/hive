@@ -260,7 +260,10 @@ To use this feature:
            gcp:
              credentials:
                name: gcp-creds
-       ```
+
+  1. Specify which domains Hive is allowed to manage by adding them to the `managedDomains` list. When specifying `managedDNS: true` in a ClusterDeployment, the ClusterDeployment's baseDomain must be a direct child of one of these domains, otherwise the ClusterDeployment creation will result in a validation error. The baseDomain must also be unique to that cluster and must not be used in any other ClusterDeployment, including on separate Hive instances.
+
+     As such, a domain may exist in the `managedDomains` list in multiple Hive instances. Note that the specified credentials must be valid to add and remove NS record entries for all domains listed in `managedDomains`.
 
 You can now create clusters with manageDNS enabled and a basedomain of mydomain.hive.example.com.
 

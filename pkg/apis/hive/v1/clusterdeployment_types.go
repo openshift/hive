@@ -7,6 +7,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 )
 
@@ -314,6 +315,9 @@ type Platform struct {
 	// GCP is the configuration used when installing on Google Cloud Platform.
 	// +optional
 	GCP *gcp.Platform `json:"gcp,omitempty"`
+
+	// BareMetal is the configuration used when installing on bare metal.
+	BareMetal *baremetal.Platform `json:"bareMetal,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

@@ -300,6 +300,10 @@ spec:
                         will be created.
                       type: string
                   type: object
+                bareMetal:
+                  description: BareMetal is the configuration used when installing
+                    on bare metal.
+                  type: object
                 gcp:
                   description: GCP is the configuration used when installing on Google
                     Cloud Platform.

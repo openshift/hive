@@ -267,6 +267,9 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		platforms = append(platforms, "azure")
 		allErrs = append(allErrs, validateAzureMachinePoolPlatformInvariants(spec.Platform.Azure, platformPath.Child("azure"))...)
 	}
+	if spec.Platform.BareMetal != nil {
+		platforms = append(platforms, "baremetal")
+	}
 	switch len(platforms) {
 	case 0:
 		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))

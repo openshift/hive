@@ -3183,6 +3183,10 @@ spec:
                         type: string
                       type: array
                   type: object
+                bareMetal:
+                  description: BareMetal is the configuration used when installing
+                    on bare metal.
+                  type: object
                 gcp:
                   description: GCP is the configuration used when installing on GCP.
                   properties:

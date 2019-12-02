@@ -285,6 +285,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
 		}
 	}
+	if newObject.Spec.Platform.BareMetal != nil {
+		numberOfPlatforms++
+	}
 	switch {
 	case numberOfPlatforms == 0:
 		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))

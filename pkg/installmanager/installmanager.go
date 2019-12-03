@@ -72,6 +72,7 @@ const (
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
 	defaultManifestsMountPath           = "/manifests"
+	hiveSSHKnownHostsAnnotation         = "hive.openshift.io/ssh-known-host"
 )
 
 var (
@@ -232,11 +233,19 @@ func (m *InstallManager) Run() error {
 	cmd := exec.Command("cp", m.InstallConfigMountPath, destInstallConfigPath)
 	err = cmd.Run()
 	if err != nil {
-		log.WithError(err).Errorf("error copying install-config.yaml from %s to %s",
+		m.log.WithError(err).Errorf("error copying install-config.yaml from %s to %s",
 			m.InstallConfigMountPath, destInstallConfigPath)
 		return err
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
+
+	if knownHost, ok := cd.Annotations[hiveSSHKnownHostsAnnotation]; ok {
+		err = m.setupSSHKnownHost(knownHost)
+		if err != nil {
+			m.log.WithError(err).Error("error setting up SSH known_hosts")
+			return err
+		}
+	}
 
 	// If the cluster provision has an infraID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
@@ -1131,6 +1140,19 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 		},
 	)
 	return errors.Wrap(err, "ClusterProvision did not transition to provisioning stage")
+}
+
+func (m *InstallManager) setupSSHKnownHost(knownHost string) error {
+	if err := os.Mkdir("/root/.ssh", 0700); err != nil {
+		m.log.WithError(err).Error("error creating /root/.ssh directory")
+		return err
+	}
+	if err := ioutil.WriteFile("/root/.ssh/known_hosts", []byte(knownHost), 0644); err != nil {
+		m.log.WithError(err).Error("error writing ssh known_hosts")
+		return err
+	}
+	m.log.Infof("Wrote known host to /root/.ssh/known_hosts: %s", knownHost)
+	return nil
 }
 
 type provisionMutation func(provision *hivev1.ClusterProvision)

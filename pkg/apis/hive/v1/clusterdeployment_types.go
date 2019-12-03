@@ -120,7 +120,7 @@ type Provisioning struct {
 	// there are install failures.
 	// The SSH private key is expected to be in the secret data under the "ssh-privatekey" key.
 	// +optional
-	SSHPrivateKeySecretRef *corev1.LocalObjectReference `json:"sshPrivateSecretKeyRef,omitempty"`
+	SSHPrivateKeySecretRef *corev1.LocalObjectReference `json:"sshPrivateKeySecretRef,omitempty"`
 }
 
 // ProvisionImages allows overriding the default images used to provision a cluster.

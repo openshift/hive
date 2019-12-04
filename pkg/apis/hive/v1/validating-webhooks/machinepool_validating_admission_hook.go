@@ -27,7 +27,7 @@ import (
 const (
 	machinePoolGroup    = "hive.openshift.io"
 	machinePoolVersion  = "v1"
-	machinePoolResource = "machinePools"
+	machinePoolResource = "machinepools"
 
 	defaultWorkerPoolName = "worker"
 )
@@ -53,7 +53,7 @@ func (a *MachinePoolValidatingAdmissionHook) ValidatingResource() (plural schema
 			Version:  "v1",
 			Resource: "machinepoolvalidators",
 		},
-		"machinePoolvalidator"
+		"machinepoolvalidator"
 }
 
 // Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.

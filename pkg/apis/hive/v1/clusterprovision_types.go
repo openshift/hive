@@ -113,7 +113,7 @@ const (
 // ClusterProvision is the Schema for the clusterprovisions API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="ClusterDeployment",type="string",JSONPath=".spec.clusterDeployment.name"
+// +kubebuilder:printcolumn:name="ClusterDeployment",type="string",JSONPath=".spec.clusterDeploymentRef.name"
 // +kubebuilder:printcolumn:name="Stage",type="string",JSONPath=".spec.stage"
 // +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".spec.infraID"
 // +kubebuilder:resource:path=clusterprovisions

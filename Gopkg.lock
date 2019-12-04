@@ -768,11 +768,15 @@
   revision = "093a944a412b3d8cb269716553eb7f9e1fb80b1a"
 
 [[projects]]
-  digest = "1:f9c1fc8da2b44ba323ec3b338f0da9f375e26c787bc3a6ea241f9cb3f191cb62"
-  name = "github.com/openshift/cluster-network-operator"
-  packages = ["pkg/apis/networkoperator/v1"]
+  branch = "master"
+  digest = "1:81b556a4bb0847f4092b9493451034c573307fef1d94654802643de920f1969f"
+  name = "github.com/openshift/cluster-autoscaler-operator"
+  packages = [
+    "pkg/apis/autoscaling/v1",
+    "pkg/apis/autoscaling/v1beta1",
+  ]
   pruneopts = "NUT"
-  revision = "fb8b55a1072436a51b153de9acf5bf5525efcf83"
+  revision = "19de17fd6e66c4a7dcf02069c3faa7e7403fbc70"
 
 [[projects]]
   digest = "1:a3e7136ef0712327eb7364b9c1e5acbb867e07f17f82ad0f17e51c65aec27c21"
@@ -2032,7 +2036,8 @@
     "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1",
     "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
-    "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1",
+    "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1",
+    "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1",
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/installconfig/azure",
     "github.com/openshift/installer/pkg/asset/machines/aws",
@@ -2080,6 +2085,7 @@
     "k8s.io/apimachinery/pkg/api/validation",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
+    "k8s.io/apimachinery/pkg/apis/meta/v1/validation",
     "k8s.io/apimachinery/pkg/fields",
     "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",

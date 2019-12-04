@@ -8,7 +8,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	v1beta1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	types "github.com/openshift/installer/pkg/types"
 	logrus "github.com/sirupsen/logrus"
 	reflect "reflect"
 )
@@ -37,7 +36,7 @@ func (m *MockActuator) EXPECT() *MockActuatorMockRecorder {
 }
 
 // GenerateMachineSets mocks base method
-func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *types.InstallConfig, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, error) {
+func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.MachinePool, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateMachineSets", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*v1beta1.MachineSet)

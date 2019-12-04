@@ -1503,3 +1503,39 @@ func computeHash(data interface{}) string {
 	}
 	return fmt.Sprintf("%x", md5.Sum(b))
 }
+
+func TestSSIReApplyDuration(t *testing.T) {
+	startProbe := time.Now()
+
+	resources := []runtime.Object{
+		testCM("foo1", "bar", "baz"),
+		testCM("foo2", "bar", "baz"),
+		testCM("foo3", "bar", "baz"),
+	}
+
+	cd := testClusterDeployment()
+	ss := testSyncSetWithResources("aaa", resources...)
+	ssi := syncSetInstanceForSyncSet(cd, ss)
+	ssi.Status = successfulResourceStatus(resources...)
+
+	tenMinutesAgo := metav1.NewTime(time.Now().Add(-10 * time.Minute))
+	fortyFiveMinutesAgo := metav1.NewTime(time.Now().Add(-45 * time.Minute))
+	ninetyMinutesAgo := metav1.NewTime(time.Now().Add(-90 * time.Minute))
+	oldestResourceApplyTimes := []time.Time{
+		tenMinutesAgo.Time,
+		fortyFiveMinutesAgo.Time,
+		ninetyMinutesAgo.Time,
+	}
+
+	for i, oldestResourceApplyTime := range oldestResourceApplyTimes {
+		ssi.Status.Resources[i].Conditions[0].LastProbeTime = metav1.NewTime(oldestResourceApplyTime)
+		requeueAfter := ssiReApplyDuration(ssi)
+		endProbe := time.Now()
+
+		maxRequeueAfter := reapplyInterval - startProbe.Sub(oldestResourceApplyTime)
+		minRequeueAfter := reapplyInterval - endProbe.Sub(oldestResourceApplyTime)
+		if maxRequeueAfter < requeueAfter || minRequeueAfter > requeueAfter {
+			t.Fatalf("requeueAfter did not fall between expected times, actual: %v, expected between %v and %v", requeueAfter, minRequeueAfter, maxRequeueAfter)
+		}
+	}
+}

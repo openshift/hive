@@ -2422,7 +2422,7 @@ metadata:
   name: clusterprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.clusterDeployment.name
+  - JSONPath: .spec.clusterDeploymentRef.name
     name: ClusterDeployment
     type: string
   - JSONPath: .spec.stage

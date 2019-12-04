@@ -3,8 +3,9 @@ package syncmachineset
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -412,7 +413,6 @@ func TestNewMachineSetActuator(t *testing.T) {
 		clusterDeployment *hivev1.ClusterDeployment
 		existingObjects   []runtime.Object
 		expectErr         bool
-		validate          func(*testing.T)
 	}{
 		{
 			name:              "return an actuator",

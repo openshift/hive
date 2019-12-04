@@ -102,7 +102,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "secret"
+				ss.Spec.SecretReferences[0].Source.Kind = "Secret"
 				return ss
 			}(),
 			expectedAllowed: true,
@@ -112,7 +112,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Target.Kind = "secret"
+				ss.Spec.SecretReferences[0].Target.Kind = "Secret"
 				return ss
 			}(),
 			expectedAllowed: true,
@@ -122,7 +122,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "secret"
+				ss.Spec.SecretReferences[0].Source.Kind = "Secret"
 				return ss
 			}(),
 			expectedAllowed: true,
@@ -132,7 +132,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Target.Kind = "secret"
+				ss.Spec.SecretReferences[0].Target.Kind = "Secret"
 				return ss
 			}(),
 			expectedAllowed: true,
@@ -142,7 +142,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "wrongkind"
+				ss.Spec.SecretReferences[0].Source.Kind = "Wrong"
 				return ss
 			}(),
 			expectedAllowed: false,
@@ -152,7 +152,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Target.Kind = "wrongkind"
+				ss.Spec.SecretReferences[0].Target.Kind = "Wrong"
 				return ss
 			}(),
 			expectedAllowed: false,
@@ -162,7 +162,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "wrongkind"
+				ss.Spec.SecretReferences[0].Source.Kind = "Wrong"
 				return ss
 			}(),
 			expectedAllowed: false,
@@ -172,7 +172,7 @@ func TestSyncSetValidate(t *testing.T) {
 			operation: admissionv1beta1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
-				ss.Spec.SecretReferences[0].Target.Kind = "wrongkind"
+				ss.Spec.SecretReferences[0].Target.Kind = "Wrong"
 				return ss
 			}(),
 			expectedAllowed: false,

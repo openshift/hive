@@ -231,6 +231,8 @@ func (m *InstallManager) Run() error {
 
 	m.waitForInstallerBinaries()
 
+	go m.tailFullInstallLog()
+
 	// Generate an install-config.yaml:
 	sshKey := os.Getenv("SSH_PUB_KEY")
 	pullSecret := os.Getenv("PULL_SECRET")
@@ -556,9 +558,9 @@ func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 	cmd.Dir = m.WorkDir
 
 	// save the commands' stdout/stderr to a file
-	stdOutAndErrOutput, err := os.Create(installerConsoleLogFilePath)
+	stdOutAndErrOutput, err := os.OpenFile(installerConsoleLogFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
-		m.log.WithError(err).Error("error creating/truncating installer console log file")
+		m.log.WithError(err).Error("error creating/appending installer console log file")
 		return err
 	}
 	defer stdOutAndErrOutput.Close()
@@ -571,55 +573,6 @@ func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 		return err
 	}
 
-	// 'tail -f' on the installer log file so this binary's output
-	// becomes the full log of the installer
-	go func() {
-		logfileName := filepath.Join(m.WorkDir, installerFullLogFile)
-		m.waitForFiles([]string{logfileName})
-
-		logfile, err := os.Open(logfileName)
-		defer logfile.Close()
-		if err != nil {
-			// FIXME what is a better response to being unable to open the file
-			m.log.WithError(err).Fatalf("unable to open installer log file to display to stdout")
-			panic("unable to open log file")
-		}
-
-		r := bufio.NewReader(logfile)
-		fullLine := ""
-		fiveMS := time.Millisecond * 5
-
-		// this loop will store up a full line worth of text into fullLine before
-		// passing through regex and then out to stdout
-		//
-		// NOTE: this is *not* going to catch the unlikely case where the log file contains
-		// 'some leading text, pass', which we get no prefix==true, and then later the
-		// file is appended to with 'word: SECRETHERE'
-		for {
-			line, prefix, err := r.ReadLine()
-			if err != nil && err != io.EOF {
-				m.log.WithError(err).Error("error reading from log file")
-			}
-			// pause for EOF and any other error
-			if err != nil {
-				time.Sleep(fiveMS)
-				continue
-			}
-
-			fullLine = fmt.Sprintf("%v%v", fullLine, string(line))
-
-			if prefix {
-				// need to do another read to get to end-of-line
-				continue
-			}
-
-			cleanLine := cleanupLogOutput(fullLine)
-			fmt.Println(cleanLine)
-			// clear out the line buffer so we can start again
-			fullLine = ""
-		}
-	}()
-
 	err = cmd.Wait()
 	// give goroutine above a chance to read through whole buffer
 	time.Sleep(time.Second)
@@ -630,6 +583,55 @@ func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 
 	m.log.Info("command completed successfully")
 	return nil
+}
+
+// tailFullInstallLog streams the full install log to standard out so that
+// the log can be seen from the pods logs.
+func (m *InstallManager) tailFullInstallLog() {
+	logfileName := filepath.Join(m.WorkDir, installerFullLogFile)
+	m.waitForFiles([]string{logfileName})
+
+	logfile, err := os.Open(logfileName)
+	defer logfile.Close()
+	if err != nil {
+		// FIXME what is a better response to being unable to open the file
+		m.log.WithError(err).Fatalf("unable to open installer log file to display to stdout")
+		panic("unable to open log file")
+	}
+
+	r := bufio.NewReader(logfile)
+	fullLine := ""
+	fiveMS := time.Millisecond * 5
+
+	// this loop will store up a full line worth of text into fullLine before
+	// passing through regex and then out to stdout
+	//
+	// NOTE: this is *not* going to catch the unlikely case where the log file contains
+	// 'some leading text, pass', which we get no prefix==true, and then later the
+	// file is appended to with 'word: SECRETHERE'
+	for {
+		line, prefix, err := r.ReadLine()
+		if err != nil && err != io.EOF {
+			m.log.WithError(err).Error("error reading from log file")
+		}
+		// pause for EOF and any other error
+		if err != nil {
+			time.Sleep(fiveMS)
+			continue
+		}
+
+		fullLine = fmt.Sprintf("%v%v", fullLine, string(line))
+
+		if prefix {
+			// need to do another read to get to end-of-line
+			continue
+		}
+
+		cleanLine := cleanupLogOutput(fullLine)
+		fmt.Println(cleanLine)
+		// clear out the line buffer so we can start again
+		fullLine = ""
+	}
 }
 
 func readClusterMetadata(provision *hivev1.ClusterProvision, m *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {

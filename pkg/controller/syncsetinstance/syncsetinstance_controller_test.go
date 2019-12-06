@@ -210,25 +210,25 @@ func TestSyncSetReconcile(t *testing.T) {
 		},
 		{
 			name:    "Apply single patch successfully",
-			syncSet: testSyncSetWithPatches("ss1", testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1")),
+			syncSet: testSyncSetWithPatches("ss1", testSyncObjectPatch("foo", "bar", "baz", "v1", "value1")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulPatchStatus(
 					[]hivev1.SyncObjectPatch{
-						testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
+						testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
 					}))
 			},
 		},
 		{
 			name: "Apply multiple patches successfully",
 			syncSet: testSyncSetWithPatches("ss1",
-				testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
-				testSyncObjectPatch("chicken", "potato", "stew", "v1", "AlwaysApply", "value2"),
+				testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
+				testSyncObjectPatch("chicken", "potato", "stew", "v1", "value2"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulPatchStatus(
 					[]hivev1.SyncObjectPatch{
-						testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
-						testSyncObjectPatch("chicken", "potato", "stew", "v1", "AlwaysApply", "value2"),
+						testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
+						testSyncObjectPatch("chicken", "potato", "stew", "v1", "value2"),
 					},
 				))
 			},
@@ -236,15 +236,15 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "Reapply single patch",
 			status: successfulPatchStatus([]hivev1.SyncObjectPatch{
-				testSyncObjectPatch("foo", "bar", "baz", "v1", "ApplyOnce", "value1"),
+				testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
 			}),
 			syncSet: testSyncSetWithPatches("ss1",
-				testSyncObjectPatch("foo", "bar", "baz", "v1", "ApplyOnce", "value1***changed"),
+				testSyncObjectPatch("foo", "bar", "baz", "v1", "value1***changed"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulPatchStatus(
 					[]hivev1.SyncObjectPatch{
-						testSyncObjectPatch("foo", "bar", "baz", "v1", "ApplyOnce", "value1***changed"),
+						testSyncObjectPatch("foo", "bar", "baz", "v1", "value1***changed"),
 					},
 				))
 			},
@@ -252,18 +252,18 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "Stop applying patches when error occurs",
 			syncSet: testSyncSetWithPatches("ss1",
-				testSyncObjectPatch("thing1", "bar", "baz", "v1", "AlwaysApply", "value1"),
-				testSyncObjectPatch("thing2", "bar", "baz", "v1", "AlwaysApply", "value1"),
-				testSyncObjectPatch("thing3", "bar", "baz", "v1", "AlwaysApply", "patch-error"),
-				testSyncObjectPatch("thing4", "bar", "baz", "v1", "AlwaysApply", "value1"),
+				testSyncObjectPatch("thing1", "bar", "baz", "v1", "value1"),
+				testSyncObjectPatch("thing2", "bar", "baz", "v1", "value1"),
+				testSyncObjectPatch("thing3", "bar", "baz", "v1", "patch-error"),
+				testSyncObjectPatch("thing4", "bar", "baz", "v1", "value1"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := successfulPatchStatus([]hivev1.SyncObjectPatch{
-					testSyncObjectPatch("thing1", "bar", "baz", "v1", "AlwaysApply", "value1"),
-					testSyncObjectPatch("thing2", "bar", "baz", "v1", "AlwaysApply", "value1"),
+					testSyncObjectPatch("thing1", "bar", "baz", "v1", "value1"),
+					testSyncObjectPatch("thing2", "bar", "baz", "v1", "value1"),
 				})
 				status.Patches = append(status.Patches, failedPatchStatus("ss1", []hivev1.SyncObjectPatch{
-					testSyncObjectPatch("thing3", "bar", "baz", "v1", "AlwaysApply", "patch-error"),
+					testSyncObjectPatch("thing3", "bar", "baz", "v1", "patch-error"),
 				}).Patches...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
@@ -279,8 +279,8 @@ func TestSyncSetReconcile(t *testing.T) {
 					testCM("cm4", "key4", "value4"),
 				},
 				[]hivev1.SyncObjectPatch{
-					testSyncObjectPatch("thing1", "bar", "baz", "v1", "AlwaysApply", "value1"),
-					testSyncObjectPatch("thing2", "bar", "baz", "v1", "AlwaysApply", "value2"),
+					testSyncObjectPatch("thing1", "bar", "baz", "v1", "value1"),
+					testSyncObjectPatch("thing2", "bar", "baz", "v1", "value2"),
 				}),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := successfulResourceStatus(
@@ -777,14 +777,13 @@ func testSyncSetWithSecretReferences(name string, refs ...hivev1.SecretReference
 	return ss
 }
 
-func testSyncObjectPatch(name, namespace, kind, apiVersion string, applyMode hivev1.SyncSetPatchApplyMode, value string) hivev1.SyncObjectPatch {
+func testSyncObjectPatch(name, namespace, kind, apiVersion string, value string) hivev1.SyncObjectPatch {
 	patch := fmt.Sprintf("{'spec': {'key: '%v'}}", value)
 	return hivev1.SyncObjectPatch{
 		Name:       name,
 		Namespace:  namespace,
 		Kind:       kind,
 		APIVersion: apiVersion,
-		ApplyMode:  applyMode,
 		Patch:      patch,
 		PatchType:  "merge",
 	}

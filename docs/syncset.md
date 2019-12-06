@@ -37,7 +37,6 @@ spec:
     apiVersion: v1
     name: foo
     namespace: default
-    applyMode: AlwaysApply
     patch: |-
       { "data": { "foo": "new-bar" } }
     patchType: merge

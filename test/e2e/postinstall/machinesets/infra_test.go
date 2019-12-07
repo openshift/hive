@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/hive/test/e2e/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/pointer"
 
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
@@ -17,8 +18,55 @@ import (
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 )
 
-func TestManageMachineSets(t *testing.T) {
+func TestScaleMachinePool(t *testing.T) {
 	cd := common.MustGetInstalledClusterDeployment()
+	cfg := common.MustGetClusterDeploymentClientConfig()
+
+	switch p := cd.Spec.Platform; {
+	case p.AWS == nil:
+	case p.GCP == nil:
+	default:
+		t.Log("Scaling the machine pool is only implemented for AWS and GCP")
+	}
+
+	c := common.MustGetClient()
+
+	// Scale down
+	pool := common.GetMachinePool(cd, "worker")
+	if pool == nil {
+		t.Fatal("worker machine pool does not exist")
+	}
+	pool.Spec.Replicas = pointer.Int64Ptr(1)
+	if err := c.Update(context.TODO(), pool); err != nil {
+		t.Fatalf("cannot update worker machine pool to reduce replicas: %v", err)
+	}
+	if err := waitForMachines(cfg, cd, "worker", 1); err != nil {
+		t.Errorf("timed out waiting for machines to be created")
+	}
+	if err := waitForNodes(cfg, cd, "worker", 1); err != nil {
+		t.Errorf("timed out waiting for nodes to be created")
+	}
+
+	// Scale up
+	pool = common.GetMachinePool(cd, "worker")
+	if pool == nil {
+		t.Fatal("worker machine pool does not exist")
+	}
+	pool.Spec.Replicas = pointer.Int64Ptr(3)
+	if err := c.Update(context.TODO(), pool); err != nil {
+		t.Fatalf("cannot update worker machine pool to increase replicas: %v", err)
+	}
+	if err := waitForMachines(cfg, cd, "worker", 3); err != nil {
+		t.Errorf("timed out waiting for machines to be created")
+	}
+	if err := waitForNodes(cfg, cd, "worker", 3); err != nil {
+		t.Errorf("timed out waiting for nodes to be created")
+	}
+}
+
+func TestNewMachinePool(t *testing.T) {
+	cd := common.MustGetInstalledClusterDeployment()
+	cfg := common.MustGetClusterDeploymentClientConfig()
 
 	if cd.Spec.Platform.AWS == nil {
 		t.Log("Remote machineset management is only implemented for AWS")
@@ -70,88 +118,32 @@ func TestManageMachineSets(t *testing.T) {
 
 	// Wait for machines to be created
 	t.Logf("Waiting for 3 infra machines to be created")
-	cfg := common.MustGetClusterDeploymentClientConfig()
-	err = common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
-		count := 0
-		for _, m := range machines {
-			if strings.HasPrefix(m.Name, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
-				count++
-			}
-		}
-		return count >= 3
-	}, 5*time.Minute)
-
-	if err != nil {
+	if err := waitForMachines(cfg, cd, "infra", 3); err != nil {
 		t.Errorf("timed out waiting for machines to be created")
 	}
 
-	t.Logf("Waiting for nodes to be created")
-	err = common.WaitForNodes(cfg, func(nodes []*corev1.Node) bool {
-		infraNodes := []*corev1.Node{}
-		for _, n := range nodes {
-			if n.Annotations == nil {
-				continue
-			}
-			machineAnnotation := n.Annotations["machine.openshift.io/machine"]
-			name := strings.Split(machineAnnotation, "/")
-			if len(name) < 2 {
-				continue
-			}
-			machineName := name[1]
-			if strings.HasPrefix(machineName, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
-				infraNodes = append(infraNodes, n)
-			}
-		}
-		if len(infraNodes) < 3 {
-			return false
-		}
-
-		// Ensure that labels and taints were applied to the nodes
-		for _, node := range infraNodes {
-			if node.Labels == nil {
-				return false
-			}
+	if err := waitForNodes(cfg, cd, "infra", 3,
+		// Ensure that labels were applied to the nodes
+		func(node *corev1.Node) bool {
 			if machineType := node.Labels["openshift.io/machine-type"]; machineType != "infra" {
 				t.Logf("Did not find expected label in node")
 				return false
 			}
-			found := false
+			return true
+		},
+		// Ensure that taints were applied to the nodes
+		func(node *corev1.Node) bool {
 			for _, taint := range node.Spec.Taints {
 				if taint.Key == "openshift.io/compute" && taint.Value == "true" {
-					found = true
+					return true
 				}
 			}
-			if !found {
-				t.Logf("Did not find expected taint in node")
-				return false
-			}
-		}
-		return true
-	}, 10*time.Minute)
-
-	if err != nil {
+			t.Logf("Did not find expected taint in node")
+			return false
+		},
+	); err != nil {
 		t.Errorf("timed out waiting for nodes to be created")
 	}
-
-	// Now reduce the number of machines to 1 in the machine pool and wait for there to be only one machine
-	infraMachinePool = common.GetMachinePool(cd, "infra")
-	if infraMachinePool == nil {
-		t.Fatal("could not find infra machine pool")
-	}
-	infraMachinePool.Spec.Replicas = pointer.Int64Ptr(1)
-	if err := c.Update(context.TODO(), infraMachinePool); err != nil {
-		t.Fatalf("cannot update infra machine pool to reduce replicas: %v", err)
-	}
-
-	common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
-		count := 0
-		for _, m := range machines {
-			if strings.HasPrefix(m.Name, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
-				count++
-			}
-		}
-		return count == 1
-	}, 5*time.Minute)
 
 	// Now remove the infra machinepool and make sure that any machinesets associated
 	// with it are removed
@@ -166,10 +158,64 @@ func TestManageMachineSets(t *testing.T) {
 	common.WaitForMachineSets(cfg, func(machineSets []*machinev1.MachineSet) bool {
 		count := 0
 		for _, ms := range machineSets {
-			if strings.HasPrefix(ms.Name, fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, "infra")) {
+			if strings.HasPrefix(ms.Name, machineNamePrefix(cd, "infra")) {
 				count++
 			}
 		}
 		return count == 0
 	}, 5*time.Minute)
+}
+
+func waitForMachines(cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string, expectedReplicas int) error {
+	return common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
+		count := 0
+		for _, m := range machines {
+			if strings.HasPrefix(m.Name, machineNamePrefix(cd, poolName)) {
+				count++
+			}
+		}
+		return count == expectedReplicas
+	}, 5*time.Minute)
+}
+
+func waitForNodes(cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string, expectedReplicas int, extraChecks ...func(node *corev1.Node) bool) error {
+	return common.WaitForNodes(cfg, func(nodes []*corev1.Node) bool {
+		poolNodes := []*corev1.Node{}
+		for _, n := range nodes {
+			if n.Annotations == nil {
+				continue
+			}
+			machineAnnotation := n.Annotations["machine.openshift.io/machine"]
+			name := strings.Split(machineAnnotation, "/")
+			if len(name) < 2 {
+				continue
+			}
+			machineName := name[1]
+			if strings.HasPrefix(machineName, machineNamePrefix(cd, poolName)) {
+				poolNodes = append(poolNodes, n)
+			}
+		}
+		if len(poolNodes) != expectedReplicas {
+			return false
+		}
+
+		for _, c := range extraChecks {
+			for _, n := range poolNodes {
+				if !c(n) {
+					return false
+				}
+			}
+		}
+
+		return true
+	}, 10*time.Minute)
+}
+
+func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) string {
+	switch p := cd.Spec.Platform; {
+	case p.GCP != nil:
+		return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName[:1])
+	default:
+		return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName)
+	}
 }

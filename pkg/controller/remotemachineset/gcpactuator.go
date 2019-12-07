@@ -1,16 +1,17 @@
-package syncmachineset
+package remotemachineset
 
 import (
-	//	"fmt"
+	"fmt"
 
-	//	"github.com/pkg/errors"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 
-	//	installgcp "github.com/openshift/installer/pkg/asset/machines/gcp"
-	installtypes "github.com/openshift/installer/pkg/types"
-	//	installtypesgcp "github.com/openshift/installer/pkg/types/gcp"
+	installgcp "github.com/openshift/installer/pkg/asset/machines/gcp"
+	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/gcpclient"
@@ -26,8 +27,8 @@ type GCPActuator struct {
 var _ Actuator = &GCPActuator{}
 
 // NewGCPActuator is the constructor for building a GCPActuator
-func NewGCPActuator(gcpCreds []byte, gcpProjectID string, logger log.FieldLogger) (*GCPActuator, error) {
-	gcpClient, err := gcpclient.NewClient(gcpProjectID, gcpCreds)
+func NewGCPActuator(gcpCreds *corev1.Secret, logger log.FieldLogger) (*GCPActuator, error) {
+	gcpClient, err := gcpclient.NewClientFromSecret(gcpCreds)
 	if err != nil {
 		logger.WithError(err).Warn("failed to create GCP client with creds in clusterDeployment's secret")
 		return nil, err
@@ -41,59 +42,53 @@ func NewGCPActuator(gcpCreds []byte, gcpProjectID string, logger log.FieldLogger
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
-func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, ic *installtypes.InstallConfig, logger log.FieldLogger) ([]*machineapi.MachineSet, error) {
-	machineSets := []*machineapi.MachineSet{}
+func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, error) {
+	if cd.Spec.ClusterMetadata == nil {
+		return nil, errors.New("ClusterDeployment does not have cluster metadata")
+	}
+	if cd.Spec.Platform.GCP == nil {
+		return nil, errors.New("ClusterDeployment is not for GCP")
+	}
+	if pool.Spec.Platform.GCP == nil {
+		return nil, errors.New("MachinePool is not for GCP")
+	}
 
-	// TODO: Use MachinePool CRD
-	/*
-		// get image ID for the generated machine sets
-		imageID, err := a.getImageID(cd, logger)
+	ic := &installertypes.InstallConfig{
+		Platform: installertypes.Platform{
+			GCP: &installertypesgcp.Platform{
+				Region: cd.Spec.Platform.GCP.Region,
+			},
+		},
+	}
+
+	computePool := baseMachinePool(pool)
+	computePool.Platform.GCP = &installertypesgcp.MachinePool{
+		Zones:        pool.Spec.Platform.GCP.Zones,
+		InstanceType: pool.Spec.Platform.GCP.InstanceType,
+	}
+
+	// get image ID for the generated machine sets
+	imageID, err := a.getImageID(cd, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to find image ID for the machine sets")
+	}
+
+	if len(computePool.Platform.GCP.Zones) == 0 {
+		zones, err := a.getZones(cd.Spec.Platform.GCP.Region)
 		if err != nil {
-			a.logger.WithError(err).Warn("failed to find image ID for the machine sets")
-			return nil, err
+			return nil, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
 		}
-
-		regionZones := []string{}
-
-		// create the machinesets
-		for _, computePool := range ic.Compute {
-			if computePool.Platform.GCP == nil {
-				computePool.Platform.GCP = &installtypesgcp.MachinePool{}
-			}
-			if len(computePool.Platform.GCP.Zones) == 0 {
-				if len(regionZones) == 0 {
-					regionZones, err = a.getGCPZones(cd.Spec.Platform.GCP.Region)
-					if err != nil {
-						msg := "compute pool not providing list of zones and failed to fetch list of zones"
-						logger.WithError(err).Error(msg)
-						return nil, errors.Wrap(err, msg)
-					}
-					if len(regionZones) == 0 {
-						msg := fmt.Sprintf("zero zones returned for region %s", cd.Spec.Platform.GCP.Region)
-						logger.Error(msg)
-						return nil, errors.New(msg)
-					}
-				}
-				computePool.Platform.GCP.Zones = regionZones
-			}
-
-			installerMachineSets, err := installgcp.MachineSets(cd.Status.InfraID, ic, &computePool, imageID, computePool.Name, "worker-user-data")
-			if err != nil {
-				logger.WithError(err).Error("failed to generate machinesets")
-				return nil, err
-			}
-
-			for _, ms := range installerMachineSets {
-				machineSets = append(machineSets, ms)
-			}
+		if len(zones) == 0 {
+			return nil, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.GCP.Region)
 		}
-	*/
-	return machineSets, nil
+		computePool.Platform.GCP.Zones = zones
+	}
+
+	installerMachineSets, err := installgcp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, pool.Spec.Name, "worker-user-data")
+	return installerMachineSets, errors.Wrap(err, "failed to generate machinesets")
 }
 
-// TODO: Use MachinePool CRD
-/*
-func (a *GCPActuator) getGCPZones(region string) ([]string, error) {
+func (a *GCPActuator) getZones(region string) ([]string, error) {
 	zones := []string{}
 
 	// Filter to regions matching '.*<region>.*' (where the zone is actually UP)
@@ -147,4 +142,3 @@ func (a *GCPActuator) getImageID(cd *hivev1.ClusterDeployment, logger log.FieldL
 		return "", errors.New(msg)
 	}
 }
-*/

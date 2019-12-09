@@ -9,6 +9,10 @@ const (
 	// FinalizerDNSZone is used on DNSZones to ensure we successfully deprovision
 	// the cloud objects before cleaning up the API object.
 	FinalizerDNSZone string = "hive.openshift.io/dnszone"
+
+	// FinalizerDNSEndpoint is used on DNSZones to ensure we successfully
+	// delete the parent-link records before cleaning up the API object.
+	FinalizerDNSEndpoint string = "hive.openshift.io/dnsendpoint"
 )
 
 // DNSZoneSpec defines the desired state of DNSZone
@@ -127,6 +131,8 @@ type DNSZoneConditionType string
 const (
 	// ZoneAvailableDNSZoneCondition is true if the DNSZone is responding to DNS queries
 	ZoneAvailableDNSZoneCondition DNSZoneConditionType = "ZoneAvailable"
+	// ParentLinkCreatedCondition is true if the parent link has been created
+	ParentLinkCreatedCondition DNSZoneConditionType = "ParentLinkCreated"
 )
 
 // +genclient

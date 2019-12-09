@@ -2,12 +2,14 @@ package dnsendpoint
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,7 +89,7 @@ func Add(mgr manager.Manager) error {
 	if err != nil {
 		return err
 	}
-	if err := ctrl.Watch(&source.Kind{Type: &hivev1.DNSEndpoint{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := ctrl.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 	return ctrl.Watch(&source.Channel{Source: nameServerChanges}, &handler.EnqueueRequestForObject{})
@@ -109,8 +111,8 @@ type ReconcileDNSEndpoint struct {
 func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	dnsLog := r.logger.WithFields(log.Fields{
-		"dnsendpoint": request.Name,
-		"namespace":   request.Namespace,
+		"dnszone":   request.Name,
+		"namespace": request.Namespace,
 	})
 
 	// For logging, we need to see when the reconciliation loop starts and ends.
@@ -121,35 +123,36 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 
-	// Fetch the DNSEndpoint object
-	instance := &hivev1.DNSEndpoint{}
+	// Fetch the DNSZone object
+	instance := &hivev1.DNSZone{}
 	if err := r.Get(context.TODO(), request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		dnsLog.WithError(err).Error("Error fetching dnsendpoint object")
+		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
 
-	if !isValidDNSEndpoint(instance, dnsLog) {
+	if !instance.Spec.LinkToParentDomain {
 		return reconcile.Result{}, nil
 	}
-	domain := instance.Spec.Endpoints[0].DNSName
-	dnsLog = dnsLog.WithField("domain", domain)
 
-	if instance.DeletionTimestamp != nil {
-		if !controllerutils.HasFinalizer(instance, hivev1.FinalizerDNSEndpoint) {
-			return reconcile.Result{}, nil
-		}
-		return reconcile.Result{}, r.syncDeletedEndpoint(instance, dnsLog)
+	isDeleted := instance.DeletionTimestamp != nil
+	hasFinalizer := controllerutils.HasFinalizer(instance, hivev1.FinalizerDNSEndpoint)
+
+	if isDeleted && !hasFinalizer {
+		return reconcile.Result{}, nil
 	}
+
+	domain := instance.Spec.Zone
+	dnsLog = dnsLog.WithField("domain", domain)
 
 	if !r.nameServerScraper.HasBeenScraped(domain) {
 		return reconcile.Result{}, errors.New("name servers have not yet been scraped")
 	}
 
-	if !controllerutils.HasFinalizer(instance, hivev1.FinalizerDNSEndpoint) {
+	if !hasFinalizer {
 		controllerutils.AddFinalizer(instance, hivev1.FinalizerDNSEndpoint)
 		if err := r.Update(context.TODO(), instance); err != nil {
 			dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
@@ -158,61 +161,64 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, nil
 	}
 
-	desiredNameServers := sets.NewString(instance.Spec.Endpoints[0].Targets...)
+	desiredNameServers := sets.NewString(instance.Status.NameServers...)
 	rootDomain, currentNameServers := r.nameServerScraper.GetEndpoint(domain)
-	if currentNameServers.Equal(desiredNameServers) {
+
+	switch {
+	// NS is up-to-date
+	case !isDeleted && currentNameServers.Equal(desiredNameServers):
 		dnsLog.Debug("NS record is up to date")
-		return reconcile.Result{}, r.observeCurrentGeneration(instance, dnsLog)
+	// NS needs to be created or updated
+	case !isDeleted && len(desiredNameServers) > 0:
+		dnsLog.Info("creating NS record")
+		if err := r.nameServerQuery.Create(rootDomain, domain, desiredNameServers); err != nil {
+			dnsLog.WithError(err).Error("error creating NS record")
+			return reconcile.Result{}, err
+		}
+		r.nameServerScraper.AddEndpoint(request.NamespacedName, domain, desiredNameServers)
+	// NS needs to be deleted, either because the DNSZone has been deleted or because
+	// there are no targets for the NS.
+	default:
+		dnsLog.Info("deleting NS record")
+		if err := r.nameServerQuery.Delete(rootDomain, domain, currentNameServers); err != nil {
+			dnsLog.WithError(err).Error("error deleting NS record")
+			return reconcile.Result{}, err
+		}
+		r.nameServerScraper.RemoveEndpoint(domain)
 	}
 
-	dnsLog.Info("creating NS record")
-	if err := r.nameServerQuery.Create(rootDomain, domain, desiredNameServers); err != nil {
-		dnsLog.WithError(err).Error("error creating NS record")
-		return reconcile.Result{}, err
+	status := corev1.ConditionFalse
+	reason := "ParentLinkNotCreated"
+	message := "Parent link has not been created"
+	if !isDeleted && len(desiredNameServers) > 0 {
+		status = corev1.ConditionTrue
+		reason = "ParentLinkCreated"
+		message = fmt.Sprintf("Parent link created for name servers %s", desiredNameServers)
 	}
-	r.nameServerScraper.AddEndpoint(request.NamespacedName, domain, desiredNameServers)
+	if conds, changed := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		instance.Status.Conditions,
+		hivev1.ParentLinkCreatedCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	); changed {
+		instance.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), instance); err != nil {
+			dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update status conditions")
+			return reconcile.Result{}, err
+		}
+	}
 
-	return reconcile.Result{}, r.observeCurrentGeneration(instance, dnsLog)
-}
+	if isDeleted {
+		controllerutils.DeleteFinalizer(instance, hivev1.FinalizerDNSEndpoint)
+		if err := r.Update(context.Background(), instance); err != nil {
+			dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting finalizer")
+			return reconcile.Result{}, err
+		}
+	}
 
-func (r *ReconcileDNSEndpoint) syncDeletedEndpoint(instance *hivev1.DNSEndpoint, dnsLog log.FieldLogger) error {
-	dnsLog.Info("deleting NS record")
-	domain := instance.Spec.Endpoints[0].DNSName
-	rootDomain, currentNameServers := r.nameServerScraper.GetEndpoint(domain)
-	if err := r.nameServerQuery.Delete(rootDomain, domain, currentNameServers); err != nil {
-		dnsLog.WithError(err).Error("error deleting NS record")
-		return err
-	}
-	r.nameServerScraper.RemoveEndpoint(domain)
-	controllerutils.DeleteFinalizer(instance, hivev1.FinalizerDNSEndpoint)
-	if err := r.Update(context.Background(), instance); err != nil {
-		dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting finalizer")
-		return err
-	}
-	return nil
-}
-
-func (r *ReconcileDNSEndpoint) observeCurrentGeneration(instance *hivev1.DNSEndpoint, dnsLog log.FieldLogger) error {
-	if instance.Generation == instance.Status.ObservedGeneration {
-		return nil
-	}
-	instance.Status.ObservedGeneration = instance.Generation
-	return errors.Wrap(
-		r.Status().Update(context.Background(), instance),
-		"error setting observed generation",
-	)
-}
-
-func isValidDNSEndpoint(instance *hivev1.DNSEndpoint, dnsLog log.FieldLogger) bool {
-	if len(instance.Spec.Endpoints) != 1 {
-		dnsLog.Error("dnsendpoint does not contain exactly 1 endpoint")
-		return false
-	}
-	if instance.Spec.Endpoints[0].RecordType != "NS" {
-		dnsLog.Error("dnsendpoint is not a NS")
-		return false
-	}
-	return true
+	return reconcile.Result{}, nil
 }
 
 func createNameServerQuery(c client.Client, logger log.FieldLogger) nameserver.Query {

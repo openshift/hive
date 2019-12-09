@@ -177,7 +177,6 @@ rules:
   - dnszones
   - dnszones/status
   - dnszones/finalizers
-  - dnsendpoints
   verbs:
   - get
   - list

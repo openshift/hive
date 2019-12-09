@@ -83,13 +83,6 @@ var (
 		}
 	}
 
-	validDNSEndpoint = func() *hivev1.DNSEndpoint {
-		ep := &hivev1.DNSEndpoint{}
-		ep.Namespace = "ns"
-		ep.Name = "dnszoneobject-ns"
-		return ep
-	}
-
 	validDNSZoneWithLinkToParent = func() *hivev1.DNSZone {
 		zone := validDNSZone()
 		zone.Spec.LinkToParentDomain = true
@@ -168,9 +161,4 @@ func fakeGCPClientBuilder(mockGCPClient *mockgcp.MockClient) gcpClientBuilderTyp
 // setFakeDNSZoneInKube is an easy way to register a dns zone object with kube.
 func setFakeDNSZoneInKube(mocks *mocks, dnsZone *hivev1.DNSZone) error {
 	return mocks.fakeKubeClient.Create(context.TODO(), dnsZone)
-}
-
-// setFakeDNSEndpointInKube creates a fake DNSEndpoint
-func setFakeDNSEndpointInKube(mocks *mocks, endpoint *hivev1.DNSEndpoint) error {
-	return mocks.fakeKubeClient.Create(context.TODO(), endpoint)
 }

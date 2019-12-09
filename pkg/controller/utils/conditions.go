@@ -204,6 +204,29 @@ func SetDNSZoneCondition(
 	message string,
 	updateConditionCheck UpdateConditionCheck,
 ) []hivev1.DNSZoneCondition {
+	newConditions, _ := SetDNSZoneConditionWithChangeCheck(
+		conditions,
+		conditionType,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	return newConditions
+}
+
+// SetDNSZoneConditionWithChangeCheck sets a condition on a DNSZone resource's status
+// It returns the conditions as well a boolean indicating whether there was a change made
+// to the conditions.
+func SetDNSZoneConditionWithChangeCheck(
+	conditions []hivev1.DNSZoneCondition,
+	conditionType hivev1.DNSZoneConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) ([]hivev1.DNSZoneCondition, bool) {
+	changed := false
 	now := metav1.Now()
 	existingCondition := FindDNSZoneCondition(conditions, conditionType)
 	if existingCondition == nil {
@@ -219,6 +242,7 @@ func SetDNSZoneCondition(
 					LastProbeTime:      now,
 				},
 			)
+			changed = true
 		}
 	} else {
 		if shouldUpdateCondition(
@@ -233,9 +257,10 @@ func SetDNSZoneCondition(
 			existingCondition.Reason = reason
 			existingCondition.Message = message
 			existingCondition.LastProbeTime = now
+			changed = true
 		}
 	}
-	return conditions
+	return conditions, changed
 }
 
 // FindClusterDeploymentCondition finds in the condition that has the

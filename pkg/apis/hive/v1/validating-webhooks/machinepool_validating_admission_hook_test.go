@@ -173,6 +173,112 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			}(),
 		},
 		{
+			name: "replicas and autoscaling",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Replicas = pointer.Int64Ptr(1)
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{}
+				return pool
+			}(),
+		},
+		{
+			name: "zero min replicas",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 0,
+					MaxReplicas: 1,
+				}
+				return pool
+			}(),
+		},
+		{
+			name: "min replicas less than number of AWS zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 1,
+					MaxReplicas: 1,
+				}
+				return pool
+			}(),
+		},
+		{
+			name: "min replicas equal to number of AWS zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 2,
+					MaxReplicas: 2,
+				}
+				return pool
+			}(),
+			expectAllowed: true,
+		},
+		{
+			name: "min replicas less than number of GCP zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testGCPMachinePool()
+				pool.Spec.Platform.GCP.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 1,
+					MaxReplicas: 1,
+				}
+				return pool
+			}(),
+		},
+		{
+			name: "min replicas equal to number of GCP zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testGCPMachinePool()
+				pool.Spec.Platform.GCP.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 2,
+					MaxReplicas: 2,
+				}
+				return pool
+			}(),
+			expectAllowed: true,
+		},
+		{
+			name: "min replicas less than number of Azure zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testAzureMachinePool()
+				pool.Spec.Platform.Azure.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 1,
+					MaxReplicas: 1,
+				}
+				return pool
+			}(),
+		},
+		{
+			name: "min replicas equal to number of Azure zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testAzureMachinePool()
+				pool.Spec.Platform.Azure.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 2,
+					MaxReplicas: 2,
+				}
+				return pool
+			}(),
+			expectAllowed: true,
+		},
+		{
+			name: "min replicas greater than max replicas",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 2,
+					MaxReplicas: 1,
+				}
+				return pool
+			}(),
+		},
+		{
 			name: "missing platform",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
@@ -340,7 +446,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 				Object:    runtime.RawExtension{Raw: rawProvision},
 			}
 			response := cut.Validate(request)
-			assert.Equal(t, tc.expectAllowed, response.Allowed, "unexpected response: %#v", response)
+			assert.Equal(t, tc.expectAllowed, response.Allowed, "unexpected response: %#v", response.Result)
 		})
 	}
 }

@@ -247,25 +247,34 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	if spec.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must have a name for the remote machine pool"))
 	}
-	if spec.Replicas != nil && *spec.Replicas < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), *spec.Replicas, "replicas count must not be negative"))
+	if spec.Replicas != nil {
+		if spec.Autoscaling != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), *spec.Replicas, "replicas must not be specified when autoscaling is specified"))
+		}
+		if *spec.Replicas < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("replicas"), *spec.Replicas, "replicas count must not be negative"))
+		}
 	}
 	platformPath := fldPath.Child("platform")
 	platforms := []string{}
-	if spec.Platform.AWS != nil {
+	numberOfMachineSets := 0
+	if p := spec.Platform.AWS; p != nil {
 		platforms = append(platforms, "aws")
-		allErrs = append(allErrs, validateAWSMachinePoolPlatformInvariants(spec.Platform.AWS, platformPath.Child("aws"))...)
+		allErrs = append(allErrs, validateAWSMachinePoolPlatformInvariants(p, platformPath.Child("aws"))...)
+		numberOfMachineSets = len(p.Zones)
 	}
-	if spec.Platform.GCP != nil {
+	if p := spec.Platform.GCP; p != nil {
 		platforms = append(platforms, "gcp")
 		if spec.Name != defaultWorkerPoolName {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("name"), spec.Name, []string{defaultWorkerPoolName}))
 		}
-		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(spec.Platform.GCP, platformPath.Child("gcp"))...)
+		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(p, platformPath.Child("gcp"))...)
+		numberOfMachineSets = len(p.Zones)
 	}
-	if spec.Platform.Azure != nil {
+	if p := spec.Platform.Azure; p != nil {
 		platforms = append(platforms, "azure")
-		allErrs = append(allErrs, validateAzureMachinePoolPlatformInvariants(spec.Platform.Azure, platformPath.Child("azure"))...)
+		allErrs = append(allErrs, validateAzureMachinePoolPlatformInvariants(p, platformPath.Child("azure"))...)
+		numberOfMachineSets = len(p.Zones)
 	}
 	switch len(platforms) {
 	case 0:
@@ -274,6 +283,21 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		// valid
 	default:
 		allErrs = append(allErrs, field.Invalid(platformPath, spec.Platform, fmt.Sprintf("multiple platforms specified: %s", platforms)))
+	}
+	if spec.Autoscaling != nil {
+		autoscalingPath := fldPath.Child("autoscaling")
+		if numberOfMachineSets == 0 {
+			if spec.Autoscaling.MinReplicas < 1 {
+				allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must at least 1"))
+			}
+		} else {
+			if spec.Autoscaling.MinReplicas < int32(numberOfMachineSets) {
+				allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must be at least the number of zones"))
+			}
+		}
+		if spec.Autoscaling.MinReplicas > spec.Autoscaling.MaxReplicas {
+			allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must not be greater than maximum replicas"))
+		}
 	}
 	allErrs = append(allErrs, metavalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	return allErrs

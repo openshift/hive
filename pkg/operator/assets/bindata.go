@@ -1343,8 +1343,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: hive-frontend
-groupNames:
-- hive-frontend
 subjects:
 - kind: ServiceAccount
   name: hive-frontend
@@ -3032,11 +3030,11 @@ spec:
                 deployment.
               type: object
             managedDomains:
-              description: 'ManagedDomains is the list of DNS domains that are managed
-                by the Hive cluster When specifying ''managedDNS: true'' in a ClusterDeployment,
-                the ClusterDeployment''s baseDomain should be a direct child of one
-                of these domains, otherwise the ClusterDeployment creation will result
-                in a validation error.'
+              description: 'ManagedDomains is the list of DNS domains that are allowed
+                to be used by the ''managedDNS'' feature. When specifying ''managedDNS:
+                true'' in a ClusterDeployment, the ClusterDeployment''s baseDomain
+                must be a direct child of one of these domains, otherwise the ClusterDeployment
+                creation will result in a validation error.'
               items:
                 type: string
               type: array

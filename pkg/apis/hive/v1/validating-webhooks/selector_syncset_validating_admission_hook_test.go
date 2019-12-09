@@ -98,92 +98,212 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name:      "Test valid SecretReference kind create",
+			name:            "Test valid SecretReference create",
+			operation:       admissionv1beta1.Create,
+			selectorSyncSet: testSecretReferenceSelectorSyncSet(),
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test valid SecretReference update",
+			operation:       admissionv1beta1.Update,
+			selectorSyncSet: testSecretReferenceSelectorSyncSet(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference source kind create",
 			operation: admissionv1beta1.Create,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "secret"
-				ss.Spec.SecretReferences[0].Target.Kind = "secret"
+				ss.Spec.SecretReferences[0].Source.Kind = "Secret"
 				return ss
 			}(),
 			expectedAllowed: true,
 		},
 		{
-			name:      "Test valid SecretReference kind update",
-			operation: admissionv1beta1.Update,
+			name:      "Test valid SecretReference target kind create",
+			operation: admissionv1beta1.Create,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "secret"
-				ss.Spec.SecretReferences[0].Target.Kind = "secret"
+				ss.Spec.SecretReferences[0].Target.Kind = "Secret"
 				return ss
 			}(),
 			expectedAllowed: true,
 		},
 		{
-			name:      "Test invalid SecretReference kind create",
-			operation: admissionv1beta1.Create,
-			selectorSyncSet: func() *hivev1.SelectorSyncSet {
-				ss := testSecretReferenceSelectorSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "wrongkind"
-				ss.Spec.SecretReferences[0].Target.Kind = "wrongkind"
-				return ss
-			}(),
-			expectedAllowed: false,
-		},
-		{
-			name:      "Test invalid SecretReference kind update",
+			name:      "Test valid SecretReference source kind update",
 			operation: admissionv1beta1.Update,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
-				ss.Spec.SecretReferences[0].Source.Kind = "wrongkind"
-				ss.Spec.SecretReferences[0].Target.Kind = "wrongkind"
+				ss.Spec.SecretReferences[0].Source.Kind = "Secret"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid SecretReference target kind update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "Secret"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test invalid SecretReference source kind create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
+				ss.Spec.SecretReferences[0].Source.Kind = "Wrong"
 				return ss
 			}(),
 			expectedAllowed: false,
 		},
 		{
-			name:      "Test invalid SecretReference no name create",
+			name:      "Test invalid SecretReference target kind create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "Wrong"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source kind update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
+				ss.Spec.SecretReferences[0].Source.Kind = "Wrong"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target kind update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
+				ss.Spec.SecretReferences[0].Target.Kind = "Wrong"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no source name create",
 			operation: admissionv1beta1.Create,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Source.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no target name create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Target.Name = ""
 				return ss
 			}(),
 			expectedAllowed: false,
 		},
 		{
-			name:      "Test invalid SecretReference no name update",
+			name:      "Test invalid SecretReference no source name update",
 			operation: admissionv1beta1.Update,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Source.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference no target name update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Target.Name = ""
 				return ss
 			}(),
 			expectedAllowed: false,
 		},
 		{
-			name:      "Test invalid SecretReference invalid fields set create",
+			name:      "Test invalid SecretReference source fieldPath set create",
 			operation: admissionv1beta1.Create,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Source.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source UID set create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Source.UID = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target fieldPath set create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Target.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target UID set create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Target.UID = "dontset"
 				return ss
 			}(),
 			expectedAllowed: false,
 		},
 		{
-			name:      "Test invalid SecretReference invalid fields set update",
+			name:      "Test invalid SecretReference source fieldPath set update",
 			operation: admissionv1beta1.Update,
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Source.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source UID set update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Source.UID = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target fieldPath set update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Target.FieldPath = "dontset"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference target UID set update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.SecretReferences[0].Target.UID = "dontset"
 				return ss
 			}(),

@@ -284,8 +284,8 @@ func validateSecretReferences(secrets []hivev1.SecretReference, fldPath *field.P
 
 func validateSecretRef(ref corev1.ObjectReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(ref.Kind) > 0 && ref.Kind != "secret" {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), ref.Kind, []string{"secret"}))
+	if len(ref.Kind) > 0 && ref.Kind != "Secret" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), ref.Kind, []string{"Secret"}))
 	}
 	if ref.GroupVersionKind().Group != "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ref.APIVersion, "Group part of API version must be empty"))

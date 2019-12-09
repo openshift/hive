@@ -4,6 +4,7 @@
 
 - [Developing Hive](#developing-hive)
   - [Prerequisites](#prerequisites)
+  - [External tools](#external-tools)
   - [Build and run tests](#build-and-run-tests)
   - [Setting up the development environment](#setting-up-the-development-environment)
     - [Cloning the repository](#cloning-the-repository)
@@ -34,7 +35,28 @@
 - Git
 - Make
 - A recent Go distribution (>=1.12)
+
+### External tools
+
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
+- [mockgen](https://github.com/golang/mock)
+- [golangci-lint](https://github.com/golangci/golangci-lint)
+
+If you do not care to install those tools locally, then you can use them from the Hive build image.
+
+To build the image, run:
+
+```bash
+make build-build-image
+```
+
+Then, replace executions of `make` with executions of `hack/make`.
+
+For example, to run the tests you would run the following.
+
+```bash
+hack/make test
+```
 
 ## Build and run tests
 
@@ -245,6 +267,8 @@ Before you can use Dep you need to download and install it from GitHub:
 ```
 
 This will install the `dep` binary into *_$GOPATH/bin_*.
+
+Alternatively, if you would rather not install Dep, you can run from a container using the Hive build image as described in the [External tools](#external-tools) section.
 
 ### Updating Dependencies
 

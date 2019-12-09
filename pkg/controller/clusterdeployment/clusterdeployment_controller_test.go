@@ -395,7 +395,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = nil
-					cd.Spec.Images.InstallerImage = "test-installer-image:latest"
+					cd.Spec.Provisioning.InstallerImage = "test-installer-image:latest"
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -415,8 +415,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = nil
-					cd.Spec.Images.InstallerImage = ""
-					cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Spec.Provisioning.InstallerImage = ""
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
 				func() *hivev1.ClusterImageSet {
@@ -441,8 +441,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = nil
-					cd.Spec.Images.InstallerImage = ""
-					cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Spec.Provisioning.InstallerImage = ""
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
 					return cd
 				}(),
@@ -474,9 +474,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = nil
-					cd.Spec.Images.InstallerImage = ""
-					cd.Spec.Images.ReleaseImage = "embedded-release-image:latest"
-					cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Spec.Provisioning.InstallerImage = ""
+					cd.Spec.Provisioning.ReleaseImage = "embedded-release-image:latest"
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
 					return cd
 				}(),
@@ -507,8 +507,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image:latest")
-					cd.Spec.Images.InstallerImage = ""
-					cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Spec.Provisioning.InstallerImage = ""
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
 				func() *hivev1.ClusterImageSet {
@@ -743,7 +743,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testDeletedClusterDeployment()
-					cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),

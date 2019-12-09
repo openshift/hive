@@ -798,8 +798,8 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 // 1 - specified in the cluster deployment spec.images.releaseImage
 // 2 - referenced in the cluster deployment spec.imageSet
 func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, cdLog log.FieldLogger) string {
-	if cd.Spec.Images.ReleaseImage != "" {
-		return cd.Spec.Images.ReleaseImage
+	if cd.Spec.Provisioning.ReleaseImage != "" {
+		return cd.Spec.Provisioning.ReleaseImage
 	}
 	if imageSet != nil && imageSet.Spec.ReleaseImage != nil {
 		return *imageSet.Spec.ReleaseImage
@@ -808,18 +808,18 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 }
 
 func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
-	if cd.Spec.ImageSetRef == nil || len(cd.Spec.ImageSetRef.Name) == 0 {
+	if cd.Spec.Provisioning.ImageSetRef == nil || len(cd.Spec.Provisioning.ImageSetRef.Name) == 0 {
 		return nil, nil
 	}
 	imageSet := &hivev1.ClusterImageSet{}
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.ImageSetRef.Name}, imageSet); err != nil {
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.Provisioning.ImageSetRef.Name}, imageSet); err != nil {
 		if apierrors.IsNotFound(err) {
-			cdLog.WithField("clusterimageset", cd.Spec.ImageSetRef.Name).Warning("clusterdeployment references non-existent clusterimageset")
+			cdLog.WithField("clusterimageset", cd.Spec.Provisioning.ImageSetRef.Name).Warning("clusterdeployment references non-existent clusterimageset")
 			if err := r.setImageSetNotFoundCondition(cd, false, cdLog); err != nil {
 				return nil, err
 			}
 		} else {
-			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.ImageSetRef.Name).Error("unexpected error retrieving clusterimageset")
+			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.Provisioning.ImageSetRef.Name).Error("unexpected error retrieving clusterimageset")
 		}
 		return nil, err
 	}
@@ -835,13 +835,13 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 }
 
 func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
-	if len(cd.Spec.Images.InstallerImage) > 0 {
-		cdLog.WithField("image", cd.Spec.Images.InstallerImage).
+	if cd.Spec.Provisioning.InstallerImage != "" {
+		cdLog.WithField("image", cd.Spec.Provisioning.InstallerImage).
 			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
-		cd.Status.InstallerImage = &cd.Spec.Images.InstallerImage
+		cd.Status.InstallerImage = &cd.Spec.Provisioning.InstallerImage
 		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
 	}
-	if imageSet != nil && imageSet.Spec.InstallerImage != nil {
+	if imageSet != nil && imageSet.Spec.InstallerImage != nil && *imageSet.Spec.InstallerImage != "" {
 		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
 		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
 		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
@@ -936,11 +936,11 @@ func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterD
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) error {
 	status := corev1.ConditionFalse
 	reason := clusterImageSetFoundReason
-	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.ImageSetRef.Name)
+	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.Provisioning.ImageSetRef.Name)
 	if isNotFound {
 		status = corev1.ConditionTrue
 		reason = clusterImageSetNotFoundReason
-		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.ImageSetRef.Name)
+		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.Provisioning.ImageSetRef.Name)
 	}
 	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,

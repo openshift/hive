@@ -240,8 +240,8 @@ func InstallerPodSpec(
 	cliImage := *cd.Status.CLIImage
 
 	installerImagePullPolicy := defaultInstallerImagePullPolicy
-	if cd.Spec.Images.InstallerImagePullPolicy != "" {
-		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
+	if cd.Spec.Provisioning.InstallerImagePullPolicy != "" {
+		installerImagePullPolicy = cd.Spec.Provisioning.InstallerImagePullPolicy
 	}
 
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,

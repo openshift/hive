@@ -62,7 +62,7 @@ test-e2e-postinstall:
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: $(GOPATH)/bin/mockgen manager hiveutil hiveadmission operator
+build: manager hiveutil hiveadmission operator
 
 
 # Build manager binary
@@ -171,7 +171,7 @@ verify-generated:
 
 # Generate code
 .PHONY: generate
-generate: $(GOPATH)/bin/mockgen
+generate:
 	go generate ./pkg/... ./cmd/...
 	hack/update-bindata.sh
 
@@ -207,9 +207,6 @@ buildah-dev-push: build
 buildah-push: buildah-build
 	$(SUDO_CMD) buildah push ${IMG}
 
-$(GOPATH)/bin/mockgen:
-	go get -u github.com/golang/mock/mockgen/...
-
 .PHONY: clean ## Remove all build artifacts
 clean:
 	rm -rf $(BINDIR)
@@ -219,3 +216,7 @@ clean:
 .PHONY: lint
 lint:
 	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
+
+# Build the build image so that it can be used locally for performing builds.
+build-build-image: build/build-image/Dockerfile
+	$(BUILD_CMD) -t "hive-build:latest" -f build/build-image/Dockerfile .

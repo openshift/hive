@@ -32,6 +32,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -332,6 +333,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if deprovision != nil {
 					t.Errorf("got unexpected deprovision request")
 				}
+			},
+		},
+		{
+			name: "Skip deprovision for deleted BareMetal cluster",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Platform.AWS = nil
+					cd.Spec.Platform.BareMetal = &baremetal.Platform{}
+					cd.Labels[hivev1.HiveClusterPlatformLabel] = "baremetal"
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				deprovision := getDeprovision(c)
+				assert.Nil(t, deprovision, "expected no deprovision request")
+				cd := getCD(c)
+				assert.Equal(t, 0, len(cd.Finalizers))
 			},
 		},
 		{

@@ -182,7 +182,7 @@ docker-build:
 
 # Build the docker image
 .PHONY: docker-dev-push
-docker-dev-push: build
+docker-dev-push: manifests generate build
 	$(DOCKER_CMD) build -t ${IMG} -f Dockerfile.dev .
 	$(DOCKER_CMD) push ${IMG}
 

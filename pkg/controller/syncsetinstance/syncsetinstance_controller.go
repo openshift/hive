@@ -258,6 +258,8 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 	original := ssi.DeepCopy()
 	applier := r.applierBuilder(kubeConfig, ssiLog)
 	applyErr := r.applySyncSet(ssi, spec, dynamicClient, applier, kubeConfig, ssiLog)
+	ssi.Status.Applied = applyErr == nil
+
 	err = r.updateSyncSetInstanceStatus(ssi, original, ssiLog)
 	if err != nil {
 		return reconcile.Result{}, err

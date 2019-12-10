@@ -7,9 +7,6 @@ metadata:
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .status.installerImage
-    name: Installer
-    type: string
   - JSONPath: .spec.releaseImage
     name: Release
     type: string
@@ -39,15 +36,9 @@ spec:
           type: object
         spec:
           properties:
-            installerImage:
-              description: InstallerImage is the image used to install a cluster.
-                If not specified, the installer image reference is obtained from the
-                release image.
-              type: string
             releaseImage:
               description: ReleaseImage is the image that contains the payload to
-                use when installing a cluster. If the installer image is specified,
-                the release image is optional.
+                use when installing a cluster.
               type: string
           type: object
         status:

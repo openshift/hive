@@ -148,8 +148,8 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
-	if newObject.Spec.InstallerImage == nil && newObject.Spec.ReleaseImage == nil {
-		message := "Failed validation: you must specify either an installer image or a release image"
+	if newObject.Spec.ReleaseImage == "" {
+		message := "Failed validation: you must specify a release image"
 		contextLogger.Infof(message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

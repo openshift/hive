@@ -73,10 +73,6 @@ RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
 obtained from a the following URL:
 https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
-
-INSTALLER_IMAGE - Installer image to use to install the cluster. If not specified,
-the --installer-image flag is used. If that's not specified, the image is
-derived from the release image at runtime.
 `
 const (
 	deleteAfterAnnotation      = "hive.openshift.io/delete-after"
@@ -116,7 +112,6 @@ type Options struct {
 	Cloud                    string
 	CredsFile                string
 	ClusterImageSet          string
-	InstallerImage           string
 	ReleaseImage             string
 	ReleaseImageSource       string
 	DeleteAfter              string
@@ -201,7 +196,6 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
-	flags.StringVar(&opt.InstallerImage, "installer-image", "", "Installer image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
 	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
 	flags.StringVar(&opt.ServingCert, "serving-cert", "", "Serving certificate for control plane and routes")
@@ -768,12 +762,10 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: o.Name,
-			BaseDomain:  o.BaseDomain,
-			ManageDNS:   o.ManageDNS,
-			Provisioning: &hivev1.Provisioning{
-				InstallerImagePullPolicy: corev1.PullAlways,
-			},
+			ClusterName:  o.Name,
+			BaseDomain:   o.BaseDomain,
+			ManageDNS:    o.ManageDNS,
+			Provisioning: &hivev1.Provisioning{},
 		},
 	}
 
@@ -834,7 +826,6 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 		}
 	}
 	if !o.UseClusterImageSet {
-		cd.Spec.Provisioning.InstallerImage = o.InstallerImage
 		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
 		return nil, nil
 	}
@@ -848,8 +839,7 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			APIVersion: hivev1.SchemeGroupVersion.String(),
 		},
 		Spec: hivev1.ClusterImageSetSpec{
-			ReleaseImage:   &o.ReleaseImage,
-			InstallerImage: &o.InstallerImage,
+			ReleaseImage: o.ReleaseImage,
 		},
 	}
 	cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{

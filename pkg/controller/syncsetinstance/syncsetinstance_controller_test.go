@@ -1544,11 +1544,11 @@ func TestFilterApplyError(t *testing.T) {
 	err1 := "error when creating \"/tmp/apply-475927931\": namespaces \"openshift-am-config\" not found"
 	expectedFilteredErr1 := "namespaces \"openshift-am-config\" not found"
 	if filterApplyError(err1) != expectedFilteredErr1 {
-		t.Fatalf("expected temporary file to be trimmed from error message")
+		t.Errorf("expected temporary file to be trimmed from error message")
 	}
 
-	err2 := "unable to parse \"[ { \\\"op\\\": \\\"replace\\\", \\\"path\\\": \\\"/data/foo\\\", \\\"value\\\": \\\"baz-json\\\" ]\": yaml: did not find expected ',' or '}'"
+	err2 := "unable to parse"
 	if filterApplyError(err2) != err2 {
-		t.Fatalf("expected error message to be unchanged")
+		t.Errorf("expected error message to be unchanged")
 	}
 }

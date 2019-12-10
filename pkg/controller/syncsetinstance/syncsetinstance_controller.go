@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -59,6 +60,7 @@ const (
 	secretsResource          = "secrets"
 	secretKind               = "Secret"
 	secretAPIVersion         = "v1"
+	applyTempFile            = "/tmp/apply-"
 )
 
 // Applier knows how to Apply, Patch and return Info for []byte arrays describing objects and patches.
@@ -856,6 +858,32 @@ func (r *ReconcileSyncSetInstance) clearUnknownObjectSyncCondition(syncSetCondit
 	)
 }
 
+// filterApplyError determines if the apply error contains the applyTempFile prefix and
+// trims the beginning of the error message removing everything up to the temporary path
+// so that we only return the useful part of the error message.
+// The message we set in the apply failed status condition needs to remain static so that
+// we don't update with a new message every reconcile as condition updates rely on
+// controllerutils.UpdateConditionIfReasonOrMessageChange.
+// Ex:
+//     applyErr="error when creating \"/tmp/apply-475927931\": namespaces \"openshift-am-config\" not found"
+// Returns:
+//     "namespaces \"openshift-am-config\" not found"
+func filterApplyError(applyErr string) string {
+	if !strings.Contains(applyErr, applyTempFile) {
+		return applyErr
+	}
+
+	splitErr := strings.Split(applyErr, " ")
+	tempFileIndex := 0
+	for i, s := range splitErr {
+		if strings.Contains(s, applyTempFile) {
+			tempFileIndex = i
+			break
+		}
+	}
+	return strings.Join(splitErr[tempFileIndex+1:], " ")
+}
+
 func (r *ReconcileSyncSetInstance) setApplySyncConditions(resourceSyncConditions []hivev1.SyncCondition, err error) []hivev1.SyncCondition {
 	var reason, message string
 	var successStatus, failureStatus corev1.ConditionStatus
@@ -871,7 +899,7 @@ func (r *ReconcileSyncSetInstance) setApplySyncConditions(resourceSyncConditions
 		// TODO: we cannot include the actual error here as it currently contains a temp filename which always changes,
 		// which triggers a hotloop by always updating status and then reconciling again. If we were to filter out the portion
 		// of the error message with filename, we could re-add this here.
-		message = "Apply failed"
+		message = fmt.Sprintf("Apply failed: %s", filterApplyError(err.Error()))
 		successStatus = corev1.ConditionFalse
 		failureStatus = corev1.ConditionTrue
 		updateCondition = controllerutils.UpdateConditionIfReasonOrMessageChange

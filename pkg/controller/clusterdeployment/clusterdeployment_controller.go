@@ -1113,6 +1113,16 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 
+	// We do not yet support deprovision for BareMetal, for now skip deprovision and remove finalizer.
+	if cd.Spec.Platform.BareMetal != nil {
+		cdLog.Info("skipping deprovision for BareMetal cluster, removing finalizer")
+		err := r.removeClusterDeploymentFinalizer(cd)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
+		}
+		return reconcile.Result{}, err
+	}
+
 	// Generate a deprovision request
 	request, err := generateDeprovision(cd)
 	if err != nil {
@@ -1754,6 +1764,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return "azure"
 	case cd.Spec.Platform.GCP != nil:
 		return "gcp"
+	case cd.Spec.Platform.BareMetal != nil:
+		return "baremetal"
 	}
 	return "unknown"
 }

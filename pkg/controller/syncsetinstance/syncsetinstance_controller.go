@@ -63,7 +63,7 @@ const (
 )
 
 var (
-	applyTempFileMatcher = regexp.MustCompile(`/tmp/apply-\S*(\s|$)`)
+	applyTempFileMatcher = regexp.MustCompile(`/apply-\S*(\s|$)`)
 )
 
 // Applier knows how to Apply, Patch and return Info for []byte arrays describing objects and patches.

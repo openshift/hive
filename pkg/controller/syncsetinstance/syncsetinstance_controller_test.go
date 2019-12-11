@@ -1571,8 +1571,14 @@ func TestFilterApplyError(t *testing.T) {
 		t.Errorf("expected temporary file to be trimmed from error message")
 	}
 
-	err2 := "unable to parse"
-	if filterApplyError(err2) != err2 {
+	err2 := "error when creating \"/var/cache/kubectl/apply-475927931\": namespaces \"openshift-am-config\" not found"
+	expectedFilteredErr2 := "namespaces \"openshift-am-config\" not found"
+	if filterApplyError(err2) != expectedFilteredErr2 {
+		t.Errorf("expected temporary file to be trimmed from error message")
+	}
+
+	err3 := "unable to parse"
+	if filterApplyError(err3) != err3 {
 		t.Errorf("expected error message to be unchanged")
 	}
 }

@@ -64,7 +64,6 @@ func validGCPClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.GCP = &hivev1gcp.Platform{
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
-		ProjectID:            "my-test-project",
 		Region:               "us-central1",
 	}
 	return cd

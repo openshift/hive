@@ -115,7 +115,6 @@ case "${CLOUD}" in
 "gcp")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/gce.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
-	EXTRA_CREATE_CLUSTER_ARGS=" --gcp-project-id=openshift-gce-devel-ci"
 	;;
 *)
 	echo "unknown cloud: ${CLOUD}"

@@ -278,9 +278,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if gcp.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("credentialsSecretRef", "name"), "must specify secrets for GCP access"))
 		}
-		if gcp.ProjectID == "" {
-			allErrs = append(allErrs, field.Required(gcpPath.Child("projectID"), "must specify GCP project ID"))
-		}
 		if gcp.Region == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
 		}

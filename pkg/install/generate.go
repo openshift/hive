@@ -525,8 +525,6 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"debug",
 				"--region",
 				req.Spec.Platform.GCP.Region,
-				"--gcp-project-id",
-				req.Spec.Platform.GCP.ProjectID,
 				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,

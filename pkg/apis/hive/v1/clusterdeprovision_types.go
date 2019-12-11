@@ -53,8 +53,6 @@ type AzureClusterDeprovision struct {
 type GCPClusterDeprovision struct {
 	// Region is the GCP region for this deprovision
 	Region string `json:"region"`
-	// ProjectID is the ID of the GCP project in which the cluster exists
-	ProjectID string `json:"projectID"`
 	// CredentialsSecretRef is the GCP account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 }

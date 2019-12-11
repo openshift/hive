@@ -20,19 +20,15 @@ import (
 func NewGCPQuery(c client.Client, credsSecretName string) Query {
 	return &gcpQuery{
 		getGCPClient: func() (gcpclient.Client, error) {
-			secret := &corev1.Secret{}
+			credsSecret := &corev1.Secret{}
 			if err := c.Get(
 				context.Background(),
 				client.ObjectKey{Namespace: constants.HiveNamespace, Name: credsSecretName},
-				secret,
+				credsSecret,
 			); err != nil {
 				return nil, errors.Wrap(err, "could not get the creds secret")
 			}
-			authJSON, ok := secret.Data[constants.GCPCredentialsName]
-			if !ok {
-				return nil, errors.New("creds secret does not contain \"" + constants.GCPCredentialsName + "\" data")
-			}
-			gcpClient, err := gcpclient.NewClientWithDefaultProject(authJSON)
+			gcpClient, err := gcpclient.NewClientFromSecret(credsSecret)
 			return gcpClient, errors.Wrap(err, "error creating GCP client")
 		},
 	}

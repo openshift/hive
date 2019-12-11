@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/hive/pkg/gcpclient"
 	"io"
 	"io/ioutil"
 	"os"
@@ -491,12 +492,17 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 
 		return uninstaller.Run()
 	case cd.Spec.Platform.GCP != nil:
+		credsFile := os.Getenv("GOOGLE_CREDENTIALS")
+		projectID, err := gcpclient.ProjectIDFromFile(credsFile)
+		if err != nil {
+			return errors.Wrap(err, "could not get GCP project ID")
+		}
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				GCP: &installertypesgcp.Metadata{
 					Region:    cd.Spec.Platform.GCP.Region,
-					ProjectID: cd.Spec.Platform.GCP.ProjectID,
+					ProjectID: projectID,
 				},
 			},
 		}

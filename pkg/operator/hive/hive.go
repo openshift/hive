@@ -24,7 +24,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,25 +77,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		)
 	}
 
-	if e := instance.Spec.ExternalDNS; e != nil {
-		switch {
-		case e.AWS != nil:
-			hiveContainer.Env = append(
-				hiveContainer.Env,
-				corev1.EnvVar{
-					Name:  constants.ExternalDNSAWSCredsEnvVar,
-					Value: e.AWS.CredentialsSecretRef.Name,
-				},
-			)
-		case e.GCP != nil:
-			hiveContainer.Env = append(
-				hiveContainer.Env,
-				corev1.EnvVar{
-					Name:  constants.ExternalDNSGCPCredsEnvVar,
-					Value: e.GCP.CredentialsSecretRef.Name,
-				},
-			)
-		}
+	if len(instance.Spec.ManagedDomains) > 0 {
 		addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec)
 	}
 
@@ -220,17 +201,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			hLog.WithField("clusterImageSet", isName).Info("deleted outdated ClusterImageSet")
 		}
 
-	}
-
-	// Delete the legacy DNSEndpoints CRD. Its functionality has been included in the DNSZones CRD.
-	if err := resource.DeleteAnyExistingObject(
-		r,
-		client.ObjectKey{Name: "dnsendpoints.hive.openshift.io"},
-		&apiextensionsv1beta1.CustomResourceDefinition{},
-		hLog,
-	); err != nil {
-		hLog.WithError(err).Error("could not delete DNSEndpoint CRD")
-		return err
 	}
 
 	hLog.Info("all hive components successfully reconciled")

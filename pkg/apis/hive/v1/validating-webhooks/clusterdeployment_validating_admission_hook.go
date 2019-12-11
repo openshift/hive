@@ -50,9 +50,13 @@ func NewClusterDeploymentValidatingAdmissionHook() *ClusterDeploymentValidatingA
 	if err != nil {
 		logger.WithError(err).Fatal("Unable to read managedDomains file")
 	}
-	logger.WithField("managedDomains", strings.Join(managedDomains, ",")).Info("Read managed domains")
+	domains := []string{}
+	for _, md := range managedDomains {
+		domains = append(domains, md.Domains...)
+	}
+	logger.WithField("managedDomains", domains).Info("Read managed domains")
 	return &ClusterDeploymentValidatingAdmissionHook{
-		validManagedDomains: managedDomains,
+		validManagedDomains: domains,
 	}
 }
 

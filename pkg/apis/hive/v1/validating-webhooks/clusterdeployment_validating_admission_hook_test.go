@@ -2,7 +2,6 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -695,20 +694,44 @@ func TestNewClusterDeploymentValidatingAdmissionHook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
-	domains := []string{
+
+	domains := []hivev1.ManageDNSConfig{
+		{
+			Domains: []string{
+				"first.domain.com",
+				"second.domain.com",
+				"third.domain.com",
+			},
+		},
+		{
+			Domains: []string{
+				"extra.domain.com",
+			},
+		},
+	}
+
+	expectedDomains := []string{
 		"first.domain.com",
 		"second.domain.com",
 		"third.domain.com",
+		"extra.domain.com",
 	}
-	for _, domain := range domains {
-		fmt.Fprintf(tempFile, "     %s     \n", domain)
-		fmt.Fprintf(tempFile, "     \n")
+
+	domainsJSON, err := json.Marshal(domains)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
 	}
+
+	_, err = tempFile.Write(domainsJSON)
+	if err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+
 	err = tempFile.Close()
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
 	os.Setenv(constants.ManagedDomainsFileEnvVar, tempFile.Name())
 	webhook := NewClusterDeploymentValidatingAdmissionHook()
-	assert.Equal(t, webhook.validManagedDomains, domains, "valid domains must match expected")
+	assert.Equal(t, webhook.validManagedDomains, expectedDomains, "valid domains must match expected")
 }

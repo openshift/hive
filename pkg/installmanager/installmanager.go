@@ -72,6 +72,7 @@ const (
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
 	defaultManifestsMountPath           = "/manifests"
+	hiveSSHKnownHostsAnnotation         = "hive.openshift.io/ssh-known-host"
 )
 
 var (
@@ -223,6 +224,23 @@ func (m *InstallManager) Run() error {
 		os.Exit(0)
 	}
 
+	// will be non-nil if we've been unable to setup SSH, which is a non-fatal error:
+	var sshAgentSetupErr error
+
+	var sshKeyPath string
+	sshKeyPath, sshAgentSetupErr = m.initSSHKey()
+	if sshAgentSetupErr != nil {
+		// Not a fatal error.
+		m.log.WithError(sshAgentSetupErr).Info("unable to initialize ssh agent")
+	} else {
+		sshCleanupFunc, sshAgentSetupErr := m.initSSHAgent(sshKeyPath)
+		defer sshCleanupFunc()
+		if sshAgentSetupErr != nil {
+			// Not a fatal error.
+			m.log.WithError(sshAgentSetupErr).Info("ssh agent is not initialized")
+		}
+	}
+
 	m.ClusterName = cd.Spec.ClusterName
 
 	m.waitForInstallerBinaries()
@@ -232,11 +250,19 @@ func (m *InstallManager) Run() error {
 	cmd := exec.Command("cp", m.InstallConfigMountPath, destInstallConfigPath)
 	err = cmd.Run()
 	if err != nil {
-		log.WithError(err).Errorf("error copying install-config.yaml from %s to %s",
+		m.log.WithError(err).Errorf("error copying install-config.yaml from %s to %s",
 			m.InstallConfigMountPath, destInstallConfigPath)
 		return err
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
+
+	if knownHost, ok := cd.Annotations[hiveSSHKnownHostsAnnotation]; ok {
+		err = m.setupSSHKnownHost(knownHost)
+		if err != nil {
+			m.log.WithError(err).Error("error setting up SSH known_hosts")
+			return err
+		}
+	}
 
 	// If the cluster provision has an infraID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
@@ -322,7 +348,7 @@ func (m *InstallManager) Run() error {
 
 		// Fetch logs from all cluster machines:
 		if m.isGatherLogsEnabled() {
-			m.gatherLogs(cd)
+			m.gatherLogs(cd, sshKeyPath, sshAgentSetupErr)
 		}
 
 		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
@@ -678,9 +704,13 @@ func isGatherLogsEnabled() bool {
 // If neither succeeds we do not consider this a fatal error,
 // we're just gathering as much information as we can and then proceeding with cleanup
 // so we can re-try.
-func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment) {
+func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath string, sshAgentSetupErr error) {
 	if !m.isBootstrapComplete() {
-		if err := m.gatherBootstrapNodeLogs(cd); err != nil {
+		if sshAgentSetupErr != nil {
+			m.log.Warn("unable to fetch logs from bootstrap node as SSH agent was not configured")
+			return
+		}
+		if err := m.gatherBootstrapNodeLogs(cd, sshPrivKeyPath); err != nil {
 			m.log.WithError(err).Warn("error fetching logs from bootstrap node")
 			return
 		}
@@ -705,75 +735,27 @@ func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
 	return err
 }
 
-func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment) error {
-
-	m.log.Info("attempting to gather logs from cluster bootstrap node")
-
+func (m *InstallManager) initSSHKey() (string, error) {
 	m.log.Debug("checking for SSH private key")
 	sshPrivKeyPath := os.Getenv("SSH_PRIV_KEY_PATH")
 	if sshPrivKeyPath == "" {
-		m.log.Warn("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
-		return fmt.Errorf("cannot gather logs as SSH_PRIV_KEY_PATH is unset or empty")
+		m.log.Warn("cannot configure SSH agent as SSH_PRIV_KEY_PATH is unset or empty")
+		return "", fmt.Errorf("cannot configure SSH agent as SSH_PRIV_KEY_PATH is unset or empty")
 	}
 	fileInfo, err := os.Stat(sshPrivKeyPath)
 	if err != nil && os.IsNotExist(err) {
-		m.log.Warn("cannot gather logs/tarball as no ssh private key file found")
-		return err
+		m.log.WithField("path", sshPrivKeyPath).Warn("SSH_PRIV_KEY_PATH defined but file does not exist")
+		return "", err
 	} else if err != nil {
-		m.log.WithError(err).Error("error stating file containing private key")
-		return err
+		m.log.WithError(err).Error("error stat'ing file containing private key")
+		return "", err
+	} else if fileInfo.Size() == 0 {
+		m.log.Warn("cannot initialize SSH as the private key file is empty")
+		return "", errors.New("cannot initialize SSH as the private key file is empty")
 	}
 
-	newSSHPrivKeyPath, err := m.chmodSSHPrivateKey(sshPrivKeyPath)
-	if err != nil {
-		return err
-	}
-
-	if fileInfo.Size() == 0 {
-		m.log.Warn("cannot gather logs/tarball as ssh private key file is empty")
-		return errors.New("cannot gather logs/tarball as ssh private key file is empty")
-	}
-
-	// set up ssh private key, and run the log gathering script
-	// TODO: is this still required now that we're using the installer's gather command?
-	cleanup, err := initSSHAgent(newSSHPrivKeyPath, m)
-	defer cleanup()
-	if err != nil {
-		m.log.WithError(err).Error("failed to setup SSH agent")
-		return err
-	}
-
-	m.log.Info("attempting to gather logs with 'openshift-install gather bootstrap'")
-	err = m.runOpenShiftInstallCommand("gather", "bootstrap", "--key", newSSHPrivKeyPath)
-	if err != nil {
-		m.log.WithError(err).Error("failed to gather logs from bootstrap node")
-		return err
-	}
-
-	m.log.Infof("copying log bundles from %s to %s", m.WorkDir, m.LogsDir)
-	logBundles, err := filepath.Glob(filepath.Join(m.WorkDir, "log-bundle-*.tar.gz"))
-	if err != nil {
-		m.log.WithError(err).Error("erroring globbing log bundles")
-		return err
-	}
-	for _, lb := range logBundles {
-		// Using mv here rather than reading them into memory to write them out again.
-		cmd := exec.Command("mv", lb, m.LogsDir)
-		err = cmd.Run()
-		if err != nil {
-			log.WithError(err).Errorf("error moving file %s", lb)
-			return err
-		}
-		m.log.Infof("moved %s to %s", lb, m.LogsDir)
-	}
-	m.log.Info("bootstrap node log gathering complete")
-
-	return nil
-}
-
-// chmodSSHPrivateKey copies the mounted volume with the ssh private key to
-// a temporary file, which allows us to chmod it 0600 to appease ssh-add.
-func (m *InstallManager) chmodSSHPrivateKey(sshPrivKeyPath string) (string, error) {
+	// copy the mounted volume with the ssh private key to
+	// a temporary file, which allows us to chmod it 0600 to appease ssh-add.
 	input, err := ioutil.ReadFile(sshPrivKeyPath)
 	if err != nil {
 		m.log.WithError(err).Error("error reading ssh private key to copy")
@@ -784,61 +766,12 @@ func (m *InstallManager) chmodSSHPrivateKey(sshPrivKeyPath string) (string, erro
 		m.log.WithError(err).Error("error writing copy of ssh private key")
 		return "", err
 	}
+
 	return sshCopyTempFile, nil
+
 }
 
-func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir string) (string, error) {
-
-	tmpFile, err := ioutil.TempFile(workDir, "gatherlog")
-	if err != nil {
-		m.log.WithError(err).Error("failed to create temp log gathering file")
-		return "", err
-	}
-	defer os.Remove(tmpFile.Name())
-
-	destTarball := filepath.Join(m.LogsDir, fmt.Sprintf("%s-log-bundle.tar.gz", time.Now().Format("20060102150405")))
-	script := fmt.Sprintf(scriptTemplate, bootstrapIP, bootstrapIP, destTarball)
-	m.log.Debugf("generated script: %s", script)
-
-	if _, err := tmpFile.Write([]byte(script)); err != nil {
-		m.log.WithError(err).Error("failed to write to log gathering file")
-		return "", err
-	}
-	if err := tmpFile.Chmod(0555); err != nil {
-		m.log.WithError(err).Error("failed to set script as executable")
-		return "", err
-	}
-	if err := tmpFile.Close(); err != nil {
-		m.log.WithError(err).Error("failed to close script")
-		return "", err
-	}
-
-	m.log.Info("Gathering logs from bootstrap node")
-	gatherCmd := exec.Command(tmpFile.Name())
-	if err := gatherCmd.Run(); err != nil {
-		m.log.WithError(err).Error("failed while running gather script")
-		return "", err
-	}
-
-	_, err = os.Stat(destTarball)
-	if err != nil {
-		m.log.WithError(err).Error("error while stat-ing log tarball")
-		return "", err
-	}
-	m.log.Infof("cluster logs gathered: %s", destTarball)
-
-	return destTarball, nil
-}
-
-func (m *InstallManager) isBootstrapComplete() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "./openshift-install", "wait-for", "bootstrap-complete")
-	cmd.Dir = m.WorkDir
-	return cmd.Run() == nil
-}
-
-func initSSHAgent(privKeyPath string, m *InstallManager) (func(), error) {
+func (m *InstallManager) initSSHAgent(sshKeyPath string) (func(), error) {
 	sshAgentCleanup := func() {}
 
 	sock := os.Getenv("SSH_AUTH_SOCK")
@@ -903,10 +836,10 @@ func initSSHAgent(privKeyPath string, m *InstallManager) (func(), error) {
 		return sshAgentCleanup, err
 	}
 
-	cmd := exec.Command(bin, privKeyPath)
+	cmd := exec.Command(bin, sshKeyPath)
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		m.log.WithError(err).Errorf("failed to add private key: %v", privKeyPath)
+		m.log.WithError(err).Errorf("failed to add private key: %v", sshKeyPath)
 		return sshAgentCleanup, err
 	}
 
@@ -932,6 +865,87 @@ func readInstallerLog(provision *hivev1.ClusterProvision, m *InstallManager) (st
 	m.log.Debugf("installer console log: %v", logWithoutSensitiveData)
 
 	return logWithoutSensitiveData, nil
+}
+
+func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment, newSSHPrivKeyPath string) error {
+
+	m.log.Info("attempting to gather logs with 'openshift-install gather bootstrap'")
+	err := m.runOpenShiftInstallCommand("gather", "bootstrap", "--key", newSSHPrivKeyPath)
+	if err != nil {
+		m.log.WithError(err).Error("failed to gather logs from bootstrap node")
+		return err
+	}
+
+	m.log.Infof("copying log bundles from %s to %s", m.WorkDir, m.LogsDir)
+	logBundles, err := filepath.Glob(filepath.Join(m.WorkDir, "log-bundle-*.tar.gz"))
+	if err != nil {
+		m.log.WithError(err).Error("erroring globbing log bundles")
+		return err
+	}
+	for _, lb := range logBundles {
+		// Using mv here rather than reading them into memory to write them out again.
+		cmd := exec.Command("mv", lb, m.LogsDir)
+		err = cmd.Run()
+		if err != nil {
+			log.WithError(err).Errorf("error moving file %s", lb)
+			return err
+		}
+		m.log.Infof("moved %s to %s", lb, m.LogsDir)
+	}
+	m.log.Info("bootstrap node log gathering complete")
+
+	return nil
+}
+
+func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir string) (string, error) {
+
+	tmpFile, err := ioutil.TempFile(workDir, "gatherlog")
+	if err != nil {
+		m.log.WithError(err).Error("failed to create temp log gathering file")
+		return "", err
+	}
+	defer os.Remove(tmpFile.Name())
+
+	destTarball := filepath.Join(m.LogsDir, fmt.Sprintf("%s-log-bundle.tar.gz", time.Now().Format("20060102150405")))
+	script := fmt.Sprintf(scriptTemplate, bootstrapIP, bootstrapIP, destTarball)
+	m.log.Debugf("generated script: %s", script)
+
+	if _, err := tmpFile.Write([]byte(script)); err != nil {
+		m.log.WithError(err).Error("failed to write to log gathering file")
+		return "", err
+	}
+	if err := tmpFile.Chmod(0555); err != nil {
+		m.log.WithError(err).Error("failed to set script as executable")
+		return "", err
+	}
+	if err := tmpFile.Close(); err != nil {
+		m.log.WithError(err).Error("failed to close script")
+		return "", err
+	}
+
+	m.log.Info("Gathering logs from bootstrap node")
+	gatherCmd := exec.Command(tmpFile.Name())
+	if err := gatherCmd.Run(); err != nil {
+		m.log.WithError(err).Error("failed while running gather script")
+		return "", err
+	}
+
+	_, err = os.Stat(destTarball)
+	if err != nil {
+		m.log.WithError(err).Error("error while stat-ing log tarball")
+		return "", err
+	}
+	m.log.Infof("cluster logs gathered: %s", destTarball)
+
+	return destTarball, nil
+}
+
+func (m *InstallManager) isBootstrapComplete() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "./openshift-install", "wait-for", "bootstrap-complete")
+	cmd.Dir = m.WorkDir
+	return cmd.Run() == nil
 }
 
 func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager) (*corev1.Secret, error) {
@@ -1131,6 +1145,20 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 		},
 	)
 	return errors.Wrap(err, "ClusterProvision did not transition to provisioning stage")
+}
+
+func (m *InstallManager) setupSSHKnownHost(knownHost string) error {
+
+	if err := os.MkdirAll("/root/.ssh", 0700); err != nil {
+		m.log.WithError(err).Error("error creating /root/.ssh directory")
+		return err
+	}
+	if err := ioutil.WriteFile("/root/.ssh/known_hosts", []byte(knownHost), 0644); err != nil {
+		m.log.WithError(err).Error("error writing ssh known_hosts")
+		return err
+	}
+	m.log.Infof("Wrote known host to /root/.ssh/known_hosts: %s", knownHost)
+	return nil
 }
 
 type provisionMutation func(provision *hivev1.ClusterProvision)

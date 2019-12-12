@@ -70,10 +70,30 @@ type MachinePoolPlatform struct {
 
 // MachinePoolStatus defines the observed state of MachinePool
 type MachinePoolStatus struct {
+	// Replicas is the current number of replicas for the machine pool.
+	Replicas int32 `json:"replicas"`
+
+	// MachineSets is the status of the machine sets for the machine pool on the remote cluster.
+	MachineSets []MachineSetStatus `json:"machineSets,omitempty"`
 
 	// Conditions includes more detailed status for the cluster deployment
 	// +optional
 	Conditions []MachinePoolCondition `json:"conditions,omitempty"`
+}
+
+// MachineSetStatus is the status of a machineset in the remote cluster.
+type MachineSetStatus struct {
+	// Name is the name of the machine set.
+	Name string `json:"name"`
+
+	// Replicas is the current number of replicas for the machine set.
+	Replicas int32 `json:"replicas"`
+
+	// MinReplicas is the minimum number of replicas for the machine set.
+	MinReplicas int32 `json:"minReplicas"`
+
+	// MaxReplicas is the maximum number of replicas for the machine set.
+	MaxReplicas int32 `json:"maxReplicas"`
 }
 
 // MachinePoolCondition contains details for the current condition of a machine pool
@@ -111,6 +131,7 @@ const (
 // MachinePool is the Schema for the machinepools API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:printcolumn:name="PoolName",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="ClusterDeployment",type="string",JSONPath=".spec.clusterDeploymentRef.name"
 // +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas"

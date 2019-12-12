@@ -9,10 +9,22 @@ RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clea
 # libvirt libraries required for running bare metal installer.
 RUN yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*
 
+
 ADD bin/hiveadmission /opt/services/
 ADD bin/hive-operator /opt/services/
 ADD bin/manager /opt/services/
 ADD bin/hiveutil /usr/bin/
+
+# Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
+# Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as
+# we're hitting libvirt over ssh. OpenShift will not let you write these directories
+# by default so we must setup some permissions here, and at runtime add our random UID
+# to /etc/passwd. (in installmanager.go)
+ENV HOME /home/hive
+RUN mkdir -p /home/hive && \
+    chgrp -R 0 /home/hive && \
+    chmod -R g=u /home/hive
+RUN chmod g=u /etc/passwd
 
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

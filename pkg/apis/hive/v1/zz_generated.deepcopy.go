@@ -1747,6 +1747,13 @@ func (in *Provisioning) DeepCopyInto(out *Provisioning) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.InstallerEnv != nil {
+		in, out := &in.InstallerEnv, &out.InstallerEnv
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

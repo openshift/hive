@@ -267,7 +267,7 @@ func InstallerPodSpec(
 			Name:            "hive",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env:             env,
+			Env:             append(env, cd.Spec.Provisioning.InstallerEnv...),
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{"install-manager",
 				"--work-dir", "/output",

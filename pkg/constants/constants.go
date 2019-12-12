@@ -50,6 +50,15 @@ const (
 
 	// GCPCredentialsName is the name of the GCP credentials file or secret key.
 	GCPCredentialsName = "osServiceAccount.json"
+
+	// ClusterDeploymentOwnerLabel is the label that is used to identify the owner of a runtime object.
+	ClusterDeploymentOwnerLabel = "hive.openshift.io/owner-cluster-deployment-name"
+
+	// ClusterProvisionOwnerLabel is the label that is used to identify the owner of a runtime object.
+	ClusterProvisionOwnerLabel = "hive.openshift.io/owner-cluster-provision-name"
+
+	// ClusterDeprovisionOwnerLabel is the label that is used to identify the owner of a runtime object.
+	ClusterDeprovisionOwnerLabel = "hive.openshift.io/owner-cluster-deprovision-name"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -989,6 +989,7 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 		},
 	}
 
+	controllerutils.SetOwnerLabel(constants.ClusterProvisionOwnerLabel, provision, kubeconfigSecret)
 	if err := controllerutil.SetControllerReference(provision, kubeconfigSecret, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return nil, err
@@ -1030,6 +1031,7 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) 
 		},
 	}
 
+	controllerutils.SetOwnerLabel(constants.ClusterProvisionOwnerLabel, provision, s)
 	if err := controllerutil.SetControllerReference(provision, s, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return nil, err

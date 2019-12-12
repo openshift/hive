@@ -9,11 +9,12 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -173,7 +174,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return
 			contextLogger.Info("cluster deployment not found")
 			return reconcile.Result{}, nil
@@ -252,7 +253,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 
 	ss := &hivev1.SyncSet{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: ssName, Namespace: cd.Namespace}, ss)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		if len(allIdps) == 0 {
 			// The IDP list is empty -and- an existing syncset wasn't found, which means that IDPs on this cluster
 			// haven't been managed previously. Therefore, DO NOT write out a syncset.
@@ -269,6 +270,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 		}
 
 		// ensure the syncset gets cleaned up when the clusterdeployment is deleted
+		controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, ss)
 		if err := controllerutil.SetControllerReference(cd, ss, r.scheme); err != nil {
 			contextLogger.WithError(err).Error("error setting controller reference on syncset")
 			return err

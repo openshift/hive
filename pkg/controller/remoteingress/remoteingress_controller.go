@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,8 +29,10 @@ import (
 	ingresscontroller "github.com/openshift/api/operator/v1"
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/utils"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -133,7 +135,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found (must have been deleted), return
 			return reconcile.Result{}, nil
 		}
@@ -269,6 +271,7 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 	}
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, rContext.clusterDeployment, syncSet)
 	if err := controllerutil.SetControllerReference(rContext.clusterDeployment, syncSet, r.scheme); err != nil {
 		r.logger.WithError(err).Error("error setting owner reference")
 		return err
@@ -358,7 +361,7 @@ func (r *ReconcileRemoteClusterIngress) getIngressSecrets(rContext *reconcileCon
 				}
 
 				if err := r.Get(context.TODO(), searchKey, cbSecret); err != nil {
-					if errors.IsNotFound(err) {
+					if apierrors.IsNotFound(err) {
 						return cbSecrets, fmt.Errorf("secret %v for certbundle %v was not found", cb.CertificateSecretRef.Name, cb.Name)
 					}
 					rContext.logger.WithError(err).Error("error while gathering certBundle secret")

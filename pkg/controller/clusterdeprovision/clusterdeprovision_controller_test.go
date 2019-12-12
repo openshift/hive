@@ -21,6 +21,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -158,6 +159,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 
 			if test.deployment != nil {
 				// Associate the cluster deployment as the owner of the provision to match real world:
+				controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, test.deployment, test.deprovision)
 				err := controllerutil.SetControllerReference(test.deployment, test.deprovision, scheme.Scheme)
 				if err != nil {
 					t.Errorf("unable to set owner reference on deprovision: %v", err)

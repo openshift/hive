@@ -1270,6 +1270,9 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testEmptyClusterDeployment()
 
+	cd.APIVersion = "hive.openshift.io/v1"
+	cd.Kind = "ClusterDeployment"
+
 	cd.Spec = hivev1.ClusterDeploymentSpec{
 		ClusterName: testClusterName,
 		PullSecretRef: &corev1.LocalObjectReference{
@@ -1369,6 +1372,7 @@ func testProvision() *hivev1.ClusterProvision {
 		},
 	}
 
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, provision)
 	controllerutil.SetControllerReference(cd, provision, scheme.Scheme)
 
 	return provision

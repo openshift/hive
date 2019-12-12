@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +44,19 @@ import (
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+var (
+	controllerKind                    = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+	ownedByClusterDeploymentListTypes = []runtime.Object{
+		&batchv1.JobList{},
+		&corev1.PersistentVolumeClaimList{},
+		&corev1.SecretList{},
+		&hivev1.ClusterProvisionList{},
+		&hivev1.ClusterDeprovisionList{},
+		&hivev1.DNSZoneList{},
+		&hivev1.ClusterStateList{},
+		&hivev1.SyncSetList{},
+	}
+)
 
 const (
 	controllerName     = "clusterDeployment"
@@ -282,7 +295,86 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 		return reconcile.Result{}, err
 	}
 
+	rolResult, err := r.reconcileOwnerReferences(constants.ClusterDeploymentOwnerLabel, cd, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("Failed to reconcile objects owned by this cluster deployment.")
+		return reconcile.Result{}, err
+	}
+
+	if rolResult != nil {
+		cdLog.Info("Reconciled objects owned by this cluster deployment.")
+		return *rolResult, nil
+	}
+
 	return r.reconcile(request, cd, cdLog)
+}
+
+func (r *ReconcileClusterDeployment) reconcileOwnerReferences(ownerLabel string, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {
+	selector := map[string]string{ownerLabel: cd.Name}
+	objects, err := controllerutils.GetRuntimeObjects(r, ownedByClusterDeploymentListTypes, client.InNamespace(cd.Namespace), client.MatchingLabels(selector))
+	if err != nil {
+		errors.Wrap(err, "Failed to list objects owned by ClusterDeployment")
+		return nil, err
+	}
+
+	allErrors := []error{}
+	objectsModified := false
+
+	for _, obj := range objects {
+		tmpModified, err := r.checkAndFixOwnerReferences(cd, obj, cdLog)
+		if tmpModified {
+			objectsModified = true
+		}
+		if err != nil {
+			allErrors = append(allErrors, err)
+		}
+	}
+
+	if len(allErrors) != 0 {
+		return nil, utilerrors.NewAggregate(allErrors)
+	}
+
+	if objectsModified {
+		cdLog.Debug("We successfully reconciled all owner references, and some were fixed.")
+		return &reconcile.Result{
+			RequeueAfter: defaultRequeueTime,
+		}, nil
+	}
+
+	cdLog.Debug("We successfully reconciled all owner references, and none needed to be fixed.")
+	return nil, nil
+}
+
+func (r *ReconcileClusterDeployment) checkAndFixOwnerReferences(cd *hivev1.ClusterDeployment, obj runtime.Object, cdLog log.FieldLogger) (bool, error) {
+	meta, ok := obj.(metav1.Object)
+	if !ok {
+		return false, fmt.Errorf("Failed converting runtime object to meta object: %v", obj)
+	}
+
+	objLog := cdLog.WithField("ownedObject", meta.GetName())
+
+	for _, ownerRef := range meta.GetOwnerReferences() {
+		if *ownerRef.Controller &&
+			ownerRef.APIVersion == cd.APIVersion &&
+			ownerRef.Kind == cd.Kind &&
+			ownerRef.Name == cd.Name {
+
+			objLog.Debug("We found the owner reference. Nothing more to do on this one.")
+			return false, nil
+		}
+	}
+
+	objLog.Debug("Restore the owner reference")
+	if err := controllerutil.SetControllerReference(cd, meta, r.scheme); err != nil {
+		return false, errors.Wrapf(err, "could not restore the owner reference: %v", meta.GetName())
+	}
+	err := r.Update(context.TODO(), obj)
+	if err != nil {
+		return false, errors.Wrapf(err, "could not update the object with the restored owner reference: %v", meta.GetName())
+	}
+
+	objLog.Info("We successfully fixed the owner reference for this object.")
+	return true, nil
 }
 
 func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnErr error) {
@@ -530,6 +622,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		provision.Spec.PrevInfraID = &cd.Spec.ClusterMetadata.InfraID
 	}
 
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, provision)
 	if err := controllerutil.SetControllerReference(cd, provision, r.scheme); err != nil {
 		cdLog.WithError(err).Error("could not set the owner ref on provision")
 		return reconcile.Result{}, err
@@ -785,10 +878,12 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 	}
 
 	cdLog.WithField("pvc", pvc.Name).Info("creating persistent volume claim")
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, pvc)
 	if err := controllerutil.SetControllerReference(cd, pvc, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on pvc")
 		return err
 	}
+
 	err := r.Create(context.TODO(), pvc)
 	if err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating pvc")
@@ -848,6 +943,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 
 	cliImage := images.GetCLIImage()
 	job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, job)
 	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err
@@ -1114,6 +1210,8 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		cdLog.WithError(err).Error("error generating deprovision request")
 		return reconcile.Result{}, err
 	}
+
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, request)
 	err = controllerutil.SetControllerReference(cd, request, r.scheme)
 	if err != nil {
 		cdLog.Errorf("error setting controller reference on deprovision request: %v", err)
@@ -1305,6 +1403,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 		}
 	}
 
+	controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, dnsZone)
 	if err := controllerutil.SetControllerReference(cd, dnsZone, r.scheme); err != nil {
 		logger.WithError(err).Error("error setting controller reference on dnszone")
 		return err
@@ -1555,11 +1654,14 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 			mergedSecretName,
 			cd,
 		)
+
+		controllerutils.SetOwnerLabel(constants.ClusterDeploymentOwnerLabel, cd, newPullSecretObj)
 		err = controllerutil.SetControllerReference(cd, newPullSecretObj, r.scheme)
 		if err != nil {
 			cdLog.Errorf("error setting controller reference on new merged pull secret: %v", err)
 			return false, err
 		}
+
 		err = r.Create(context.TODO(), newPullSecretObj)
 		if err != nil {
 			return false, errors.Wrap(err, "error creating new pull secret object")

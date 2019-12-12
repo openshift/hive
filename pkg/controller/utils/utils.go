@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
@@ -9,8 +10,12 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 )
@@ -121,4 +126,35 @@ func LogLevel(err error) log.Level {
 		}
 		err = cause
 	}
+}
+
+// SetOwnerLabel creates a label on the given runtime object that corresponds to the name of the owner object.
+// It is assumed that the owner type is known via context and that the owner is in the same namespace as the owned object.
+func SetOwnerLabel(ownerLabel string, owner, object metav1.Object) {
+	labels := object.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[ownerLabel] = owner.GetName()
+	object.SetLabels(labels)
+}
+
+// GetRuntimeObjects queries kubernetes for a list of types.
+func GetRuntimeObjects(client client.Client, typesToList []runtime.Object, opts ...client.ListOptionFunc) ([]runtime.Object, error) {
+	objects := []runtime.Object{}
+
+	for _, t := range typesToList {
+		listObj := t.DeepCopyObject()
+		if err := client.List(context.TODO(), listObj, opts...); err != nil {
+			return nil, err
+		}
+		list, err := meta.ExtractList(listObj)
+		if err != nil {
+			return nil, err
+		}
+
+		objects = append(objects, list...)
+	}
+
+	return objects, nil
 }

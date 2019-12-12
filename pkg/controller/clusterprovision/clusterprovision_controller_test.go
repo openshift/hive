@@ -310,6 +310,7 @@ func testJob(opts ...jobOption) *batchv1.Job {
 	}
 	job.Labels[clusterProvisionLabelKey] = provision.Name
 
+	controllerutils.SetOwnerLabel(constants.ClusterProvisionOwnerLabel, provision, job)
 	controllerutil.SetControllerReference(provision, job, scheme.Scheme)
 
 	for _, o := range opts {

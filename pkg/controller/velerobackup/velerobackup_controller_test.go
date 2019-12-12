@@ -11,6 +11,7 @@ import (
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
@@ -22,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -196,7 +198,7 @@ func TestReconcile(t *testing.T) {
 
 			// Act
 			actualResult, actualError := r.Reconcile(test.request)
-			actualObjects, err := r.getRuntimeObjects(types, namespace)
+			actualObjects, err := controllerutils.GetRuntimeObjects(r, types, client.InNamespace(namespace))
 			lastBackupName, lastBackupTimestamp := ignoreUncomparedFields(test.expectedObjects, actualObjects)
 
 			// Assert
@@ -276,7 +278,7 @@ func TestGetRuntimeObjects(t *testing.T) {
 			r := fakeClientReconcileBackup(test.existingObjects)
 
 			// Act
-			actualObjects, actualError := r.getRuntimeObjects(hiveNamespaceScopedListTypes, namespace)
+			actualObjects, actualError := controllerutils.GetRuntimeObjects(r, hiveNamespaceScopedListTypes, client.InNamespace(namespace))
 
 			// Assert
 			assert.NoError(t, actualError)

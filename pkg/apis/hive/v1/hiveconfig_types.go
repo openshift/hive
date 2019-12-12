@@ -39,6 +39,12 @@ type HiveConfigSpec struct {
 
 	// FailedProvisionConfig is used to configure settings related to handling provision failures.
 	FailedProvisionConfig FailedProvisionConfig `json:"failedProvisionConfig"`
+
+	// LogLevel is the level of logging to use for the Hive controllers.
+	// Acceptable levels, from coarsest to finest, are panic, fatal, error, warn, info, debug, and trace.
+	// The default level is info.
+	// +optional
+	LogLevel string `json:"logLevel,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

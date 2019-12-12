@@ -70,6 +70,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		)
 	}
 
+	if level := instance.Spec.LogLevel; level != "" {
+		hiveDeployment.Spec.Template.Spec.Containers[0].Command = append(
+			hiveDeployment.Spec.Template.Spec.Containers[0].Command,
+			"--log-level",
+			level,
+		)
+	}
+
 	if e := instance.Spec.ExternalDNS; e != nil {
 		switch {
 		case e.AWS != nil:

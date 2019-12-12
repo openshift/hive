@@ -163,7 +163,7 @@ func (a *AWSActuator) syncTags() error {
 // ModifyStatus updates the DnsZone's status with AWS specific information.
 func (a *AWSActuator) ModifyStatus() error {
 	if a.zoneID == nil {
-		return errors.New("currentHostedZone is unpopulated")
+		return errors.New("zoneID is unpopulated")
 	}
 
 	a.dnsZone.Status.AWS = &hivev1.AWSDNSZoneStatus{
@@ -181,7 +181,7 @@ func min(a, b int) int {
 }
 
 // Refresh gets the AWS object for the zone.
-// If a zone cannot be found or no longer exists, actuator.currentHostedZone remains unset.
+// If a zone cannot be found or no longer exists, actuator.zoneID remains unset.
 func (a *AWSActuator) Refresh() error {
 	var zoneID string
 	var err error
@@ -286,7 +286,7 @@ func (a *AWSActuator) expectedTags() []*route53.Tag {
 }
 
 func (a *AWSActuator) existingTags(zoneID *string) ([]*route53.Tag, error) {
-	logger := a.logger.WithField("zone", aws.StringValue(zoneID))
+	logger := a.logger.WithField("id", aws.StringValue(zoneID))
 	logger.Debug("listing existing tags for zone")
 	resp, err := a.awsClient.ListTagsForResource(&route53.ListTagsForResourceInput{
 		ResourceId:   zoneID,
@@ -373,11 +373,11 @@ func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*rout
 		}
 		for _, zone := range resp.HostedZones {
 			if aws.StringValue(zone.CallerReference) == callerRef {
-				logger.WithField("zone", aws.StringValue(zone.Id)).Debug("found hosted zone matching caller reference")
+				logger.WithField("id", aws.StringValue(zone.Id)).Debug("found hosted zone matching caller reference")
 				return zone, nil
 			}
 			if aws.StringValue(zone.Name) != domain {
-				logger.WithField("name", aws.StringValue(zone.Name)).Debug("reached zone with different domain name, aborting search")
+				logger.WithField("zone", aws.StringValue(zone.Name)).Debug("reached zone with different domain name, aborting search")
 				return nil, fmt.Errorf("Hosted zone not found")
 			}
 		}
@@ -393,7 +393,7 @@ func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*rout
 // Delete removes an AWS Route53 hosted zone, typically because the DNSZone object is in a deleting state.
 func (a *AWSActuator) Delete() error {
 	if a.zoneID == nil {
-		return errors.New("currentHostedZone is unpopulated")
+		return errors.New("zoneID is unpopulated")
 	}
 
 	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone).WithField("id", aws.StringValue(a.zoneID))
@@ -410,7 +410,7 @@ func (a *AWSActuator) Delete() error {
 // GetNameServers returns the nameservers listed in the route53 hosted zone NS record.
 func (a *AWSActuator) GetNameServers() ([]string, error) {
 	if a.zoneID == nil {
-		return nil, errors.New("currentHostedZone is unpopulated")
+		return nil, errors.New("zoneID is unpopulated")
 	}
 
 	logger := a.logger.WithField("id", a.zoneID)

@@ -247,11 +247,12 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return *result, nil
 	}
 
-	if err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger); err != nil {
+	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	if err := r.syncMachineAutoscalers(pool, cd, generatedMachineSets, remoteClusterAPIClient, logger); err != nil {
+	if err := r.syncMachineAutoscalers(pool, cd, machineSets, remoteClusterAPIClient, logger); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -263,7 +264,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return r.removeFinalizer(pool, logger)
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, r.updatePoolStatusForMachineSets(pool, machineSets, logger)
 }
 
 func (r *ReconcileRemoteMachineSet) getRemoteMachineSets(
@@ -397,7 +398,9 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 	remoteMachineSets *machineapi.MachineSetList,
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
-) error {
+) ([]*machineapi.MachineSet, error) {
+	result := make([]*machineapi.MachineSet, len(generatedMachineSets))
+
 	machineSetsToDelete := []*machineapi.MachineSet{}
 	machineSetsToCreate := []*machineapi.MachineSet{}
 	machineSetsToUpdate := []*machineapi.MachineSet{}
@@ -466,12 +469,15 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 					rMS.Generation++
 					machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
 				}
+
+				result[i] = &rMS
 				break
 			}
 		}
 
 		if !found {
 			machineSetsToCreate = append(machineSetsToCreate, ms)
+			result[i] = ms
 		}
 	}
 
@@ -498,7 +504,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 		logger.WithField("machineset", ms.Name).Info("creating machineset")
 		if err := remoteClusterAPIClient.Create(context.Background(), ms); err != nil {
 			logger.WithError(err).Error("unable to create machine set")
-			return err
+			return nil, err
 		}
 	}
 
@@ -506,7 +512,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 		logger.WithField("machineset", ms.Name).Info("updating machineset")
 		if err := remoteClusterAPIClient.Update(context.Background(), ms); err != nil {
 			logger.WithError(err).Error("unable to update machine set")
-			return err
+			return nil, err
 		}
 	}
 
@@ -514,12 +520,12 @@ func (r *ReconcileRemoteMachineSet) syncMachineSets(
 		logger.WithField("machineset", ms.Name).Info("deleting machineset")
 		if err := remoteClusterAPIClient.Delete(context.Background(), ms); err != nil {
 			logger.WithError(err).Error("unable to delete machine set")
-			return err
+			return nil, err
 		}
 	}
 
 	logger.Info("done reconciling machine sets for machine pool")
-	return nil
+	return result, nil
 }
 
 func (r *ReconcileRemoteMachineSet) syncMachineAutoscalers(
@@ -711,6 +717,40 @@ func (r *ReconcileRemoteMachineSet) syncClusterAutoscaler(
 		}
 	}
 	return nil
+}
+
+func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
+	pool *hivev1.MachinePool,
+	machineSets []*machineapi.MachineSet,
+	logger log.FieldLogger,
+) error {
+	origPool := pool.DeepCopy()
+
+	pool.Status.MachineSets = make([]hivev1.MachineSetStatus, len(machineSets))
+	pool.Status.Replicas = 0
+	for i, ms := range machineSets {
+		var min, max int32
+		if pool.Spec.Autoscaling == nil {
+			min = *ms.Spec.Replicas
+			max = *ms.Spec.Replicas
+		} else {
+			min, max = getMinMaxReplicasForMachineSet(pool, machineSets, i)
+		}
+		pool.Status.MachineSets[i] = hivev1.MachineSetStatus{
+			Name:        ms.Name,
+			Replicas:    *ms.Spec.Replicas,
+			MinReplicas: min,
+			MaxReplicas: max,
+		}
+		pool.Status.Replicas += *ms.Spec.Replicas
+	}
+
+	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
+		reflect.DeepEqual(origPool.Status, pool.Status) {
+		return nil
+	}
+
+	return errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
 }
 
 func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {

@@ -768,13 +768,12 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 			Annotations: map[string]string{},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			Images: hivev1.ProvisionImages{
+			ClusterName: o.Name,
+			BaseDomain:  o.BaseDomain,
+			ManageDNS:   o.ManageDNS,
+			Provisioning: &hivev1.Provisioning{
 				InstallerImagePullPolicy: corev1.PullAlways,
 			},
-			ClusterName:  o.Name,
-			BaseDomain:   o.BaseDomain,
-			ManageDNS:    o.ManageDNS,
-			Provisioning: &hivev1.Provisioning{},
 		},
 	}
 
@@ -819,7 +818,7 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 
 func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.ClusterImageSet, error) {
 	if len(o.ClusterImageSet) > 0 {
-		cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{
+		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{
 			Name: o.ClusterImageSet,
 		}
 		return nil, nil
@@ -834,9 +833,9 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			return nil, fmt.Errorf("Cannot determine release image: %v", err)
 		}
 	}
-	if o.UseClusterImageSet {
-		cd.Spec.Images.InstallerImage = o.InstallerImage
-		cd.Spec.Images.ReleaseImage = o.ReleaseImage
+	if !o.UseClusterImageSet {
+		cd.Spec.Provisioning.InstallerImage = o.InstallerImage
+		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
 		return nil, nil
 	}
 
@@ -853,7 +852,7 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			InstallerImage: &o.InstallerImage,
 		},
 	}
-	cd.Spec.ImageSetRef = &hivev1.ClusterImageSetReference{
+	cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{
 		Name: imageSet.Name,
 	}
 

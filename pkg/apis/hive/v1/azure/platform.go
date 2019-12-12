@@ -18,11 +18,6 @@ type Platform struct {
 
 	// BaseDomainResourceGroupName specifies the resource group where the azure DNS zone for the base domain is found
 	BaseDomainResourceGroupName string `json:"baseDomainResourceGroupName,omitempty"`
-	// DefaultMachinePlatform is the default configuration used when
-	// installing on Azure for machine pools which do not define their own
-	// platform configuration.
-	// +optional
-	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
 }
 
 //SetBaseDomain parses the baseDomainID and sets the related fields on azure.Platform

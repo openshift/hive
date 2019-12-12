@@ -53,11 +53,6 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 			(*out)[key] = val
 		}
 	}
-	if in.DefaultMachinePlatform != nil {
-		in, out := &in.DefaultMachinePlatform, &out.DefaultMachinePlatform
-		*out = new(MachinePoolPlatform)
-		(*in).DeepCopyInto(*out)
-	}
 	return
 }
 

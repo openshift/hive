@@ -698,8 +698,6 @@ spec:
             memory: 512Mi
         command:
           - /opt/services/manager
-          - --log-level
-          - info
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl
@@ -2932,6 +2930,11 @@ spec:
                 with precedence given to the contents of the pull secret for the cluster
                 deployment.
               type: object
+            logLevel:
+              description: LogLevel is the level of logging to use for the Hive controllers.
+                Acceptable levels, from coarsest to finest, are panic, fatal, error,
+                warn, info, debug, and trace. The default level is info.
+              type: string
             managedDomains:
               description: 'ManagedDomains is the list of DNS domains that are allowed
                 to be used by the ''managedDNS'' feature. When specifying ''managedDNS:

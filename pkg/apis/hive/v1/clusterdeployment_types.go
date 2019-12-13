@@ -103,18 +103,12 @@ type Provisioning struct {
 	// version for the release you are provisioning.
 	InstallConfigSecretRef corev1.LocalObjectReference `json:"installConfigSecretRef"`
 
-	// InstallerImage is the image containing the openshift-install binary that will be used to install.
-	InstallerImage string `json:"installerImage,omitempty"`
-
-	// InstallerImagePullPolicy is the pull policy for the installer image.
-	InstallerImagePullPolicy corev1.PullPolicy `json:"installerImagePullPolicy,omitempty"`
-
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
 	ReleaseImage string `json:"releaseImage,omitempty"`
 
-	// ImageSetRef is a reference to a ClusterImageSet. If values are specified for InstallerImage or ReleaseImage,
-	// those will take precedence over the ones from the ClusterImageSet.
+	// ImageSetRef is a reference to a ClusterImageSet. If a value is specified for ReleaseImage,
+	// that will take precedence over the one from the ClusterImageSet.
 	ImageSetRef *ClusterImageSetReference `json:"imageSetRef,omitempty"`
 
 	// ManifestsConfigMapRef is a reference to user-provided manifests to

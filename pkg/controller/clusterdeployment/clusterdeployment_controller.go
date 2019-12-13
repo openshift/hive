@@ -801,8 +801,8 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 	if cd.Spec.Provisioning.ReleaseImage != "" {
 		return cd.Spec.Provisioning.ReleaseImage
 	}
-	if imageSet != nil && imageSet.Spec.ReleaseImage != nil {
-		return *imageSet.Spec.ReleaseImage
+	if imageSet != nil {
+		return imageSet.Spec.ReleaseImage
 	}
 	return ""
 }
@@ -835,18 +835,6 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 }
 
 func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
-	if cd.Spec.Provisioning.InstallerImage != "" {
-		cdLog.WithField("image", cd.Spec.Provisioning.InstallerImage).
-			Debug("setting status.InstallerImage to the value in spec.images.installerImage")
-		cd.Status.InstallerImage = &cd.Spec.Provisioning.InstallerImage
-		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
-	}
-	if imageSet != nil && imageSet.Spec.InstallerImage != nil && *imageSet.Spec.InstallerImage != "" {
-		cd.Status.InstallerImage = imageSet.Spec.InstallerImage
-		cdLog.WithField("imageset", imageSet.Name).Debug("setting status.InstallerImage using imageSet.Spec.InstallerImage")
-		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
-	}
-
 	// If the .status.clusterVersionsStatus.availableUpdates field is nil,
 	// do a status update to set it to an empty list. All status updates
 	// done by controllers set this automatically. However, the imageset

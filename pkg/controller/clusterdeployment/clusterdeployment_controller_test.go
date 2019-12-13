@@ -414,58 +414,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Resolve installer image from spec.images.installerimage",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.InstallerImage = nil
-					cd.Spec.Provisioning.InstallerImage = "test-installer-image:latest"
-					return cd
-				}(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if cd.Status.InstallerImage == nil || *cd.Status.InstallerImage != "test-installer-image:latest" {
-					t.Errorf("unexpected status.installerImage")
-				}
-			},
-		},
-		{
-			name: "Resolve installer image from imageSet.spec.installerimage",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Status.InstallerImage = nil
-					cd.Spec.Provisioning.InstallerImage = ""
-					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
-					return cd
-				}(),
-				func() *hivev1.ClusterImageSet {
-					cis := testClusterImageSet()
-					cis.Spec.InstallerImage = pointer.StringPtr("test-cis-installer-image:latest")
-					return cis
-				}(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if cd.Status.InstallerImage == nil || *cd.Status.InstallerImage != "test-cis-installer-image:latest" {
-					t.Errorf("unexpected status.installerImage")
-				}
-			},
-		},
-		{
 			name: "Create job to resolve installer image",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = nil
-					cd.Spec.Provisioning.InstallerImage = ""
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
 					return cd
@@ -484,7 +437,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				envVars := job.Spec.Template.Spec.Containers[0].Env
 				for _, e := range envVars {
 					if e.Name == "RELEASE_IMAGE" {
-						if e.Value != *testClusterImageSet().Spec.ReleaseImage {
+						if e.Value != testClusterImageSet().Spec.ReleaseImage {
 							t.Errorf("unexpected release image used in job: %s", e.Value)
 						}
 						break
@@ -498,7 +451,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = nil
-					cd.Spec.Provisioning.InstallerImage = ""
 					cd.Spec.Provisioning.ReleaseImage = "embedded-release-image:latest"
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
@@ -531,13 +483,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image:latest")
-					cd.Spec.Provisioning.InstallerImage = ""
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
 				func() *hivev1.ClusterImageSet {
 					cis := testClusterImageSet()
-					cis.Spec.ReleaseImage = pointer.StringPtr("test-release-image:latest")
+					cis.Spec.ReleaseImage = "test-release-image:latest"
 					return cis
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1511,7 +1462,7 @@ func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
 func testClusterImageSet() *hivev1.ClusterImageSet {
 	cis := &hivev1.ClusterImageSet{}
 	cis.Name = testClusterImageSetName
-	cis.Spec.ReleaseImage = pointer.StringPtr("test-release-image:latest")
+	cis.Spec.ReleaseImage = "test-release-image:latest"
 	return cis
 }
 

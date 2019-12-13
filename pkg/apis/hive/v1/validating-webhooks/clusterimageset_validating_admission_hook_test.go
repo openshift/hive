@@ -53,17 +53,9 @@ func TestClusterImageSetValidate(t *testing.T) {
 		gvr             *metav1.GroupVersionResource
 	}{
 		{
-			name: "Test valid ClusterImageSet.Spec.Zone with release image",
+			name: "Test valid ClusterImageSet.Spec with release image",
 			newSpec: hivev1.ClusterImageSetSpec{
-				ReleaseImage: strptr("image:tag"),
-			},
-			operation:       admissionv1beta1.Create,
-			expectedAllowed: true,
-		},
-		{
-			name: "Test valid ClusterImageSet.Spec.Zone with release image",
-			newSpec: hivev1.ClusterImageSetSpec{
-				InstallerImage: strptr("image:tag"),
+				ReleaseImage: "image:tag",
 			},
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
@@ -95,10 +87,10 @@ func TestClusterImageSetValidate(t *testing.T) {
 		{
 			name: "Test ClusterImageSet.Spec is immutable (updates not allowed)",
 			newSpec: hivev1.ClusterImageSetSpec{
-				ReleaseImage: strptr("a:tag"),
+				ReleaseImage: "a:tag",
 			},
 			oldSpec: hivev1.ClusterImageSetSpec{
-				ReleaseImage: strptr("b:tag"),
+				ReleaseImage: "b:tag",
 			},
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
@@ -182,8 +174,4 @@ func TestClusterImageSetValidate(t *testing.T) {
 			assert.Equal(t, tc.expectedAllowed, response.Allowed)
 		})
 	}
-}
-
-func strptr(s string) *string {
-	return &s
 }

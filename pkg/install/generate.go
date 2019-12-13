@@ -22,12 +22,11 @@ const (
 	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
 	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 
-	defaultInstallerImagePullPolicy = corev1.PullAlways
-	tryUninstallOnceAnnotation      = "hive.openshift.io/try-uninstall-once"
-	azureAuthDir                    = "/.azure"
-	azureAuthFile                   = azureAuthDir + "/osServicePrincipal.json"
-	gcpAuthDir                      = "/.gcp"
-	gcpAuthFile                     = gcpAuthDir + "/" + constants.GCPCredentialsName
+	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	azureAuthDir               = "/.azure"
+	azureAuthFile              = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir                 = "/.gcp"
+	gcpAuthFile                = gcpAuthDir + "/" + constants.GCPCredentialsName
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -239,18 +238,13 @@ func InstallerPodSpec(
 	}
 	cliImage := *cd.Status.CLIImage
 
-	installerImagePullPolicy := defaultInstallerImagePullPolicy
-	if cd.Spec.Provisioning.InstallerImagePullPolicy != "" {
-		installerImagePullPolicy = cd.Spec.Provisioning.InstallerImagePullPolicy
-	}
-
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			ImagePullPolicy: corev1.PullAlways,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
@@ -261,7 +255,7 @@ func InstallerPodSpec(
 		{
 			Name:            "cli",
 			Image:           cliImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			ImagePullPolicy: corev1.PullAlways,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for

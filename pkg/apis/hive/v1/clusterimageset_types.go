@@ -7,15 +7,8 @@ import (
 // ClusterImageSetSpec defines the desired state of ClusterImageSet
 type ClusterImageSetSpec struct {
 	// ReleaseImage is the image that contains the payload to use when installing
-	// a cluster. If the installer image is specified, the release image
-	// is optional.
-	// +optional
-	ReleaseImage *string `json:"releaseImage,omitempty"`
-
-	// InstallerImage is the image used to install a cluster. If not specified,
-	// the installer image reference is obtained from the release image.
-	// +optional
-	InstallerImage *string `json:"installerImage,omitempty"`
+	// a cluster.
+	ReleaseImage string `json:"releaseImage"`
 }
 
 // ClusterImageSetStatus defines the observed state of ClusterImageSet
@@ -28,7 +21,6 @@ type ClusterImageSetStatus struct{}
 // ClusterImageSet is the Schema for the clusterimagesets API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Installer",type="string",JSONPath=".status.installerImage"
 // +kubebuilder:printcolumn:name="Release",type="string",JSONPath=".spec.releaseImage"
 // +kubebuilder:resource:path=clusterimagesets,shortName=imgset
 type ClusterImageSet struct {

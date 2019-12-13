@@ -122,6 +122,11 @@ type Provisioning struct {
 	// The SSH private key is expected to be in the secret data under the "ssh-privatekey" key.
 	// +optional
 	SSHPrivateKeySecretRef *corev1.LocalObjectReference `json:"sshPrivateKeySecretRef,omitempty"`
+
+	// InstallerEnv are extra environment variables to pass through to the installer. This may be used to enable
+	// additional features of the installer.
+	// +optional
+	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
 }
 
 // ClusterImageSetReference is a reference to a ClusterImageSet

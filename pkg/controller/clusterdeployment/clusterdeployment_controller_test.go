@@ -446,6 +446,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Delete imageset job when complete",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image")
+					cd.Status.CLIImage = pointer.StringPtr("test-cli-image")
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testCompletedImageSetJob(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				job := getImageSetJob(c)
+				assert.Nil(t, job, "expected imageset job to be deleted")
+			},
+		},
+		{
 			name: "Ensure release image from clusterdeployment (when present) is used to generate imageset job",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -1796,4 +1819,19 @@ func createSyncSetInstanceStatus(syncCondType hivev1.SyncConditionType) hivev1.S
 		},
 	}
 	return status
+}
+
+func testCompletedImageSetJob() *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      imageSetJobName,
+			Namespace: testNamespace,
+		},
+		Status: batchv1.JobStatus{
+			Conditions: []batchv1.JobCondition{{
+				Type:   batchv1.JobComplete,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
 }

@@ -233,22 +233,26 @@ func newClient(authJSON []byte) (*gcpClient, error) {
 		return nil, err
 	}
 
-	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, option.WithCredentials(creds))
+	options := []option.ClientOption{
+		option.WithCredentials(creds),
+		option.WithUserAgent("openshift.io hive/v1"),
+	}
+	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	computeClient, err := compute.NewService(ctx, option.WithCredentials(creds))
+	computeClient, err := compute.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
+	serviceUsageClient, err := serviceusage.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	dnsClient, err := dns.NewService(ctx, option.WithCredentials(creds))
+	dnsClient, err := dns.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}

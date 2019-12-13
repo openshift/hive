@@ -395,20 +395,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
-	// Check to make sure only allowed fields under controlPlaneConfig are being modified
-	if hasChangedImmutableControlPlaneConfigFields(&oldObject.Spec, &newObject.Spec) {
-		message := fmt.Sprintf("Attempt to modify immutable field in controlPlaneConfig (only servingCertificates is mutable)")
-		contextLogger.Infof("Failed validation: %v", message)
-
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
-	}
-
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
@@ -470,22 +456,6 @@ func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec
 	}
 
 	return false, ""
-}
-
-// currently only allow controlPlaneConfig.servingCertificates to be mutable
-func hasChangedImmutableControlPlaneConfigFields(origObject, newObject *hivev1.ClusterDeploymentSpec) bool {
-	origCopy := origObject.ControlPlaneConfig.DeepCopy()
-	newCopy := newObject.ControlPlaneConfig.DeepCopy()
-
-	// blank out the servingCertificates, since we don't care if they're different
-	origCopy.ServingCertificates = hivev1.ControlPlaneServingCertificateSpec{}
-	newCopy.ServingCertificates = hivev1.ControlPlaneServingCertificateSpec{}
-
-	if !reflect.DeepEqual(origCopy, newCopy) {
-		return true
-	}
-
-	return false
 }
 
 func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {

@@ -22,8 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/tools/clientcmd"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -41,6 +39,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
+	"github.com/openshift/hive/pkg/remoteclient"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -142,13 +141,16 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
-	return &ReconcileClusterDeployment{
-		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:                        mgr.GetScheme(),
-		logger:                        logger,
-		expectations:                  controllerutils.NewExpectations(logger),
-		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
+	r := &ReconcileClusterDeployment{
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:       mgr.GetScheme(),
+		logger:       logger,
+		expectations: controllerutils.NewExpectations(logger),
 	}
+	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
+		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+	}
+	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -238,9 +240,9 @@ type ReconcileClusterDeployment struct {
 	// A TTLCache of clusterprovision creates each clusterdeployment expects to see
 	expectations controllerutils.ExpectationsInterface
 
-	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
-	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
+	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
+	// for the remote cluster's API server
+	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -676,7 +678,7 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 			cdLog.WithError(err).Error("failed to fix up admin kubeconfig secret")
 			return reconcile.Result{}, err
 		}
-		if err := r.setAdminKubeconfigStatus(cd, adminKubeconfigSecret, cdLog); err != nil {
+		if err := r.setAdminKubeconfigStatus(cd, cdLog); err != nil {
 			cdLog.WithError(err).Error("failed to set admin kubeconfig status")
 			return reconcile.Result{}, err
 		}
@@ -980,38 +982,33 @@ func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.S
 }
 
 // setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
-func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, adminKubeconfigSecret *corev1.Secret, cdLog log.FieldLogger) error {
-	if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
-		remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(adminKubeconfigSecret.Data[adminKubeconfigKey]), controllerName)
-		if err != nil {
-			cdLog.WithError(err).Error("error building remote cluster-api client connection")
-			return err
-		}
-
-		// Parse the admin kubeconfig for the server URL:
-		config, err := clientcmd.Load(adminKubeconfigSecret.Data["kubeconfig"])
-		if err != nil {
-			return err
-		}
-		cluster, ok := config.Clusters[cd.Spec.ClusterName]
-		if !ok {
-			return fmt.Errorf("error parsing admin kubeconfig secret data")
-		}
-
-		// We should be able to assume only one cluster in here:
-		server := cluster.Server
-		cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
-		cd.Status.APIURL = server
-		routeObject := &routev1.Route{}
-		err = remoteClusterAPIClient.Get(context.Background(),
-			types.NamespacedName{Namespace: "openshift-console", Name: "console"}, routeObject)
-		if err != nil {
-			cdLog.WithError(err).Error("error fetching remote route object")
-			return err
-		}
-		cdLog.Debugf("read remote route object: %s", routeObject)
-		cd.Status.WebConsoleURL = "https://" + routeObject.Spec.Host
+func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	if cd.Status.WebConsoleURL != "" || cd.Status.APIURL != "" {
+		return nil
 	}
+
+	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
+	server, err := remoteClientBuilder.APIURL()
+	if err != nil {
+		return err
+	}
+	cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
+	cd.Status.APIURL = server
+	remoteClient, err := remoteClientBuilder.Build()
+	if err != nil {
+		return err
+	}
+	routeObject := &routev1.Route{}
+	if err := remoteClient.Get(
+		context.Background(),
+		client.ObjectKey{Namespace: "openshift-console", Name: "console"},
+		routeObject,
+	); err != nil {
+		cdLog.WithError(err).Error("error fetching remote route object")
+		return err
+	}
+	cdLog.Debugf("read remote route object: %s", routeObject)
+	cd.Status.WebConsoleURL = "https://" + routeObject.Spec.Host
 	return nil
 }
 

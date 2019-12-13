@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -35,6 +36,8 @@ import (
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
 
 const (
@@ -57,9 +60,7 @@ const (
     server: https://bar-api.clusters.example.com:6443
   name: bar
 `
-	adminPasswordSecret             = "foo-lqmsh-admin-password"
-	testRemoteClusterCurrentVersion = "4.0.0"
-	remoteClusterVersionObjectName  = "version"
+	adminPasswordSecret = "foo-lqmsh-admin-password"
 
 	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"
@@ -107,13 +108,14 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                  string
-		existing              []runtime.Object
-		pendingCreation       bool
-		expectErr             bool
-		expectedRequeueAfter  time.Duration
-		expectPendingCreation bool
-		validate              func(client.Client, *testing.T)
+		name                    string
+		existing                []runtime.Object
+		pendingCreation         bool
+		expectErr               bool
+		expectedRequeueAfter    time.Duration
+		expectPendingCreation   bool
+		expectConsoleRouteFetch bool
+		validate                func(client.Client, *testing.T)
 	}{
 		{
 			name: "Add finalizer",
@@ -211,6 +213,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 				testMetadataConfigMap(),
 			},
+			expectConsoleRouteFetch: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
@@ -228,6 +231,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
 			},
+			expectConsoleRouteFetch: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
@@ -1035,12 +1039,15 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
 			fakeClient := fake.NewFakeClient(test.existing...)
 			controllerExpectations := controllerutils.NewExpectations(logger)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        logger,
 				expectations:                  controllerExpectations,
-				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
 			reconcileRequest := reconcile.Request{
@@ -1052,6 +1059,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 
 			if test.pendingCreation {
 				controllerExpectations.ExpectCreations(reconcileRequest.String(), 1)
+			}
+
+			if test.expectConsoleRouteFetch {
+				mockRemoteClientBuilder.EXPECT().APIURL().Return("https://bar-api.clusters.example.com:6443", nil)
+				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(), nil)
 			}
 
 			result, err := rcd.Reconcile(reconcileRequest)
@@ -1101,12 +1113,15 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
 			fakeClient := fake.NewFakeClient(test.existing...)
 			controllerExpectations := controllerutils.NewExpectations(logger)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        logger,
 				expectations:                  controllerExpectations,
-				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
 			reconcileResult, err := rcd.Reconcile(reconcile.Request{
@@ -1424,14 +1439,7 @@ func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.S
 	return s
 }
 
-func testRemoteClusterAPIClientBuilder(secretData, controllerName string) (client.Client, error) {
-	remoteClusterVersion := &openshiftapiv1.ClusterVersion{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: remoteClusterVersionObjectName,
-		},
-	}
-	remoteClusterVersion.Status = testRemoteClusterVersionStatus()
-
+func testRemoteClusterAPIClient() client.Client {
 	remoteClusterRouteObject := &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      remoteClusterRouteObjectName,
@@ -1440,23 +1448,7 @@ func testRemoteClusterAPIClientBuilder(secretData, controllerName string) (clien
 	}
 	remoteClusterRouteObject.Spec.Host = "bar-api.clusters.example.com:6443/console"
 
-	remoteClient := fake.NewFakeClient(remoteClusterVersion, remoteClusterRouteObject)
-	return remoteClient, nil
-}
-
-func testRemoteClusterVersionStatus() openshiftapiv1.ClusterVersionStatus {
-	status := openshiftapiv1.ClusterVersionStatus{
-		History: []openshiftapiv1.UpdateHistory{
-			{
-				State:   openshiftapiv1.CompletedUpdate,
-				Version: testRemoteClusterCurrentVersion,
-				Image:   "TESTIMAGE",
-			},
-		},
-		ObservedGeneration: 123456789,
-		VersionHash:        "TESTVERSIONHASH",
-	}
-	return status
+	return fake.NewFakeClient(remoteClusterRouteObject)
 }
 
 func testClusterImageSet() *hivev1.ClusterImageSet {
@@ -1566,11 +1558,14 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existingCD...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
-				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
 			_, err := rcd.Reconcile(reconcile.Request{
@@ -1724,11 +1719,14 @@ func TestMergePullSecrets(t *testing.T) {
 				test.existingObjs = append(test.existingObjs, localSecretObject)
 			}
 			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
-				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
 			cd := getCDFromClient(rcd.Client)

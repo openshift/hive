@@ -8,10 +8,11 @@ import (
 	"sort"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -117,7 +118,7 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
@@ -130,11 +131,11 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 	existingSyncSet := &hivev1.SyncSet{}
 	existingSyncSetNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controlPlaneCertsSyncSetName(cd.Name)}
 	err = r.Get(context.TODO(), existingSyncSetNamespacedName, existingSyncSet)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		cdLog.WithError(err).Error("failed to retrieve existing control plane certs syncset")
 		return reconcile.Result{}, err
 	}
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		existingSyncSet = nil
 	}
 
@@ -192,7 +193,7 @@ func (r *ReconcileControlPlaneCerts) getControlPlaneSecrets(cd *hivev1.ClusterDe
 		secret := &corev1.Secret{}
 		err := r.Get(context.TODO(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				cdLog.WithField("secret", secretName).Debug("certificate secret is not available yet, will check later")
 				return nil, false, nil
 			}
@@ -279,9 +280,12 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	additionalCerts := cd.Spec.ControlPlaneConfig.ServingCertificates.Additional
 	if cd.Spec.ControlPlaneConfig.ServingCertificates.Default != "" {
 		cdLog.Debug("setting default serving certificate for control plane")
+		if cd.Status.APIURL == "" {
+			return nil, errors.New("API URL not set in ClusterDeployment")
+		}
 		cpCert := hivev1.ControlPlaneAdditionalCertificate{
 			Name:   cd.Spec.ControlPlaneConfig.ServingCertificates.Default,
-			Domain: defaultControlPlaneDomain(cd),
+			Domain: cd.Status.APIURL,
 		}
 		additionalCerts = append([]hivev1.ControlPlaneAdditionalCertificate{cpCert}, additionalCerts...)
 	}
@@ -367,10 +371,6 @@ func certificateBundle(cd *hivev1.ClusterDeployment, name string) *hivev1.Certif
 
 func controlPlaneCertsSyncSetName(name string) string {
 	return apihelpers.GetResourceName(name, "cp-certs")
-}
-
-func defaultControlPlaneDomain(cd *hivev1.ClusterDeployment) string {
-	return fmt.Sprintf("api.%s.%s", cd.Spec.ClusterName, cd.Spec.BaseDomain)
 }
 
 func writeSecretData(w io.Writer, secret *corev1.Secret) {

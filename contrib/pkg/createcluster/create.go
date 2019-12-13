@@ -424,7 +424,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			},
 			MachineCIDR: ipnet.MustParseCIDR("10.0.0.0/16"),
 		},
-		PullSecret: pullSecret,
 		ControlPlane: &installertypes.MachinePool{
 			Name:     "master",
 			Replicas: pointer.Int64Ptr(3),

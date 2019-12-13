@@ -164,8 +164,14 @@ func TestInstallManager(t *testing.T) {
 
 			// create a fake install-config
 			mountedInstallConfigFile := filepath.Join(tempDir, "mounted-install-config.yaml")
-			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("FAKE INSTALL CONFIG"), 0600); err != nil {
+			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake install-config file: %v", err)
+			}
+
+			// create a fake pull secret file
+			mountedPullSecretFile := filepath.Join(tempDir, "mounted-pull-secret.json")
+			if err := ioutil.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake pull secret file: %v", err)
 			}
 
 			im := InstallManager{
@@ -175,6 +181,7 @@ func TestInstallManager(t *testing.T) {
 				Namespace:              testNamespace,
 				DynamicClient:          fakeClient,
 				InstallConfigMountPath: mountedInstallConfigFile,
+				PullSecretMountPath:    mountedPullSecretFile,
 			}
 			im.Complete([]string{})
 
@@ -563,8 +570,14 @@ func TestInstallManagerSSH(t *testing.T) {
 
 			// create a fake install-config
 			mountedInstallConfigFile := filepath.Join(testDir, "mounted-install-config.yaml")
-			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("FAKE INSTALL CONFIG"), 0600); err != nil {
+			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake install-config file: %v", err)
+			}
+
+			// create a fake pull secret file
+			mountedPullSecretFile := filepath.Join(testDir, "mounted-pull-secret.json")
+			if err := ioutil.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake pull secret file: %v", err)
 			}
 
 			tempDir, err := ioutil.TempDir("", "installmanagersshtestresults")
@@ -577,6 +590,7 @@ func TestInstallManagerSSH(t *testing.T) {
 				LogLevel:               "debug",
 				WorkDir:                tempDir,
 				InstallConfigMountPath: mountedInstallConfigFile,
+				PullSecretMountPath:    mountedPullSecretFile,
 			}
 
 			if test.existingSSHAgentRunning {
@@ -658,6 +672,27 @@ func TestIsBootstrapComplete(t *testing.T) {
 			im := &InstallManager{WorkDir: dir}
 			actualComplete := im.isBootstrapComplete()
 			assert.Equal(t, tc.expectedComplete, actualComplete, "unexpected bootstrap complete")
+		})
+	}
+}
+
+func Test_pasteInPullSecret(t *testing.T) {
+	for _, inputFile := range []string{
+		"install-config.yaml",
+		"install-config-with-existing-pull-secret.yaml",
+	} {
+		t.Run(inputFile, func(t *testing.T) {
+			icData, err := ioutil.ReadFile(filepath.Join("testdata", inputFile))
+			if !assert.NoError(t, err, "unexpected error reading install-config.yaml") {
+				return
+			}
+			expected, err := ioutil.ReadFile(filepath.Join("testdata", "install-config-with-pull-secret.yaml"))
+			if !assert.NoError(t, err, "unexpected error reading install-config-with-pull-secret.yaml") {
+				return
+			}
+			actual, err := pasteInPullSecret(icData, filepath.Join("testdata", "pull-secret.json"))
+			assert.NoError(t, err, "unexpected error pasting in pull secret")
+			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig with pasted pull secret")
 		})
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -71,6 +72,7 @@ const (
 	provisioningTransitionTimeout       = 5 * time.Minute
 	sshCopyTempFile                     = "/tmp/ssh-privatekey"
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
+	defaultPullSecretMountPath          = "/pullsecret/" + corev1.DockerConfigJsonKey
 	defaultManifestsMountPath           = "/manifests"
 	hiveSSHKnownHostsAnnotation         = "hive.openshift.io/ssh-known-host"
 )
@@ -92,6 +94,7 @@ type InstallManager struct {
 	ClusterProvisionName     string
 	Namespace                string
 	InstallConfigMountPath   string
+	PullSecretMountPath      string
 	ManifestsMountPath       string
 	DynamicClient            client.Client
 	cleanupFailedProvision   func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
@@ -124,6 +127,7 @@ func NewInstallManagerCommand() *cobra.Command {
 			// Parse the namespace/name for our cluster provision:
 			im.Namespace, im.ClusterProvisionName = args[0], args[1]
 			im.InstallConfigMountPath = defaultInstallConfigMountPath
+			im.PullSecretMountPath = defaultPullSecretMountPath
 			im.ManifestsMountPath = defaultManifestsMountPath
 
 			if err := im.Validate(); err != nil {
@@ -246,13 +250,19 @@ func (m *InstallManager) Run() error {
 	m.waitForInstallerBinaries()
 
 	m.log.Info("copying install-config.yaml")
-	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
-	cmd := exec.Command("cp", m.InstallConfigMountPath, destInstallConfigPath)
-	err = cmd.Run()
+	icData, err := ioutil.ReadFile(m.InstallConfigMountPath)
 	if err != nil {
-		m.log.WithError(err).Errorf("error copying install-config.yaml from %s to %s",
-			m.InstallConfigMountPath, destInstallConfigPath)
+		m.log.WithError(err).Error("error reading install-config.yaml")
 		return err
+	}
+	icData, err = pasteInPullSecret(icData, m.PullSecretMountPath)
+	if err != nil {
+		m.log.WithError(err).Error("error adding pull secret to install-config.yaml")
+		return err
+	}
+	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
+	if err := ioutil.WriteFile(destInstallConfigPath, icData, 0644); err != nil {
+		m.log.WithError(err).Error("error writing install-config.yaml")
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
 
@@ -1205,4 +1215,17 @@ func isDirNonEmpty(dir string) bool {
 
 	_, err = f.Readdirnames(1)
 	return err == nil
+}
+
+func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {
+	pullSecretData, err := ioutil.ReadFile(pullSecretFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not read the pull secret file")
+	}
+	icRaw := map[string]interface{}{}
+	if err := yaml.Unmarshal(icData, &icRaw); err != nil {
+		return nil, errors.Wrap(err, "could not unmarshal InstallConfig")
+	}
+	icRaw["pullSecret"] = string(pullSecretData)
+	return yaml.Marshal(icRaw)
 }

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -22,6 +23,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
 
 const (
@@ -51,17 +54,19 @@ func TestClusterStateReconcile(t *testing.T) {
 	uco := unavailableClusterOperator
 
 	tests := []struct {
-		name     string
-		existing []runtime.Object
-		remote   []runtime.Object
-		validate func(*testing.T, client.Client, reconcile.Result)
-		noUpdate bool
+		name         string
+		existing     []runtime.Object
+		remote       []runtime.Object
+		noRemoteCall bool
+		validate     func(*testing.T, client.Client, reconcile.Result)
+		noUpdate     bool
 	}{
 		{
 			name: "create cluster state",
 			existing: []runtime.Object{
 				testClusterDeployment(),
 			},
+			noRemoteCall: true,
 			validate: func(t *testing.T, c client.Client, result reconcile.Result) {
 				st := cs(t, c)
 				assert.NotNil(t, st, "clusterstate should have been created")
@@ -152,14 +157,19 @@ func TestClusterStateReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			mockRemoteClientBuilder.EXPECT().Unreachable().Return(false)
+			if !test.noRemoteCall {
+				mockRemoteClientBuilder.EXPECT().Build().Return(fake.NewFakeClient(test.remote...), nil)
+			}
 			updateCalled := false
 			rcd := &ReconcileClusterState{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
-				logger: log.WithField("controller", "clusterState"),
-				remoteClientBuilder: func(secret string, controllerName string) (client.Client, error) {
-					return fake.NewFakeClient(test.remote...), nil
-				},
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterState"),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				updateStatus: func(c client.Client, st *hivev1.ClusterState) error {
 					updateCalled = true
 					return updateClusterStateStatus(c, st)

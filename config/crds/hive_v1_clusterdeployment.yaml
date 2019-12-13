@@ -113,6 +113,17 @@ spec:
               description: ControlPlaneConfig contains additional configuration for
                 the target cluster's control plane
               properties:
+                apiURLOverride:
+                  description: APIURLOverride is the optional URL override to which
+                    Hive will transition for communication with the API server of
+                    the remote cluster. When a remote cluster is created, Hive will
+                    initially communicate using the API URL established during installation.
+                    If an API URL Override is specified, Hive will periodically attempt
+                    to connect to the remote cluster using the override URL. Once
+                    Hive has determined that the override URL is active, Hive will
+                    use the override URL for further communications with the API server
+                    of the remote cluster.
+                  type: string
                 servingCertificates:
                   description: ServingCertificates specifies serving certificates
                     for the control plane

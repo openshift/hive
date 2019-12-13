@@ -32,6 +32,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
 )
 
 const (
@@ -45,13 +46,15 @@ const (
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	r := &ReconcileRemoteMachineSet{
-		Client:                        controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:                        mgr.GetScheme(),
-		logger:                        log.WithField("controller", controllerName),
-		remoteClusterAPIClientBuilder: controllerutils.BuildClusterAPIClientFromKubeconfig,
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme: mgr.GetScheme(),
+		logger: log.WithField("controller", controllerName),
 	}
 	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 		return r.createActuator(cd, remoteMachineSets, logger)
+	}
+	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
+		return remoteclient.NewBuilder(r.Client, cd, controllerName)
 	}
 
 	// Create a new controller
@@ -115,9 +118,9 @@ type ReconcileRemoteMachineSet struct {
 
 	logger log.FieldLogger
 
-	// remoteClusterAPIClientBuilder is a function pointer to the function that builds a client for the
-	// remote cluster's cluster-api
-	remoteClusterAPIClientBuilder func(string, string) (client.Client, error)
+	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
+	// for the remote cluster's API server
+	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 
 	// actuatorBuilder is a function pointer to the function that builds the actuator
 	actuatorBuilder func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error)
@@ -181,12 +184,6 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return r.removeFinalizer(pool, logger)
 	}
 
-	// If the cluster is unreachable, do not reconcile.
-	if controllerutils.HasUnreachableCondition(cd) {
-		logger.Debug("skipping cluster with unreachable condition")
-		return reconcile.Result{}, nil
-	}
-
 	if !cd.Spec.Installed {
 		// Cluster isn't installed yet, return
 		logger.Debug("cluster installation is not complete")
@@ -207,22 +204,15 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	adminKubeconfigSecret := &corev1.Secret{}
-	if err := r.Get(
-		context.TODO(),
-		types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, Namespace: cd.Namespace},
-		adminKubeconfigSecret,
-	); err != nil {
-		logger.WithError(err).Error("unable to fetch admin kubeconfig secret")
-		return reconcile.Result{}, err
-	}
-	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
-	if err != nil {
-		logger.WithError(err).Error("unable to fixup admin kubeconfig")
-		return reconcile.Result{}, err
+	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
+
+	// If the cluster is unreachable, do not reconcile.
+	if remoteClientBuilder.Unreachable() {
+		logger.Debug("skipping cluster with unreachable condition")
+		return reconcile.Result{}, nil
 	}
 
-	remoteClusterAPIClient, err := r.remoteClusterAPIClientBuilder(string(kubeConfig), controllerName)
+	remoteClusterAPIClient, err := remoteClientBuilder.Build()
 	if err != nil {
 		logger.WithError(err).Error("error building remote cluster-api client connection")
 		return reconcile.Result{}, err

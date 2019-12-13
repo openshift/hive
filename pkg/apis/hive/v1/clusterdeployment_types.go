@@ -231,8 +231,12 @@ const (
 	// secrets required by an Ingress is not available.
 	IngressCertificateNotFoundCondition ClusterDeploymentConditionType = "IngressCertificateNotFound"
 
-	// UnreachableCondition indicates that are unable to establish an API connection to the remote cluster.
+	// UnreachableCondition indicates that Hive is unable to establish an API connection to the remote cluster.
 	UnreachableCondition ClusterDeploymentConditionType = "Unreachable"
+
+	// ActiveAPIURLOverrideCondition indicates that Hive is communicating with the remote cluster using the
+	// API URL override.
+	ActiveAPIURLOverrideCondition ClusterDeploymentConditionType = "ActiveAPIURLOverride"
 
 	// InstallFailingCondition indicates that a failure has been detected and we will attempt to offer some
 	// information as to why in the reason.
@@ -257,6 +261,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ControlPlaneCertificateNotFoundCondition,
 	IngressCertificateNotFoundCondition,
 	UnreachableCondition,
+	ActiveAPIURLOverrideCondition,
 	InstallFailingCondition,
 	DNSNotReadyCondition,
 	ProvisionFailedCondition,
@@ -344,6 +349,14 @@ type ControlPlaneConfigSpec struct {
 	// ServingCertificates specifies serving certificates for the control plane
 	// +optional
 	ServingCertificates ControlPlaneServingCertificateSpec `json:"servingCertificates,omitempty"`
+
+	// APIURLOverride is the optional URL override to which Hive will transition for communication with the API
+	// server of the remote cluster. When a remote cluster is created, Hive will initially communicate using the
+	// API URL established during installation. If an API URL Override is specified, Hive will periodically attempt
+	// to connect to the remote cluster using the override URL. Once Hive has determined that the override URL is
+	// active, Hive will use the override URL for further communications with the API server of the remote cluster.
+	// +optional
+	APIURLOverride string `json:"apiURLOverride,omitempty"`
 }
 
 // ControlPlaneServingCertificateSpec specifies serving certificate settings for

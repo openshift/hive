@@ -32,21 +32,20 @@ import (
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/remotemachineset/mock"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
 
 const (
-	testName                 = "foo"
-	testNamespace            = "default"
-	testClusterID            = "foo-12345-uuid"
-	testInfraID              = "foo-12345"
-	machineAPINamespace      = "openshift-machine-api"
-	adminKubeconfigSecret    = "foo-admin-kubeconfig"
-	adminKubeconfigSecretKey = "kubeconfig"
-	testAMI                  = "ami-totallyfake"
-	testRegion               = "test-region"
-	testPoolName             = "worker"
-	testInstanceType         = "test-instance-type"
+	testName            = "foo"
+	testNamespace       = "default"
+	testClusterID       = "foo-12345-uuid"
+	testInfraID         = "foo-12345"
+	machineAPINamespace = "openshift-machine-api"
+	testAMI             = "ami-totallyfake"
+	testRegion          = "test-region"
+	testPoolName        = "worker"
+	testInstanceType    = "test-instance-type"
 )
 
 func init() {
@@ -114,7 +113,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		machinePool                      *hivev1.MachinePool
 		remoteExisting                   []runtime.Object
 		generatedMachineSets             []*machineapi.MachineSet
-		noKubeconfigSecret               bool
+		unreachable                      bool
 		expectErr                        bool
 		expectNoFinalizer                bool
 		expectedRemoteMachineSets        []*machineapi.MachineSet
@@ -122,11 +121,13 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		expectedRemoteClusterAutoscalers []autoscalingv1.ClusterAutoscaler
 	}{
 		{
-			name:               "Kubeconfig doesn't exist yet",
-			clusterDeployment:  testClusterDeployment(),
-			machinePool:        testMachinePool(),
-			noKubeconfigSecret: true,
-			expectErr:          true,
+			name: "Cluster not installed yet",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Installed = false
+				return cd
+			}(),
+			machinePool: testMachinePool(),
 		},
 		{
 			name:              "No-op",
@@ -198,14 +199,10 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool: testMachinePool(),
 		},
 		{
-			name: "Skip create missing machine set when cluster has unreachable condition",
-			clusterDeployment: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeployment()
-				cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions,
-					hivev1.UnreachableCondition, corev1.ConditionTrue, "", "", controllerutils.UpdateConditionAlways)
-				return cd
-			}(),
-			machinePool: testMachinePool(),
+			name:              "Skip create missing machine set when cluster is unreachable",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			unreachable:       true,
 		},
 		{
 			name:              "Delete extra machine set",
@@ -594,9 +591,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
 			}
-			if !test.noKubeconfigSecret {
-				localExisting = append(localExisting, testSecret(adminKubeconfigSecret, adminKubeconfigSecretKey, testName))
-			}
 			fakeClient := fake.NewFakeClient(localExisting...)
 			remoteFakeClient := fake.NewFakeClient(test.remoteExisting...)
 
@@ -610,13 +604,15 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					Return(test.generatedMachineSets, nil)
 			}
 
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			mockRemoteClientBuilder.EXPECT().Unreachable().Return(test.unreachable).AnyTimes()
+			mockRemoteClientBuilder.EXPECT().Build().Return(remoteFakeClient, nil).AnyTimes()
+
 			rcd := &ReconcileRemoteMachineSet{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
-				logger: log.WithField("controller", "remotemachineset"),
-				remoteClusterAPIClientBuilder: func(string, string) (client.Client, error) {
-					return remoteFakeClient, nil
-				},
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "remotemachineset"),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				actuatorBuilder: func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
 					return mockActuator, nil
 				},
@@ -880,19 +876,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Installed: true,
 		},
 	}
-}
-
-func testSecret(name, key, value string) *corev1.Secret {
-	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-		},
-		Data: map[string][]byte{
-			key: []byte(value),
-		},
-	}
-	return s
 }
 
 func printAWSMachineProviderConfig(cfg *awsprovider.AWSMachineProviderConfig) string {

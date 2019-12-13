@@ -21,10 +21,12 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"k8s.io/client-go/rest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,6 +50,8 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -600,15 +604,21 @@ func TestSyncSetReconcile(t *testing.T) {
 			dynamicClient := &fakeDynamicClient{}
 
 			helper := &fakeHelper{t: t}
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			mockRemoteClientBuilder.EXPECT().Unreachable().Return(false).AnyTimes()
+			mockRemoteClientBuilder.EXPECT().RESTConfig().Return(nil, nil).AnyTimes()
+			mockRemoteClientBuilder.EXPECT().BuildDynamic().Return(dynamicClient, nil).AnyTimes()
+
 			r := &ReconcileSyncSetInstance{
-				Client:         fakeClient,
-				scheme:         scheme.Scheme,
-				logger:         log.WithField("controller", "syncset"),
-				applierBuilder: helper.newHelper,
-				hash:           fakeHashFunc(t),
-				dynamicClientBuilder: func(string, string) (dynamic.Interface, error) {
-					return dynamicClient, nil
-				},
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "syncset"),
+				applierBuilder:                helper.newHelper,
+				hash:                          fakeHashFunc(t),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 			_, err := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -1156,7 +1166,7 @@ type fakeHelper struct {
 	t *testing.T
 }
 
-func (f *fakeHelper) newHelper(kubeconfig []byte, logger log.FieldLogger) Applier {
+func (f *fakeHelper) newHelper(*rest.Config, log.FieldLogger) Applier {
 	return f
 }
 

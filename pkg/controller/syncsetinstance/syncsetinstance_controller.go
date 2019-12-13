@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -46,6 +47,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
 	hiveresource "github.com/openshift/hive/pkg/resource"
 )
 
@@ -78,20 +80,21 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileSyncSetInstance{
-		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:               mgr.GetScheme(),
-		logger:               log.WithField("controller", controllerName),
-		applierBuilder:       applierBuilderFunc,
-		dynamicClientBuilder: controllerutils.BuildDynamicClientFromKubeconfig,
+		Client:         controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:         mgr.GetScheme(),
+		logger:         log.WithField("controller", controllerName),
+		applierBuilder: applierBuilderFunc,
 	}
 	r.hash = r.resourceHash
+	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
+		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+	}
 	return r
 }
 
 // applierBuilderFunc returns an Applier which implements Info, Apply and Patch
-func applierBuilderFunc(kubeConfig []byte, logger log.FieldLogger) Applier {
-	var helper Applier = hiveresource.NewHelper(kubeConfig, logger)
-	return helper
+func applierBuilderFunc(restConfig *rest.Config, logger log.FieldLogger) Applier {
+	return hiveresource.NewHelperFromRESTConfig(restConfig, logger)
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -152,10 +155,13 @@ type ReconcileSyncSetInstance struct {
 	client.Client
 	scheme *runtime.Scheme
 
-	logger               log.FieldLogger
-	applierBuilder       func([]byte, log.FieldLogger) Applier
-	hash                 func([]byte) string
-	dynamicClientBuilder func(string, string) (dynamic.Interface, error)
+	logger         log.FieldLogger
+	applierBuilder func(*rest.Config, log.FieldLogger) Applier
+	hash           func([]byte) string
+
+	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
+	// for the remote cluster's API server
+	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 }
 
 // Reconcile applies SyncSet or SelectorSyncSets associated with SyncSetInstances to the owning cluster.
@@ -219,14 +225,11 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
-	// If the cluster is unreachable, return from here.
-	if controllerutils.HasUnreachableCondition(cd) {
-		ssiLog.Debug("skipping cluster with unreachable condition")
-		return reconcile.Result{}, nil
-	}
+	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
 
-	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name) == 0 {
-		ssiLog.Debug("admin kubeconfig secret name is not set on clusterdeployment")
+	// If the cluster is unreachable, return from here.
+	if remoteClientBuilder.Unreachable() {
+		ssiLog.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
 
@@ -243,26 +246,19 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		}
 		return reconcile.Result{}, err
 	}
-
-	// get kubeconfig for the cluster
-	adminKubeconfigSecret, err := r.getKubeconfigSecret(cd, ssiLog)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
-	if err != nil {
-		ssiLog.WithError(err).Error("unable to fixup cluster client")
-		return reconcile.Result{}, err
-	}
-	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig), controllerName)
+	dynamicClient, err := remoteClientBuilder.BuildDynamic()
 	if err != nil {
 		ssiLog.WithError(err).Error("unable to build dynamic client")
 		return reconcile.Result{}, err
 	}
+	restConfig, err := remoteClientBuilder.RESTConfig()
+	if err != nil {
+		ssiLog.WithError(err).Error("unable to get REST config")
+	}
 	ssiLog.Debug("applying sync set")
 	original := ssi.DeepCopy()
-	applier := r.applierBuilder(kubeConfig, ssiLog)
-	applyErr := r.applySyncSet(ssi, spec, dynamicClient, applier, kubeConfig, ssiLog)
+	applier := r.applierBuilder(restConfig, ssiLog)
+	applyErr := r.applySyncSet(ssi, spec, dynamicClient, applier, ssiLog)
 	err = r.updateSyncSetInstanceStatus(ssi, original, ssiLog)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -306,20 +302,6 @@ func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInsta
 	return cd, nil
 }
 
-func (r *ReconcileSyncSetInstance) getKubeconfigSecret(cd *hivev1.ClusterDeployment, ssiLog log.FieldLogger) (*corev1.Secret, error) {
-	if len(cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name) == 0 {
-		return nil, fmt.Errorf("no kubeconfigconfig secret is set on clusterdeployment")
-	}
-	secret := &corev1.Secret{}
-	secretName := types.NamespacedName{Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, Namespace: cd.Namespace}
-	err := r.Get(context.TODO(), secretName, secret)
-	if err != nil {
-		ssiLog.WithError(err).WithField("secret", secretName).Error("unable to load admin kubeconfig secret")
-		return nil, err
-	}
-	return secret, nil
-}
-
 func (r *ReconcileSyncSetInstance) addSyncSetInstanceFinalizer(ssi *hivev1.SyncSetInstance, ssiLog log.FieldLogger) error {
 	ssiLog.Debug("adding finalizer")
 	controllerutils.AddFinalizer(ssi, hivev1.FinalizerSyncSetInstance)
@@ -359,26 +341,15 @@ func (r *ReconcileSyncSetInstance) syncDeletedSyncSetInstance(ssi *hivev1.SyncSe
 		return reconcile.Result{}, r.removeSyncSetInstanceFinalizer(ssi, ssiLog)
 	}
 
+	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
+
 	// If the cluster is unreachable, do not reconcile.
-	if controllerutils.HasUnreachableCondition(cd) {
+	if remoteClientBuilder.Unreachable() {
 		ssiLog.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
 
-	kubeconfigSecret, err := r.getKubeconfigSecret(cd, ssiLog)
-	if errors.IsNotFound(err) {
-		// kubeconfig secret cannot be found, just remove the finalizer
-		return reconcile.Result{}, r.removeSyncSetInstanceFinalizer(ssi, ssiLog)
-	} else if err != nil {
-		// unknown error, try again
-		return reconcile.Result{}, err
-	}
-	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(kubeconfigSecret.Data)
-	if err != nil {
-		ssiLog.WithError(err).Error("unable to fixup cluster client")
-		return reconcile.Result{}, err
-	}
-	dynamicClient, err := r.dynamicClientBuilder(string(kubeConfig), controllerName)
+	dynamicClient, err := remoteClientBuilder.BuildDynamic()
 	if err != nil {
 		ssiLog.WithError(err).Error("unable to build dynamic client")
 		return reconcile.Result{}, err
@@ -396,7 +367,7 @@ func (r *ReconcileSyncSetInstance) syncDeletedSyncSetInstance(ssi *hivev1.SyncSe
 	return reconcile.Result{}, r.removeSyncSetInstanceFinalizer(ssi, ssiLog)
 }
 
-func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spec *hivev1.SyncSetCommonSpec, dynamicClient dynamic.Interface, h Applier, kubeConfig []byte, ssiLog log.FieldLogger) error {
+func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spec *hivev1.SyncSetCommonSpec, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
 	defer func() {
 		// Temporary fix for status hot loop: do not update ssi.Status.{Patches,Resources,SecretReferences} with empty slice.
 		if len(ssi.Status.Resources) == 0 {
@@ -413,7 +384,7 @@ func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spe
 	if err := r.applySyncSetResources(ssi, spec.Resources, dynamicClient, h, ssiLog); err != nil {
 		return err
 	}
-	if err := r.applySyncSetPatches(ssi, spec.Patches, kubeConfig, ssiLog); err != nil {
+	if err := r.applySyncSetPatches(ssi, spec.Patches, h, ssiLog); err != nil {
 		return err
 	}
 	return r.applySyncSetSecretReferences(ssi, spec.SecretReferences, dynamicClient, h, ssiLog)
@@ -673,9 +644,7 @@ func (r *ReconcileSyncSetInstance) reconcileDeleted(deleteTerm string, applyMode
 }
 
 // applySyncSetPatches applies patches to cluster identified by kubeConfig
-func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstance, ssPatches []hivev1.SyncObjectPatch, kubeConfig []byte, ssiLog log.FieldLogger) error {
-	h := r.applierBuilder(kubeConfig, r.logger)
-
+func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstance, ssPatches []hivev1.SyncObjectPatch, h Applier, ssiLog log.FieldLogger) error {
 	for _, ssPatch := range ssPatches {
 
 		b, err := json.Marshal(ssPatch)

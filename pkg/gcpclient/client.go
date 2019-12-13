@@ -64,10 +64,6 @@ type gcpClient struct {
 
 const (
 	defaultCallTimeout = 2 * time.Minute
-
-	// ErrCodeNotFound is what the google api returns when a resource doesn't exist.
-	// googleapi does not give us a constant for this.
-	ErrCodeNotFound = 404
 )
 
 func contextWithTimeout(ctx context.Context) (context.Context, context.CancelFunc) {

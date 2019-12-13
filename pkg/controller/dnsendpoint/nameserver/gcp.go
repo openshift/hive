@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/pkg/errors"
 	dns "google.golang.org/api/dns/v1"
@@ -101,10 +102,10 @@ func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.String) 
 		if !ok {
 			return errors.Wrap(err, "error deleting the name server")
 		}
-		if gcpErr.Code == gcpclient.ErrCodeNotFound {
+		if gcpErr.Code == http.StatusNotFound {
 			return nil
 		}
-		if gcpErr.Code != 412 {
+		if gcpErr.Code != http.StatusPreconditionFailed {
 			return errors.Wrap(err, "error deleting the name server")
 		}
 	}

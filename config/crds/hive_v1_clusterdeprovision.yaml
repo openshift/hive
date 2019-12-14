@@ -83,10 +83,6 @@ spec:
                       description: CredentialsSecretRef is the GCP account credentials
                         to use for deprovisioning the cluster
                       type: object
-                    projectID:
-                      description: ProjectID is the ID of the GCP project in which
-                        the cluster exists
-                      type: string
                     region:
                       description: Region is the GCP region for this deprovision
                       type: string

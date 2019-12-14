@@ -310,10 +310,6 @@ spec:
                             type: string
                           type: array
                       type: object
-                    projectID:
-                      description: ProjectID is the the project that will be used
-                        for the cluster.
-                      type: string
                     region:
                       description: Region specifies the GCP region where the cluster
                         will be created.

@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/user"
@@ -133,13 +132,10 @@ func (s *LiveGCPTestSuite) getCUT() *gcpQuery {
 	if err != nil {
 		s.T().Fatalf("could not get the current user: %v", err)
 	}
-	authJSON, err := ioutil.ReadFile(filepath.Join(usr.HomeDir, ".gcp", constants.GCPCredentialsName))
-	if err != nil {
-		s.T().Fatalf("could not read gcp creds: %v", err)
-	}
+	credsFile := filepath.Join(usr.HomeDir, ".gcp", constants.GCPCredentialsName)
 	return &gcpQuery{
 		getGCPClient: func() (gcpclient.Client, error) {
-			return gcpclient.NewClientWithDefaultProject(authJSON)
+			return gcpclient.NewClientFromFile(credsFile)
 		},
 	}
 }

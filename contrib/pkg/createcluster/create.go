@@ -136,9 +136,6 @@ type Options struct {
 	// Azure
 	AzureBaseDomainResourceGroupName string
 
-	// GCP
-	GCPProjectID string
-
 	homeDir       string
 	cloudProvider cloudProvider
 }
@@ -165,7 +162,7 @@ func NewCreateClusterCommand() *cobra.Command {
 		Use: `create-cluster CLUSTER_DEPLOYMENT_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -221,9 +218,6 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
 
-	// GCP flags
-	flags.StringVar(&opt.GCPProjectID, "gcp-project-id", "", "Project ID is the ID of the GCP project to use")
-
 	return cmd
 }
 
@@ -254,15 +248,6 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		cmd.Usage()
 		log.Infof("Unsupported cloud: %s", o.Cloud)
 		return fmt.Errorf("Unsupported cloud: %s", o.Cloud)
-	}
-	switch o.Cloud {
-	case cloudGCP:
-		if o.GCPProjectID == "" {
-			cmd.Usage()
-			log.Infof("Must specify the GCP project ID when installing on GCP. Use the --gcp-project-id flag.")
-			return fmt.Errorf("gcp requires gcp-project-id flag")
-
-		}
 	}
 
 	if o.Adopt {

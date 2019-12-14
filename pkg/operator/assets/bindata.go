@@ -1873,10 +1873,6 @@ spec:
                             type: string
                           type: array
                       type: object
-                    projectID:
-                      description: ProjectID is the the project that will be used
-                        for the cluster.
-                      type: string
                     region:
                       description: Region specifies the GCP region where the cluster
                         will be created.
@@ -2292,10 +2288,6 @@ spec:
                       description: CredentialsSecretRef is the GCP account credentials
                         to use for deprovisioning the cluster
                       type: object
-                    projectID:
-                      description: ProjectID is the ID of the GCP project in which
-                        the cluster exists
-                      type: string
                     region:
                       description: Region is the GCP region for this deprovision
                       type: string

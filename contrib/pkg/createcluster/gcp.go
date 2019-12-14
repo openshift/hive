@@ -13,6 +13,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/gcpclient"
 )
 
 const (
@@ -52,13 +53,21 @@ func (p *gcpCloudProvider) addPlatformDetails(
 	machinePool *hivev1.MachinePool,
 	installConfig *installertypes.InstallConfig,
 ) error {
+	creds, err := gcputils.GetCreds(o.CredsFile)
+	if err != nil {
+		return err
+	}
+	projectID, err := gcpclient.ProjectID(creds)
+	if err != nil {
+		return err
+	}
+
 	cd.Spec.Platform = hivev1.Platform{
 		GCP: &hivev1gcp.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			ProjectID: o.GCPProjectID,
-			Region:    gcpRegion,
+			Region: gcpRegion,
 		},
 	}
 
@@ -68,7 +77,7 @@ func (p *gcpCloudProvider) addPlatformDetails(
 
 	installConfig.Platform = installertypes.Platform{
 		GCP: &installergcp.Platform{
-			ProjectID: o.GCPProjectID,
+			ProjectID: projectID,
 			Region:    gcpRegion,
 		},
 	}

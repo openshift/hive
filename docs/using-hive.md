@@ -140,10 +140,8 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=aws myclu
 Credentials will be read from `~/.azure/osServicePrincipal.json` typically created via the `az login` command.
 
 ```bash
-bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup mycluster
 ```
-
-`--release-image` is used above as Azure installer support is only present in 4.2 dev preview builds.
 
 #### Create Cluster on GCP
 
@@ -156,10 +154,8 @@ Credentials will be read from `~/.gcp/osServiceAccount.json`, this can be create
  1. Download resulting JSON file and save to `~/.gcp/osServiceAccount.json`.
 
 ```bash
-bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp --gcp-project-id=myproject --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp mycluster
 ```
-
-`--release-image` is used above as GCP installer support is only present in 4.2 dev preview builds.
 
 ### Monitor the Install Job
 

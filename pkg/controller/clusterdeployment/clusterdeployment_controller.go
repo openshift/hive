@@ -1406,7 +1406,6 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 	case cd.Spec.Platform.GCP != nil:
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{
 			Region:               cd.Spec.Platform.GCP.Region,
-			ProjectID:            cd.Spec.Platform.GCP.ProjectID,
 			CredentialsSecretRef: &cd.Spec.Platform.GCP.CredentialsSecretRef,
 		}
 	default:

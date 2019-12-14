@@ -11,9 +11,6 @@ type Platform struct {
 	// credentials.
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
-	// ProjectID is the the project that will be used for the cluster.
-	ProjectID string `json:"projectID"`
-
 	// Region specifies the GCP region where the cluster will be created.
 	Region string `json:"region"`
 

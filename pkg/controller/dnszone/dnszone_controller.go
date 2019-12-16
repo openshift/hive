@@ -199,7 +199,6 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 			r.logger.Debug("DNSZone resource is deleted, deleting hosted zone")
 			err := actuator.Delete()
 			if err != nil {
-				r.logger.WithError(err).Error("Failed to delete hosted zone")
 				return reconcile.Result{}, err
 			}
 		}

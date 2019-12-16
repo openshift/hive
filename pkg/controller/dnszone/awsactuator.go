@@ -402,7 +402,11 @@ func (a *AWSActuator) Delete() error {
 		Id: a.zoneID,
 	})
 	if err != nil {
-		log.WithError(err).Error("Cannot delete hosted zone")
+		logLevel := log.ErrorLevel
+		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == route53.ErrCodeHostedZoneNotEmpty {
+			logLevel = log.InfoLevel
+		}
+		log.WithError(err).Log(logLevel, "Cannot delete hosted zone")
 	}
 	return err
 }

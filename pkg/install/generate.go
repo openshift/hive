@@ -84,6 +84,14 @@ func InstallerPodSpec(
 				},
 			},
 		},
+		{
+			Name: "pullsecret",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: constants.GetMergedPullSecretName(cd),
+				},
+			},
+		},
 	}
 	volumeMounts := []corev1.VolumeMount{
 		{
@@ -93,6 +101,10 @@ func InstallerPodSpec(
 		{
 			Name:      "installconfig",
 			MountPath: "/installconfig",
+		},
+		{
+			Name:      "pullsecret",
+			MountPath: "/pullsecret",
 		},
 	}
 

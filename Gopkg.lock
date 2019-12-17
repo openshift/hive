@@ -242,6 +242,18 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:0ec9c645e9de0492d7e30134a5f2c147a0f3b57428ae9864b61637c762b41d32"
+  name = "github.com/docker/distribution"
+  packages = [
+    "context",
+    "registry/api/errcode",
+    "uuid",
+  ]
+  pruneopts = "NUT"
+  revision = "2461543d988979529609e8cb6fca9ca190dc48da"
+  version = "v2.7.1"
+
+[[projects]]
   digest = "1:5c709df1e94c6dbee6fdd9699b11e3cdfa06870b1e828e9311e4e879b2ae6a4a"
   name = "github.com/docker/docker"
   packages = [
@@ -250,6 +262,14 @@
   ]
   pruneopts = "NUT"
   revision = "a9fbbdc8dd8794b20af358382ab780559bca589d"
+
+[[projects]]
+  digest = "1:de58cd8a9f5068f844fdd29dea9e2574bea6a91a881bc127661596990b1c30fd"
+  name = "github.com/docker/go-healthcheck"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "a4f20681d8a1929b947920b5dfe2d16809d815ca"
+  version = "v0.1.0"
 
 [[projects]]
   branch = "master"
@@ -438,6 +458,14 @@
   pruneopts = "NUT"
   revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
   version = "v0.2.0"
+
+[[projects]]
+  digest = "1:3c8c26bb118e3f02230d4f5f30b972dbfe0c6b371acea8f190aa99ceaaae7028"
+  name = "github.com/gorilla/mux"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "00bdffe0f3c77e27d2cf6f5c70232a2d3e4d9c15"
+  version = "v1.7.3"
 
 [[projects]]
   branch = "master"
@@ -2007,6 +2035,7 @@
     "github.com/aws/aws-sdk-go/aws/arn",
     "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/credentials",
+    "github.com/aws/aws-sdk-go/aws/request",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/ec2",
     "github.com/aws/aws-sdk-go/service/ec2/ec2iface",
@@ -2019,6 +2048,7 @@
     "github.com/aws/aws-sdk-go/service/route53/route53iface",
     "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3iface",
+    "github.com/docker/go-healthcheck",
     "github.com/emicklei/go-restful",
     "github.com/evanphx/json-patch",
     "github.com/ghodss/yaml",
@@ -2075,6 +2105,7 @@
     "k8s.io/api/apps/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
+    "k8s.io/api/extensions/v1beta1",
     "k8s.io/api/rbac/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
@@ -2149,6 +2180,7 @@
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/controller-tools/cmd/controller-gen",
     "sigs.k8s.io/testing_frameworks/integration",
+    "sigs.k8s.io/yaml",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

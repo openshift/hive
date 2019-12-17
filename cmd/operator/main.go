@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	golog "log"
+	"net/http"
 	"time"
 
+	_ "github.com/docker/go-healthcheck"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -110,6 +112,11 @@ func newRootCommand() *cobra.Command {
 			if err := operator.AddToOperator(mgr); err != nil {
 				log.Fatal(err)
 			}
+
+			// Start http server which will enable the /debug/health handler from go-healthcheck
+			log.Printf("Starting debug/health endpoint.")
+
+			go http.ListenAndServe(":8080", nil)
 
 			log.Printf("Starting the Cmd.")
 

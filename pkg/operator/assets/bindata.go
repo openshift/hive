@@ -704,6 +704,13 @@ spec:
         env:
         - name: CLI_CACHE_DIR
           value: /var/cache/kubectl
+        livenessProbe:
+          httpGet:
+            path: /debug/health
+            port: 8080
+          initialDelaySeconds: 10
+          failureThreshold: 1
+          periodSeconds: 10
       terminationGracePeriodSeconds: 10
 `)
 

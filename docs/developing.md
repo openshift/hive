@@ -47,6 +47,7 @@ If you do not care to install those tools locally, then you can use them from th
 To build the image, run:
 
 ```bash
+go get -u github.com/openshift/imagebuilder/cmd/imagebuilder  # if you don't have imagebuilder
 make build-build-image
 ```
 
@@ -76,10 +77,10 @@ make test
 
 ### Cloning the repository
 
-Get the sources from GitHub:
+Get the sources from GitHub into the right place under $GOPATH (building anywhere else doesn't work presently):
 
 ```bash
-cd $GOPATH/src/openshift
+cd $GOPATH/src/github.com/openshift
 git clone https://github.com/openshift/hive.git
 ```
 
@@ -205,7 +206,7 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
  2. Make a temporary working directory in your hive checkout: `$ mkdir temp`
  3. Compile your hiveutil changes: `$ make hiveutil`
  4. Set your pull secret as an env var to match the pod: `$ export PULL_SECRET=$(cat ~/pull-secret)`
- 5. Run: `/bin/hiveutil install-manager --work-dir ~/go/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
+ 5. Run: `/bin/hiveutil install-manager --work-dir $GOPATH/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
 
 ## Enable Debug Logging In Hive Controllers
 

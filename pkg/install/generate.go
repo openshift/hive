@@ -215,28 +215,29 @@ func InstallerPodSpec(
 			Name:      "logs",
 			MountPath: "/logs",
 		})
-		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
-			volumes = append(volumes, corev1.Volume{
-				Name: "sshkeys",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name,
-					},
-				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "sshkeys",
-				MountPath: SSHPrivateKeyDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  "SSH_PRIV_KEY_PATH",
-				Value: SSHPrivateKeyFilePath,
-			})
-		}
 	} else {
 		env = append(env, corev1.EnvVar{
 			Name:  constants.SkipGatherLogsEnvVar,
 			Value: "true",
+		})
+	}
+
+	if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "sshkeys",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "sshkeys",
+			MountPath: SSHPrivateKeyDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "SSH_PRIV_KEY_PATH",
+			Value: SSHPrivateKeyFilePath,
 		})
 	}
 

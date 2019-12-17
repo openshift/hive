@@ -1165,15 +1165,40 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 
 func (m *InstallManager) setupSSHKnownHost(knownHost string) error {
 
-	if err := os.MkdirAll("/root/.ssh", 0700); err != nil {
-		m.log.WithError(err).Error("error creating /root/.ssh directory")
+	// Add our potentially random UID to /etc/passwd so ssh works. Need to shell out here as
+	// the go libraries for user info appear to rely on /etc/passwd, which our user is not in.
+	// TODO: temporary work so we can use libvirt over ssh, this whole function can go once we're no longer doing that.
+	out, err := exec.Command("id", "-u").Output()
+	if err != nil {
+		m.log.WithError(err).Error("error running id -u")
 		return err
 	}
-	if err := ioutil.WriteFile("/root/.ssh/known_hosts", []byte(knownHost), 0644); err != nil {
+	uid := strings.TrimSpace(string(out))
+	m.log.Infof("Adding user ID to passwd file: %s", uid)
+	f, err := os.OpenFile("/etc/passwd",
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		m.log.WithError(err).Error("error opening /etc/passwd")
+		return err
+	}
+	defer f.Close()
+	passwdLine := fmt.Sprintf("default:x:%s:0:default user:/home/hive:/sbin/nologin\n", uid)
+	m.log.Infof("Wrote passwd line: %s", passwdLine)
+	if _, err := f.WriteString(passwdLine); err != nil {
+		m.log.WithError(err).Error("error writing to /etc/passwd")
+		return err
+	}
+
+	sshDir := "/home/hive/.ssh"
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		m.log.WithError(err).Errorf("error creating %s directory", sshDir)
+		return err
+	}
+	if err := ioutil.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte(knownHost), 0644); err != nil {
 		m.log.WithError(err).Error("error writing ssh known_hosts")
 		return err
 	}
-	m.log.Infof("Wrote known host to /root/.ssh/known_hosts: %s", knownHost)
+	m.log.Infof("Wrote known host to %s/known_hosts: %s", sshDir, knownHost)
 	return nil
 }
 

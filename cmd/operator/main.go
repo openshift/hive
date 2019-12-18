@@ -89,7 +89,7 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
-			log.Printf("Registering Components.")
+			log.Info("Registering Components.")
 
 			// Setup Scheme for all resources
 			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
@@ -114,11 +114,11 @@ func newRootCommand() *cobra.Command {
 			}
 
 			// Start http server which will enable the /debug/health handler from go-healthcheck
-			log.Printf("Starting debug/health endpoint.")
+			log.Info("Starting debug/health endpoint.")
 
 			go http.ListenAndServe(":8080", nil)
 
-			log.Printf("Starting the Cmd.")
+			log.Info("Starting the Cmd.")
 
 			// Start the Cmd
 			log.Fatal(mgr.Start(signals.SetupSignalHandler()))

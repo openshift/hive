@@ -11,6 +11,7 @@ required = [
     "github.com/openshift/installer/pkg/destroy/azure",
     "github.com/openshift/installer/pkg/asset/installconfig/azure",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
+    "k8s.io/code-generator/cmd/client-gen", # for go generate
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
     "sigs.k8s.io/controller-runtime/pkg/client/config",
@@ -148,3 +149,7 @@ version="v1.4.7"
 [[constraint]]
   name = "github.com/golang/mock"
   version = "1.2.0"
+
+[[override]]
+  name = "k8s.io/code-generator"
+  version="kubernetes-1.14.1"

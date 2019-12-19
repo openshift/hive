@@ -192,9 +192,9 @@ oc get nodes
   oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
   ```
 
-* Retrive the password for `kubeadmin` user
+* Retrieve the password for `kubeadmin` user
   ```
-  oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminPasswordSecret.name }'` -o jsonpath='{ .data.password }' | base64 --decode
+  oc extract secret/$(oc get cd -o jsonpath='{.items[].spec.clusterMetadata.adminPasswordSecretRef.name}') --to=-
   ```
 
 ## DNS Management

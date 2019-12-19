@@ -1576,11 +1576,12 @@
   version = "kubernetes-1.14.1"
 
 [[projects]]
-  digest = "1:c4b298de72f3e8fb4f53a0c804e8a33083a4b72f8627b4234eb6ab4b5fd68a75"
+  digest = "1:1daca11279b1f197cbf5e96686f9e78ce3792ef67edafb3d662e2fc7666b7855"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
     "discovery/cached/disk",
+    "discovery/fake",
     "dynamic",
     "informers",
     "informers/admissionregistration",
@@ -1762,16 +1763,25 @@
   version = "v0.0.6"
 
 [[projects]]
-  branch = "master"
-  digest = "1:937e46834bfd618b223206d7e3d459bf0eb53ac7d05135bf809d73b8fafdf7f7"
+  digest = "1:1d2e0142f5019c9ac2f1b562ea1c7a7d24f896080f7c670d04c4201ca13e2b14"
   name = "k8s.io/code-generator"
   packages = [
+    "cmd/client-gen",
+    "cmd/client-gen/args",
+    "cmd/client-gen/generators",
+    "cmd/client-gen/generators/fake",
+    "cmd/client-gen/generators/scheme",
+    "cmd/client-gen/generators/util",
+    "cmd/client-gen/path",
+    "cmd/client-gen/types",
     "cmd/deepcopy-gen",
     "cmd/deepcopy-gen/args",
+    "pkg/namer",
     "pkg/util",
   ]
   pruneopts = "NUT"
-  revision = "639c964206c28ac3859cf36f212c24775616884a"
+  revision = "50b561225d70b3eb79a1faafd3dfe7b1a62cbe73"
+  version = "kubernetes-1.14.1"
 
 [[projects]]
   branch = "master"
@@ -2128,6 +2138,7 @@
     "k8s.io/apimachinery/pkg/util/diff",
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/rand",
+    "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/sets",
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/validation/field",
@@ -2137,6 +2148,7 @@
     "k8s.io/cli-runtime/pkg/printers",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/discovery/cached/disk",
+    "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/dynamic",
     "k8s.io/client-go/informers",
     "k8s.io/client-go/kubernetes",
@@ -2145,13 +2157,16 @@
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/restmapper",
+    "k8s.io/client-go/testing",
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/client-go/tools/watch",
+    "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/retry",
     "k8s.io/client-go/util/workqueue",
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
+    "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
     "k8s.io/klog",
     "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",

@@ -28,6 +28,8 @@ type Client interface {
 
 	DeleteResourceRecordSet(managedZone string, recordSet *dns.ResourceRecordSet) error
 
+	UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *dns.ResourceRecordSet) error
+
 	GetManagedZone(managedZone string) (*dns.ManagedZone, error)
 
 	CreateManagedZone(managedZone *dns.ManagedZone) (*dns.ManagedZone, error)
@@ -132,6 +134,20 @@ func (c *gcpClient) AddResourceRecordSet(managedZone string, recordSet *dns.Reso
 		&dns.Change{
 			Additions: []*dns.ResourceRecordSet{recordSet},
 		},
+	)
+}
+
+func (c *gcpClient) UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *dns.ResourceRecordSet) error {
+	change := &dns.Change{}
+	if addRecordSet != nil && len(addRecordSet.Rrdatas) > 0 {
+		change.Additions = []*dns.ResourceRecordSet{addRecordSet}
+	}
+	if removeRecordSet != nil && len(removeRecordSet.Rrdatas) > 0 {
+		change.Deletions = []*dns.ResourceRecordSet{removeRecordSet}
+	}
+	return c.changeResourceRecordSet(
+		managedZone,
+		change,
 	)
 }
 

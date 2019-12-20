@@ -998,7 +998,7 @@
   version = "v1.0.3"
 
 [[projects]]
-  digest = "1:b31059dac028ff111793a8345eacf0f99d0f1150ead34ebf32fdd2b7d54c2d45"
+  digest = "1:f6c38cabfb8e5768a8440c0a885fb56844c5cab8abe227f52ae578c0ca24561a"
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
@@ -1006,8 +1006,8 @@
     "suite",
   ]
   pruneopts = "NUT"
-  revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
-  version = "v1.2.2"
+  revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
+  version = "v1.4.0"
 
 [[projects]]
   digest = "1:9b92a6e1b43f36f3df5c78b3219ad67df94543c0416f3839454ef6c44a3d43aa"
@@ -2063,6 +2063,7 @@
     "github.com/evanphx/json-patch",
     "github.com/ghodss/yaml",
     "github.com/golang/mock/gomock",
+    "github.com/google/uuid",
     "github.com/heptio/velero/pkg/apis/velero/v1",
     "github.com/json-iterator/go",
     "github.com/jteeuwen/go-bindata",
@@ -2161,6 +2162,7 @@
     "k8s.io/client-go/tools/cache",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/tools/clientcmd/api",
+    "k8s.io/client-go/tools/record",
     "k8s.io/client-go/tools/watch",
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/retry",
@@ -2193,6 +2195,7 @@
     "sigs.k8s.io/controller-runtime/pkg/runtime/scheme",
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
+    "sigs.k8s.io/controller-runtime/pkg/webhook",
     "sigs.k8s.io/controller-tools/cmd/controller-gen",
     "sigs.k8s.io/testing_frameworks/integration",
     "sigs.k8s.io/yaml",

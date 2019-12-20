@@ -133,6 +133,9 @@ const (
 	ZoneAvailableDNSZoneCondition DNSZoneConditionType = "ZoneAvailable"
 	// ParentLinkCreatedCondition is true if the parent link has been created
 	ParentLinkCreatedCondition DNSZoneConditionType = "ParentLinkCreated"
+	// DomainNotManaged is true if we try to reconcile a DNSZone and the HiveConfig
+	// does not contain a ManagedDNS entry for the domain in the DNSZone
+	DomainNotManaged DNSZoneConditionType = "DomainNotManaged"
 )
 
 // +genclient

@@ -7,17 +7,12 @@ import (
 
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
-	// ManagedDomains is the list of DNS domains that are allowed to be used by the 'managedDNS' feature.
+	// ManagedDomains is the list of DNS domains that are managed by the Hive cluster
 	// When specifying 'managedDNS: true' in a ClusterDeployment, the ClusterDeployment's
-	// baseDomain must be a direct child of one of these domains, otherwise the
+	// baseDomain should be a direct child of one of these domains, otherwise the
 	// ClusterDeployment creation will result in a validation error.
 	// +optional
-	ManagedDomains []string `json:"managedDomains,omitempty"`
-
-	// ExternalDNS specifies configuration for external-dns if it is to be deployed by
-	// Hive. If absent, external-dns will not be deployed.
-	// +optional
-	ExternalDNS *ExternalDNSConfig `json:"externalDNS,omitempty"`
+	ManagedDomains []ManageDNSConfig `json:"managedDomains,omitempty"`
 
 	// AdditionalCertificateAuthoritiesSecretRef is a list of references to secrets in the
 	// 'hive' namespace that contain an additional Certificate Authority to use when communicating
@@ -85,42 +80,46 @@ type FailedProvisionConfig struct {
 	SkipGatherLogs bool `json:"skipGatherLogs,omitempty"`
 }
 
-// ExternalDNSConfig contains settings for running external-dns in a Hive
-// environment.
-type ExternalDNSConfig struct {
+// ManageDNSConfig contains the domain being managed, and the cloud-specific
+// details for accessing/managing the domain.
+type ManageDNSConfig struct {
+
+	// Domains is the list of domains that hive will be managing entries for with the provided credentials.
+	Domains []string `json:"domains"`
 
 	// AWS contains AWS-specific settings for external DNS
 	// +optional
-	AWS *ExternalDNSAWSConfig `json:"aws,omitempty"`
+	AWS *ManageDNSAWSConfig `json:"aws,omitempty"`
 
 	// GCP contains GCP-specific settings for external DNS
 	// +optional
-	GCP *ExternalDNSGCPConfig `json:"gcp,omitempty"`
+	GCP *ManageDNSGCPConfig `json:"gcp,omitempty"`
 
 	// As other cloud providers are supported, additional fields will be
 	// added for each of those cloud providers. Only a single cloud provider
 	// may be configured at a time.
 }
 
-// ExternalDNSAWSConfig contains AWS-specific settings for external DNS
-type ExternalDNSAWSConfig struct {
+// ManageDNSAWSConfig contains AWS-specific info to manage a given domain.
+type ManageDNSAWSConfig struct {
 	// CredentialsSecretRef references a secret that will be used to authenticate with
-	// AWS Route53. It will need permission to manage entries in each of the
-	// managed domains for this cluster.
+	// AWS Route53. It will need permission to manage entries for the domain
+	// listed in the parent ManageDNSConfig object.
 	// Secret should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
 	// +optional
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 }
 
-// ExternalDNSGCPConfig contains GCP-specific settings for external DNS
-type ExternalDNSGCPConfig struct {
+// ManageDNSGCPConfig contains GCP-specific info to manage a given domain.
+type ManageDNSGCPConfig struct {
 	// CredentialsSecretRef references a secret that will be used to authenticate with
 	// GCP DNS. It will need permission to manage entries in each of the
 	// managed domains for this cluster.
+	// listed in the parent ManageDNSConfig object.
 	// Secret should have a key named 'osServiceAccount.json'.
 	// The credentials must specify the project to use.
 	// +optional
-	CredentialsSecretRef corev1.LocalObjectReference `json:"credentials,omitempty"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 }
 
 // +genclient:nonNamespaced

@@ -103,51 +103,51 @@ status:
 ### Proposed Changes
 
 
- 1. Add Spec.Provisionin struct to contain install specific, immutable settings.
- 1. Add Spec.Provisionin.InstallConfigSecret containing a full openshift-install InstallConfig  to pass directly to installer.
-   * This will allow immediate use of new openshift-install features without needing to mirror in Hive's API.
-   * Ideally most items in ClusterDeployment.Spec should be assumed mutable, however this will not universally be true.
-   * There will be some overlap, information that must be provided in both the InstallConfig and the ClusterDeployment. We will attempt to error if you mismatch this information whenever possible.
- 1. Add Spec.Provisionin.ManifestsConfigMap for injecting additional manifests into the install process.
-   * Can be used for something like switching to Calico for networking.
-   * ConfigMap with a file in each key. Will mount the whole configmap and iterate each file, adding to the installer's manifests dir.
- 1. Remove:
-   * Spec.ClusterName - In install config, not relevant thereafter.
-     * May be used in some naming, but hopefully can transition to CD.Name instead.
-   * Spec.ControlPlane - Not relevant after install today as masters are not a MachineSet. Can be re-added in future if necessary.
-   * Spec.Networking
- 1. Remaining immutable ClusterDeployment.Spec fields:
-   * Spec.ImageSet and Spec.Images. (technically could be mutable but has no effect once we've installed)
-   * Spec.Platform.AWS.Region (deemed important enough to be present in spec)
-   * ManageDNS bool: Enabled automated DNS forwarding. May be removed in V2.
-   * BaseDomain: Used to drive the automatic creation of the DNSZone if manageDNS is true. May be removed in V2.
- 1. Introduce Spec.ClusterMetadata struct with fields for InfraID, ClusterUUID, and admin password/kubeconfig secret references.
-   * All of these fields will be removed from Status where they cannot be restored.
-   * InfraID and ClusterUUID will be programatically mutable, but once set and the cluster is marked installed, validation will make them immutable.
-   * ClusterMetadata may be renamed if a better idea comes up.
- 1. Rename ClusterDeployment.Spec.SSHKey to ClusterDeployment.Spec.SSHKeySecret to better match all other secret references.
-   * Should not be removed as private keys are not contained in InstallConfig and are used by Hive.
-   * Rename to SSHPrivateKeySecret and should only contain private key going forward.
- 1. Rename CertificateBundle.SecretRef to CertificateSecret.
- 1. Move PlatformSecrets into Platform, rename Credentials to CredentialsSecret.
- 1. Move MachinePool definitions out of ClusterDeployment and to a separate CRD.
-   * Master pool will remain only in InstallConfig for now until we reach a point where masters are also an in-cluster MachineSet.
-   * Change replicas to an optional field. This is to allow future support for specifying autoscaling config for the pool. (see below)
-   * Future feature: Add support for [autoscaling](https://docs.openshift.com/container-platform/4.2/machine_management/applying-autoscaling.html#machine-autoscaler-cr_applying-autoscaling) here.
-     * MachinePool.Spec.Autoscaling.MinReplicas and MaxReplicas.
-     * Can exactly one of MachinePool.Spec.Replicas and MachinePool.Spec.Autoscaling.
-     * Requested min/max would be broken down across all specified availability zones as we do for replicas today. If a user wants more control and less magic over this, they can create multiple MachinePools with just one AZ, each with it's own autoscaling config.
-   * Future feature: Add support for configuring [MachineConfigPools](https://github.com/openshift/machine-config-operator/blob/master/docs/MachineConfigController.md#machineconfigpool) for this MachinePool.
- 1. Add support for bare metal provisioning.
-   * At this point, we do not see any major implications for BareMetal. This is modelled as a separate platform in install config (see [this example](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md#install-config))
-   * This would be specified in the InstallConfig.
-   * Hive would likely want a platform indicator explicitly for bare metal if we need a special invocation of the installer.
-   * However for the most part, we do not see any major complications adding bare metal support to the Hive API.
- 1. Add support for hosted control plane provisioning. (control plane running in Hive management cluster, in the same namespace as the ClusterDeployment, but cluster workers in a remote cloud provider account)
-   * A lot needs to be settled here before we can know exactly how this would look. However looking over the [current inputs for the POC code](https://github.com/sjenning/hosted-cluster-poc/blob/master/config.sh.aws_example), we will likely combine a Spec.Platform as we have today, with another Spec.HostedControlPlane section containing a variety of settings.
-   * May deploy control plane to the same cluster as Hive, or give Hive a kubeconfig for a remote cluster where the control plane should run.
-   * Safer to assume we are not the cluster where control plane will run.
-   * Spec.Platform.AWS specified, as well as Spec.HostedControlPlane.Kubeconfig etc.
+  1. Add Spec.Provisionin struct to contain install specific, immutable settings.
+  1. Add Spec.Provisionin.InstallConfigSecret containing a full openshift-install InstallConfig  to pass directly to installer.
+    * This will allow immediate use of new openshift-install features without needing to mirror in Hive's API.
+    * Ideally most items in ClusterDeployment.Spec should be assumed mutable, however this will not universally be true.
+    * There will be some overlap, information that must be provided in both the InstallConfig and the ClusterDeployment. We will attempt to error if you mismatch this information whenever possible.
+  1. Add Spec.Provisionin.ManifestsConfigMap for injecting additional manifests into the install process.
+    * Can be used for something like switching to Calico for networking.
+    * ConfigMap with a file in each key. Will mount the whole configmap and iterate each file, adding to the installer's manifests dir.
+  1. Remove:
+    * Spec.ClusterName - In install config, not relevant thereafter.
+      * May be used in some naming, but hopefully can transition to CD.Name instead.
+    * Spec.ControlPlane - Not relevant after install today as masters are not a MachineSet. Can be re-added in future if necessary.
+    * Spec.Networking
+  1. Remaining immutable ClusterDeployment.Spec fields:
+    * Spec.ImageSet and Spec.Images. (technically could be mutable but has no effect once we've installed)
+    * Spec.Platform.AWS.Region (deemed important enough to be present in spec)
+    * ManageDNS bool: Enabled automated DNS forwarding. May be removed in V2.
+    * BaseDomain: Used to drive the automatic creation of the DNSZone if manageDNS is true. May be removed in V2.
+  1. Introduce Spec.ClusterMetadata struct with fields for InfraID, ClusterUUID, and admin password/kubeconfig secret references.
+    * All of these fields will be removed from Status where they cannot be restored.
+    * InfraID and ClusterUUID will be programatically mutable, but once set and the cluster is marked installed, validation will make them immutable.
+    * ClusterMetadata may be renamed if a better idea comes up.
+  1. Rename ClusterDeployment.Spec.SSHKey to ClusterDeployment.Spec.SSHKeySecret to better match all other secret references.
+    * Should not be removed as private keys are not contained in InstallConfig and are used by Hive.
+    * Rename to SSHPrivateKeySecret and should only contain private key going forward.
+  1. Rename CertificateBundle.SecretRef to CertificateSecret.
+  1. Move PlatformSecrets into Platform, rename Credentials to CredentialsSecret.
+  1. Move MachinePool definitions out of ClusterDeployment and to a separate CRD.
+    * Master pool will remain only in InstallConfig for now until we reach a point where masters are also an in-cluster MachineSet.
+    * Change replicas to an optional field. This is to allow future support for specifying autoscaling config for the pool. (see below)
+    * Future feature: Add support for [autoscaling](https://docs.openshift.com/container-platform/4.2/machine_management/applying-autoscaling.html#machine-autoscaler-cr_applying-autoscaling) here.
+      * MachinePool.Spec.Autoscaling.MinReplicas and MaxReplicas.
+      * Can exactly one of MachinePool.Spec.Replicas and MachinePool.Spec.Autoscaling.
+      * Requested min/max would be broken down across all specified availability zones as we do for replicas today. If a user wants more control and less magic over this, they can create multiple MachinePools with just one AZ, each with it's own autoscaling config.
+    * Future feature: Add support for configuring [MachineConfigPools](https://github.com/openshift/machine-config-operator/blob/master/docs/MachineConfigController.md#machineconfigpool) for this MachinePool.
+  1. Add support for bare metal provisioning.
+    * At this point, we do not see any major implications for BareMetal. This is modelled as a separate platform in install config (see [this example](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md#install-config))
+    * This would be specified in the InstallConfig.
+    * Hive would likely want a platform indicator explicitly for bare metal if we need a special invocation of the installer.
+    * However for the most part, we do not see any major complications adding bare metal support to the Hive API.
+  1. Add support for hosted control plane provisioning. (control plane running in Hive management cluster, in the same namespace as the ClusterDeployment, but cluster workers in a remote cloud provider account)
+    * A lot needs to be settled here before we can know exactly how this would look. However looking over the [current inputs for the POC code](https://github.com/sjenning/hosted-cluster-poc/blob/master/config.sh.aws_example), we will likely combine a Spec.Platform as we have today, with another Spec.HostedControlPlane section containing a variety of settings.
+    * May deploy control plane to the same cluster as Hive, or give Hive a kubeconfig for a remote cluster where the control plane should run.
+    * Safer to assume we are not the cluster where control plane will run.
+    * Spec.Platform.AWS specified, as well as Spec.HostedControlPlane.Kubeconfig etc.
 
 
 ### Proposed V1 ClusterDeployment
@@ -242,59 +242,55 @@ spec:
 
 ## ClusterDeprovisionRequest
 
- 1. Rename to ClusterDeprovision, to better match ClusterProvision.
+  1. Rename to ClusterDeprovision, to better match ClusterProvision.
 
 ## SyncSet + SelectorSyncSet
 
- 1. Drop support for ApplyOnce patch mode.
+  1. Drop support for ApplyOnce patch mode.
 
 ## HiveConfig
 
- 1. Adjust HiveConfig API to map managed DNS domains to cloud provider they should be used for.
-   * Would allow using Hive to provision to multiple clouds, using that cloud for DNS forwarding, from one Hive.
-   * This is not the expected deployment model in Dedicated (one Hive per cloud)
-   * Convert managedDomains to a list of structs rather than just a string. Struct should include a list of the platforms we will manage DNS for on this sub-domain.
-   * Could have multiple domains on AWS using different certs.
- 1. Rename ExternalDNS to ManageDNS (section where the credentials are stored, ExternalDNS being phased out)
+  1. Adjust HiveConfig API to map managed DNS domains to cloud provider they should be used for.
+    * Would allow using Hive to provision to multiple clouds, using that cloud for DNS forwarding, from one Hive.
+    * This is not the expected deployment model in Dedicated (one Hive per cloud)
+    * Convert managedDomains to a list of structs rather than just a string. Struct should include a list of the platforms we will manage DNS for on this sub-domain.
+    * Could have multiple domains on AWS using different certs.
+  1. Rename ExternalDNS to ManageDNS (section where the credentials are stored, ExternalDNS being phased out)
 
 
 # Migrating to V1
 
 CRD versioning functionality is not available in OpenShift 3.11 where prod/stage run and will continue to do so until private cluster support is ready and we can migrate. We must however move to V1 as soon as possible.
 
-To avoid having to fork and abandon stage/prod until they can move to 4.3+ we propose the following solution using an aggregated API server. The migration will be orchestrated by the hive-operator.
+To avoid having to fork and abandon stage/prod until they can move to 4.3+ we propose the following solution using an aggregated API server.
 
-  1. Begin V1 work in v1 branch. Will merge back to master once we have the migration code ready. (may be a period of a few weeks)
-  1. hive-operator migration
-    1. Scale down v1alpha1 controllers pod.
-    1. Deploy an admission validating webhook that blocks all mutating actions on v1alpha1 CRDs.
-      * This will block all integrating applications from making any changes while data is being migrated.
-      * WARNING: we're not sure this works, the removal of finalizers is an update, we'd block ourselves.
-    1. Delete the v1alpha1 controller deployments.
-    1. Deploy the new v1 Hive CRDs.
-      * These will have the same names as in v1alpha1 but reside in a new API group.
-    1. Migrate v1alpha1 CRs to v1.
-      * We will create an InstallConfig secret for all legacy ClusterDeployments during this process. This ensures no data is lost and API responses remain consistent.
-    1. Remove finalizers on v1alpha1 objects to help ensure the controllers do not attempt to deprovision or perform any actions when we delete.
-    1. Delete all v1alpha1 custom resources.
-      * Finalizers should be deleted and controllers scaled down, so no action should be taken.
-    1. Delete all v1alpha1 CRDs, at this point the API is temporarily down for anyone using v1alpha1.
-    1. Delete the blocking webhook.
-    1. Deploy the aggregated API server to handle v1alpha1 API requests.
-      * Aggregated API will serve v1alpha1 exactly as we do today, no change is required for callers such as OCM and SRE operators.
-      * Aggregated API will forward all requests to the Hive v1 CRs.
-      * Aggregated API must be able to handle an incoming create requests which do not have InstallConfig referenced. We will need to generate an InstallConfig, save to a Secret, and then forward the translated V1 object to the normal API server.
-    1. Deploy the new V1 hive controllers deployment.
+Migration will be launched manually by SRE (with Hive team present), logged into the cluster as cluster admin. Likely a go program accompanied by shell scripts. After each phase we can examine state of cluster to ensure everything is progressing ok.
 
-Benefits:
+## Migration Steps
 
-  * No forking of codebase required.
-  * All Hive code outside the aggregated API server is using the new types.
-  * Once everyone is off v1alpha1, we can simply delete the aggregated API server to remove v1alpha1.
+  1. Phase 1
+    1. Scale down hive-operator, hive-controllers, and wait until no pods are running.
+    1. Fetch yaml for all Hive v1alpha1 CRs and store on disk.
+    1. Copy all yaml and manipulate for v1 CRs into a separate parallel directory structure we can diff.
+      * Will require generating an InstallConfig secret, this is best done in go.
+      * Will require breaking out MachinePools into separate  CRs. Not a good fit for jq, may be Python or Go.
+  1. Phase 2
+    1. Deploy all v1 Hive CRDs.
+      * Ensure OLM will not choke when we deploy a new version of the CSV that carries v1 CRDs which are already deployed.
+    1. oc apply our copied and modified yaml from disk.
+    1. Examine state of cluster and ensure everything looks healthy.
+  1. Phase 3 (beginning permanent changes)
+    1. Update all owner references. (secrets, configmaps, etc)
+    1. Remove all v1alpha1 finalizers. (ensure hive-controller is not running)
+  1. Phase 4
+    1. Delete all v1alpha1 CRs.
+    1. Delete all v1alpha1 CRDs.
+  1. Phase 5
+    1. Merge v1 into master, triggering a deploy via OLM with v1 CRs and v1alpha1 aggregated API server.
+
 
 Concerns:
 
   * Must be very careful nothing can possibly be listening when we do the migration, particularly when deleting the old CRs, which would trigger a cluster deprovision. However if finalizers are removed and controllers are scaled down, this should not be possible.
-  * We will want to ensure callers are migrating off v1alpha1 in a timely manner to limit maintenance overhead of the aggregated api.
-  * Loss of hive.openshift.io API group. We will need to find a way to maintain this during a migration.
+  * We will want to ensure callers are migrating off v1alpha1 in a timely manner to limit maintenance overhead of the aggregated api. 6 weeks planned window.
 

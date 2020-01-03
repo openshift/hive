@@ -20,6 +20,8 @@ type HiveV1Interface interface {
 	DNSZonesGetter
 	HiveConfigsGetter
 	MachinePoolsGetter
+	SelectorSyncIdentityProvidersGetter
+	SelectorSyncSetsGetter
 	SyncIdentityProvidersGetter
 	SyncSetsGetter
 	SyncSetInstancesGetter
@@ -64,6 +66,14 @@ func (c *HiveV1Client) HiveConfigs() HiveConfigInterface {
 
 func (c *HiveV1Client) MachinePools(namespace string) MachinePoolInterface {
 	return newMachinePools(c, namespace)
+}
+
+func (c *HiveV1Client) SelectorSyncIdentityProviders() SelectorSyncIdentityProviderInterface {
+	return newSelectorSyncIdentityProviders(c)
+}
+
+func (c *HiveV1Client) SelectorSyncSets() SelectorSyncSetInterface {
+	return newSelectorSyncSets(c)
 }
 
 func (c *HiveV1Client) SyncIdentityProviders(namespace string) SyncIdentityProviderInterface {

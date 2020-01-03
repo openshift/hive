@@ -217,6 +217,7 @@ type SyncSetStatus struct {
 type SelectorSyncSetStatus struct {
 }
 
+// +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

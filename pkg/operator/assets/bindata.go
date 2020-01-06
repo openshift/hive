@@ -1770,37 +1770,6 @@ spec:
                       description: CredentialsSecretRef refers to a secret that contains
                         the AWS account access credentials.
                       type: object
-                    defaultMachinePlatform:
-                      description: DefaultMachinePlatform is the default configuration
-                        used when installing on AWS for machine pools which do not
-                        define their own platform configuration.
-                      properties:
-                        rootVolume:
-                          description: EC2RootVolume defines the storage for ec2 instance.
-                          properties:
-                            iops:
-                              description: IOPS defines the iops for the storage.
-                              format: int64
-                              type: integer
-                            size:
-                              description: Size defines the size of the storage.
-                              format: int64
-                              type: integer
-                            type:
-                              description: Type defines the type of the storage.
-                              type: string
-                          type: object
-                        type:
-                          description: InstanceType defines the ec2 instance type.
-                            eg. m4-large
-                          type: string
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used.
-                          items:
-                            type: string
-                          type: array
-                      type: object
                     region:
                       description: Region specifies the AWS region where the cluster
                         will be created.
@@ -1822,31 +1791,6 @@ spec:
                       description: CredentialsSecretRef refers to a secret that contains
                         the Azure account access credentials.
                       type: object
-                    defaultMachinePlatform:
-                      description: DefaultMachinePlatform is the default configuration
-                        used when installing on Azure for machine pools which do not
-                        define their own platform configuration.
-                      properties:
-                        osDisk:
-                          description: OSDisk defines the storage for instance.
-                          properties:
-                            diskSizeGB:
-                              description: DiskSizeGB defines the size of disk in
-                                GB.
-                              format: int32
-                              type: integer
-                          type: object
-                        type:
-                          description: InstanceType defines the azure instance type.
-                            eg. Standard_DS_V2
-                          type: string
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used. eg. ["1", "2", "3"]
-                          items:
-                            type: string
-                          type: array
-                      type: object
                     region:
                       description: Region specifies the Azure region where the cluster
                         will be created.
@@ -1863,22 +1807,6 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the GCP account access credentials.
-                      type: object
-                    defaultMachinePlatform:
-                      description: DefaultMachinePlatform is the default configuration
-                        used when installing on GCP for machine pools which do not
-                        define their own platform configuration.
-                      properties:
-                        type:
-                          description: InstanceType defines the GCP instance type.
-                            eg. n1-standard-4
-                          type: string
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used.
-                          items:
-                            type: string
-                          type: array
                       type: object
                     region:
                       description: Region specifies the GCP region where the cluster

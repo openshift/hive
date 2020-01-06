@@ -1705,12 +1705,12 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.Azure != nil {
 		in, out := &in.Azure, &out.Azure
 		*out = new(azure.Platform)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	if in.GCP != nil {
 		in, out := &in.GCP, &out.GCP
 		*out = new(gcp.Platform)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	if in.BareMetal != nil {
 		in, out := &in.BareMetal, &out.BareMetal

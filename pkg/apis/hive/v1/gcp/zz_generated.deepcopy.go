@@ -45,11 +45,6 @@ func (in *Metadata) DeepCopy() *Metadata {
 func (in *Platform) DeepCopyInto(out *Platform) {
 	*out = *in
 	out.CredentialsSecretRef = in.CredentialsSecretRef
-	if in.DefaultMachinePlatform != nil {
-		in, out := &in.DefaultMachinePlatform, &out.DefaultMachinePlatform
-		*out = new(MachinePool)
-		(*in).DeepCopyInto(*out)
-	}
 	return
 }
 

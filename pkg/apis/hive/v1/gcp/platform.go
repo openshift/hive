@@ -13,10 +13,4 @@ type Platform struct {
 
 	// Region specifies the GCP region where the cluster will be created.
 	Region string `json:"region"`
-
-	// DefaultMachinePlatform is the default configuration used when
-	// installing on GCP for machine pools which do not define their own
-	// platform configuration.
-	// +optional
-	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
 }

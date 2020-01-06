@@ -264,29 +264,28 @@ CRD versioning functionality is not available in OpenShift 3.11 where prod/stage
 
 To avoid having to fork and abandon stage/prod until they can move to 4.3+ we propose the following solution using an aggregated API server.
 
-Migration will be launched manually by SRE (with Hive team present), logged into the cluster as cluster admin. Likely a go program accompanied by shell scripts. After each phase we can examine state of cluster to ensure everything is progressing ok.
+Migration will be launched manually by SRE (with Hive team present), logged into the cluster as cluster admin. Migration will proceed in phases, so we can examine state of cluster to ensure everything is progressing ok.
+
+## Prerequisites
+
+  1. Deploy a version of Hive with twiest's DR owner reference restoration labelling. We will need these labels to restore owner refs.
 
 ## Migration Steps
 
   1. Phase 1
     1. Scale down hive-operator, hive-controllers, and wait until no pods are running.
     1. Fetch yaml for all Hive v1alpha1 CRs and store on disk.
-    1. Copy all yaml and manipulate for v1 CRs into a separate parallel directory structure we can diff.
-      * Will require generating an InstallConfig secret, this is best done in go.
-      * Will require breaking out MachinePools into separate  CRs. Not a good fit for jq, may be Python or Go.
+    1. Remove all v1alpha1 finalizers.
   1. Phase 2
-    1. Deploy all v1 Hive CRDs.
-      * Ensure OLM will not choke when we deploy a new version of the CSV that carries v1 CRDs which are already deployed.
-    1. oc apply our copied and modified yaml from disk.
-    1. Examine state of cluster and ensure everything looks healthy.
-  1. Phase 3 (beginning permanent changes)
-    1. Update all owner references. (secrets, configmaps, etc)
-    1. Remove all v1alpha1 finalizers. (ensure hive-controller is not running)
-  1. Phase 4
-    1. Delete all v1alpha1 CRs.
+    1. Ensure no hive pods running.
+    1. Delete all v1alpha1 CRs. Seems safer than orphaning them in etcd and just deleting the CRDs.
     1. Delete all v1alpha1 CRDs.
-  1. Phase 5
-    1. Merge v1 into master, triggering a deploy via OLM with v1 CRs and v1alpha1 aggregated API server.
+  1. Phase 3
+    1. Deploy new version of Hive with v1 CRDs and v1alpha1 aggregated API by merging v1 branch into master.
+      * Wait for it to be up and running. No v1 CRDs will exist
+    1. Scale down new pods for hive-operator and hive-controllers again, but leave the v1alpha1 aggregated API running.
+    1. oc apply the backups of v1alpha1 CRs and let the aggregated API server migrate them and store them as v1.
+    1. Scale up hive-operator and hive-controllers, allow them to restore owner refs for us as if this was a DR restore.
 
 
 Concerns:

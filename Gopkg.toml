@@ -12,7 +12,9 @@ required = [
     "github.com/openshift/installer/pkg/asset/installconfig/azure",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/client-gen", # for go generate
+    "k8s.io/code-generator/cmd/conversion-gen", # for go generate
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
+    "k8s.io/code-generator/cmd/defaulter-gen", # for go generate
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/controller",

@@ -12,7 +12,7 @@ parameters:
   displayName: Service Namespace
   description: The namespace in which the hivev1alpha1 aggregated API server runs.
   value: hive
-- name: HIVEAPI_IMAGE
+- name: HIVE_IMAGE
   displayName: Hive v1alpha1 API Server Image
   description: Image of the Hive v1alpha1 aggregated API Server
   value: 172.17.0.1:5000/hive:latest
@@ -84,17 +84,16 @@ objects:
         labels:
           api: ${SVC_NAME}
           apiserver: "true"
-          etcd: ${SVC_NAME}
       spec:
         containers:
         - name: apiserver
-          image: ${HIVEAPI_IMAGE}
+          image: ${HIVE_IMAGE}
           volumeMounts:
           - name: apiserver-certs
             mountPath: /apiserver.local.config/certificates
             readOnly: true
           command:
-          - "hive-apiserver"
+          - "/opt/services/hive-apiserver"
           args:
           - "start"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"

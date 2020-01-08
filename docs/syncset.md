@@ -6,7 +6,9 @@
 
 To use `SyncSet` objects to manage resources, you must create them in the same namespace as the `ClusterDeployment` resource that they manage. If you want to manage resources in clusters that match a specific label use `SelectorSyncSet` instead. These objects apply changes to clusters in any namespace that match the `clusterDeploymentSelector` that you set.
 
-With both `SyncSets` and `SelectorSyncSets`, the individual resources and patches are reapplied when 2 hours have passed since their last reconciliation or if their contents are updated in the `SyncSet` or `SelectorSyncSets`.
+With both `SyncSets` and `SelectorSyncSets`, the individual resources and patches are reapplied when 2 hours have passed since their last reconciliation (by default) or if their contents are updated in the `SyncSet` or `SelectorSyncSets`.
+
+The default `syncSetReapplyInterval` can be overridden by specifying a string duration within the `hiveconfig` such as `syncSetReapplyInterval: "1h"` for a one hour reapply interval.
 
 ## SyncSet Object Definition
 

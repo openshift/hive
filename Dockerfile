@@ -31,17 +31,5 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-apiserver /opt/se
 # file and unblock ssh.
 RUN chmod g+rw /etc/passwd
 
-# Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
-# Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as
-# we're hitting libvirt over ssh. OpenShift will not let you write these directories
-# by default so we must setup some permissions here, and at runtime add our random UID
-# to /etc/passwd. (in installmanager.go)
-ENV HOME /home/hive
-RUN mkdir -p /home/hive && \
-    chgrp -R 0 /home/hive && \
-    chmod -R g=u /home/hive
-RUN chmod g=u /etc/passwd
-
-
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

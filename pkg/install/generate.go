@@ -295,7 +295,8 @@ func InstallerPodSpec(
 	if cd.Spec.Platform.BareMetal != nil {
 		containers = append(containers,
 			corev1.Container{
-				Name:            "libvirt",
+				Name: "libvirt",
+				// TODO: need an official image for this
 				Image:           "docker.io/djzager/libvirt:netstart",
 				ImagePullPolicy: corev1.PullAlways,
 				SecurityContext: corev1.SecurityContext{Privileged: pointer.BoolPtr(true)},
@@ -306,9 +307,20 @@ func InstallerPodSpec(
 						MountPath: "/output",
 					},
 				},
+				/*
+					Env: []corev1.EnvVar{
+						{
+							Name: "LIBVIRT_PORT",
+							// TODO: randomize the port here to allow more than one install pod per
+							// host
+							Value: "16509",
+						},
+					},
+				*/
 			},
 		)
-		// TODO: remove this if possible
+		// TODO: host networking is used to access the networks for target clusters.
+		// instead we should provide access: https://docs.openshift.com/container-platform/4.2/networking/multiple-networks/attaching-pod.html
 		hostNetwork := true
 	}
 

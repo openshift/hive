@@ -75,7 +75,6 @@ const (
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
 	defaultPullSecretMountPath          = "/pullsecret/" + corev1.DockerConfigJsonKey
 	defaultManifestsMountPath           = "/manifests"
-	hiveSSHKnownHostsAnnotation         = "hive.openshift.io/ssh-known-host"
 )
 
 var (
@@ -266,14 +265,6 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error writing install-config.yaml")
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
-
-	if knownHost, ok := cd.Annotations[hiveSSHKnownHostsAnnotation]; ok {
-		err = m.setupSSHKnownHost(knownHost)
-		if err != nil {
-			m.log.WithError(err).Error("error setting up SSH known_hosts")
-			return err
-		}
-	}
 
 	// If the cluster provision has an infraID set, this implies we failed an install
 	// and are re-trying. Cleanup any resources that may have been provisioned.
@@ -1161,45 +1152,6 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 		},
 	)
 	return errors.Wrap(err, "ClusterProvision did not transition to provisioning stage")
-}
-
-func (m *InstallManager) setupSSHKnownHost(knownHost string) error {
-
-	// Add our potentially random UID to /etc/passwd so ssh works. Need to shell out here as
-	// the go libraries for user info appear to rely on /etc/passwd, which our user is not in.
-	// TODO: temporary work so we can use libvirt over ssh, this whole function can go once we're no longer doing that.
-	out, err := exec.Command("id", "-u").Output()
-	if err != nil {
-		m.log.WithError(err).Error("error running id -u")
-		return err
-	}
-	uid := strings.TrimSpace(string(out))
-	m.log.Infof("Adding user ID to passwd file: %s", uid)
-	f, err := os.OpenFile("/etc/passwd",
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		m.log.WithError(err).Error("error opening /etc/passwd")
-		return err
-	}
-	defer f.Close()
-	passwdLine := fmt.Sprintf("default:x:%s:0:default user:/home/hive:/sbin/nologin\n", uid)
-	m.log.Infof("Wrote passwd line: %s", passwdLine)
-	if _, err := f.WriteString(passwdLine); err != nil {
-		m.log.WithError(err).Error("error writing to /etc/passwd")
-		return err
-	}
-
-	sshDir := "/home/hive/.ssh"
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		m.log.WithError(err).Errorf("error creating %s directory", sshDir)
-		return err
-	}
-	if err := ioutil.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte(knownHost), 0644); err != nil {
-		m.log.WithError(err).Error("error writing ssh known_hosts")
-		return err
-	}
-	m.log.Infof("Wrote known host to %s/known_hosts: %s", sshDir, knownHost)
-	return nil
 }
 
 type provisionMutation func(provision *hivev1.ClusterProvision)

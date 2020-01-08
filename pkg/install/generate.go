@@ -291,11 +291,33 @@ func InstallerPodSpec(
 		},
 	}
 
+	var hostNetwork bool
+	if cd.Spec.Platform.BareMetal != nil {
+		containers = append(containers,
+			corev1.Container{
+				Name:            "libvirt",
+				Image:           "docker.io/djzager/libvirt:netstart",
+				ImagePullPolicy: corev1.PullAlways,
+				SecurityContext: corev1.SecurityContext{Privileged: pointer.BoolPtr(true)},
+				// Re-use the output mount shared between installer and hive containers
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "output",
+						MountPath: "/output",
+					},
+				},
+			},
+		)
+		// TODO: remove this if possible
+		hostNetwork := true
+	}
+
 	return &corev1.PodSpec{
 		DNSPolicy:          corev1.DNSClusterFirst,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         containers,
 		Volumes:            volumes,
+		HostNetwork:        hostNetwork,
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
 	}, nil

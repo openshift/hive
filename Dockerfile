@@ -6,6 +6,7 @@ RUN go build -o bin/manager github.com/openshift/hive/cmd/manager
 RUN go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
 RUN go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
 RUN go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
+RUN go build -o bin/hive-apiserver github.com/openshift/hive/cmd/hive-apiserver
 
 #FROM registry.access.redhat.com/ubi7/ubi
 FROM registry.svc.ci.openshift.org/origin/4.1:base
@@ -20,6 +21,7 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-operator /opt/services
+COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-apiserver /opt/services/
 
 # In the event of failures we run ssh commands to execute the script which gathers logs
 # from all systems in the cluster, and scp's those from the bootstrap node into the

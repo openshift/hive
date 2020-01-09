@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: apiserver-template
+
+parameters:
+- name: SVC_NAME
+  displayName: Service Name
+  description: The name of the hive v1alpha1 aggregated API server service.
+  value: hiveapi
+- name: SVC_NAMESPACE
+  displayName: Service Namespace
+  description: The namespace in which the hivev1alpha1 aggregated API server runs.
+  value: hive
+- name: HIVE_IMAGE
+  displayName: Hive v1alpha1 API Server Image
+  description: Image of the Hive v1alpha1 aggregated API Server
+  value: 172.17.0.1:5000/hive:latest
+- name: CA_CRT
+  displayName: Hive v1alpha1 CA CRT
+  description: base64-encoded CA CRT for the hive v1alpha1 aggregated API Server
+  required: true
+- name: TLS_CRT
+  displayName: Hive v1alpha1 TLS CRT
+  description: base-64 encoded TLS CRT for the hive v1alpha1 aggregated API Server
+  required: true
+- name: TLS_KEY
+  displayName: Hive v1alpha1 TLS KEY
+  description: base-64 encoded TLS key for the hive v1alpha1 aggregated API Server
+  required: true
+
+objects:
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: ${SVC_NAMESPACE}
+
+- apiVersion: apiregistration.k8s.io/v1
+  kind: APIService
+  metadata:
+    name: v1alpha1.hive.openshift.io
+    labels:
+      api: hiveapi
+      apiserver: "true"
+  spec:
+    version: v1alpha1
+    group: hive.openshift.io
+    groupPriorityMinimum: 2000
+    service:
+      name: ${SVC_NAME}
+      namespace: ${SVC_NAMESPACE}
+    versionPriority: 10
+    caBundle: ${CA_CRT}
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${SVC_NAME}
+    namespace: ${SVC_NAMESPACE}
+    labels:
+      api: ${SVC_NAME}
+      apiserver: "true"
+  spec:
+    ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 443
+    selector:
+      api: ${SVC_NAME}
+      apiserver: "true"
+
+- apiVersion: apps/v1beta1
+  kind: Deployment
+  metadata:
+    name: ${SVC_NAME}
+    namespace: ${SVC_NAMESPACE}
+    labels:
+      api: ${SVC_NAME}
+      apiserver: "true"
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          api: ${SVC_NAME}
+          apiserver: "true"
+      spec:
+        containers:
+        - name: apiserver
+          image: ${HIVE_IMAGE}
+          volumeMounts:
+          - name: apiserver-certs
+            mountPath: /apiserver.local.config/certificates
+            readOnly: true
+          command:
+          - "/opt/services/hive-apiserver"
+          args:
+          - "start"
+          - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
+          - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 20Mi
+            limits:
+              cpu: 100m
+              memory: 30Mi
+        serviceAccountName: ${SVC_NAME}-sa
+        volumes:
+        - name: apiserver-certs
+          secret:
+            secretName: ${SVC_NAME}
+
+- apiVersion: v1
+  kind: Secret
+  type: kubernetes.io/tls
+  metadata:
+    name: ${SVC_NAME}
+    namespace: ${SVC_NAMESPACE}
+    labels:
+      api: ${SVC_NAME}
+      apiserver: "true"
+  data:
+    tls.crt: ${TLS_CRT}
+    tls.key: ${TLS_KEY}
+
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: ${SVC_NAME}-sa
+    namespace: ${SVC_NAMESPACE}
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: ${SVC_NAME}-cluster-admin
+    namespace: ${SVC_NAMESPACE}
+  subjects:
+    - kind: ServiceAccount
+      name: ${SVC_NAME}-sa
+      namespace: ${SVC_NAMESPACE}
+  roleRef:
+    kind: ClusterRole
+    name: cluster-admin
+    apiGroup: rbac.authorization.k8s.io

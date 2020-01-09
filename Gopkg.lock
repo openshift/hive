@@ -880,10 +880,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d52e40c8c2f0c086a06ec3b5f2f001ee767580e0c2d2bd805a27665220d3b9bd"
+  digest = "1:dc72947420fba63fc4131bf8474dfed1a837df3c4ba5c8a111d05039eed15c7a"
   name = "github.com/openshift/library-go"
   packages = [
     "pkg/apiserver/apiserverconfig",
+    "pkg/controller",
     "pkg/operator/events",
     "pkg/operator/resource/resourcemerge",
     "pkg/operator/resource/resourceread",
@@ -1415,12 +1416,11 @@
   version = "kubernetes-1.14.1"
 
 [[projects]]
-  digest = "1:f91a40d3c310ce9fa36417f61b9d1816314da5c6d7e8da46d9b467c09869666e"
+  digest = "1:fc6d264b521728322ce1ca10c764edda4df125741c99fdf27a28cc9e3dd9fbf0"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/apitesting",
     "pkg/api/apitesting/fuzzer",
-    "pkg/api/apitesting/roundtrip",
     "pkg/api/equality",
     "pkg/api/errors",
     "pkg/api/meta",
@@ -1894,42 +1894,21 @@
   revision = "07b8972065522ba66df16032247530e1dbaca011"
 
 [[projects]]
-  digest = "1:91d4c018c82383964bf55aadc227492180841fe8c6e17c4ef2546a120b0f1521"
+  digest = "1:22f181aee3676cbbac6d97dce8105e60e1bd83a4803c8fc0a6117f60dbe028ca"
   name = "k8s.io/kubernetes"
   packages = [
     "pkg/api/legacyscheme",
     "pkg/api/service",
-    "pkg/api/testing",
-    "pkg/apis/admissionregistration",
-    "pkg/apis/admissionregistration/fuzzer",
     "pkg/apis/apps",
-    "pkg/apis/apps/fuzzer",
-    "pkg/apis/auditregistration",
-    "pkg/apis/auditregistration/fuzzer",
     "pkg/apis/autoscaling",
-    "pkg/apis/autoscaling/fuzzer",
-    "pkg/apis/batch",
-    "pkg/apis/batch/fuzzer",
-    "pkg/apis/certificates",
-    "pkg/apis/certificates/fuzzer",
     "pkg/apis/core",
-    "pkg/apis/core/fuzzer",
     "pkg/apis/core/helper",
     "pkg/apis/core/install",
     "pkg/apis/core/pods",
     "pkg/apis/core/v1",
     "pkg/apis/core/v1/helper",
     "pkg/apis/core/validation",
-    "pkg/apis/extensions/fuzzer",
-    "pkg/apis/networking",
-    "pkg/apis/networking/fuzzer",
-    "pkg/apis/policy",
-    "pkg/apis/policy/fuzzer",
-    "pkg/apis/rbac",
-    "pkg/apis/rbac/fuzzer",
     "pkg/apis/scheduling",
-    "pkg/apis/storage",
-    "pkg/apis/storage/fuzzer",
     "pkg/capabilities",
     "pkg/client/metrics/prometheus",
     "pkg/features",
@@ -2137,7 +2116,6 @@
     "github.com/emicklei/go-restful",
     "github.com/evanphx/json-patch",
     "github.com/ghodss/yaml",
-    "github.com/go-openapi/spec",
     "github.com/golang/mock/gomock",
     "github.com/google/gofuzz",
     "github.com/google/uuid",
@@ -2170,6 +2148,7 @@
     "github.com/openshift/installer/pkg/types/azure",
     "github.com/openshift/installer/pkg/types/gcp",
     "github.com/openshift/library-go/pkg/apiserver/apiserverconfig",
+    "github.com/openshift/library-go/pkg/controller",
     "github.com/openshift/library-go/pkg/operator/events",
     "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
     "github.com/openshift/library-go/pkg/operator/resource/resourceread",
@@ -2202,7 +2181,6 @@
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/apitesting",
     "k8s.io/apimachinery/pkg/api/apitesting/fuzzer",
-    "k8s.io/apimachinery/pkg/api/apitesting/roundtrip",
     "k8s.io/apimachinery/pkg/api/equality",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/meta",
@@ -2272,9 +2250,7 @@
     "k8s.io/klog",
     "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
     "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1",
-    "k8s.io/kube-openapi/pkg/common",
     "k8s.io/kubernetes/pkg/api/legacyscheme",
-    "k8s.io/kubernetes/pkg/api/testing",
     "k8s.io/kubernetes/pkg/apis/core",
     "k8s.io/kubernetes/pkg/apis/core/install",
     "k8s.io/kubernetes/pkg/apis/core/v1",

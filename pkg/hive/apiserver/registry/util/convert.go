@@ -2,14 +2,13 @@ package util
 
 import (
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	installtypes "github.com/openshift/installer/pkg/types"
 	installtypesaws "github.com/openshift/installer/pkg/types/aws"
 	installtypesazure "github.com/openshift/installer/pkg/types/azure"
 	installtypesgcp "github.com/openshift/installer/pkg/types/gcp"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	hiveapiaws "github.com/openshift/hive/pkg/hive/apis/hive/aws"
 	hiveapiazure "github.com/openshift/hive/pkg/hive/apis/hive/azure"
@@ -18,569 +17,429 @@ import (
 )
 
 // CheckpointToHiveV1 turns a v1alpha1 Checkpoint into a v1 Checkpoint.
-// The returned object is safe to mutate.
-func CheckpointToHiveV1(obj *hiveapi.Checkpoint) (*hivev1.Checkpoint, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.Checkpoint{}
-	if err := hiveconversion.Convert_v1alpha1_Checkpoint_To_v1_Checkpoint(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func CheckpointToHiveV1(in *hiveapi.Checkpoint, out *hivev1.Checkpoint) error {
+	return hiveconversion.Convert_v1alpha1_Checkpoint_To_v1_Checkpoint(in.DeepCopy(), out, nil)
 }
 
 // CheckpointFromHiveV1 turns a v1 Checkpoint into a v1alpha1 Checkpoint.
-// The returned object is safe to mutate.
-func CheckpointFromHiveV1(obj *hivev1.Checkpoint) (*hiveapi.Checkpoint, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.Checkpoint{}
-	if err := hiveconversion.Convert_v1_Checkpoint_To_v1alpha1_Checkpoint(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func CheckpointFromHiveV1(in *hivev1.Checkpoint, out *hiveapi.Checkpoint) error {
+	return hiveconversion.Convert_v1_Checkpoint_To_v1alpha1_Checkpoint(in.DeepCopy(), out, nil)
 }
 
 // ClusterDeploymentToHiveV1 turns a v1alpha1 ClusterDeployment into a v1 ClusterDeployment.
-// The returned object is safe to mutate.
-func ClusterDeploymentToHiveV1(obj *hiveapi.ClusterDeployment, sshKey string) (*hivev1.ClusterDeployment, *installtypes.InstallConfig, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
+func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig) error {
+	in = in.DeepCopy()
 
-	convertedObj := &hivev1.ClusterDeployment{}
-	if err := hiveconversion.Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(objCopy, convertedObj, nil); err != nil {
-		return nil, nil, err
+	if err := hiveconversion.Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in, out, nil); err != nil {
+		return err
 	}
 
-	installConfig := &installtypes.InstallConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: objCopy.Spec.ClusterName,
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: installtypes.InstallConfigVersion,
-		},
-		SSHKey:     sshKey,
-		BaseDomain: objCopy.Spec.BaseDomain,
-		Networking: &installtypes.Networking{
-			NetworkType:    string(objCopy.Spec.Networking.Type),
-			ServiceNetwork: []ipnet.IPNet{*parseCIDR(objCopy.Spec.Networking.ServiceCIDR)},
-			MachineCIDR:    parseCIDR(objCopy.Spec.Networking.MachineCIDR),
-		},
-		// PullSecret: <filled in by the Hive installmanager>
-		ControlPlane: machinePoolToInstallConfig(&objCopy.Spec.ControlPlane),
+	installConfig.ObjectMeta.Name = in.Spec.ClusterName
+	installConfig.TypeMeta.APIVersion = installtypes.InstallConfigVersion
+	installConfig.SSHKey = sshKey
+	installConfig.BaseDomain = in.Spec.BaseDomain
+	if installConfig.Networking == nil {
+		installConfig.Networking = &installtypes.Networking{}
 	}
-	installConfig.ClusterNetwork = make([]installtypes.ClusterNetworkEntry, len(objCopy.Spec.ClusterNetworks))
-	for i, inNet := range objCopy.Spec.ClusterNetworks {
+	installConfig.Networking.NetworkType = string(in.Spec.Networking.Type)
+	installConfig.Networking.ServiceNetwork = []ipnet.IPNet{*parseCIDR(in.Spec.Networking.ServiceCIDR)}
+	installConfig.Networking.MachineCIDR = parseCIDR(in.Spec.Networking.MachineCIDR)
+	// installConfig.PullSecret = <filled in by the Hive installmanager>
+	if installConfig.ControlPlane == nil {
+		installConfig.ControlPlane = &installtypes.MachinePool{}
+	}
+	machinePoolToInstallConfig(&in.Spec.ControlPlane, installConfig.ControlPlane)
+	installConfig.ClusterNetwork = make([]installtypes.ClusterNetworkEntry, len(in.Spec.ClusterNetworks))
+	for i, inNet := range in.Spec.ClusterNetworks {
 		outNet := &installConfig.ClusterNetwork[i]
 		outNet.CIDR = *parseCIDR(inNet.CIDR)
 		// In v1alpha1, Hive is mis-interpreting the host subnet length as the host prefix.
 		outNet.HostPrefix = int32(inNet.HostSubnetLength)
 	}
-	if aws := objCopy.Spec.AWS; aws != nil {
-		installConfig.AWS = &installtypesaws.Platform{
-			Region:                 aws.Region,
-			UserTags:               aws.UserTags,
-			DefaultMachinePlatform: awsMachinePoolToInstallConfig(aws.DefaultMachinePlatform),
+	if inAWS := in.Spec.AWS; inAWS != nil {
+		if installConfig.AWS == nil {
+			installConfig.AWS = &installtypesaws.Platform{}
 		}
+		outAWS := installConfig.AWS
+		outAWS.Region = inAWS.Region
+		outAWS.UserTags = inAWS.UserTags
+		if p := inAWS.DefaultMachinePlatform; p != nil {
+			if outAWS.DefaultMachinePlatform == nil {
+				outAWS.DefaultMachinePlatform = &installtypesaws.MachinePool{}
+			}
+			awsMachinePoolToInstallConfig(p, outAWS.DefaultMachinePlatform)
+		} else {
+			outAWS.DefaultMachinePlatform = nil
+		}
+	} else {
+		installConfig.AWS = nil
 	}
-	if azure := objCopy.Spec.Azure; azure != nil {
-		installConfig.Azure = &installtypesazure.Platform{
-			Region:                      azure.Region,
-			BaseDomainResourceGroupName: azure.BaseDomainResourceGroupName,
-			DefaultMachinePlatform:      azureMachinePoolToInstallConfig(azure.DefaultMachinePlatform),
+	if inAzure := in.Spec.Azure; inAzure != nil {
+		if installConfig.Azure == nil {
+			installConfig.Azure = &installtypesazure.Platform{}
 		}
+		outAzure := installConfig.Azure
+		outAzure.Region = inAzure.Region
+		outAzure.BaseDomainResourceGroupName = inAzure.BaseDomainResourceGroupName
+		if p := inAzure.DefaultMachinePlatform; p != nil {
+			if outAzure.DefaultMachinePlatform == nil {
+				outAzure.DefaultMachinePlatform = &installtypesazure.MachinePool{}
+			}
+			azureMachinePoolToInstallConfig(p, outAzure.DefaultMachinePlatform)
+		} else {
+			outAzure.DefaultMachinePlatform = nil
+		}
+	} else {
+		installConfig.Azure = nil
 	}
-	if gcp := objCopy.Spec.GCP; gcp != nil {
-		installConfig.GCP = &installtypesgcp.Platform{
-			ProjectID:              gcp.ProjectID,
-			Region:                 gcp.Region,
-			DefaultMachinePlatform: gcpMachinePoolToInstallConfig(gcp.DefaultMachinePlatform),
+	if inGCP := in.Spec.GCP; inGCP != nil {
+		if installConfig.GCP == nil {
+			installConfig.GCP = &installtypesgcp.Platform{}
 		}
+		outGCP := installConfig.GCP
+		outGCP.ProjectID = inGCP.ProjectID
+		outGCP.Region = inGCP.Region
+		if p := inGCP.DefaultMachinePlatform; p != nil {
+			if outGCP.DefaultMachinePlatform == nil {
+				outGCP.DefaultMachinePlatform = &installtypesgcp.MachinePool{}
+			}
+			gcpMachinePoolToInstallConfig(p, outGCP.DefaultMachinePlatform)
+		} else {
+			outGCP.DefaultMachinePlatform = nil
+		}
+	} else {
+		installConfig.GCP = nil
 	}
 	installConfig.ControlPlane.Name = "master"
-	for _, compute := range objCopy.Spec.Compute {
-		if compute.Name != "worker" {
+	installConfig.Compute = nil
+	for _, inCompute := range in.Spec.Compute {
+		if inCompute.Name != "worker" {
 			continue
 		}
-		installConfig.Compute = []installtypes.MachinePool{
-			*machinePoolToInstallConfig(&compute),
-		}
+		outCompute := installtypes.MachinePool{}
+		machinePoolToInstallConfig(&inCompute, &outCompute)
+		installConfig.Compute = append(installConfig.Compute, outCompute)
 	}
 
-	return convertedObj, installConfig, nil
+	return nil
 }
 
 // ClusterDeploymentFromHiveV1 turns a v1 ClusterDeployment into a v1alpha1 ClusterDeployment.
-// The returned object is safe to mutate.
-func ClusterDeploymentFromHiveV1(obj *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig) (*hiveapi.ClusterDeployment, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
+func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, out *hiveapi.ClusterDeployment) error {
+	in = in.DeepCopy()
 
-	convertedObj := &hiveapi.ClusterDeployment{}
-	if err := hiveconversion.Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(objCopy, convertedObj, nil); err != nil {
-		return nil, err
+	if err := hiveconversion.Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in, out, nil); err != nil {
+		return err
 	}
 
 	if installConfig != nil {
 		if networking := installConfig.Networking; networking != nil {
 			if cidr := networking.MachineCIDR; cidr != nil {
-				convertedObj.Spec.MachineCIDR = cidr.String()
+				out.Spec.MachineCIDR = cidr.String()
+			} else {
+				out.Spec.MachineCIDR = ""
 			}
-			convertedObj.Spec.Type = hiveapi.NetworkType(networking.NetworkType)
+			out.Spec.Type = hiveapi.NetworkType(networking.NetworkType)
 			if len(networking.ServiceNetwork) > 0 {
-				convertedObj.Spec.ServiceCIDR = networking.ServiceNetwork[0].String()
+				out.Spec.ServiceCIDR = networking.ServiceNetwork[0].String()
+			} else {
+				out.Spec.ServiceCIDR = ""
 			}
-			convertedObj.Spec.ClusterNetworks = make([]netopv1.ClusterNetwork, len(networking.ClusterNetwork))
+			out.Spec.ClusterNetworks = make([]netopv1.ClusterNetwork, len(networking.ClusterNetwork))
 			for i, inNet := range networking.ClusterNetwork {
-				outNet := &convertedObj.Spec.ClusterNetworks[i]
+				outNet := &out.Spec.ClusterNetworks[i]
 				outNet.CIDR = inNet.CIDR.String()
 				// In v1alpha1, Hive is mis-interpreting the host subnet length as the host prefix.
 				outNet.HostSubnetLength = uint32(inNet.HostPrefix)
 			}
+		} else {
+			out.Spec.MachineCIDR = ""
+			out.Spec.Type = ""
+			out.Spec.ServiceCIDR = ""
+			out.Spec.ClusterNetworks = nil
 		}
 		if cp := installConfig.ControlPlane; cp != nil {
-			convertedObj.Spec.ControlPlane = *machinePoolFromInstallConfig(cp)
+			machinePoolFromInstallConfig(cp, &out.Spec.ControlPlane)
+		} else {
+			out.Spec.ControlPlane = hiveapi.MachinePool{}
 		}
-		convertedObj.Spec.Compute = make([]hiveapi.MachinePool, len(installConfig.Compute))
+		out.Spec.Compute = make([]hiveapi.MachinePool, len(installConfig.Compute))
 		for i, c := range installConfig.Compute {
-			convertedObj.Spec.Compute[i] = *machinePoolFromInstallConfig(&c)
+			machinePoolFromInstallConfig(&c, &out.Spec.Compute[i])
 		}
-		if aws := installConfig.AWS; aws != nil {
-			convertedObj.Spec.AWS = &hiveapiaws.Platform{
-				Region:                 aws.Region,
-				UserTags:               aws.UserTags,
-				DefaultMachinePlatform: awsMachinePoolFromInstallConfig(aws.DefaultMachinePlatform),
+		if inAWS := installConfig.AWS; inAWS != nil {
+			if out.Spec.AWS == nil {
+				out.Spec.AWS = &hiveapiaws.Platform{}
 			}
-		}
-		if azure := installConfig.Azure; azure != nil {
-			convertedObj.Spec.Azure = &hiveapiazure.Platform{
-				Region:                      azure.Region,
-				BaseDomainResourceGroupName: azure.BaseDomainResourceGroupName,
-				DefaultMachinePlatform:      azureMachinePoolFromInstallConfig(azure.DefaultMachinePlatform),
+			outAWS := out.Spec.AWS
+			outAWS.Region = inAWS.Region
+			outAWS.UserTags = inAWS.UserTags
+			if p := inAWS.DefaultMachinePlatform; p != nil {
+				if outAWS.DefaultMachinePlatform == nil {
+					outAWS.DefaultMachinePlatform = &hiveapiaws.MachinePoolPlatform{}
+				}
+				awsMachinePoolFromInstallConfig(p, outAWS.DefaultMachinePlatform)
+			} else {
+				outAWS.DefaultMachinePlatform = nil
 			}
+		} else {
+			out.Spec.AWS = nil
 		}
-		if gcp := installConfig.GCP; gcp != nil {
-			convertedObj.Spec.GCP = &hiveapigcp.Platform{
-				ProjectID:              gcp.ProjectID,
-				Region:                 gcp.Region,
-				DefaultMachinePlatform: gcpMachinePoolFromInstallConfig(gcp.DefaultMachinePlatform),
+		if inAzure := installConfig.Azure; inAzure != nil {
+			if out.Spec.Azure == nil {
+				out.Spec.Azure = &hiveapiazure.Platform{}
 			}
+			outAzure := out.Spec.Azure
+			outAzure.Region = inAzure.Region
+			outAzure.BaseDomainResourceGroupName = inAzure.BaseDomainResourceGroupName
+			if p := inAzure.DefaultMachinePlatform; p != nil {
+				if outAzure.DefaultMachinePlatform == nil {
+					outAzure.DefaultMachinePlatform = &hiveapiazure.MachinePool{}
+				}
+				azureMachinePoolFromInstallConfig(p, outAzure.DefaultMachinePlatform)
+			} else {
+				outAzure.DefaultMachinePlatform = nil
+			}
+		} else {
+			out.Spec.Azure = nil
 		}
+		if inGCP := installConfig.GCP; inGCP != nil {
+			if out.Spec.GCP == nil {
+				out.Spec.GCP = &hiveapigcp.Platform{}
+			}
+			outGCP := out.Spec.GCP
+			outGCP.ProjectID = inGCP.ProjectID
+			outGCP.Region = inGCP.Region
+			if p := inGCP.DefaultMachinePlatform; p != nil {
+				if outGCP.DefaultMachinePlatform == nil {
+					outGCP.DefaultMachinePlatform = &hiveapigcp.MachinePool{}
+				}
+				gcpMachinePoolFromInstallConfig(p, outGCP.DefaultMachinePlatform)
+			} else {
+				outGCP.DefaultMachinePlatform = nil
+			}
+		} else {
+			out.Spec.GCP = nil
+		}
+	} else {
+		out.Spec.MachineCIDR = ""
+		out.Spec.Type = ""
+		out.Spec.ServiceCIDR = ""
+		out.Spec.ClusterNetworks = nil
+		out.Spec.ControlPlane = hiveapi.MachinePool{}
+		out.Spec.Compute = nil
+		out.Spec.AWS = nil
+		out.Spec.Azure = nil
+		out.Spec.GCP = nil
 	}
 
-	return convertedObj, nil
+	return nil
 }
 
 // ClusterDeprovisionRequestToHiveV1 turns a v1alpha1 ClusterDeprovisionRequest into a v1 ClusterDeprovisionRequest.
-// The returned object is safe to mutate.
-func ClusterDeprovisionRequestToHiveV1(obj *hiveapi.ClusterDeprovisionRequest) (*hivev1.ClusterDeprovision, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.ClusterDeprovision{}
-	if err := hiveconversion.Convert_v1alpha1_ClusterDeprovisionRequest_To_v1_ClusterDeprovision(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterDeprovisionRequestToHiveV1(in *hiveapi.ClusterDeprovisionRequest, out *hivev1.ClusterDeprovision) error {
+	return hiveconversion.Convert_v1alpha1_ClusterDeprovisionRequest_To_v1_ClusterDeprovision(in.DeepCopy(), out, nil)
 }
 
 // ClusterDeprovisionRequestFromHiveV1 turns a v1 ClusterDeprovisionRequest into a v1alpha1 ClusterDeprovisionRequest.
-// The returned object is safe to mutate.
-func ClusterDeprovisionRequestFromHiveV1(obj *hivev1.ClusterDeprovision) (*hiveapi.ClusterDeprovisionRequest, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.ClusterDeprovisionRequest{}
-	if err := hiveconversion.Convert_v1_ClusterDeprovision_To_v1alpha1_ClusterDeprovisionRequest(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterDeprovisionRequestFromHiveV1(in *hivev1.ClusterDeprovision, out *hiveapi.ClusterDeprovisionRequest) error {
+	return hiveconversion.Convert_v1_ClusterDeprovision_To_v1alpha1_ClusterDeprovisionRequest(in.DeepCopy(), out, nil)
 }
 
 // ClusterImageSetToHiveV1 turns a v1alpha1 ClusterImageSet into a v1 ClusterImageSet.
-// The returned object is safe to mutate.
-func ClusterImageSetToHiveV1(obj *hiveapi.ClusterImageSet) (*hivev1.ClusterImageSet, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.ClusterImageSet{}
-	if err := hiveconversion.Convert_v1alpha1_ClusterImageSet_To_v1_ClusterImageSet(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterImageSetToHiveV1(in *hiveapi.ClusterImageSet, out *hivev1.ClusterImageSet) error {
+	return hiveconversion.Convert_v1alpha1_ClusterImageSet_To_v1_ClusterImageSet(in.DeepCopy(), out, nil)
 }
 
 // ClusterImageSetFromHiveV1 turns a v1 ClusterImageSet into a v1alpha1 ClusterImageSet.
-// The returned object is safe to mutate.
-func ClusterImageSetFromHiveV1(obj *hivev1.ClusterImageSet) (*hiveapi.ClusterImageSet, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.ClusterImageSet{}
-	if err := hiveconversion.Convert_v1_ClusterImageSet_To_v1alpha1_ClusterImageSet(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterImageSetFromHiveV1(in *hivev1.ClusterImageSet, out *hiveapi.ClusterImageSet) error {
+	return hiveconversion.Convert_v1_ClusterImageSet_To_v1alpha1_ClusterImageSet(in.DeepCopy(), out, nil)
 }
 
 // ClusterProvisionToHiveV1 turns a v1alpha1 ClusterProvision into a v1 ClusterProvision.
-// The returned object is safe to mutate.
-func ClusterProvisionToHiveV1(obj *hiveapi.ClusterProvision) (*hivev1.ClusterProvision, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.ClusterProvision{}
-	if err := hiveconversion.Convert_v1alpha1_ClusterProvision_To_v1_ClusterProvision(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterProvisionToHiveV1(in *hiveapi.ClusterProvision, out *hivev1.ClusterProvision) error {
+	return hiveconversion.Convert_v1alpha1_ClusterProvision_To_v1_ClusterProvision(in.DeepCopy(), out, nil)
 }
 
 // ClusterProvisionFromHiveV1 turns a v1 ClusterProvision into a v1alpha1 ClusterProvision.
-// The returned object is safe to mutate.
-func ClusterProvisionFromHiveV1(obj *hivev1.ClusterProvision) (*hiveapi.ClusterProvision, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.ClusterProvision{}
-	if err := hiveconversion.Convert_v1_ClusterProvision_To_v1alpha1_ClusterProvision(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterProvisionFromHiveV1(in *hivev1.ClusterProvision, out *hiveapi.ClusterProvision) error {
+	return hiveconversion.Convert_v1_ClusterProvision_To_v1alpha1_ClusterProvision(in.DeepCopy(), out, nil)
 }
 
 // ClusterStateToHiveV1 turns a v1alpha1 ClusterState into a v1 ClusterState.
-// The returned object is safe to mutate.
-func ClusterStateToHiveV1(obj *hiveapi.ClusterState) (*hivev1.ClusterState, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.ClusterState{}
-	if err := hiveconversion.Convert_v1alpha1_ClusterState_To_v1_ClusterState(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterStateToHiveV1(in *hiveapi.ClusterState, out *hivev1.ClusterState) error {
+	return hiveconversion.Convert_v1alpha1_ClusterState_To_v1_ClusterState(in.DeepCopy(), out, nil)
 }
 
 // ClusterStateFromHiveV1 turns a v1 ClusterState into a v1alpha1 ClusterState.
-// The returned object is safe to mutate.
-func ClusterStateFromHiveV1(obj *hivev1.ClusterState) (*hiveapi.ClusterState, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.ClusterState{}
-	if err := hiveconversion.Convert_v1_ClusterState_To_v1alpha1_ClusterState(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func ClusterStateFromHiveV1(in *hivev1.ClusterState, out *hiveapi.ClusterState) error {
+	return hiveconversion.Convert_v1_ClusterState_To_v1alpha1_ClusterState(in.DeepCopy(), out, nil)
 }
 
 // DNSZoneToHiveV1 turns a v1alpha1 DNSZone into a v1 DNSZone.
-// The returned object is safe to mutate.
-func DNSZoneToHiveV1(obj *hiveapi.DNSZone) (*hivev1.DNSZone, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.DNSZone{}
-	if err := hiveconversion.Convert_v1alpha1_DNSZone_To_v1_DNSZone(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func DNSZoneToHiveV1(in *hiveapi.DNSZone, out *hivev1.DNSZone) error {
+	return hiveconversion.Convert_v1alpha1_DNSZone_To_v1_DNSZone(in.DeepCopy(), out, nil)
 }
 
 // DNSZoneFromHiveV1 turns a v1 DNSZone into a v1alpha1 DNSZone.
-// The returned object is safe to mutate.
-func DNSZoneFromHiveV1(obj *hivev1.DNSZone) (*hiveapi.DNSZone, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.DNSZone{}
-	if err := hiveconversion.Convert_v1_DNSZone_To_v1alpha1_DNSZone(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func DNSZoneFromHiveV1(in *hivev1.DNSZone, out *hiveapi.DNSZone) error {
+	return hiveconversion.Convert_v1_DNSZone_To_v1alpha1_DNSZone(in.DeepCopy(), out, nil)
 }
 
 // HiveConfigToHiveV1 turns a v1alpha1 HiveConfig into a v1 HiveConfig.
-// The returned object is safe to mutate.
-func HiveConfigToHiveV1(obj *hiveapi.HiveConfig) (*hivev1.HiveConfig, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.HiveConfig{}
-	if err := hiveconversion.Convert_v1alpha1_HiveConfig_To_v1_HiveConfig(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func HiveConfigToHiveV1(in *hiveapi.HiveConfig, out *hivev1.HiveConfig) error {
+	return hiveconversion.Convert_v1alpha1_HiveConfig_To_v1_HiveConfig(in.DeepCopy(), out, nil)
 }
 
 // HiveConfigFromHiveV1 turns a v1 HiveConfig into a v1alpha1 HiveConfig.
-// The returned object is safe to mutate.
-func HiveConfigFromHiveV1(obj *hivev1.HiveConfig) (*hiveapi.HiveConfig, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.HiveConfig{}
-	if err := hiveconversion.Convert_v1_HiveConfig_To_v1alpha1_HiveConfig(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func HiveConfigFromHiveV1(in *hivev1.HiveConfig, out *hiveapi.HiveConfig) error {
+	return hiveconversion.Convert_v1_HiveConfig_To_v1alpha1_HiveConfig(in.DeepCopy(), out, nil)
 }
 
 // SyncIdentityProviderToHiveV1 turns a v1alpha1 SyncIdentityProvider into a v1 SyncIdentityProvider.
-// The returned object is safe to mutate.
-func SyncIdentityProviderToHiveV1(obj *hiveapi.SyncIdentityProvider) (*hivev1.SyncIdentityProvider, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.SyncIdentityProvider{}
-	if err := hiveconversion.Convert_v1alpha1_SyncIdentityProvider_To_v1_SyncIdentityProvider(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SyncIdentityProviderToHiveV1(in *hiveapi.SyncIdentityProvider, out *hivev1.SyncIdentityProvider) error {
+	return hiveconversion.Convert_v1alpha1_SyncIdentityProvider_To_v1_SyncIdentityProvider(in.DeepCopy(), out, nil)
 }
 
 // SyncIdentityProviderFromHiveV1 turns a v1 SyncIdentityProvider into a v1alpha1 SyncIdentityProvider.
-// The returned object is safe to mutate.
-func SyncIdentityProviderFromHiveV1(obj *hivev1.SyncIdentityProvider) (*hiveapi.SyncIdentityProvider, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.SyncIdentityProvider{}
-	if err := hiveconversion.Convert_v1_SyncIdentityProvider_To_v1alpha1_SyncIdentityProvider(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SyncIdentityProviderFromHiveV1(in *hivev1.SyncIdentityProvider, out *hiveapi.SyncIdentityProvider) error {
+	return hiveconversion.Convert_v1_SyncIdentityProvider_To_v1alpha1_SyncIdentityProvider(in.DeepCopy(), out, nil)
 }
 
 // SelectorSyncIdentityProviderToHiveV1 turns a v1alpha1 SelectorSyncIdentityProvider into a v1 SelectorSyncIdentityProvider.
-// The returned object is safe to mutate.
-func SelectorSyncIdentityProviderToHiveV1(obj *hiveapi.SelectorSyncIdentityProvider) (*hivev1.SelectorSyncIdentityProvider, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.SelectorSyncIdentityProvider{}
-	if err := hiveconversion.Convert_v1alpha1_SelectorSyncIdentityProvider_To_v1_SelectorSyncIdentityProvider(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SelectorSyncIdentityProviderToHiveV1(in *hiveapi.SelectorSyncIdentityProvider, out *hivev1.SelectorSyncIdentityProvider) error {
+	return hiveconversion.Convert_v1alpha1_SelectorSyncIdentityProvider_To_v1_SelectorSyncIdentityProvider(in.DeepCopy(), out, nil)
 }
 
 // SelectorSyncIdentityProviderFromHiveV1 turns a v1 SelectorSyncIdentityProvider into a v1alpha1 SelectorSyncIdentityProvider.
-// The returned object is safe to mutate.
-func SelectorSyncIdentityProviderFromHiveV1(obj *hivev1.SelectorSyncIdentityProvider) (*hiveapi.SelectorSyncIdentityProvider, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.SelectorSyncIdentityProvider{}
-	if err := hiveconversion.Convert_v1_SelectorSyncIdentityProvider_To_v1alpha1_SelectorSyncIdentityProvider(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SelectorSyncIdentityProviderFromHiveV1(in *hivev1.SelectorSyncIdentityProvider, out *hiveapi.SelectorSyncIdentityProvider) error {
+	return hiveconversion.Convert_v1_SelectorSyncIdentityProvider_To_v1alpha1_SelectorSyncIdentityProvider(in.DeepCopy(), out, nil)
 }
 
 // SyncSetToHiveV1 turns a v1alpha1 SyncSet into a v1 SyncSet.
-// The returned object is safe to mutate.
-func SyncSetToHiveV1(obj *hiveapi.SyncSet) (*hivev1.SyncSet, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.SyncSet{}
-	if err := hiveconversion.Convert_v1alpha1_SyncSet_To_v1_SyncSet(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SyncSetToHiveV1(in *hiveapi.SyncSet, out *hivev1.SyncSet) error {
+	return hiveconversion.Convert_v1alpha1_SyncSet_To_v1_SyncSet(in.DeepCopy(), out, nil)
 }
 
 // SyncSetFromHiveV1 turns a v1 SyncSet into a v1alpha1 SyncSet.
-// The returned object is safe to mutate.
-func SyncSetFromHiveV1(obj *hivev1.SyncSet) (*hiveapi.SyncSet, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.SyncSet{}
-	if err := hiveconversion.Convert_v1_SyncSet_To_v1alpha1_SyncSet(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SyncSetFromHiveV1(in *hivev1.SyncSet, out *hiveapi.SyncSet) error {
+	return hiveconversion.Convert_v1_SyncSet_To_v1alpha1_SyncSet(in.DeepCopy(), out, nil)
 }
 
 // SelectorSyncSetToHiveV1 turns a v1alpha1 SelectorSyncSet into a v1 SelectorSyncSet.
-// The returned object is safe to mutate.
-func SelectorSyncSetToHiveV1(obj *hiveapi.SelectorSyncSet) (*hivev1.SelectorSyncSet, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.SelectorSyncSet{}
-	if err := hiveconversion.Convert_v1alpha1_SelectorSyncSet_To_v1_SelectorSyncSet(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SelectorSyncSetToHiveV1(in *hiveapi.SelectorSyncSet, out *hivev1.SelectorSyncSet) error {
+	return hiveconversion.Convert_v1alpha1_SelectorSyncSet_To_v1_SelectorSyncSet(in.DeepCopy(), out, nil)
 }
 
 // SelectorSyncSetFromHiveV1 turns a v1 SelectorSyncSet into a v1alpha1 SelectorSyncSet.
-// The returned object is safe to mutate.
-func SelectorSyncSetFromHiveV1(obj *hivev1.SelectorSyncSet) (*hiveapi.SelectorSyncSet, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.SelectorSyncSet{}
-	if err := hiveconversion.Convert_v1_SelectorSyncSet_To_v1alpha1_SelectorSyncSet(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SelectorSyncSetFromHiveV1(in *hivev1.SelectorSyncSet, out *hiveapi.SelectorSyncSet) error {
+	return hiveconversion.Convert_v1_SelectorSyncSet_To_v1alpha1_SelectorSyncSet(in.DeepCopy(), out, nil)
 }
 
 // SyncSetInstanceToHiveV1 turns a v1alpha1 SyncSetInstance into a v1 SyncSetInstance.
-// The returned object is safe to mutate.
-func SyncSetInstanceToHiveV1(obj *hiveapi.SyncSetInstance) (*hivev1.SyncSetInstance, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hivev1.SyncSetInstance{}
-	if err := hiveconversion.Convert_v1alpha1_SyncSetInstance_To_v1_SyncSetInstance(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SyncSetInstanceToHiveV1(in *hiveapi.SyncSetInstance, out *hivev1.SyncSetInstance) error {
+	return hiveconversion.Convert_v1alpha1_SyncSetInstance_To_v1_SyncSetInstance(in.DeepCopy(), out, nil)
 }
 
 // SyncSetInstanceFromHiveV1 turns a v1 SyncSetInstance into a v1alpha1 SyncSetInstance.
-// The returned object is safe to mutate.
-func SyncSetInstanceFromHiveV1(obj *hivev1.SyncSetInstance) (*hiveapi.SyncSetInstance, error) {
-	// do a deep copy here since conversion does not guarantee a new object.
-	objCopy := obj.DeepCopy()
-
-	convertedObj := &hiveapi.SyncSetInstance{}
-	if err := hiveconversion.Convert_v1_SyncSetInstance_To_v1alpha1_SyncSetInstance(objCopy, convertedObj, nil); err != nil {
-		return nil, err
-	}
-
-	return convertedObj, nil
+func SyncSetInstanceFromHiveV1(in *hivev1.SyncSetInstance, out *hiveapi.SyncSetInstance) error {
+	return hiveconversion.Convert_v1_SyncSetInstance_To_v1alpha1_SyncSetInstance(in.DeepCopy(), out, nil)
 }
 
-func machinePoolFromInstallConfig(pool *installtypes.MachinePool) *hiveapi.MachinePool {
-	return &hiveapi.MachinePool{
-		Name:     pool.Name,
-		Replicas: pool.Replicas,
-		Platform: hiveapi.MachinePoolPlatform{
-			AWS:   awsMachinePoolFromInstallConfig(pool.Platform.AWS),
-			Azure: azureMachinePoolFromInstallConfig(pool.Platform.Azure),
-			GCP:   gcpMachinePoolFromInstallConfig(pool.Platform.GCP),
-		},
+func machinePoolFromInstallConfig(in *installtypes.MachinePool, out *hiveapi.MachinePool) {
+	out.Name = in.Name
+	out.Replicas = in.Replicas
+	if aws := in.Platform.AWS; aws != nil {
+		if out.Platform.AWS == nil {
+			out.Platform.AWS = &hiveapiaws.MachinePoolPlatform{}
+		}
+		awsMachinePoolFromInstallConfig(aws, out.Platform.AWS)
+	} else {
+		out.Platform.AWS = nil
 	}
-}
-
-func machinePoolToInstallConfig(pool *hiveapi.MachinePool) *installtypes.MachinePool {
-	return &installtypes.MachinePool{
-		Name:     pool.Name,
-		Replicas: pool.Replicas,
-		Platform: installtypes.MachinePoolPlatform{
-			AWS:   awsMachinePoolToInstallConfig(pool.Platform.AWS),
-			Azure: azureMachinePoolToInstallConfig(pool.Platform.Azure),
-			GCP:   gcpMachinePoolToInstallConfig(pool.Platform.GCP),
-		},
+	if azure := in.Platform.Azure; azure != nil {
+		if out.Platform.Azure == nil {
+			out.Platform.Azure = &hiveapiazure.MachinePool{}
+		}
+		azureMachinePoolFromInstallConfig(azure, out.Platform.Azure)
+	} else {
+		out.Platform.Azure = nil
+	}
+	if gcp := in.Platform.GCP; gcp != nil {
+		if out.Platform.GCP == nil {
+			out.Platform.GCP = &hiveapigcp.MachinePool{}
+		}
+		gcpMachinePoolFromInstallConfig(gcp, out.Platform.GCP)
+	} else {
+		out.Platform.GCP = nil
 	}
 }
 
-func awsMachinePoolFromInstallConfig(p *installtypesaws.MachinePool) *hiveapiaws.MachinePoolPlatform {
-	if p == nil {
-		return nil
+func machinePoolToInstallConfig(in *hiveapi.MachinePool, out *installtypes.MachinePool) {
+	out.Name = in.Name
+	out.Replicas = in.Replicas
+	if aws := in.Platform.AWS; aws != nil {
+		if out.Platform.AWS == nil {
+			out.Platform.AWS = &installtypesaws.MachinePool{}
+		}
+		awsMachinePoolToInstallConfig(aws, out.Platform.AWS)
+	} else {
+		out.Platform.AWS = nil
 	}
-	return &hiveapiaws.MachinePoolPlatform{
-		Zones:        p.Zones,
-		InstanceType: p.InstanceType,
-		EC2RootVolume: hiveapiaws.EC2RootVolume{
-			IOPS: p.IOPS,
-			Size: p.Size,
-			Type: p.Type,
-		},
+	if azure := in.Platform.Azure; azure != nil {
+		if out.Platform.Azure == nil {
+			out.Platform.Azure = &installtypesazure.MachinePool{}
+		}
+		azureMachinePoolToInstallConfig(azure, out.Platform.Azure)
+	} else {
+		out.Platform.Azure = nil
 	}
-}
-
-func awsMachinePoolToInstallConfig(p *hiveapiaws.MachinePoolPlatform) *installtypesaws.MachinePool {
-	if p == nil {
-		return nil
-	}
-	return &installtypesaws.MachinePool{
-		Zones:        p.Zones,
-		InstanceType: p.InstanceType,
-		EC2RootVolume: installtypesaws.EC2RootVolume{
-			IOPS: p.IOPS,
-			Size: p.Size,
-			Type: p.Type,
-		},
-	}
-}
-
-func azureMachinePoolFromInstallConfig(p *installtypesazure.MachinePool) *hiveapiazure.MachinePool {
-	if p == nil {
-		return nil
-	}
-	return &hiveapiazure.MachinePool{
-		Zones:        p.Zones,
-		InstanceType: p.InstanceType,
-		OSDisk: hiveapiazure.OSDisk{
-			DiskSizeGB: p.DiskSizeGB,
-		},
+	if gcp := in.Platform.GCP; gcp != nil {
+		if out.Platform.GCP == nil {
+			out.Platform.GCP = &installtypesgcp.MachinePool{}
+		}
+		gcpMachinePoolToInstallConfig(gcp, out.Platform.GCP)
+	} else {
+		out.Platform.GCP = nil
 	}
 }
 
-func azureMachinePoolToInstallConfig(p *hiveapiazure.MachinePool) *installtypesazure.MachinePool {
-	if p == nil {
-		return nil
-	}
-	return &installtypesazure.MachinePool{
-		Zones:        p.Zones,
-		InstanceType: p.InstanceType,
-		OSDisk: installtypesazure.OSDisk{
-			DiskSizeGB: p.DiskSizeGB,
-		},
-	}
+func awsMachinePoolFromInstallConfig(in *installtypesaws.MachinePool, out *hiveapiaws.MachinePoolPlatform) {
+	out.Zones = in.Zones
+	out.InstanceType = in.InstanceType
+	out.IOPS = in.IOPS
+	out.Size = in.Size
+	out.Type = in.Type
 }
 
-func gcpMachinePoolFromInstallConfig(p *installtypesgcp.MachinePool) *hiveapigcp.MachinePool {
-	if p == nil {
-		return nil
-	}
-	return &hiveapigcp.MachinePool{
-		Zones:        p.Zones,
-		InstanceType: p.InstanceType,
-	}
+func awsMachinePoolToInstallConfig(in *hiveapiaws.MachinePoolPlatform, out *installtypesaws.MachinePool) {
+	out.Zones = in.Zones
+	out.InstanceType = in.InstanceType
+	out.IOPS = in.IOPS
+	out.Size = in.Size
+	out.Type = in.Type
 }
 
-func gcpMachinePoolToInstallConfig(p *hiveapigcp.MachinePool) *installtypesgcp.MachinePool {
-	if p == nil {
-		return nil
-	}
-	return &installtypesgcp.MachinePool{
-		Zones:        p.Zones,
-		InstanceType: p.InstanceType,
-	}
+func azureMachinePoolFromInstallConfig(in *installtypesazure.MachinePool, out *hiveapiazure.MachinePool) {
+	out.Zones = in.Zones
+	out.InstanceType = in.InstanceType
+	out.DiskSizeGB = in.DiskSizeGB
+}
+
+func azureMachinePoolToInstallConfig(in *hiveapiazure.MachinePool, out *installtypesazure.MachinePool) {
+	out.Zones = in.Zones
+	out.InstanceType = in.InstanceType
+	out.DiskSizeGB = in.DiskSizeGB
+}
+
+func gcpMachinePoolFromInstallConfig(in *installtypesgcp.MachinePool, out *hiveapigcp.MachinePool) {
+	out.Zones = in.Zones
+	out.InstanceType = in.InstanceType
+}
+
+func gcpMachinePoolToInstallConfig(in *hiveapigcp.MachinePool, out *installtypesgcp.MachinePool) {
+	out.Zones = in.Zones
+	out.InstanceType = in.InstanceType
 }
 
 func parseCIDR(s string) *ipnet.IPNet {

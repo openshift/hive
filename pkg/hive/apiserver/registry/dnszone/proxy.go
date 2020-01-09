@@ -3,7 +3,6 @@ package dnszone
 import (
 	"context"
 
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +11,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -65,13 +67,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.DNSZoneList{ListMeta: dnsZones.ListMeta}
-	for _, curr := range dnsZones.Items {
-		dnsZone, err := util.DNSZoneFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.DNSZoneList{
+		ListMeta: dnsZones.ListMeta,
+		Items:    make([]hiveapi.DNSZone, len(dnsZones.Items)),
+	}
+	for i, curr := range dnsZones.Items {
+		if err := util.DNSZoneFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *dnsZone)
 	}
 	return ret, nil
 }
@@ -87,8 +90,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	dnsZone, err := util.DNSZoneFromHiveV1(ret)
-	if err != nil {
+	dnsZone := &hiveapi.DNSZone{}
+	if err := util.DNSZoneFromHiveV1(ret, dnsZone); err != nil {
 		return nil, err
 	}
 	return dnsZone, nil
@@ -113,8 +116,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.DNSZoneToHiveV1(obj.(*hiveapi.DNSZone))
-	if err != nil {
+	convertedObj := &hivev1.DNSZone{}
+	if err := util.DNSZoneToHiveV1(obj.(*hiveapi.DNSZone), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -123,8 +126,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	dnsZone, err := util.DNSZoneFromHiveV1(ret)
-	if err != nil {
+	dnsZone := &hiveapi.DNSZone{}
+	if err := util.DNSZoneFromHiveV1(ret, dnsZone); err != nil {
 		return nil, err
 	}
 	return dnsZone, nil
@@ -136,36 +139,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	dNSZone, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldDNSZone, err := util.DNSZoneFromHiveV1(old)
+	old := &hiveapi.DNSZone{}
+	if err := util.DNSZoneFromHiveV1(dNSZone, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldDNSZone)
+	if err := util.DNSZoneToHiveV1(obj.(*hiveapi.DNSZone), dNSZone); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(dNSZone)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedDNSZone, err := util.DNSZoneToHiveV1(obj.(*hiveapi.DNSZone))
-	if err != nil {
+	new := &hiveapi.DNSZone{}
+	if err := util.DNSZoneFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedDNSZone)
-	if err != nil {
-		return nil, false, err
-	}
-
-	dnsZone, err := util.DNSZoneFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return dnsZone, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.DNSZoneInterface, error) {

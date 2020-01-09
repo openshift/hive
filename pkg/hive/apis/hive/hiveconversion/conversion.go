@@ -13,7 +13,7 @@ import (
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	hiveapiaws "github.com/openshift/hive/pkg/hive/apis/hive/aws"
-	hiveapiaazure "github.com/openshift/hive/pkg/hive/apis/hive/azure"
+	hiveapiazure "github.com/openshift/hive/pkg/hive/apis/hive/azure"
 	hiveapigcp "github.com/openshift/hive/pkg/hive/apis/hive/gcp"
 )
 
@@ -77,33 +77,48 @@ func Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in *hiveapi.Clus
 	out.Spec.ClusterName = in.Spec.ClusterName
 	out.Spec.BaseDomain = in.Spec.BaseDomain
 	if inAWS := in.Spec.Platform.AWS; inAWS != nil {
-		outAWS := &hivev1aws.Platform{
-			Region:   inAWS.Region,
-			UserTags: inAWS.UserTags,
+		if out.Spec.Platform.AWS == nil {
+			out.Spec.Platform.AWS = &hivev1aws.Platform{}
 		}
+		outAWS := out.Spec.Platform.AWS
+		outAWS.Region = inAWS.Region
+		outAWS.UserTags = inAWS.UserTags
 		if creds := in.Spec.PlatformSecrets.AWS; creds != nil {
 			outAWS.CredentialsSecretRef = creds.Credentials
+		} else {
+			outAWS.CredentialsSecretRef = corev1.LocalObjectReference{}
 		}
-		out.Spec.Platform.AWS = outAWS
+	} else {
+		out.Spec.Platform.AWS = nil
 	}
 	if inAzure := in.Spec.Platform.Azure; inAzure != nil {
-		outAzure := &hivev1azure.Platform{
-			Region:                      inAzure.Region,
-			BaseDomainResourceGroupName: inAzure.BaseDomainResourceGroupName,
+		if out.Spec.Platform.Azure == nil {
+			out.Spec.Platform.Azure = &hivev1azure.Platform{}
 		}
+		outAzure := out.Spec.Platform.Azure
+		outAzure.Region = inAzure.Region
+		outAzure.BaseDomainResourceGroupName = inAzure.BaseDomainResourceGroupName
 		if creds := in.Spec.PlatformSecrets.Azure; creds != nil {
 			outAzure.CredentialsSecretRef = creds.Credentials
+		} else {
+			outAzure.CredentialsSecretRef = corev1.LocalObjectReference{}
 		}
-		out.Spec.Platform.Azure = outAzure
+	} else {
+		out.Spec.Platform.Azure = nil
 	}
 	if inGCP := in.Spec.Platform.GCP; inGCP != nil {
-		outGCP := &hivev1gcp.Platform{
-			Region: inGCP.Region,
+		if out.Spec.Platform.GCP == nil {
+			out.Spec.Platform.GCP = &hivev1gcp.Platform{}
 		}
+		outGCP := out.Spec.Platform.GCP
+		outGCP.Region = inGCP.Region
 		if creds := in.Spec.PlatformSecrets.GCP; creds != nil {
 			outGCP.CredentialsSecretRef = creds.Credentials
+		} else {
+			outGCP.CredentialsSecretRef = corev1.LocalObjectReference{}
 		}
-		out.Spec.Platform.GCP = outGCP
+	} else {
+		out.Spec.Platform.GCP = nil
 	}
 	out.Spec.PullSecretRef = in.Spec.PullSecret
 	out.Spec.PreserveOnDelete = in.Spec.PreserveOnDelete
@@ -138,20 +153,27 @@ func Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in *hiveapi.Clus
 			AdminKubeconfigSecretRef: in.Status.AdminKubeconfigSecret,
 			AdminPasswordSecretRef:   in.Status.AdminPasswordSecret,
 		}
+	} else {
+		out.Spec.ClusterMetadata = nil
 	}
 	out.Spec.Installed = in.Spec.Installed
-	out.Spec.Provisioning = &hivev1.Provisioning{
-		ReleaseImage: in.Spec.Images.ReleaseImage,
+	if out.Spec.Provisioning == nil {
+		out.Spec.Provisioning = &hivev1.Provisioning{}
 	}
+	out.Spec.Provisioning.ReleaseImage = in.Spec.Images.ReleaseImage
 	if is := in.Spec.ImageSet; is != nil {
 		out.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{
 			Name: is.Name,
 		}
+	} else {
+		out.Spec.Provisioning.ImageSetRef = nil
 	}
 	if ssh := in.Spec.SSHKey.Name; ssh != "" {
 		out.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{
 			Name: ssh,
 		}
+	} else {
+		out.Spec.Provisioning.SSHPrivateKeySecretRef = nil
 	}
 	out.Status.InstallRestarts = in.Status.InstallRestarts
 	out.Status.ClusterVersionStatus = in.Status.ClusterVersionStatus
@@ -185,36 +207,52 @@ func Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in *hivev1.Clust
 	out.Spec.ClusterName = in.Spec.ClusterName
 	if p := in.Spec.Provisioning; p != nil && p.SSHPrivateKeySecretRef != nil {
 		out.Spec.SSHKey.Name = p.SSHPrivateKeySecretRef.Name
+	} else {
+		out.Spec.SSHKey.Name = ""
 	}
 	out.Spec.BaseDomain = in.Spec.BaseDomain
 	if inAWS := in.Spec.Platform.AWS; inAWS != nil {
-		outAWS := &hiveapiaws.Platform{
-			Region:   inAWS.Region,
-			UserTags: inAWS.UserTags,
+		if out.Spec.Platform.AWS == nil {
+			out.Spec.Platform.AWS = &hiveapiaws.Platform{}
 		}
-		out.Spec.PlatformSecrets.AWS = &hiveapiaws.PlatformSecrets{
-			Credentials: inAWS.CredentialsSecretRef,
+		outAWS := out.Spec.Platform.AWS
+		outAWS.Region = inAWS.Region
+		outAWS.UserTags = inAWS.UserTags
+		if out.Spec.PlatformSecrets.AWS == nil {
+			out.Spec.PlatformSecrets.AWS = &hiveapiaws.PlatformSecrets{}
 		}
-		out.Spec.Platform.AWS = outAWS
+		out.Spec.PlatformSecrets.AWS.Credentials = inAWS.CredentialsSecretRef
+	} else {
+		out.Spec.Platform.AWS = nil
+		out.Spec.PlatformSecrets.AWS = nil
 	}
 	if inAzure := in.Spec.Platform.Azure; inAzure != nil {
-		outAzure := &hiveapiaazure.Platform{
-			Region:                      inAzure.Region,
-			BaseDomainResourceGroupName: inAzure.BaseDomainResourceGroupName,
+		if out.Spec.Platform.Azure == nil {
+			out.Spec.Platform.Azure = &hiveapiazure.Platform{}
 		}
-		out.Spec.PlatformSecrets.Azure = &hiveapiaazure.PlatformSecrets{
-			Credentials: inAzure.CredentialsSecretRef,
+		outAzure := out.Spec.Platform.Azure
+		outAzure.Region = inAzure.Region
+		outAzure.BaseDomainResourceGroupName = inAzure.BaseDomainResourceGroupName
+		if out.Spec.PlatformSecrets.Azure == nil {
+			out.Spec.PlatformSecrets.Azure = &hiveapiazure.PlatformSecrets{}
 		}
-		out.Spec.Platform.Azure = outAzure
+		out.Spec.PlatformSecrets.Azure.Credentials = inAzure.CredentialsSecretRef
+	} else {
+		out.Spec.Platform.Azure = nil
+		out.Spec.PlatformSecrets.Azure = nil
 	}
 	if inGCP := in.Spec.Platform.GCP; inGCP != nil {
-		outGCP := &hiveapigcp.Platform{
-			Region: inGCP.Region,
+		if out.Spec.Platform.GCP == nil {
+			out.Spec.Platform.GCP = &hiveapigcp.Platform{}
 		}
-		out.Spec.PlatformSecrets.GCP = &hiveapigcp.PlatformSecrets{
-			Credentials: inGCP.CredentialsSecretRef,
+		out.Spec.Platform.GCP.Region = inGCP.Region
+		if out.Spec.PlatformSecrets.GCP == nil {
+			out.Spec.PlatformSecrets.GCP = &hiveapigcp.PlatformSecrets{}
 		}
-		out.Spec.Platform.GCP = outGCP
+		out.Spec.PlatformSecrets.GCP.Credentials = inGCP.CredentialsSecretRef
+	} else {
+		out.Spec.Platform.GCP = nil
+		out.Spec.PlatformSecrets.GCP = nil
 	}
 	out.Spec.PullSecret = in.Spec.PullSecretRef
 	if p := in.Spec.Provisioning; p != nil {
@@ -223,7 +261,12 @@ func Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in *hivev1.Clust
 			out.Spec.ImageSet = &hiveapi.ClusterImageSetReference{
 				Name: imageSet.Name,
 			}
+		} else {
+			out.Spec.ImageSet = nil
 		}
+	} else {
+		out.Spec.Images.ReleaseImage = ""
+		out.Spec.ImageSet = nil
 	}
 	out.Spec.PreserveOnDelete = in.Spec.PreserveOnDelete
 	out.Spec.ControlPlaneConfig.ServingCertificates.Default = in.Spec.ControlPlaneConfig.ServingCertificates.Default
@@ -256,6 +299,11 @@ func Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in *hivev1.Clust
 		out.Status.InfraID = meta.InfraID
 		out.Status.AdminKubeconfigSecret = meta.AdminKubeconfigSecretRef
 		out.Status.AdminPasswordSecret = meta.AdminPasswordSecretRef
+	} else {
+		out.Status.ClusterID = ""
+		out.Status.InfraID = ""
+		out.Status.AdminKubeconfigSecret = corev1.LocalObjectReference{}
+		out.Status.AdminPasswordSecret = corev1.LocalObjectReference{}
 	}
 	out.Status.Installed = in.Spec.Installed
 	out.Status.InstallRestarts = in.Status.InstallRestarts
@@ -289,6 +337,8 @@ func Convert_v1alpha1_ClusterImageSet_To_v1_ClusterImageSet(in *hiveapi.ClusterI
 	out.ObjectMeta = in.ObjectMeta
 	if in.Spec.ReleaseImage != nil {
 		out.Spec.ReleaseImage = *in.Spec.ReleaseImage
+	} else {
+		out.Spec.ReleaseImage = ""
 	}
 	return nil
 }
@@ -304,21 +354,30 @@ func Convert_v1alpha1_ClusterDeprovisionRequest_To_v1_ClusterDeprovision(in *hiv
 	out.Spec.InfraID = in.Spec.InfraID
 	out.Spec.ClusterID = in.Spec.ClusterID
 	if aws := in.Spec.Platform.AWS; aws != nil {
-		out.Spec.Platform.AWS = &hivev1.AWSClusterDeprovision{
-			Region:               aws.Region,
-			CredentialsSecretRef: aws.Credentials,
+		if out.Spec.Platform.AWS == nil {
+			out.Spec.Platform.AWS = &hivev1.AWSClusterDeprovision{}
 		}
+		out.Spec.Platform.AWS.Region = aws.Region
+		out.Spec.Platform.AWS.CredentialsSecretRef = aws.Credentials
+	} else {
+		out.Spec.Platform.AWS = nil
 	}
 	if azure := in.Spec.Platform.Azure; azure != nil {
-		out.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
-			CredentialsSecretRef: azure.Credentials,
+		if out.Spec.Platform.Azure == nil {
+			out.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{}
 		}
+		out.Spec.Platform.Azure.CredentialsSecretRef = azure.Credentials
+	} else {
+		out.Spec.Platform.Azure = nil
 	}
 	if gcp := in.Spec.Platform.GCP; gcp != nil {
-		out.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{
-			Region:               gcp.Region,
-			CredentialsSecretRef: gcp.Credentials,
+		if out.Spec.Platform.GCP == nil {
+			out.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{}
 		}
+		out.Spec.Platform.GCP.Region = gcp.Region
+		out.Spec.Platform.GCP.CredentialsSecretRef = gcp.Credentials
+	} else {
+		out.Spec.Platform.GCP = nil
 	}
 	out.Status.Completed = in.Status.Completed
 	return nil
@@ -329,21 +388,28 @@ func Convert_v1_ClusterDeprovision_To_v1alpha1_ClusterDeprovisionRequest(in *hiv
 	out.Spec.InfraID = in.Spec.InfraID
 	out.Spec.ClusterID = in.Spec.ClusterID
 	if aws := in.Spec.Platform.AWS; aws != nil {
-		out.Spec.Platform.AWS = &hiveapi.AWSClusterDeprovisionRequest{
-			Region:      aws.Region,
-			Credentials: aws.CredentialsSecretRef,
+		if out.Spec.Platform.AWS == nil {
+			out.Spec.Platform.AWS = &hiveapi.AWSClusterDeprovisionRequest{}
 		}
+		out.Spec.Platform.AWS.Region = aws.Region
+		out.Spec.Platform.AWS.Credentials = aws.CredentialsSecretRef
+	} else {
+		out.Spec.Platform.AWS = nil
 	}
 	if azure := in.Spec.Platform.Azure; azure != nil {
-		out.Spec.Platform.Azure = &hiveapi.AzureClusterDeprovisionRequest{
-			Credentials: azure.CredentialsSecretRef,
+		if out.Spec.Platform.Azure == nil {
+			out.Spec.Platform.Azure = &hiveapi.AzureClusterDeprovisionRequest{}
 		}
+		out.Spec.Platform.Azure.Credentials = azure.CredentialsSecretRef
+	} else {
+		out.Spec.Platform.Azure = nil
 	}
 	if gcp := in.Spec.Platform.GCP; gcp != nil {
-		out.Spec.Platform.GCP = &hiveapi.GCPClusterDeprovisionRequest{
-			Region:      gcp.Region,
-			Credentials: gcp.CredentialsSecretRef,
+		if out.Spec.Platform.GCP == nil {
+			out.Spec.Platform.GCP = &hiveapi.GCPClusterDeprovisionRequest{}
 		}
+		out.Spec.Platform.GCP.Region = gcp.Region
+		out.Spec.Platform.GCP.Credentials = gcp.CredentialsSecretRef
 	}
 	out.Status.Completed = in.Status.Completed
 	return nil
@@ -434,35 +500,47 @@ func Convert_v1alpha1_DNSZone_To_v1_DNSZone(in *hiveapi.DNSZone, out *hivev1.DNS
 	out.Spec.Zone = in.Spec.Zone
 	out.Spec.LinkToParentDomain = in.Spec.LinkToParentDomain
 	if inAWS := in.Spec.AWS; inAWS != nil {
-		outAWS := &hivev1.AWSDNSZoneSpec{
-			CredentialsSecretRef: inAWS.AccountSecret,
-			AdditionalTags:       make([]hivev1.AWSResourceTag, len(inAWS.AdditionalTags)),
+		if out.Spec.AWS == nil {
+			out.Spec.AWS = &hivev1.AWSDNSZoneSpec{}
 		}
+		outAWS := out.Spec.AWS
+		outAWS.CredentialsSecretRef = inAWS.AccountSecret
+		outAWS.AdditionalTags = make([]hivev1.AWSResourceTag, len(inAWS.AdditionalTags))
 		for i, tag := range inAWS.AdditionalTags {
 			outAWS.AdditionalTags[i] = hivev1.AWSResourceTag{
 				Key:   tag.Key,
 				Value: tag.Value,
 			}
 		}
-		out.Spec.AWS = outAWS
+	} else {
+		out.Spec.AWS = nil
 	}
 	if inGCP := in.Spec.GCP; inGCP != nil {
-		out.Spec.GCP = &hivev1.GCPDNSZoneSpec{
-			CredentialsSecretRef: inGCP.CredentialsSecretRef,
+		if out.Spec.GCP == nil {
+			out.Spec.GCP = &hivev1.GCPDNSZoneSpec{}
 		}
+		out.Spec.GCP.CredentialsSecretRef = inGCP.CredentialsSecretRef
+	} else {
+		out.Spec.GCP = nil
 	}
 	out.Status.LastSyncTimestamp = in.Status.LastSyncTimestamp
 	out.Status.LastSyncGeneration = in.Status.LastSyncGeneration
 	out.Status.NameServers = in.Status.NameServers
 	if aws := in.Status.AWS; aws != nil {
-		out.Status.AWS = &hivev1.AWSDNSZoneStatus{
-			ZoneID: aws.ZoneID,
+		if out.Status.AWS == nil {
+			out.Status.AWS = &hivev1.AWSDNSZoneStatus{}
 		}
+		out.Status.AWS.ZoneID = aws.ZoneID
+	} else {
+		out.Status.AWS = nil
 	}
 	if gcp := in.Status.GCP; gcp != nil {
-		out.Status.GCP = &hivev1.GCPDNSZoneStatus{
-			ZoneName: gcp.ZoneName,
+		if out.Status.GCP == nil {
+			out.Status.GCP = &hivev1.GCPDNSZoneStatus{}
 		}
+		out.Status.GCP.ZoneName = gcp.ZoneName
+	} else {
+		out.Status.GCP = nil
 	}
 	out.Status.Conditions = make([]hivev1.DNSZoneCondition, len(in.Status.Conditions))
 	for i, inCond := range in.Status.Conditions {
@@ -482,35 +560,47 @@ func Convert_v1_DNSZone_To_v1alpha1_DNSZone(in *hivev1.DNSZone, out *hiveapi.DNS
 	out.Spec.Zone = in.Spec.Zone
 	out.Spec.LinkToParentDomain = in.Spec.LinkToParentDomain
 	if inAWS := in.Spec.AWS; inAWS != nil {
-		outAWS := &hiveapi.AWSDNSZoneSpec{
-			AccountSecret:  inAWS.CredentialsSecretRef,
-			AdditionalTags: make([]hiveapi.AWSResourceTag, len(inAWS.AdditionalTags)),
+		if out.Spec.AWS == nil {
+			out.Spec.AWS = &hiveapi.AWSDNSZoneSpec{}
 		}
+		outAWS := out.Spec.AWS
+		outAWS.AccountSecret = inAWS.CredentialsSecretRef
+		outAWS.AdditionalTags = make([]hiveapi.AWSResourceTag, len(inAWS.AdditionalTags))
 		for i, tag := range inAWS.AdditionalTags {
 			outAWS.AdditionalTags[i] = hiveapi.AWSResourceTag{
 				Key:   tag.Key,
 				Value: tag.Value,
 			}
 		}
-		out.Spec.AWS = outAWS
+	} else {
+		out.Spec.AWS = nil
 	}
 	if inGCP := in.Spec.GCP; inGCP != nil {
-		out.Spec.GCP = &hiveapi.GCPDNSZoneSpec{
-			CredentialsSecretRef: inGCP.CredentialsSecretRef,
+		if out.Spec.GCP == nil {
+			out.Spec.GCP = &hiveapi.GCPDNSZoneSpec{}
 		}
+		out.Spec.GCP.CredentialsSecretRef = inGCP.CredentialsSecretRef
+	} else {
+		out.Spec.GCP = nil
 	}
 	out.Status.LastSyncTimestamp = in.Status.LastSyncTimestamp
 	out.Status.LastSyncGeneration = in.Status.LastSyncGeneration
 	out.Status.NameServers = in.Status.NameServers
 	if aws := in.Status.AWS; aws != nil {
-		out.Status.AWS = &hiveapi.AWSDNSZoneStatus{
-			ZoneID: aws.ZoneID,
+		if out.Status.AWS == nil {
+			out.Status.AWS = &hiveapi.AWSDNSZoneStatus{}
 		}
+		out.Status.AWS.ZoneID = aws.ZoneID
+	} else {
+		out.Status.AWS = nil
 	}
 	if gcp := in.Status.GCP; gcp != nil {
-		out.Status.GCP = &hiveapi.GCPDNSZoneStatus{
-			ZoneName: gcp.ZoneName,
+		if out.Status.GCP == nil {
+			out.Status.GCP = &hiveapi.GCPDNSZoneStatus{}
 		}
+		out.Status.GCP.ZoneName = gcp.ZoneName
+	} else {
+		out.Status.GCP = nil
 	}
 	out.Status.Conditions = make([]hiveapi.DNSZoneCondition, len(in.Status.Conditions))
 	for i, inCond := range in.Status.Conditions {
@@ -542,6 +632,8 @@ func Convert_v1alpha1_HiveConfig_To_v1_HiveConfig(in *hiveapi.HiveConfig, out *h
 				CredentialsSecretRef: gcp.Credentials,
 			}
 		}
+	} else {
+		out.Spec.ManagedDomains = nil
 	}
 	out.Spec.AdditionalCertificateAuthoritiesSecretRef = in.Spec.AdditionalCertificateAuthorities
 	out.Spec.GlobalPullSecretRef = in.Spec.GlobalPullSecret
@@ -557,18 +649,29 @@ func Convert_v1_HiveConfig_To_v1alpha1_HiveConfig(in *hivev1.HiveConfig, out *hi
 	if len(in.Spec.ManagedDomains) > 0 {
 		inDNS := in.Spec.ManagedDomains[0]
 		out.Spec.ManagedDomains = inDNS.Domains
-		outDNS := &hiveapi.ExternalDNSConfig{}
+		if out.Spec.ExternalDNS == nil {
+			out.Spec.ExternalDNS = &hiveapi.ExternalDNSConfig{}
+		}
+		outDNS := out.Spec.ExternalDNS
 		if aws := inDNS.AWS; aws != nil {
-			outDNS.AWS = &hiveapi.ExternalDNSAWSConfig{
-				Credentials: aws.CredentialsSecretRef,
+			if outDNS.AWS == nil {
+				outDNS.AWS = &hiveapi.ExternalDNSAWSConfig{}
 			}
+			outDNS.AWS.Credentials = aws.CredentialsSecretRef
+		} else {
+			outDNS.AWS = nil
 		}
 		if gcp := inDNS.GCP; gcp != nil {
-			outDNS.GCP = &hiveapi.ExternalDNSGCPConfig{
-				Credentials: gcp.CredentialsSecretRef,
+			if outDNS.GCP == nil {
+				outDNS.GCP = &hiveapi.ExternalDNSGCPConfig{}
 			}
+			outDNS.GCP.Credentials = gcp.CredentialsSecretRef
+		} else {
+			outDNS.GCP = nil
 		}
-		out.Spec.ExternalDNS = outDNS
+	} else {
+		out.Spec.ManagedDomains = nil
+		out.Spec.ExternalDNS = nil
 	}
 	out.Spec.AdditionalCertificateAuthorities = in.Spec.AdditionalCertificateAuthoritiesSecretRef
 	out.Spec.GlobalPullSecret = in.Spec.GlobalPullSecretRef
@@ -759,6 +862,8 @@ func Convert_v1alpha1_SyncSetInstance_To_v1_SyncSetInstance(in *hiveapi.SyncSetI
 		out.Spec.SelectorSyncSetRef = &hivev1.SelectorSyncSetReference{
 			Name: ref.Name,
 		}
+	} else {
+		out.Spec.SelectorSyncSetRef = nil
 	}
 	out.Spec.ResourceApplyMode = hivev1.SyncSetResourceApplyMode(in.Spec.ResourceApplyMode)
 	out.Spec.SyncSetHash = in.Spec.SyncSetHash
@@ -777,6 +882,8 @@ func Convert_v1_SyncSetInstance_To_v1alpha1_SyncSetInstance(in *hivev1.SyncSetIn
 		out.Spec.SelectorSyncSet = &hiveapi.SelectorSyncSetReference{
 			Name: ref.Name,
 		}
+	} else {
+		out.Spec.SelectorSyncSet = nil
 	}
 	out.Spec.ResourceApplyMode = hiveapi.SyncSetResourceApplyMode(in.Spec.ResourceApplyMode)
 	out.Spec.SyncSetHash = in.Spec.SyncSetHash

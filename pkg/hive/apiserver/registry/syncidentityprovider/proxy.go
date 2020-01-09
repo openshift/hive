@@ -3,7 +3,6 @@ package syncidentityprovider
 import (
 	"context"
 
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +11,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -65,13 +67,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.SyncIdentityProviderList{ListMeta: syncIdentityProviders.ListMeta}
-	for _, curr := range syncIdentityProviders.Items {
-		syncIdentityProvider, err := util.SyncIdentityProviderFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.SyncIdentityProviderList{
+		ListMeta: syncIdentityProviders.ListMeta,
+		Items:    make([]hiveapi.SyncIdentityProvider, len(syncIdentityProviders.Items)),
+	}
+	for i, curr := range syncIdentityProviders.Items {
+		if err := util.SyncIdentityProviderFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *syncIdentityProvider)
 	}
 	return ret, nil
 }
@@ -87,8 +90,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	syncIdentityProvider, err := util.SyncIdentityProviderFromHiveV1(ret)
-	if err != nil {
+	syncIdentityProvider := &hiveapi.SyncIdentityProvider{}
+	if err := util.SyncIdentityProviderFromHiveV1(ret, syncIdentityProvider); err != nil {
 		return nil, err
 	}
 	return syncIdentityProvider, nil
@@ -113,8 +116,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.SyncIdentityProviderToHiveV1(obj.(*hiveapi.SyncIdentityProvider))
-	if err != nil {
+	convertedObj := &hivev1.SyncIdentityProvider{}
+	if err := util.SyncIdentityProviderToHiveV1(obj.(*hiveapi.SyncIdentityProvider), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -123,8 +126,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	syncIdentityProvider, err := util.SyncIdentityProviderFromHiveV1(ret)
-	if err != nil {
+	syncIdentityProvider := &hiveapi.SyncIdentityProvider{}
+	if err := util.SyncIdentityProviderFromHiveV1(ret, syncIdentityProvider); err != nil {
 		return nil, err
 	}
 	return syncIdentityProvider, nil
@@ -136,36 +139,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	syncIdentityProvider, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldSyncIdentityProvider, err := util.SyncIdentityProviderFromHiveV1(old)
+	old := &hiveapi.SyncIdentityProvider{}
+	if err := util.SyncIdentityProviderFromHiveV1(syncIdentityProvider, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldSyncIdentityProvider)
+	if err := util.SyncIdentityProviderToHiveV1(obj.(*hiveapi.SyncIdentityProvider), syncIdentityProvider); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(syncIdentityProvider)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedSyncIdentityProvider, err := util.SyncIdentityProviderToHiveV1(obj.(*hiveapi.SyncIdentityProvider))
-	if err != nil {
+	new := &hiveapi.SyncIdentityProvider{}
+	if err := util.SyncIdentityProviderFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedSyncIdentityProvider)
-	if err != nil {
-		return nil, false, err
-	}
-
-	syncIdentityProvider, err := util.SyncIdentityProviderFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return syncIdentityProvider, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.SyncIdentityProviderInterface, error) {

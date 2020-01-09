@@ -3,7 +3,6 @@ package clusterstate
 import (
 	"context"
 
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +11,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -65,13 +67,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.ClusterStateList{ListMeta: clusterStates.ListMeta}
-	for _, curr := range clusterStates.Items {
-		clusterState, err := util.ClusterStateFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.ClusterStateList{
+		ListMeta: clusterStates.ListMeta,
+		Items:    make([]hiveapi.ClusterState, len(clusterStates.Items)),
+	}
+	for i, curr := range clusterStates.Items {
+		if err := util.ClusterStateFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *clusterState)
 	}
 	return ret, nil
 }
@@ -87,8 +90,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	clusterState, err := util.ClusterStateFromHiveV1(ret)
-	if err != nil {
+	clusterState := &hiveapi.ClusterState{}
+	if err := util.ClusterStateFromHiveV1(ret, clusterState); err != nil {
 		return nil, err
 	}
 	return clusterState, nil
@@ -113,8 +116,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.ClusterStateToHiveV1(obj.(*hiveapi.ClusterState))
-	if err != nil {
+	convertedObj := &hivev1.ClusterState{}
+	if err := util.ClusterStateToHiveV1(obj.(*hiveapi.ClusterState), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -123,8 +126,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	clusterState, err := util.ClusterStateFromHiveV1(ret)
-	if err != nil {
+	clusterState := &hiveapi.ClusterState{}
+	if err := util.ClusterStateFromHiveV1(ret, clusterState); err != nil {
 		return nil, err
 	}
 	return clusterState, nil
@@ -136,36 +139,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	clusterState, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldClusterState, err := util.ClusterStateFromHiveV1(old)
+	old := &hiveapi.ClusterState{}
+	if err := util.ClusterStateFromHiveV1(clusterState, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldClusterState)
+	if err := util.ClusterStateToHiveV1(obj.(*hiveapi.ClusterState), clusterState); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(clusterState)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedClusterState, err := util.ClusterStateToHiveV1(obj.(*hiveapi.ClusterState))
-	if err != nil {
+	new := &hiveapi.ClusterState{}
+	if err := util.ClusterStateFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedClusterState)
-	if err != nil {
-		return nil, false, err
-	}
-
-	clusterState, err := util.ClusterStateFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return clusterState, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.ClusterStateInterface, error) {

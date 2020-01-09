@@ -1,6 +1,8 @@
 package util
 
 import (
+	"fmt"
+
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	installtypes "github.com/openshift/installer/pkg/types"
@@ -9,6 +11,9 @@ import (
 	installtypesgcp "github.com/openshift/installer/pkg/types/gcp"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	hiveapiaws "github.com/openshift/hive/pkg/hive/apis/hive/aws"
 	hiveapiazure "github.com/openshift/hive/pkg/hive/apis/hive/azure"
@@ -27,7 +32,7 @@ func CheckpointFromHiveV1(in *hivev1.Checkpoint, out *hiveapi.Checkpoint) error 
 }
 
 // ClusterDeploymentToHiveV1 turns a v1alpha1 ClusterDeployment into a v1 ClusterDeployment.
-func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig) error {
+func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, machinePools *[]*hivev1.MachinePool) error {
 	in = in.DeepCopy()
 
 	if err := hiveconversion.Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in, out, nil); err != nil {
@@ -121,11 +126,30 @@ func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out
 		installConfig.Compute = append(installConfig.Compute, outCompute)
 	}
 
+	newMachinePools := make([]*hivev1.MachinePool, len(in.Spec.Compute))
+	for i, c := range in.Spec.Compute {
+		var pool *hivev1.MachinePool
+		for _, p := range *machinePools {
+			if c.Name == p.Spec.Name {
+				pool = p
+				break
+			}
+		}
+		if pool == nil {
+			pool = &hivev1.MachinePool{}
+			pool.Name = fmt.Sprintf("%s-%s", in.Name, c.Name)
+			pool.Spec.ClusterDeploymentRef.Name = in.Name
+		}
+		machinePoolToHiveV1(&c, &pool.Spec)
+		newMachinePools[i] = pool
+	}
+	*machinePools = newMachinePools
+
 	return nil
 }
 
 // ClusterDeploymentFromHiveV1 turns a v1 ClusterDeployment into a v1alpha1 ClusterDeployment.
-func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, out *hiveapi.ClusterDeployment) error {
+func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, machinePools []*hivev1.MachinePool, out *hiveapi.ClusterDeployment) error {
 	in = in.DeepCopy()
 
 	if err := hiveconversion.Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in, out, nil); err != nil {
@@ -232,6 +256,18 @@ func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *in
 		out.Spec.Azure = nil
 		out.Spec.GCP = nil
 	}
+
+	newCompute := make([]hiveapi.MachinePool, len(machinePools))
+	for i, p := range machinePools {
+		for _, c := range out.Spec.Compute {
+			if p.Spec.Name == c.Name {
+				newCompute[i] = c
+				break
+			}
+		}
+		machinePoolFromHiveV1(&p.Spec, &newCompute[i])
+	}
+	out.Spec.Compute = newCompute
 
 	return nil
 }
@@ -440,6 +476,91 @@ func gcpMachinePoolFromInstallConfig(in *installtypesgcp.MachinePool, out *hivea
 func gcpMachinePoolToInstallConfig(in *hiveapigcp.MachinePool, out *installtypesgcp.MachinePool) {
 	out.Zones = in.Zones
 	out.InstanceType = in.InstanceType
+}
+
+func machinePoolFromHiveV1(in *hivev1.MachinePoolSpec, out *hiveapi.MachinePool) {
+	out.Name = in.Name
+	out.Replicas = in.Replicas
+	if inAWS := in.Platform.AWS; inAWS != nil {
+		if out.Platform.AWS == nil {
+			out.Platform.AWS = &hiveapiaws.MachinePoolPlatform{}
+		}
+		outAWS := out.Platform.AWS
+		outAWS.Zones = inAWS.Zones
+		outAWS.InstanceType = inAWS.InstanceType
+		outAWS.IOPS = inAWS.IOPS
+		outAWS.Size = inAWS.Size
+		outAWS.Type = inAWS.Type
+	} else {
+		out.Platform.AWS = nil
+	}
+	if inAzure := in.Platform.Azure; inAzure != nil {
+		if out.Platform.Azure == nil {
+			out.Platform.Azure = &hiveapiazure.MachinePool{}
+		}
+		outAzure := out.Platform.Azure
+		outAzure.Zones = inAzure.Zones
+		outAzure.InstanceType = inAzure.InstanceType
+		outAzure.DiskSizeGB = inAzure.DiskSizeGB
+	} else {
+		out.Platform.Azure = nil
+	}
+	if inGCP := in.Platform.GCP; inGCP != nil {
+		if out.Platform.GCP == nil {
+			out.Platform.GCP = &hiveapigcp.MachinePool{}
+		}
+		outGCP := out.Platform.GCP
+		outGCP.Zones = inGCP.Zones
+		outGCP.InstanceType = inGCP.InstanceType
+	} else {
+		out.Platform.GCP = nil
+	}
+	out.Labels = in.Labels
+	out.Taints = in.Taints
+}
+
+func machinePoolToHiveV1(in *hiveapi.MachinePool, out *hivev1.MachinePoolSpec) {
+	out.Name = in.Name
+	out.Replicas = in.Replicas
+	if out.Replicas != nil {
+		out.Autoscaling = nil
+	}
+	if inAWS := in.Platform.AWS; inAWS != nil {
+		if out.Platform.AWS == nil {
+			out.Platform.AWS = &hivev1aws.MachinePoolPlatform{}
+		}
+		outAWS := out.Platform.AWS
+		outAWS.Zones = inAWS.Zones
+		outAWS.InstanceType = inAWS.InstanceType
+		outAWS.IOPS = inAWS.IOPS
+		outAWS.Size = inAWS.Size
+		outAWS.Type = inAWS.Type
+	} else {
+		out.Platform.AWS = nil
+	}
+	if inAzure := in.Platform.Azure; inAzure != nil {
+		if out.Platform.Azure == nil {
+			out.Platform.Azure = &hivev1azure.MachinePool{}
+		}
+		outAzure := out.Platform.Azure
+		outAzure.Zones = inAzure.Zones
+		outAzure.InstanceType = inAzure.InstanceType
+		outAzure.DiskSizeGB = inAzure.DiskSizeGB
+	} else {
+		out.Platform.Azure = nil
+	}
+	if inGCP := in.Platform.GCP; inGCP != nil {
+		if out.Platform.GCP == nil {
+			out.Platform.GCP = &hivev1gcp.MachinePool{}
+		}
+		outGCP := out.Platform.GCP
+		outGCP.Zones = inGCP.Zones
+		outGCP.InstanceType = inGCP.InstanceType
+	} else {
+		out.Platform.GCP = nil
+	}
+	out.Labels = in.Labels
+	out.Taints = in.Taints
 }
 
 func parseCIDR(s string) *ipnet.IPNet {

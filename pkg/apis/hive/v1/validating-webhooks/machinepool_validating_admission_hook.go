@@ -29,6 +29,7 @@ const (
 	machinePoolVersion  = "v1"
 	machinePoolResource = "machinepools"
 
+	defaultMasterPoolName = "master"
 	defaultWorkerPoolName = "worker"
 )
 
@@ -228,6 +229,9 @@ func validateMachinePoolName(pool *hivev1.MachinePool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if pool.Name != fmt.Sprintf("%s-%s", pool.Spec.ClusterDeploymentRef.Name, pool.Spec.Name) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), pool.Name, "name must be ${CD_NAME}-${POOL_NAME}, where ${CD_NAME} is the name of the clusterdeployment and ${POOL_NAME} is the name of the remote machine pool"))
+	}
+	if pool.Spec.Name == defaultMasterPoolName {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "name"), pool.Spec.Name, fmt.Sprintf("pool name cannot be %q", defaultMasterPoolName)))
 	}
 	return allErrs
 }

@@ -1,6 +1,7 @@
 package hiveconversion
 
 import (
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -646,7 +647,11 @@ func Convert_v1alpha1_HiveConfig_To_v1_HiveConfig(in *hiveapi.HiveConfig, out *h
 
 func Convert_v1_HiveConfig_To_v1alpha1_HiveConfig(in *hivev1.HiveConfig, out *hiveapi.HiveConfig, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if len(in.Spec.ManagedDomains) > 0 {
+	switch len(in.Spec.ManagedDomains) {
+	case 0:
+		out.Spec.ManagedDomains = nil
+		out.Spec.ExternalDNS = nil
+	case 1:
 		inDNS := in.Spec.ManagedDomains[0]
 		out.Spec.ManagedDomains = inDNS.Domains
 		if out.Spec.ExternalDNS == nil {
@@ -669,9 +674,8 @@ func Convert_v1_HiveConfig_To_v1alpha1_HiveConfig(in *hivev1.HiveConfig, out *hi
 		} else {
 			outDNS.GCP = nil
 		}
-	} else {
-		out.Spec.ManagedDomains = nil
-		out.Spec.ExternalDNS = nil
+	default:
+		return errors.New("cannot convert HiveConfig with multiple managed domains from v1 to v1alpha1")
 	}
 	out.Spec.AdditionalCertificateAuthorities = in.Spec.AdditionalCertificateAuthoritiesSecretRef
 	out.Spec.GlobalPullSecret = in.Spec.GlobalPullSecretRef

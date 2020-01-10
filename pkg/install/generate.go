@@ -299,7 +299,7 @@ func InstallerPodSpec(
 				// TODO: need an official image for this
 				Image:           "docker.io/djzager/libvirt:netstart",
 				ImagePullPolicy: corev1.PullAlways,
-				SecurityContext: corev1.SecurityContext{Privileged: pointer.BoolPtr(true)},
+				SecurityContext: &corev1.SecurityContext{Privileged: pointer.BoolPtr(true)},
 				// Re-use the output mount shared between installer and hive containers
 				VolumeMounts: []corev1.VolumeMount{
 					{

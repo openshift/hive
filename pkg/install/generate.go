@@ -321,7 +321,7 @@ func InstallerPodSpec(
 		)
 		// TODO: host networking is used to access the networks for target clusters.
 		// instead we should provide access: https://docs.openshift.com/container-platform/4.2/networking/multiple-networks/attaching-pod.html
-		hostNetwork := true
+		hostNetwork = true
 	}
 
 	return &corev1.PodSpec{

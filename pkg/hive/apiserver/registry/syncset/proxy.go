@@ -3,7 +3,6 @@ package syncset
 import (
 	"context"
 
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +11,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -65,13 +67,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.SyncSetList{ListMeta: syncSets.ListMeta}
-	for _, curr := range syncSets.Items {
-		role, err := util.SyncSetFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.SyncSetList{
+		ListMeta: syncSets.ListMeta,
+		Items:    make([]hiveapi.SyncSet, len(syncSets.Items)),
+	}
+	for i, curr := range syncSets.Items {
+		if err := util.SyncSetFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *role)
 	}
 	return ret, nil
 }
@@ -87,8 +90,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	syncSet, err := util.SyncSetFromHiveV1(ret)
-	if err != nil {
+	syncSet := &hiveapi.SyncSet{}
+	if err := util.SyncSetFromHiveV1(ret, syncSet); err != nil {
 		return nil, err
 	}
 	return syncSet, nil
@@ -113,8 +116,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.SyncSetToHiveV1(obj.(*hiveapi.SyncSet))
-	if err != nil {
+	convertedObj := &hivev1.SyncSet{}
+	if err := util.SyncSetToHiveV1(obj.(*hiveapi.SyncSet), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -123,11 +126,11 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	role, err := util.SyncSetFromHiveV1(ret)
-	if err != nil {
+	syncSet := &hiveapi.SyncSet{}
+	if err := util.SyncSetFromHiveV1(ret, syncSet); err != nil {
 		return nil, err
 	}
-	return role, nil
+	return syncSet, nil
 }
 
 func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
@@ -136,36 +139,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	syncSet, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldSyncSet, err := util.SyncSetFromHiveV1(old)
+	old := &hiveapi.SyncSet{}
+	if err := util.SyncSetFromHiveV1(syncSet, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldSyncSet)
+	if err := util.SyncSetToHiveV1(obj.(*hiveapi.SyncSet), syncSet); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(syncSet)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedSyncSet, err := util.SyncSetToHiveV1(obj.(*hiveapi.SyncSet))
-	if err != nil {
+	new := &hiveapi.SyncSet{}
+	if err := util.SyncSetFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedSyncSet)
-	if err != nil {
-		return nil, false, err
-	}
-
-	syncSet, err := util.SyncSetFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return syncSet, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.SyncSetInterface, error) {

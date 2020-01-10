@@ -3,6 +3,7 @@ package clusterdeprovisionrequest
 import (
 	"context"
 
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -65,13 +66,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.ClusterDeprovisionRequestList{ListMeta: clusterDeprovisions.ListMeta}
-	for _, curr := range clusterDeprovisions.Items {
-		clusterDeprovisionRequest, err := util.ClusterDeprovisionRequestFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.ClusterDeprovisionRequestList{
+		ListMeta: clusterDeprovisions.ListMeta,
+		Items:    make([]hiveapi.ClusterDeprovisionRequest, len(clusterDeprovisions.Items)),
+	}
+	for i, curr := range clusterDeprovisions.Items {
+		if err := util.ClusterDeprovisionRequestFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *clusterDeprovisionRequest)
 	}
 	return ret, nil
 }
@@ -87,8 +89,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	clusterDeprovisionRequest, err := util.ClusterDeprovisionRequestFromHiveV1(ret)
-	if err != nil {
+	clusterDeprovisionRequest := &hiveapi.ClusterDeprovisionRequest{}
+	if err := util.ClusterDeprovisionRequestFromHiveV1(ret, clusterDeprovisionRequest); err != nil {
 		return nil, err
 	}
 	return clusterDeprovisionRequest, nil
@@ -113,8 +115,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.ClusterDeprovisionRequestToHiveV1(obj.(*hiveapi.ClusterDeprovisionRequest))
-	if err != nil {
+	convertedObj := &hivev1.ClusterDeprovision{}
+	if err := util.ClusterDeprovisionRequestToHiveV1(obj.(*hiveapi.ClusterDeprovisionRequest), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -123,8 +125,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	clusterDeprovisionRequest, err := util.ClusterDeprovisionRequestFromHiveV1(ret)
-	if err != nil {
+	clusterDeprovisionRequest := &hiveapi.ClusterDeprovisionRequest{}
+	if err := util.ClusterDeprovisionRequestFromHiveV1(ret, clusterDeprovisionRequest); err != nil {
 		return nil, err
 	}
 	return clusterDeprovisionRequest, nil
@@ -136,36 +138,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	clusterDeprovisionRequest, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldClusterDeprovisionRequest, err := util.ClusterDeprovisionRequestFromHiveV1(old)
+	old := &hiveapi.ClusterDeprovisionRequest{}
+	if err := util.ClusterDeprovisionRequestFromHiveV1(clusterDeprovisionRequest, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldClusterDeprovisionRequest)
+	if err := util.ClusterDeprovisionRequestToHiveV1(obj.(*hiveapi.ClusterDeprovisionRequest), clusterDeprovisionRequest); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(clusterDeprovisionRequest)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedClusterDeprovisionRequest, err := util.ClusterDeprovisionRequestToHiveV1(obj.(*hiveapi.ClusterDeprovisionRequest))
-	if err != nil {
+	new := &hiveapi.ClusterDeprovisionRequest{}
+	if err := util.ClusterDeprovisionRequestFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedClusterDeprovisionRequest)
-	if err != nil {
-		return nil, false, err
-	}
-
-	clusterDeprovisionRequest, err := util.ClusterDeprovisionRequestFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return clusterDeprovisionRequest, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.ClusterDeprovisionInterface, error) {

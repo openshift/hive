@@ -3,13 +3,15 @@ package hiveconfig
 import (
 	"context"
 
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -63,13 +65,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.HiveConfigList{ListMeta: hiveConfigs.ListMeta}
-	for _, curr := range hiveConfigs.Items {
-		hiveConfig, err := util.HiveConfigFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.HiveConfigList{
+		ListMeta: hiveConfigs.ListMeta,
+		Items:    make([]hiveapi.HiveConfig, len(hiveConfigs.Items)),
+	}
+	for i, curr := range hiveConfigs.Items {
+		if err := util.HiveConfigFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *hiveConfig)
 	}
 	return ret, nil
 }
@@ -85,8 +88,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	hiveConfig, err := util.HiveConfigFromHiveV1(ret)
-	if err != nil {
+	hiveConfig := &hiveapi.HiveConfig{}
+	if err := util.HiveConfigFromHiveV1(ret, hiveConfig); err != nil {
 		return nil, err
 	}
 	return hiveConfig, nil
@@ -111,8 +114,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.HiveConfigToHiveV1(obj.(*hiveapi.HiveConfig))
-	if err != nil {
+	convertedObj := &hivev1.HiveConfig{}
+	if err := util.HiveConfigToHiveV1(obj.(*hiveapi.HiveConfig), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -121,8 +124,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	hiveConfig, err := util.HiveConfigFromHiveV1(ret)
-	if err != nil {
+	hiveConfig := &hiveapi.HiveConfig{}
+	if err := util.HiveConfigFromHiveV1(ret, hiveConfig); err != nil {
 		return nil, err
 	}
 	return hiveConfig, nil
@@ -134,36 +137,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	hiveConfig, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldHiveConfig, err := util.HiveConfigFromHiveV1(old)
+	old := &hiveapi.HiveConfig{}
+	if err := util.HiveConfigFromHiveV1(hiveConfig, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldHiveConfig)
+	if err := util.HiveConfigToHiveV1(obj.(*hiveapi.HiveConfig), hiveConfig); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(hiveConfig)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedHiveConfig, err := util.HiveConfigToHiveV1(obj.(*hiveapi.HiveConfig))
-	if err != nil {
+	new := &hiveapi.HiveConfig{}
+	if err := util.HiveConfigFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedHiveConfig)
-	if err != nil {
-		return nil, false, err
-	}
-
-	hiveConfig, err := util.HiveConfigFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return hiveConfig, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.HiveConfigInterface, error) {

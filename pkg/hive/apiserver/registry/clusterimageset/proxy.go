@@ -3,13 +3,15 @@ package clusterimageset
 import (
 	"context"
 
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -63,13 +65,14 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		return nil, err
 	}
 
-	ret := &hiveapi.ClusterImageSetList{ListMeta: clusterImageSets.ListMeta}
-	for _, curr := range clusterImageSets.Items {
-		clusterImageSet, err := util.ClusterImageSetFromHiveV1(&curr)
-		if err != nil {
+	ret := &hiveapi.ClusterImageSetList{
+		ListMeta: clusterImageSets.ListMeta,
+		Items:    make([]hiveapi.ClusterImageSet, len(clusterImageSets.Items)),
+	}
+	for i, curr := range clusterImageSets.Items {
+		if err := util.ClusterImageSetFromHiveV1(&curr, &ret.Items[i]); err != nil {
 			return nil, err
 		}
-		ret.Items = append(ret.Items, *clusterImageSet)
 	}
 	return ret, nil
 }
@@ -85,8 +88,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	clusterImageSet, err := util.ClusterImageSetFromHiveV1(ret)
-	if err != nil {
+	clusterImageSet := &hiveapi.ClusterImageSet{}
+	if err := util.ClusterImageSetFromHiveV1(ret, clusterImageSet); err != nil {
 		return nil, err
 	}
 	return clusterImageSet, nil
@@ -111,8 +114,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	convertedObj, err := util.ClusterImageSetToHiveV1(obj.(*hiveapi.ClusterImageSet))
-	if err != nil {
+	convertedObj := &hivev1.ClusterImageSet{}
+	if err := util.ClusterImageSetToHiveV1(obj.(*hiveapi.ClusterImageSet), convertedObj); err != nil {
 		return nil, err
 	}
 
@@ -121,8 +124,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		return nil, err
 	}
 
-	clusterImageSet, err := util.ClusterImageSetFromHiveV1(ret)
-	if err != nil {
+	clusterImageSet := &hiveapi.ClusterImageSet{}
+	if err := util.ClusterImageSetFromHiveV1(ret, clusterImageSet); err != nil {
 		return nil, err
 	}
 	return clusterImageSet, nil
@@ -134,36 +137,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	old, err := client.Get(name, metav1.GetOptions{})
+	clusterImageSet, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
-	oldClusterImageSet, err := util.ClusterImageSetFromHiveV1(old)
+	old := &hiveapi.ClusterImageSet{}
+	if err := util.ClusterImageSetFromHiveV1(clusterImageSet, old); err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, old)
 	if err != nil {
 		return nil, false, err
 	}
 
-	obj, err := objInfo.UpdatedObject(ctx, oldClusterImageSet)
+	if err := util.ClusterImageSetToHiveV1(obj.(*hiveapi.ClusterImageSet), clusterImageSet); err != nil {
+		return nil, false, err
+	}
+
+	ret, err := client.Update(clusterImageSet)
 	if err != nil {
 		return nil, false, err
 	}
 
-	updatedClusterImageSet, err := util.ClusterImageSetToHiveV1(obj.(*hiveapi.ClusterImageSet))
-	if err != nil {
+	new := &hiveapi.ClusterImageSet{}
+	if err := util.ClusterImageSetFromHiveV1(ret, new); err != nil {
 		return nil, false, err
 	}
-
-	ret, err := client.Update(updatedClusterImageSet)
-	if err != nil {
-		return nil, false, err
-	}
-
-	clusterImageSet, err := util.ClusterImageSetFromHiveV1(ret)
-	if err != nil {
-		return nil, false, err
-	}
-	return clusterImageSet, false, err
+	return new, false, err
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.ClusterImageSetInterface, error) {

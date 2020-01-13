@@ -15,7 +15,7 @@ parameters:
 - name: HIVE_IMAGE
   displayName: Hive v1alpha1 API Server Image
   description: Image of the Hive v1alpha1 aggregated API Server
-  value: 172.17.0.1:5000/hive:latest
+  value: registry.svc.ci.openshift.org/openshift/hivev1:hive
 - name: CA_CRT
   displayName: Hive v1alpha1 CA CRT
   description: base64-encoded CA CRT for the hive v1alpha1 aggregated API Server

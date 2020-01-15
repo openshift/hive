@@ -55,15 +55,15 @@ func NewAWSActuator(awsCreds *corev1.Secret, region string, remoteMachineSets []
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
-func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, error) {
+func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
 	if cd.Spec.ClusterMetadata == nil {
-		return nil, errors.New("ClusterDeployment does not have cluster metadata")
+		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
 	}
 	if cd.Spec.Platform.AWS == nil {
-		return nil, errors.New("ClusterDeployment is not for AWS")
+		return nil, false, errors.New("ClusterDeployment is not for AWS")
 	}
 	if pool.Spec.Platform.AWS == nil {
-		return nil, errors.New("MachinePool is not for AWS")
+		return nil, false, errors.New("MachinePool is not for AWS")
 	}
 
 	computePool := baseMachinePool(pool)
@@ -80,10 +80,10 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	if len(computePool.Platform.AWS.Zones) == 0 {
 		zones, err := a.fetchAvailabilityZones()
 		if err != nil {
-			return nil, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
+			return nil, false, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
 		}
 		if len(zones) == 0 {
-			return nil, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.AWS.Region)
+			return nil, false, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.AWS.Region)
 		}
 		computePool.Platform.AWS.Zones = zones
 	}
@@ -97,7 +97,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, a.amiID, pool.Spec.Name, "worker-user-data", userTags)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate machinesets")
+		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}
 
 	// Re-use existing AWS resources for generated MachineSets.
@@ -105,7 +105,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		a.updateProviderConfig(ms, cd.Spec.ClusterMetadata.InfraID)
 	}
 
-	return installerMachineSets, nil
+	return installerMachineSets, true, nil
 }
 
 // Scan the pre-existing machinesets to find an AMI ID we can use if we need to create

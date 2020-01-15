@@ -27,6 +27,9 @@ const (
 	// UninstallJobLabel is the label used for artifacts specific to Hive cluster deprovision.
 	UninstallJobLabel = "hive.openshift.io/uninstall"
 
+	// MachinePoolNameLabel is the label that is used to identify the MachinePool which owns a particular resource.
+	MachinePoolNameLabel = "hive.openshift.io/machine-pool-name"
+
 	// ClusterDeploymentNameLabel is the label that is used to identify a relationship to a given cluster deployment object.
 	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 

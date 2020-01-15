@@ -48,6 +48,10 @@ func (c *FakeHiveV1) MachinePools(namespace string) v1.MachinePoolInterface {
 	return &FakeMachinePools{c, namespace}
 }
 
+func (c *FakeHiveV1) MachinePoolNameLeases(namespace string) v1.MachinePoolNameLeaseInterface {
+	return &FakeMachinePoolNameLeases{c, namespace}
+}
+
 func (c *FakeHiveV1) SelectorSyncIdentityProviders() v1.SelectorSyncIdentityProviderInterface {
 	return &FakeSelectorSyncIdentityProviders{c}
 }

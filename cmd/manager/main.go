@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	golog "log"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -167,6 +168,7 @@ func (writer klogWriter) Write(data []byte) (n int, err error) {
 
 func main() {
 	defer klog.Flush()
+	rand.Seed(time.Now().UnixNano())
 	cmd := newRootCommand()
 	err := cmd.Execute()
 	if err != nil {

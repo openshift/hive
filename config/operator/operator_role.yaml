@@ -76,6 +76,8 @@ rules:
   - dnszones
   - dnsendpoints
   - machinepools
+  - machinepoolnameleases
+  - machinepoolnameleases/status
   - selectorsyncidentityproviders
   - selectorsyncsets
   - syncidentityproviders

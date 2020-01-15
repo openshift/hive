@@ -98,7 +98,7 @@ func TestAWSActuator(t *testing.T) {
 				amiID:  testAMI,
 			}
 
-			generatedMachineSets, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
+			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
 
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")

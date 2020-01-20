@@ -419,7 +419,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
 				return reconcile.Result{}, err
 			}
-
 		}
 		return reconcile.Result{}, nil
 	}
@@ -541,12 +540,17 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		cdLog.WithError(err).Error("could not generate installer pod spec")
 		return reconcile.Result{}, err
 	}
+	annotations := map[string]string{}
+	if networks, ok := cd.Annotations[constants.CNINetworksAnnotation]; ok {
+		annotations[constants.CNINetworksAnnotation] = networks
+	}
 
 	provision := &hivev1.ClusterProvision{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionName,
-			Namespace: cd.Namespace,
-			Labels:    labels,
+			Name:        provisionName,
+			Namespace:   cd.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: hivev1.ClusterProvisionSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{

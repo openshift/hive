@@ -42,6 +42,12 @@ const (
 	// SyncsetPauseAnnotation is a annotation used by clusterDeployment, if it's true, then we will disable syncing to a specific cluster
 	SyncsetPauseAnnotation = "hive.openshift.io/syncset-pause"
 
+	// CNINetworksLabel is the annotation for attaching a pod to additional networks. Typically
+	// this is used for accessing the provisioning network for bare metal installs. If this
+	// annotation is present on a ClusterDeployment we will pass it through the
+	// ClusterProvision > Job > Pod.
+	CNINetworksAnnotation = "k8s.v1.cni.cncf.io/networks"
+
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

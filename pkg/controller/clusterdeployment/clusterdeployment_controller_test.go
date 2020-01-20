@@ -146,6 +146,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Create provision transfers CNI networks annotation",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Annotations[constants.CNINetworksAnnotation] = "net1,net2"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				provisions := getProvisions(c)
+				assert.Len(t, provisions, 1, "expected provision to exist")
+				assert.Equal(t, "net1,net2", provisions[0].Annotations[constants.CNINetworksAnnotation])
+			},
+		},
+		{
 			name: "Provision not created when pending create",
 			existing: []runtime.Object{
 				testClusterDeployment(),

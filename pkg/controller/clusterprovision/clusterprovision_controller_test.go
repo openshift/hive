@@ -33,6 +33,7 @@ const (
 	testProvisionName  = "test-provision-name"
 	installJobName     = "test-provision-name-provision"
 	testNamespace      = "test-namespace"
+	testCNINetworks    = "net1,net2"
 )
 
 func init() {
@@ -223,6 +224,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 				assert.Nil(t, job, "expected no job")
 			} else {
 				assert.NotNil(t, job, "expected job")
+				assert.Equal(t, testCNINetworks, job.Spec.Template.ObjectMeta.Annotations[constants.CNINetworksAnnotation])
 			}
 
 			actualPendingCreation := !controllerExpectations.SatisfiedExpectations(reconcileRequest.String())
@@ -244,6 +246,9 @@ func testProvision(opts ...provisionOption) *hivev1.ClusterProvision {
 			Namespace: testNamespace,
 			Labels: map[string]string{
 				constants.ClusterDeploymentNameLabel: testDeploymentName,
+			},
+			Annotations: map[string]string{
+				constants.CNINetworksAnnotation: testCNINetworks,
 			},
 		},
 		Spec: hivev1.ClusterProvisionSpec{

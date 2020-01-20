@@ -351,6 +351,12 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 		labels = map[string]string{}
 	}
 	labels[constants.InstallJobLabel] = "true"
+	// Ensure we transfer the CNI networks onto the pod if defined on the ClusterDeployment
+	// and ClusterProvision.
+	annotations := map[string]string{}
+	if networks, ok := provision.Annotations[constants.CNINetworksAnnotation]; ok {
+		annotations[constants.CNINetworksAnnotation] = networks
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -363,7 +369,8 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 			Completions:  pointer.Int32Ptr(1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: provision.Spec.PodSpec,
 			},

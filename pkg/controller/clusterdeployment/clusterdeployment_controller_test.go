@@ -221,6 +221,31 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Parse server URL from admin kubeconfig for adopted cluster",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						InfraID:                  "fakeinfra",
+						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+					}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+				testMetadataConfigMap(),
+			},
+			expectConsoleRouteFetch: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
+				assert.Equal(t, "https://bar-api.clusters.example.com:6443/console", cd.Status.WebConsoleURL)
+			},
+		},
+		{
 			name: "Completed provision",
 			existing: []runtime.Object{
 				testClusterDeploymentWithProvision(),
@@ -1308,6 +1333,8 @@ func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeploy
 	cd := testClusterDeployment()
 	cd.Spec.Installed = true
 	cd.Status.InstalledTimestamp = &metav1.Time{Time: installedAt}
+	cd.Status.APIURL = "http://quite.fake.com"
+	cd.Status.WebConsoleURL = "http://quite.fake.com/console"
 	return cd
 }
 

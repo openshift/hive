@@ -285,6 +285,25 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 	return r.reconcile(request, cd, cdLog)
 }
 
+func (r *ReconcileClusterDeployment) postProcessAdminKubeconfig(cd *hivev1.ClusterDeployment,
+	cdLog log.FieldLogger) error {
+
+	adminKubeconfigSecret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name}, adminKubeconfigSecret); err != nil {
+		cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
+		return err
+	}
+	if err := r.fixupAdminKubeconfigSecret(adminKubeconfigSecret, cdLog); err != nil {
+		cdLog.WithError(err).Error("failed to fix up admin kubeconfig secret")
+		return err
+	}
+	if err := r.setAdminKubeconfigStatus(cd, cdLog); err != nil {
+		cdLog.WithError(err).Error("failed to set admin kubeconfig status")
+		return err
+	}
+	return nil
+}
+
 func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnErr error) {
 	// Set platform label on the ClusterDeployment
 	if platform := getClusterPlatform(cd); cd.Labels[hivev1.HiveClusterPlatformLabel] != platform {
@@ -387,6 +406,21 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 		cdLog.Debug("cluster is already installed, no processing of provision needed")
 		r.cleanupInstallLogPVC(cd, cdLog)
+
+		if cd.Spec.ClusterMetadata != nil &&
+			cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" &&
+			(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+
+			err := r.postProcessAdminKubeconfig(cd, cdLog)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+			if err := r.Status().Update(context.TODO(), cd); err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
+				return reconcile.Result{}, err
+			}
+
+		}
 		return reconcile.Result{}, nil
 	}
 
@@ -667,19 +701,13 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		statusChange = true
 		cd.Status.Conditions = conds
 	}
-	if provision.Spec.AdminKubeconfigSecretRef != nil && (cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+	if cd.Spec.ClusterMetadata != nil &&
+		cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" &&
+		(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+
 		statusChange = true
-		adminKubeconfigSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: provision.Spec.AdminKubeconfigSecretRef.Name}, adminKubeconfigSecret); err != nil {
-			cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
-			return reconcile.Result{}, err
-		}
-		if err := r.fixupAdminKubeconfigSecret(adminKubeconfigSecret, cdLog); err != nil {
-			cdLog.WithError(err).Error("failed to fix up admin kubeconfig secret")
-			return reconcile.Result{}, err
-		}
-		if err := r.setAdminKubeconfigStatus(cd, cdLog); err != nil {
-			cdLog.WithError(err).Error("failed to set admin kubeconfig status")
+		err := r.postProcessAdminKubeconfig(cd, cdLog)
+		if err != nil {
 			return reconcile.Result{}, err
 		}
 	}

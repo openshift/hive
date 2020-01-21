@@ -77,6 +77,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		)
 	}
 
+	if syncSetReapplyInterval := instance.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {
+		syncsetReapplyIntervalEnvVar := corev1.EnvVar{
+			Name:  "SYNCSET_REAPPLY_INTERVAL",
+			Value: syncSetReapplyInterval,
+		}
+
+		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
+	}
+
 	if len(instance.Spec.ManagedDomains) > 0 {
 		addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec)
 	}

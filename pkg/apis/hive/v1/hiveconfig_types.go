@@ -40,6 +40,11 @@ type HiveConfigSpec struct {
 	// The default level is info.
 	// +optional
 	LogLevel string `json:"logLevel,omitempty"`
+
+	// SyncSetReapplyInterval is a string duration indicating how much time must pass before SyncSet resources
+	// will be reapplied.
+	// The default reapply interval is two hours.
+	SyncSetReapplyInterval string `json:"syncSetReapplyInterval,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

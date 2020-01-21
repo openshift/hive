@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -57,7 +58,8 @@ const (
 	applySucceededReason     = "ApplySucceeded"
 	applyFailedReason        = "ApplyFailed"
 	deletionFailedReason     = "DeletionFailed"
-	reapplyInterval          = 2 * time.Hour
+	defaultReapplyInterval   = 2 * time.Hour
+	reapplyIntervalEnvKey    = "SYNCSET_REAPPLY_INTERVAL"
 	secretsResource          = "secrets"
 	secretKind               = "Secret"
 	secretAPIVersion         = "v1"
@@ -71,19 +73,31 @@ type Applier interface {
 	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
 }
 
-// Add creates a new SyncSet controller and adds it to the manager with default RBAC. The manager will set fields on the
+// Add creates a new SyncSetInstance controller and adds it to the manager with default RBAC. The manager will set fields on the
 // controller and start it when the manager starts.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	logger := log.WithField("controller", controllerName)
+	reapplyInterval := defaultReapplyInterval
+	if envReapplyInterval := os.Getenv(reapplyIntervalEnvKey); len(envReapplyInterval) > 0 {
+		var err error
+		reapplyInterval, err = time.ParseDuration(envReapplyInterval)
+		if err != nil {
+			log.WithError(err).WithField("reapplyInterval", envReapplyInterval).Errorf("unable to parse %s", reapplyIntervalEnvKey)
+			return err
+		}
+	}
+	log.WithField("reapplyInterval", reapplyInterval).Info("Reapply interval set")
+	return AddToManager(mgr, NewReconciler(mgr, logger, reapplyInterval))
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager, logger log.FieldLogger, reapplyInterval time.Duration) reconcile.Reconciler {
 	r := &ReconcileSyncSetInstance{
-		Client:         controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme:         mgr.GetScheme(),
-		logger:         log.WithField("controller", controllerName),
-		applierBuilder: applierBuilderFunc,
+		Client:          controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:          mgr.GetScheme(),
+		logger:          logger,
+		applierBuilder:  applierBuilderFunc,
+		reapplyInterval: reapplyInterval,
 	}
 	r.hash = r.resourceHash
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
@@ -155,9 +169,10 @@ type ReconcileSyncSetInstance struct {
 	client.Client
 	scheme *runtime.Scheme
 
-	logger         log.FieldLogger
-	applierBuilder func(*rest.Config, log.FieldLogger) Applier
-	hash           func([]byte) string
+	logger          log.FieldLogger
+	applierBuilder  func(*rest.Config, log.FieldLogger) Applier
+	hash            func([]byte) string
+	reapplyInterval time.Duration
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
@@ -269,13 +284,13 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, applyErr
 	}
 
-	reapplyDuration := ssiReApplyDuration(ssi)
+	reapplyDuration := ssiReapplyDuration(ssi, r.reapplyInterval)
 	return reconcile.Result{RequeueAfter: reapplyDuration}, nil
 }
 
-// ssiReApplyDuration returns the shortest time.Duration to meet reapplyInterval from successfully applied
+// ssiReapplyDuration returns the shortest time.Duration to meet reapplyInterval from successfully applied
 // resources, patches and secretReferences in the SyncSetInstance status.
-func ssiReApplyDuration(ssi *hivev1.SyncSetInstance) time.Duration {
+func ssiReapplyDuration(ssi *hivev1.SyncSetInstance, reapplyInterval time.Duration) time.Duration {
 	timeSinceOldestApply := time.Duration(0)
 	for _, statuses := range [][]hivev1.SyncStatus{ssi.Status.Resources, ssi.Status.Patches, ssi.Status.SecretReferences} {
 		for _, status := range statuses {
@@ -497,8 +512,8 @@ func findSyncStatus(status hivev1.SyncStatus, statusList []hivev1.SyncStatus) *h
 	return nil
 }
 
-// needToReApply determines if the provided status indicates that the resource, secret or patch needs to be re-applied
-func needToReApply(applyTerm string, newStatus, existingStatus hivev1.SyncStatus, ssiLog log.FieldLogger) bool {
+// needToReapply determines if the provided status indicates that the resource, secret or patch needs to be re-applied
+func (r *ReconcileSyncSetInstance) needToReapply(applyTerm string, newStatus, existingStatus hivev1.SyncStatus, ssiLog log.FieldLogger) bool {
 	// Re-apply if hash has changed
 	if existingStatus.Hash != newStatus.Hash {
 		ssiLog.Debugf("%s %s/%s (%s) has changed, will re-apply", applyTerm, newStatus.Namespace, newStatus.Name, newStatus.Kind)
@@ -514,7 +529,7 @@ func needToReApply(applyTerm string, newStatus, existingStatus hivev1.SyncStatus
 	// Re-apply if past reapplyInterval
 	if applySuccessCondition := controllerutils.FindSyncCondition(existingStatus.Conditions, hivev1.ApplySuccessSyncCondition); applySuccessCondition != nil {
 		since := time.Since(applySuccessCondition.LastProbeTime.Time)
-		if since > reapplyInterval {
+		if since > r.reapplyInterval {
 			ssiLog.Debugf("It has been %v since %s %s/%s (%s) was last applied, will re-apply", applyTerm, since, newStatus.Namespace, newStatus.Name, newStatus.Kind)
 			return true
 		}
@@ -550,7 +565,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 			Hash:       r.hash(resource.Raw),
 		}
 
-		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || needToReApply("resource", resourceSyncStatus, *rss, ssiLog) {
+		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply("resource", resourceSyncStatus, *rss, ssiLog) {
 			// Apply resource
 			ssiLog.Debugf("applying resource: %s/%s (%s)", resourceSyncStatus.Namespace, resourceSyncStatus.Name, resourceSyncStatus.Kind)
 			var applyResult hiveresource.ApplyResult
@@ -660,7 +675,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 			Hash:       r.hash(b),
 		}
 
-		if pss := findSyncStatus(patchSyncStatus, ssi.Status.Patches); pss == nil || needToReApply("patch", patchSyncStatus, *pss, ssiLog) {
+		if pss := findSyncStatus(patchSyncStatus, ssi.Status.Patches); pss == nil || r.needToReapply("patch", patchSyncStatus, *pss, ssiLog) {
 			// Apply patch
 			ssiLog.Debugf("applying patch: %s/%s (%s)", ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
 			namespacedName := types.NamespacedName{
@@ -744,7 +759,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretReferences(ssi *hivev1.Sync
 		}
 		secretReferenceSyncStatus.Hash = hash
 
-		if rss == nil || needToReApply("secret", secretReferenceSyncStatus, *rss, ssiLog) {
+		if rss == nil || r.needToReapply("secret", secretReferenceSyncStatus, *rss, ssiLog) {
 			// Apply secret
 			ssiLog.Debugf("applying secret: %s/%s (%s)", secret.Namespace, secret.Name, secret.Kind)
 			var result hiveresource.ApplyResult

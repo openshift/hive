@@ -2869,6 +2869,11 @@ spec:
                     type: object
                 type: object
               type: array
+            syncSetReapplyInterval:
+              description: SyncSetReapplyInterval is a string duration indicating
+                how much time must pass before SyncSet resources will be reapplied.
+                The default reapply interval is two hours.
+              type: string
           type: object
         status:
           properties:

@@ -40,7 +40,7 @@ const (
 	hiveAdditionalCASecret = "hive-additional-ca"
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
 
 	asset := assets.MustAsset("config/manager/deployment.yaml")
 	hLog.Debug("reading deployment")
@@ -86,9 +86,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
-	if len(instance.Spec.ManagedDomains) > 0 {
-		addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec)
-	}
+	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, mdConfigMap.Name)
 
 	// By default we will try to gather logs on failed installs:
 	logsEnvVar := corev1.EnvVar{

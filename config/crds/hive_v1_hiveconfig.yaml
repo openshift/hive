@@ -149,6 +149,15 @@ spec:
                 client CA configmap data from the openshift-config-managed namespace.
                 When the configmap changes, admission is redeployed.
               type: string
+            configApplied:
+              description: ConfigApplied will be set by the hive operator to indicate
+                whether or not the LastGenerationObserved was successfully reconciled.
+              type: boolean
+            observedGeneration:
+              description: ObservedGeneration will record the most recently processed
+                HiveConfig object's generation.
+              format: int64
+              type: integer
           type: object
   version: v1
 status:

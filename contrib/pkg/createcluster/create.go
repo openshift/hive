@@ -179,6 +179,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 			err := opt.Run()
 			if err != nil {
 				log.WithError(err).Error("Error")
+				os.Exit(1)
 			}
 		},
 	}
@@ -332,7 +333,10 @@ func (o *Options) Run() error {
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)
-		rh.ApplyRuntimeObject(obj, scheme.Scheme)
+		if _, err := rh.ApplyRuntimeObject(obj, scheme.Scheme); err != nil {
+			return err
+		}
+
 	}
 	return nil
 }

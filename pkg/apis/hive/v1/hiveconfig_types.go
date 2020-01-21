@@ -62,6 +62,13 @@ type HiveConfigStatus struct {
 	// configmap data from the openshift-config-managed namespace. When the configmap changes,
 	// admission is redeployed.
 	AggregatorClientCAHash string `json:"aggregatorClientCAHash,omitempty"`
+
+	// ObservedGeneration will record the most recently processed HiveConfig object's generation.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ConfigApplied will be set by the hive operator to indicate whether or not the LastGenerationObserved
+	// was successfully reconciled.
+	ConfigApplied bool `json:"configApplied,omitempty"`
 }
 
 // BackupConfig contains settings for the Velero backup integration.

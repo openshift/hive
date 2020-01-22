@@ -291,7 +291,6 @@ func InstallerPodSpec(
 		},
 	}
 
-	var hostNetwork bool
 	if cd.Spec.Platform.BareMetal != nil {
 		containers = append(containers,
 			corev1.Container{
@@ -319,9 +318,6 @@ func InstallerPodSpec(
 				*/
 			},
 		)
-		// TODO: host networking is used to access the networks for target clusters.
-		// instead we should provide access: https://docs.openshift.com/container-platform/4.2/networking/multiple-networks/attaching-pod.html
-		hostNetwork = true
 	}
 
 	return &corev1.PodSpec{
@@ -329,7 +325,6 @@ func InstallerPodSpec(
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         containers,
 		Volumes:            volumes,
-		HostNetwork:        hostNetwork,
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
 	}, nil

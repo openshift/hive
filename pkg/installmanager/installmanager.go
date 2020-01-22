@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/hive/pkg/gcpclient"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/openshift/hive/pkg/gcpclient"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -347,6 +348,10 @@ func (m *InstallManager) Run() error {
 	installErr := m.provisionCluster()
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
+
+		// TODO: remove this
+		m.log.Info("sleeping for 2 hours for debugging")
+		time.Sleep(120 * time.Minute)
 
 		// Fetch logs from all cluster machines:
 		if m.isGatherLogsEnabled() {

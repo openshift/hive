@@ -14,7 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,7 +45,7 @@ func calculateRuntimeObjectsChecksum(objects []runtime.Object) string {
 	return r.calculateObjectsChecksumWithoutStatus(r.logger, objects...)
 }
 
-func ignoreUncomparedFields(expected, actual []runtime.Object) (corev1.ObjectReference, metav1.Time) {
+func ignoreUncomparedFields(expected, actual []runtime.Object) (hivev1.BackupReference, metav1.Time) {
 	// We need this for the comparisons to work.
 	if len(expected) > 0 {
 		expectedCheckpoint := expected[len(expected)-1].(*hivev1.Checkpoint)
@@ -59,7 +58,7 @@ func ignoreUncomparedFields(expected, actual []runtime.Object) (corev1.ObjectRef
 		return actualCheckpoint.Spec.LastBackupRef, actualCheckpoint.Spec.LastBackupTime
 	}
 
-	return corev1.ObjectReference{Namespace: namespace}, metav1.Now()
+	return hivev1.BackupReference{Namespace: namespace}, metav1.Now()
 }
 
 func calculateErrorChecksum() string {

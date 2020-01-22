@@ -10,7 +10,6 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -172,7 +171,7 @@ func (a *SyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec").Child("resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec").Child("patches"))...)
-	allErrs = append(allErrs, validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec").Child("secretReferences"))...)
+	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec").Child("secretMappings"))...)
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
@@ -219,7 +218,7 @@ func (a *SyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec", "resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec", "patches"))...)
-	allErrs = append(allErrs, validateSecretReferences(newObject.Spec.SecretReferences, field.NewPath("spec", "secretReferences"))...)
+	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec", "secretMappings"))...)
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
@@ -273,31 +272,19 @@ func validateResource(resource runtime.RawExtension, fldPath *field.Path) field.
 	return allErrs
 }
 
-func validateSecretReferences(secrets []hivev1.SecretReference, fldPath *field.Path) field.ErrorList {
+func validateSecrets(secrets []hivev1.SecretMapping, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, secret := range secrets {
-		allErrs = append(allErrs, validateSecretRef(secret.Source, fldPath.Index(i).Child("source"))...)
-		allErrs = append(allErrs, validateSecretRef(secret.Target, fldPath.Index(i).Child("target"))...)
+		allErrs = append(allErrs, validateSecretRef(secret.SourceRef, fldPath.Index(i).Child("sourceRef"))...)
+		allErrs = append(allErrs, validateSecretRef(secret.TargetRef, fldPath.Index(i).Child("targetRef"))...)
 	}
 	return allErrs
 }
 
-func validateSecretRef(ref corev1.ObjectReference, fldPath *field.Path) field.ErrorList {
+func validateSecretRef(ref hivev1.SecretReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(ref.Kind) > 0 && ref.Kind != "Secret" {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), ref.Kind, []string{"Secret"}))
-	}
-	if ref.GroupVersionKind().Group != "" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ref.APIVersion, "Group part of API version must be empty"))
-	}
 	if len(ref.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "Name is required"))
-	}
-	if len(ref.FieldPath) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldPath"), ref.FieldPath, "FieldPath should not be set"))
-	}
-	if len(ref.UID) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("UID"), ref.UID, "UID should not be set"))
 	}
 	return allErrs
 }

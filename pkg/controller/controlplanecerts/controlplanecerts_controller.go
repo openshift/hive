@@ -253,23 +253,23 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 		},
 	}
 
-	// Using SecretReference to sync secrets
-	secretReferences := []hivev1.SecretReference{}
+	// Using SecretMapping to sync secrets
+	secretMappings := []hivev1.SecretMapping{}
 	for _, secret := range secrets {
 		cdLog.WithField("secret", secret.Name).Debug("adding secret to secretReferences list")
-		secretReference := hivev1.SecretReference{
-			Source: corev1.ObjectReference{
+		secretMapping := hivev1.SecretMapping{
+			SourceRef: hivev1.SecretReference{
 				Namespace: secret.Namespace,
 				Name:      secret.Name,
 			},
-			Target: corev1.ObjectReference{
+			TargetRef: hivev1.SecretReference{
 				Name:      remoteSecretName(secret.Name, cd),
 				Namespace: openshiftConfigNamespace,
 			},
 		}
-		secretReferences = append(secretReferences, secretReference)
+		secretMappings = append(secretMappings, secretMapping)
 	}
-	syncSet.Spec.SecretReferences = secretReferences
+	syncSet.Spec.Secrets = secretMappings
 
 	resources := []runtime.RawExtension{}
 	apiServerConfig := &configv1.APIServer{

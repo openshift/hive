@@ -36,6 +36,11 @@ spec:
               type: string
             lastBackupRef:
               description: LastBackupRef is a reference to last backup object created
+              properties:
+                name:
+                  type: string
+                namespace:
+                  type: string
               type: object
             lastBackupTime:
               description: LastBackupTime is the last time we performed a backup of

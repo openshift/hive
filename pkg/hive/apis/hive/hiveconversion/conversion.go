@@ -61,7 +61,8 @@ func Convert_v1alpha1_Checkpoint_To_v1_Checkpoint(in *hiveapi.Checkpoint, out *h
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec.LastBackupChecksum = in.Spec.LastBackupChecksum
 	out.Spec.LastBackupTime = in.Spec.LastBackupTime
-	out.Spec.LastBackupRef = in.Spec.LastBackupRef
+	out.Spec.LastBackupRef.Name = in.Spec.LastBackupRef.Name
+	out.Spec.LastBackupRef.Namespace = in.Spec.LastBackupRef.Namespace
 	return nil
 }
 
@@ -69,7 +70,8 @@ func Convert_v1_Checkpoint_To_v1alpha1_Checkpoint(in *hivev1.Checkpoint, out *hi
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec.LastBackupChecksum = in.Spec.LastBackupChecksum
 	out.Spec.LastBackupTime = in.Spec.LastBackupTime
-	out.Spec.LastBackupRef = in.Spec.LastBackupRef
+	out.Spec.LastBackupRef.Name = in.Spec.LastBackupRef.Name
+	out.Spec.LastBackupRef.Namespace = in.Spec.LastBackupRef.Namespace
 	return nil
 }
 
@@ -735,11 +737,13 @@ func convert_v1alpha1_SyncSetCommonSpec_To_v1_SyncSetCommonSpec(in *hiveapi.Sync
 		outPatch.Patch = inPatch.Patch
 		outPatch.PatchType = inPatch.PatchType
 	}
-	out.SecretReferences = make([]hivev1.SecretReference, len(in.SecretReferences))
+	out.Secrets = make([]hivev1.SecretMapping, len(in.SecretReferences))
 	for i, inRef := range in.SecretReferences {
-		outRef := &out.SecretReferences[i]
-		outRef.Source = inRef.Source
-		outRef.Target = inRef.Target
+		outRef := &out.Secrets[i]
+		outRef.SourceRef.Name = inRef.Source.Name
+		outRef.SourceRef.Namespace = inRef.Source.Namespace
+		outRef.TargetRef.Name = inRef.Target.Name
+		outRef.TargetRef.Namespace = inRef.Target.Namespace
 	}
 }
 
@@ -756,11 +760,13 @@ func convert_v1_SyncSetCommonSpec_To_v1alpha1_SyncSetCommonSpec(in *hivev1.SyncS
 		outPatch.Patch = inPatch.Patch
 		outPatch.PatchType = inPatch.PatchType
 	}
-	out.SecretReferences = make([]hiveapi.SecretReference, len(in.SecretReferences))
-	for i, inRef := range in.SecretReferences {
+	out.SecretReferences = make([]hiveapi.SecretReference, len(in.Secrets))
+	for i, inRef := range in.Secrets {
 		outRef := &out.SecretReferences[i]
-		outRef.Source = inRef.Source
-		outRef.Target = inRef.Target
+		outRef.Source.Name = inRef.SourceRef.Name
+		outRef.Source.Namespace = inRef.SourceRef.Namespace
+		outRef.Target.Name = inRef.TargetRef.Name
+		outRef.Target.Namespace = inRef.TargetRef.Namespace
 	}
 }
 
@@ -873,7 +879,7 @@ func Convert_v1alpha1_SyncSetInstance_To_v1_SyncSetInstance(in *hiveapi.SyncSetI
 	out.Spec.SyncSetHash = in.Spec.SyncSetHash
 	convert_v1alpha1_SyncStatusSlice_To_v1_SyncStatusSlice(&in.Status.Resources, &out.Status.Resources)
 	convert_v1alpha1_SyncStatusSlice_To_v1_SyncStatusSlice(&in.Status.Patches, &out.Status.Patches)
-	convert_v1alpha1_SyncStatusSlice_To_v1_SyncStatusSlice(&in.Status.SecretReferences, &out.Status.SecretReferences)
+	convert_v1alpha1_SyncStatusSlice_To_v1_SyncStatusSlice(&in.Status.SecretReferences, &out.Status.Secrets)
 	convert_v1alpha1_SyncConditionSlice_To_v1_SyncConditionSlice(&in.Status.Conditions, &out.Status.Conditions)
 	return nil
 }
@@ -893,7 +899,7 @@ func Convert_v1_SyncSetInstance_To_v1alpha1_SyncSetInstance(in *hivev1.SyncSetIn
 	out.Spec.SyncSetHash = in.Spec.SyncSetHash
 	convert_v1_SyncStatusSlice_To_v1alpha1_SyncStatusSlice(&in.Status.Resources, &out.Status.Resources)
 	convert_v1_SyncStatusSlice_To_v1alpha1_SyncStatusSlice(&in.Status.Patches, &out.Status.Patches)
-	convert_v1_SyncStatusSlice_To_v1alpha1_SyncStatusSlice(&in.Status.SecretReferences, &out.Status.SecretReferences)
+	convert_v1_SyncStatusSlice_To_v1alpha1_SyncStatusSlice(&in.Status.Secrets, &out.Status.SecretReferences)
 	convert_v1_SyncConditionSlice_To_v1alpha1_SyncConditionSlice(&in.Status.Conditions, &out.Status.Conditions)
 	return nil
 }

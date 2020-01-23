@@ -79,6 +79,7 @@ const (
 	deleteAfterAnnotation      = "hive.openshift.io/delete-after"
 	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
 	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	hiveutilCreatedLabel       = "hive.openshift.io/hiveutil-created"
 	cloudAWS                   = "aws"
 	cloudAzure                 = "azure"
 	cloudGCP                   = "gcp"
@@ -119,6 +120,7 @@ type Options struct {
 	UninstallOnce            bool
 	SimulateBootstrapFailure bool
 	WorkerNodes              int64
+	CreateSampleSyncsets     bool
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -196,6 +198,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp --gcp-project-id=PROJECT_ID`,
 	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
 	flags.BoolVar(&opt.SimulateBootstrapFailure, "simulate-bootstrap-failure", false, "Simulate an install bootstrap failure by injecting an invalid manifest.")
 	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
+	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
@@ -375,6 +378,10 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 
 	result = append(result, cd)
 
+	if o.CreateSampleSyncsets {
+		result = append(result, o.generateSampleSyncSets()...)
+	}
+
 	return result, err
 }
 
@@ -526,6 +533,9 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret) (*hivev1.
 			Name:        o.Name,
 			Namespace:   o.Namespace,
 			Annotations: map[string]string{},
+			Labels: map[string]string{
+				hiveutilCreatedLabel: "true",
+			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			SSHKey: corev1.LocalObjectReference{
@@ -641,6 +651,76 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 	}
 
 	return imageSet, nil
+}
+
+func (o *Options) generateSampleSyncSets() []runtime.Object {
+	syncsets := []runtime.Object{}
+	for i := range [10]int{} {
+		syncsets = append(syncsets, sampleSyncSet(fmt.Sprintf("sample-syncset%d", i), o.Namespace, o.Name))
+		syncsets = append(syncsets, sampleSelectorSyncSet(fmt.Sprintf("sample-selector-syncset%d", i), o.Name))
+	}
+	return syncsets
+}
+
+func sampleSyncSet(name, namespace, cdName string) *hivev1.SyncSet {
+	return &hivev1.SyncSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: hivev1.SyncSetSpec{
+			ClusterDeploymentRefs: []corev1.LocalObjectReference{
+				{
+					Name: cdName,
+				},
+			},
+			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
+				ResourceApplyMode: hivev1.SyncResourceApplyMode,
+				Resources: []runtime.RawExtension{
+					{
+						Object: sampleCM(fmt.Sprintf("%s-configmap", name)),
+					},
+				},
+			},
+		},
+	}
+}
+
+func sampleSelectorSyncSet(name, cdName string) *hivev1.SelectorSyncSet {
+	return &hivev1.SelectorSyncSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: hivev1.SelectorSyncSetSpec{
+			ClusterDeploymentSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{hiveutilCreatedLabel: "true"},
+			},
+			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
+				ResourceApplyMode: hivev1.SyncResourceApplyMode,
+				Resources: []runtime.RawExtension{
+					{
+						Object: sampleCM(fmt.Sprintf("%s-configmap", name)),
+					},
+				},
+			},
+		},
+	}
+}
+
+func sampleCM(name string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
 }
 
 func printObjects(objects []runtime.Object, scheme *runtime.Scheme, printer printers.ResourcePrinter) {

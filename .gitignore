@@ -17,6 +17,7 @@ DONT_COMMIT
 
 # Certs for deploying locally to kind
 hiveadmission-certs/**
+hiveapi-certs/**
 
 # Certs for apiserver
 config/apiserver/certificates/**

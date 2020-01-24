@@ -96,9 +96,9 @@ objects:
           - "/opt/services/hive-apiserver"
           args:
           - "start"
+          - "--logtostderr"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
           - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"
-          - "--logtostderr"
           resources:
             requests:
               cpu: 100m
@@ -110,13 +110,13 @@ objects:
         volumes:
         - name: apiserver-certs
           secret:
-            secretName: ${SVC_NAME}
+            secretName: ${SVC_NAME}-serving-cert
 
 - apiVersion: v1
   kind: Secret
   type: kubernetes.io/tls
   metadata:
-    name: ${SVC_NAME}
+    name: ${SVC_NAME}-serving-cert
     namespace: ${SVC_NAMESPACE}
     labels:
       api: ${SVC_NAME}

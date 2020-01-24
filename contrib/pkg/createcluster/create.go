@@ -656,8 +656,8 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 func (o *Options) generateSampleSyncSets() []runtime.Object {
 	syncsets := []runtime.Object{}
 	for i := range [10]int{} {
-		syncsets = append(syncsets, sampleSyncSet(fmt.Sprintf("sample-syncset%d", i), o.Namespace, o.Name))
-		syncsets = append(syncsets, sampleSelectorSyncSet(fmt.Sprintf("sample-selector-syncset%d", i), o.Name))
+		syncsets = append(syncsets, sampleSyncSet(fmt.Sprintf("%s-sample-syncset%d", o.Name, i), o.Namespace, o.Name))
+		syncsets = append(syncsets, sampleSelectorSyncSet(fmt.Sprintf("%s-sample-selector-syncset%d", o.Name, i), o.Name))
 	}
 	return syncsets
 }

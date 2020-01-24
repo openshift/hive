@@ -39,6 +39,11 @@ type HiveConfigSpec struct {
 
 	// FailedProvisionConfig is used to configure settings related to handling provision failures.
 	FailedProvisionConfig FailedProvisionConfig `json:"failedProvisionConfig"`
+
+	// MaintenanceMode can be set to true to disable the hive controllers in situations where we need to ensure
+	// nothing is running that will add or act upon finalizers on Hive types. This should rarely be needed.
+	// Sets replicas to 0 for the hive-controllers deployment to accomplish this.
+	MaintenanceMode *bool `json:"maintenanceMode,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

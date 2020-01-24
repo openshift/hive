@@ -109,6 +109,13 @@ spec:
                 with precedence given to the contents of the pull secret for the cluster
                 deployment.
               type: object
+            maintenanceMode:
+              description: MaintenanceMode can be set to true to disable the hive
+                controllers in situations where we need to ensure nothing is running
+                that will add or act upon finalizers on Hive types. This should rarely
+                be needed. Sets replicas to 0 for the hive-controllers deployment
+                to accomplish this.
+              type: boolean
             managedDomains:
               description: 'ManagedDomains is the list of DNS domains that are allowed
                 to be used by the ''managedDNS'' feature. When specifying ''managedDNS:

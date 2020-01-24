@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -21,6 +22,8 @@ func NewHiveAPIConfig(options *genericapiserveroptions.RecommendedOptions) (*Hiv
 	if err != nil {
 		return nil, err
 	}
+	// Do not do any throttling
+	kubeClientConfig.RateLimiter = flowcontrol.NewFakeAlwaysRateLimiter()
 	kubeClient, err := kubernetes.NewForConfig(kubeClientConfig)
 	if err != nil {
 		return nil, err

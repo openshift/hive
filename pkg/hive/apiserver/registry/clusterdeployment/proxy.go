@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -41,6 +42,7 @@ type REST struct {
 	hiveClient hivev1client.HiveV1Interface
 	coreClient corev1client.CoreV1Interface
 	rest.TableConvertor
+	logger log.FieldLogger
 }
 
 var _ rest.Lister = &REST{}
@@ -54,6 +56,7 @@ func NewREST(hiveClient hivev1client.HiveV1Interface, coreClient corev1client.Co
 		hiveClient:     hiveClient,
 		coreClient:     coreClient,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		logger:         log.WithField("resource", "clusterdeployments"),
 	})
 }
 
@@ -70,7 +73,9 @@ func (s *REST) NamespaceScoped() bool {
 }
 
 func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (runtime.Object, error) {
-	cdClient, secretClient, machinePoolClient, err := s.getClients(ctx)
+	s.logger.Info("list")
+
+	cdClient, _, _, err := s.getClients(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +95,8 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		Items:    make([]hiveapi.ClusterDeployment, len(clusterDeployments.Items)),
 	}
 	for i, curr := range clusterDeployments.Items {
-		installConfig, _ := getInstallConfig(&curr, secretClient)
-		machinePools, err := getMachinePools(curr.Name, machinePoolClient)
+		installConfig, _ := getInstallConfig(&curr, s.coreClient.Secrets(curr.Namespace))
+		machinePools, err := getMachinePools(curr.Name, s.hiveClient.MachinePools(curr.Namespace))
 		if err != nil {
 			return nil, err
 		}
@@ -103,6 +108,8 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 }
 
 func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	s.logger.WithField("name", name).Info("get")
+
 	cdClient, secretClient, machinePoolClient, err := s.getClients(ctx)
 	if err != nil {
 		return nil, err
@@ -127,6 +134,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 }
 
 func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	s.logger.WithField("name", name).Info("delete")
+
 	cdClient, _, _, err := s.getClients(ctx)
 	if err != nil {
 		return nil, false, err
@@ -140,6 +149,9 @@ func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 }
 
 func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateObjectFunc, options *metav1.CreateOptions) (result runtime.Object, err error) {
+	logger := s.logger.WithField("name", obj.(*hiveapi.ClusterDeployment).Name)
+	logger.Info("create")
+
 	cdClient, secretClient, machinePoolClient, err := s.getClients(ctx)
 	if err != nil {
 		return nil, err
@@ -193,7 +205,7 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		cdClient.Delete(convertedObj.Name, &metav1.DeleteOptions{})
 	}()
 
-	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, ret, machinePoolClient)
+	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, ret, machinePoolClient, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -206,6 +218,9 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 }
 
 func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	logger := s.logger.WithField("name", name)
+	logger.Info("update")
+
 	cdClient, secretClient, machinePoolClient, err := s.getClients(ctx)
 	if err != nil {
 		return nil, false, err
@@ -215,6 +230,10 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	if err != nil {
 		return nil, false, err
 	}
+
+	origClusterDeployment := clusterDeployment.DeepCopy()
+	origStatus := origClusterDeployment.Status
+	origClusterDeployment.Status = hivev1.ClusterDeploymentStatus{}
 
 	installConfig, installConfigSecret := getInstallConfig(clusterDeployment, secretClient)
 	machinePools, err := getMachinePools(name, machinePoolClient)
@@ -249,18 +268,35 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, clusterDeployment, machinePoolClient)
+	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, clusterDeployment, machinePoolClient, logger)
 	if err != nil {
 		return nil, false, err
 	}
 
-	ret, err := cdClient.Update(clusterDeployment)
-	if err != nil {
-		return nil, false, err
+	newStatus := clusterDeployment.Status
+	clusterDeployment.Status = hivev1.ClusterDeploymentStatus{}
+
+	if !reflect.DeepEqual(clusterDeployment, origClusterDeployment) {
+		logger.Info("forwarding regular update")
+		var err error
+		clusterDeployment, err = cdClient.Update(clusterDeployment)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
+	clusterDeployment.Status = newStatus
+	if !reflect.DeepEqual(newStatus, origStatus) {
+		logger.Info("forwarding status update")
+		var err error
+		clusterDeployment, err = cdClient.UpdateStatus(clusterDeployment)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	new := &hiveapi.ClusterDeployment{}
-	if err := util.ClusterDeploymentFromHiveV1(ret, installConfig, machinePools, new); err != nil {
+	if err := util.ClusterDeploymentFromHiveV1(clusterDeployment, installConfig, machinePools, new); err != nil {
 		return nil, false, err
 	}
 	return new, false, err
@@ -345,7 +381,7 @@ func getMachinePools(cdName string, machinePoolClient hivev1client.MachinePoolIn
 	return pools, nil
 }
 
-func reconcileMachinePools(oldMachinePools []*hivev1.MachinePool, machinePools []*hivev1.MachinePool, cd *hivev1.ClusterDeployment, machinePoolClient hivev1client.MachinePoolInterface) ([]*hivev1.MachinePool, error) {
+func reconcileMachinePools(oldMachinePools []*hivev1.MachinePool, machinePools []*hivev1.MachinePool, cd *hivev1.ClusterDeployment, machinePoolClient hivev1client.MachinePoolInterface, logger log.FieldLogger) ([]*hivev1.MachinePool, error) {
 	for i, p := range machinePools {
 		addOwnerRef(cd, p)
 		existing := false
@@ -353,13 +389,32 @@ func reconcileMachinePools(oldMachinePools []*hivev1.MachinePool, machinePools [
 			if p.Name != oldP.Name {
 				continue
 			}
+
+			newStatus := p.Status
+			p.Status = hivev1.MachinePoolStatus{}
+
+			oldStatus := oldP.Status
+			oldP.Status = hivev1.MachinePoolStatus{}
+
 			if !reflect.DeepEqual(p, oldP) {
+				logger.WithField("machinePool", p.Name).Info("forwarding regular update of machine pool")
 				var err error
-				machinePools[i], err = machinePoolClient.Update(p)
+				p, err = machinePoolClient.Update(p)
 				if err != nil {
 					return machinePools, err
 				}
 			}
+
+			p.Status = newStatus
+			if !reflect.DeepEqual(newStatus, oldStatus) {
+				logger.WithField("machinePool", p.Name).Info("forwarding status update of machine pool")
+				var err error
+				p, err = machinePoolClient.UpdateStatus(p)
+				if err != nil {
+					return machinePools, err
+				}
+			}
+
 			existing = true
 			break
 		}

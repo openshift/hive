@@ -126,27 +126,39 @@ func Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in *hiveapi.Clus
 	out.Spec.PullSecretRef = in.Spec.PullSecret
 	out.Spec.PreserveOnDelete = in.Spec.PreserveOnDelete
 	out.Spec.ControlPlaneConfig.ServingCertificates.Default = in.Spec.ControlPlaneConfig.ServingCertificates.Default
-	out.Spec.ControlPlaneConfig.ServingCertificates.Additional = make([]hivev1.ControlPlaneAdditionalCertificate, len(in.Spec.ControlPlaneConfig.ServingCertificates.Additional))
-	for i, inCert := range in.Spec.ControlPlaneConfig.ServingCertificates.Additional {
-		outCert := &out.Spec.ControlPlaneConfig.ServingCertificates.Additional[i]
-		outCert.Name = inCert.Name
-		outCert.Domain = inCert.Domain
+	if additional := in.Spec.ControlPlaneConfig.ServingCertificates.Additional; additional != nil {
+		out.Spec.ControlPlaneConfig.ServingCertificates.Additional = make([]hivev1.ControlPlaneAdditionalCertificate, len(additional))
+		for i, inCert := range additional {
+			outCert := &out.Spec.ControlPlaneConfig.ServingCertificates.Additional[i]
+			outCert.Name = inCert.Name
+			outCert.Domain = inCert.Domain
+		}
+	} else {
+		out.Spec.ControlPlaneConfig.ServingCertificates.Additional = nil
 	}
-	out.Spec.Ingress = make([]hivev1.ClusterIngress, len(in.Spec.Ingress))
-	for i, inIngress := range in.Spec.Ingress {
-		outIngress := &out.Spec.Ingress[i]
-		outIngress.Name = inIngress.Name
-		outIngress.Domain = inIngress.Domain
-		outIngress.NamespaceSelector = inIngress.NamespaceSelector
-		outIngress.RouteSelector = inIngress.RouteSelector
-		outIngress.ServingCertificate = inIngress.ServingCertificate
+	if ingress := in.Spec.Ingress; ingress != nil {
+		out.Spec.Ingress = make([]hivev1.ClusterIngress, len(ingress))
+		for i, inIngress := range ingress {
+			outIngress := &out.Spec.Ingress[i]
+			outIngress.Name = inIngress.Name
+			outIngress.Domain = inIngress.Domain
+			outIngress.NamespaceSelector = inIngress.NamespaceSelector
+			outIngress.RouteSelector = inIngress.RouteSelector
+			outIngress.ServingCertificate = inIngress.ServingCertificate
+		}
+	} else {
+		out.Spec.Ingress = nil
 	}
-	out.Spec.CertificateBundles = make([]hivev1.CertificateBundleSpec, len(in.Spec.CertificateBundles))
-	for i, inCert := range in.Spec.CertificateBundles {
-		outCert := &out.Spec.CertificateBundles[i]
-		outCert.Name = inCert.Name
-		outCert.Generate = inCert.Generate
-		outCert.CertificateSecretRef = inCert.SecretRef
+	if certs := in.Spec.CertificateBundles; certs != nil {
+		out.Spec.CertificateBundles = make([]hivev1.CertificateBundleSpec, len(certs))
+		for i, inCert := range certs {
+			outCert := &out.Spec.CertificateBundles[i]
+			outCert.Name = inCert.Name
+			outCert.Generate = inCert.Generate
+			outCert.CertificateSecretRef = inCert.SecretRef
+		}
+	} else {
+		out.Spec.CertificateBundles = nil
 	}
 	out.Spec.ManageDNS = in.Spec.ManageDNS
 	if in.Status.InfraID != "" {
@@ -184,21 +196,29 @@ func Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in *hiveapi.Clus
 	out.Status.WebConsoleURL = in.Status.WebConsoleURL
 	out.Status.InstallerImage = in.Status.InstallerImage
 	out.Status.CLIImage = in.Status.CLIImage
-	out.Status.Conditions = make([]hivev1.ClusterDeploymentCondition, len(in.Status.Conditions))
-	for i, inCond := range in.Status.Conditions {
-		outCond := &out.Status.Conditions[i]
-		outCond.Type = hivev1.ClusterDeploymentConditionType(inCond.Type)
-		outCond.Status = inCond.Status
-		outCond.LastProbeTime = inCond.LastProbeTime
-		outCond.LastTransitionTime = inCond.LastTransitionTime
-		outCond.Reason = inCond.Reason
-		outCond.Message = inCond.Message
+	if conds := in.Status.Conditions; conds != nil {
+		out.Status.Conditions = make([]hivev1.ClusterDeploymentCondition, len(conds))
+		for i, inCond := range conds {
+			outCond := &out.Status.Conditions[i]
+			outCond.Type = hivev1.ClusterDeploymentConditionType(inCond.Type)
+			outCond.Status = inCond.Status
+			outCond.LastProbeTime = inCond.LastProbeTime
+			outCond.LastTransitionTime = inCond.LastTransitionTime
+			outCond.Reason = inCond.Reason
+			outCond.Message = inCond.Message
+		}
+	} else {
+		out.Status.Conditions = nil
 	}
-	out.Status.CertificateBundles = make([]hivev1.CertificateBundleStatus, len(in.Status.CertificateBundles))
-	for i, inCert := range in.Status.CertificateBundles {
-		outCert := &out.Status.CertificateBundles[i]
-		outCert.Name = inCert.Name
-		outCert.Generated = inCert.Generated
+	if certs := in.Status.CertificateBundles; certs != nil {
+		out.Status.CertificateBundles = make([]hivev1.CertificateBundleStatus, len(certs))
+		for i, inCert := range certs {
+			outCert := &out.Status.CertificateBundles[i]
+			outCert.Name = inCert.Name
+			outCert.Generated = inCert.Generated
+		}
+	} else {
+		out.Status.CertificateBundles = nil
 	}
 	out.Status.InstalledTimestamp = in.Status.InstalledTimestamp
 	out.Status.ProvisionRef = in.Status.Provision
@@ -273,27 +293,39 @@ func Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in *hivev1.Clust
 	}
 	out.Spec.PreserveOnDelete = in.Spec.PreserveOnDelete
 	out.Spec.ControlPlaneConfig.ServingCertificates.Default = in.Spec.ControlPlaneConfig.ServingCertificates.Default
-	out.Spec.ControlPlaneConfig.ServingCertificates.Additional = make([]hiveapi.ControlPlaneAdditionalCertificate, len(in.Spec.ControlPlaneConfig.ServingCertificates.Additional))
-	for i, inCert := range in.Spec.ControlPlaneConfig.ServingCertificates.Additional {
-		outCert := &out.Spec.ControlPlaneConfig.ServingCertificates.Additional[i]
-		outCert.Name = inCert.Name
-		outCert.Domain = inCert.Domain
+	if additional := in.Spec.ControlPlaneConfig.ServingCertificates.Additional; additional != nil {
+		out.Spec.ControlPlaneConfig.ServingCertificates.Additional = make([]hiveapi.ControlPlaneAdditionalCertificate, len(additional))
+		for i, inCert := range additional {
+			outCert := &out.Spec.ControlPlaneConfig.ServingCertificates.Additional[i]
+			outCert.Name = inCert.Name
+			outCert.Domain = inCert.Domain
+		}
+	} else {
+		out.Spec.ControlPlaneConfig.ServingCertificates.Additional = nil
 	}
-	out.Spec.Ingress = make([]hiveapi.ClusterIngress, len(in.Spec.Ingress))
-	for i, inIngress := range in.Spec.Ingress {
-		outIngress := &out.Spec.Ingress[i]
-		outIngress.Name = inIngress.Name
-		outIngress.Domain = inIngress.Domain
-		outIngress.NamespaceSelector = inIngress.NamespaceSelector
-		outIngress.RouteSelector = inIngress.RouteSelector
-		outIngress.ServingCertificate = inIngress.ServingCertificate
+	if ingress := in.Spec.Ingress; ingress != nil {
+		out.Spec.Ingress = make([]hiveapi.ClusterIngress, len(ingress))
+		for i, inIngress := range ingress {
+			outIngress := &out.Spec.Ingress[i]
+			outIngress.Name = inIngress.Name
+			outIngress.Domain = inIngress.Domain
+			outIngress.NamespaceSelector = inIngress.NamespaceSelector
+			outIngress.RouteSelector = inIngress.RouteSelector
+			outIngress.ServingCertificate = inIngress.ServingCertificate
+		}
+	} else {
+		out.Spec.Ingress = nil
 	}
-	out.Spec.CertificateBundles = make([]hiveapi.CertificateBundleSpec, len(in.Spec.CertificateBundles))
-	for i, inCert := range in.Spec.CertificateBundles {
-		outCert := &out.Spec.CertificateBundles[i]
-		outCert.Name = inCert.Name
-		outCert.Generate = inCert.Generate
-		outCert.SecretRef = inCert.CertificateSecretRef
+	if certs := in.Spec.CertificateBundles; certs != nil {
+		out.Spec.CertificateBundles = make([]hiveapi.CertificateBundleSpec, len(certs))
+		for i, inCert := range certs {
+			outCert := &out.Spec.CertificateBundles[i]
+			outCert.Name = inCert.Name
+			outCert.Generate = inCert.Generate
+			outCert.SecretRef = inCert.CertificateSecretRef
+		}
+	} else {
+		out.Spec.CertificateBundles = nil
 	}
 	out.Spec.ManageDNS = in.Spec.ManageDNS
 	out.Spec.Installed = in.Spec.Installed
@@ -315,21 +347,29 @@ func Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in *hivev1.Clust
 	out.Status.WebConsoleURL = in.Status.WebConsoleURL
 	out.Status.InstallerImage = in.Status.InstallerImage
 	out.Status.CLIImage = in.Status.CLIImage
-	out.Status.Conditions = make([]hiveapi.ClusterDeploymentCondition, len(in.Status.Conditions))
-	for i, inCond := range in.Status.Conditions {
-		outCond := &out.Status.Conditions[i]
-		outCond.Type = hiveapi.ClusterDeploymentConditionType(inCond.Type)
-		outCond.Status = inCond.Status
-		outCond.LastProbeTime = inCond.LastProbeTime
-		outCond.LastTransitionTime = inCond.LastTransitionTime
-		outCond.Reason = inCond.Reason
-		outCond.Message = inCond.Message
+	if conds := in.Status.Conditions; conds != nil {
+		out.Status.Conditions = make([]hiveapi.ClusterDeploymentCondition, len(conds))
+		for i, inCond := range conds {
+			outCond := &out.Status.Conditions[i]
+			outCond.Type = hiveapi.ClusterDeploymentConditionType(inCond.Type)
+			outCond.Status = inCond.Status
+			outCond.LastProbeTime = inCond.LastProbeTime
+			outCond.LastTransitionTime = inCond.LastTransitionTime
+			outCond.Reason = inCond.Reason
+			outCond.Message = inCond.Message
+		}
+	} else {
+		out.Status.Conditions = nil
 	}
-	out.Status.CertificateBundles = make([]hiveapi.CertificateBundleStatus, len(in.Status.CertificateBundles))
-	for i, inCert := range in.Status.CertificateBundles {
-		outCert := &out.Status.CertificateBundles[i]
-		outCert.Name = inCert.Name
-		outCert.Generated = inCert.Generated
+	if certs := in.Status.CertificateBundles; certs != nil {
+		out.Status.CertificateBundles = make([]hiveapi.CertificateBundleStatus, len(certs))
+		for i, inCert := range certs {
+			outCert := &out.Status.CertificateBundles[i]
+			outCert.Name = inCert.Name
+			outCert.Generated = inCert.Generated
+		}
+	} else {
+		out.Status.CertificateBundles = nil
 	}
 	out.Status.InstalledTimestamp = in.Status.InstalledTimestamp
 	out.Status.Provision = in.Status.ProvisionRef
@@ -433,15 +473,19 @@ func Convert_v1alpha1_ClusterProvision_To_v1_ClusterProvision(in *hiveapi.Cluste
 	out.Spec.PrevClusterID = in.Spec.PrevClusterID
 	out.Spec.PrevInfraID = in.Spec.PrevInfraID
 	out.Status.JobRef = in.Status.Job
-	out.Status.Conditions = make([]hivev1.ClusterProvisionCondition, len(in.Status.Conditions))
-	for i, inCond := range in.Status.Conditions {
-		outCond := &out.Status.Conditions[i]
-		outCond.Type = hivev1.ClusterProvisionConditionType(inCond.Type)
-		outCond.Status = inCond.Status
-		outCond.LastProbeTime = inCond.LastProbeTime
-		outCond.LastTransitionTime = inCond.LastTransitionTime
-		outCond.Reason = inCond.Reason
-		outCond.Message = inCond.Message
+	if conds := in.Status.Conditions; conds != nil {
+		out.Status.Conditions = make([]hivev1.ClusterProvisionCondition, len(conds))
+		for i, inCond := range conds {
+			outCond := &out.Status.Conditions[i]
+			outCond.Type = hivev1.ClusterProvisionConditionType(inCond.Type)
+			outCond.Status = inCond.Status
+			outCond.LastProbeTime = inCond.LastProbeTime
+			outCond.LastTransitionTime = inCond.LastTransitionTime
+			outCond.Reason = inCond.Reason
+			outCond.Message = inCond.Message
+		}
+	} else {
+		out.Status.Conditions = nil
 	}
 	return nil
 }
@@ -461,15 +505,19 @@ func Convert_v1_ClusterProvision_To_v1alpha1_ClusterProvision(in *hivev1.Cluster
 	out.Spec.PrevClusterID = in.Spec.PrevClusterID
 	out.Spec.PrevInfraID = in.Spec.PrevInfraID
 	out.Status.Job = in.Status.JobRef
-	out.Status.Conditions = make([]hiveapi.ClusterProvisionCondition, len(in.Status.Conditions))
-	for i, inCond := range in.Status.Conditions {
-		outCond := &out.Status.Conditions[i]
-		outCond.Type = hiveapi.ClusterProvisionConditionType(inCond.Type)
-		outCond.Status = inCond.Status
-		outCond.LastProbeTime = inCond.LastProbeTime
-		outCond.LastTransitionTime = inCond.LastTransitionTime
-		outCond.Reason = inCond.Reason
-		outCond.Message = inCond.Message
+	if conds := in.Status.Conditions; conds != nil {
+		out.Status.Conditions = make([]hiveapi.ClusterProvisionCondition, len(conds))
+		for i, inCond := range conds {
+			outCond := &out.Status.Conditions[i]
+			outCond.Type = hiveapi.ClusterProvisionConditionType(inCond.Type)
+			outCond.Status = inCond.Status
+			outCond.LastProbeTime = inCond.LastProbeTime
+			outCond.LastTransitionTime = inCond.LastTransitionTime
+			outCond.Reason = inCond.Reason
+			outCond.Message = inCond.Message
+		}
+	} else {
+		out.Status.Conditions = nil
 	}
 	return nil
 }
@@ -477,11 +525,15 @@ func Convert_v1_ClusterProvision_To_v1alpha1_ClusterProvision(in *hivev1.Cluster
 func Convert_v1alpha1_ClusterState_To_v1_ClusterState(in *hiveapi.ClusterState, out *hivev1.ClusterState, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Status.LastUpdated = in.Status.LastUpdated
-	out.Status.ClusterOperators = make([]hivev1.ClusterOperatorState, len(in.Status.ClusterOperators))
-	for i, inOp := range in.Status.ClusterOperators {
-		outOp := &out.Status.ClusterOperators[i]
-		outOp.Name = inOp.Name
-		outOp.Conditions = inOp.Conditions
+	if ops := in.Status.ClusterOperators; ops != nil {
+		out.Status.ClusterOperators = make([]hivev1.ClusterOperatorState, len(ops))
+		for i, inOp := range ops {
+			outOp := &out.Status.ClusterOperators[i]
+			outOp.Name = inOp.Name
+			outOp.Conditions = inOp.Conditions
+		}
+	} else {
+		out.Status.ClusterOperators = nil
 	}
 	return nil
 }
@@ -489,11 +541,15 @@ func Convert_v1alpha1_ClusterState_To_v1_ClusterState(in *hiveapi.ClusterState, 
 func Convert_v1_ClusterState_To_v1alpha1_ClusterState(in *hivev1.ClusterState, out *hiveapi.ClusterState, _ conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Status.LastUpdated = in.Status.LastUpdated
-	out.Status.ClusterOperators = make([]hiveapi.ClusterOperatorState, len(in.Status.ClusterOperators))
-	for i, inOp := range in.Status.ClusterOperators {
-		outOp := &out.Status.ClusterOperators[i]
-		outOp.Name = inOp.Name
-		outOp.Conditions = inOp.Conditions
+	if ops := in.Status.ClusterOperators; ops != nil {
+		out.Status.ClusterOperators = make([]hiveapi.ClusterOperatorState, len(ops))
+		for i, inOp := range ops {
+			outOp := &out.Status.ClusterOperators[i]
+			outOp.Name = inOp.Name
+			outOp.Conditions = inOp.Conditions
+		}
+	} else {
+		out.Status.ClusterOperators = nil
 	}
 	return nil
 }
@@ -508,12 +564,16 @@ func Convert_v1alpha1_DNSZone_To_v1_DNSZone(in *hiveapi.DNSZone, out *hivev1.DNS
 		}
 		outAWS := out.Spec.AWS
 		outAWS.CredentialsSecretRef = inAWS.AccountSecret
-		outAWS.AdditionalTags = make([]hivev1.AWSResourceTag, len(inAWS.AdditionalTags))
-		for i, tag := range inAWS.AdditionalTags {
-			outAWS.AdditionalTags[i] = hivev1.AWSResourceTag{
-				Key:   tag.Key,
-				Value: tag.Value,
+		if tags := inAWS.AdditionalTags; tags != nil {
+			outAWS.AdditionalTags = make([]hivev1.AWSResourceTag, len(tags))
+			for i, tag := range tags {
+				outAWS.AdditionalTags[i] = hivev1.AWSResourceTag{
+					Key:   tag.Key,
+					Value: tag.Value,
+				}
 			}
+		} else {
+			outAWS.AdditionalTags = nil
 		}
 	} else {
 		out.Spec.AWS = nil
@@ -545,15 +605,19 @@ func Convert_v1alpha1_DNSZone_To_v1_DNSZone(in *hiveapi.DNSZone, out *hivev1.DNS
 	} else {
 		out.Status.GCP = nil
 	}
-	out.Status.Conditions = make([]hivev1.DNSZoneCondition, len(in.Status.Conditions))
-	for i, inCond := range in.Status.Conditions {
-		outCond := &out.Status.Conditions[i]
-		outCond.Type = hivev1.DNSZoneConditionType(inCond.Type)
-		outCond.Status = inCond.Status
-		outCond.LastProbeTime = inCond.LastProbeTime
-		outCond.LastTransitionTime = inCond.LastTransitionTime
-		outCond.Reason = inCond.Reason
-		outCond.Message = inCond.Message
+	if conds := in.Status.Conditions; conds != nil {
+		out.Status.Conditions = make([]hivev1.DNSZoneCondition, len(conds))
+		for i, inCond := range conds {
+			outCond := &out.Status.Conditions[i]
+			outCond.Type = hivev1.DNSZoneConditionType(inCond.Type)
+			outCond.Status = inCond.Status
+			outCond.LastProbeTime = inCond.LastProbeTime
+			outCond.LastTransitionTime = inCond.LastTransitionTime
+			outCond.Reason = inCond.Reason
+			outCond.Message = inCond.Message
+		}
+	} else {
+		out.Status.Conditions = nil
 	}
 	return nil
 }
@@ -568,12 +632,16 @@ func Convert_v1_DNSZone_To_v1alpha1_DNSZone(in *hivev1.DNSZone, out *hiveapi.DNS
 		}
 		outAWS := out.Spec.AWS
 		outAWS.AccountSecret = inAWS.CredentialsSecretRef
-		outAWS.AdditionalTags = make([]hiveapi.AWSResourceTag, len(inAWS.AdditionalTags))
-		for i, tag := range inAWS.AdditionalTags {
-			outAWS.AdditionalTags[i] = hiveapi.AWSResourceTag{
-				Key:   tag.Key,
-				Value: tag.Value,
+		if tags := inAWS.AdditionalTags; tags != nil {
+			outAWS.AdditionalTags = make([]hiveapi.AWSResourceTag, len(tags))
+			for i, tag := range tags {
+				outAWS.AdditionalTags[i] = hiveapi.AWSResourceTag{
+					Key:   tag.Key,
+					Value: tag.Value,
+				}
 			}
+		} else {
+			outAWS.AdditionalTags = nil
 		}
 	} else {
 		out.Spec.AWS = nil
@@ -605,15 +673,19 @@ func Convert_v1_DNSZone_To_v1alpha1_DNSZone(in *hivev1.DNSZone, out *hiveapi.DNS
 	} else {
 		out.Status.GCP = nil
 	}
-	out.Status.Conditions = make([]hiveapi.DNSZoneCondition, len(in.Status.Conditions))
-	for i, inCond := range in.Status.Conditions {
-		outCond := &out.Status.Conditions[i]
-		outCond.Type = hiveapi.DNSZoneConditionType(inCond.Type)
-		outCond.Status = inCond.Status
-		outCond.LastProbeTime = inCond.LastProbeTime
-		outCond.LastTransitionTime = inCond.LastTransitionTime
-		outCond.Reason = inCond.Reason
-		outCond.Message = inCond.Message
+	if conds := in.Status.Conditions; conds != nil {
+		out.Status.Conditions = make([]hiveapi.DNSZoneCondition, len(conds))
+		for i, inCond := range conds {
+			outCond := &out.Status.Conditions[i]
+			outCond.Type = hiveapi.DNSZoneConditionType(inCond.Type)
+			outCond.Status = inCond.Status
+			outCond.LastProbeTime = inCond.LastProbeTime
+			outCond.LastTransitionTime = inCond.LastTransitionTime
+			outCond.Reason = inCond.Reason
+			outCond.Message = inCond.Message
+		}
+	} else {
+		out.Status.Conditions = nil
 	}
 	return nil
 }
@@ -727,46 +799,62 @@ func Convert_v1_SelectorSyncIdentityProvider_To_v1alpha1_SelectorSyncIdentityPro
 func convert_v1alpha1_SyncSetCommonSpec_To_v1_SyncSetCommonSpec(in *hiveapi.SyncSetCommonSpec, out *hivev1.SyncSetCommonSpec) {
 	out.Resources = in.Resources
 	out.ResourceApplyMode = hivev1.SyncSetResourceApplyMode(in.ResourceApplyMode)
-	out.Patches = make([]hivev1.SyncObjectPatch, len(in.Patches))
-	for i, inPatch := range in.Patches {
-		outPatch := &out.Patches[i]
-		outPatch.APIVersion = inPatch.APIVersion
-		outPatch.Kind = inPatch.Kind
-		outPatch.Name = inPatch.Name
-		outPatch.Namespace = inPatch.Namespace
-		outPatch.Patch = inPatch.Patch
-		outPatch.PatchType = inPatch.PatchType
+	if patches := in.Patches; patches != nil {
+		out.Patches = make([]hivev1.SyncObjectPatch, len(patches))
+		for i, inPatch := range patches {
+			outPatch := &out.Patches[i]
+			outPatch.APIVersion = inPatch.APIVersion
+			outPatch.Kind = inPatch.Kind
+			outPatch.Name = inPatch.Name
+			outPatch.Namespace = inPatch.Namespace
+			outPatch.Patch = inPatch.Patch
+			outPatch.PatchType = inPatch.PatchType
+		}
+	} else {
+		out.Patches = nil
 	}
-	out.Secrets = make([]hivev1.SecretMapping, len(in.SecretReferences))
-	for i, inRef := range in.SecretReferences {
-		outRef := &out.Secrets[i]
-		outRef.SourceRef.Name = inRef.Source.Name
-		outRef.SourceRef.Namespace = inRef.Source.Namespace
-		outRef.TargetRef.Name = inRef.Target.Name
-		outRef.TargetRef.Namespace = inRef.Target.Namespace
+	if secrets := in.SecretReferences; secrets != nil {
+		out.Secrets = make([]hivev1.SecretMapping, len(secrets))
+		for i, inRef := range secrets {
+			outRef := &out.Secrets[i]
+			outRef.SourceRef.Name = inRef.Source.Name
+			outRef.SourceRef.Namespace = inRef.Source.Namespace
+			outRef.TargetRef.Name = inRef.Target.Name
+			outRef.TargetRef.Namespace = inRef.Target.Namespace
+		}
+	} else {
+		out.Secrets = nil
 	}
 }
 
 func convert_v1_SyncSetCommonSpec_To_v1alpha1_SyncSetCommonSpec(in *hivev1.SyncSetCommonSpec, out *hiveapi.SyncSetCommonSpec) {
 	out.Resources = in.Resources
 	out.ResourceApplyMode = hiveapi.SyncSetResourceApplyMode(in.ResourceApplyMode)
-	out.Patches = make([]hiveapi.SyncObjectPatch, len(in.Patches))
-	for i, inPatch := range in.Patches {
-		outPatch := &out.Patches[i]
-		outPatch.APIVersion = inPatch.APIVersion
-		outPatch.Kind = inPatch.Kind
-		outPatch.Name = inPatch.Name
-		outPatch.Namespace = inPatch.Namespace
-		outPatch.Patch = inPatch.Patch
-		outPatch.PatchType = inPatch.PatchType
+	if patches := in.Patches; patches != nil {
+		out.Patches = make([]hiveapi.SyncObjectPatch, len(patches))
+		for i, inPatch := range patches {
+			outPatch := &out.Patches[i]
+			outPatch.APIVersion = inPatch.APIVersion
+			outPatch.Kind = inPatch.Kind
+			outPatch.Name = inPatch.Name
+			outPatch.Namespace = inPatch.Namespace
+			outPatch.Patch = inPatch.Patch
+			outPatch.PatchType = inPatch.PatchType
+		}
+	} else {
+		out.Patches = nil
 	}
-	out.SecretReferences = make([]hiveapi.SecretReference, len(in.Secrets))
-	for i, inRef := range in.Secrets {
-		outRef := &out.SecretReferences[i]
-		outRef.Source.Name = inRef.SourceRef.Name
-		outRef.Source.Namespace = inRef.SourceRef.Namespace
-		outRef.Target.Name = inRef.TargetRef.Name
-		outRef.Target.Namespace = inRef.TargetRef.Namespace
+	if secrets := in.Secrets; secrets != nil {
+		out.SecretReferences = make([]hiveapi.SecretReference, len(secrets))
+		for i, inRef := range secrets {
+			outRef := &out.SecretReferences[i]
+			outRef.Source.Name = inRef.SourceRef.Name
+			outRef.Source.Namespace = inRef.SourceRef.Namespace
+			outRef.Target.Name = inRef.TargetRef.Name
+			outRef.Target.Namespace = inRef.TargetRef.Namespace
+		}
+	} else {
+		out.SecretReferences = nil
 	}
 }
 
@@ -817,16 +905,24 @@ func convert_v1_SyncCondition_To_v1alpha1_SyncCondition(in *hivev1.SyncCondition
 }
 
 func convert_v1alpha1_SyncConditionSlice_To_v1_SyncConditionSlice(in *[]hiveapi.SyncCondition, out *[]hivev1.SyncCondition) {
-	*out = make([]hivev1.SyncCondition, len(*in))
-	for i, status := range *in {
-		convert_v1alpha1_SyncCondition_To_v1_SyncCondition(&status, &(*out)[i])
+	if *in != nil {
+		*out = make([]hivev1.SyncCondition, len(*in))
+		for i, status := range *in {
+			convert_v1alpha1_SyncCondition_To_v1_SyncCondition(&status, &(*out)[i])
+		}
+	} else {
+		*out = nil
 	}
 }
 
 func convert_v1_SyncConditionSlice_To_v1alpha1_SyncConditionSlice(in *[]hivev1.SyncCondition, out *[]hiveapi.SyncCondition) {
-	*out = make([]hiveapi.SyncCondition, len(*in))
-	for i, status := range *in {
-		convert_v1_SyncCondition_To_v1alpha1_SyncCondition(&status, &(*out)[i])
+	if *in != nil {
+		*out = make([]hiveapi.SyncCondition, len(*in))
+		for i, status := range *in {
+			convert_v1_SyncCondition_To_v1alpha1_SyncCondition(&status, &(*out)[i])
+		}
+	} else {
+		*out = nil
 	}
 }
 
@@ -851,16 +947,24 @@ func convert_v1_SyncStatus_To_v1alpha1_SyncStatus(in *hivev1.SyncStatus, out *hi
 }
 
 func convert_v1alpha1_SyncStatusSlice_To_v1_SyncStatusSlice(in *[]hiveapi.SyncStatus, out *[]hivev1.SyncStatus) {
-	*out = make([]hivev1.SyncStatus, len(*in))
-	for i, status := range *in {
-		convert_v1alpha1_SyncStatus_To_v1_SyncStatus(&status, &(*out)[i])
+	if *in != nil {
+		*out = make([]hivev1.SyncStatus, len(*in))
+		for i, status := range *in {
+			convert_v1alpha1_SyncStatus_To_v1_SyncStatus(&status, &(*out)[i])
+		}
+	} else {
+		*out = nil
 	}
 }
 
 func convert_v1_SyncStatusSlice_To_v1alpha1_SyncStatusSlice(in *[]hivev1.SyncStatus, out *[]hiveapi.SyncStatus) {
-	*out = make([]hiveapi.SyncStatus, len(*in))
-	for i, status := range *in {
-		convert_v1_SyncStatus_To_v1alpha1_SyncStatus(&status, &(*out)[i])
+	if *in != nil {
+		*out = make([]hiveapi.SyncStatus, len(*in))
+		for i, status := range *in {
+			convert_v1_SyncStatus_To_v1alpha1_SyncStatus(&status, &(*out)[i])
+		}
+	} else {
+		*out = nil
 	}
 }
 

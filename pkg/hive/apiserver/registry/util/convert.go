@@ -54,12 +54,16 @@ func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out
 		installConfig.ControlPlane = &installtypes.MachinePool{}
 	}
 	machinePoolToInstallConfig(&in.Spec.ControlPlane, installConfig.ControlPlane)
-	installConfig.ClusterNetwork = make([]installtypes.ClusterNetworkEntry, len(in.Spec.ClusterNetworks))
-	for i, inNet := range in.Spec.ClusterNetworks {
-		outNet := &installConfig.ClusterNetwork[i]
-		outNet.CIDR = *parseCIDR(inNet.CIDR)
-		// In v1alpha1, Hive is mis-interpreting the host subnet length as the host prefix.
-		outNet.HostPrefix = int32(inNet.HostSubnetLength)
+	if nets := in.Spec.ClusterNetworks; nets != nil {
+		installConfig.ClusterNetwork = make([]installtypes.ClusterNetworkEntry, len(nets))
+		for i, inNet := range nets {
+			outNet := &installConfig.ClusterNetwork[i]
+			outNet.CIDR = *parseCIDR(inNet.CIDR)
+			// In v1alpha1, Hive is mis-interpreting the host subnet length as the host prefix.
+			outNet.HostPrefix = int32(inNet.HostSubnetLength)
+		}
+	} else {
+		installConfig.ClusterNetwork = nil
 	}
 	if inAWS := in.Spec.AWS; inAWS != nil {
 		if installConfig.AWS == nil {
@@ -126,24 +130,28 @@ func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out
 		installConfig.Compute = append(installConfig.Compute, outCompute)
 	}
 
-	newMachinePools := make([]*hivev1.MachinePool, len(in.Spec.Compute))
-	for i, c := range in.Spec.Compute {
-		var pool *hivev1.MachinePool
-		for _, p := range *machinePools {
-			if c.Name == p.Spec.Name {
-				pool = p
-				break
+	if compute := in.Spec.Compute; compute != nil {
+		newMachinePools := make([]*hivev1.MachinePool, len(compute))
+		for i, c := range compute {
+			var pool *hivev1.MachinePool
+			for _, p := range *machinePools {
+				if c.Name == p.Spec.Name {
+					pool = p
+					break
+				}
 			}
+			if pool == nil {
+				pool = &hivev1.MachinePool{}
+				pool.Name = fmt.Sprintf("%s-%s", in.Name, c.Name)
+				pool.Spec.ClusterDeploymentRef.Name = in.Name
+			}
+			machinePoolToHiveV1(&c, &pool.Spec)
+			newMachinePools[i] = pool
 		}
-		if pool == nil {
-			pool = &hivev1.MachinePool{}
-			pool.Name = fmt.Sprintf("%s-%s", in.Name, c.Name)
-			pool.Spec.ClusterDeploymentRef.Name = in.Name
-		}
-		machinePoolToHiveV1(&c, &pool.Spec)
-		newMachinePools[i] = pool
+		*machinePools = newMachinePools
+	} else {
+		*machinePools = nil
 	}
-	*machinePools = newMachinePools
 
 	return nil
 }
@@ -169,12 +177,16 @@ func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *in
 			} else {
 				out.Spec.ServiceCIDR = ""
 			}
-			out.Spec.ClusterNetworks = make([]netopv1.ClusterNetwork, len(networking.ClusterNetwork))
-			for i, inNet := range networking.ClusterNetwork {
-				outNet := &out.Spec.ClusterNetworks[i]
-				outNet.CIDR = inNet.CIDR.String()
-				// In v1alpha1, Hive is mis-interpreting the host subnet length as the host prefix.
-				outNet.HostSubnetLength = uint32(inNet.HostPrefix)
+			if nets := networking.ClusterNetwork; nets != nil {
+				out.Spec.ClusterNetworks = make([]netopv1.ClusterNetwork, len(nets))
+				for i, inNet := range nets {
+					outNet := &out.Spec.ClusterNetworks[i]
+					outNet.CIDR = inNet.CIDR.String()
+					// In v1alpha1, Hive is mis-interpreting the host subnet length as the host prefix.
+					outNet.HostSubnetLength = uint32(inNet.HostPrefix)
+				}
+			} else {
+				out.Spec.ClusterNetworks = nil
 			}
 		} else {
 			out.Spec.MachineCIDR = ""
@@ -187,9 +199,13 @@ func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *in
 		} else {
 			out.Spec.ControlPlane = hiveapi.MachinePool{}
 		}
-		out.Spec.Compute = make([]hiveapi.MachinePool, len(installConfig.Compute))
-		for i, c := range installConfig.Compute {
-			machinePoolFromInstallConfig(&c, &out.Spec.Compute[i])
+		if compute := installConfig.Compute; compute != nil {
+			out.Spec.Compute = make([]hiveapi.MachinePool, len(compute))
+			for i, c := range compute {
+				machinePoolFromInstallConfig(&c, &out.Spec.Compute[i])
+			}
+		} else {
+			out.Spec.Compute = nil
 		}
 		if inAWS := installConfig.AWS; inAWS != nil {
 			if out.Spec.AWS == nil {
@@ -257,17 +273,21 @@ func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *in
 		out.Spec.GCP = nil
 	}
 
-	newCompute := make([]hiveapi.MachinePool, len(machinePools))
-	for i, p := range machinePools {
-		for _, c := range out.Spec.Compute {
-			if p.Spec.Name == c.Name {
-				newCompute[i] = c
-				break
+	if machinePools != nil {
+		newCompute := make([]hiveapi.MachinePool, len(machinePools))
+		for i, p := range machinePools {
+			for _, c := range out.Spec.Compute {
+				if p.Spec.Name == c.Name {
+					newCompute[i] = c
+					break
+				}
 			}
+			machinePoolFromHiveV1(&p.Spec, &newCompute[i])
 		}
-		machinePoolFromHiveV1(&p.Spec, &newCompute[i])
+		out.Spec.Compute = newCompute
+	} else {
+		out.Spec.Compute = nil
 	}
-	out.Spec.Compute = newCompute
 
 	return nil
 }

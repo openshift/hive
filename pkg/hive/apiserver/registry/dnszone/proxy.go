@@ -2,7 +2,9 @@ package dnszone
 
 import (
 	"context"
+	"reflect"
 
+	log "github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +26,7 @@ import (
 type REST struct {
 	client hivev1client.HiveV1Interface
 	rest.TableConvertor
+	logger log.FieldLogger
 }
 
 var _ rest.Lister = &REST{}
@@ -36,6 +39,7 @@ func NewREST(client hivev1client.HiveV1Interface) registry.NoWatchStorage {
 	return registry.WrapNoWatchStorageError(&REST{
 		client:         client,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		logger:         log.WithField("resource", "dnszones"),
 	})
 }
 
@@ -52,6 +56,8 @@ func (s *REST) NamespaceScoped() bool {
 }
 
 func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (runtime.Object, error) {
+	s.logger.Info("list")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -80,6 +86,8 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 }
 
 func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	s.logger.WithField("name", name).Info("get")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -98,6 +106,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 }
 
 func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	s.logger.WithField("name", name).Info("delete")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, false, err
@@ -111,6 +121,8 @@ func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 }
 
 func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	s.logger.WithField("name", obj.(*hiveapi.DNSZone).Name).Info("create")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -134,18 +146,25 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 }
 
 func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	logger := s.logger.WithField("name", name)
+	logger.Info("update")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, false, err
 	}
 
-	dNSZone, err := client.Get(name, metav1.GetOptions{})
+	dnsZone, err := client.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
 	}
 
+	origDNSZone := dnsZone.DeepCopy()
+	origStatus := origDNSZone.Status
+	origDNSZone.Status = hivev1.DNSZoneStatus{}
+
 	old := &hiveapi.DNSZone{}
-	if err := util.DNSZoneFromHiveV1(dNSZone, old); err != nil {
+	if err := util.DNSZoneFromHiveV1(dnsZone, old); err != nil {
 		return nil, false, err
 	}
 
@@ -154,17 +173,34 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	if err := util.DNSZoneToHiveV1(obj.(*hiveapi.DNSZone), dNSZone); err != nil {
+	if err := util.DNSZoneToHiveV1(obj.(*hiveapi.DNSZone), dnsZone); err != nil {
 		return nil, false, err
 	}
 
-	ret, err := client.Update(dNSZone)
-	if err != nil {
-		return nil, false, err
+	newStatus := dnsZone.Status
+	dnsZone.Status = hivev1.DNSZoneStatus{}
+
+	if !reflect.DeepEqual(dnsZone, origDNSZone) {
+		logger.Info("forwarding regular update")
+		var err error
+		dnsZone, err = client.Update(dnsZone)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
+	dnsZone.Status = newStatus
+	if !reflect.DeepEqual(newStatus, origStatus) {
+		logger.Info("forwarding status update")
+		var err error
+		dnsZone, err = client.UpdateStatus(dnsZone)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	new := &hiveapi.DNSZone{}
-	if err := util.DNSZoneFromHiveV1(ret, new); err != nil {
+	if err := util.DNSZoneFromHiveV1(dnsZone, new); err != nil {
 		return nil, false, err
 	}
 	return new, false, err

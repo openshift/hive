@@ -2,6 +2,9 @@ package clusterprovision
 
 import (
 	"context"
+	"reflect"
+
+	log "github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -24,6 +27,7 @@ import (
 type REST struct {
 	client hivev1client.HiveV1Interface
 	rest.TableConvertor
+	logger log.FieldLogger
 }
 
 var _ rest.Lister = &REST{}
@@ -36,6 +40,7 @@ func NewREST(client hivev1client.HiveV1Interface) registry.NoWatchStorage {
 	return registry.WrapNoWatchStorageError(&REST{
 		client:         client,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		logger:         log.WithField("resource", "clusterprovisions"),
 	})
 }
 
@@ -52,6 +57,8 @@ func (s *REST) NamespaceScoped() bool {
 }
 
 func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (runtime.Object, error) {
+	s.logger.Info("list")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -80,6 +87,8 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 }
 
 func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	s.logger.WithField("name", name).Info("get")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -98,6 +107,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 }
 
 func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	s.logger.WithField("name", name).Info("delete")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, false, err
@@ -111,6 +122,8 @@ func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 }
 
 func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	s.logger.WithField("name", obj.(*hiveapi.ClusterProvision).Name).Info("create")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -134,6 +147,9 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 }
 
 func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	logger := s.logger.WithField("name", name)
+	logger.Info("update")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, false, err
@@ -143,6 +159,10 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	if err != nil {
 		return nil, false, err
 	}
+
+	origClusterProvision := clusterProvision.DeepCopy()
+	origStatus := origClusterProvision.Status
+	origClusterProvision.Status = hivev1.ClusterProvisionStatus{}
 
 	old := &hiveapi.ClusterProvision{}
 	if err := util.ClusterProvisionFromHiveV1(clusterProvision, old); err != nil {
@@ -158,13 +178,30 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	ret, err := client.Update(clusterProvision)
-	if err != nil {
-		return nil, false, err
+	newStatus := clusterProvision.Status
+	clusterProvision.Status = hivev1.ClusterProvisionStatus{}
+
+	if !reflect.DeepEqual(clusterProvision, origClusterProvision) {
+		logger.Info("forwarding regular update")
+		var err error
+		clusterProvision, err = client.Update(clusterProvision)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
+	clusterProvision.Status = newStatus
+	if !reflect.DeepEqual(newStatus, origStatus) {
+		logger.Info("forwarding status update")
+		var err error
+		clusterProvision, err = client.UpdateStatus(clusterProvision)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	new := &hiveapi.ClusterProvision{}
-	if err := util.ClusterProvisionFromHiveV1(ret, new); err != nil {
+	if err := util.ClusterProvisionFromHiveV1(clusterProvision, new); err != nil {
 		return nil, false, err
 	}
 	return new, false, err

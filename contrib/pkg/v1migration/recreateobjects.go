@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
@@ -104,6 +105,10 @@ func (o *RecreateObjectsOptions) recreateObject(client dynamic.Interface, objFro
 		logger.Warn("object in JSON file is not a Hive v1alpha1 resource")
 		return
 	}
+	if kind == "DNSEndpoint" {
+		logger.Info("re-creation skipped since not used in v1")
+		return
+	}
 	gvr := hivev1alpha1.SchemeGroupVersion.WithResource(resourceForHiveKind(kind))
 	var resourceClient dynamic.ResourceInterface
 	if namespace != "" {
@@ -114,28 +119,22 @@ func (o *RecreateObjectsOptions) recreateObject(client dynamic.Interface, objFro
 	clearResourceVersion(objFromFile)
 	removeHiveOwnerReferences(objFromFile)
 	removeKubectlLastAppliedAnnotation(objFromFile)
+	if kind == "HiveConfig" {
+		switch err := resourceClient.Delete(name, &metav1.DeleteOptions{}); {
+		case apierrors.IsNotFound(err):
+			logger.Info("HiveConfig not found when trying to replace it")
+		case err != nil:
+			logger.WithError(err).Error("could not delete HiveConfig")
+		default:
+			logger.Info("HiveConfig deleted so that it can be replaced")
+		}
+	}
 	_, err := resourceClient.Create(objFromFile, metav1.CreateOptions{})
 	if err != nil {
 		logger.WithError(err).Error("could not create object")
 		return
 	}
 	logger.Info("created object")
-
-	// TODO: Do we care enough to separate status updates into a sub-resource? For most of the resources, it is pretty
-	// straight-forward. For ClusterDeployments it is tricky because fields have moved from status to spec in v1.
-	//
-	// statusFromFile, found, err := unstructured.NestedFieldNoCopy(objFromFile.Object, "status")
-	// if err != nil {
-	// 	logger.WithError(err).Error("could not get the status of the object from the JSON file")
-	// 	return
-	// }
-	// if found {
-	// 	unstructured.SetNestedField(createdObj.Object, statusFromFile, "status")
-	// 	if _, err := resourceClient.Update(createdObj, metav1.UpdateOptions{}, "status"); err != nil {
-	// 		logger.WithError(err).Error("could not set status of object")
-	// 	}
-	// 	logger.Info("updated object with status")
-	// }
 }
 
 func clearResourceVersion(obj *unstructured.Unstructured) {

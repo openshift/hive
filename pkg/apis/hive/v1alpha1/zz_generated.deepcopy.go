@@ -1575,6 +1575,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 	}
 	in.Backup.DeepCopyInto(&out.Backup)
 	out.FailedProvisionConfig = in.FailedProvisionConfig
+	if in.MaintenanceMode != nil {
+		in, out := &in.MaintenanceMode, &out.MaintenanceMode
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

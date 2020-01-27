@@ -130,6 +130,12 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 	r.includeGlobalPullSecret(hLog, h, instance, hiveDeployment)
 
+	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
+		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
+		replicas := int32(0)
+		hiveDeployment.Spec.Replicas = &replicas
+	}
+
 	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")

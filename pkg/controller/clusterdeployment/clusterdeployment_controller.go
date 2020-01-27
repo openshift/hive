@@ -1705,7 +1705,7 @@ func checkForFailedSyncSetInstance(syncSetInstances []*hivev1.SyncSetInstance) b
 				return true
 			}
 		}
-		for _, s := range syncSetInstance.Status.SecretReferences {
+		for _, s := range syncSetInstance.Status.Secrets {
 			if checkSyncSetConditionsForFailure(s.Conditions) {
 				return true
 			}

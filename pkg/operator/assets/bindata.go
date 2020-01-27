@@ -1535,6 +1535,11 @@ spec:
               type: string
             lastBackupRef:
               description: LastBackupRef is a reference to last backup object created
+              properties:
+                name:
+                  type: string
+                namespace:
+                  type: string
               type: object
             lastBackupTime:
               description: LastBackupTime is the last time we performed a backup of
@@ -3791,14 +3796,36 @@ spec:
               items:
                 type: object
               type: array
-            secretReferences:
-              description: SecretReferences is the list of secrets to sync from existing
-                resources.
+            secretMappings:
+              description: Secrets is the list of secrets to sync along with their
+                respective destinations.
               items:
                 properties:
-                  source:
+                  sourceRef:
+                    description: SourceRef specifies the name and namespace of a secret
+                      on the management cluster
+                    properties:
+                      name:
+                        description: Name is the name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace where the secret lives.
+                          If not present for the source secret reference, it is assumed
+                          to be the same namespace as the syncset with the reference.
+                        type: string
                     type: object
-                  target:
+                  targetRef:
+                    description: TargetRef specifies the target name and namespace
+                      of the secret on the target cluster
+                    properties:
+                      name:
+                        description: Name is the name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace where the secret lives.
+                          If not present for the source secret reference, it is assumed
+                          to be the same namespace as the syncset with the reference.
+                        type: string
                     type: object
                 type: object
               type: array
@@ -4472,14 +4499,36 @@ spec:
               items:
                 type: object
               type: array
-            secretReferences:
-              description: SecretReferences is the list of secrets to sync from existing
-                resources.
+            secretMappings:
+              description: Secrets is the list of secrets to sync along with their
+                respective destinations.
               items:
                 properties:
-                  source:
+                  sourceRef:
+                    description: SourceRef specifies the name and namespace of a secret
+                      on the management cluster
+                    properties:
+                      name:
+                        description: Name is the name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace where the secret lives.
+                          If not present for the source secret reference, it is assumed
+                          to be the same namespace as the syncset with the reference.
+                        type: string
                     type: object
-                  target:
+                  targetRef:
+                    description: TargetRef specifies the target name and namespace
+                      of the secret on the target cluster
+                    properties:
+                      name:
+                        description: Name is the name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace where the secret lives.
+                          If not present for the source secret reference, it is assumed
+                          to be the same namespace as the syncset with the reference.
+                        type: string
                     type: object
                 type: object
               type: array
@@ -4730,8 +4779,8 @@ spec:
                 type: object
               type: array
             secretReferences:
-              description: SecretReferences is the list of SyncStatus for secrets
-                that have been synced.
+              description: Secrets is the list of SyncStatus for secrets that have
+                been synced.
               items:
                 properties:
                   apiVersion:

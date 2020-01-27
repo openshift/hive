@@ -1,7 +1,6 @@
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -14,7 +13,13 @@ type CheckpointSpec struct {
 	LastBackupTime metav1.Time `json:"lastBackupTime"`
 
 	// LastBackupRef is a reference to last backup object created
-	LastBackupRef corev1.ObjectReference `json:"lastBackupRef"`
+	LastBackupRef BackupReference `json:"lastBackupRef"`
+}
+
+// BackupReference is a reference to a backup resource
+type BackupReference struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 // CheckpointStatus defines the observed state of Checkpoint

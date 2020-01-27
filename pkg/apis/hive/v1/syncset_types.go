@@ -59,10 +59,25 @@ type SyncObjectPatch struct {
 	PatchType string `json:"patchType,omitempty"`
 }
 
-// SecretReference represents a reference to an existing secret object to be synced
+// SecretReference is a reference to a secret by name and namespace
 type SecretReference struct {
-	Source corev1.ObjectReference `json:"source"`
-	Target corev1.ObjectReference `json:"target"`
+	// Name is the name of the secret
+	Name string `json:"name"`
+	// Namespace is the namespace where the secret lives. If not present for the source
+	// secret reference, it is assumed to be the same namespace as the syncset with the
+	// reference.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// SecretMapping defines a source and destination for a secret to be synced by a SyncSet
+type SecretMapping struct {
+
+	// SourceRef specifies the name and namespace of a secret on the management cluster
+	SourceRef SecretReference `json:"sourceRef"`
+
+	// TargetRef specifies the target name and namespace of the secret on the target cluster
+	TargetRef SecretReference `json:"targetRef"`
 }
 
 // SyncConditionType is a valid value for SyncCondition.Type
@@ -125,9 +140,9 @@ type SyncSetObjectStatus struct {
 	// +optional
 	Patches []SyncStatus `json:"patches,omitempty"`
 
-	// SecretReferences is the list of SyncStatus for secrets that have been synced.
+	// Secrets is the list of SyncStatus for secrets that have been synced.
 	// +optional
-	SecretReferences []SyncStatus `json:"secretReferences,omitempty"`
+	Secrets []SyncStatus `json:"secrets,omitempty"`
 
 	// Conditions is the list of SyncConditions used to indicate UnknownObject
 	// when a resource type cannot be determined from a SyncSet resource.
@@ -180,9 +195,9 @@ type SyncSetCommonSpec struct {
 	// +optional
 	Patches []SyncObjectPatch `json:"patches,omitempty"`
 
-	// SecretReferences is the list of secrets to sync from existing resources.
+	// Secrets is the list of secrets to sync along with their respective destinations.
 	// +optional
-	SecretReferences []SecretReference `json:"secretReferences,omitempty"`
+	Secrets []SecretMapping `json:"secretMappings,omitempty"`
 }
 
 // SelectorSyncSetSpec defines the SyncSetCommonSpec resources and patches to sync along

@@ -216,8 +216,8 @@ spec:
                 type: object
               type: array
             secretReferences:
-              description: SecretReferences is the list of SyncStatus for secrets
-                that have been synced.
+              description: Secrets is the list of SyncStatus for secrets that have
+                been synced.
               items:
                 properties:
                   apiVersion:

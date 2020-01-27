@@ -473,8 +473,8 @@ func syncSetFromClusterDeployment(cd *hivev1.ClusterDeployment) *hivev1.SyncSet 
 		certBundleSecrets: fakeSecretListForCertBundles(cd),
 	}
 	rawExtensions := rawExtensionsFromClusterDeployment(&rContext)
-	srList := secretRefrenceFromClusterDeployment(&rContext)
-	ssSpec := newSyncSetSpec(cd, rawExtensions, srList)
+	sMappings := secretMappingsFromClusterDeployment(&rContext)
+	ssSpec := newSyncSetSpec(cd, rawExtensions, sMappings)
 	return &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cd.Name + "clusteringress",
@@ -593,10 +593,10 @@ type createdResourceInfo struct {
 	defaultCertificate string
 }
 type createdSyncSetInfo struct {
-	name             string
-	namespace        string
-	resources        []createdResourceInfo
-	secretRefefences []hivev1.SecretReference
+	name           string
+	namespace      string
+	resources      []createdResourceInfo
+	secretMappings []hivev1.SecretMapping
 }
 
 type fakeKubeCLI struct {
@@ -640,7 +640,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			continue
 		}
 	}
-	created.secretRefefences = ss.Spec.SecretReferences
+	created.secretMappings = ss.Spec.Secrets
 
 	f.createdSyncSet = created
 
@@ -650,8 +650,8 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedSecrets []string, expectedIngressControllers []SyncSetIngressEntry) {
 	for _, secret := range expectedSecrets {
 		found := false
-		for _, sr := range existingSyncSet.secretRefefences {
-			if sr.Target.Name == secret {
+		for _, mapping := range existingSyncSet.secretMappings {
+			if mapping.TargetRef.Name == secret {
 				found = true
 				break
 			}

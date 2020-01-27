@@ -81,7 +81,7 @@ func TestReconcile(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testclusterdeployment.Build(clusterDeploymentBase()),
 				testcheckpoint.Build(checkpointBase(),
-					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupRef(hivev1.BackupReference{Name: "notarealbackup", Namespace: namespace}),
 					testcheckpoint.WithLastBackupTime(fiveHoursAgo),
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
@@ -92,7 +92,7 @@ func TestReconcile(t *testing.T) {
 			expectedObjects: []runtime.Object{
 				testclusterdeployment.Build(clusterDeploymentBase()),
 				testcheckpoint.Build(checkpointBase(),
-					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupRef(hivev1.BackupReference{Name: "notarealbackup", Namespace: namespace}),
 					testcheckpoint.WithLastBackupTime(fiveHoursAgo),
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
@@ -111,7 +111,7 @@ func TestReconcile(t *testing.T) {
 				testclusterdeployment.Build(clusterDeploymentBase()),
 				testsyncset.Build(syncSetBase()),
 				testcheckpoint.Build(checkpointBase(),
-					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupRef(hivev1.BackupReference{Name: "notarealbackup", Namespace: namespace}),
 					testcheckpoint.WithLastBackupTime(twoMinutesAgo),
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
@@ -125,7 +125,7 @@ func TestReconcile(t *testing.T) {
 				testclusterdeployment.Build(clusterDeploymentBase()),
 				testsyncset.Build(syncSetBase()),
 				testcheckpoint.Build(checkpointBase(),
-					testcheckpoint.WithLastBackupRef(corev1.ObjectReference{Name: "notarealbackup", Namespace: namespace}),
+					testcheckpoint.WithLastBackupRef(hivev1.BackupReference{Name: "notarealbackup", Namespace: namespace}),
 					testcheckpoint.WithLastBackupTime(twoMinutesAgo),
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
@@ -220,7 +220,7 @@ func TestCreateVeleroBackupObject(t *testing.T) {
 	actualBackups := &velerov1.BackupList{}
 	r := fakeClientReconcileBackup(emptyRuntimeObjectSlice)
 	timestamp := metav1.NewTime(time.Now().UTC())
-	expectedBackupRef := corev1.ObjectReference{
+	expectedBackupRef := hivev1.BackupReference{
 		Name:      fmt.Sprintf("backup-%v-%v", namespace, timestamp.Format(formatStr)),
 		Namespace: "velero",
 	}

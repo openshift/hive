@@ -7,7 +7,8 @@ RUN chmod g+rw /etc/passwd
 RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clean all && rm -rf /var/cache/yum/*; fi
 #
 # libvirt libraries required for running bare metal installer.
-RUN yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*
+# net-tools for libvirt debugging
+RUN yum install -y libvirt-devel net-tools && yum clean all && rm -rf /var/cache/yum/*
 
 
 ADD bin/hiveadmission /opt/services/

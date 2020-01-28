@@ -275,6 +275,10 @@ func (m *InstallManager) Run() error {
 		return err
 	}
 
+	// TODO: only for bare metal, find a better way
+	m.log.Info("waiting 60 seconds for libvirt to be running")
+	time.Sleep(60 * time.Second)
+
 	// Generate installer assets we need to modify or upload.
 	m.log.Info("generating assets")
 	if err := m.generateAssets(provision); err != nil {
@@ -531,6 +535,9 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 	err := m.runOpenShiftInstallCommand("create", "manifests")
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
+		// TODO: remove this
+		m.log.Info("sleeping for 2 hours for debugging")
+		time.Sleep(120 * time.Minute)
 		return err
 	}
 

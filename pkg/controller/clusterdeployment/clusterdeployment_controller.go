@@ -456,8 +456,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if cd.Status.InstallerImage == nil || cd.Status.CLIImage == nil {
-		return r.resolveInstallerImage(cd, imageSet, releaseImage, cdLog)
+	switch result, err := r.resolveInstallerImage(cd, imageSet, releaseImage, cdLog); {
+	case err != nil:
+		return reconcile.Result{}, err
+	case result != nil:
+		return *result, nil
 	}
 
 	if !r.expectations.SatisfiedExpectations(request.String()) {
@@ -864,69 +867,89 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 	return err
 }
 
-func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (reconcile.Result, error) {
-	// If the .status.clusterVersionsStatus.availableUpdates field is nil,
-	// do a status update to set it to an empty list. All status updates
-	// done by controllers set this automatically. However, the imageset
-	// job does not. If the field is still nil when the imageset job tries
-	// to update the status, then the update will fail validation.
-	if cd.Status.ClusterVersionStatus.AvailableUpdates == nil {
-		return reconcile.Result{}, r.statusUpdate(cd, cdLog)
-	}
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (*reconcile.Result, error) {
+	areImagesResolved := cd.Status.InstallerImage != nil && cd.Status.CLIImage != nil
 
-	cliImage := images.GetCLIImage()
-	job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
-	if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
-		cdLog.WithError(err).Error("error setting controller reference on job")
-		return reconcile.Result{}, err
-	}
-
-	jobName := types.NamespacedName{Name: job.Name, Namespace: job.Namespace}
-	jobLog := cdLog.WithField("job", jobName)
+	jobKey := client.ObjectKey{Namespace: cd.Namespace, Name: imageset.GetImageSetJobName(cd.Name)}
+	jobLog := cdLog.WithField("job", jobKey.Name)
 
 	existingJob := &batchv1.Job{}
-	err := r.Get(context.TODO(), jobName, existingJob)
-	switch {
-	// If the job exists but is in the process of getting deleted, requeue and wait for the delete
-	// to complete.
-	case err == nil && !job.DeletionTimestamp.IsZero():
-		jobLog.Debug("imageset job is being deleted. Will recreate once deleted")
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, err
-	// If job exists and is finished, delete so we can recreate it
-	case err == nil && controllerutils.IsFinished(existingJob):
-		jobLog.WithField("successful", controllerutils.IsSuccessful(existingJob)).
-			Warning("Finished job found, but all images not yet resolved. Deleting.")
-		err := r.Delete(context.Background(), existingJob,
-			client.PropagationPolicy(metav1.DeletePropagationForeground))
-		if err != nil {
-			jobLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot delete imageset job")
-		}
-		return reconcile.Result{}, err
+	switch err := r.Get(context.Background(), jobKey, existingJob); {
+	// The job does not exist. If the images have been resolved, continue reconciling. Otherwise, create the job.
 	case apierrors.IsNotFound(err):
+		if areImagesResolved {
+			return nil, nil
+		}
+
+		// If the .status.clusterVersionsStatus.availableUpdates field is nil,
+		// do a status update to set it to an empty list. All status updates
+		// done by controllers set this automatically. However, the imageset
+		// job does not. If the field is still nil when the imageset job tries
+		// to update the status, then the update will fail validation.
+		if cd.Status.ClusterVersionStatus.AvailableUpdates == nil {
+			return &reconcile.Result{}, r.statusUpdate(cd, cdLog)
+		}
+
+		cliImage := images.GetCLIImage()
+		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
+		if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
+			cdLog.WithError(err).Error("error setting controller reference on job")
+			return nil, err
+		}
+
 		jobLog.WithField("releaseImage", releaseImage).Info("creating imageset job")
 		err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
-			return reconcile.Result{}, err
+			return nil, err
 		}
 
-		err = r.Create(context.TODO(), job)
-		if err != nil {
+		if err := r.Create(context.TODO(), job); err != nil {
 			jobLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating job")
-		} else {
-			// kickstartDuration calculates the delay between creation of cd and start of imageset job
-			kickstartDuration := time.Since(cd.CreationTimestamp.Time)
-			cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
-			metricImageSetDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+			return nil, err
 		}
-		return reconcile.Result{}, err
+		// kickstartDuration calculates the delay between creation of cd and start of imageset job
+		kickstartDuration := time.Since(cd.CreationTimestamp.Time)
+		cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
+		metricImageSetDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+		return &reconcile.Result{}, nil
+
+	// There was an error getting the job. Return the error.
 	case err != nil:
 		jobLog.WithError(err).Error("cannot get job")
-		return reconcile.Result{}, err
+		return nil, err
+
+	// The job exists and is in the process of getting deleted. If the images were resolved, then continue reconciling.
+	// If the images were not resolved, requeue and wait for the delete to complete.
+	case !existingJob.DeletionTimestamp.IsZero():
+		if areImagesResolved {
+			return nil, nil
+		}
+		jobLog.Debug("imageset job is being deleted. Will recreate once deleted")
+		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, err
+
+	// If job exists and is finished, delete it. If the images were not resolved, then the job will be re-created.
+	case controllerutils.IsFinished(existingJob):
+		jobLog.WithField("successful", controllerutils.IsSuccessful(existingJob)).
+			Warning("Finished job found. Deleting.")
+		if err := r.Delete(
+			context.Background(),
+			existingJob,
+			client.PropagationPolicy(metav1.DeletePropagationForeground),
+		); err != nil {
+			jobLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot delete imageset job")
+			return nil, err
+		}
+		if areImagesResolved {
+			return nil, nil
+		}
+		return &reconcile.Result{}, nil
+
+	// The job exists and is in progress. Wait for the job to finish before doing any more reconciliation.
 	default:
 		jobLog.Debug("job exists and is in progress")
+		return &reconcile.Result{}, nil
 	}
-	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterDeployment, isReady bool, message string, cdLog log.FieldLogger) error {

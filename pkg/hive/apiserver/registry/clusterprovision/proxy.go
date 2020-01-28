@@ -4,7 +4,9 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/watch"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -35,9 +37,10 @@ var _ rest.Getter = &REST{}
 var _ rest.CreaterUpdater = &REST{}
 var _ rest.GracefulDeleter = &REST{}
 var _ rest.Scoper = &REST{}
+var _ rest.Watcher = &REST{}
 
-func NewREST(client hivev1client.HiveV1Interface) registry.NoWatchStorage {
-	return registry.WrapNoWatchStorageError(&REST{
+func NewREST(client hivev1client.HiveV1Interface) registry.Storage {
+	return registry.WrapStorageError(&REST{
 		client:         client,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 		logger:         log.WithField("resource", "clusterprovisions"),
@@ -205,6 +208,44 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 	return new, false, err
+}
+
+func (s *REST) Watch(ctx context.Context, options *metainternal.ListOptions) (watch.Interface, error) {
+	s.logger.Info("watch")
+
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	optv1 := metav1.ListOptions{}
+	if err := metainternal.Convert_internalversion_ListOptions_To_v1_ListOptions(options, &optv1, nil); err != nil {
+		return nil, err
+	}
+
+	v1watcher, err := client.Watch(optv1)
+	if err != nil {
+		return nil, err
+	}
+
+	return registry.NewProxyWatcher(v1watcher, &eventConverter{}, s.logger), nil
+}
+
+type eventConverter struct{}
+
+func (c *eventConverter) Convert(v1Event watch.Event) (*watch.Event, error) {
+	v1ClusterProvision, ok := v1Event.Object.(*hivev1.ClusterProvision)
+	if !ok {
+		return nil, errors.Errorf("event object is not a ClusterProvision: %T", v1Event.Object)
+	}
+	v1alpha1ClusterProvision := &hiveapi.ClusterProvision{}
+	if err := util.ClusterProvisionFromHiveV1(v1ClusterProvision, v1alpha1ClusterProvision); err != nil {
+		return nil, errors.Wrap(err, "could not convert clusterProvision from v1")
+	}
+	return &watch.Event{
+		Type:   v1Event.Type,
+		Object: v1alpha1ClusterProvision,
+	}, nil
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.ClusterProvisionInterface, error) {

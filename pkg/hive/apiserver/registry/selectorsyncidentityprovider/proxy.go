@@ -4,10 +4,12 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -32,9 +34,10 @@ var _ rest.Getter = &REST{}
 var _ rest.CreaterUpdater = &REST{}
 var _ rest.GracefulDeleter = &REST{}
 var _ rest.Scoper = &REST{}
+var _ rest.Watcher = &REST{}
 
-func NewREST(client hivev1client.HiveV1Interface) registry.NoWatchStorage {
-	return registry.WrapNoWatchStorageError(&REST{
+func NewREST(client hivev1client.HiveV1Interface) registry.Storage {
+	return registry.WrapStorageError(&REST{
 		client:         client,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 		logger:         log.WithField("resource", "selectorsyncsetidentityproviders"),
@@ -202,6 +205,44 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 	return new, false, err
+}
+
+func (s *REST) Watch(ctx context.Context, options *metainternal.ListOptions) (watch.Interface, error) {
+	s.logger.Info("watch")
+
+	client, err := s.getClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	optv1 := metav1.ListOptions{}
+	if err := metainternal.Convert_internalversion_ListOptions_To_v1_ListOptions(options, &optv1, nil); err != nil {
+		return nil, err
+	}
+
+	v1watcher, err := client.Watch(optv1)
+	if err != nil {
+		return nil, err
+	}
+
+	return registry.NewProxyWatcher(v1watcher, &eventConverter{}, s.logger), nil
+}
+
+type eventConverter struct{}
+
+func (c *eventConverter) Convert(v1Event watch.Event) (*watch.Event, error) {
+	v1SelectorSyncIdentityProvider, ok := v1Event.Object.(*hivev1.SelectorSyncIdentityProvider)
+	if !ok {
+		return nil, errors.Errorf("event object is not a SelectorSyncIdentityProvider: %T", v1Event.Object)
+	}
+	v1alpha1SelectorSyncIdentityProvider := &hiveapi.SelectorSyncIdentityProvider{}
+	if err := util.SelectorSyncIdentityProviderFromHiveV1(v1SelectorSyncIdentityProvider, v1alpha1SelectorSyncIdentityProvider); err != nil {
+		return nil, errors.Wrap(err, "could not convert selectorSyncIdentityProvider from v1")
+	}
+	return &watch.Event{
+		Type:   v1Event.Type,
+		Object: v1alpha1SelectorSyncIdentityProvider,
+	}, nil
 }
 
 func (s *REST) getClient(ctx context.Context) (hivev1client.SelectorSyncIdentityProviderInterface, error) {

@@ -10,69 +10,76 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
-type NoWatchStorage interface {
+type Storage interface {
 	rest.Getter
 	rest.Lister
 	rest.TableConvertor
 	rest.CreaterUpdater
 	rest.GracefulDeleter
 	rest.Scoper
+	rest.Watcher
 }
 
-// WrapNoWatchStorageError uses syncStatusError to inject the correct group
+// WrapStorageError uses syncStatusError to inject the correct group
 // resource info into the errors that are returned by the delegated storage
-func WrapNoWatchStorageError(delegate NoWatchStorage) NoWatchStorage {
-	return &noWatchStorageErrWrapper{delegate: delegate}
+func WrapStorageError(delegate Storage) Storage {
+	return &storageErrWrapper{delegate: delegate}
 }
 
-var _ = NoWatchStorage(&noWatchStorageErrWrapper{})
+var _ = Storage(&storageErrWrapper{})
 
-type noWatchStorageErrWrapper struct {
-	delegate NoWatchStorage
+type storageErrWrapper struct {
+	delegate Storage
 }
 
-func (s *noWatchStorageErrWrapper) NamespaceScoped() bool {
+func (s *storageErrWrapper) NamespaceScoped() bool {
 	return s.delegate.NamespaceScoped()
 }
 
-func (s *noWatchStorageErrWrapper) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+func (s *storageErrWrapper) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := s.delegate.Get(ctx, name, options)
 	return obj, syncStatusError(ctx, err)
 }
 
-func (s *noWatchStorageErrWrapper) List(ctx context.Context, options *internalversion.ListOptions) (runtime.Object, error) {
+func (s *storageErrWrapper) List(ctx context.Context, options *internalversion.ListOptions) (runtime.Object, error) {
 	obj, err := s.delegate.List(ctx, options)
 	return obj, syncStatusError(ctx, err)
 }
 
-func (s *noWatchStorageErrWrapper) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (s *storageErrWrapper) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return s.delegate.ConvertToTable(ctx, object, tableOptions)
 }
 
-func (s *noWatchStorageErrWrapper) Create(ctx context.Context, in runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+func (s *storageErrWrapper) Create(ctx context.Context, in runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	obj, err := s.delegate.Create(ctx, in, createValidation, options)
 	return obj, syncStatusError(ctx, err)
 }
 
-func (s *noWatchStorageErrWrapper) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+func (s *storageErrWrapper) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, created, err := s.delegate.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
 	return obj, created, syncStatusError(ctx, err)
 }
 
-func (s *noWatchStorageErrWrapper) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (s *storageErrWrapper) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	obj, deleted, err := s.delegate.Delete(ctx, name, options)
 	return obj, deleted, syncStatusError(ctx, err)
 }
 
-func (s *noWatchStorageErrWrapper) New() runtime.Object {
+func (s *storageErrWrapper) Watch(ctx context.Context, options *internalversion.ListOptions) (watch.Interface, error) {
+	w, err := s.delegate.Watch(ctx, options)
+	return w, syncStatusError(ctx, err)
+}
+
+func (s *storageErrWrapper) New() runtime.Object {
 	return s.delegate.New()
 }
 
-func (s *noWatchStorageErrWrapper) NewList() runtime.Object {
+func (s *storageErrWrapper) NewList() runtime.Object {
 	return s.delegate.NewList()
 }
 

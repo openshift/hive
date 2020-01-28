@@ -68,6 +68,10 @@ func InstallerPodSpec(
 			Name:  "OPENSHIFT_INSTALL_INVOKER",
 			Value: "hive",
 		},
+		{
+			Name:  "HOME",
+			Value: "/output",
+		},
 	}
 	volumes := []corev1.Volume{
 		{
@@ -298,7 +302,12 @@ func InstallerPodSpec(
 				// TODO: need an official image for this
 				Image:           "docker.io/djzager/libvirt:netstart",
 				ImagePullPolicy: corev1.PullAlways,
-				SecurityContext: &corev1.SecurityContext{Privileged: pointer.BoolPtr(true)},
+				SecurityContext: &corev1.SecurityContext{
+					Privileged: pointer.BoolPtr(true),
+					Capabilities: &corev1.Capabilities{
+						Add: []corev1.Capability{"NET_ADMIN"},
+					},
+				},
 				// Re-use the output mount shared between installer and hive containers
 				VolumeMounts: []corev1.VolumeMount{
 					{

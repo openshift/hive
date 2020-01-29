@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
@@ -105,8 +104,12 @@ func (o *RecreateObjectsOptions) recreateObject(client dynamic.Interface, objFro
 		logger.Warn("object in JSON file is not a Hive v1alpha1 resource")
 		return
 	}
-	if kind == "DNSEndpoint" {
+	switch kind {
+	case "DNSEndpoint":
 		logger.Info("re-creation skipped since not used in v1")
+		return
+	case "HiveConfig":
+		logger.Info("re-creation skipped since HiveConfig has already been restored")
 		return
 	}
 	gvr := hivev1alpha1.SchemeGroupVersion.WithResource(resourceForHiveKind(kind))
@@ -119,16 +122,6 @@ func (o *RecreateObjectsOptions) recreateObject(client dynamic.Interface, objFro
 	clearResourceVersion(objFromFile)
 	removeHiveOwnerReferences(objFromFile)
 	removeKubectlLastAppliedAnnotation(objFromFile)
-	if kind == "HiveConfig" {
-		switch err := resourceClient.Delete(name, &metav1.DeleteOptions{}); {
-		case apierrors.IsNotFound(err):
-			logger.Info("HiveConfig not found when trying to replace it")
-		case err != nil:
-			logger.WithError(err).Error("could not delete HiveConfig")
-		default:
-			logger.Info("HiveConfig deleted so that it can be replaced")
-		}
-	}
 	_, err := resourceClient.Create(objFromFile, metav1.CreateOptions{})
 	if err != nil {
 		logger.WithError(err).Error("could not create object")

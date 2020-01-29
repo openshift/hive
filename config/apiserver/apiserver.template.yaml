@@ -98,13 +98,14 @@ objects:
           - "start"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
           - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"
+          - "--logtostderr"
           resources:
             requests:
               cpu: 100m
-              memory: 20Mi
+              memory: 100Mi
             limits:
               cpu: 100m
-              memory: 30Mi
+              memory: 200Mi
         serviceAccountName: ${SVC_NAME}-sa
         volumes:
         - name: apiserver-certs

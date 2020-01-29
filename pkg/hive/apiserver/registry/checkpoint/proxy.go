@@ -2,9 +2,9 @@ package checkpoint
 
 import (
 	"context"
+	"reflect"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
+	log "github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,6 +13,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1client "github.com/openshift/hive/pkg/client/clientset-generated/clientset/typed/hive/v1"
 
 	hiveapi "github.com/openshift/hive/pkg/hive/apis/hive"
 	"github.com/openshift/hive/pkg/hive/apiserver/registry"
@@ -23,6 +26,7 @@ import (
 type REST struct {
 	client hivev1client.HiveV1Interface
 	rest.TableConvertor
+	logger log.FieldLogger
 }
 
 var _ rest.Lister = &REST{}
@@ -35,6 +39,7 @@ func NewREST(client hivev1client.HiveV1Interface) registry.NoWatchStorage {
 	return registry.WrapNoWatchStorageError(&REST{
 		client:         client,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		logger:         log.WithField("resource", "checkpoints"),
 	})
 }
 
@@ -51,6 +56,8 @@ func (s *REST) NamespaceScoped() bool {
 }
 
 func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (runtime.Object, error) {
+	s.logger.Info("list")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -79,6 +86,8 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 }
 
 func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	s.logger.WithField("name", name).Info("get")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -97,6 +106,8 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 }
 
 func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	s.logger.WithField("name", name).Info("delete")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, false, err
@@ -110,6 +121,8 @@ func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 }
 
 func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	s.logger.WithField("name", obj.(*hiveapi.Checkpoint).Name).Info("create")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
@@ -133,6 +146,9 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 }
 
 func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	logger := s.logger.WithField("name", name)
+	logger.Info("update")
+
 	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, false, err
@@ -142,6 +158,10 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	if err != nil {
 		return nil, false, err
 	}
+
+	origCheckpoint := checkpoint.DeepCopy()
+	origStatus := origCheckpoint.Status
+	origCheckpoint.Status = hivev1.CheckpointStatus{}
 
 	old := &hiveapi.Checkpoint{}
 	if err := util.CheckpointFromHiveV1(checkpoint, old); err != nil {
@@ -157,13 +177,30 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 		return nil, false, err
 	}
 
-	ret, err := client.Update(checkpoint)
-	if err != nil {
-		return nil, false, err
+	newStatus := checkpoint.Status
+	checkpoint.Status = hivev1.CheckpointStatus{}
+
+	if !reflect.DeepEqual(checkpoint, origCheckpoint) {
+		logger.Info("forwarding regular update")
+		var err error
+		checkpoint, err = client.Update(checkpoint)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
+	checkpoint.Status = newStatus
+	if !reflect.DeepEqual(newStatus, origStatus) {
+		logger.Info("forwarding status update")
+		var err error
+		checkpoint, err = client.UpdateStatus(checkpoint)
+		if err != nil {
+			return nil, false, err
+		}
 	}
 
 	new := &hiveapi.Checkpoint{}
-	if err := util.CheckpointFromHiveV1(ret, new); err != nil {
+	if err := util.CheckpointFromHiveV1(checkpoint, new); err != nil {
 		return nil, false, err
 	}
 	return new, false, err

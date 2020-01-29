@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -28,6 +29,8 @@ func main() {
 
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	log.SetLevel(log.InfoLevel)
 
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		runtime.GOMAXPROCS(runtime.NumCPU())

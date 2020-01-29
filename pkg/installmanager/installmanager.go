@@ -989,6 +989,9 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 		},
 	}
 
+	m.log.WithField("derivedObject", kubeconfigSecret.Name).Debug("Setting labels on derived object")
+	controllerutils.AddLabel(kubeconfigSecret, constants.ClusterProvisionNameLabel, provision.Name)
+	controllerutils.AddLabel(kubeconfigSecret, constants.SecretTypeLabel, constants.SecretTypeKubeConfig)
 	if err := controllerutil.SetControllerReference(provision, kubeconfigSecret, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return nil, err
@@ -1030,6 +1033,9 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) 
 		},
 	}
 
+	m.log.WithField("derivedObject", s.Name).Debug("Setting labels on derived object")
+	controllerutils.AddLabel(s, constants.ClusterProvisionNameLabel, provision.Name)
+	controllerutils.AddLabel(s, constants.SecretTypeLabel, constants.SecretTypeKubeAdminCreds)
 	if err := controllerutil.SetControllerReference(provision, s, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return nil, err

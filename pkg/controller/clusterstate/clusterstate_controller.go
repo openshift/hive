@@ -23,6 +23,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -143,6 +144,9 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		logger.Info("Creating cluster state resource for cluster deployment")
 		st.Name = cd.Name
 		st.Namespace = cd.Namespace
+
+		logger.WithField("derivedObject", st.Name).Debug("Setting label on derived object")
+		controllerutils.AddLabel(st, constants.ClusterDeploymentNameLabel, cd.Name)
 		if err = controllerutil.SetControllerReference(cd, st, r.scheme); err != nil {
 			logger.WithError(err).Error("error setting controller reference on cluster state")
 			return reconcile.Result{}, err

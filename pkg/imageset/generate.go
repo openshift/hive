@@ -50,9 +50,6 @@ exit 0
 `
 	// ImagesetJobLabel is the label used for counting the number of imageset jobs in Hive
 	ImagesetJobLabel = "hive.openshift.io/imageset"
-
-	// ClusterDeploymentNameLabel is the label that is used to identify the imageset pod of a particular cluster deployment
-	ClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 )
 
 // GenerateImageSetJob creates a job to determine the installer image for a ClusterImageSet
@@ -157,8 +154,8 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 	deadline := int64((24 * time.Hour).Seconds())
 	backoffLimit := int32(123456)
 	labels := map[string]string{
-		ImagesetJobLabel:           "true",
-		ClusterDeploymentNameLabel: cd.Name,
+		ImagesetJobLabel:                     "true",
+		constants.ClusterDeploymentNameLabel: cd.Name,
 	}
 	if cd.Labels != nil {
 		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]

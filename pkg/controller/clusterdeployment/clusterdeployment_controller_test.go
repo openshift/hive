@@ -10,6 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -143,6 +144,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Len(t, provisions, 1, "expected provision to exist")
+
+				pvc := &corev1.PersistentVolumeClaim{}
+				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallLogPVC().Name, Namespace: testNamespace}, pvc)
+				assert.NoError(t, err)
+				assert.Equal(t, testClusterDeployment().Name, pvc.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.PVCTypeInstallLogs, pvc.Labels[constants.PVCTypeLabel], "incorrect pvc type label")
 			},
 		},
 		{
@@ -439,7 +446,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				deprovision := getDeprovision(c)
-				assert.NotNil(t, deprovision, "expected deprovision request")
+				require.NotNil(t, deprovision, "expected deprovision request")
+				assert.Equal(t, testClusterDeployment().Name, deprovision.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
 			},
 		},
 		{
@@ -472,6 +480,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						break
 					}
 				}
+
+				// Ensure job type labels are set correctly
+				require.NotNil(t, job, "expected job")
+				assert.Equal(t, testClusterDeployment().Name, job.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.JobTypeImageSet, job.Labels[constants.JobTypeLabel], "incorrect job type label")
 			},
 		},
 		{
@@ -585,7 +598,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				zone := getDNSZone(c)
-				assert.NotNil(t, zone, "dns zone should exist")
+				require.NotNil(t, zone, "dns zone should exist")
+				assert.Equal(t, testClusterDeployment().Name, zone.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.DNSZoneTypeChild, zone.Labels[constants.DNSZoneTypeLabel], "incorrect dnszone type label")
 			},
 		},
 		{
@@ -1021,9 +1036,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					if assert.NotNil(t, cd.Labels, "missing labels map") {
-						assert.Equal(t, cd.Labels[hivev1.HiveClusterPlatformLabel], getClusterPlatform(cd), "incorrect cluster platform label")
-					}
+					assert.Equal(t, getClusterPlatform(cd), cd.Labels[hivev1.HiveClusterPlatformLabel], "incorrect cluster platform label")
 				}
 			},
 		},
@@ -1601,6 +1614,10 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, testPullSecret1),
 				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			validate: func(t *testing.T, pullSecretObj *corev1.Secret) {
+				assert.Equal(t, testClusterDeployment().Name, pullSecretObj.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.SecretTypeMergedPullSecret, pullSecretObj.Labels[constants.SecretTypeLabel], "incorrect secret type label")
 			},
 		},
 	}

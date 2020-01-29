@@ -8,6 +8,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -23,6 +24,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
@@ -69,7 +71,8 @@ func TestClusterStateReconcile(t *testing.T) {
 			noRemoteCall: true,
 			validate: func(t *testing.T, c client.Client, result reconcile.Result) {
 				st := cs(t, c)
-				assert.NotNil(t, st, "clusterstate should have been created")
+				require.NotNil(t, st, "clusterstate should have been created")
+				assert.Equal(t, testClusterDeployment().Name, st.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
 			},
 		},
 		{

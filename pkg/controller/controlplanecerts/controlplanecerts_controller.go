@@ -29,6 +29,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
@@ -321,6 +322,9 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	syncSet.Spec.Patches = []hivev1.SyncObjectPatch{kubeAPIServerPatch}
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
+	cdLog.WithField("derivedObject", syncSet.Name).Debug("Setting labels on derived object")
+	controllerutils.AddLabel(syncSet, constants.ClusterDeploymentNameLabel, cd.Name)
+	controllerutils.AddLabel(syncSet, constants.SyncSetTypeLabel, constants.SyncSetTypeControlPlaneCerts)
 	if err := controllerutil.SetControllerReference(cd, syncSet, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting owner reference")
 		return nil, err

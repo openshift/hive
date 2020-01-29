@@ -9,6 +9,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +37,10 @@ var (
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "someclusterdeployment-idp",
 				Namespace: "default",
+				Labels: map[string]string{
+					constants.ClusterDeploymentNameLabel: clusterDeploymentWithLabels(labelMap).Name,
+					constants.SyncSetTypeLabel:           constants.SyncSetTypeIdentityProvider,
+				},
 			},
 			Spec: hivev1.SyncSetSpec{
 				SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
@@ -472,7 +477,16 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, test.expectedError, err)
 			assert.Nil(t, ssListErr)
 			assert.True(t, areSyncSetSpecsEqual(t, &test.expectedSyncSetList, ssList))
+			assertSyncSetLabelsCorrect(t, ssList)
 		})
+	}
+}
+
+func assertSyncSetLabelsCorrect(t *testing.T, actual *hivev1.SyncSetList) {
+	for ix := range actual.Items {
+		labels := actual.Items[ix].Labels
+		assert.Equal(t, clusterDeploymentWithLabels(labelMap).Name, labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+		assert.Equal(t, constants.SyncSetTypeIdentityProvider, labels[constants.SyncSetTypeLabel], "incorrect syncset type label")
 	}
 }
 

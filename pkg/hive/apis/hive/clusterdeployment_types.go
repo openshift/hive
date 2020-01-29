@@ -29,10 +29,6 @@ const (
 	// value will not be added as a label, only used for metrics vectors.
 	DefaultClusterType = "unspecified"
 
-	// HiveClusterDeploymentNameLabel is used on various objects created by Hive to link to their associated
-	// ClusterDeployment
-	HiveClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
-
 	// HiveInstallLogLabel is used on ConfigMaps uploaded by the install manager which contain an install log.
 	HiveInstallLogLabel = "hive.openshift.io/install-log"
 

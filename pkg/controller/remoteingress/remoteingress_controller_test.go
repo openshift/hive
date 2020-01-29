@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -597,6 +598,7 @@ type createdSyncSetInfo struct {
 	namespace      string
 	resources      []createdResourceInfo
 	secretMappings []hivev1.SecretMapping
+	syncset        *hivev1.SyncSet
 }
 
 type fakeKubeCLI struct {
@@ -609,6 +611,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 	created := createdSyncSetInfo{
 		name:      ss.Name,
 		namespace: ss.Namespace,
+		syncset:   ss,
 	}
 
 	for _, raw := range ss.Spec.Resources {
@@ -648,6 +651,13 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 }
 
 func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedSecrets []string, expectedIngressControllers []SyncSetIngressEntry) {
+	if existingSyncSet.syncset != nil {
+		// Test label creation
+		labels := existingSyncSet.syncset.Labels
+		assert.Equal(t, testClusterDeployment().Name, labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+		assert.Equal(t, constants.SyncSetTypeRemoteIngress, labels[constants.SyncSetTypeLabel], "incorrect syncset type label")
+	}
+
 	for _, secret := range expectedSecrets {
 		found := false
 		for _, mapping := range existingSyncSet.secretMappings {

@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -170,6 +171,9 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 	}
 
 	rLog.Debug("setting uninstall job controller reference")
+	rLog.WithField("derivedObject", uninstallJob.Name).Debug("Setting labels on derived object")
+	controllerutils.AddLabel(uninstallJob, constants.ClusterDeprovisionNameLabel, instance.Name)
+	controllerutils.AddLabel(uninstallJob, constants.JobTypeLabel, constants.JobTypeDeprovision)
 	err = controllerutil.SetControllerReference(instance, uninstallJob, r.scheme)
 	if err != nil {
 		rLog.Errorf("error setting controller reference on job: %v", err)

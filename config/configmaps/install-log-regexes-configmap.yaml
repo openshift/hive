@@ -5,6 +5,12 @@ metadata:
   namespace: hive
 data:
   regexes: |
+    # AWS Specific:
+    - name: AWSNATGatewayLimitExceeded
+      searchRegexStrings:
+      - "NatGatewayLimitExceeded"
+      installFailingReason: AWSNATGatewayLimitExceeded
+      installFailingMessage: AWS NAT gateway limit exceeded
     - name: DNSAlreadyExists
       searchRegexStrings:
       - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"

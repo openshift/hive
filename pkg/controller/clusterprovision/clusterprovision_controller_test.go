@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,6 +66,13 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			expectedStage:         hivev1.ClusterProvisionStageInitializing,
 			expectNoJobReference:  true,
 			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				job := getJob(c)
+
+				require.NotNil(t, job, "expected job")
+				assert.Equal(t, testProvision().Name, job.Labels[constants.ClusterProvisionNameLabel], "incorrect cluster provision name label")
+				assert.Equal(t, constants.JobTypeProvision, job.Labels[constants.JobTypeLabel], "incorrect job type label")
+			},
 		},
 		{
 			name: "job not created when pending create",

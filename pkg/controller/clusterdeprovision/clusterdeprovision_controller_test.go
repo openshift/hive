@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 )
@@ -259,6 +262,10 @@ func validateJobExists(t *testing.T, c client.Client) {
 	if err != nil {
 		t.Errorf("cannot get expected job")
 	}
+
+	require.NotNil(t, job, "expected job")
+	assert.Equal(t, testClusterDeprovision().Name, job.Labels[constants.ClusterDeprovisionNameLabel], "incorrect cluster deprovision name label")
+	assert.Equal(t, constants.JobTypeDeprovision, job.Labels[constants.JobTypeLabel], "incorrect job type label")
 }
 
 func validateNotCompleted(t *testing.T, c client.Client) {

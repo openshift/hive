@@ -122,3 +122,15 @@ func LogLevel(err error) log.Level {
 		err = cause
 	}
 }
+
+// AddLabel sets the specified label on the object. If the label key is already present, then it is over written with the value. If the labels map is nil, a new labels map is created.
+func AddLabel(object metav1.Object, key, value string) {
+	objLabels := object.GetLabels()
+	if objLabels == nil {
+		objLabels = map[string]string{}
+	}
+
+	// Set the new labels in the existing labels.
+	objLabels[key] = value
+	object.SetLabels(objLabels)
+}

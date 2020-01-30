@@ -27,6 +27,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -257,6 +258,9 @@ func TestInstallManager(t *testing.T) {
 					if assert.True(t, ok) {
 						assert.Equal(t, []byte("fakekubeconfig\n"), kubeconfig, "unexpected kubeconfig")
 					}
+
+					assert.Equal(t, testClusterProvision().Name, adminKubeconfig.Labels[constants.ClusterProvisionNameLabel], "incorrect cluster provision name label")
+					assert.Equal(t, constants.SecretTypeKubeConfig, adminKubeconfig.Labels[constants.SecretTypeLabel], "incorrect secret type label")
 				}
 			} else {
 				assert.True(t, apierrors.IsNotFound(err), "unexpected response from getting kubeconfig secret: %v", err)
@@ -279,6 +283,9 @@ func TestInstallManager(t *testing.T) {
 					if assert.True(t, ok) {
 						assert.Equal(t, []byte("fakepassword"), password, "unexpected admin password")
 					}
+
+					assert.Equal(t, testClusterProvision().Name, adminPassword.Labels[constants.ClusterProvisionNameLabel], "incorrect cluster provision name label")
+					assert.Equal(t, constants.SecretTypeKubeAdminCreds, adminPassword.Labels[constants.SecretTypeLabel], "incorrect secret type label")
 				}
 			} else {
 				assert.True(t, apierrors.IsNotFound(err), "unexpected response from getting password secret: %v", err)

@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -198,6 +199,9 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 
 	pLog = pLog.WithField("job", job.Name)
 
+	pLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
+	controllerutils.AddLabel(job, constants.ClusterProvisionNameLabel, instance.Name)
+	controllerutils.AddLabel(job, constants.JobTypeLabel, constants.JobTypeProvision)
 	if err = controllerutil.SetControllerReference(instance, job, r.scheme); err != nil {
 		pLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err

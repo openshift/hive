@@ -29,8 +29,10 @@ import (
 	ingresscontroller "github.com/openshift/api/operator/v1"
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/utils"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -269,6 +271,9 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 	}
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
+	r.logger.WithField("derivedObject", syncSet.Name).Debug("Setting labels on derived object")
+	controllerutils.AddLabel(syncSet, constants.ClusterDeploymentNameLabel, rContext.clusterDeployment.Name)
+	controllerutils.AddLabel(syncSet, constants.SyncSetTypeLabel, constants.SyncSetTypeRemoteIngress)
 	if err := controllerutil.SetControllerReference(rContext.clusterDeployment, syncSet, r.scheme); err != nil {
 		r.logger.WithError(err).Error("error setting owner reference")
 		return err

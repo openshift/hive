@@ -9,6 +9,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
@@ -269,6 +270,9 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 		}
 
 		// ensure the syncset gets cleaned up when the clusterdeployment is deleted
+		r.logger.WithField("derivedObject", ss.Name).Debug("Setting labels on derived object")
+		controllerutils.AddLabel(ss, constants.ClusterDeploymentNameLabel, cd.Name)
+		controllerutils.AddLabel(ss, constants.SyncSetTypeLabel, constants.SyncSetTypeIdentityProvider)
 		if err := controllerutil.SetControllerReference(cd, ss, r.scheme); err != nil {
 			contextLogger.WithError(err).Error("error setting controller reference on syncset")
 			return err

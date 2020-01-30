@@ -24,6 +24,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -69,6 +70,12 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
 				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURL, "default-secret"))
+
+				ss := applied[0].(metav1.Object)
+				labels := ss.GetLabels()
+
+				assert.Equal(t, fakeClusterDeployment().obj().Name, labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.SyncSetTypeControlPlaneCerts, labels[constants.SyncSetTypeLabel], "incorrect syncset type label")
 			},
 		},
 		{

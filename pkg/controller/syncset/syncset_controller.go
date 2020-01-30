@@ -397,7 +397,7 @@ func (r *ReconcileSyncSet) syncSetInstanceForSyncSet(cd *hivev1.ClusterDeploymen
 			Namespace:       cd.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*cdRef},
 			Labels: map[string]string{
-				"SyncSetName": syncSet.Name,
+				hivev1.SyncSetNameLabel: syncSet.Name,
 			},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
@@ -425,7 +425,7 @@ func (r *ReconcileSyncSet) syncSetInstanceForSelectorSyncSet(cd *hivev1.ClusterD
 			Namespace:       cd.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*cdRef},
 			Labels: map[string]string{
-				"SelectorSyncSetName": selectorSyncSet.Name,
+				hivev1.SelectorSyncSetNameLabel: selectorSyncSet.Name,
 			},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{

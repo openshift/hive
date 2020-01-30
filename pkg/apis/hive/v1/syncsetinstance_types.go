@@ -31,6 +31,12 @@ const (
 	// FinalizerSyncSetInstance is used on SyncSetInstances to ensure we remove
 	// resources corresponnding to Sync mode syncset resources.
 	FinalizerSyncSetInstance string = "hive.openshift.io/syncsetinstance"
+
+	// SyncSetNameLabel is the label used to identify the SyncSet of a particular SyncSetInstance
+	SyncSetNameLabel = "hive.openshift.io/sync-set-name"
+
+	// SelectorSyncSetNameLabel is the label used to identify the SyncSet of a particular SelectorSyncSetInstance
+	SelectorSyncSetNameLabel = "hive.openshift.io/selector-sync-set-name"
 )
 
 // SyncSetInstanceSpec defines the desired state of SyncSetInstance

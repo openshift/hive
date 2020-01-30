@@ -301,6 +301,12 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	err = r.deployHiveAPI(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying Hive v1alpha1 aggregated API")
+		return reconcile.Result{}, err
+	}
+
 	if err := r.teardownLegacyExternalDNS(hLog); err != nil {
 		hLog.WithError(err).Error("error tearing down legacy ExternalDNS")
 		return reconcile.Result{}, err

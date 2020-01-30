@@ -5,8 +5,8 @@ export SVC_NAMESPACE="${SVC_NAMESPACE:-hive}"
 export HIVE_IMAGE="${HIVE_IMAGE:-registry.svc.ci.openshift.org/openshift/hivev1:hive}"
 
 oc process --local=true -f "config/apiserver/apiserver.template.yaml" \
-  -p CA_CRT="$(base64 -w0 config/apiserver/certificates/apiserver_ca.crt)" \
-  -p TLS_CRT="$(base64 -w0 config/apiserver/certificates/apiserver.crt)" \
-  -p TLS_KEY="$(base64 -w0 config/apiserver/certificates/apiserver.key)" \
+  -p CA_CRT="$(base64 -w0 hiveapi-certs/apiserver_ca.crt)" \
+  -p TLS_CRT="$(base64 -w0 hiveapi-certs/apiserver.crt)" \
+  -p TLS_KEY="$(base64 -w0 hiveapi-certs/apiserver.key)" \
   -p HIVE_IMAGE="${HIVE_IMAGE}" \
   | oc apply -f -

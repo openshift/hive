@@ -45,6 +45,10 @@ type HiveConfigSpec struct {
 	// will be reapplied.
 	// The default reapply interval is two hours.
 	SyncSetReapplyInterval string `json:"syncSetReapplyInterval,omitempty"`
+
+	// HiveAPIEnabled is a boolean controlling whether or not the Hive operator will start up
+	// the v1alpha1 aggregated API server.
+	HiveAPIEnabled bool `json:"hiveAPIEnabled,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

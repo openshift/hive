@@ -184,8 +184,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	return nil
 }
 
-func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hLog log.FieldLogger) error {
-
+func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger) ([]byte, []byte, error) {
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debug("listing secrets in hive namespace")
@@ -193,7 +192,7 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	err := r.Client.List(context.Background(), secrets, client.InNamespace(constants.HiveNamespace))
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
-		return err
+		return nil, nil, err
 	}
 	var firstSATokenSecret *corev1.Secret
 	hLog.Debugf("found %d secrets", len(secrets.Items))
@@ -204,11 +203,11 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 		}
 	}
 	if firstSATokenSecret == nil {
-		return fmt.Errorf("no %s secrets found", corev1.SecretTypeServiceAccountToken)
+		return nil, nil, fmt.Errorf("no %s secrets found", corev1.SecretTypeServiceAccountToken)
 	}
 	kubeCA, ok := firstSATokenSecret.Data["ca.crt"]
 	if !ok {
-		return fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
+		return nil, nil, fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
 	}
 	hLog.Debugf("found kube CA: %s", string(kubeCA))
 
@@ -218,7 +217,16 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 		hLog.Warnf("secret %s did not contain key service-ca.crt, likely not running on OpenShift, using ca.crt instead", firstSATokenSecret.Name)
 		serviceCA = kubeCA
 	}
+
 	hLog.Debugf("found service CA: %s", string(serviceCA))
+	return serviceCA, kubeCA, nil
+}
+
+func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hLog log.FieldLogger) error {
+	serviceCA, kubeCA, err := r.getCACerts(hLog)
+	if err != nil {
+		return err
+	}
 
 	// Add the service CA to the aggregated API service:
 	apiService.Spec.CABundle = serviceCA

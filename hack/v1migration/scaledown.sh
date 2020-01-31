@@ -2,7 +2,8 @@
 
 set -e
 
-source "$(dirname $0)/verify_scaledown.sh"
+# shellcheck source=verify_scaledown.sh
+source "$(dirname "$0")/verify_scaledown.sh"
 
 scaledown() {
   local deployment_name=${1:?must specify a deployment name}

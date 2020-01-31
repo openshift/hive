@@ -19,7 +19,8 @@ esac
 
 if [[ -z $dry_run ]]
 then
-  source "$(dirname $0)/verify_scaledown.sh"
+  # shellcheck source=verify_scaledown.sh
+  source "$(dirname "$0")/verify_scaledown.sh"
   verify_all_scaled_down
 fi
 

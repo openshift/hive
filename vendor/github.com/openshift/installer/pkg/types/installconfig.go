@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
+	"github.com/openshift/installer/pkg/types/ovirt"
 	"github.com/openshift/installer/pkg/types/vsphere"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -39,7 +40,18 @@ var (
 		baremetal.Name,
 		none.Name,
 		vsphere.Name,
+		ovirt.Name,
 	}
+)
+
+// PublishingStrategy is a strategy for how various endpoints for the cluster are exposed.
+type PublishingStrategy string
+
+const (
+	// ExternalPublishingStrategy exposes endpoints for the cluster to the Internet.
+	ExternalPublishingStrategy PublishingStrategy = "External"
+	// InternalPublishingStrategy exposes the endpoints for the cluster to the private network only.
+	InternalPublishingStrategy PublishingStrategy = "Internal"
 )
 
 // InstallConfig is the configuration for an OpenShift install.
@@ -90,6 +102,14 @@ type InstallConfig struct {
 	// ImageContentSources lists sources/repositories for the release-image content.
 	// +optional
 	ImageContentSources []ImageContentSource `json:"imageContentSources,omitempty"`
+
+	// Publish controls how the user facing endpoints of the cluster like the Kubernetes API, OpenShift routes etc. are exposed.
+	// When no strategy is specified, the strategy is `External`.
+	// +optional
+	Publish PublishingStrategy `json:"publish,omitempty"`
+
+	// FIPS configures https://www.nist.gov/itl/fips-general-information
+	FIPS bool `json:"fips,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
@@ -131,6 +151,10 @@ type Platform struct {
 	// VSphere is the configuration used when installing on vSphere.
 	// +optional
 	VSphere *vsphere.Platform `json:"vsphere,omitempty"`
+
+	// Ovirt is the configuration used when installing on oVirt.
+	// +optional
+	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
 }
 
 // Name returns a string representation of the platform (e.g. "aws" if
@@ -156,6 +180,8 @@ func (p *Platform) Name() string {
 		return openstack.Name
 	case p.VSphere != nil:
 		return vsphere.Name
+	case p.Ovirt != nil:
+		return ovirt.Name
 	default:
 		return ""
 	}
@@ -163,29 +189,36 @@ func (p *Platform) Name() string {
 
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
-	// MachineCIDR is the IP address pool for machines.
-	// +optional
-	// Default is 10.0.0.0/16 for all platforms other than libvirt.
-	// For libvirt, the default is 192.168.126.0/24.
-	MachineCIDR *ipnet.IPNet `json:"machineCIDR,omitempty"`
-
 	// NetworkType is the type of network to install.
 	// +optional
 	// Default is OpenShiftSDN.
 	NetworkType string `json:"networkType,omitempty"`
 
-	// ClusterNetwork is the IP address pool for pods.
+	// MachineNetwork is the list of IP address pools for machines.
+	// This field replaces MachineCIDR, and if set MachineCIDR must
+	// be empty or match the first entry in the list.
+	// +optional
+	// Default is 10.0.0.0/16 for all platforms other than libvirt.
+	// For libvirt, the default is 192.168.126.0/24.
+	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`
+
+	// ClusterNetwork is the list of IP address pools for pods.
 	// +optional
 	// Default is 10.128.0.0/14 and a host prefix of /23.
 	ClusterNetwork []ClusterNetworkEntry `json:"clusterNetwork,omitempty"`
 
-	// ServiceNetwork is the IP address pool for services.
+	// ServiceNetwork is the list of IP address pools for services.
 	// +optional
 	// Default is 172.30.0.0/16.
 	// NOTE: currently only one entry is supported.
 	ServiceNetwork []ipnet.IPNet `json:"serviceNetwork,omitempty"`
 
 	// Deprected types, scheduled to be removed
+
+	// Deprecated name for MachineCIDRs. If set, MachineCIDRs must
+	// be empty or the first index must match.
+	// +optional
+	DeprecatedMachineCIDR *ipnet.IPNet `json:"machineCIDR,omitempty"`
 
 	// Deprecated name for NetworkType
 	// +optional
@@ -198,6 +231,12 @@ type Networking struct {
 	// Deprecated name for ClusterNetwork
 	// +optional
 	DeprecatedClusterNetworks []ClusterNetworkEntry `json:"clusterNetworks,omitempty"`
+}
+
+// MachineNetworkEntry is a single IP address block for node IP blocks.
+type MachineNetworkEntry struct {
+	// CIDR is the IP block address pool for machines within the cluster.
+	CIDR ipnet.IPNet `json:"cidr"`
 }
 
 // ClusterNetworkEntry is a single IP address block for pod IP blocks. IP blocks

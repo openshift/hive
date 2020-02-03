@@ -33,6 +33,7 @@ spec:
           - "/opt/services/hive-apiserver"
         args:
           - "start"
+          - "--v=2"
           - "--logtostderr"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
           - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"

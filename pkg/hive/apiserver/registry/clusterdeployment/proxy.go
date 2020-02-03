@@ -12,6 +12,7 @@ import (
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -50,9 +51,10 @@ var _ rest.Getter = &REST{}
 var _ rest.CreaterUpdater = &REST{}
 var _ rest.GracefulDeleter = &REST{}
 var _ rest.Scoper = &REST{}
+var _ rest.Watcher = &REST{}
 
-func NewREST(hiveClient hivev1client.HiveV1Interface, coreClient corev1client.CoreV1Interface) registry.NoWatchStorage {
-	return registry.WrapNoWatchStorageError(&REST{
+func NewREST(hiveClient hivev1client.HiveV1Interface, coreClient corev1client.CoreV1Interface) registry.Storage {
+	return registry.WrapStorageError(&REST{
 		hiveClient:     hiveClient,
 		coreClient:     coreClient,
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
@@ -302,6 +304,39 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	return new, false, err
 }
 
+func (s *REST) Watch(ctx context.Context, options *metainternal.ListOptions) (watch.Interface, error) {
+	s.logger.Info("watch")
+
+	cdClient, secretClient, machinePoolClient, err := s.getClients(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	optv1 := metav1.ListOptions{}
+	if err := metainternal.Convert_internalversion_ListOptions_To_v1_ListOptions(options, &optv1, nil); err != nil {
+		return nil, err
+	}
+
+	cdWatcher, err := cdClient.Watch(optv1)
+	if err != nil {
+		return nil, err
+	}
+
+	dependentListOptions := metav1.ListOptions{
+		TimeoutSeconds: options.TimeoutSeconds,
+	}
+	secretWatcher, err := secretClient.Watch(dependentListOptions)
+	if err != nil {
+		return nil, err
+	}
+	machinePoolWatcher, err := machinePoolClient.Watch(dependentListOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return newProxyWatcher(s.hiveClient, s.coreClient, cdWatcher, secretWatcher, machinePoolWatcher, s.logger), nil
+}
+
 func (s *REST) getClients(ctx context.Context) (hivev1client.ClusterDeploymentInterface, corev1client.SecretInterface, hivev1client.MachinePoolInterface, error) {
 	namespace, ok := apirequest.NamespaceFrom(ctx)
 	if !ok {
@@ -321,15 +356,19 @@ func getInstallConfig(cd *hivev1.ClusterDeployment, secretClient corev1client.Se
 	if err != nil {
 		return nil, nil
 	}
+	return getInstallConfigFromSecret(installConfigSecret), installConfigSecret
+}
+
+func getInstallConfigFromSecret(installConfigSecret *corev1.Secret) *installtypes.InstallConfig {
 	installConfigData, ok := installConfigSecret.Data[installConfigKey]
 	if !ok {
-		return nil, nil
+		return nil
 	}
 	installConfig := &installtypes.InstallConfig{}
 	if err := yaml.Unmarshal(installConfigData, &installConfig); err != nil {
-		return nil, nil
+		return nil
 	}
-	return installConfig, installConfigSecret
+	return installConfig
 }
 
 func createInstallConfigSecret(installConfig []byte, cdName string, secretClient corev1client.SecretInterface) (*corev1.Secret, error) {

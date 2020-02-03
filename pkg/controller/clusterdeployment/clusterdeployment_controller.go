@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -568,7 +569,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	cdLog.WithField("derivedObject", provision.Name).Debug("Setting label on derived object")
-	controllerutils.AddLabel(provision, constants.ClusterDeploymentNameLabel, cd.Name)
+	provision.Labels = k8slabels.AddLabel(provision.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
 	if err := controllerutil.SetControllerReference(cd, provision, r.scheme); err != nil {
 		cdLog.WithError(err).Error("could not set the owner ref on provision")
 		return reconcile.Result{}, err
@@ -820,8 +821,8 @@ func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdL
 	cdLog.WithField("pvc", pvc.Name).Info("creating persistent volume claim")
 
 	cdLog.WithField("derivedObject", pvc.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(pvc, constants.ClusterDeploymentNameLabel, cd.Name)
-	controllerutils.AddLabel(pvc, constants.PVCTypeLabel, constants.PVCTypeInstallLogs)
+	pvc.Labels = k8slabels.AddLabel(pvc.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+	pvc.Labels = k8slabels.AddLabel(pvc.Labels, constants.PVCTypeLabel, constants.PVCTypeInstallLogs)
 	if err := controllerutil.SetControllerReference(cd, pvc, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting controller reference on pvc")
 		return err
@@ -900,8 +901,8 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
-		controllerutils.AddLabel(job, constants.ClusterDeploymentNameLabel, cd.Name)
-		controllerutils.AddLabel(job, constants.JobTypeLabel, constants.JobTypeImageSet)
+		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+		job.Labels = k8slabels.AddLabel(job.Labels, constants.JobTypeLabel, constants.JobTypeImageSet)
 		if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
 			cdLog.WithError(err).Error("error setting controller reference on job")
 			return nil, err
@@ -1177,7 +1178,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 
 	cdLog.WithField("derivedObject", request.Name).Debug("Setting label on derived object")
-	controllerutils.AddLabel(request, constants.ClusterDeploymentNameLabel, cd.Name)
+	request.Labels = k8slabels.AddLabel(request.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
 	err = controllerutil.SetControllerReference(cd, request, r.scheme)
 	if err != nil {
 		cdLog.Errorf("error setting controller reference on deprovision request: %v", err)
@@ -1370,8 +1371,8 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 	}
 
 	logger.WithField("derivedObject", dnsZone.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(dnsZone, constants.ClusterDeploymentNameLabel, cd.Name)
-	controllerutils.AddLabel(dnsZone, constants.DNSZoneTypeLabel, constants.DNSZoneTypeChild)
+	dnsZone.Labels = k8slabels.AddLabel(dnsZone.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+	dnsZone.Labels = k8slabels.AddLabel(dnsZone.Labels, constants.DNSZoneTypeLabel, constants.DNSZoneTypeChild)
 	if err := controllerutil.SetControllerReference(cd, dnsZone, r.scheme); err != nil {
 		logger.WithError(err).Error("error setting controller reference on dnszone")
 		return err
@@ -1624,8 +1625,8 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 		)
 
 		cdLog.WithField("derivedObject", newPullSecretObj.Name).Debug("Setting labels on derived object")
-		controllerutils.AddLabel(newPullSecretObj, constants.ClusterDeploymentNameLabel, cd.Name)
-		controllerutils.AddLabel(newPullSecretObj, constants.SecretTypeLabel, constants.SecretTypeMergedPullSecret)
+		newPullSecretObj.Labels = k8slabels.AddLabel(newPullSecretObj.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+		newPullSecretObj.Labels = k8slabels.AddLabel(newPullSecretObj.Labels, constants.SecretTypeLabel, constants.SecretTypeMergedPullSecret)
 		err = controllerutil.SetControllerReference(cd, newPullSecretObj, r.scheme)
 		if err != nil {
 			cdLog.Errorf("error setting controller reference on new merged pull secret: %v", err)

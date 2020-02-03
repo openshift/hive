@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -271,8 +272,8 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 
 		// ensure the syncset gets cleaned up when the clusterdeployment is deleted
 		r.logger.WithField("derivedObject", ss.Name).Debug("Setting labels on derived object")
-		controllerutils.AddLabel(ss, constants.ClusterDeploymentNameLabel, cd.Name)
-		controllerutils.AddLabel(ss, constants.SyncSetTypeLabel, constants.SyncSetTypeIdentityProvider)
+		ss.Labels = k8slabels.AddLabel(ss.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+		ss.Labels = k8slabels.AddLabel(ss.Labels, constants.SyncSetTypeLabel, constants.SyncSetTypeIdentityProvider)
 		if err := controllerutil.SetControllerReference(cd, ss, r.scheme); err != nil {
 			contextLogger.WithError(err).Error("error setting controller reference on syncset")
 			return err

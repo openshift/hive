@@ -119,6 +119,11 @@ type Provisioning struct {
 	// +optional
 	SSHPrivateKeySecretRef *corev1.LocalObjectReference `json:"sshPrivateKeySecretRef,omitempty"`
 
+	// SSHKnownHosts are known hosts to be configured in the hive install manager pod to avoid ssh prompts.
+	// Use of ssh in the install pod is somewhat limited today (failure log gathering from cluster, some bare metal
+	// provisioning scenarios), so this setting is often not needed.
+	SSHKnownHosts []string `json:"sshKnownHosts,omitempty"`
+
 	// InstallerEnv are extra environment variables to pass through to the installer. This may be used to enable
 	// additional features of the installer.
 	// +optional

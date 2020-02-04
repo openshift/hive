@@ -77,7 +77,7 @@ const (
 	defaultInstallConfigMountPath       = "/installconfig/install-config.yaml"
 	defaultPullSecretMountPath          = "/pullsecret/" + corev1.DockerConfigJsonKey
 	defaultManifestsMountPath           = "/manifests"
-	hiveSSHKnownHostsAnnotation         = "hive.openshift.io/ssh-known-host"
+	defaultHomeDir                      = "/home/hive" // Used if no HOME env var set.
 )
 
 var (
@@ -269,8 +269,13 @@ func (m *InstallManager) Run() error {
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
 
-	if knownHost, ok := cd.Annotations[hiveSSHKnownHostsAnnotation]; ok {
-		err = m.setupSSHKnownHost(knownHost)
+	if cd.Spec.Provisioning != nil && len(cd.Spec.Provisioning.SSHKnownHosts) > 0 {
+		err = m.setupSSHUser()
+		if err != nil {
+			m.log.WithError(err).Error("error setting up SSH known_hosts")
+			return err
+		}
+		err = m.writeSSHKnownHosts(getHomeDir(), cd.Spec.Provisioning.SSHKnownHosts)
 		if err != nil {
 			m.log.WithError(err).Error("error setting up SSH known_hosts")
 			return err
@@ -1171,11 +1176,10 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 	return errors.Wrap(err, "ClusterProvision did not transition to provisioning stage")
 }
 
-func (m *InstallManager) setupSSHKnownHost(knownHost string) error {
+func (m *InstallManager) setupSSHUser() error {
 
 	// Add our potentially random UID to /etc/passwd so ssh works. Need to shell out here as
 	// the go libraries for user info appear to rely on /etc/passwd, which our user is not in.
-	// TODO: temporary work so we can use libvirt over ssh, this whole function can go once we're no longer doing that.
 	out, err := exec.Command("id", "-u").Output()
 	if err != nil {
 		m.log.WithError(err).Error("error running id -u")
@@ -1190,23 +1194,27 @@ func (m *InstallManager) setupSSHKnownHost(knownHost string) error {
 		return err
 	}
 	defer f.Close()
-	passwdLine := fmt.Sprintf("default:x:%s:0:default user:/home/hive:/sbin/nologin\n", uid)
+	passwdLine := fmt.Sprintf("default:x:%s:0:default user:%s:/sbin/nologin\n", uid, getHomeDir())
 	m.log.Infof("Wrote passwd line: %s", passwdLine)
 	if _, err := f.WriteString(passwdLine); err != nil {
 		m.log.WithError(err).Error("error writing to /etc/passwd")
 		return err
 	}
+	return nil
+}
 
-	sshDir := "/home/hive/.ssh"
+func (m *InstallManager) writeSSHKnownHosts(homeDir string, knownHosts []string) error {
+	sshDir := filepath.Join(homeDir, ".ssh")
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		m.log.WithError(err).Errorf("error creating %s directory", sshDir)
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte(knownHost), 0644); err != nil {
+	allKnownHosts := strings.Join(knownHosts, "\n")
+	if err := ioutil.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte(allKnownHosts), 0644); err != nil {
 		m.log.WithError(err).Error("error writing ssh known_hosts")
 		return err
 	}
-	m.log.Infof("Wrote known host to %s/known_hosts: %s", sshDir, knownHost)
+	m.log.WithField("knownHosts", knownHosts).Infof("Wrote known hosts to %s/known_hosts", sshDir)
 	return nil
 }
 
@@ -1267,4 +1275,12 @@ func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {
 	}
 	icRaw["pullSecret"] = string(pullSecretData)
 	return yaml.Marshal(icRaw)
+}
+
+func getHomeDir() string {
+	home := os.Getenv("HOME")
+	if home != "" {
+		return home
+	}
+	return defaultHomeDir
 }

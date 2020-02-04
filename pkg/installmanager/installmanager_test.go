@@ -3,6 +3,7 @@ package installmanager
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"path"
@@ -339,6 +340,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Name:      testDeploymentName,
 			Namespace: testNamespace,
 		},
+		Spec: hivev1.ClusterDeploymentSpec{
+			Provisioning: &hivev1.Provisioning{},
+		},
 	}
 }
 
@@ -644,6 +648,53 @@ func TestInstallManagerSSH(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+func TestInstallManagerSSHKnownHosts(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name         string
+		knownHosts   []string
+		expectedFile string
+	}{
+		{
+			name: "single ssh known host",
+			knownHosts: []string{
+				"192.168.86.100 ecdsa-sha2-nistp256 FOOBAR",
+			},
+			expectedFile: `192.168.86.100 ecdsa-sha2-nistp256 FOOBAR`,
+		},
+		{
+			name: "multiple ssh known hosts",
+			knownHosts: []string{
+				"192.168.86.100 ecdsa-sha2-nistp256 FOOBAR",
+				"192.168.86.101 ecdsa-sha2-nistp256 FOOBAR2",
+				"192.168.86.102 ecdsa-sha2-nistp256 FOOBAR3",
+			},
+			expectedFile: `192.168.86.100 ecdsa-sha2-nistp256 FOOBAR
+192.168.86.101 ecdsa-sha2-nistp256 FOOBAR2
+192.168.86.102 ecdsa-sha2-nistp256 FOOBAR3`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tempDir, err := ioutil.TempDir("", "installmanagersshknownhosts")
+			require.NoError(t, err, "error creating test tempdir")
+			defer os.RemoveAll(tempDir)
+
+			im := InstallManager{
+				log: log.WithField("test", test.name),
+			}
+			err = im.writeSSHKnownHosts(tempDir, test.knownHosts)
+			require.NoError(t, err, "error writing ssh known hosts ")
+
+			content, err := ioutil.ReadFile(filepath.Join(tempDir, ".ssh", "known_hosts"))
+			require.NoError(t, err, "error reading expected ssh known_hosts file")
+
+			assert.Equal(t, test.expectedFile, string(content), "unexpected known_hosts file contents")
 		})
 	}
 }

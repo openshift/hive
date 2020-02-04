@@ -287,6 +287,15 @@ spec:
                     way to specify what specific version of OpenShift you wish to
                     install.
                   type: string
+                sshKnownHosts:
+                  description: SSHKnownHosts are known hosts to be configured in the
+                    hive install manager pod to avoid ssh prompts. Use of ssh in the
+                    install pod is somewhat limited today (failure log gathering from
+                    cluster, some bare metal provisioning scenarios), so this setting
+                    is often not needed.
+                  items:
+                    type: string
+                  type: array
                 sshPrivateKeySecretRef:
                   description: SSHPrivateKeySecretRef is the reference to the secret
                     that contains the private SSH key to use for access to compute

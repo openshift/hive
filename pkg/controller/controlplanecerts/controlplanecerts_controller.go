@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -323,8 +324,8 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
 	cdLog.WithField("derivedObject", syncSet.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(syncSet, constants.ClusterDeploymentNameLabel, cd.Name)
-	controllerutils.AddLabel(syncSet, constants.SyncSetTypeLabel, constants.SyncSetTypeControlPlaneCerts)
+	syncSet.Labels = k8slabels.AddLabel(syncSet.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+	syncSet.Labels = k8slabels.AddLabel(syncSet.Labels, constants.SyncSetTypeLabel, constants.SyncSetTypeControlPlaneCerts)
 	if err := controllerutil.SetControllerReference(cd, syncSet, r.scheme); err != nil {
 		cdLog.WithError(err).Error("error setting owner reference")
 		return nil, err

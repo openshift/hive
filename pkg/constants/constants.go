@@ -36,6 +36,12 @@ const (
 	// ClusterProvisionNameLabel is the label that is used to identify a relationship to a given cluster provision object.
 	ClusterProvisionNameLabel = "hive.openshift.io/cluster-provision-name"
 
+	// SyncSetNameLabel is the label that is used to identify a relationship to a given syncset object.
+	SyncSetNameLabel = "hive.openshift.io/syncset-name"
+
+	// SelectorSyncSetNameLabel is the label that is used to identify a relationship to a given selector syncset object.
+	SelectorSyncSetNameLabel = "hive.openshift.io/selector-syncset-name"
+
 	// PVCTypeLabel is the label that is used to identify what a PVC is being used for.
 	PVCTypeLabel = "hive.openshift.io/pvc-type"
 

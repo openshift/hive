@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -146,7 +147,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		st.Namespace = cd.Namespace
 
 		logger.WithField("derivedObject", st.Name).Debug("Setting label on derived object")
-		controllerutils.AddLabel(st, constants.ClusterDeploymentNameLabel, cd.Name)
+		st.Labels = k8slabels.AddLabel(st.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
 		if err = controllerutil.SetControllerReference(cd, st, r.scheme); err != nil {
 			logger.WithError(err).Error("error setting controller reference on cluster state")
 			return reconcile.Result{}, err

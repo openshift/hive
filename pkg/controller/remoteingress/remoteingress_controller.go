@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -32,7 +33,6 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/utils"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -272,8 +272,8 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
 	r.logger.WithField("derivedObject", syncSet.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(syncSet, constants.ClusterDeploymentNameLabel, rContext.clusterDeployment.Name)
-	controllerutils.AddLabel(syncSet, constants.SyncSetTypeLabel, constants.SyncSetTypeRemoteIngress)
+	syncSet.Labels = k8slabels.AddLabel(syncSet.Labels, constants.ClusterDeploymentNameLabel, rContext.clusterDeployment.Name)
+	syncSet.Labels = k8slabels.AddLabel(syncSet.Labels, constants.SyncSetTypeLabel, constants.SyncSetTypeRemoteIngress)
 	if err := controllerutil.SetControllerReference(rContext.clusterDeployment, syncSet, r.scheme); err != nil {
 		r.logger.WithError(err).Error("error setting owner reference")
 		return err

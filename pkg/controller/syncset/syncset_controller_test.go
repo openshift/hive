@@ -19,6 +19,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -168,7 +169,8 @@ func validateExpected(t *testing.T, c client.Client, expected []*hivev1.SyncSetI
 func containsMatchingInstance(instance hivev1.SyncSetInstance, list []hivev1.SyncSetInstance) bool {
 	for _, i := range list {
 		if instance.Name == i.Name {
-			if reflect.DeepEqual(instance.Spec, i.Spec) {
+			if reflect.DeepEqual(instance.Spec, i.Spec) &&
+				reflect.DeepEqual(instance.Labels, i.Labels) {
 				return true
 			}
 		}
@@ -250,6 +252,10 @@ func testSyncSetInstanceForSyncSet(name string, applyMode ...hivev1.SyncSetResou
 			Namespace: testNamespace,
 			Name: syncSetInstanceNameForSyncSet(
 				testClusterDeployment(), testMatchingSyncSet(name)),
+			Labels: map[string]string{
+				constants.SyncSetNameLabel:           name,
+				constants.ClusterDeploymentNameLabel: testName,
+			},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{
@@ -270,6 +276,10 @@ func testSyncSetInstanceForSelectorSyncSet(name string, applyMode ...hivev1.Sync
 			Namespace: testNamespace,
 			Name: syncSetInstanceNameForSelectorSyncSet(
 				testClusterDeployment(), testMatchingSelectorSyncSet(name)),
+			Labels: map[string]string{
+				constants.SelectorSyncSetNameLabel:   name,
+				constants.ClusterDeploymentNameLabel: testName,
+			},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{

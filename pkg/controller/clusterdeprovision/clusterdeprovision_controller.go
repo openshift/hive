@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -172,8 +173,8 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 
 	rLog.Debug("setting uninstall job controller reference")
 	rLog.WithField("derivedObject", uninstallJob.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(uninstallJob, constants.ClusterDeprovisionNameLabel, instance.Name)
-	controllerutils.AddLabel(uninstallJob, constants.JobTypeLabel, constants.JobTypeDeprovision)
+	uninstallJob.Labels = k8slabels.AddLabel(uninstallJob.Labels, constants.ClusterDeprovisionNameLabel, instance.Name)
+	uninstallJob.Labels = k8slabels.AddLabel(uninstallJob.Labels, constants.JobTypeLabel, constants.JobTypeDeprovision)
 	err = controllerutil.SetControllerReference(instance, uninstallJob, r.scheme)
 	if err != nil {
 		rLog.Errorf("error setting controller reference on job: %v", err)

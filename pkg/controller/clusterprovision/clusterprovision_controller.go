@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -200,8 +201,8 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 	pLog = pLog.WithField("job", job.Name)
 
 	pLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(job, constants.ClusterProvisionNameLabel, instance.Name)
-	controllerutils.AddLabel(job, constants.JobTypeLabel, constants.JobTypeProvision)
+	job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterProvisionNameLabel, instance.Name)
+	job.Labels = k8slabels.AddLabel(job.Labels, constants.JobTypeLabel, constants.JobTypeProvision)
 	if err = controllerutil.SetControllerReference(instance, job, r.scheme); err != nil {
 		pLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err

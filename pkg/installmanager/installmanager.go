@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/hive/pkg/gcpclient"
 	"io"
 	"io/ioutil"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/openshift/hive/pkg/gcpclient"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/client-go/kubernetes/scheme"
@@ -990,8 +992,8 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 	}
 
 	m.log.WithField("derivedObject", kubeconfigSecret.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(kubeconfigSecret, constants.ClusterProvisionNameLabel, provision.Name)
-	controllerutils.AddLabel(kubeconfigSecret, constants.SecretTypeLabel, constants.SecretTypeKubeConfig)
+	kubeconfigSecret.Labels = k8slabels.AddLabel(kubeconfigSecret.Labels, constants.ClusterProvisionNameLabel, provision.Name)
+	kubeconfigSecret.Labels = k8slabels.AddLabel(kubeconfigSecret.Labels, constants.SecretTypeLabel, constants.SecretTypeKubeConfig)
 	if err := controllerutil.SetControllerReference(provision, kubeconfigSecret, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return nil, err
@@ -1034,8 +1036,8 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) 
 	}
 
 	m.log.WithField("derivedObject", s.Name).Debug("Setting labels on derived object")
-	controllerutils.AddLabel(s, constants.ClusterProvisionNameLabel, provision.Name)
-	controllerutils.AddLabel(s, constants.SecretTypeLabel, constants.SecretTypeKubeAdminCreds)
+	s.Labels = k8slabels.AddLabel(s.Labels, constants.ClusterProvisionNameLabel, provision.Name)
+	s.Labels = k8slabels.AddLabel(s.Labels, constants.SecretTypeLabel, constants.SecretTypeKubeAdminCreds)
 	if err := controllerutil.SetControllerReference(provision, s, scheme.Scheme); err != nil {
 		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
 		return nil, err

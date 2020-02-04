@@ -1894,7 +1894,7 @@
   revision = "07b8972065522ba66df16032247530e1dbaca011"
 
 [[projects]]
-  digest = "1:22f181aee3676cbbac6d97dce8105e60e1bd83a4803c8fc0a6117f60dbe028ca"
+  digest = "1:8ddafc655921cecc57b70d1d747e1b5f65928061d4ed17df85a57f62076c79f5"
   name = "k8s.io/kubernetes"
   packages = [
     "pkg/api/legacyscheme",
@@ -1949,6 +1949,7 @@
     "pkg/printers/storage",
     "pkg/security/apparmor",
     "pkg/util/interrupt",
+    "pkg/util/labels",
     "pkg/util/parsers",
     "pkg/util/reflector/prometheus",
     "pkg/util/workqueue/prometheus",
@@ -2159,6 +2160,7 @@
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/require",
     "github.com/stretchr/testify/suite",
     "golang.org/x/net/context",
     "golang.org/x/oauth2/google",
@@ -2264,6 +2266,7 @@
     "k8s.io/kubernetes/pkg/kubelet/types",
     "k8s.io/kubernetes/pkg/printers",
     "k8s.io/kubernetes/pkg/printers/storage",
+    "k8s.io/kubernetes/pkg/util/labels",
     "k8s.io/kubernetes/pkg/util/reflector/prometheus",
     "k8s.io/kubernetes/pkg/util/workqueue/prometheus",
     "k8s.io/utils/pointer",

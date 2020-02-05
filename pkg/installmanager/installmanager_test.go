@@ -619,7 +619,7 @@ func TestInstallManagerSSH(t *testing.T) {
 				t.Fatalf("error setting PATH (for fake binaries): %v", err)
 			}
 
-			cleanup, err := im.initSSHAgent(sshKeyFile)
+			cleanup, err := im.initSSHAgent([]string{sshKeyFile})
 
 			// restore PATH
 			if err := os.Setenv("PATH", origPathEnv); err != nil {

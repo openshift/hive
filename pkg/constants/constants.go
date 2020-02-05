@@ -110,6 +110,14 @@ const (
 
 	// GCPCredentialsName is the name of the GCP credentials file or secret key.
 	GCPCredentialsName = "osServiceAccount.json"
+
+	// SSHPrivKeyPathEnvVar is the environment variable Hive will set for the installmanager pod to point to the
+	// path where we mount in the SSH key to be configured on the cluster hosts.
+	SSHPrivKeyPathEnvVar = "SSH_PRIV_KEY_PATH"
+
+	// LibvirtSSHPrivKeyPathEnvVar is the environment variable Hive will set for the installmanager pod to point to the
+	// path where we mount in the SSH key for connecting to the bare metal libvirt provisioning host.
+	LibvirtSSHPrivKeyPathEnvVar = "LIBVIRT_SSH_PRIV_KEY_PATH"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -44,7 +44,7 @@ const (
 
 	// while the IngressController objects live in openshift-ingress-operator
 	// the secrets that the ingressControllers refer to must live in openshift-ingress
-	remoteIngressConrollerSecretsNamespace = "openshift-ingress"
+	remoteIngressControllerSecretsNamespace = "openshift-ingress"
 
 	ingressCertificateNotFoundReason = "IngressCertificateNotFound"
 	ingressCertificateFoundReason    = "IngressCertificateFound"
@@ -228,7 +228,7 @@ func secretMappingsFromClusterDeployment(rContext *reconcileContext) []hivev1.Se
 				Name:      cbSecret.Name,
 			},
 			TargetRef: hivev1.SecretReference{
-				Namespace: remoteIngressConrollerSecretsNamespace,
+				Namespace: remoteIngressControllerSecretsNamespace,
 				Name:      remoteSecretNameForCertificateBundleSecret(cbSecret.Name, rContext.clusterDeployment),
 			},
 		}

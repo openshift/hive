@@ -120,16 +120,17 @@ func (pw *proxyWatcher) processEvent(sourceEvent watch.Event) error {
 	eventType := watch.Modified
 	var v1ClusterDeployment *hivev1.ClusterDeployment
 	var installConfig *installtypes.InstallConfig
+	var installConfigResourceVersion string
 	var err error
 
 	switch t := sourceEvent.Object.(type) {
 	case *hivev1.ClusterDeployment:
 		eventType = sourceEvent.Type
-		v1ClusterDeployment, installConfig, err = pw.objectsForClusterDeploymentEvent(t)
+		v1ClusterDeployment, installConfig, installConfigResourceVersion, err = pw.objectsForClusterDeploymentEvent(t)
 	case *corev1.Secret:
-		v1ClusterDeployment, installConfig, err = pw.objectsForSecretEvent(t)
+		v1ClusterDeployment, installConfig, installConfigResourceVersion, err = pw.objectsForSecretEvent(t)
 	case *hivev1.MachinePool:
-		v1ClusterDeployment, installConfig, err = pw.objectsForMachinePoolEvent(t)
+		v1ClusterDeployment, installConfig, installConfigResourceVersion, err = pw.objectsForMachinePoolEvent(t)
 	default:
 		pw.logger.WithField("type", reflect.TypeOf(t)).Error("unknown event object type")
 		return errors.Errorf("unknown event object type: %T", t)
@@ -151,7 +152,7 @@ func (pw *proxyWatcher) processEvent(sourceEvent watch.Event) error {
 	}
 
 	v1alpha1ClusterDeploymnet := &hiveapi.ClusterDeployment{}
-	if err := util.ClusterDeploymentFromHiveV1(v1ClusterDeployment, installConfig, machinePools, v1alpha1ClusterDeploymnet); err != nil {
+	if err := util.ClusterDeploymentFromHiveV1(v1ClusterDeployment, installConfig, machinePools, installConfigResourceVersion, v1alpha1ClusterDeploymnet); err != nil {
 		pw.logger.WithField("namespace", v1ClusterDeployment.Namespace).WithField("name", v1ClusterDeployment.Name).WithError(err).Error("could not convert clusterdeployment from v1")
 		return errors.Wrap(err, "could not convert clusterdeployment from v1")
 	}
@@ -164,43 +165,70 @@ func (pw *proxyWatcher) processEvent(sourceEvent watch.Event) error {
 	return nil
 }
 
-func (pw *proxyWatcher) objectsForClusterDeploymentEvent(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeployment, *installtypes.InstallConfig, error) {
-	installConfig, _ := getInstallConfig(cd, pw.coreClient.Secrets(cd.Namespace))
-	return cd, installConfig, nil
+func (pw *proxyWatcher) objectsForClusterDeploymentEvent(in *hivev1.ClusterDeployment) (
+	cd *hivev1.ClusterDeployment,
+	installConfig *installtypes.InstallConfig,
+	installConfigResourceVersion string,
+	returnErr error,
+) {
+	cd = in
+	var installConfigSecret *corev1.Secret
+	installConfig, installConfigSecret = getInstallConfig(cd, pw.coreClient.Secrets(cd.Namespace))
+	if installConfigSecret != nil {
+		installConfigResourceVersion = installConfigSecret.ResourceVersion
+	}
+	return
 }
 
-func (pw *proxyWatcher) objectsForSecretEvent(secret *corev1.Secret) (*hivev1.ClusterDeployment, *installtypes.InstallConfig, error) {
-	installConfig := getInstallConfigFromSecret(secret)
+func (pw *proxyWatcher) objectsForSecretEvent(secret *corev1.Secret) (
+	cd *hivev1.ClusterDeployment,
+	installConfig *installtypes.InstallConfig,
+	installConfigResourceVersion string,
+	returnErr error,
+) {
+	installConfig = getInstallConfigFromSecret(secret)
 	if installConfig == nil {
 		pw.logger.WithField("namespace", secret.Namespace).WithField("name", secret.Name).Debug("secret is not an installconfig for a clusterdeployment")
-		return nil, nil, nil
+		return
 	}
+	installConfigResourceVersion = secret.ResourceVersion
 	clusterDeployments, err := pw.hiveClient.ClusterDeployments(secret.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		pw.logger.WithField("namespace", secret.Namespace).WithField("name", secret.Name).WithError(err).Error("could not get clusterdeployment for installconfig")
-		return nil, nil, errors.Wrap(err, "could not get clusterdeployment for installconfig")
+		returnErr = errors.Wrap(err, "could not get clusterdeployment for installconfig")
+		return
 	}
-	for i, cd := range clusterDeployments.Items {
-		if prov := cd.Spec.Provisioning; prov != nil {
+	for i, clusterDeployment := range clusterDeployments.Items {
+		if prov := clusterDeployment.Spec.Provisioning; prov != nil {
 			if prov.InstallConfigSecretRef.Name == secret.Name {
-				return &clusterDeployments.Items[i], installConfig, nil
+				cd = &clusterDeployments.Items[i]
+				return
 			}
 		}
 	}
 	pw.logger.WithField("namespace", secret.Namespace).WithField("name", secret.Name).Debug("no clusterdeployment found referencing installconfig secret")
-	return nil, nil, nil
+	return
 }
 
-func (pw *proxyWatcher) objectsForMachinePoolEvent(machinePool *hivev1.MachinePool) (*hivev1.ClusterDeployment, *installtypes.InstallConfig, error) {
+func (pw *proxyWatcher) objectsForMachinePoolEvent(machinePool *hivev1.MachinePool) (
+	cd *hivev1.ClusterDeployment,
+	installConfig *installtypes.InstallConfig,
+	installConfigResourceVersion string,
+	returnErr error,
+) {
 	cd, err := pw.hiveClient.ClusterDeployments(machinePool.Namespace).Get(machinePool.Spec.ClusterDeploymentRef.Name, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
 		pw.logger.WithField("namespace", machinePool.Namespace).WithField("name", machinePool.Name).Debug("no clusterdeployment found for machinepool")
-		return nil, nil, nil
+		return
 	case err != nil:
 		pw.logger.WithField("namespace", machinePool.Namespace).WithField("name", machinePool.Name).WithError(err).Error("could not get clusterdeployment for machinepool")
-		return nil, nil, errors.Wrap(err, "could not get clusterdeployment for machinepool")
+		returnErr = errors.Wrap(err, "could not get clusterdeployment for machinepool")
+		return
 	}
-	installConfig, _ := getInstallConfig(cd, pw.coreClient.Secrets(cd.Namespace))
-	return cd, installConfig, nil
+	installConfig, installConfigSecret := getInstallConfig(cd, pw.coreClient.Secrets(cd.Namespace))
+	if installConfigSecret != nil {
+		installConfigResourceVersion = installConfigSecret.ResourceVersion
+	}
+	return
 }

@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"strings"
 
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
 	"github.com/openshift/installer/pkg/ipnet"
@@ -35,9 +36,15 @@ func CheckpointFromHiveV1(in *hivev1.Checkpoint, out *hiveapi.Checkpoint) error 
 func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, machinePools *[]*hivev1.MachinePool) error {
 	in = in.DeepCopy()
 
+	// Preserve the resource version since the v1alpha1 resource version is an amalgamation of resource versions from
+	// multiple resources.
+	outResourceVersion := out.ResourceVersion
+
 	if err := hiveconversion.Convert_v1alpha1_ClusterDeployment_To_v1_ClusterDeployment(in, out, nil); err != nil {
 		return err
 	}
+
+	out.ResourceVersion = outResourceVersion
 
 	installConfig.ObjectMeta.Name = in.Spec.ClusterName
 	installConfig.TypeMeta.APIVersion = installtypes.InstallConfigVersion
@@ -157,12 +164,20 @@ func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out
 }
 
 // ClusterDeploymentFromHiveV1 turns a v1 ClusterDeployment into a v1alpha1 ClusterDeployment.
-func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, machinePools []*hivev1.MachinePool, out *hiveapi.ClusterDeployment) error {
+func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *installtypes.InstallConfig, machinePools []*hivev1.MachinePool, installConfigResourceVersion string, out *hiveapi.ClusterDeployment) error {
 	in = in.DeepCopy()
 
 	if err := hiveconversion.Convert_v1_ClusterDeployment_To_v1alpha1_ClusterDeployment(in, out, nil); err != nil {
 		return err
 	}
+
+	resourceVersions := make([]string, 2+len(machinePools))
+	resourceVersions[0] = in.ResourceVersion
+	resourceVersions[1] = installConfigResourceVersion
+	for i, pool := range machinePools {
+		resourceVersions[i+2] = pool.ResourceVersion
+	}
+	out.ResourceVersion = strings.Join(resourceVersions, "-")
 
 	if installConfig != nil {
 		if networking := installConfig.Networking; networking != nil {

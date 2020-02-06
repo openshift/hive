@@ -5,7 +5,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -97,12 +100,16 @@ func (s *REST) List(ctx context.Context, options *metainternal.ListOptions) (run
 		Items:    make([]hiveapi.ClusterDeployment, len(clusterDeployments.Items)),
 	}
 	for i, curr := range clusterDeployments.Items {
-		installConfig, _ := getInstallConfig(&curr, s.coreClient.Secrets(curr.Namespace))
+		installConfig, installConfigSecret := getInstallConfig(&curr, s.coreClient.Secrets(curr.Namespace))
+		installConfigResourceVersion := ""
+		if installConfigSecret != nil {
+			installConfigResourceVersion = installConfigSecret.ResourceVersion
+		}
 		machinePools, err := getMachinePools(curr.Name, s.hiveClient.MachinePools(curr.Namespace))
 		if err != nil {
 			return nil, err
 		}
-		if err := util.ClusterDeploymentFromHiveV1(&curr, installConfig, machinePools, &ret.Items[i]); err != nil {
+		if err := util.ClusterDeploymentFromHiveV1(&curr, installConfig, machinePools, installConfigResourceVersion, &ret.Items[i]); err != nil {
 			return nil, err
 		}
 	}
@@ -122,14 +129,18 @@ func (s *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 		return nil, err
 	}
 
-	installConfig, _ := getInstallConfig(ret, secretClient)
+	installConfig, installConfigSecret := getInstallConfig(ret, secretClient)
+	installConfigResourceVersion := ""
+	if installConfigSecret != nil {
+		installConfigResourceVersion = installConfigSecret.ResourceVersion
+	}
 	machinePools, err := getMachinePools(ret.Name, machinePoolClient)
 	if err != nil {
 		return nil, err
 	}
 
 	clusterDeployment := &hiveapi.ClusterDeployment{}
-	if err := util.ClusterDeploymentFromHiveV1(ret, installConfig, machinePools, clusterDeployment); err != nil {
+	if err := util.ClusterDeploymentFromHiveV1(ret, installConfig, machinePools, installConfigResourceVersion, clusterDeployment); err != nil {
 		return nil, err
 	}
 	return clusterDeployment, nil
@@ -141,6 +152,14 @@ func (s *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 	cdClient, _, _, err := s.getClients(ctx)
 	if err != nil {
 		return nil, false, err
+	}
+
+	if options.Preconditions != nil && options.Preconditions.ResourceVersion != nil {
+		v1ResourceVersion, _, _, err := getV1ResourceVersions(*options.Preconditions.ResourceVersion)
+		if err != nil {
+			return nil, false, apierrors.NewConflict(hiveapi.Resource("clusterdeployments"), name, err)
+		}
+		options.Preconditions.ResourceVersion = &v1ResourceVersion
 	}
 
 	if err := cdClient.Delete(name, options); err != nil {
@@ -167,9 +186,8 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 	if err != nil {
 		return nil, err
 	}
-	oldMachinePools := make([]*hivev1.MachinePool, len(machinePools))
-	for i, p := range machinePools {
-		oldMachinePools[i] = p.DeepCopy()
+	if len(machinePools) > 0 {
+		return nil, errors.New("existing machine pools referencing clusterdeployment")
 	}
 
 	convertedObj := &hivev1.ClusterDeployment{}
@@ -207,13 +225,13 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 		cdClient.Delete(convertedObj.Name, &metav1.DeleteOptions{})
 	}()
 
-	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, ret, machinePoolClient, logger)
+	machinePools, err = reconcileMachinePools(nil, machinePools, nil, ret, machinePoolClient, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	clusterDeployment := &hiveapi.ClusterDeployment{}
-	if err := util.ClusterDeploymentFromHiveV1(ret, installConfig, machinePools, clusterDeployment); err != nil {
+	if err := util.ClusterDeploymentFromHiveV1(ret, installConfig, machinePools, installConfigSecret.ResourceVersion, clusterDeployment); err != nil {
 		return nil, err
 	}
 	return clusterDeployment, nil
@@ -238,6 +256,10 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	origClusterDeployment.Status = hivev1.ClusterDeploymentStatus{}
 
 	installConfig, installConfigSecret := getInstallConfig(clusterDeployment, secretClient)
+	if installConfig == nil {
+		return nil, false, errors.New("cannot update clusterdeployment when there is no installconfig secret")
+	}
+
 	machinePools, err := getMachinePools(name, machinePoolClient)
 	if err != nil {
 		return nil, false, err
@@ -248,7 +270,7 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	}
 
 	old := &hiveapi.ClusterDeployment{}
-	if err := util.ClusterDeploymentFromHiveV1(clusterDeployment, installConfig, machinePools, old); err != nil {
+	if err := util.ClusterDeploymentFromHiveV1(clusterDeployment, installConfig, machinePools, installConfigSecret.ResourceVersion, old); err != nil {
 		return nil, false, err
 	}
 
@@ -259,18 +281,29 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 
 	newClusterDeployment := obj.(*hiveapi.ClusterDeployment)
 
+	cdResourceVersion, installConfigResourceVersion, machinePoolsResourceVersions, err := getV1ResourceVersions(newClusterDeployment.ResourceVersion)
+	if err != nil {
+		return nil, false, apierrors.NewConflict(hiveapi.Resource("clusterdeployments"), name, err)
+	}
+
+	if len(oldMachinePools) != len(machinePoolsResourceVersions) {
+		return nil, false, apierrors.NewConflict(hiveapi.Resource("clusterdeployments"), name, errors.New("machinepools are out of date"))
+	}
+
 	sshKey := getSSHKey(newClusterDeployment, secretClient)
 
 	if err := util.ClusterDeploymentToHiveV1(newClusterDeployment, sshKey, clusterDeployment, installConfig, &machinePools); err != nil {
 		return nil, false, err
 	}
+	newClusterDeployment.ResourceVersion = cdResourceVersion
 
-	_, err = updateInstallConfigSecret(installConfig, installConfigSecret, clusterDeployment, secretClient)
+	installConfigSecret, err = updateInstallConfigSecret(installConfig, installConfigSecret, clusterDeployment, secretClient)
 	if err != nil {
 		return nil, false, err
 	}
+	installConfigSecret.ResourceVersion = installConfigResourceVersion
 
-	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, clusterDeployment, machinePoolClient, logger)
+	machinePools, err = reconcileMachinePools(oldMachinePools, machinePools, machinePoolsResourceVersions, clusterDeployment, machinePoolClient, logger)
 	if err != nil {
 		return nil, false, err
 	}
@@ -298,7 +331,7 @@ func (s *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	}
 
 	new := &hiveapi.ClusterDeployment{}
-	if err := util.ClusterDeploymentFromHiveV1(clusterDeployment, installConfig, machinePools, new); err != nil {
+	if err := util.ClusterDeploymentFromHiveV1(clusterDeployment, installConfig, machinePools, installConfigSecret.ResourceVersion, new); err != nil {
 		return nil, false, err
 	}
 	return new, false, err
@@ -417,17 +450,29 @@ func getMachinePools(cdName string, machinePoolClient hivev1client.MachinePoolIn
 		}
 		pools = append(pools, &poolsList.Items[i])
 	}
+	sort.Slice(pools, func(i, j int) bool {
+		return pools[i].Name < pools[j].Name
+	})
 	return pools, nil
 }
 
-func reconcileMachinePools(oldMachinePools []*hivev1.MachinePool, machinePools []*hivev1.MachinePool, cd *hivev1.ClusterDeployment, machinePoolClient hivev1client.MachinePoolInterface, logger log.FieldLogger) ([]*hivev1.MachinePool, error) {
+func reconcileMachinePools(
+	oldMachinePools []*hivev1.MachinePool,
+	machinePools []*hivev1.MachinePool,
+	machinePoolsResourceVersions []string,
+	cd *hivev1.ClusterDeployment,
+	machinePoolClient hivev1client.MachinePoolInterface,
+	logger log.FieldLogger,
+) ([]*hivev1.MachinePool, error) {
 	for i, p := range machinePools {
 		addOwnerRef(cd, p)
 		existing := false
-		for _, oldP := range oldMachinePools {
+		for j, oldP := range oldMachinePools {
 			if p.Name != oldP.Name {
 				continue
 			}
+
+			p.ResourceVersion = machinePoolsResourceVersions[j]
 
 			newStatus := p.Status
 			p.Status = hivev1.MachinePoolStatus{}
@@ -465,7 +510,7 @@ func reconcileMachinePools(oldMachinePools []*hivev1.MachinePool, machinePools [
 			}
 		}
 	}
-	for _, oldP := range oldMachinePools {
+	for i, oldP := range oldMachinePools {
 		found := false
 		for _, p := range machinePools {
 			if oldP.Name == p.Name {
@@ -474,7 +519,14 @@ func reconcileMachinePools(oldMachinePools []*hivev1.MachinePool, machinePools [
 			}
 		}
 		if !found {
-			if err := machinePoolClient.Delete(oldP.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := machinePoolClient.Delete(
+				oldP.Name,
+				&metav1.DeleteOptions{
+					Preconditions: &metav1.Preconditions{
+						ResourceVersion: &machinePoolsResourceVersions[i],
+					},
+				},
+			); err != nil {
 				return machinePools, err
 			}
 		}
@@ -493,4 +545,16 @@ func addOwnerRef(cd *hivev1.ClusterDeployment, obj metav1.Object) bool {
 			BlockOwnerDeletion: pointer.BoolPtr(true),
 		},
 	)
+}
+
+func getV1ResourceVersions(resourceVersion string) (cd, installConfig string, machinePools []string, err error) {
+	rvSplit := strings.Split(resourceVersion, "-")
+	if len(rvSplit) < 2 {
+		err = errors.New("invalid resource version")
+		return
+	}
+	cd = rvSplit[0]
+	installConfig = rvSplit[1]
+	machinePools = rvSplit[2:]
+	return
 }

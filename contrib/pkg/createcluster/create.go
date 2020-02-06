@@ -664,6 +664,10 @@ func (o *Options) generateSampleSyncSets() []runtime.Object {
 
 func sampleSyncSet(name, namespace, cdName string) *hivev1.SyncSet {
 	return &hivev1.SyncSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "SyncSet",
+			APIVersion: hivev1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -688,6 +692,10 @@ func sampleSyncSet(name, namespace, cdName string) *hivev1.SyncSet {
 
 func sampleSelectorSyncSet(name, cdName string) *hivev1.SelectorSyncSet {
 	return &hivev1.SelectorSyncSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "SelectorSyncSet",
+			APIVersion: hivev1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

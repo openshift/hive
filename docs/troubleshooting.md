@@ -34,6 +34,6 @@ To diagnose a hiveadmission failure, try running the operation directly against 
 
 For instance, try this:
 ```sh
-# oc create --raw /apis/admission.hive.openshift.io/v1alpha1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
+# oc create --raw /apis/admission.hive.openshift.io/v1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
 ```
 

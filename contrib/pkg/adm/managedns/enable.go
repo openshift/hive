@@ -2,10 +2,12 @@ package managedns
 
 import (
 	"context"
+	"fmt"
 	"os/user"
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -21,7 +23,7 @@ import (
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -36,10 +38,9 @@ managed domains, create a credentials secret for your cloud provider, and link i
 the ExternalDNS section of HiveConfig.
 `
 const (
-	cloudAWS                   = "aws"
-	cloudGCP                   = "gcp"
-	hiveNamespace              = "hive"
-	manageDNSCredentialsSecret = "manage-dns-creds"
+	cloudAWS      = "aws"
+	cloudGCP      = "gcp"
+	hiveNamespace = "hive"
 )
 
 // Options is the set of options to generate and apply a new cluster deployment
@@ -118,7 +119,9 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 		log.WithError(err).Fatal("error looking up HiveConfig 'hive'")
 	}
 
-	hc.Spec.ManagedDomains = args
+	dnsConf := hivev1.ManageDNSConfig{
+		Domains: args,
+	}
 
 	var credsSecret *corev1.Secret
 
@@ -129,10 +132,8 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 		if err != nil {
 			log.WithError(err).Fatal("error generating manageDNS credentials secret")
 		}
-		hc.Spec.ExternalDNS = &hivev1.ExternalDNSConfig{
-			AWS: &hivev1.ExternalDNSAWSConfig{
-				Credentials: corev1.LocalObjectReference{Name: manageDNSCredentialsSecret},
-			},
+		dnsConf.AWS = &hivev1.ManageDNSAWSConfig{
+			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret.Name},
 		}
 	case cloudGCP:
 		// Apply a secret for credentials to manage the root domain:
@@ -140,18 +141,21 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 		if err != nil {
 			log.WithError(err).Fatal("error generating manageDNS credentials secret")
 		}
-		hc.Spec.ExternalDNS = &hivev1.ExternalDNSConfig{
-			GCP: &hivev1.ExternalDNSGCPConfig{
-				Credentials: corev1.LocalObjectReference{Name: manageDNSCredentialsSecret},
-			},
+		dnsConf.GCP = &hivev1.ManageDNSGCPConfig{
+			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret.Name},
 		}
 	default:
 		log.WithField("cloud", o.Cloud).Fatal("unsupported cloud")
 	}
 
+	log.Debug("adding new ManagedDomain config to existing HiveConfig")
+	hc.Spec.ManagedDomains = append(hc.Spec.ManagedDomains, dnsConf)
+
 	log.Infof("created cloud credentials secret: %s", credsSecret.Name)
 	credsSecret.Namespace = hiveNamespace
-	rh.ApplyRuntimeObject(credsSecret, scheme.Scheme)
+	if _, err := rh.ApplyRuntimeObject(credsSecret, scheme.Scheme); err != nil {
+		log.WithError(err).Fatal("failed to save generated secret")
+	}
 
 	err = dynClient.Update(context.Background(), hc)
 	if err != nil {
@@ -208,7 +212,7 @@ func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      manageDNSCredentialsSecret,
+			Name:      fmt.Sprintf("aws-dns-creds-%s", uuid.New().String()[:5]),
 			Namespace: hiveNamespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -230,7 +234,7 @@ func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      manageDNSCredentialsSecret,
+			Name:      fmt.Sprintf("gcp-dns-creds-%s", uuid.New().String()[:5]),
 			Namespace: hiveNamespace,
 		},
 		Type: corev1.SecretTypeOpaque,

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: cluster-selectorsyncsets
+
+parameters:
+- name: RESOURCE_INDEX
+  required: true
+  description: A index to create multiple copied of the same syncset.
+
+objects:
+- apiVersion: hive.openshift.io/v1
+  kind: SelectorSyncSet
+  metadata:
+    name: scaletest-${RESOURCE_INDEX}-configmap
+  spec:
+    resources:
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+    clusterDeploymentSelector:
+      matchLabels:
+        scaletest: "true"

@@ -6,7 +6,7 @@ tempdir="$(mktemp -d)"
 
 SRC_DIR="$(git rev-parse --show-toplevel)"
 
-cp "${SRC_DIR}/pkg/apis/hive/v1alpha1/zz_generated.deepcopy.go" "${tempdir}"
+cp "${SRC_DIR}/pkg/apis/hive/v1/zz_generated.deepcopy.go" "${tempdir}"
 cp "${SRC_DIR}/pkg/operator/assets/bindata.go" "${tempdir}"
 mkdir "${tempdir}/crds"
 cp ${SRC_DIR}/config/crds/* "${tempdir}/crds/"
@@ -14,7 +14,7 @@ cp ${SRC_DIR}/config/crds/* "${tempdir}/crds/"
 cd "${SRC_DIR}"
 make generate
 
-if ! diff -Naup "./pkg/apis/hive/v1alpha1/zz_generated.deepcopy.go" "${tempdir}/zz_generated.deepcopy.go"; then
+if ! diff -Naup "./pkg/apis/hive/v1/zz_generated.deepcopy.go" "${tempdir}/zz_generated.deepcopy.go"; then
 	echo "Generated deepcopy file is different. Run 'make generate'"
 	exit 1
 fi

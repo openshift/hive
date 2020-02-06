@@ -11,8 +11,10 @@ required = [
     "github.com/openshift/installer/pkg/destroy/azure",
     "github.com/openshift/installer/pkg/asset/installconfig/azure",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
+    "k8s.io/code-generator/cmd/client-gen", # for go generate
+    "k8s.io/code-generator/cmd/conversion-gen", # for go generate
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
-    "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
+    "k8s.io/code-generator/cmd/defaulter-gen", # for go generate
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/controller",
     "sigs.k8s.io/controller-runtime/pkg/handler",
@@ -21,6 +23,10 @@ required = [
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/testing_frameworks/integration", # for integration testing
     "github.com/heptio/velero/pkg/apis/velero/v1",
+]
+
+ignored = [
+    "github.com/openshift/hive/tools"
 ]
 
 [prune]
@@ -37,12 +43,6 @@ required = [
 [[override]]
   name="sigs.k8s.io/controller-runtime"
   branch="release-0.2"
-
-# Remove when we're no longer using the master team's controller-tools repo (https://github.com/openshift/kubernetes-sigs-controller-tools).
-[[constraint]]
-  name="sigs.k8s.io/controller-tools"
-  source = "github.com/openshift/kubernetes-sigs-controller-tools"
-  branch = "origin-4.1-kubernetes-1.13.4"
 
 [[override]]
   name="k8s.io/api"
@@ -142,9 +142,12 @@ version="v1.4.7"
 
 [[override]]
   name="k8s.io/apiextensions-apiserver"
-  branch="origin-4.1-kubernetes-1.13.4"
-  source="github.com/openshift/kubernetes-apiextensions-apiserver"
+  version="kubernetes-1.14.1"
 
 [[constraint]]
   name = "github.com/golang/mock"
   version = "1.2.0"
+
+[[override]]
+  name = "k8s.io/code-generator"
+  version="kubernetes-1.14.1"

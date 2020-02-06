@@ -6,6 +6,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	netopv1 "github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1"
+
 	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1alpha1/gcp"
@@ -27,10 +28,6 @@ const (
 	// DefaultClusterType will be used when the above HiveClusterTypeLabel is unset. This
 	// value will not be added as a label, only used for metrics vectors.
 	DefaultClusterType = "unspecified"
-
-	// HiveClusterDeploymentNameLabel is used on various objects created by Hive to link to their associated
-	// ClusterDeployment
-	HiveClusterDeploymentNameLabel = "hive.openshift.io/cluster-deployment-name"
 
 	// HiveInstallLogLabel is used on ConfigMaps uploaded by the install manager which contain an install log.
 	HiveInstallLogLabel = "hive.openshift.io/install-log"
@@ -435,8 +432,4 @@ type CertificateBundleStatus struct {
 
 	// Generated indicates whether the certificate bundle was generated
 	Generated bool `json:"generated"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ClusterDeployment{}, &ClusterDeploymentList{})
 }

@@ -7,13 +7,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/remoteclient"
 )
 
 func MustGetClusterDeployment() *hivev1.ClusterDeployment {
@@ -36,7 +34,7 @@ func MustGetClusterDeployment() *hivev1.ClusterDeployment {
 
 func MustGetInstalledClusterDeployment() *hivev1.ClusterDeployment {
 	cd := MustGetClusterDeployment()
-	if !cd.Spec.Installed || len(cd.Status.AdminKubeconfigSecret.Name) == 0 {
+	if !cd.Spec.Installed || cd.Spec.ClusterMetadata == nil || len(cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name) == 0 {
 		log.WithField("clusterdeployment", fmt.Sprintf("%s/%s", cd.Namespace, cd.Name)).Fatalf("cluster deployment is not installed")
 	}
 	return cd
@@ -45,25 +43,10 @@ func MustGetInstalledClusterDeployment() *hivev1.ClusterDeployment {
 func MustGetClusterDeploymentClientConfig() *rest.Config {
 	cd := MustGetInstalledClusterDeployment()
 	c := MustGetClient()
-	adminKubeconfigSecret := &corev1.Secret{}
-	err := c.Get(context.TODO(), types.NamespacedName{Name: cd.Status.AdminKubeconfigSecret.Name, Namespace: cd.Namespace}, adminKubeconfigSecret)
+	remoteClientBuilder := remoteclient.NewBuilder(c, cd, "e2e-test")
+	cfg, err := remoteClientBuilder.RESTConfig()
 	if err != nil {
-		log.WithError(err).Fatal("unable to fetch admin kubeconfig secret")
-		return nil
-	}
-	kubeConfig, err := controllerutils.FixupKubeconfigSecretData(adminKubeconfigSecret.Data)
-	if err != nil {
-		log.WithError(err).Fatal("unable to fixup admin kubeconfig")
-		return nil
-	}
-	config, err := clientcmd.Load([]byte(kubeConfig))
-	if err != nil {
-		log.WithError(err).Fatal("unable to load kubeconfig")
-		return nil
-	}
-	cfg, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
-	if err != nil {
-		log.WithError(err).Fatal("unable to load kubeconfig")
+		log.WithError(err).Fatal("unable to get REST config for clusterdeployment")
 		return nil
 	}
 	return cfg

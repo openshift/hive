@@ -4,7 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 // UpdateConditionCheck tests whether a condition should be updated from the
@@ -204,6 +204,29 @@ func SetDNSZoneCondition(
 	message string,
 	updateConditionCheck UpdateConditionCheck,
 ) []hivev1.DNSZoneCondition {
+	newConditions, _ := SetDNSZoneConditionWithChangeCheck(
+		conditions,
+		conditionType,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	return newConditions
+}
+
+// SetDNSZoneConditionWithChangeCheck sets a condition on a DNSZone resource's status
+// It returns the conditions as well a boolean indicating whether there was a change made
+// to the conditions.
+func SetDNSZoneConditionWithChangeCheck(
+	conditions []hivev1.DNSZoneCondition,
+	conditionType hivev1.DNSZoneConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) ([]hivev1.DNSZoneCondition, bool) {
+	changed := false
 	now := metav1.Now()
 	existingCondition := FindDNSZoneCondition(conditions, conditionType)
 	if existingCondition == nil {
@@ -219,6 +242,7 @@ func SetDNSZoneCondition(
 					LastProbeTime:      now,
 				},
 			)
+			changed = true
 		}
 	} else {
 		if shouldUpdateCondition(
@@ -233,9 +257,78 @@ func SetDNSZoneCondition(
 			existingCondition.Reason = reason
 			existingCondition.Message = message
 			existingCondition.LastProbeTime = now
+			changed = true
 		}
 	}
-	return conditions
+	return conditions, changed
+}
+
+// SetMachinePoolCondition sets a condition on a MachinePool resource's status
+func SetMachinePoolCondition(
+	conditions []hivev1.MachinePoolCondition,
+	conditionType hivev1.MachinePoolConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) []hivev1.MachinePoolCondition {
+	newConditions, _ := SetMachinePoolConditionWithChangeCheck(
+		conditions,
+		conditionType,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	return newConditions
+}
+
+// SetMachinePoolConditionWithChangeCheck sets a condition on a MachinePool resource's status.
+// It returns the conditions as well a boolean indicating whether there was a change made
+// to the conditions.
+func SetMachinePoolConditionWithChangeCheck(
+	conditions []hivev1.MachinePoolCondition,
+	conditionType hivev1.MachinePoolConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) ([]hivev1.MachinePoolCondition, bool) {
+	changed := false
+	now := metav1.Now()
+	existingCondition := FindMachinePoolCondition(conditions, conditionType)
+	if existingCondition == nil {
+		if status == corev1.ConditionTrue {
+			conditions = append(
+				conditions,
+				hivev1.MachinePoolCondition{
+					Type:               conditionType,
+					Status:             status,
+					Reason:             reason,
+					Message:            message,
+					LastTransitionTime: now,
+					LastProbeTime:      now,
+				},
+			)
+			changed = true
+		}
+	} else {
+		if shouldUpdateCondition(
+			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
+			status, reason, message,
+			updateConditionCheck,
+		) {
+			if existingCondition.Status != status {
+				existingCondition.LastTransitionTime = now
+			}
+			existingCondition.Status = status
+			existingCondition.Reason = reason
+			existingCondition.Message = message
+			existingCondition.LastProbeTime = now
+			changed = true
+		}
+	}
+	return conditions, changed
 }
 
 // FindClusterDeploymentCondition finds in the condition that has the
@@ -274,6 +367,17 @@ func FindSyncCondition(conditions []hivev1.SyncCondition, conditionType hivev1.S
 // FindDNSZoneCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
 func FindDNSZoneCondition(conditions []hivev1.DNSZoneCondition, conditionType hivev1.DNSZoneConditionType) *hivev1.DNSZoneCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
+// FindMachinePoolCondition finds in the condition that has the
+// specified condition type in the given list. If none exists, then returns nil.
+func FindMachinePoolCondition(conditions []hivev1.MachinePoolCondition, conditionType hivev1.MachinePoolConditionType) *hivev1.MachinePoolCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

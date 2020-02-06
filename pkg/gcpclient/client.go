@@ -2,6 +2,7 @@ package gcpclient
 
 import (
 	"context"
+	"io/ioutil"
 	"time"
 
 	"github.com/openshift/hive/pkg/constants"
@@ -26,6 +27,8 @@ type Client interface {
 	AddResourceRecordSet(managedZone string, recordSet *dns.ResourceRecordSet) error
 
 	DeleteResourceRecordSet(managedZone string, recordSet *dns.ResourceRecordSet) error
+
+	UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *dns.ResourceRecordSet) error
 
 	GetManagedZone(managedZone string) (*dns.ManagedZone, error)
 
@@ -64,10 +67,6 @@ type gcpClient struct {
 
 const (
 	defaultCallTimeout = 2 * time.Minute
-
-	// ErrCodeNotFound is what the google api returns when a resource doesn't exist.
-	// googleapi does not give us a constant for this.
-	ErrCodeNotFound = 404
 )
 
 func contextWithTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -138,6 +137,20 @@ func (c *gcpClient) AddResourceRecordSet(managedZone string, recordSet *dns.Reso
 	)
 }
 
+func (c *gcpClient) UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *dns.ResourceRecordSet) error {
+	change := &dns.Change{}
+	if addRecordSet != nil && len(addRecordSet.Rrdatas) > 0 {
+		change.Additions = []*dns.ResourceRecordSet{addRecordSet}
+	}
+	if removeRecordSet != nil && len(removeRecordSet.Rrdatas) > 0 {
+		change.Deletions = []*dns.ResourceRecordSet{removeRecordSet}
+	}
+	return c.changeResourceRecordSet(
+		managedZone,
+		change,
+	)
+}
+
 func (c *gcpClient) DeleteResourceRecordSet(managedZone string, recordSet *dns.ResourceRecordSet) error {
 	return c.changeResourceRecordSet(
 		managedZone,
@@ -199,56 +212,85 @@ func (c *gcpClient) ListComputeImages(opts ListComputeImagesOptions) (*compute.I
 	return call.Do()
 }
 
-// NewClient creates our client wrapper object for interacting with GCP.
-func NewClient(projectName string, authJSON []byte) (Client, error) {
-	c, err := newClient(authJSON)
+// NewClient creates our client wrapper object for interacting with GCP. The supplied byte slice contains the GCP creds.
+func NewClient(authJSON []byte) (Client, error) {
+	return newClient(authJSONPassthroughSource(authJSON))
+}
+
+// NewClientFromSecret creates our client wrapper object for interacting with GCP. The GCP creds are read from the
+// specified secret.
+func NewClientFromSecret(secret *corev1.Secret) (Client, error) {
+	return newClient(authJSONFromSecretSource(secret))
+}
+
+// NewClientFromFile creates our client wrapper object for interacting with GCP. The GCP creds are read from the
+// specified file.
+func NewClientFromFile(filename string) (Client, error) {
+	return newClient(authJSONFromFileSource(filename))
+}
+
+// ProjectID returns the GCP project ID specified in the GCP creds. The supplied byte slice contains the GCP creds.
+func ProjectID(authJSON []byte) (string, error) {
+	return projectID(authJSONPassthroughSource(authJSON))
+}
+
+// ProjectIDFromSecret returns the GCP project ID specified in the GCP creds. The GCP creds are read from the
+// specified secret.
+func ProjectIDFromSecret(secret *corev1.Secret) (string, error) {
+	return projectID(authJSONFromSecretSource(secret))
+}
+
+// ProjectIDFromFile returns the GCP project ID specified in the GCP creds. The GCP creds are read from the
+// specified file.
+func ProjectIDFromFile(filename string) (string, error) {
+	return projectID(authJSONFromFileSource(filename))
+}
+
+func projectID(authJSONSource func() ([]byte, error)) (string, error) {
+	authJSON, err := authJSONSource()
+	if err != nil {
+		return "", err
+	}
+	creds, err := google.CredentialsFromJSON(context.Background(), authJSON)
+	if err != nil {
+		return "", err
+	}
+	return creds.ProjectID, nil
+}
+
+func newClient(authJSONSource func() ([]byte, error)) (*gcpClient, error) {
+	ctx := context.TODO()
+
+	authJSON, err := authJSONSource()
 	if err != nil {
 		return nil, err
 	}
-	c.projectName = projectName
-	return c, nil
-}
-
-// NewClientFromSecret creates our client wrapper object for interacting with GCP.
-func NewClientFromSecret(secret *corev1.Secret) (Client, error) {
-	authJSON, ok := secret.Data[constants.GCPCredentialsName]
-	if !ok {
-		return nil, errors.New("creds secret does not contain \"" + constants.GCPCredentialsName + "\" data")
-	}
-	gcpClient, err := NewClientWithDefaultProject(authJSON)
-	return gcpClient, errors.Wrap(err, "error creating GCP client")
-}
-
-// NewClientWithDefaultProject creates our client wrapper object for interacting with GCP.
-func NewClientWithDefaultProject(authJSON []byte) (Client, error) {
-	return newClient(authJSON)
-}
-
-func newClient(authJSON []byte) (*gcpClient, error) {
-	ctx := context.TODO()
-
 	// since we're using a single creds var, we should specify all the required scopes when initializing
 	creds, err := google.CredentialsFromJSON(ctx, authJSON, dns.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
 
-	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, option.WithCredentials(creds))
+	options := []option.ClientOption{
+		option.WithCredentials(creds),
+		option.WithUserAgent("openshift.io hive/v1"),
+	}
+	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	computeClient, err := compute.NewService(ctx, option.WithCredentials(creds))
+	computeClient, err := compute.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
+	serviceUsageClient, err := serviceusage.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	dnsClient, err := dns.NewService(ctx, option.WithCredentials(creds))
+	dnsClient, err := dns.NewService(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -261,4 +303,26 @@ func newClient(authJSON []byte) (*gcpClient, error) {
 		serviceUsageClient:         serviceUsageClient,
 		dnsClient:                  dnsClient,
 	}, nil
+}
+
+func authJSONPassthroughSource(authJSON []byte) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		return authJSON, nil
+	}
+}
+
+func authJSONFromSecretSource(secret *corev1.Secret) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		authJSON, ok := secret.Data[constants.GCPCredentialsName]
+		if !ok {
+			return nil, errors.New("creds secret does not contain \"" + constants.GCPCredentialsName + "\" data")
+		}
+		return authJSON, nil
+	}
+}
+
+func authJSONFromFileSource(filename string) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		return ioutil.ReadFile(filename)
+	}
 }

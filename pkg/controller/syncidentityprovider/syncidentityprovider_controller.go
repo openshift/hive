@@ -8,7 +8,8 @@ import (
 	"time"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -269,6 +271,9 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 		}
 
 		// ensure the syncset gets cleaned up when the clusterdeployment is deleted
+		r.logger.WithField("derivedObject", ss.Name).Debug("Setting labels on derived object")
+		ss.Labels = k8slabels.AddLabel(ss.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+		ss.Labels = k8slabels.AddLabel(ss.Labels, constants.SyncSetTypeLabel, constants.SyncSetTypeIdentityProvider)
 		if err := controllerutil.SetControllerReference(cd, ss, r.scheme); err != nil {
 			contextLogger.WithError(err).Error("error setting controller reference on syncset")
 			return err

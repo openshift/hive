@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/user"
@@ -84,6 +83,25 @@ func (s *LiveGCPTestSuite) TestCreateAndDelete_UnknownDeleteValues() {
 	})
 }
 
+type testCreateThenUpdateCase struct {
+	createValues []string
+	updateValues []string
+}
+
+func (s *LiveGCPTestSuite) TestCreateThenUpdate_SameValuesOnUpdate() {
+	s.testCreateThenUpdate(&testCreateThenUpdateCase{
+		createValues: []string{"test-value"},
+		updateValues: []string{"test-value"},
+	})
+}
+
+func (s *LiveGCPTestSuite) TestCreateThenUpdate_DifferentValuesOnUpdate() {
+	s.testCreateThenUpdate(&testCreateThenUpdateCase{
+		createValues: []string{"test-value"},
+		updateValues: []string{"test-value-2"},
+	})
+}
+
 type testCreateAndDeleteCase struct {
 	createValues []string
 	deleteValues []string
@@ -133,13 +151,33 @@ func (s *LiveGCPTestSuite) getCUT() *gcpQuery {
 	if err != nil {
 		s.T().Fatalf("could not get the current user: %v", err)
 	}
-	authJSON, err := ioutil.ReadFile(filepath.Join(usr.HomeDir, ".gcp", constants.GCPCredentialsName))
-	if err != nil {
-		s.T().Fatalf("could not read gcp creds: %v", err)
-	}
+	credsFile := filepath.Join(usr.HomeDir, ".gcp", constants.GCPCredentialsName)
 	return &gcpQuery{
 		getGCPClient: func() (gcpclient.Client, error) {
-			return gcpclient.NewClientWithDefaultProject(authJSON)
+			return gcpclient.NewClientFromFile(credsFile)
 		},
 	}
+}
+
+func (s *LiveGCPTestSuite) testCreateThenUpdate(tc *testCreateThenUpdateCase) {
+	cut := s.getCUT()
+	domain := fmt.Sprintf("live-gcp-test-%08d.%s", rand.Intn(100000000), s.rootDomain)
+	s.T().Logf("domain = %q", domain)
+	err := cut.Create(s.rootDomain, domain, sets.NewString(tc.createValues...))
+	if s.NoError(err, "unexpected error creating NS") {
+		defer func() {
+			err := cut.Delete(s.rootDomain, domain, sets.NewString())
+			s.NoError(err, "unexpected error deleting NS")
+		}()
+	}
+
+	// now test updating by re-issuing a Create()
+	err = cut.Create(s.rootDomain, domain, sets.NewString(tc.updateValues...))
+	s.NoError(err, "unexpected error updating NS")
+
+	nameServers, err := cut.Get(s.rootDomain)
+	s.NoError(err, "unexpected error querying domain")
+	s.NotEmpty(nameServers, "expected some name servers")
+	actualValues := nameServers[domain]
+	s.Equal(sets.NewString(tc.updateValues...), actualValues, "unexpected values for domain")
 }

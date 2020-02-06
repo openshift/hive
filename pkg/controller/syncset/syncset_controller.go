@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -22,7 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -286,12 +288,12 @@ func (r *ReconcileSyncSet) reconcileSyncSetInstances(cd *hivev1.ClusterDeploymen
 	}
 
 	for _, syncSetInstance := range syncSetInstances {
-		if syncSetInstance.Spec.SyncSet != nil {
-			if !containsSyncSet(syncSetInstance.Spec.SyncSet.Name, syncSets) {
+		if syncSetInstance.Spec.SyncSetRef != nil {
+			if !containsSyncSet(syncSetInstance.Spec.SyncSetRef.Name, syncSets) {
 				toDelete = append(toDelete, syncSetInstance)
 			}
-		} else if syncSetInstance.Spec.SelectorSyncSet != nil {
-			if !containsSelectorSyncSet(syncSetInstance.Spec.SelectorSyncSet.Name, selectorSyncSets) {
+		} else if syncSetInstance.Spec.SelectorSyncSetRef != nil {
+			if !containsSelectorSyncSet(syncSetInstance.Spec.SelectorSyncSetRef.Name, selectorSyncSets) {
 				toDelete = append(toDelete, syncSetInstance)
 			}
 		}
@@ -359,7 +361,7 @@ func (r *ReconcileSyncSet) getRelatedSyncSetInstances(cd *hivev1.ClusterDeployme
 
 	syncSetInstances := []*hivev1.SyncSetInstance{}
 	for i, syncSetInstance := range list.Items {
-		if syncSetInstance.Spec.ClusterDeployment.Name == cd.Name {
+		if syncSetInstance.Spec.ClusterDeploymentRef.Name == cd.Name {
 			syncSetInstances = append(syncSetInstances, &list.Items[i])
 		}
 	}
@@ -369,7 +371,7 @@ func (r *ReconcileSyncSet) getRelatedSyncSetInstances(cd *hivev1.ClusterDeployme
 
 func findSyncSetInstanceForSyncSet(name string, syncSetInstances []*hivev1.SyncSetInstance) *hivev1.SyncSetInstance {
 	for _, syncSetInstance := range syncSetInstances {
-		if syncSetInstance.Spec.SyncSet != nil && syncSetInstance.Spec.SyncSet.Name == name {
+		if syncSetInstance.Spec.SyncSetRef != nil && syncSetInstance.Spec.SyncSetRef.Name == name {
 			return syncSetInstance
 		}
 	}
@@ -378,7 +380,7 @@ func findSyncSetInstanceForSyncSet(name string, syncSetInstances []*hivev1.SyncS
 
 func findSyncSetInstanceForSelectorSyncSet(name string, syncSetInstances []*hivev1.SyncSetInstance) *hivev1.SyncSetInstance {
 	for _, syncSetInstance := range syncSetInstances {
-		if syncSetInstance.Spec.SelectorSyncSet != nil && syncSetInstance.Spec.SelectorSyncSet.Name == name {
+		if syncSetInstance.Spec.SelectorSyncSetRef != nil && syncSetInstance.Spec.SelectorSyncSetRef.Name == name {
 			return syncSetInstance
 		}
 	}
@@ -386,53 +388,69 @@ func findSyncSetInstanceForSelectorSyncSet(name string, syncSetInstances []*hive
 }
 
 func (r *ReconcileSyncSet) syncSetInstanceForSyncSet(cd *hivev1.ClusterDeployment, syncSet *hivev1.SyncSet) (*hivev1.SyncSetInstance, error) {
+	ssiLogger := r.logger.WithField("syncSetName", syncSet.Name)
 	cdRef := metav1.NewControllerRef(cd, hivev1.SchemeGroupVersion.WithKind("ClusterDeployment"))
 	hash, err := r.computeHash(syncSet.Spec)
 	if err != nil {
 		return nil, err
 	}
-	return &hivev1.SyncSetInstance{
+
+	syncSetInstance := &hivev1.SyncSetInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            syncSetInstanceNameForSyncSet(cd, syncSet),
 			Namespace:       cd.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*cdRef},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
-			SyncSet: &corev1.LocalObjectReference{
+			SyncSetRef: &corev1.LocalObjectReference{
 				Name: syncSet.Name,
 			},
 			ResourceApplyMode: syncSet.Spec.ResourceApplyMode,
 			SyncSetHash:       hash,
 		},
-	}, nil
+	}
+
+	ssiLogger.Debug("Add syncset name and clusterdeployment name labels to syncsetinstance")
+	syncSetInstance.Labels = k8slabels.AddLabel(syncSetInstance.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+	syncSetInstance.Labels = k8slabels.AddLabel(syncSetInstance.Labels, constants.SyncSetNameLabel, syncSet.Name)
+
+	return syncSetInstance, nil
 }
 
 func (r *ReconcileSyncSet) syncSetInstanceForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyncSet *hivev1.SelectorSyncSet) (*hivev1.SyncSetInstance, error) {
+	ssiLogger := r.logger.WithField("selectorSyncSetName", selectorSyncSet.Name)
 	cdRef := metav1.NewControllerRef(cd, hivev1.SchemeGroupVersion.WithKind("ClusterDeployment"))
 	hash, err := r.computeHash(selectorSyncSet.Spec)
 	if err != nil {
 		return nil, err
 	}
-	return &hivev1.SyncSetInstance{
+
+	syncSetInstance := &hivev1.SyncSetInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            syncSetInstanceNameForSelectorSyncSet(cd, selectorSyncSet),
 			Namespace:       cd.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*cdRef},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
-			SelectorSyncSet: &hivev1.SelectorSyncSetReference{
+			SelectorSyncSetRef: &hivev1.SelectorSyncSetReference{
 				Name: selectorSyncSet.Name,
 			},
 			ResourceApplyMode: selectorSyncSet.Spec.ResourceApplyMode,
 			SyncSetHash:       hash,
 		},
-	}, nil
+	}
+
+	ssiLogger.Debug("Add selectorsyncset name and clusterdeployment name labels to syncsetinstance")
+	syncSetInstance.Labels = k8slabels.AddLabel(syncSetInstance.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+	syncSetInstance.Labels = k8slabels.AddLabel(syncSetInstance.Labels, constants.SelectorSyncSetNameLabel, selectorSyncSet.Name)
+
+	return syncSetInstance, nil
 }
 
 func containsSyncSet(name string, syncSets []*hivev1.SyncSet) bool {

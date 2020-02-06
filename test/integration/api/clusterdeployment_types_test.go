@@ -8,24 +8,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 func TestStorageClusterDeployment(t *testing.T) {
 	key := types.NamespacedName{Name: "foo", Namespace: "default"}
-	replicas := int64(3)
 	created := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
-		Spec: hivev1.ClusterDeploymentSpec{
-			ControlPlane: hivev1.MachinePool{
-				Replicas: &replicas,
-			},
-			Compute: []hivev1.MachinePool{
-				{
-					Replicas: &replicas,
-				},
-			},
-		},
 	}
 	g := gomega.NewGomegaWithT(t)
 

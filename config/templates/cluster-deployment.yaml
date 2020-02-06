@@ -82,7 +82,7 @@ objects:
     ssh-publickey: "${SSH_KEY}"
     ssh-privatekey: "${SSH_PRIV_KEY}"
 
-- apiVersion: hive.openshift.io/v1alpha1
+- apiVersion: hive.openshift.io/v1
   kind: ClusterDeployment
   metadata:
     labels:

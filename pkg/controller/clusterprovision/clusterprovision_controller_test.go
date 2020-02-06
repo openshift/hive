@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,7 +23,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -65,6 +66,13 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			expectedStage:         hivev1.ClusterProvisionStageInitializing,
 			expectNoJobReference:  true,
 			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				job := getJob(c)
+
+				require.NotNil(t, job, "expected job")
+				assert.Equal(t, testProvision().Name, job.Labels[constants.ClusterProvisionNameLabel], "incorrect cluster provision name label")
+				assert.Equal(t, constants.JobTypeProvision, job.Labels[constants.JobTypeLabel], "incorrect job type label")
+			},
 		},
 		{
 			name: "job not created when pending create",
@@ -210,10 +218,10 @@ func TestClusterProvisionReconcile(t *testing.T) {
 					assert.Nil(t, failedCond, "expected not to find a Failed condition")
 				}
 				if test.expectNoJobReference {
-					assert.Nil(t, provision.Status.Job, "expected no job reference from provision")
+					assert.Nil(t, provision.Status.JobRef, "expected no job reference from provision")
 				} else {
-					if assert.NotNil(t, provision.Status.Job, "expected job reference from provision") {
-						assert.Equal(t, installJobName, provision.Status.Job.Name, "unexpected job name referenced from provision")
+					if assert.NotNil(t, provision.Status.JobRef, "expected job reference from provision") {
+						assert.Equal(t, installJobName, provision.Status.JobRef.Name, "unexpected job name referenced from provision")
 					}
 				}
 			}
@@ -247,7 +255,7 @@ func testProvision(opts ...provisionOption) *hivev1.ClusterProvision {
 			},
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: testDeploymentName,
 			},
 			Stage: hivev1.ClusterProvisionStageInitializing,
@@ -281,7 +289,7 @@ func failed() provisionOption {
 
 func withJob() provisionOption {
 	return func(p *hivev1.ClusterProvision) {
-		p.Status.Job = &corev1.LocalObjectReference{
+		p.Status.JobRef = &corev1.LocalObjectReference{
 			Name: installJobName,
 		}
 	}

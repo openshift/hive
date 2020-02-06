@@ -14,6 +14,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
@@ -323,6 +324,11 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	s.Handlers.Build.PushBackNamed(request.NamedHandler{
+		Name: "openshift.io/hive",
+		Fn:   request.MakeAddToUserAgentHandler("openshift.io hive", "v1"),
+	})
 
 	return &awsClient{
 		ec2Client:     ec2.New(s),

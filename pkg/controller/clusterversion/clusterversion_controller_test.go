@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -20,8 +21,10 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
 
 const (
@@ -29,7 +32,6 @@ const (
 	testClusterName                 = "bar"
 	testClusterID                   = "testFooClusterUUID"
 	testNamespace                   = "default"
-	sshKeySecret                    = "ssh-key"
 	pullSecretSecret                = "pull-secret"
 	testRemoteClusterCurrentVersion = "4.0.0"
 	remoteClusterVersionObjectName  = "version"
@@ -44,27 +46,23 @@ func TestClusterVersionReconcile(t *testing.T) {
 	configv1.Install(scheme.Scheme)
 
 	tests := []struct {
-		name        string
-		existing    []runtime.Object
-		expectError bool
-		validate    func(*testing.T, *hivev1.ClusterDeployment)
+		name         string
+		existing     []runtime.Object
+		noRemoteCall bool
+		expectError  bool
+		validate     func(*testing.T, *hivev1.ClusterDeployment)
 	}{
 		{
 			// no cluster deployment, no error expected
-			name: "clusterdeployment doesn't exist",
+			name:         "clusterdeployment doesn't exist",
+			noRemoteCall: true,
 		},
 		{
 			name: "deleted clusterdeployment",
 			existing: []runtime.Object{
 				testDeletedClusterDeployment(),
 			},
-		},
-		{
-			name: "no admin kubeconfig secret",
-			existing: []runtime.Object{
-				testClusterDeployment(),
-			},
-			expectError: true,
+			noRemoteCall: true,
 		},
 		{
 			name: "needs update",
@@ -84,10 +82,17 @@ func TestClusterVersionReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			if !test.noRemoteCall {
+				mockRemoteClientBuilder.EXPECT().Unreachable().Return(false)
+				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(), nil)
+			}
 			rcd := &ReconcileClusterVersion{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
-				remoteClusterAPIClientBuilder: testRemoteClusterAPIClientBuilder,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
 			namespacedName := types.NamespacedName{
@@ -127,36 +132,24 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
-			SSHKey: corev1.LocalObjectReference{
-				Name: sshKeySecret,
-			},
-			ControlPlane: hivev1.MachinePool{},
-			Compute:      []hivev1.MachinePool{},
-			PullSecret: &corev1.LocalObjectReference{
+			PullSecretRef: &corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "aws-credentials",
+					},
 					Region: "us-east-1",
 				},
 			},
-			Networking: hivev1.Networking{
-				Type: hivev1.NetworkTypeOpenshiftSDN,
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
-						Name: "aws-credentials",
-					},
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				ClusterID: testClusterID,
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+					Name: "kubeconfig-secret",
 				},
 			},
 			Installed: true,
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterID: testClusterID,
-			AdminKubeconfigSecret: corev1.LocalObjectReference{
-				Name: "kubeconfig-secret",
-			},
 		},
 	}
 	return cd
@@ -186,7 +179,7 @@ func testSecret(name, key, value string) *corev1.Secret {
 	return s
 }
 
-func testRemoteClusterAPIClientBuilder(secretData string, controllerName string) (client.Client, error) {
+func testRemoteClusterAPIClient() client.Client {
 	remoteClusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: remoteClusterVersionObjectName,
@@ -194,8 +187,7 @@ func testRemoteClusterAPIClientBuilder(secretData string, controllerName string)
 	}
 	remoteClusterVersion.Status = testRemoteClusterVersionStatus()
 
-	remoteClient := fake.NewFakeClient(remoteClusterVersion)
-	return remoteClient, nil
+	return fake.NewFakeClient(remoteClusterVersion)
 }
 
 func testRemoteClusterVersionStatus() configv1.ClusterVersionStatus {

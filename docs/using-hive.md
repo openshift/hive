@@ -55,7 +55,7 @@ Hive supports two methods of specifying what version of OpenShift you wish to in
 An example ClusterImageSet:
 
 ```yaml
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: ClusterImageSet
 metadata:
   name: openshift-v4.2.0
@@ -70,7 +70,7 @@ Cluster provisioning begins when a caller creates a ClusterDeployment CR, which 
 An example ClusterDeployment:
 
 ```yaml
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: ClusterDeployment
 metadata:
   name: mycluster
@@ -140,10 +140,8 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=aws myclu
 Credentials will be read from `~/.azure/osServicePrincipal.json` typically created via the `az login` command.
 
 ```bash
-bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup mycluster
 ```
-
-`--release-image` is used above as Azure installer support is only present in 4.2 dev preview builds.
 
 #### Create Cluster on GCP
 
@@ -156,10 +154,8 @@ Credentials will be read from `~/.gcp/osServiceAccount.json`, this can be create
  1. Download resulting JSON file and save to `~/.gcp/osServiceAccount.json`.
 
 ```bash
-bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp --gcp-project-id=myproject --release-image=registry.svc.ci.openshift.org/origin/release:4.2 mycluster
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp mycluster
 ```
-
-`--release-image` is used above as GCP installer support is only present in 4.2 dev preview builds.
 
 ### Monitor the Install Job
 
@@ -196,9 +192,9 @@ oc get nodes
   oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.webConsoleURL }'
   ```
 
-* Retrive the password for `kubeadmin` user
+* Retrieve the password for `kubeadmin` user
   ```
-  oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminPasswordSecret.name }'` -o jsonpath='{ .data.password }' | base64 --decode
+  oc extract secret/$(oc get cd -o jsonpath='{.items[].spec.clusterMetadata.adminPasswordSecretRef.name}') --to=-
   ```
 
 ## DNS Management
@@ -235,7 +231,7 @@ To use this feature:
   1. Update your HiveConfig to enable externalDNS and set the list of managed domains:
      - AWS
        ```yaml
-       apiVersion: hive.openshift.io/v1alpha1
+       apiVersion: hive.openshift.io/v1
        kind: HiveConfig
        metadata:
          name: hive
@@ -244,12 +240,12 @@ To use this feature:
          - hive.example.com
          externalDNS:
            aws:
-             credentials:
+             credentialsSecretRef:
                name: route53-aws-creds
        ```
      - GCP
        ```yaml
-       apiVersion: hive.openshift.io/v1alpha1
+       apiVersion: hive.openshift.io/v1
        kind: HiveConfig
        metadata:
          name: hive
@@ -258,7 +254,7 @@ To use this feature:
          - hive.example.com
          externalDNS:
            gcp:
-             credentials:
+             credentialsSecretRef:
                name: gcp-creds
 
   1. Specify which domains Hive is allowed to manage by adding them to the `managedDomains` list. When specifying `managedDNS: true` in a ClusterDeployment, the ClusterDeployment's baseDomain must be a direct child of one of these domains, otherwise the ClusterDeployment creation will result in a validation error. The baseDomain must also be unique to that cluster and must not be used in any other ClusterDeployment, including on separate Hive instances.
@@ -299,6 +295,6 @@ For more information please see the [SyncIdentityProvider](syncidentityprovider.
 oc delete clusterdeployment ${CLUSTER_NAME} --wait=false
 ```
 
-Deleting a ClusterDeployment will create a ClusterDeprovisionRequest resource, which in turn will launch a pod to attempt to delete all cloud resources created for and by the cluster. This is done by scanning the cloud provider for resources tagged with the cluster's generated InfraID. (i.e. kubernetes.io/cluster/mycluster-fcp4z=owned) Once all resources have been deleted the pod will terminate, finalizers will be removed, and the ClusterDeployment and dependent objects will be removed. The deprovision process is powered by vendoring the same code from the OpenShift installer used for `openshift-install cluster destroy`.
+Deleting a ClusterDeployment will create a ClusterDeprovision resource, which in turn will launch a pod to attempt to delete all cloud resources created for and by the cluster. This is done by scanning the cloud provider for resources tagged with the cluster's generated InfraID. (i.e. kubernetes.io/cluster/mycluster-fcp4z=owned) Once all resources have been deleted the pod will terminate, finalizers will be removed, and the ClusterDeployment and dependent objects will be removed. The deprovision process is powered by vendoring the same code from the OpenShift installer used for `openshift-install cluster destroy`.
 
-The ClusterDeprovisionRequest resource can also be used to manually run a deprovision pod for clusters which no longer have a ClusterDeployment. (i.e. clusterDeployment.spec.preserveOnDelete=true)
+The ClusterDeprovision resource can also be used to manually run a deprovision pod for clusters which no longer have a ClusterDeployment. (i.e. clusterDeployment.spec.preserveOnDelete=true)

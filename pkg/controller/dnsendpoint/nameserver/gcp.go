@@ -2,6 +2,8 @@ package nameserver
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
 	"github.com/pkg/errors"
 	dns "google.golang.org/api/dns/v1"
@@ -20,19 +22,15 @@ import (
 func NewGCPQuery(c client.Client, credsSecretName string) Query {
 	return &gcpQuery{
 		getGCPClient: func() (gcpclient.Client, error) {
-			secret := &corev1.Secret{}
+			credsSecret := &corev1.Secret{}
 			if err := c.Get(
 				context.Background(),
 				client.ObjectKey{Namespace: constants.HiveNamespace, Name: credsSecretName},
-				secret,
+				credsSecret,
 			); err != nil {
 				return nil, errors.Wrap(err, "could not get the creds secret")
 			}
-			authJSON, ok := secret.Data[constants.GCPCredentialsName]
-			if !ok {
-				return nil, errors.New("creds secret does not contain \"" + constants.GCPCredentialsName + "\" data")
-			}
-			gcpClient, err := gcpclient.NewClientWithDefaultProject(authJSON)
+			gcpClient, err := gcpclient.NewClientFromSecret(credsSecret)
 			return gcpClient, errors.Wrap(err, "error creating GCP client")
 		},
 	}
@@ -101,10 +99,10 @@ func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.String) 
 		if !ok {
 			return errors.Wrap(err, "error deleting the name server")
 		}
-		if gcpErr.Code == gcpclient.ErrCodeNotFound {
+		if gcpErr.Code == http.StatusNotFound {
 			return nil
 		}
-		if gcpErr.Code != 412 {
+		if gcpErr.Code != http.StatusPreconditionFailed {
 			return errors.Wrap(err, "error deleting the name server")
 		}
 	}
@@ -197,7 +195,39 @@ func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone strin
 
 // createNameServers creates the name servers for the specified domain in the specified managed zone.
 func (q *gcpQuery) createNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.String) error {
-	return gcpClient.AddResourceRecordSet(managedZone, q.resourceRecordSet(domain, values))
+
+	err := gcpClient.AddResourceRecordSet(managedZone, q.resourceRecordSet(domain, values))
+	if gcpErr, ok := err.(*googleapi.Error); ok && gcpErr.Code == http.StatusConflict {
+		// this means there is already an existing resource record, so we need
+		// to fall through to the update path
+	} else if err != nil {
+		return errors.Wrap(err, "unexpected error creating NS record")
+	} else {
+		return nil
+	}
+
+	// An update using the GCP API involves listing the current set of records
+	// for removal, and adding the new desired set of records as additions.
+	response, err := gcpClient.ListResourceRecordSets(managedZone, gcpclient.ListResourceRecordSetsOptions{
+		Name: controllerutils.Dotted(domain),
+		Type: "NS",
+	})
+	if err != nil {
+		errors.Wrap(err, "failed to list existing record sets")
+	}
+	switch len(response.Rrsets) {
+	case 1:
+		// Exactly one NS record that needs updating
+		currentNSValues := sets.NewString(response.Rrsets[0].Rrdatas...)
+
+		addRRSet := q.resourceRecordSet(domain, values)
+		removeRRSet := q.resourceRecordSet(domain, currentNSValues)
+
+		err := gcpClient.UpdateResourceRecordSet(managedZone, addRRSet, removeRRSet)
+		return errors.Wrap(err, "failed to update existing NS entry")
+	default:
+		return fmt.Errorf("unexpected response when querying domain")
+	}
 }
 
 // deleteNameServers deletes the name servers for the specified domain in the specified managed zone.

@@ -21,75 +21,70 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
-	"github.com/openshift/hive/pkg/apis"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/openshift/hive/pkg/apis"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
 
 const (
-	testName                        = "foo-unreachable"
-	testClusterName                 = "bar"
-	testClusterID                   = "testFooClusterUUID"
-	testNamespace                   = "default"
-	sshKeySecret                    = "ssh-key"
-	pullSecretSecret                = "pull-secret"
-	testRemoteClusterCurrentVersion = "4.0.0"
-	remoteClusterVersionObjectName  = "version"
+	testName         = "foo-unreachable"
+	testClusterName  = "bar"
+	testClusterID    = "testFooClusterUUID"
+	testNamespace    = "default"
+	pullSecretSecret = "pull-secret"
 )
 
 func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func TestUnreachablClusterStatusCondition(t *testing.T) {
+func TestReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme) //remove later
+	configv1.Install(scheme.Scheme)
+
 	tests := []struct {
-		name        string
-		existing    []runtime.Object
-		expectError bool
-		validate    func(*testing.T, *hivev1.ClusterDeployment)
+		name                          string
+		existing                      []runtime.Object
+		errorConnecting               bool
+		errorConnectingSecondary      *bool
+		expectError                   bool
+		expectNoCondition             bool
+		expectedStatus                corev1.ConditionStatus
+		expectActiveOverrideCondition bool
+		expectedActiveOverrideStatus  corev1.ConditionStatus
 	}{
 		{
 			name: "unreachable condition should be added",
 			existing: []runtime.Object{
 				getClusterDeployment(),
-				getKubeconfigSecret(),
 			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if cond.Status != corev1.ConditionTrue {
-					t.Errorf("Did not get expected state for unreachable condition. Expected: \n%#v\nGot: \n%#v", corev1.ConditionTrue, cond.Status)
-				}
-			},
+			errorConnecting: true,
+			expectedStatus:  corev1.ConditionTrue,
 		},
 		{
 			name: "unreachable condition should change from false to true",
 			existing: []runtime.Object{
 				getCDWithUnreachableConditionFalse(),
-				getKubeconfigSecret(),
 			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if cond.Status != corev1.ConditionTrue {
-					t.Errorf("Did not get expected state for unreachable condition. Expected: \n%#v\nGot: \n%#v", corev1.ConditionTrue, cond.Status)
-				}
-			},
+			errorConnecting: true,
+			expectedStatus:  corev1.ConditionTrue,
 		},
 		{
 			name: "lastProbeTime>2hr lastTransitionTime-12hour condition false to true",
@@ -99,89 +94,23 @@ func TestUnreachablClusterStatusCondition(t *testing.T) {
 					lastTransitionTime := metav1.NewTime(time.Now().Add(-(time.Hour * 12)))
 					return getCDWithProbeAndTransitionTime(lastProbeTime, lastTransitionTime, corev1.ConditionFalse)
 				}(),
-				getKubeconfigSecret(),
 			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if cond.Status != corev1.ConditionTrue {
-					t.Errorf("Did not get expected state for unreachable condition. Expected: \n%#v\nGot: \n%#v", corev1.ConditionFalse, cond.Status)
-				}
-			},
+			errorConnecting: true,
+			expectedStatus:  corev1.ConditionTrue,
 		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existing...)
-			rcd := &ReconcileRemoteMachineSet{
-				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "unreachable"),
-				remoteClusterAPIClientBuilder: mockUnreachableClusterAPIClientBuilder,
-			}
-
-			namespacedName := types.NamespacedName{
-				Name:      testName,
-				Namespace: testNamespace,
-			}
-
-			_, err := rcd.Reconcile(reconcile.Request{NamespacedName: namespacedName})
-
-			if test.validate != nil {
-				cd := &hivev1.ClusterDeployment{}
-				err := fakeClient.Get(context.TODO(), namespacedName, cd)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-					return
-				}
-				test.validate(t, cd)
-			}
-
-			if err != nil && !test.expectError {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			if err == nil && test.expectError {
-				t.Errorf("Expected error but got none")
-			}
-		})
-	}
-}
-
-func TestReachableClusterStatusCondition(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
-
-	tests := []struct {
-		name        string
-		existing    []runtime.Object
-		expectError bool
-		validate    func(*testing.T, *hivev1.ClusterDeployment)
-	}{
 		{
 			name: "unreachable condition should not be added",
 			existing: []runtime.Object{
 				getClusterDeployment(),
-				getKubeconfigSecret(),
 			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if cond != nil {
-					t.Error("Did not expect to get the unreachable status condition.")
-				}
-			},
+			expectNoCondition: true,
 		},
 		{
 			name: "unreachable condition should change from true to false",
 			existing: []runtime.Object{
 				getCDWithUnreachableConditionTrue(),
-				getKubeconfigSecret(),
 			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if cond.Status != corev1.ConditionFalse {
-					t.Errorf("Did not get expected state for unreachable condition. Expected: \n%#v\nGot: \n%#v", corev1.ConditionFalse, cond.Status)
-				}
-			},
+			expectedStatus: corev1.ConditionFalse,
 		},
 		{
 			name: "lastProbeTime lastTransitionTime 1hour ago unreachable condition true to false",
@@ -191,25 +120,79 @@ func TestReachableClusterStatusCondition(t *testing.T) {
 					lastTransitionTime := lastProbeTime
 					return getCDWithProbeAndTransitionTime(lastProbeTime, lastTransitionTime, corev1.ConditionTrue)
 				}(),
-				getKubeconfigSecret(),
 			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if cond.Status != corev1.ConditionFalse {
-					t.Errorf("Did not get expected state for unreachable condition. Expected: \n%#v\nGot: \n%#v", corev1.ConditionFalse, cond.Status)
-				}
+			expectedStatus: corev1.ConditionFalse,
+		},
+		{
+			name: "primary reachable",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := getCDWithUnreachableConditionTrue()
+					cd.Spec.ControlPlaneConfig.APIURLOverride = "test override URL"
+					return cd
+				}(),
 			},
+			expectedStatus:                corev1.ConditionFalse,
+			expectActiveOverrideCondition: true,
+			expectedActiveOverrideStatus:  corev1.ConditionTrue,
+		},
+		{
+			name: "secondary reachable",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := getCDWithUnreachableConditionTrue()
+					cd.Spec.ControlPlaneConfig.APIURLOverride = "test override URL"
+					return cd
+				}(),
+			},
+			errorConnecting:               true,
+			errorConnectingSecondary:      pointer.BoolPtr(false),
+			expectedStatus:                corev1.ConditionFalse,
+			expectActiveOverrideCondition: true,
+			expectedActiveOverrideStatus:  corev1.ConditionFalse,
+		},
+		{
+			name: "primary and secondary unreachable",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := getClusterDeployment()
+					cd.Spec.ControlPlaneConfig.APIURLOverride = "test override URL"
+					return cd
+				}(),
+			},
+			errorConnecting:               true,
+			errorConnectingSecondary:      pointer.BoolPtr(true),
+			expectedStatus:                corev1.ConditionTrue,
+			expectActiveOverrideCondition: true,
+			expectedActiveOverrideStatus:  corev1.ConditionFalse,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			mockRemoteClientBuilder.EXPECT().UsePrimaryAPIURL().Return(mockRemoteClientBuilder)
+			var buildError error
+			if test.errorConnecting {
+				buildError = errors.New("cluster not reachable")
+			}
+			mockRemoteClientBuilder.EXPECT().Build().Return(nil, buildError)
+			if test.errorConnectingSecondary != nil {
+				mockRemoteClientBuilder.EXPECT().UseSecondaryAPIURL().Return(mockRemoteClientBuilder)
+				var buildError error
+				if *test.errorConnectingSecondary {
+					buildError = errors.New("cluster not reachable")
+				}
+				mockRemoteClientBuilder.EXPECT().Build().Return(nil, buildError)
+			}
 			rcd := &ReconcileRemoteMachineSet{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "unreachable"),
-				remoteClusterAPIClientBuilder: mockReachableClusterAPIClientBuilder,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
 			namespacedName := types.NamespacedName{
@@ -219,21 +202,30 @@ func TestReachableClusterStatusCondition(t *testing.T) {
 
 			_, err := rcd.Reconcile(reconcile.Request{NamespacedName: namespacedName})
 
-			if test.validate != nil {
-				cd := &hivev1.ClusterDeployment{}
-				err := fakeClient.Get(context.TODO(), namespacedName, cd)
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-					return
-				}
-				test.validate(t, cd)
+			if test.expectError {
+				assert.Error(t, err, "expected error during reconcile")
+				return
 			}
 
-			if err != nil && !test.expectError {
-				t.Errorf("Unexpected error: %v", err)
-			}
-			if err == nil && test.expectError {
-				t.Errorf("Expected error but got none")
+			assert.NoError(t, err, "unexpected error during reconcile")
+			cd := &hivev1.ClusterDeployment{}
+			if err := fakeClient.Get(context.TODO(), namespacedName, cd); assert.NoError(t, err, "missing clusterdeployment") {
+				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
+				if test.expectNoCondition {
+					assert.Nil(t, cond, "expected no unreachable condition")
+				} else {
+					if assert.NotNil(t, cond, "missing unreachable condition") {
+						assert.Equal(t, string(test.expectedStatus), string(cond.Status), "unexpected status on unreachable condition")
+					}
+				}
+				cond = controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition)
+				if !test.expectActiveOverrideCondition {
+					assert.Nil(t, cond, "expected no active override condition")
+				} else {
+					if assert.NotNil(t, cond, "missing active override condition") {
+						assert.Equal(t, string(test.expectedActiveOverrideStatus), string(cond.Status), "unexpected status on active override condition")
+					}
+				}
 			}
 		})
 	}
@@ -303,40 +295,6 @@ func TestIsTimeForConnectivityCheck(t *testing.T) {
 	}
 }
 
-func mockUnreachableClusterAPIClientBuilder(secretData, controllerName string) (client.Client, error) {
-	err := errors.New("cluster not reachable")
-	return nil, err
-}
-
-func mockReachableClusterAPIClientBuilder(secretData, controllerName string) (client.Client, error) {
-
-	remoteClusterVersion := &configv1.ClusterVersion{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: remoteClusterVersionObjectName,
-		},
-	}
-	remoteClusterVersion.Status = testRemoteClusterVersionStatus()
-	remoteClient := fake.NewFakeClient(remoteClusterVersion)
-	return remoteClient, nil
-}
-
-func testRemoteClusterVersionStatus() configv1.ClusterVersionStatus {
-	zeroTime := metav1.NewTime(time.Unix(0, 0))
-	status := configv1.ClusterVersionStatus{
-		History: []configv1.UpdateHistory{
-			{
-				State:          configv1.CompletedUpdate,
-				Version:        testRemoteClusterCurrentVersion,
-				Image:          "TESTIMAGE",
-				CompletionTime: &zeroTime,
-			},
-		},
-		ObservedGeneration: 123456789,
-		VersionHash:        "TESTVERSIONHASH",
-	}
-	return status
-}
-
 func getClusterDeployment() *hivev1.ClusterDeployment {
 	cd := &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -347,38 +305,26 @@ func getClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
-			SSHKey: corev1.LocalObjectReference{
-				Name: sshKeySecret,
-			},
-			ControlPlane: hivev1.MachinePool{},
-			Compute:      []hivev1.MachinePool{},
-			PullSecret: &corev1.LocalObjectReference{
+			PullSecretRef: &corev1.LocalObjectReference{
 				Name: pullSecretSecret,
 			},
 			Platform: hivev1.Platform{
 				AWS: &hivev1aws.Platform{
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "aws-credentials",
+					},
 					Region: "us-east-1",
 				},
 			},
-			Networking: hivev1.Networking{
-				Type: hivev1.NetworkTypeOpenshiftSDN,
-			},
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
-						Name: "aws-credentials",
-					},
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				ClusterID: testClusterID,
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+					Name: "kubeconfig-secret",
 				},
 			},
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			ClusterID: testClusterID,
-			AdminKubeconfigSecret: corev1.LocalObjectReference{
-				Name: "kubeconfig-secret",
-			},
+			Installed: true,
 		},
 	}
-	cd.Spec.Installed = true
 	return cd
 }
 
@@ -433,28 +379,11 @@ func getCDWithProbeAndTransitionTime(lastProbeTime, lastTransitionTime metav1.Ti
 		hivev1.ClusterDeploymentCondition{
 			Type:               hivev1.UnreachableCondition,
 			Status:             status,
-			Reason:             "ClusterReachable",
-			Message:            "Setting the condition when cluster is reachable",
+			Reason:             "test reason",
+			Message:            "test message",
 			LastTransitionTime: lastTransitionTime,
 			LastProbeTime:      lastProbeTime,
 		},
 	)
 	return cd
-}
-
-func getKubeconfigSecret() *corev1.Secret {
-	return testSecret("kubeconfig-secret", "kubeconfig", "KUBECONFIG-DATA")
-}
-
-func testSecret(name, key, value string) *corev1.Secret {
-	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: testNamespace,
-		},
-		Data: map[string][]byte{
-			key: []byte(value),
-		},
-	}
-	return s
 }

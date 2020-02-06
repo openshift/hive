@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -309,7 +309,7 @@ func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
 	ssInstancesTotal := 0
 	ssInstancesUnappliedTotal := 0
 	for _, ssi := range ssis.Items {
-		if sss := ssi.Spec.SelectorSyncSet; sss != nil {
+		if sss := ssi.Spec.SelectorSyncSetRef; sss != nil {
 			// Process SyncSetInstances with a SelectorSyncSet reference:
 			sssInstancesTotal[sss.Name]++
 			if !ssi.Status.Applied {

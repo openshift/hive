@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -24,7 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -155,12 +157,12 @@ func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconc
 
 	switch instance.Spec.Stage {
 	case hivev1.ClusterProvisionStageInitializing:
-		if instance.Status.Job != nil {
+		if instance.Status.JobRef != nil {
 			return r.reconcileRunningJob(instance, pLog)
 		}
 		return r.reconcileNewProvision(instance, pLog)
 	case hivev1.ClusterProvisionStageProvisioning:
-		if instance.Status.Job != nil {
+		if instance.Status.JobRef != nil {
 			return r.reconcileRunningJob(instance, pLog)
 		}
 		return r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, "NoJobReference", "Missing reference to install job", pLog)
@@ -198,6 +200,9 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 
 	pLog = pLog.WithField("job", job.Name)
 
+	pLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
+	job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterProvisionNameLabel, instance.Name)
+	job.Labels = k8slabels.AddLabel(job.Labels, constants.JobTypeLabel, constants.JobTypeProvision)
 	if err = controllerutil.SetControllerReference(instance, job, r.scheme); err != nil {
 		pLog.WithError(err).Error("error setting controller reference on job")
 		return reconcile.Result{}, err
@@ -215,7 +220,7 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 }
 
 func (r *ReconcileClusterProvision) adoptJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
-	instance.Status.Job = &corev1.LocalObjectReference{Name: job.Name}
+	instance.Status.JobRef = &corev1.LocalObjectReference{Name: job.Name}
 	return reconcile.Result{}, r.setCondition(instance, hivev1.ClusterProvisionJobCreated, "JobCreated", "Install job has been created", pLog)
 }
 
@@ -224,7 +229,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 	pLog.Debug("reconciling running job")
 
 	job := &batchv1.Job{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: instance.Status.Job.Name, Namespace: instance.Namespace}, job); {
+	switch err := r.Get(context.TODO(), types.NamespacedName{Name: instance.Status.JobRef.Name, Namespace: instance.Namespace}, job); {
 	case apierrors.IsNotFound(err):
 		if cond := controllerutils.FindClusterProvisionCondition(instance.Status.Conditions, hivev1.ClusterProvisionFailedCondition); cond == nil {
 			pLog.Error("install job lost")
@@ -260,7 +265,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 		if err := r.Get(
 			context.TODO(),
 			types.NamespacedName{
-				Name:      instance.Spec.ClusterDeployment.Name,
+				Name:      instance.Spec.ClusterDeploymentRef.Name,
 				Namespace: instance.Namespace,
 			},
 			&cd,
@@ -268,7 +273,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 			pLog.WithError(err).Error("could not get clusterdeployment")
 			return reconcile.Result{}, err
 		}
-		if cd.Status.InfraID == *instance.Spec.InfraID {
+		if cd.Spec.ClusterMetadata != nil && cd.Spec.ClusterMetadata.InfraID == *instance.Spec.InfraID {
 			return r.startProvisioning(instance, pLog)
 		}
 	}
@@ -296,14 +301,14 @@ func (r *ReconcileClusterProvision) startProvisioning(instance *hivev1.ClusterPr
 
 func (r *ReconcileClusterProvision) abortProvision(instance *hivev1.ClusterProvision, reason string, message string, pLog log.FieldLogger) (reconcile.Result, error) {
 	pLog.Infof("aborting provision (%s): %s", reason, message)
-	if instance.Status.Job == nil {
+	if instance.Status.JobRef == nil {
 		return r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	}
 	if err := r.setCondition(instance, hivev1.ClusterProvisionFailedCondition, reason, message, pLog); err != nil {
 		return reconcile.Result{}, err
 	}
 	job := &batchv1.Job{}
-	switch err := r.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Status.Job.Name}, job); {
+	switch err := r.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Status.JobRef.Name}, job); {
 	case apierrors.IsNotFound(err):
 		pLog.Warn("install job for aborted provision already gone before it was deleted")
 		return reconcile.Result{}, nil
@@ -405,14 +410,14 @@ func clusterDeploymentWatchHandler(a handler.MapObject) []reconcile.Request {
 		return nil
 	}
 
-	if cd.Status.Provision == nil {
+	if cd.Status.ProvisionRef == nil {
 		return nil
 	}
 
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name:      cd.Status.Provision.Name,
+				Name:      cd.Status.ProvisionRef.Name,
 				Namespace: cd.Namespace,
 			},
 		},

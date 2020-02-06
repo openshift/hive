@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // ClusterProvisionSpec defines the results of provisioning a cluster.
@@ -131,8 +131,4 @@ type ClusterProvisionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterProvision `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ClusterProvision{}, &ClusterProvisionList{})
 }

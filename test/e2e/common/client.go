@@ -14,6 +14,8 @@ import (
 	"k8s.io/client-go/rest"
 	apiregv1client "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
+	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
+
 	hiveapis "github.com/openshift/hive/pkg/apis"
 )
 
@@ -21,10 +23,15 @@ func init() {
 	apiextv1beta1.AddToScheme(scheme.Scheme)
 	hiveapis.AddToScheme(scheme.Scheme)
 	admissionv1beta1.AddToScheme(scheme.Scheme)
+	autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)
 }
 
 func MustGetClient() client.Client {
-	c, err := client.New(MustGetConfig(), client.Options{Scheme: scheme.Scheme})
+	return MustGetClientFromConfig(MustGetConfig())
+}
+
+func MustGetClientFromConfig(cfg *rest.Config) client.Client {
+	c, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		log.Fatalf("Error obtaining client: %v", err)
 	}

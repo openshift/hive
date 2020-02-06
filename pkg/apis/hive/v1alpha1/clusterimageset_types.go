@@ -47,7 +47,3 @@ type ClusterImageSetList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterImageSet `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&ClusterImageSet{}, &ClusterImageSetList{})
-}

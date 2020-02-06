@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakekubeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
@@ -39,10 +39,9 @@ var (
 			Spec: hivev1.DNSZoneSpec{
 				Zone: "blah.example.com",
 				AWS: &hivev1.AWSDNSZoneSpec{
-					AccountSecret: corev1.LocalObjectReference{
+					CredentialsSecretRef: corev1.LocalObjectReference{
 						Name: "somesecret",
 					},
-					Region: "us-east-1",
 					AdditionalTags: []hivev1.AWSResourceTag{
 						{
 							Key:   "foo",
@@ -82,13 +81,6 @@ var (
 				"osServiceAccount.json": []byte("notrealsecrettoken"),
 			},
 		}
-	}
-
-	validDNSEndpoint = func() *hivev1.DNSEndpoint {
-		ep := &hivev1.DNSEndpoint{}
-		ep.Namespace = "ns"
-		ep.Name = "dnszoneobject-ns"
-		return ep
 	}
 
 	validDNSZoneWithLinkToParent = func() *hivev1.DNSZone {
@@ -169,9 +161,4 @@ func fakeGCPClientBuilder(mockGCPClient *mockgcp.MockClient) gcpClientBuilderTyp
 // setFakeDNSZoneInKube is an easy way to register a dns zone object with kube.
 func setFakeDNSZoneInKube(mocks *mocks, dnsZone *hivev1.DNSZone) error {
 	return mocks.fakeKubeClient.Create(context.TODO(), dnsZone)
-}
-
-// setFakeDNSEndpointInKube creates a fake DNSEndpoint
-func setFakeDNSEndpointInKube(mocks *mocks, endpoint *hivev1.DNSEndpoint) error {
-	return mocks.fakeKubeClient.Create(context.TODO(), endpoint)
 }

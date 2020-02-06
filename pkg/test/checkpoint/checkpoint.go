@@ -1,9 +1,8 @@
 package checkpoint
 
 import (
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/test/generic"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,7 +41,7 @@ func WithLastBackupTime(lastBackupTime metav1.Time) Option {
 }
 
 // WithLastBackupRef sets the name of the last backup object created.
-func WithLastBackupRef(lastBackupRef corev1.ObjectReference) Option {
+func WithLastBackupRef(lastBackupRef hivev1.BackupReference) Option {
 	return func(checkpoint *hivev1.Checkpoint) {
 		checkpoint.Spec.LastBackupRef = lastBackupRef
 	}

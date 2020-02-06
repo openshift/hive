@@ -6,7 +6,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 const (
@@ -22,7 +22,7 @@ var (
 )
 
 func TestGenerateImageSetJob(t *testing.T) {
-	job := GenerateImageSetJob(testClusterDeployment(), *testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec)
+	job := GenerateImageSetJob(testClusterDeployment(), testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec)
 	validateJob(t, job)
 }
 
@@ -36,7 +36,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 func testImageSet() *hivev1.ClusterImageSet {
 	is := &hivev1.ClusterImageSet{}
 	is.Name = "test-image-set"
-	is.Spec.ReleaseImage = strPtr("test-release-image")
+	is.Spec.ReleaseImage = "test-release-image"
 	return is
 }
 
@@ -87,8 +87,4 @@ func hasVolume(job *batchv1.Job, name string) bool {
 		}
 	}
 	return false
-}
-
-func strPtr(str string) *string {
-	return &str
 }

@@ -42,7 +42,7 @@ type NetworkConfigList struct {
 // NetworkConfigSpec is the top-level network configuration object.
 type NetworkConfigSpec struct {
 	// IP address pool to use for pod IPs.
-	// Some network providers, e.g. Openshift-sdn, support multiple ClusterNetworks.
+	// Some network providers, e.g. OpenShift SDN, support multiple ClusterNetworks.
 	// Others only support one. This is equivalent to the cluster-cidr.
 	ClusterNetworks []ClusterNetwork `json:"clusterNetworks"`
 
@@ -52,16 +52,19 @@ type NetworkConfigSpec struct {
 	// The "default" network that all pods will receive
 	DefaultNetwork DefaultNetworkDefinition `json:"defaultNetwork"`
 
-	// Additional networks to make available to pods. If they are specified,
-	// pods can request them via annotations.
-	//
-	// Specifying any additionalNetworks will enable Multus across the cluster.
-	AdditionalNetworks []AdditionalNetworkDefinition `json:"additionalNetworks"`
+	// Additional networks to make available to pods when multiple networks
+	// are enabled.
+	AdditionalNetworks []AdditionalNetworkDefinition `json:"additionalNetworks,omitempty"`
+
+	// DisableMultiNetwork specifies whether or not multiple pod network
+	// support should be disabled. If unset, this property defaults to
+	// 'false' and multiple network support is enabled.
+	DisableMultiNetwork *bool `json:"disableMultiNetwork,omitempty"`
 
 	// DeployKubeProxy specifies whether or not a standalone kube-proxy should
 	// be deployed by the operator. Some network providers include kube-proxy
 	// or similar functionality. If unset, the plugin will attempt to select
-	// the correct value, which is false when Openshift-sdn and ovn-kubernetes are
+	// the correct value, which is false when OpenShift SDN and ovn-kubernetes are
 	// used and true otherwise.
 	// +optional
 	DeployKubeProxy *bool `json:"deployKubeProxy,omitempty"`
@@ -82,28 +85,19 @@ type ClusterNetwork struct {
 
 // NetworkDefinition represents a single network plugin's configuration.
 // Kind must be specified, along with exactly one "Config" that matches
-// the kind. Kinds that do not have a specific configuration parameter should
-// use OtherConfig
+// the kind.
 type DefaultNetworkDefinition struct {
 	// The type of network
 	// All NetworkTypes are supported except for NetworkTypeRaw
 	Type NetworkType `json:"type"`
 
-	// OpenshiftSDNConfig configures the openshift-sdn plugin
+	// OpenShiftSDNConfig configures the openshift-sdn plugin
 	// +optional
-	OpenshiftSDNConfig *OpenshiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
+	OpenShiftSDNConfig *OpenShiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
 
 	// OVNKubernetesConfig configures the ovn-kubernetes plugin
 	// +optional
 	OVNKubernetesConfig *OVNKubernetesConfig `json:"ovnKubernetesConfig,omitempty"`
-
-	// OtherConfig is for network plugins that are supported by the operator
-	// but do not need their own type. These values will be passed directly
-	// to the manifest templates.
-	// This is used by calico and kuryr
-	// See the plugin-specific documentation for which values are required.
-	// +optional
-	OtherConfig map[string]string `json:"otherConfig,omitEmpty"`
 }
 
 // AdditionalNetworkDefinition is extra networks that are available but not
@@ -121,9 +115,9 @@ type AdditionalNetworkDefinition struct {
 	RawCNIConfig string `json:"rawCNIConfig"`
 }
 
-// OpenshiftSDNConfig configures the three openshift-sdn plugins
-type OpenshiftSDNConfig struct {
-	// Mode is one of "multitenant", "subnet", or "networkpolicy"
+// OpenShiftSDNConfig configures the three openshift-sdn plugins
+type OpenShiftSDNConfig struct {
+	// Mode is one of "Multitenant", "Subnet", or "NetworkPolicy"
 	Mode SDNMode `json:"mode"`
 
 	// VXLANPort is the port to use for all vxlan packets. The default
@@ -164,21 +158,21 @@ type ProxyConfig struct {
 
 	// The address to "bind" on
 	// Defaults to 0.0.0.0
-	BindAddress string
+	BindAddress string `json:"bindAddress,omitempty"`
 
 	// Any additional arguments to pass to the kubeproxy process
-	ProxyArguments map[string][]string
+	ProxyArguments map[string][]string `json:"proxyArguments,omitempty"`
 }
 
 const (
-	// NetworkTypeOpenshiftSDN means the openshift-sdn plugin will be configured
-	NetworkTypeOpenshiftSDN NetworkType = "OpenshiftSDN"
+	// NetworkTypeOpenShiftSDN means the openshift-sdn plugin will be configured
+	NetworkTypeOpenShiftSDN NetworkType = "OpenShiftSDN"
+
+	// NetworkTypeDeprecatedOpenshiftSDN is equivalent to NetworkTypeOpenShiftSDN, for compatibility
+	NetworkTypeDeprecatedOpenshiftSDN NetworkType = "OpenshiftSDN"
 
 	// NetworkTypeOVNKubernetes means the ovn-kubernetes project will be configured
 	NetworkTypeOVNKubernetes NetworkType = "OVNKubernetes"
-
-	// NetworkTypeCalico means Calico will be configured
-	NetworkTypeCalico NetworkType = "Calico"
 
 	// NetworkType
 	NetworkTypeKuryr NetworkType = "Kuryr"
@@ -191,9 +185,9 @@ const (
 type SDNMode string
 
 const (
-	SDNModeMultitenant SDNMode = "Multitenant"
+	SDNModeSubnet        SDNMode = "Subnet"
+	SDNModeMultitenant   SDNMode = "Multitenant"
+	SDNModeNetworkPolicy SDNMode = "NetworkPolicy"
 
-	SDNModeSubnet SDNMode = "Subnet"
-
-	SDNModePolicy SDNMode = "Networkpolicy"
+	SDNModeDeprecatedNetworkpolicy SDNMode = "Networkpolicy"
 )

@@ -4,6 +4,7 @@
 
 - [Developing Hive](#developing-hive)
   - [Prerequisites](#prerequisites)
+  - [External tools](#external-tools)
   - [Build and run tests](#build-and-run-tests)
   - [Setting up the development environment](#setting-up-the-development-environment)
     - [Cloning the repository](#cloning-the-repository)
@@ -34,7 +35,29 @@
 - Git
 - Make
 - A recent Go distribution (>=1.12)
+
+### External tools
+
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
+- [mockgen](https://github.com/golang/mock)
+- [golangci-lint](https://github.com/golangci/golangci-lint)
+
+If you do not care to install those tools locally, then you can use them from the Hive build image.
+
+To build the image, run:
+
+```bash
+go get -u github.com/openshift/imagebuilder/cmd/imagebuilder  # if you don't have imagebuilder
+make build-build-image
+```
+
+Then, replace executions of `make` with executions of `hack/make`.
+
+For example, to run the tests you would run the following.
+
+```bash
+hack/make test
+```
 
 ## Build and run tests
 
@@ -54,10 +77,10 @@ make test
 
 ### Cloning the repository
 
-Get the sources from GitHub:
+Get the sources from GitHub into the right place under $GOPATH (building anywhere else doesn't work presently):
 
 ```bash
-cd $GOPATH/src/openshift
+cd $GOPATH/src/github.com/openshift
 git clone https://github.com/openshift/hive.git
 ```
 
@@ -88,7 +111,7 @@ CONTAINER ID        IMAGE                  COMMAND                  CREATED     
 1dc8a3c59d84        registry:2             "/entrypoint.sh /etc…"   2 weeks ago         Up 8 days           0.0.0.0:5000->5000/tcp                 registry
 ```
 
-Configure kubectl to talk to your new cluster:
+Configure kubectl/oc to talk to your new cluster:
 
 ```bash
 export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
@@ -117,6 +140,24 @@ You can leave your registry container running indefinitely. The kind cluster can
 kind delete cluster --name hive
 ./hack/create-kind-cluster.sh hive
 ```
+
+## Adopting ClusterDeployments
+
+It is possible to adopt cluster deployments into Hive, potentially even fake or kind clusters. This can be useful for developers who would like to work on functionality separate from actual provisioning.
+
+To create a kind cluster and adopt:
+
+```bash
+./hack/create-kind-cluster.sh cluster1
+bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=$(kind get kubeconfig-path --name="cluster1") --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
+```
+
+NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)
+
+Alternatively you can use any valid kubeconfig for live or since deleted clusters.
+
+Deprovision will run but find nothing to delete if no resources are tagged with your fake infrastructure ID.
+
 
 ## Writing/Testing Code
 
@@ -165,7 +206,7 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
  2. Make a temporary working directory in your hive checkout: `$ mkdir temp`
  3. Compile your hiveutil changes: `$ make hiveutil`
  4. Set your pull secret as an env var to match the pod: `$ export PULL_SECRET=$(cat ~/pull-secret)`
- 5. Run: `/bin/hiveutil install-manager --work-dir ~/go/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
+ 5. Run: `/bin/hiveutil install-manager --work-dir $GOPATH/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
 
 ## Enable Debug Logging In Hive Controllers
 
@@ -228,6 +269,8 @@ Before you can use Dep you need to download and install it from GitHub:
 
 This will install the `dep` binary into *_$GOPATH/bin_*.
 
+Alternatively, if you would rather not install Dep, you can run from a container using the Hive build image as described in the [External tools](#external-tools) section.
+
 ### Updating Dependencies
 
 If your work requires a change to the dependencies, you need to update the Dep configuration.
@@ -261,7 +304,12 @@ Alternatively, you can run the Dep command directly.
 dep ensure -v
 ```
 
-### Running the e2e test locally
+### TIP
+
+* The Dep cache located under *_$GOPATH/pkg/dep_*.
+* If you see any Dep errors during `make vendor`, you can remove local cached directory and try again.
+
+## Running the e2e test locally
 
 The e2e test deploys Hive on a cluster, tests that all Hive components are working properly, then creates a cluster
 with Hive and ensures that Hive works properly with the installed cluster. It finally tears down the created cluster.
@@ -288,8 +336,17 @@ Run the Hive e2e script:
 
 `hack/e2e-test.sh`
 
-### TIP
+## Viewing Metrics with Prometheus
 
-* The Dep cache located under *_$GOPATH/pkg/dep_*.
-* If you see any Dep errors during `make vendor`, you can remove local cached directory and try again.
+Hive publishes a number of metrics that can be scraped by prometheus. If you do not have an in-cluster prometheus that can scrape hive's endpoint, you can deploy a stateless prometheus pod in the hive namespace with:
 
+```
+oc apply -f config/prometheus
+oc port-forward svc/prometheus -n hive 9090:9090
+```
+
+Once the pods come up you should be able to view prometheus at http://localhost:9090.
+
+Hive metrics have a hive_ or controller_runtime_ prefix.
+
+Note that this prometheus uses an emptyDir volume and all data is lost on pod restart.

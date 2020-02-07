@@ -122,9 +122,15 @@ func (o *RecreateObjectsOptions) recreateObject(client dynamic.Interface, objFro
 	clearResourceVersion(objFromFile)
 	removeHiveOwnerReferences(objFromFile)
 	removeKubectlLastAppliedAnnotation(objFromFile)
-	_, err := resourceClient.Create(objFromFile, metav1.CreateOptions{})
+	newObj, err := resourceClient.Create(objFromFile, metav1.CreateOptions{})
 	if err != nil {
 		logger.WithError(err).Error("could not create object")
+		return
+	}
+	objFromFile.SetUID(newObj.GetUID())
+	objFromFile.SetResourceVersion(newObj.GetResourceVersion())
+	if _, err := resourceClient.Update(objFromFile, metav1.UpdateOptions{}); err != nil {
+		logger.WithError(err).Error("could not update re-created object with status")
 		return
 	}
 	logger.Info("created object")

@@ -237,11 +237,10 @@ To use this feature:
          name: hive
        spec:
          managedDomains:
-         - hive.example.com
-         externalDNS:
-           aws:
-             credentialsSecretRef:
-               name: route53-aws-creds
+         - credentialsSecretRef:
+           name: route53-aws-creds
+         - domains:
+           - hive.example.com
        ```
      - GCP
        ```yaml

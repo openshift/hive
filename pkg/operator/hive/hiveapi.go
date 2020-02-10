@@ -30,7 +30,7 @@ func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.He
 
 	err := util.ApplyAsset(h, "config/apiserver/hiveapi-cluster-role-binding.yaml", hLog)
 	if err != nil {
-		return err
+		hLog.WithError(err).Error("unable to apply hiveapi cluster role binding")
 	}
 
 	err = util.ApplyAsset(h, "config/apiserver/service.yaml", hLog)

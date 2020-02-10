@@ -65,7 +65,7 @@ objects:
   stringData:
     ssh-publickey: "${SSH_KEY}"
 
-- apiVersion: hive.openshift.io/v1alpha1
+- apiVersion: hive.openshift.io/v1
   kind: ClusterImageSet
   metadata:
     labels:
@@ -74,7 +74,7 @@ objects:
   spec:
     releaseImage: "${RELEASE_IMAGE}"
 
-- apiVersion: hive.openshift.io/v1alpha1
+- apiVersion: hive.openshift.io/v1
   kind: ClusterDeployment
   metadata:
     labels:

@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -40,15 +41,18 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -217,11 +221,11 @@ func TestSyncSetReconcile(t *testing.T) {
 		},
 		{
 			name:    "Apply single patch successfully",
-			syncSet: testSyncSetWithPatches("ss1", testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1")),
+			syncSet: testSyncSetWithPatches("ss1", testSyncObjectPatch("foo", "bar", "baz", "v1", "value1")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulPatchStatus(
 					[]hivev1.SyncObjectPatch{
-						testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
+						testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
 					}))
 			},
 			expectApplied: true,
@@ -229,14 +233,14 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "Apply multiple patches successfully",
 			syncSet: testSyncSetWithPatches("ss1",
-				testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
-				testSyncObjectPatch("chicken", "potato", "stew", "v1", "AlwaysApply", "value2"),
+				testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
+				testSyncObjectPatch("chicken", "potato", "stew", "v1", "value2"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulPatchStatus(
 					[]hivev1.SyncObjectPatch{
-						testSyncObjectPatch("foo", "bar", "baz", "v1", "AlwaysApply", "value1"),
-						testSyncObjectPatch("chicken", "potato", "stew", "v1", "AlwaysApply", "value2"),
+						testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
+						testSyncObjectPatch("chicken", "potato", "stew", "v1", "value2"),
 					},
 				))
 			},
@@ -245,15 +249,15 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "Reapply single patch",
 			status: successfulPatchStatus([]hivev1.SyncObjectPatch{
-				testSyncObjectPatch("foo", "bar", "baz", "v1", "ApplyOnce", "value1"),
+				testSyncObjectPatch("foo", "bar", "baz", "v1", "value1"),
 			}),
 			syncSet: testSyncSetWithPatches("ss1",
-				testSyncObjectPatch("foo", "bar", "baz", "v1", "ApplyOnce", "value1***changed"),
+				testSyncObjectPatch("foo", "bar", "baz", "v1", "value1***changed"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulPatchStatus(
 					[]hivev1.SyncObjectPatch{
-						testSyncObjectPatch("foo", "bar", "baz", "v1", "ApplyOnce", "value1***changed"),
+						testSyncObjectPatch("foo", "bar", "baz", "v1", "value1***changed"),
 					},
 				))
 			},
@@ -262,18 +266,18 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "Stop applying patches when error occurs",
 			syncSet: testSyncSetWithPatches("ss1",
-				testSyncObjectPatch("thing1", "bar", "baz", "v1", "AlwaysApply", "value1"),
-				testSyncObjectPatch("thing2", "bar", "baz", "v1", "AlwaysApply", "value1"),
-				testSyncObjectPatch("thing3", "bar", "baz", "v1", "AlwaysApply", "patch-error"),
-				testSyncObjectPatch("thing4", "bar", "baz", "v1", "AlwaysApply", "value1"),
+				testSyncObjectPatch("thing1", "bar", "baz", "v1", "value1"),
+				testSyncObjectPatch("thing2", "bar", "baz", "v1", "value1"),
+				testSyncObjectPatch("thing3", "bar", "baz", "v1", "patch-error"),
+				testSyncObjectPatch("thing4", "bar", "baz", "v1", "value1"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := successfulPatchStatus([]hivev1.SyncObjectPatch{
-					testSyncObjectPatch("thing1", "bar", "baz", "v1", "AlwaysApply", "value1"),
-					testSyncObjectPatch("thing2", "bar", "baz", "v1", "AlwaysApply", "value1"),
+					testSyncObjectPatch("thing1", "bar", "baz", "v1", "value1"),
+					testSyncObjectPatch("thing2", "bar", "baz", "v1", "value1"),
 				})
 				status.Patches = append(status.Patches, failedPatchStatus("ss1", []hivev1.SyncObjectPatch{
-					testSyncObjectPatch("thing3", "bar", "baz", "v1", "AlwaysApply", "patch-error"),
+					testSyncObjectPatch("thing3", "bar", "baz", "v1", "patch-error"),
 				}).Patches...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
@@ -289,8 +293,8 @@ func TestSyncSetReconcile(t *testing.T) {
 					testCM("cm4", "key4", "value4"),
 				},
 				[]hivev1.SyncObjectPatch{
-					testSyncObjectPatch("thing1", "bar", "baz", "v1", "AlwaysApply", "value1"),
-					testSyncObjectPatch("thing2", "bar", "baz", "v1", "AlwaysApply", "value2"),
+					testSyncObjectPatch("thing1", "bar", "baz", "v1", "value1"),
+					testSyncObjectPatch("thing2", "bar", "baz", "v1", "value2"),
 				}),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := successfulResourceStatus(
@@ -361,53 +365,53 @@ func TestSyncSetReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Apply single SecretReference successfully",
+			name: "Apply single secret successfully",
 			existingObjs: []runtime.Object{
 				testSecret("foo", "bar"),
 			},
-			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulSecretReferenceStatus(testSecret("foo", "bar")))
+					successfulSecretStatus(testSecret("foo", "bar")))
 			},
 			expectApplied: true,
 		},
 		{
-			name:      "Local SecretReference secret does not exist",
-			syncSet:   testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			name:      "Local secret does not exist",
+			syncSet:   testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			expectErr: true,
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := hivev1.SyncSetInstanceStatus{}
-				status.SecretReferences = append(status.SecretReferences, applyFailedSecretReferenceStatus("ss1",
+				status.Secrets = append(status.Secrets, applyFailedSecretStatus("ss1",
 					testSecret("foo", "bar"),
-				).SecretReferences...)
+				).Secrets...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
 		},
 		{
-			name: "Local SecretReference secret has OwnerReference",
+			name: "Local secret has OwnerReference",
 			existingObjs: []runtime.Object{
 				testSecretWithOwner("foo", "bar"),
 			},
-			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulSecretReferenceStatus(
+					successfulSecretStatus(
 						testSecret("foo", "bar"),
 					))
 			},
 			expectApplied: true,
 		},
 		{
-			name: "Apply multiple SecretReferences successfully",
+			name: "Apply multiple secrets successfully",
 			existingObjs: []runtime.Object{
 				testSecret("foo", "bar"),
 				testSecret("baz", "bar"),
 			},
-			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo"), testSecretRef("baz")),
+			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo"), testSecretMapping("baz")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulSecretReferenceStatus(
+					successfulSecretStatus(
 						testSecret("foo", "bar"),
 						testSecret("baz", "bar"),
 					))
@@ -419,11 +423,11 @@ func TestSyncSetReconcile(t *testing.T) {
 			existingObjs: []runtime.Object{
 				testSecret("foo", "data_value***changed"),
 			},
-			status:  successfulSecretReferenceStatus(testSecret("key", "data_value")),
-			syncSet: testSyncSetWithSecretReferences("ss1", testSecretRef("foo")),
+			status:  successfulSecretStatus(testSecret("key", "data_value")),
+			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulSecretReferenceStatus(testSecret("foo", "data_value***changed")))
+					successfulSecretStatus(testSecret("foo", "data_value***changed")))
 			},
 			expectApplied: true,
 		},
@@ -434,27 +438,27 @@ func TestSyncSetReconcile(t *testing.T) {
 				testSecret("s2", "value2***changed"),
 				testSecret("s3", "value3"),
 			},
-			status: successfulSecretReferenceStatusWithTime(
+			status: successfulSecretStatusWithTime(
 				[]runtime.Object{
 					testSecret("s1", "value1"),
 					testSecret("s2", "value2"),
 					testSecret("s3", "value3"),
 				},
 				metav1.NewTime(tenMinutesAgo)),
-			syncSet: testSyncSetWithSecretReferences("aaa",
-				testSecretRef("s1"),
-				testSecretRef("s2"),
-				testSecretRef("s3"),
+			syncSet: testSyncSetWithSecretMappings("aaa",
+				testSecretMapping("s1"),
+				testSecretMapping("s2"),
+				testSecretMapping("s3"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
-				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretReferenceStatus(
+				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretStatus(
 					testSecret("s1", "value1"),
 					testSecret("s2", "value2***changed"),
 					testSecret("s3", "value3"),
 				))
 				unchanged := []hivev1.SyncStatus{
-					ssi.Status.SecretReferences[0],
-					ssi.Status.SecretReferences[2],
+					ssi.Status.Secrets[0],
+					ssi.Status.Secrets[2],
 				}
 				for _, ss := range unchanged {
 					if ss.Conditions[0].LastProbeTime.Time.Unix() != tenMinutesAgo.Unix() {
@@ -464,7 +468,7 @@ func TestSyncSetReconcile(t *testing.T) {
 						t.Errorf("unexpected condition last transition time for resource %s/%s. Got: %v, Expected: %v", ss.Namespace, ss.Name, ss.Conditions[0].LastTransitionTime.Time, tenMinutesAgo)
 					}
 				}
-				changed := ssi.Status.SecretReferences[1]
+				changed := ssi.Status.Secrets[1]
 				if changed.Conditions[0].LastProbeTime.Time.Unix() <= tenMinutesAgo.Unix() {
 					t.Errorf("unexpected condition last probe time for resource %s/%s. Got: %v, Expected a more recent time", changed.Namespace, changed.Name, changed.Conditions[0].LastProbeTime.Time)
 				}
@@ -483,16 +487,16 @@ func TestSyncSetReconcile(t *testing.T) {
 				testSecret("foo3", "bar"),
 				testSecret("foo4", "bar"),
 			},
-			status: successfulSecretReferenceStatus(
+			status: successfulSecretStatus(
 				testSecret("foo1", "bar"),
 				testSecret("foo2", "bar"),
 				testSecret("foo3", "bar"),
 				testSecret("foo4", "bar"),
 			),
 			syncSet: func() *hivev1.SyncSet {
-				ss := testSyncSetWithSecretReferences("aaa",
-					testSecretRef("foo1"),
-					testSecretRef("foo3"),
+				ss := testSyncSetWithSecretMappings("aaa",
+					testSecretMapping("foo1"),
+					testSecretMapping("foo3"),
 				)
 				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
 				return ss
@@ -508,11 +512,11 @@ func TestSyncSetReconcile(t *testing.T) {
 			existingObjs: []runtime.Object{
 				testSecret("s1", "value1"),
 			},
-			selectorSyncSet: testMatchingSelectorSyncSetWithSecretReferences("foo",
-				testSecretRef("s1"),
+			selectorSyncSet: testMatchingSelectorSyncSetWithSecrets("foo",
+				testSecretMapping("s1"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
-				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretReferenceStatus(
+				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretStatus(
 					testSecret("s1", "value1"),
 				))
 			},
@@ -545,20 +549,20 @@ func TestSyncSetReconcile(t *testing.T) {
 			existingObjs: []runtime.Object{
 				testSecret("foo", "bar"),
 			},
-			status: successfulSecretReferenceStatus(
+			status: successfulSecretStatus(
 				testSecret("foo", "bar"),
 				testSecret("delete-error", "baz"),
 			),
 			syncSet: func() *hivev1.SyncSet {
-				ss := testSyncSetWithSecretReferences("aaa", testSecretRef("foo"))
+				ss := testSyncSetWithSecretMappings("aaa", testSecretMapping("foo"))
 				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
 				return ss
 			}(),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
-				status := successfulSecretReferenceStatus(testSecret("foo", "bar"))
-				status.SecretReferences = append(status.SecretReferences, deleteFailedSecretReferenceStatus("aaa",
+				status := successfulSecretStatus(testSecret("foo", "bar"))
+				status.Secrets = append(status.Secrets, deleteFailedSecretStatus("aaa",
 					testSecret("delete-error", "baz"),
-				).SecretReferences...)
+				).Secrets...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
 			expectApplied: true,
@@ -566,15 +570,15 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "cleanup deleted syncset secrets",
 			deletedSyncSet: func() *hivev1.SyncSet {
-				ss := testSyncSetWithSecretReferences("aaa",
-					testSecretRef("foo"),
-					testSecretRef("bar"),
+				ss := testSyncSetWithSecretMappings("aaa",
+					testSecretMapping("foo"),
+					testSecretMapping("bar"),
 				)
 				ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
 				return ss
 			}(),
 			isDeleted: true,
-			status: successfulSecretReferenceStatus(
+			status: successfulSecretStatus(
 				testSecret("foo", "bar"),
 				testSecret("bar", "baz"),
 			),
@@ -620,15 +624,22 @@ func TestSyncSetReconcile(t *testing.T) {
 			dynamicClient := &fakeDynamicClient{}
 
 			helper := &fakeHelper{t: t}
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			mockRemoteClientBuilder.EXPECT().Unreachable().Return(false).AnyTimes()
+			mockRemoteClientBuilder.EXPECT().RESTConfig().Return(nil, nil).AnyTimes()
+			mockRemoteClientBuilder.EXPECT().BuildDynamic().Return(dynamicClient, nil).AnyTimes()
+
 			r := &ReconcileSyncSetInstance{
-				Client:         fakeClient,
-				scheme:         scheme.Scheme,
-				logger:         log.WithField("controller", "syncset"),
-				applierBuilder: helper.newHelper,
-				hash:           fakeHashFunc(t),
-				dynamicClientBuilder: func(string, string) (dynamic.Interface, error) {
-					return dynamicClient, nil
-				},
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "syncset"),
+				applierBuilder:                helper.newHelper,
+				hash:                          fakeHashFunc(t),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+				reapplyInterval:               2 * time.Hour,
 			}
 			_, err := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -706,10 +717,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+			},
 			Installed: true,
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			AdminKubeconfigSecret: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 		},
 	}
 
@@ -783,7 +794,7 @@ func testSyncSetWithPatches(name string, patches ...hivev1.SyncObjectPatch) *hiv
 	return ss
 }
 
-func testSyncSetWithSecretReferences(name string, refs ...hivev1.SecretReference) *hivev1.SyncSet {
+func testSyncSetWithSecretMappings(name string, mappings ...hivev1.SecretMapping) *hivev1.SyncSet {
 	ss := &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -797,18 +808,17 @@ func testSyncSetWithSecretReferences(name string, refs ...hivev1.SecretReference
 			},
 		},
 	}
-	ss.Spec.SecretReferences = append(ss.Spec.SecretReferences, refs...)
+	ss.Spec.Secrets = append(ss.Spec.Secrets, mappings...)
 	return ss
 }
 
-func testSyncObjectPatch(name, namespace, kind, apiVersion string, applyMode hivev1.SyncSetPatchApplyMode, value string) hivev1.SyncObjectPatch {
+func testSyncObjectPatch(name, namespace, kind, apiVersion string, value string) hivev1.SyncObjectPatch {
 	patch := fmt.Sprintf("{'spec': {'key: '%v'}}", value)
 	return hivev1.SyncObjectPatch{
 		Name:       name,
 		Namespace:  namespace,
 		Kind:       kind,
 		APIVersion: apiVersion,
-		ApplyMode:  applyMode,
 		Patch:      patch,
 		PatchType:  "merge",
 	}
@@ -833,11 +843,11 @@ func testSelectorSyncSetWithResources(name string, resources ...runtime.Object) 
 	return ss
 }
 
-func testMatchingSelectorSyncSetWithSecretReferences(name string, refs ...hivev1.SecretReference) *hivev1.SelectorSyncSet {
-	return testSelectorSyncSetWithSecretReferences(name, map[string]string{"region": "us-east-1"}, refs...)
+func testMatchingSelectorSyncSetWithSecrets(name string, mappings ...hivev1.SecretMapping) *hivev1.SelectorSyncSet {
+	return testSelectorSyncSetWithSecrets(name, map[string]string{"region": "us-east-1"}, mappings...)
 }
 
-func testSelectorSyncSetWithSecretReferences(name string, matchLabels map[string]string, refs ...hivev1.SecretReference) *hivev1.SelectorSyncSet {
+func testSelectorSyncSetWithSecrets(name string, matchLabels map[string]string, mappings ...hivev1.SecretMapping) *hivev1.SelectorSyncSet {
 	ss := &hivev1.SelectorSyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -848,7 +858,7 @@ func testSelectorSyncSetWithSecretReferences(name string, matchLabels map[string
 			},
 		},
 	}
-	ss.Spec.SecretReferences = append(ss.Spec.SecretReferences, refs...)
+	ss.Spec.Secrets = append(ss.Spec.Secrets, mappings...)
 	return ss
 }
 
@@ -891,17 +901,15 @@ func testCMs(prefix string, count int) []runtime.Object {
 	return result
 }
 
-func testSecretRef(name string) hivev1.SecretReference {
-	return hivev1.SecretReference{
-		Source: corev1.ObjectReference{
-			Name:       name,
-			Namespace:  testNamespace,
-			APIVersion: "v1",
+func testSecretMapping(name string) hivev1.SecretMapping {
+	return hivev1.SecretMapping{
+		SourceRef: hivev1.SecretReference{
+			Name:      name,
+			Namespace: testNamespace,
 		},
-		Target: corev1.ObjectReference{
-			Name:       name,
-			Namespace:  testNamespace,
-			APIVersion: "v1",
+		TargetRef: hivev1.SecretReference{
+			Name:      name,
+			Namespace: testNamespace,
 		},
 	}
 }
@@ -973,14 +981,14 @@ func applyFailedResourceStatus(name string, resources ...runtime.Object) hivev1.
 	return status
 }
 
-func applyFailedSecretReferenceStatus(name string, secrets ...runtime.Object) hivev1.SyncSetObjectStatus {
+func applyFailedSecretStatus(name string, secrets ...runtime.Object) hivev1.SyncSetObjectStatus {
 	conditionTime := metav1.Now()
 	status := hivev1.SyncSetObjectStatus{
 		Name: name,
 	}
 	for _, s := range secrets {
 		obj, _ := meta.Accessor(s)
-		status.SecretReferences = append(status.SecretReferences, hivev1.SyncStatus{
+		status.Secrets = append(status.Secrets, hivev1.SyncStatus{
 			APIVersion: s.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 			Kind:       s.GetObjectKind().GroupVersionKind().Kind,
 			Resource:   secretsResource,
@@ -1033,7 +1041,7 @@ func deleteFailedResourceStatus(name string, resources ...runtime.Object) hivev1
 	return status
 }
 
-func deleteFailedSecretReferenceStatus(name string, secrets ...runtime.Object) hivev1.SyncSetObjectStatus {
+func deleteFailedSecretStatus(name string, secrets ...runtime.Object) hivev1.SyncSetObjectStatus {
 	conditionTime := metav1.Now()
 	status := hivev1.SyncSetObjectStatus{
 		Name: name,
@@ -1041,7 +1049,7 @@ func deleteFailedSecretReferenceStatus(name string, secrets ...runtime.Object) h
 	for _, s := range secrets {
 		obj, _ := meta.Accessor(s)
 		hash, _ := controllerutils.GetChecksumOfObject(s)
-		status.SecretReferences = append(status.SecretReferences, hivev1.SyncStatus{
+		status.Secrets = append(status.Secrets, hivev1.SyncStatus{
 			APIVersion: s.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 			Kind:       s.GetObjectKind().GroupVersionKind().Kind,
 			Resource:   secretsResource,
@@ -1121,16 +1129,16 @@ func successfulResourceStatusWithTime(resources []runtime.Object, conditionTime 
 	return status
 }
 
-func successfulSecretReferenceStatus(secrets ...runtime.Object) hivev1.SyncSetInstanceStatus {
-	return successfulSecretReferenceStatusWithTime(secrets, metav1.Now())
+func successfulSecretStatus(secrets ...runtime.Object) hivev1.SyncSetInstanceStatus {
+	return successfulSecretStatusWithTime(secrets, metav1.Now())
 }
 
-func successfulSecretReferenceStatusWithTime(secrets []runtime.Object, conditionTime metav1.Time) hivev1.SyncSetInstanceStatus {
+func successfulSecretStatusWithTime(secrets []runtime.Object, conditionTime metav1.Time) hivev1.SyncSetInstanceStatus {
 	status := hivev1.SyncSetInstanceStatus{}
 	for _, s := range secrets {
 		obj, _ := meta.Accessor(s)
 		hash, _ := controllerutils.GetChecksumOfObject(s)
-		status.SecretReferences = append(status.SecretReferences, hivev1.SyncStatus{
+		status.Secrets = append(status.Secrets, hivev1.SyncStatus{
 			APIVersion: s.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 			Kind:       s.GetObjectKind().GroupVersionKind().Kind,
 			Resource:   secretsResource,
@@ -1181,7 +1189,7 @@ type fakeHelper struct {
 	t *testing.T
 }
 
-func (f *fakeHelper) newHelper(kubeconfig []byte, logger log.FieldLogger) Applier {
+func (f *fakeHelper) newHelper(*rest.Config, log.FieldLogger) Applier {
 	return f
 }
 
@@ -1239,8 +1247,8 @@ func validateSyncSetInstanceStatus(t *testing.T, actual, expected hivev1.SyncSet
 	if len(actual.Patches) != len(expected.Patches) {
 		t.Errorf("number of patch statuses does not match, actual %d, expected: %d", len(actual.Patches), len(expected.Patches))
 	}
-	if len(actual.SecretReferences) != len(expected.SecretReferences) {
-		t.Errorf("number of secret reference statuses does not match, actual %d, expected: %d", len(actual.SecretReferences), len(expected.SecretReferences))
+	if len(actual.Secrets) != len(expected.Secrets) {
+		t.Errorf("number of secret reference statuses does not match, actual %d, expected: %d", len(actual.Secrets), len(expected.Secrets))
 	}
 
 	for _, actualResource := range actual.Resources {
@@ -1273,18 +1281,18 @@ func validateSyncSetInstanceStatus(t *testing.T, actual, expected hivev1.SyncSet
 		}
 	}
 
-	for _, actualSecretReference := range actual.SecretReferences {
+	for _, actualSecret := range actual.Secrets {
 		found := false
-		for _, expectedSecretReference := range expected.SecretReferences {
-			if matchesSecretReferenceStatus(actualSecretReference, expectedSecretReference) {
+		for _, expectedSecret := range expected.Secrets {
+			if matchesSecretStatus(actualSecret, expectedSecret) {
 				found = true
-				validateSyncStatus(t, actualSecretReference, expectedSecretReference)
+				validateSyncStatus(t, actualSecret, expectedSecret)
 				break
 			}
 		}
 		if !found {
 			t.Errorf("got unexpected secret reference status: %s/%s (kind: %s, apiVersion: %s)",
-				actualSecretReference.Namespace, actualSecretReference.Name, actualSecretReference.Kind, actualSecretReference.APIVersion)
+				actualSecret.Namespace, actualSecret.Name, actualSecret.Kind, actualSecret.APIVersion)
 		}
 	}
 }
@@ -1303,7 +1311,7 @@ func matchesPatchStatus(a, b hivev1.SyncStatus) bool {
 		a.APIVersion == b.APIVersion
 }
 
-func matchesSecretReferenceStatus(a, b hivev1.SyncStatus) bool {
+func matchesSecretStatus(a, b hivev1.SyncStatus) bool {
 	return a.Name == b.Name &&
 		a.Namespace == b.Namespace &&
 		a.Kind == b.Kind &&
@@ -1476,10 +1484,10 @@ func syncSetInstanceForSyncSet(cd *hivev1.ClusterDeployment, syncSet *hivev1.Syn
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
-			SyncSet: &corev1.LocalObjectReference{
+			SyncSetRef: &corev1.LocalObjectReference{
 				Name: syncSet.Name,
 			},
 			ResourceApplyMode: syncSet.Spec.ResourceApplyMode,
@@ -1498,10 +1506,10 @@ func syncSetInstanceForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyn
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
 		Spec: hivev1.SyncSetInstanceSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: cd.Name,
 			},
-			SelectorSyncSet: &hivev1.SelectorSyncSetReference{
+			SelectorSyncSetRef: &hivev1.SelectorSyncSetReference{
 				Name: selectorSyncSet.Name,
 			},
 			ResourceApplyMode: selectorSyncSet.Spec.ResourceApplyMode,
@@ -1553,11 +1561,11 @@ func TestSSIReApplyDuration(t *testing.T) {
 
 	for i, oldestResourceApplyTime := range oldestResourceApplyTimes {
 		ssi.Status.Resources[i].Conditions[0].LastProbeTime = metav1.NewTime(oldestResourceApplyTime)
-		requeueAfter := ssiReApplyDuration(ssi)
+		requeueAfter := ssiReapplyDuration(ssi, defaultReapplyInterval)
 		endProbe := time.Now()
 
-		maxRequeueAfter := reapplyInterval - startProbe.Sub(oldestResourceApplyTime)
-		minRequeueAfter := reapplyInterval - endProbe.Sub(oldestResourceApplyTime)
+		maxRequeueAfter := defaultReapplyInterval - startProbe.Sub(oldestResourceApplyTime)
+		minRequeueAfter := defaultReapplyInterval - endProbe.Sub(oldestResourceApplyTime)
 		if maxRequeueAfter < requeueAfter || minRequeueAfter > requeueAfter {
 			t.Fatalf("requeueAfter did not fall between expected times, actual: %v, expected between %v and %v", requeueAfter, minRequeueAfter, maxRequeueAfter)
 		}

@@ -9,7 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 
@@ -298,6 +298,12 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	err = r.deployHiveAdmission(hLog, h, instance, recorder)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
+		return reconcile.Result{}, err
+	}
+
+	err = r.deployHiveAPI(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying Hive v1alpha1 aggregated API")
 		return reconcile.Result{}, err
 	}
 

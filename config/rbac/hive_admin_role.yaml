@@ -28,12 +28,12 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
-  - dnsendpoints
+  - machinepools
   - selectorsyncidentityproviders
   - syncidentityproviders
   - syncsets
   - syncsetinstances
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   verbs:
   - get
@@ -61,6 +61,7 @@ rules:
   - clusterimagesets
   - clusterprovisions
   - dnszones
+  - machinepools
   - selectorsyncsets
   - syncsets
   verbs:

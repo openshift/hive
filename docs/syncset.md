@@ -6,7 +6,9 @@
 
 To use `SyncSet` objects to manage resources, you must create them in the same namespace as the `ClusterDeployment` resource that they manage. If you want to manage resources in clusters that match a specific label use `SelectorSyncSet` instead. These objects apply changes to clusters in any namespace that match the `clusterDeploymentSelector` that you set.
 
-With both `SyncSets` and `SelectorSyncSets`, the individual resources and patches are reapplied when 2 hours have passed since their last reconciliation or if their contents are updated in the `SyncSet` or `SelectorSyncSets`.
+With both `SyncSets` and `SelectorSyncSets`, the individual resources and patches are reapplied when 2 hours have passed since their last reconciliation (by default) or if their contents are updated in the `SyncSet` or `SelectorSyncSets`.
+
+The default `syncSetReapplyInterval` can be overridden by specifying a string duration within the `hiveconfig` such as `syncSetReapplyInterval: "1h"` for a one hour reapply interval.
 
 ## SyncSet Object Definition
 
@@ -14,7 +16,7 @@ With both `SyncSets` and `SelectorSyncSets`, the individual resources and patche
 
 ```yaml
 ---
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SyncSet
 metadata:
   name: mygroup
@@ -37,18 +39,26 @@ spec:
     apiVersion: v1
     name: foo
     namespace: default
-    applyMode: AlwaysApply
     patch: |-
       { "data": { "foo": "new-bar" } }
     patchType: merge
+    
+  secretReferences:
+  - source:
+      name: ad-bind-password
+      namespace: default
+    target:
+      name: ad-bind-password
+      namespace: openshift-config
 ```
 
 | Field | Usage |
 |-------|-------|
 | `clusterDeploymentRefs` | List of `ClusterDeployment` names in the current namespace which the `SyncSet` will apply to. |
-| `resourceApplyMode` | Defaults to `"Upsert"`, which indicates that objects will be created and updated to match the `SyncSet`. Existing resources that are not listed in the `SyncSet` are retained. Specify `"Sync"` to delete existing objects that were previously in the `resources` list. |
+| `resourceApplyMode` | Defaults to `"Upsert"`, which indicates that objects will be created and updated to match the `SyncSet`. Existing `SyncSet` resources that are not listed in the `SyncSet` are not deleted. Specify `"Sync"` to allow deleting existing objects that were previously in the resources list. |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
-| `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. You can also specify`"ApplyOnce"` to apply the patch only once. | 
+| `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. |
+| `secretReferences` | A list of secret references. The secrets will be copied from the existing sources to the target resources in the referenced clusters |
 
 ### Example of SyncSet use
 
@@ -78,7 +88,7 @@ oc create -f <syncset_file.yaml> -n <namespace>
 SyncSet File:
 
 ```yaml
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SyncSet
 metadata:
   name: sise-deploy-syncset
@@ -108,7 +118,7 @@ oc get syncsetinstances <synsetinstance name> -o yaml
 
 ```yaml
 ---
-apiVersion: hive.openshift.io/v1alpha1
+apiVersion: hive.openshift.io/v1
 kind: SelectorSyncSet
 metadata:
   name: mygroup

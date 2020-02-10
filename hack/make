@@ -1,0 +1,4 @@
+#!/bin/bash
+
+docker run --rm --volume "${PWD}:/go/src/github.com/openshift/hive:z" --workdir /go/src/github.com/openshift/hive hive-build:latest make "${@}"
+

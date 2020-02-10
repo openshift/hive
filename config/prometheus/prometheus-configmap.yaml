@@ -1,0 +1,20 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: prometheus-config
+  namespace: hive
+data:
+  prometheus.yml: |+
+    global:
+      scrape_interval:     15s
+    scrape_configs:
+
+      - job_name: 'prometheus'
+        scrape_interval: 5s
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'hive'
+        static_configs:
+          - targets: ['hive-controllers:2112']
+

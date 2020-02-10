@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hiveapi
+  namespace: hive
+  labels:
+    api: hiveapi
+    apiserver: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      api: hiveapi
+      apiserver: "true"
+  template:
+    metadata:
+      labels:
+        api: hiveapi
+        apiserver: "true"
+    spec:
+      containers:
+      # By default we will use the latest CI images published from hive master:
+      - image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+        name: apiserver
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 200Mi
+        command:
+          - "/opt/services/hive-apiserver"
+        args:
+          - "start"
+          - "--v=2"
+          - "--logtostderr"
+          - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
+          - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"
+        volumeMounts:
+        - name: apiserver-certs
+          mountPath: /apiserver.local.config/certificates
+          readOnly: true
+      serviceAccountName: hiveapi-sa
+      volumes:
+        - name: apiserver-certs
+          secret:
+            secretName: hiveapi-serving-cert

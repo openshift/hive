@@ -16,7 +16,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -125,25 +125,38 @@ func TestHiveConfig(t *testing.T) {
 		t.Errorf("could not fetch hive config: %v", err)
 		return
 	}
-	if len(hiveConfig.Spec.ManagedDomains) > 0 && hiveConfig.Spec.ExternalDNS == nil {
-		t.Errorf("external DNS is not configured, but managed domains are")
-	}
-	if hiveConfig.Spec.ExternalDNS != nil && len(hiveConfig.Spec.ManagedDomains) == 0 {
-		t.Errorf("external DNS is configured, but no managed domains are")
-	}
-	if hiveConfig.Spec.ExternalDNS != nil && hiveConfig.Spec.ExternalDNS.AWS != nil {
-		if len(hiveConfig.Spec.ExternalDNS.AWS.Credentials.Name) == 0 {
-			t.Errorf("AWS external DNS configured, but no credentials secret specified")
+	for _, md := range hiveConfig.Spec.ManagedDomains {
+		if md.AWS == nil && md.GCP == nil {
+			t.Errorf("managed domain entry found without cloud configuration")
 			return
 		}
-		secret := &corev1.Secret{}
-		secretName := types.NamespacedName{
-			Namespace: hiveNamespace,
-			Name:      hiveConfig.Spec.ExternalDNS.AWS.Credentials.Name,
+
+		var secretName string
+
+		if md.AWS != nil {
+			if len(md.AWS.CredentialsSecretRef.Name) == 0 {
+				t.Errorf("AWS managed DNS configured, but no credentials secret specified")
+				return
+			}
+			secretName = md.AWS.CredentialsSecretRef.Name
 		}
-		err := c.Get(context.TODO(), secretName, secret)
+
+		if md.GCP != nil {
+			if len(md.GCP.CredentialsSecretRef.Name) == 0 {
+				t.Errorf("GCP managed DNS configured, but no credentials secret specified")
+				return
+			}
+			secretName = md.GCP.CredentialsSecretRef.Name
+		}
+
+		secret := &corev1.Secret{}
+		secretKey := types.NamespacedName{
+			Namespace: hiveNamespace,
+			Name:      secretName,
+		}
+		err := c.Get(context.TODO(), secretKey, secret)
 		if err != nil {
-			t.Errorf("AWS external DNS credentials secret specified (%s), but secret cannot be fetched: %v", secretName.Name, err)
+			t.Errorf("managed DNS credentials secret specified (%s), but secret cannot be fetched: %v", secretName, err)
 		}
 	}
 }

@@ -138,6 +138,6 @@ func newPatchCommand() *cobra.Command {
 	cmd.Flags().StringVar(&namespace, "namespace", "", "Namespace of resource to patch")
 	cmd.Flags().StringVar(&name, "name", "", "Name of the resource to patch")
 	cmd.Flags().StringVar(&kind, "kind", "", "Kind of the resource to patch")
-	cmd.Flags().StringVar(&apiVersion, "api-version", "", "API version of the resource to patch (ie. hive.openshift.io/v1alpha1)")
+	cmd.Flags().StringVar(&apiVersion, "api-version", "", "API version of the resource to patch (ie. hive.openshift.io/v1)")
 	return cmd
 }

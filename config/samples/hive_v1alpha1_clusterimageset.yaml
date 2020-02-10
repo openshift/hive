@@ -1,8 +1,0 @@
-apiVersion: hive.openshift.io/v1alpha1
-kind: ClusterImageSet
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: clusterimageset-sample
-spec:
-  releaseImage: quay.io/openshift-release-dev/ocp-release:4.0.0-0.6

@@ -3,6 +3,7 @@ package installmanager
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"path"
@@ -26,7 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -162,12 +164,26 @@ func TestInstallManager(t *testing.T) {
 
 			fakeClient := fake.NewFakeClient(existing...)
 
+			// create a fake install-config
+			mountedInstallConfigFile := filepath.Join(tempDir, "mounted-install-config.yaml")
+			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake install-config file: %v", err)
+			}
+
+			// create a fake pull secret file
+			mountedPullSecretFile := filepath.Join(tempDir, "mounted-pull-secret.json")
+			if err := ioutil.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake pull secret file: %v", err)
+			}
+
 			im := InstallManager{
-				LogLevel:             "debug",
-				WorkDir:              tempDir,
-				ClusterProvisionName: testProvisionName,
-				Namespace:            testNamespace,
-				DynamicClient:        fakeClient,
+				LogLevel:               "debug",
+				WorkDir:                tempDir,
+				ClusterProvisionName:   testProvisionName,
+				Namespace:              testNamespace,
+				DynamicClient:          fakeClient,
+				InstallConfigMountPath: mountedInstallConfigFile,
+				PullSecretMountPath:    mountedPullSecretFile,
 			}
 			im.Complete([]string{})
 
@@ -243,6 +259,9 @@ func TestInstallManager(t *testing.T) {
 					if assert.True(t, ok) {
 						assert.Equal(t, []byte("fakekubeconfig\n"), kubeconfig, "unexpected kubeconfig")
 					}
+
+					assert.Equal(t, testClusterProvision().Name, adminKubeconfig.Labels[constants.ClusterProvisionNameLabel], "incorrect cluster provision name label")
+					assert.Equal(t, constants.SecretTypeKubeConfig, adminKubeconfig.Labels[constants.SecretTypeLabel], "incorrect secret type label")
 				}
 			} else {
 				assert.True(t, apierrors.IsNotFound(err), "unexpected response from getting kubeconfig secret: %v", err)
@@ -265,6 +284,9 @@ func TestInstallManager(t *testing.T) {
 					if assert.True(t, ok) {
 						assert.Equal(t, []byte("fakepassword"), password, "unexpected admin password")
 					}
+
+					assert.Equal(t, testClusterProvision().Name, adminPassword.Labels[constants.ClusterProvisionNameLabel], "incorrect cluster provision name label")
+					assert.Equal(t, constants.SecretTypeKubeAdminCreds, adminPassword.Labels[constants.SecretTypeLabel], "incorrect secret type label")
 				}
 			} else {
 				assert.True(t, apierrors.IsNotFound(err), "unexpected response from getting password secret: %v", err)
@@ -283,16 +305,16 @@ func TestInstallManager(t *testing.T) {
 
 			if test.expectProvisionMetadataUpdate {
 				assert.NotNil(t, provision.Spec.Metadata, "expected metadata to be set")
-				if assert.NotNil(t, provision.Spec.AdminKubeconfigSecret, "expected kubeconfig secret reference to be set") {
-					assert.Equal(t, "test-provision-admin-kubeconfig", provision.Spec.AdminKubeconfigSecret.Name, "unexpected name for kubeconfig secret reference")
+				if assert.NotNil(t, provision.Spec.AdminKubeconfigSecretRef, "expected kubeconfig secret reference to be set") {
+					assert.Equal(t, "test-provision-admin-kubeconfig", provision.Spec.AdminKubeconfigSecretRef.Name, "unexpected name for kubeconfig secret reference")
 				}
-				if assert.NotNil(t, provision.Spec.AdminPasswordSecret, "expected password secret reference to be set") {
-					assert.Equal(t, "test-provision-admin-password", provision.Spec.AdminPasswordSecret.Name, "unexpected name for password secret reference")
+				if assert.NotNil(t, provision.Spec.AdminPasswordSecretRef, "expected password secret reference to be set") {
+					assert.Equal(t, "test-provision-admin-password", provision.Spec.AdminPasswordSecretRef.Name, "unexpected name for password secret reference")
 				}
 			} else {
 				assert.Nil(t, provision.Spec.Metadata, "expected metadata to be empty")
-				assert.Nil(t, provision.Spec.AdminKubeconfigSecret, "expected kubeconfig secret reference to be empty")
-				assert.Nil(t, provision.Spec.AdminPasswordSecret, "expected password secret reference to be empty")
+				assert.Nil(t, provision.Spec.AdminKubeconfigSecretRef, "expected kubeconfig secret reference to be empty")
+				assert.Nil(t, provision.Spec.AdminPasswordSecretRef, "expected password secret reference to be empty")
 			}
 
 			if test.expectProvisionLogUpdate {
@@ -318,6 +340,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Name:      testDeploymentName,
 			Namespace: testNamespace,
 		},
+		Spec: hivev1.ClusterDeploymentSpec{
+			Provisioning: &hivev1.Provisioning{},
+		},
 	}
 }
 
@@ -328,7 +353,7 @@ func testClusterProvision() *hivev1.ClusterProvision {
 			Namespace: testNamespace,
 		},
 		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeployment: corev1.LocalObjectReference{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
 				Name: testDeploymentName,
 			},
 			Stage: hivev1.ClusterProvisionStageProvisioning,
@@ -554,6 +579,18 @@ func TestInstallManagerSSH(t *testing.T) {
 				t.Fatalf("error creating fake ssh-agent binary: %v", err)
 			}
 
+			// create a fake install-config
+			mountedInstallConfigFile := filepath.Join(testDir, "mounted-install-config.yaml")
+			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake install-config file: %v", err)
+			}
+
+			// create a fake pull secret file
+			mountedPullSecretFile := filepath.Join(testDir, "mounted-pull-secret.json")
+			if err := ioutil.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
+				t.Fatalf("error creating temporary fake pull secret file: %v", err)
+			}
+
 			tempDir, err := ioutil.TempDir("", "installmanagersshtestresults")
 			if err != nil {
 				t.Fatalf("errored while setting up temp dir for test: %v", err)
@@ -561,8 +598,10 @@ func TestInstallManagerSSH(t *testing.T) {
 			defer os.RemoveAll(tempDir)
 
 			im := InstallManager{
-				LogLevel: "debug",
-				WorkDir:  tempDir,
+				LogLevel:               "debug",
+				WorkDir:                tempDir,
+				InstallConfigMountPath: mountedInstallConfigFile,
+				PullSecretMountPath:    mountedPullSecretFile,
 			}
 
 			if test.existingSSHAgentRunning {
@@ -580,7 +619,7 @@ func TestInstallManagerSSH(t *testing.T) {
 				t.Fatalf("error setting PATH (for fake binaries): %v", err)
 			}
 
-			cleanup, err := initSSHAgent(sshKeyFile, &im)
+			cleanup, err := im.initSSHAgent(sshKeyFile)
 
 			// restore PATH
 			if err := os.Setenv("PATH", origPathEnv); err != nil {
@@ -609,6 +648,53 @@ func TestInstallManagerSSH(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+func TestInstallManagerSSHKnownHosts(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name         string
+		knownHosts   []string
+		expectedFile string
+	}{
+		{
+			name: "single ssh known host",
+			knownHosts: []string{
+				"192.168.86.100 ecdsa-sha2-nistp256 FOOBAR",
+			},
+			expectedFile: `192.168.86.100 ecdsa-sha2-nistp256 FOOBAR`,
+		},
+		{
+			name: "multiple ssh known hosts",
+			knownHosts: []string{
+				"192.168.86.100 ecdsa-sha2-nistp256 FOOBAR",
+				"192.168.86.101 ecdsa-sha2-nistp256 FOOBAR2",
+				"192.168.86.102 ecdsa-sha2-nistp256 FOOBAR3",
+			},
+			expectedFile: `192.168.86.100 ecdsa-sha2-nistp256 FOOBAR
+192.168.86.101 ecdsa-sha2-nistp256 FOOBAR2
+192.168.86.102 ecdsa-sha2-nistp256 FOOBAR3`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tempDir, err := ioutil.TempDir("", "installmanagersshknownhosts")
+			require.NoError(t, err, "error creating test tempdir")
+			defer os.RemoveAll(tempDir)
+
+			im := InstallManager{
+				log: log.WithField("test", test.name),
+			}
+			err = im.writeSSHKnownHosts(tempDir, test.knownHosts)
+			require.NoError(t, err, "error writing ssh known hosts ")
+
+			content, err := ioutil.ReadFile(filepath.Join(tempDir, ".ssh", "known_hosts"))
+			require.NoError(t, err, "error reading expected ssh known_hosts file")
+
+			assert.Equal(t, test.expectedFile, string(content), "unexpected known_hosts file contents")
 		})
 	}
 }
@@ -644,6 +730,27 @@ func TestIsBootstrapComplete(t *testing.T) {
 			im := &InstallManager{WorkDir: dir}
 			actualComplete := im.isBootstrapComplete()
 			assert.Equal(t, tc.expectedComplete, actualComplete, "unexpected bootstrap complete")
+		})
+	}
+}
+
+func Test_pasteInPullSecret(t *testing.T) {
+	for _, inputFile := range []string{
+		"install-config.yaml",
+		"install-config-with-existing-pull-secret.yaml",
+	} {
+		t.Run(inputFile, func(t *testing.T) {
+			icData, err := ioutil.ReadFile(filepath.Join("testdata", inputFile))
+			if !assert.NoError(t, err, "unexpected error reading install-config.yaml") {
+				return
+			}
+			expected, err := ioutil.ReadFile(filepath.Join("testdata", "install-config-with-pull-secret.yaml"))
+			if !assert.NoError(t, err, "unexpected error reading install-config-with-pull-secret.yaml") {
+				return
+			}
+			actual, err := pasteInPullSecret(icData, filepath.Join("testdata", "pull-secret.json"))
+			assert.NoError(t, err, "unexpected error pasting in pull secret")
+			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig with pasted pull secret")
 		})
 	}
 }

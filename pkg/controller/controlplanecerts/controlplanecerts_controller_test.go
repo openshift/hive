@@ -23,7 +23,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -32,6 +33,7 @@ const (
 	fakeName      = "fake-cluster"
 	fakeNamespace = "fake-namespace"
 	fakeDomain    = "example.com"
+	fakeAPIURL    = "test-api-url"
 )
 
 func init() {
@@ -67,7 +69,13 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, "", additionalCert(defaultControlPlaneDomain(cd), "default-secret"))
+				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURL, "default-secret"))
+
+				ss := applied[0].(metav1.Object)
+				labels := ss.GetLabels()
+
+				assert.Equal(t, fakeClusterDeployment().obj().Name, labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.SyncSetTypeControlPlaneCerts, labels[constants.SyncSetTypeLabel], "incorrect syncset type label")
 			},
 		},
 		{
@@ -99,7 +107,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, "", additionalCert(defaultControlPlaneDomain(cd), "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
+				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURL, "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
 		{
@@ -280,6 +288,9 @@ func fakeClusterDeployment() *fakeClusterDeploymentWrapper {
 			ClusterName: fakeName,
 			BaseDomain:  fakeDomain,
 		},
+		Status: hivev1.ClusterDeploymentStatus{
+			APIURL: fakeAPIURL,
+		},
 	}
 	return &fakeClusterDeploymentWrapper{cd: cd}
 }
@@ -292,7 +303,7 @@ func (f *fakeClusterDeploymentWrapper) defaultCert(name, secretName string) *fak
 	f.cd.Spec.ControlPlaneConfig.ServingCertificates.Default = name
 	f.cd.Spec.CertificateBundles = append(f.cd.Spec.CertificateBundles, hivev1.CertificateBundleSpec{
 		Name: name,
-		SecretRef: corev1.LocalObjectReference{
+		CertificateSecretRef: corev1.LocalObjectReference{
 			Name: secretName,
 		},
 	})
@@ -306,7 +317,7 @@ func (f *fakeClusterDeploymentWrapper) namedCert(name, domain, secretName string
 	})
 	f.cd.Spec.CertificateBundles = append(f.cd.Spec.CertificateBundles, hivev1.CertificateBundleSpec{
 		Name: name,
-		SecretRef: corev1.LocalObjectReference{
+		CertificateSecretRef: corev1.LocalObjectReference{
 			Name: secretName,
 		},
 	})
@@ -353,7 +364,7 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 	assert.Len(t, objs, 1, "single syncset expected")
 	assert.IsType(t, &hivev1.SyncSet{}, objs[0], "syncset object expected")
 	ss := objs[0].(*hivev1.SyncSet)
-	secretReferences := ss.Spec.SecretReferences
+	secretMappings := ss.Spec.Secrets
 	var apiServerConfig *configv1.APIServer
 	for _, rr := range ss.Spec.Resources {
 		if config, ok := rr.Object.(*configv1.APIServer); ok {
@@ -363,11 +374,11 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 		assert.Fail(t, "unexpected resource type", "syncset resource type: %T", rr.Object)
 	}
 	// Ensure there are no duplicate names
-	names := secretNames(secretReferences)
+	names := secretNames(secretMappings)
 	assert.Equal(t, sets.NewString(names...).Len(), len(names))
 
 	if defaultSecret != "" {
-		s := findSecret(secretReferences, defaultSecret)
+		s := findSecret(secretMappings, defaultSecret)
 		assert.NotNil(t, s)
 		assert.Equal(t, apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name, s)
 	} else {
@@ -375,7 +386,7 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 	}
 
 	for i, c := range additional {
-		s := findSecret(secretReferences, c.secret)
+		s := findSecret(secretMappings, c.secret)
 		assert.NotNil(t, s)
 		assert.Contains(t, apiServerConfig.Spec.ServingCerts.NamedCertificates[i].Names, c.domain)
 		assert.Equal(t, apiServerConfig.Spec.ServingCerts.NamedCertificates[i].ServingCertificate.Name, c.secret)
@@ -386,7 +397,7 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 
 	// If not setting any secrets, ensure they're empty
 	if defaultSecret == "" && len(additional) == 0 {
-		assert.Empty(t, secretReferences)
+		assert.Empty(t, secretMappings)
 	}
 }
 
@@ -405,19 +416,19 @@ func fakeSyncSet() *hivev1.SyncSet {
 	return ss
 }
 
-func findSecret(ss []hivev1.SecretReference, name string) string {
+func findSecret(ss []hivev1.SecretMapping, name string) string {
 	for _, s := range ss {
-		if s.Target.Name == name {
+		if s.TargetRef.Name == name {
 			return name
 		}
 	}
 	return ""
 }
 
-func secretNames(ss []hivev1.SecretReference) []string {
+func secretNames(ss []hivev1.SecretMapping) []string {
 	names := []string{}
 	for _, s := range ss {
-		names = append(names, s.Target.Name)
+		names = append(names, s.TargetRef.Name)
 	}
 	return names
 }

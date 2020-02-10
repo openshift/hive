@@ -20,8 +20,9 @@ import (
 
 	ingresscontroller "github.com/openshift/api/operator/v1"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1alpha1/aws"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -473,8 +474,8 @@ func syncSetFromClusterDeployment(cd *hivev1.ClusterDeployment) *hivev1.SyncSet 
 		certBundleSecrets: fakeSecretListForCertBundles(cd),
 	}
 	rawExtensions := rawExtensionsFromClusterDeployment(&rContext)
-	srList := secretRefrenceFromClusterDeployment(&rContext)
-	ssSpec := newSyncSetSpec(cd, rawExtensions, srList)
+	sMappings := secretMappingsFromClusterDeployment(&rContext)
+	ssSpec := newSyncSetSpec(cd, rawExtensions, sMappings)
 	return &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cd.Name + "clusteringress",
@@ -521,9 +522,9 @@ func testClusterDeploymentWithoutIngress() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testClusterName,
-			PlatformSecrets: hivev1.PlatformSecrets{
-				AWS: &hivev1aws.PlatformSecrets{
-					Credentials: corev1.LocalObjectReference{
+			Platform: hivev1.Platform{
+				AWS: &hivev1aws.Platform{
+					CredentialsSecretRef: corev1.LocalObjectReference{
 						Name: "aws-credentials",
 					},
 				},
@@ -546,7 +547,7 @@ func testSecretsForClusterDeployment(cd *hivev1.ClusterDeployment) []corev1.Secr
 func testSecretForCertificateBundle(cb hivev1.CertificateBundleSpec) corev1.Secret {
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cb.SecretRef.Name,
+			Name:      cb.CertificateSecretRef.Name,
 			Namespace: testNamespace,
 		},
 		TypeMeta: metav1.TypeMeta{
@@ -570,7 +571,7 @@ func addCertificateBundlesForIngressList(cd *hivev1.ClusterDeployment) []hivev1.
 		}
 		cb := hivev1.CertificateBundleSpec{
 			Name: ingress.ServingCertificate,
-			SecretRef: corev1.LocalObjectReference{
+			CertificateSecretRef: corev1.LocalObjectReference{
 				Name: fmt.Sprintf("%s-secret", ingress.ServingCertificate),
 			},
 		}
@@ -593,10 +594,11 @@ type createdResourceInfo struct {
 	defaultCertificate string
 }
 type createdSyncSetInfo struct {
-	name             string
-	namespace        string
-	resources        []createdResourceInfo
-	secretRefefences []hivev1.SecretReference
+	name           string
+	namespace      string
+	resources      []createdResourceInfo
+	secretMappings []hivev1.SecretMapping
+	syncset        *hivev1.SyncSet
 }
 
 type fakeKubeCLI struct {
@@ -609,6 +611,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 	created := createdSyncSetInfo{
 		name:      ss.Name,
 		namespace: ss.Namespace,
+		syncset:   ss,
 	}
 
 	for _, raw := range ss.Spec.Resources {
@@ -640,7 +643,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			continue
 		}
 	}
-	created.secretRefefences = ss.Spec.SecretReferences
+	created.secretMappings = ss.Spec.Secrets
 
 	f.createdSyncSet = created
 
@@ -648,10 +651,17 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 }
 
 func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedSecrets []string, expectedIngressControllers []SyncSetIngressEntry) {
+	if existingSyncSet.syncset != nil {
+		// Test label creation
+		labels := existingSyncSet.syncset.Labels
+		assert.Equal(t, testClusterDeployment().Name, labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+		assert.Equal(t, constants.SyncSetTypeRemoteIngress, labels[constants.SyncSetTypeLabel], "incorrect syncset type label")
+	}
+
 	for _, secret := range expectedSecrets {
 		found := false
-		for _, sr := range existingSyncSet.secretRefefences {
-			if sr.Target.Name == secret {
+		for _, mapping := range existingSyncSet.secretMappings {
+			if mapping.TargetRef.Name == secret {
 				found = true
 				break
 			}

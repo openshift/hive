@@ -10,7 +10,7 @@ import (
 
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -107,7 +107,7 @@ func (o *ProvisioningReportOptions) Run(dynClient client.Client) error {
 	var total, installed, provisioning int
 	for _, cd := range cdList.Items {
 		total++
-		if cd.Status.Installed {
+		if cd.Spec.Installed {
 			installed++
 			continue
 		}
@@ -145,8 +145,8 @@ func (o *ProvisioningReportOptions) Run(dynClient client.Client) error {
 		fmt.Printf("Created: %s\n", cd.CreationTimestamp.Time)
 		fmt.Printf("Provisioning for: %.2f hours\n", provisioningFor)
 		fmt.Printf("Install Retries: %d\n", cd.Status.InstallRestarts)
-		if cd.Spec.ImageSet != nil {
-			fmt.Printf("ImageSet: %s\n", cd.Spec.ImageSet.Name)
+		if cd.Spec.Provisioning.ImageSetRef != nil {
+			fmt.Printf("ImageSet: %s\n", cd.Spec.Provisioning.ImageSetRef.Name)
 		}
 		cfgMap := &corev1.ConfigMap{}
 		cfgMapName := fmt.Sprintf("%s-install-log", cd.Name)

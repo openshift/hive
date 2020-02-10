@@ -93,6 +93,20 @@ func (mr *MockClientMockRecorder) DeleteResourceRecordSet(managedZone, recordSet
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteResourceRecordSet", reflect.TypeOf((*MockClient)(nil).DeleteResourceRecordSet), managedZone, recordSet)
 }
 
+// UpdateResourceRecordSet mocks base method
+func (m *MockClient) UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *v10.ResourceRecordSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateResourceRecordSet", managedZone, addRecordSet, removeRecordSet)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateResourceRecordSet indicates an expected call of UpdateResourceRecordSet
+func (mr *MockClientMockRecorder) UpdateResourceRecordSet(managedZone, addRecordSet, removeRecordSet interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateResourceRecordSet", reflect.TypeOf((*MockClient)(nil).UpdateResourceRecordSet), managedZone, addRecordSet, removeRecordSet)
+}
+
 // GetManagedZone mocks base method
 func (m *MockClient) GetManagedZone(managedZone string) (*v10.ManagedZone, error) {
 	m.ctrl.T.Helper()

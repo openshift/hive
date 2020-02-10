@@ -1,5 +1,8 @@
 run:
   deadline: 30m
+  skip-files:
+    - pkg/hive/apis/hive/hiveconfig_types.go
+    - pkg/hive/apis/hive/hiveconversion/conversion.go
 
 linters:
   disable-all: true

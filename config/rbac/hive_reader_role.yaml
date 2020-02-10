@@ -28,13 +28,13 @@ rules:
   - clusterdeployments
   - clusterprovisions
   - dnszones
-  - dnsendpoints
+  - machinepools
   - selectorsyncidentityproviders
   - selectorsyncsets
   - syncidentityproviders
   - syncsets
   - syncsetinstances
-  - clusterdeprovisionrequests
+  - clusterdeprovisions
   - clusterstates
   verbs:
   - get

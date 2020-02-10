@@ -111,7 +111,3 @@ type SyncSetInstanceList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []SyncSetInstance `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&SyncSetInstance{}, &SyncSetInstanceList{})
-}

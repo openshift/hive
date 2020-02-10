@@ -5,8 +5,10 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,7 +23,10 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
 
 const (
@@ -51,20 +56,23 @@ func TestClusterStateReconcile(t *testing.T) {
 	uco := unavailableClusterOperator
 
 	tests := []struct {
-		name     string
-		existing []runtime.Object
-		remote   []runtime.Object
-		validate func(*testing.T, client.Client, reconcile.Result)
-		noUpdate bool
+		name         string
+		existing     []runtime.Object
+		remote       []runtime.Object
+		noRemoteCall bool
+		validate     func(*testing.T, client.Client, reconcile.Result)
+		noUpdate     bool
 	}{
 		{
 			name: "create cluster state",
 			existing: []runtime.Object{
 				testClusterDeployment(),
 			},
+			noRemoteCall: true,
 			validate: func(t *testing.T, c client.Client, result reconcile.Result) {
 				st := cs(t, c)
-				assert.NotNil(t, st, "clusterstate should have been created")
+				require.NotNil(t, st, "clusterstate should have been created")
+				assert.Equal(t, testClusterDeployment().Name, st.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
 			},
 		},
 		{
@@ -152,14 +160,19 @@ func TestClusterStateReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			mockRemoteClientBuilder.EXPECT().Unreachable().Return(false)
+			if !test.noRemoteCall {
+				mockRemoteClientBuilder.EXPECT().Build().Return(fake.NewFakeClient(test.remote...), nil)
+			}
 			updateCalled := false
 			rcd := &ReconcileClusterState{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
-				logger: log.WithField("controller", "clusterState"),
-				remoteClientBuilder: func(secret string, controllerName string) (client.Client, error) {
-					return fake.NewFakeClient(test.remote...), nil
-				},
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterState"),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				updateStatus: func(c client.Client, st *hivev1.ClusterState) error {
 					updateCalled = true
 					return updateClusterStateStatus(c, st)
@@ -214,12 +227,12 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Name:      testName,
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
-			Installed: true,
-		},
-		Status: hivev1.ClusterDeploymentStatus{
-			AdminKubeconfigSecret: corev1.LocalObjectReference{
-				Name: testKubeconfigSecretName,
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+					Name: testKubeconfigSecretName,
+				},
 			},
+			Installed: true,
 		},
 	}
 }

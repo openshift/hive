@@ -145,7 +145,3 @@ type HiveConfigList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []HiveConfig `json:"items"`
 }
-
-func init() {
-	SchemeBuilder.Register(&HiveConfig{}, &HiveConfigList{})
-}

@@ -3,7 +3,7 @@ package install
 import (
 	"testing"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -14,26 +14,26 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func TestGenerateDeprovisionRequest(t *testing.T) {
-	dr := testClusterDeprovisionRequest()
-	job, err := GenerateUninstallerJobForDeprovisionRequest(dr)
+func TestGenerateDeprovision(t *testing.T) {
+	dr := testClusterDeprovision()
+	job, err := GenerateUninstallerJobForDeprovision(dr)
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 }
 
-func testClusterDeprovisionRequest() *hivev1.ClusterDeprovisionRequest {
-	return &hivev1.ClusterDeprovisionRequest{
+func testClusterDeprovision() *hivev1.ClusterDeprovision {
+	return &hivev1.ClusterDeprovision{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: testNamespace,
+			Name:      "foo",
+			Namespace: "default",
 		},
-		Spec: hivev1.ClusterDeprovisionRequestSpec{
+		Spec: hivev1.ClusterDeprovisionSpec{
 			InfraID:   "test-infra-id",
 			ClusterID: "test-cluster-id",
-			Platform: hivev1.ClusterDeprovisionRequestPlatform{
-				AWS: &hivev1.AWSClusterDeprovisionRequest{
+			Platform: hivev1.ClusterDeprovisionPlatform{
+				AWS: &hivev1.AWSClusterDeprovision{
 					Region: "us-east-1",
-					Credentials: &corev1.LocalObjectReference{
+					CredentialsSecretRef: &corev1.LocalObjectReference{
 						Name: "aws-creds",
 					},
 				},

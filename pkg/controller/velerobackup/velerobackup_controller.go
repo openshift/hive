@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 )
@@ -211,7 +210,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 // createVeleroBackupObjectForNamespace creates a Velero Backup object for the namespace specified.
 // The Backup options are set specifically for Hive object backups.
 // DO NOT use this function call for any other type objects as it may not back them up correctly.
-func (r *ReconcileBackup) createVeleroBackupObject(namespace string, t metav1.Time) (corev1.ObjectReference, error) {
+func (r *ReconcileBackup) createVeleroBackupObject(namespace string, t metav1.Time) (hivev1.BackupReference, error) {
 	formatStr := "2006-01-02t15-04-05z"
 	timestamp := t.UTC().Format(formatStr)
 
@@ -228,7 +227,7 @@ func (r *ReconcileBackup) createVeleroBackupObject(namespace string, t metav1.Ti
 		},
 	}
 
-	backupRef := corev1.ObjectReference{
+	backupRef := hivev1.BackupReference{
 		Name:      backup.Name,
 		Namespace: backup.Namespace,
 	}

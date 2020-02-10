@@ -12,13 +12,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
-	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -37,7 +35,6 @@ const (
 	controllerName                  = "dnszone"
 	zoneResyncDuration              = 2 * time.Hour
 	domainAvailabilityCheckInterval = 30 * time.Second
-	defaultNSRecordTTL              = hivev1.TTL(60)
 	dnsClientTimeout                = 30 * time.Second
 	resolverConfigFile              = "/etc/resolv.conf"
 	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
@@ -202,7 +199,6 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 			r.logger.Debug("DNSZone resource is deleted, deleting hosted zone")
 			err := actuator.Delete()
 			if err != nil {
-				r.logger.WithError(err).Error("Failed to delete hosted zone")
 				return reconcile.Result{}, err
 			}
 		}
@@ -246,14 +242,6 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 	if err != nil {
 		r.logger.WithError(err).Error("Failed to get hosted zone name servers")
 		return reconcile.Result{}, err
-	}
-
-	if dnsZone.Spec.LinkToParentDomain {
-		err := r.syncParentDomainLink(nameServers, dnsZone)
-		if err != nil {
-			r.logger.WithError(err).Error("failed syncing parent domain link")
-			return reconcile.Result{}, err
-		}
 	}
 
 	isZoneSOAAvailable, err := r.soaLookup(dnsZone.Spec.Zone, r.logger)
@@ -317,7 +305,7 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 		secret := &corev1.Secret{}
 		err := r.Get(context.TODO(),
 			types.NamespacedName{
-				Name:      dnsZone.Spec.AWS.AccountSecret.Name,
+				Name:      dnsZone.Spec.AWS.CredentialsSecretRef.Name,
 				Namespace: dnsZone.Namespace,
 			},
 			secret)
@@ -344,73 +332,6 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 	}
 
 	return nil, errors.New("unable to determine which actuator to use")
-}
-
-func (r *ReconcileDNSZone) syncParentDomainLink(nameServers []string, dnsZone *hivev1.DNSZone) error {
-	existingLinkRecord := &hivev1.DNSEndpoint{}
-	existingLinkRecordName := types.NamespacedName{
-		Namespace: dnsZone.Namespace,
-		Name:      parentLinkRecordName(dnsZone.Name),
-	}
-	err := r.Client.Get(context.TODO(), existingLinkRecordName, existingLinkRecord)
-	if err != nil && !apierrors.IsNotFound(err) {
-		r.logger.WithError(err).Error("failed retrieving existing DNSEndpoint")
-		return err
-	}
-	dnsEndpointNotFound := err != nil
-
-	linkRecord, err := r.parentLinkRecord(nameServers, dnsZone)
-	if err != nil {
-		r.logger.WithError(err).Error("failed to create parent link DNSEndpoint")
-		return err
-	}
-
-	if dnsEndpointNotFound {
-		if err = r.Client.Create(context.TODO(), linkRecord); err != nil {
-			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "failed creating DNSEndpoint")
-			return err
-		}
-		return nil
-	}
-
-	if !reflect.DeepEqual(existingLinkRecord.Spec, linkRecord.Spec) {
-		existingLinkRecord.Spec = linkRecord.Spec
-		if err = r.Client.Update(context.TODO(), existingLinkRecord); err != nil {
-			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update existing DNSEndpoint")
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (r *ReconcileDNSZone) parentLinkRecord(nameServers []string, dnsZone *hivev1.DNSZone) (*hivev1.DNSEndpoint, error) {
-	targets := hivev1.Targets{}
-	for _, nameServer := range nameServers {
-		// external-dns will compare the NS record values without the
-		// dot at the end. If a dot is present, an update happens every sync.
-		targets = append(targets, controllerutils.Undotted(nameServer))
-	}
-	endpoint := &hivev1.DNSEndpoint{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      parentLinkRecordName(dnsZone.Name),
-			Namespace: dnsZone.Namespace,
-		},
-		Spec: hivev1.DNSEndpointSpec{
-			Endpoints: []*hivev1.Endpoint{
-				{
-					DNSName:    dnsZone.Spec.Zone,
-					Targets:    targets,
-					RecordType: "NS",
-					RecordTTL:  defaultNSRecordTTL,
-				},
-			},
-		},
-	}
-	if err := controllerutil.SetControllerReference(dnsZone, endpoint, r.scheme); err != nil {
-		return nil, err
-	}
-	return endpoint, nil
 }
 
 func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable bool, dnsZone *hivev1.DNSZone) error {
@@ -503,8 +424,4 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 		return false, nil
 	}
 	return false, nil
-}
-
-func parentLinkRecordName(dnsZoneName string) string {
-	return apihelpers.GetResourceName(dnsZoneName, "ns")
 }

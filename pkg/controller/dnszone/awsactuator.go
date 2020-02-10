@@ -15,11 +15,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 )
 
-const hiveDNSZoneAWSTag = "hive.openshift.io/dnszone"
+const (
+	hiveDNSZoneAWSTag     = "hive.openshift.io/dnszone"
+	defaultRegionEndpoint = "us-east-1"
+)
 
 // Ensure AWSActuator implements the Actuator interface. This will fail at compile time when false.
 var _ Actuator = &AWSActuator{}
@@ -51,14 +54,9 @@ func NewAWSActuator(
 	dnsZone *hivev1.DNSZone,
 	awsClientBuilder awsClientBuilderType,
 ) (*AWSActuator, error) {
-	// This allows for using host profiles for AWS auth.
-	var regionName string
-
-	if dnsZone != nil && dnsZone.Spec.AWS != nil {
-		regionName = dnsZone.Spec.AWS.Region
-	}
-
-	awsClient, err := awsClientBuilder(secret, regionName)
+	// Route53 is a regionless service, we specify a default region just for the purpose of creating
+	// our client configuration.
+	awsClient, err := awsClientBuilder(secret, defaultRegionEndpoint)
 	if err != nil {
 		logger.WithError(err).Error("Error creating AWSClient")
 		return nil, err
@@ -165,7 +163,7 @@ func (a *AWSActuator) syncTags() error {
 // ModifyStatus updates the DnsZone's status with AWS specific information.
 func (a *AWSActuator) ModifyStatus() error {
 	if a.zoneID == nil {
-		return errors.New("currentHostedZone is unpopulated")
+		return errors.New("zoneID is unpopulated")
 	}
 
 	a.dnsZone.Status.AWS = &hivev1.AWSDNSZoneStatus{
@@ -183,7 +181,7 @@ func min(a, b int) int {
 }
 
 // Refresh gets the AWS object for the zone.
-// If a zone cannot be found or no longer exists, actuator.currentHostedZone remains unset.
+// If a zone cannot be found or no longer exists, actuator.zoneID remains unset.
 func (a *AWSActuator) Refresh() error {
 	var zoneID string
 	var err error
@@ -288,7 +286,7 @@ func (a *AWSActuator) expectedTags() []*route53.Tag {
 }
 
 func (a *AWSActuator) existingTags(zoneID *string) ([]*route53.Tag, error) {
-	logger := a.logger.WithField("zone", aws.StringValue(zoneID))
+	logger := a.logger.WithField("id", aws.StringValue(zoneID))
 	logger.Debug("listing existing tags for zone")
 	resp, err := a.awsClient.ListTagsForResource(&route53.ListTagsForResourceInput{
 		ResourceId:   zoneID,
@@ -375,11 +373,11 @@ func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*rout
 		}
 		for _, zone := range resp.HostedZones {
 			if aws.StringValue(zone.CallerReference) == callerRef {
-				logger.WithField("zone", aws.StringValue(zone.Id)).Debug("found hosted zone matching caller reference")
+				logger.WithField("id", aws.StringValue(zone.Id)).Debug("found hosted zone matching caller reference")
 				return zone, nil
 			}
 			if aws.StringValue(zone.Name) != domain {
-				logger.WithField("name", aws.StringValue(zone.Name)).Debug("reached zone with different domain name, aborting search")
+				logger.WithField("zone", aws.StringValue(zone.Name)).Debug("reached zone with different domain name, aborting search")
 				return nil, fmt.Errorf("Hosted zone not found")
 			}
 		}
@@ -395,7 +393,7 @@ func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*rout
 // Delete removes an AWS Route53 hosted zone, typically because the DNSZone object is in a deleting state.
 func (a *AWSActuator) Delete() error {
 	if a.zoneID == nil {
-		return errors.New("currentHostedZone is unpopulated")
+		return errors.New("zoneID is unpopulated")
 	}
 
 	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone).WithField("id", aws.StringValue(a.zoneID))
@@ -404,7 +402,11 @@ func (a *AWSActuator) Delete() error {
 		Id: a.zoneID,
 	})
 	if err != nil {
-		log.WithError(err).Error("Cannot delete hosted zone")
+		logLevel := log.ErrorLevel
+		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == route53.ErrCodeHostedZoneNotEmpty {
+			logLevel = log.InfoLevel
+		}
+		log.WithError(err).Log(logLevel, "Cannot delete hosted zone")
 	}
 	return err
 }
@@ -412,7 +414,7 @@ func (a *AWSActuator) Delete() error {
 // GetNameServers returns the nameservers listed in the route53 hosted zone NS record.
 func (a *AWSActuator) GetNameServers() ([]string, error) {
 	if a.zoneID == nil {
-		return nil, errors.New("currentHostedZone is unpopulated")
+		return nil, errors.New("zoneID is unpopulated")
 	}
 
 	logger := a.logger.WithField("id", a.zoneID)

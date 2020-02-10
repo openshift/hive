@@ -12,7 +12,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 )
@@ -22,12 +22,11 @@ const (
 	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
 	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 
-	defaultInstallerImagePullPolicy = corev1.PullAlways
-	tryUninstallOnceAnnotation      = "hive.openshift.io/try-uninstall-once"
-	azureAuthDir                    = "/.azure"
-	azureAuthFile                   = azureAuthDir + "/osServicePrincipal.json"
-	gcpAuthDir                      = "/.gcp"
-	gcpAuthFile                     = gcpAuthDir + "/" + constants.GCPCredentialsName
+	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
+	azureAuthDir               = "/.azure"
+	azureAuthFile              = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir                 = "/.gcp"
+	gcpAuthFile                = gcpAuthDir + "/" + constants.GCPCredentialsName
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -51,6 +50,10 @@ func InstallerPodSpec(
 	skipGatherLogs bool,
 ) (*corev1.PodSpec, error) {
 
+	if cd.Spec.Provisioning == nil {
+		return nil, fmt.Errorf("ClusterDeployment.Provisioning not set")
+	}
+
 	pLog := log.WithFields(log.Fields{
 		"clusterProvision": provisionName,
 		"namespace":        cd.Namespace,
@@ -65,121 +68,103 @@ func InstallerPodSpec(
 			Name:  "OPENSHIFT_INSTALL_INVOKER",
 			Value: "hive",
 		},
-		{
-			Name: "PULL_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{Name: constants.GetMergedPullSecretName(cd)},
-					Key:                  corev1.DockerConfigJsonKey,
-				},
-			},
-		},
-		{
-			Name: "SSH_PUB_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: cd.Spec.SSHKey,
-					Key:                  "ssh-publickey",
-				},
-			},
-		},
-		// ok when the private key isn't in the secret, as the installmanager
-		// will just gracefully handle the file not being present
-		{
-			Name:  "SSH_PRIV_KEY_PATH",
-			Value: SSHPrivateKeyFilePath,
-		},
 	}
 	volumes := []corev1.Volume{
-		{
-			Name: "sshkeys",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.SSHKey.Name,
-				},
-			},
-		},
 		{
 			Name: "output",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name: "installconfig",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Provisioning.InstallConfigSecretRef.Name,
+				},
+			},
+		},
+		{
+			Name: "pullsecret",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: constants.GetMergedPullSecretName(cd),
+				},
+			},
+		},
 	}
 	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "sshkeys",
-			MountPath: SSHPrivateKeyDir,
-		},
 		{
 			Name:      "output",
 			MountPath: "/output",
 		},
+		{
+			Name:      "installconfig",
+			MountPath: "/installconfig",
+		},
+		{
+			Name:      "pullsecret",
+			MountPath: "/pullsecret",
+		},
 	}
 
 	switch {
-	case cd.Spec.PlatformSecrets.AWS != nil:
-		if len(cd.Spec.PlatformSecrets.AWS.Credentials.Name) > 0 {
-			env = append(
-				env,
-				corev1.EnvVar{
-					Name: "AWS_ACCESS_KEY_ID",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-							Key:                  "aws_access_key_id",
-						},
+	case cd.Spec.Platform.AWS != nil:
+		env = append(
+			env,
+			corev1.EnvVar{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
+						Key:                  "aws_access_key_id",
 					},
 				},
-				corev1.EnvVar{
-					Name: "AWS_SECRET_ACCESS_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: cd.Spec.PlatformSecrets.AWS.Credentials,
-							Key:                  "aws_secret_access_key",
-						},
+			},
+			corev1.EnvVar{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
+						Key:                  "aws_secret_access_key",
 					},
 				},
-			)
-		}
-	case cd.Spec.PlatformSecrets.Azure != nil:
-		if len(cd.Spec.PlatformSecrets.Azure.Credentials.Name) > 0 {
-			volumes = append(volumes, corev1.Volume{
-				Name: "azure",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.PlatformSecrets.Azure.Credentials.Name,
-					},
+			},
+		)
+	case cd.Spec.Platform.Azure != nil:
+		volumes = append(volumes, corev1.Volume{
+			Name: "azure",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.Azure.CredentialsSecretRef.Name,
 				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "azure",
-				MountPath: azureAuthDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  "AZURE_AUTH_LOCATION",
-				Value: azureAuthFile,
-			})
-		}
-	case cd.Spec.PlatformSecrets.GCP != nil:
-		if len(cd.Spec.PlatformSecrets.GCP.Credentials.Name) > 0 {
-			volumes = append(volumes, corev1.Volume{
-				Name: "gcp",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.PlatformSecrets.GCP.Credentials.Name,
-					},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "azure",
+			MountPath: azureAuthDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "AZURE_AUTH_LOCATION",
+			Value: azureAuthFile,
+		})
+	case cd.Spec.Platform.GCP != nil:
+		volumes = append(volumes, corev1.Volume{
+			Name: "gcp",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.GCP.CredentialsSecretRef.Name,
 				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "gcp",
-				MountPath: gcpAuthDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  "GOOGLE_CREDENTIALS",
-				Value: gcpAuthFile,
-			})
-		}
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "gcp",
+			MountPath: gcpAuthDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "GOOGLE_CREDENTIALS",
+			Value: gcpAuthFile,
+		})
 	}
 
 	if releaseImage != "" {
@@ -188,6 +173,29 @@ func InstallerPodSpec(
 			corev1.EnvVar{
 				Name:  "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE",
 				Value: releaseImage,
+			},
+		)
+	}
+
+	if cd.Spec.Provisioning.ManifestsConfigMapRef != nil {
+		volumes = append(
+			volumes,
+			corev1.Volume{
+				Name: "manifests",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: cd.Spec.Provisioning.ManifestsConfigMapRef.Name,
+						},
+					},
+				},
+			},
+		)
+		volumeMounts = append(
+			volumeMounts,
+			corev1.VolumeMount{
+				Name:      "manifests",
+				MountPath: "/manifests",
 			},
 		)
 	}
@@ -214,6 +222,25 @@ func InstallerPodSpec(
 		})
 	}
 
+	if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "sshkeys",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "sshkeys",
+			MountPath: SSHPrivateKeyDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "SSH_PRIV_KEY_PATH",
+			Value: SSHPrivateKeyFilePath,
+		})
+	}
+
 	if cd.Status.InstallerImage == nil {
 		return nil, fmt.Errorf("installer image not resolved")
 	}
@@ -224,18 +251,13 @@ func InstallerPodSpec(
 	}
 	cliImage := *cd.Status.CLIImage
 
-	installerImagePullPolicy := defaultInstallerImagePullPolicy
-	if cd.Spec.Images.InstallerImagePullPolicy != "" {
-		installerImagePullPolicy = cd.Spec.Images.InstallerImagePullPolicy
-	}
-
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			ImagePullPolicy: corev1.PullAlways,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
@@ -246,7 +268,7 @@ func InstallerPodSpec(
 		{
 			Name:            "cli",
 			Image:           cliImage,
-			ImagePullPolicy: installerImagePullPolicy,
+			ImagePullPolicy: corev1.PullAlways,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
@@ -258,7 +280,7 @@ func InstallerPodSpec(
 			Name:            "hive",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env:             env,
+			Env:             append(env, cd.Spec.Provisioning.InstallerEnv...),
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{"install-manager",
 				"--work-dir", "/output",
@@ -327,9 +349,9 @@ func GetUninstallJobName(name string) string {
 	return apihelpers.GetResourceName(name, "uninstall")
 }
 
-// GenerateUninstallerJobForDeprovisionRequest generates an uninstaller job for a given deprovision request
-func GenerateUninstallerJobForDeprovisionRequest(
-	req *hivev1.ClusterDeprovisionRequest) (*batchv1.Job, error) {
+// GenerateUninstallerJobForDeprovision generates an uninstaller job for a given deprovision request
+func GenerateUninstallerJobForDeprovision(
+	req *hivev1.ClusterDeprovision) (*batchv1.Job, error) {
 
 	tryOnce := false
 	if req.Annotations != nil {
@@ -381,10 +403,10 @@ func GenerateUninstallerJobForDeprovisionRequest(
 	return job, nil
 }
 
-func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	credentialsSecret := ""
-	if len(req.Spec.Platform.AWS.Credentials.Name) > 0 {
-		credentialsSecret = req.Spec.Platform.AWS.Credentials.Name
+	if len(req.Spec.Platform.AWS.CredentialsSecretRef.Name) > 0 {
+		credentialsSecret = req.Spec.Platform.AWS.CredentialsSecretRef.Name
 	}
 	env := []corev1.EnvVar{}
 	if len(credentialsSecret) > 0 {
@@ -434,7 +456,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batch
 	job.Spec.Template.Spec.Containers = containers
 }
 
-func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 	env := []corev1.EnvVar{}
@@ -442,7 +464,7 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *bat
 		Name: "azure",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: req.Spec.Platform.Azure.Credentials.Name,
+				SecretName: req.Spec.Platform.Azure.CredentialsSecretRef.Name,
 			},
 		},
 	})
@@ -476,7 +498,7 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *bat
 
 }
 
-func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batchv1.Job) {
+func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 	env := []corev1.EnvVar{}
@@ -484,7 +506,7 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batch
 		Name: "gcp",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: req.Spec.Platform.GCP.Credentials.Name,
+				SecretName: req.Spec.Platform.GCP.CredentialsSecretRef.Name,
 			},
 		},
 	})
@@ -510,8 +532,6 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovisionRequest, job *batch
 				"debug",
 				"--region",
 				req.Spec.Platform.GCP.Region,
-				"--gcp-project-id",
-				req.Spec.Platform.GCP.ProjectID,
 				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,

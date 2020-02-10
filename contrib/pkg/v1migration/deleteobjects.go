@@ -138,29 +138,28 @@ func (o *DeleteObjectsOptions) deleteObject(client dynamic.Interface, objFromFil
 		logger.Warn("object in JSON file differs from object in the cluster")
 		fmt.Printf("Diff in %s/%s (%s)\n%s\n", kind, name, namespace, diff.ObjectReflectDiff(objFromFile, objFromKube))
 	}
-	if finalizersFromKube := objFromKube.GetFinalizers(); len(finalizersFromKube) > 0 {
-		objFromKube.SetFinalizers(nil)
-		objFromKube, err = resourceClient.Update(objFromKube, metav1.UpdateOptions{})
-		if err != nil {
-			logger.WithError(err).Error("could not remove finalizers")
+	if !o.dryRun {
+		if finalizersFromKube := objFromKube.GetFinalizers(); len(finalizersFromKube) > 0 {
+			objFromKube.SetFinalizers(nil)
+			objFromKube, err = resourceClient.Update(objFromKube, metav1.UpdateOptions{})
+			if err != nil {
+				logger.WithError(err).Error("could not remove finalizers")
+				return
+			}
+		}
+		uid := objFromKube.GetUID()
+		propagationPolicy := metav1.DeletePropagationOrphan
+		deleteOptions := &metav1.DeleteOptions{
+			Preconditions: &metav1.Preconditions{
+				UID:             &uid,
+				ResourceVersion: pointer.StringPtr(objFromKube.GetResourceVersion()),
+			},
+			PropagationPolicy: &propagationPolicy,
+		}
+		if err := resourceClient.Delete(name, deleteOptions); err != nil {
+			logger.WithError(err).Error("could not delete object")
 			return
 		}
+		logger.Info("deleted object")
 	}
-	uid := objFromKube.GetUID()
-	propagationPolicy := metav1.DeletePropagationOrphan
-	deleteOptions := &metav1.DeleteOptions{
-		Preconditions: &metav1.Preconditions{
-			UID:             &uid,
-			ResourceVersion: pointer.StringPtr(objFromKube.GetResourceVersion()),
-		},
-		PropagationPolicy: &propagationPolicy,
-	}
-	if o.dryRun {
-		deleteOptions.DryRun = []string{metav1.DryRunAll}
-	}
-	if err := resourceClient.Delete(name, deleteOptions); err != nil {
-		logger.WithError(err).Error("could not delete object")
-		return
-	}
-	logger.Info("deleted object")
 }

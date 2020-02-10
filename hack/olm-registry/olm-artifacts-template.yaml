@@ -55,11 +55,11 @@ objects:
   spec:
     additionalCertificateAuthorities:
     - name: ${ADDITIONAL_CERTIFICATE_AUTHORITY}
-    externalDNS:
-      aws:
-        credentials:
+    managedDomains:
+    - aws:
+        credentialsSecretRef:
           name: ${EXTERNAL_DNS_AWS_CREDS}
+      domains:
+      - ${EXTERNAL_DNS_MANAGED_DOMAIN}
     globalPullSecret:
       name: ${GLOBAL_PULL_SECRET}
-    managedDomains:
-    - ${EXTERNAL_DNS_MANAGED_DOMAIN}

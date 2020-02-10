@@ -28,7 +28,12 @@ func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.He
 		return r.tearDownHiveAPI(hLog)
 	}
 
-	err := util.ApplyAsset(h, "config/apiserver/service.yaml", hLog)
+	err := util.ApplyAsset(h, "config/apiserver/hiveapi-cluster-role-binding.yaml", hLog)
+	if err != nil {
+		return err
+	}
+
+	err = util.ApplyAsset(h, "config/apiserver/service.yaml", hLog)
 	if err != nil {
 		return err
 	}

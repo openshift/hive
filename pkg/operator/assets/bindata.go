@@ -198,6 +198,8 @@ metadata:
 roleRef:
   name: extension-apiserver-authentication-reader
   namespace: kube-system
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
 subjects:
 - kind: ServiceAccount
   name: hiveapi-sa

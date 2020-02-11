@@ -10,14 +10,14 @@ Hive comes with an optional `hiveutil` binary to assist creating the `ClusterDep
 
 OpenShift installation requires a live and functioning DNS zone in the cloud account into which you will be installing the new cluster(s). For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
 
-In addition to the default OpenShift DNS support, Hive offers a DNS feature called Managed DNS. With Managed DNS, Hive can automatically create delegated zones for approved base domains. For example, if hive.example.com exists and is specified as your managed domain, you can specify a base domain of cluster1.hive.example.com on your `ClusterDeployment`, and Hive will create this zone for you, wait for it to resolve, and then proceed with installation.
+In addition to the default OpenShift DNS support, Hive offers a DNS feature called Managed DNS. With Managed DNS, Hive can automatically create delegated zones for approved base domains. For example, if hive.example.com exists and is specified as your managed domain, you can specify a base domain of cluster1.hive.example.com on your `ClusterDeployment`, and Hive will create this zone for you, add forwarding records in the base domain, wait for it to resolve, and then proceed with installation.
 
 ### Pull Secret
 
 OpenShift installation requires a pull secret obtained from try.openshift.com. You can specify an individual pull secret for each cluster Hive creates, or you can use a global pull secret that will be used by all of the clusters Hive creates.
 
 ```bash
-oc create secret generic mycluster-pull-secret .dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson --namespace hive
+oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson --namespace hive
 ```
 
 ```yaml
@@ -34,7 +34,11 @@ type: kubernetes.io/dockerconfigjson
 When a global pull secret is defined in the `hive` namespace and a `ClusterDeployment`-specific pull secret is specified, the registry authentication in both secrets will be merged and used by the new OpenShift cluster.
 When a registry exists in both pull secrets, precedence will be given to the contents of the cluster-specific pull secret.
 
-The global pull secret must live in the `hive` namespace and is referenced in the `HiveConfig` (also in the `hive` namespace).
+The global pull secret must live in the `hive` namespace and is referenced in the `HiveConfig`.
+
+```bash
+oc create secret generic global-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson --namespace hive
+```
 
 ```yaml
 apiVersion: v1
@@ -60,7 +64,9 @@ spec:
 
 ### OpenShift Version
 
-Hive needs to know what version of OpenShift to install. You can specify an individual OpenShift release image for each cluster Hive creates, or you can use a global `ClusterImageSet` that will be used by all of the clusters Hive creates.
+Hive needs to know what version of OpenShift to install. A Hive cluster represents available versions via the `ClusterImageSet` resource, and there can be multiple `ClusterImageSets` available. Each `ClusterImageSet` references an OpenShift release image. A `ClusterDeployment` references a `ClusterImageSet` via the `spec.provisioning.imageSetRef` property.
+
+Alternatively, you can specify an individual OpenShift release image in the `ClusterDeployment` `spec.provisioning.releaseImage` property.
 
 An example `ClusterImageSet`:
 
@@ -72,7 +78,6 @@ metadata:
 spec:
   releaseImage: quay.io/openshift-release-dev/ocp-release:4.3.0
 ```
-Alternatively you can specify an OpenShift 4 release image directly on your `ClusterDeployment`. This value will override any value set in your `ClusterImageSet`.
 
 ### Cloud credentials
 
@@ -144,7 +149,7 @@ type: Opaque
 
 ### InstallConfig
 
-The OpenShift installer `InstallConfig` must be base64 encoded into a `secret` and referenced in the `ClusterDeployment`.
+The OpenShift installer `InstallConfig` must be base64 encoded into a `secret` and referenced in the `ClusterDeployment`. This allows Hive to more easily support installing multiple versions of OpenShift.
 
 ```yaml
 apiVersion: v1
@@ -209,15 +214,8 @@ sshKey: REDACTED
 base64 install-config.yaml
 ```
 
-```yaml
-apiVersion: v1
-data:
-  install-config.yaml: BASE64 ENCODED INSTALLCONFIG
-kind: Secret
-metadata:
-  name: mycluster-install-config
-  namespace: hive
-type: Opaque
+```bash
+oc create secret generic mycluster-install-config --from-file=./install-config.yaml
 ```
 
 ### ClusterDeployment
@@ -225,56 +223,6 @@ type: Opaque
 Cluster provisioning begins when a `ClusterDeployment` is created.
 
 Note that some parts are duplicated with the `InstallConfig`.
-
-An example `ClusterDeployment` for AWS:
-
-```yaml
-apiVersion: hive.openshift.io/v1
-kind: ClusterDeployment
-metadata:
-  name: mycluster
-spec:
-  baseDomain: hive.example.com
-  clusterName: mycluster
-  controlPlaneConfig:
-    servingCertificates: {}
-  installed: false
-  platform:
-    aws:
-      credentialsSecretRef:
-        name: mycluster-aws-creds
-      region: us-east-1
-  provisioning:
-    imageSetRef:
-      name: openshift-v4.3.0
-    installConfigSecretRef:
-      name: mycluster-install-config
-    sshPrivateKeySecretRef:
-      name: mycluster-ssh-key
-  pullSecretRef:
-    name: mycluster-pull-secret
-  compute:
-  - name: worker
-    replicas: 3
-    platform:
-      aws:
-        rootVolume:
-          iops: 100
-          size: 22
-          type: gp2
-        type: m4.xlarge
-  controlPlane:
-    name: master
-    replicas: 3
-    platform:
-      aws:
-        rootVolume:
-          iops: 100
-          size: 22
-          type: gp2
-        type: m4.xlarge
-```
-
 
 An example `ClusterDeployment` for AWS:
 
@@ -324,9 +272,11 @@ gcp:
   region: us-east1
 ```
 
-### MachineConfig
+### Machine Pools
 
-To manage `MachinePools` Day 2, you need to define these as well. The definition must match what was specified in the `InstallConfig`.
+To manage `MachinePools` Day 2, you need to define these as well. The definition of the worker pool should mostly match what was specified in `InstallConfig` to prevent replacement of all worker nodes.
+
+`InstallConfig` is limited to the one worker pool, but Hive can sync additional machine pools Day 2.
 
 ```yaml
 apiVersion: hive.openshift.io/v1

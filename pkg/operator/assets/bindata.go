@@ -159,6 +159,7 @@ spec:
         args:
           - "start"
           - "--v=2"
+          - "--secure-port=10433"
           - "--logtostderr"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
           - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"
@@ -190,13 +191,28 @@ func configApiserverDeploymentYaml() (*asset, error) {
 
 var _configApiserverHiveapiClusterRoleBindingYaml = []byte(`---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hiveapi
+  namespace: hive
+roleRef:
+  name: extension-apiserver-authentication-reader
+  namespace: kube-system
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: hiveapi-sa
+  namespace: hive
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: hiveapi-cluster-admin
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: manager-role
 subjects:
 - kind: ServiceAccount
   namespace: hive
@@ -256,7 +272,7 @@ spec:
   ports:
   - port: 443
     protocol: TCP
-    targetPort: 443
+    targetPort: 10443
   selector:
     api: hiveapi
     apiserver: "true"

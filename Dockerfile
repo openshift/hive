@@ -8,14 +8,13 @@ RUN go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
 RUN go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
 RUN go build -o bin/hive-apiserver github.com/openshift/hive/cmd/hive-apiserver
 
-FROM registry.access.redhat.com/ubi7/ubi
-#FROM registry.svc.ci.openshift.org/origin/4.1:base
+FROM centos:7
 
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clean all && rm -rf /var/cache/yum/*; fi
 
 # libvirt libraries required for running bare metal installer.
-#RUN yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*
+RUN if ! rpm -q libvirt-devel; then yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*; fi
 
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

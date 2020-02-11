@@ -43,7 +43,7 @@ HIVE_TYPES=( checkpoints clusterdeployments clusterdeprovisionrequests clusterim
 for t in "${HIVE_TYPES[@]}"
 do
 	echo "Storing all ${t} in ${WORKDIR}/${t}.json"
-	oc get "${t}.hive.openshift.io" -A -o json | jq .items[] > "${WORKDIR}/${t}.json"
+	oc get "${t}.hive.openshift.io" --all-namespaces -o json | jq .items[] > "${WORKDIR}/${t}.json"
 done
 
 bin/hiveutil v1migration save-owner-refs --work-dir "${WORKDIR}"
@@ -59,17 +59,18 @@ then
   fi
 fi
 
-if [[ -z $dry_run ]]
-then
-  echo "Deleting install jobs"
-  oc delete jobs -l "hive.openshift.io/install=true" -A
-fi
+delete_jobs() {
+  local labels=${1:?must specify a label for the jobs to delete}
+  oc get jobs -l "${labels}" --all-namespaces -ojsonpath='{.items[*].metadata.namespace}' | \
+    sort -u | \
+    xargs -i oc delete jobs -n {} -l "${labels}" "${dry_run}"
+}
 
-if [[ -z $dry_run ]]
-then
-  echo "Deleting imageset jobs"
-  oc delete jobs -l "hive.openshift.io/imageset=true" -A
-fi
+echo "Deleting install jobs"
+delete_jobs "hive.openshift.io/install=true"
+
+echo "Deleting imageset jobs"
+delete_jobs "hive.openshift.io/imageset=true"
 
 for t in "${HIVE_TYPES[@]}"
 do
@@ -80,7 +81,7 @@ do
   then
     for i in 1 2 3 4 5
     do
-      if [[ "$(oc get "${t}.hive.openshift.io" -A -o name | wc -l)" -eq 0 ]]; then break; fi
+      if [[ "$(oc get "${t}.hive.openshift.io" --all-namespaces -o name | wc -l)" -eq 0 ]]; then break; fi
       if (( i == 5 ))
       then
         echo "There are still remaining ${t}"

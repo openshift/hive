@@ -31,6 +31,9 @@ const (
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
 
+	// LibvirtSSHPrivateKeyDir is the directory where the generated Job will mount the libvirt ssh secret to
+	LibvirtSSHPrivateKeyDir = "/libvirtsshkeys"
+
 	// SSHSecretPrivateKeyName is the key name holding the private key in the SSH secret
 	SSHSecretPrivateKeyName = "ssh-privatekey"
 )
@@ -38,6 +41,9 @@ const (
 var (
 	// SSHPrivateKeyFilePath is the path to the private key contents (from the SSH secret)
 	SSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", SSHPrivateKeyDir, SSHSecretPrivateKeyName)
+
+	// LibvirtSSHPrivateKeyFilePath is the path to the private key contents (from the libvirt SSH secret)
+	LibvirtSSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", LibvirtSSHPrivateKeyDir, SSHSecretPrivateKeyName)
 )
 
 // InstallerPodSpec generates a spec for an installer pod.
@@ -236,8 +242,27 @@ func InstallerPodSpec(
 			MountPath: SSHPrivateKeyDir,
 		})
 		env = append(env, corev1.EnvVar{
-			Name:  "SSH_PRIV_KEY_PATH",
+			Name:  constants.SSHPrivKeyPathEnvVar,
 			Value: SSHPrivateKeyFilePath,
+		})
+	}
+
+	if cd.Spec.Platform.BareMetal != nil && cd.Spec.Platform.BareMetal.LibvirtSSHPrivateKeySecretRef.Name != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "libvirtsshkeys",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.BareMetal.LibvirtSSHPrivateKeySecretRef.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "libvirtsshkeys",
+			MountPath: LibvirtSSHPrivateKeyDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  constants.LibvirtSSHPrivKeyPathEnvVar,
+			Value: LibvirtSSHPrivateKeyFilePath,
 		})
 	}
 

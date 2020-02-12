@@ -2014,6 +2014,14 @@ spec:
                 bareMetal:
                   description: BareMetal is the configuration used when installing
                     on bare metal.
+                  properties:
+                    libvirtSSHPrivateKeySecretRef:
+                      description: LibvirtSSHPrivateKeySecretRef is the reference
+                        to the secret that contains the private SSH key to use for
+                        access to the libvirt provisioning host. The SSH private key
+                        is expected to be in the secret data under the "ssh-privatekey"
+                        key.
+                      type: object
                   type: object
                 gcp:
                   description: GCP is the configuration used when installing on Google

@@ -231,19 +231,37 @@ func (m *InstallManager) Run() error {
 		os.Exit(0)
 	}
 
-	// will be non-nil if we've been unable to setup SSH, which is a non-fatal error:
-	var sshAgentSetupErr error
+	// sshKeyPaths will contain paths to all ssh keys in use
+	var sshKeyPaths []string
 
-	var sshKeyPath string
-	sshKeyPath, sshAgentSetupErr = m.initSSHKey()
+	// setup the host ssh key if possible
+	sshKeyPath, sshAgentSetupErr := m.initSSHKey(constants.SSHPrivKeyPathEnvVar)
 	if sshAgentSetupErr != nil {
 		// Not a fatal error.
-		m.log.WithError(sshAgentSetupErr).Info("unable to initialize ssh agent")
+		m.log.WithError(sshAgentSetupErr).Info("unable to initialize host ssh key")
 	} else {
-		sshCleanupFunc, sshAgentSetupErr := m.initSSHAgent(sshKeyPath)
+		sshKeyPaths = append(sshKeyPaths, sshKeyPath)
+	}
+
+	// setup the bare metal provisioning libvirt ssh key if possible
+	if cd.Spec.Platform.BareMetal != nil {
+		libvirtSSHKeyPath, libvirtSSHAgentSetupErr := m.initSSHKey(constants.LibvirtSSHPrivKeyPathEnvVar)
+		if libvirtSSHAgentSetupErr != nil {
+			// Not a fatal error.
+			m.log.WithError(libvirtSSHAgentSetupErr).Info("unable to initialize libvirt ssh key")
+		} else {
+			sshKeyPaths = append(sshKeyPaths, libvirtSSHKeyPath)
+		}
+	}
+
+	if len(sshKeyPaths) > 0 {
+		m.log.Infof("initializing ssh agent with %d keys", len(sshKeyPaths))
+		sshCleanupFunc, sshAgentSetupErr := m.initSSHAgent(sshKeyPaths)
 		defer sshCleanupFunc()
 		if sshAgentSetupErr != nil {
-			// Not a fatal error.
+			// Not a fatal error. If this is bare metal, it could be, but the problem will surface soon enough
+			// and we're not sure how implementations of this will evolve, we may not be doing libvirt over ssh
+			// long term.
 			m.log.WithError(sshAgentSetupErr).Info("ssh agent is not initialized")
 		}
 	}
@@ -366,6 +384,15 @@ func (m *InstallManager) Run() error {
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
 
+		// TODO: debugging stuff, remove it later
+		out, err := exec.Command("df", "-m").Output()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("df output:\n\n%s\n", out)
+
+		m.log.Warn("sleeping 1 hour for debugging")
+		time.Sleep(60 * time.Minute)
 		// Fetch logs from all cluster machines:
 		if m.isGatherLogsEnabled() {
 			m.gatherLogs(cd, sshKeyPath, sshAgentSetupErr)
@@ -760,16 +787,15 @@ func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
 	return err
 }
 
-func (m *InstallManager) initSSHKey() (string, error) {
+func (m *InstallManager) initSSHKey(envVar string) (string, error) {
 	m.log.Debug("checking for SSH private key")
-	sshPrivKeyPath := os.Getenv("SSH_PRIV_KEY_PATH")
+	sshPrivKeyPath := os.Getenv(envVar)
 	if sshPrivKeyPath == "" {
-		m.log.Warn("cannot configure SSH agent as SSH_PRIV_KEY_PATH is unset or empty")
-		return "", fmt.Errorf("cannot configure SSH agent as SSH_PRIV_KEY_PATH is unset or empty")
+		return "", fmt.Errorf("cannot configure SSH agent as %s is unset or empty", envVar)
 	}
 	fileInfo, err := os.Stat(sshPrivKeyPath)
 	if err != nil && os.IsNotExist(err) {
-		m.log.WithField("path", sshPrivKeyPath).Warn("SSH_PRIV_KEY_PATH defined but file does not exist")
+		m.log.WithField("path", sshPrivKeyPath).Warnf("%s defined but file does not exist", envVar)
 		return "", err
 	} else if err != nil {
 		m.log.WithError(err).Error("error stat'ing file containing private key")
@@ -796,7 +822,7 @@ func (m *InstallManager) initSSHKey() (string, error) {
 
 }
 
-func (m *InstallManager) initSSHAgent(sshKeyPath string) (func(), error) {
+func (m *InstallManager) initSSHAgent(sshKeyPaths []string) (func(), error) {
 	sshAgentCleanup := func() {}
 
 	sock := os.Getenv("SSH_AUTH_SOCK")
@@ -861,11 +887,14 @@ func (m *InstallManager) initSSHAgent(sshKeyPath string) (func(), error) {
 		return sshAgentCleanup, err
 	}
 
-	cmd := exec.Command(bin, sshKeyPath)
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		m.log.WithError(err).Errorf("failed to add private key: %v", sshKeyPath)
-		return sshAgentCleanup, err
+	for _, sshKeyPath := range sshKeyPaths {
+		cmd := exec.Command(bin, sshKeyPath)
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			m.log.WithField("key", sshKeyPath).WithError(err).Errorf("failed to add private key: %v", sshKeyPath)
+			return sshAgentCleanup, err
+		}
+		m.log.WithField("key", sshKeyPath).Info("added ssh private key to agent")
 	}
 
 	return sshAgentCleanup, nil

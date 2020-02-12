@@ -274,6 +274,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 	restConfig, err := remoteClientBuilder.RESTConfig()
 	if err != nil {
 		ssiLog.WithError(err).Error("unable to get REST config")
+		return reconcile.Result{}, err
 	}
 	ssiLog.Debug("applying sync set")
 	original := ssi.DeepCopy()

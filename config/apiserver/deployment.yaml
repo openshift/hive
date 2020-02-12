@@ -34,7 +34,7 @@ spec:
         args:
           - "start"
           - "--v=2"
-          - "--secure-port=10433"
+          - "--secure-port=10443"
           - "--logtostderr"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
           - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"

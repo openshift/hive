@@ -159,7 +159,7 @@ spec:
         args:
           - "start"
           - "--v=2"
-          - "--secure-port=10433"
+          - "--secure-port=10443"
           - "--logtostderr"
           - "--tls-cert-file=/apiserver.local.config/certificates/tls.crt"
           - "--tls-private-key-file=/apiserver.local.config/certificates/tls.key"
@@ -193,7 +193,7 @@ var _configApiserverHiveapiClusterRoleBindingYaml = []byte(`---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: hiveapi
+  name: hiveapi-extension-apiserver-authentication-reader
   namespace: hive
 roleRef:
   name: extension-apiserver-authentication-reader
@@ -204,19 +204,34 @@ subjects:
 - kind: ServiceAccount
   name: hiveapi-sa
   namespace: hive
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: hiveapi-cluster-admin
+  name: hiveapi-auth-delegator
+roleRef:
+  name: system:auth-delegator
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: hiveapi-sa
+    namespace: hive
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hiveapi-manager
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: manager-role
 subjects:
 - kind: ServiceAccount
-  namespace: hive
   name: hiveapi-sa
+  namespace: hive
 `)
 
 func configApiserverHiveapiClusterRoleBindingYamlBytes() ([]byte, error) {

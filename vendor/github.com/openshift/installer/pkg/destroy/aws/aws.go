@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -148,12 +150,13 @@ func (o *ClusterUninstaller) Run() error {
 		return err
 	}
 
+	tagClientStack := append([]*resourcegroupstaggingapi.ResourceGroupsTaggingAPI(nil), tagClients...)
 	err = wait.PollImmediateInfinite(
 		time.Second*10,
 		func() (done bool, err error) {
 			var loopError error
 			nextTagClients := tagClients[:0]
-			for _, tagClient := range tagClients {
+			for _, tagClient := range tagClientStack {
 				matched := false
 				for _, filter := range o.Filters {
 					o.Logger.Debugf("search for and delete matching resources by tag in %s matching %#+v", tagClientNames[tagClient], filter)
@@ -175,11 +178,6 @@ func (o *ClusterUninstaller) Run() error {
 									parsed, err := arn.Parse(arnString)
 									if err != nil {
 										arnLogger.Debug(err)
-										continue
-									}
-
-									if parsed.Service == "ec2" && strings.HasPrefix(parsed.Resource, "network-interface/") {
-										arnLogger.Debug("skip direct tag deletion, deleting the VPC should catch this")
 										continue
 									}
 
@@ -210,7 +208,7 @@ func (o *ClusterUninstaller) Run() error {
 					o.Logger.Debugf("no deletions from %s, removing client", tagClientNames[tagClient])
 				}
 			}
-			tagClients = nextTagClients
+			tagClientStack = nextTagClients
 
 			o.Logger.Debug("search for IAM roles")
 			arns, err := iamRoleSearch.arns()
@@ -251,7 +249,7 @@ func (o *ClusterUninstaller) Run() error {
 				}
 			}
 
-			return len(tagClients) == 0 && loopError == nil, nil
+			return len(tagClientStack) == 0 && loopError == nil, nil
 		},
 	)
 	if err != nil {
@@ -263,6 +261,12 @@ func (o *ClusterUninstaller) Run() error {
 		o.Logger.Debug(err)
 		return err
 	}
+
+	err = removeSharedTags(context.TODO(), tagClients, tagClientNames, o.Filters, o.Logger)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -555,6 +559,8 @@ func deleteEC2(session *session.Session, arn arn.ARN, filter Filter, logger logr
 		return deleteEC2Volume(client, id, logger)
 	case "vpc":
 		return deleteEC2VPC(client, elb.New(session), elbv2.New(session), id, logger)
+	case "vpc-peering-connection":
+		return deleteEC2VPCPeeringConnection(client, id, logger)
 	default:
 		return errors.Errorf("unrecognized EC2 resource type %s", resourceType)
 	}
@@ -690,6 +696,11 @@ func terminateEC2InstancesByTags(ec2Client *ec2.EC2, iamClient *iam.IAM, filters
 		return nil, errors.New("EC2 client does not have region configured")
 	}
 
+	partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), *ec2Client.Config.Region)
+	if !ok {
+		return nil, errors.Errorf("no partition found for region %q", *ec2Client.Config.Region)
+	}
+
 	terminated := map[string]struct{}{}
 	err := wait.PollImmediateInfinite(
 		time.Second*10,
@@ -720,7 +731,7 @@ func terminateEC2InstancesByTags(ec2Client *ec2.EC2, iamClient *iam.IAM, filters
 
 								instanceLogger := logger.WithField("instance", *instance.InstanceId)
 								if *instance.State.Name == "terminated" {
-									arn := fmt.Sprintf("arn:aws:ec2:%s:%s:instance/%s", *ec2Client.Config.Region, *reservation.OwnerId, *instance.InstanceId)
+									arn := fmt.Sprintf("arn:%s:ec2:%s:%s:instance/%s", partition.ID(), *ec2Client.Config.Region, *reservation.OwnerId, *instance.InstanceId)
 									if _, ok := terminated[arn]; !ok {
 										instanceLogger.Debug("Terminated")
 										terminated[arn] = exists
@@ -1147,6 +1158,7 @@ func deleteEC2SubnetsByVPC(client *ec2.EC2, vpc string, failFast bool, logger lo
 		return err
 	}
 
+	var lastError error
 	for _, subnet := range results.Subnets {
 		err := deleteEC2Subnet(client, *subnet.SubnetId, logger.WithField("subnet", *subnet.SubnetId))
 		if err != nil {
@@ -1154,10 +1166,14 @@ func deleteEC2SubnetsByVPC(client *ec2.EC2, vpc string, failFast bool, logger lo
 			if failFast {
 				return err
 			}
+			if lastError != nil {
+				logger.Debug(lastError)
+			}
+			lastError = err
 		}
 	}
 
-	return nil
+	return lastError
 }
 
 func deleteEC2Volume(client *ec2.EC2, id string, logger logrus.FieldLogger) error {
@@ -1188,15 +1204,18 @@ func deleteEC2VPC(ec2Client *ec2.EC2, elbClient *elb.ELB, elbv2Client *elbv2.ELB
 		return v2lbError
 	}
 
-	for _, helper := range [](func(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error){
-		deleteEC2NATGatewaysByVPC,      // not always tagged
-		deleteEC2NetworkInterfaceByVPC, // not always tagged
-		deleteEC2RouteTablesByVPC,      // not always tagged
-		deleteEC2SecurityGroupsByVPC,   // not always tagged
-		deleteEC2SubnetsByVPC,          // not always tagged
-		deleteEC2VPCEndpointsByVPC,     // not taggable
+	for _, child := range []struct {
+		helper   func(client *ec2.EC2, vpc string, failFast bool, logger logrus.FieldLogger) error
+		failFast bool
+	}{
+		{helper: deleteEC2NATGatewaysByVPC, failFast: true},      // not always tagged
+		{helper: deleteEC2NetworkInterfaceByVPC, failFast: true}, // not always tagged
+		{helper: deleteEC2RouteTablesByVPC, failFast: true},      // not always tagged
+		{helper: deleteEC2SecurityGroupsByVPC, failFast: false},  // not always tagged
+		{helper: deleteEC2SubnetsByVPC, failFast: true},          // not always tagged
+		{helper: deleteEC2VPCEndpointsByVPC, failFast: true},     // not taggable
 	} {
-		err := helper(ec2Client, id, true, logger)
+		err := child.helper(ec2Client, id, child.failFast, logger)
 		if err != nil {
 			return err
 		}
@@ -1249,6 +1268,20 @@ func deleteEC2VPCEndpointsByVPC(client *ec2.EC2, vpc string, failFast bool, logg
 		}
 	}
 
+	return nil
+}
+
+func deleteEC2VPCPeeringConnection(client *ec2.EC2, id string, logger logrus.FieldLogger) error {
+	_, err := client.DeleteVpcPeeringConnection(&ec2.DeleteVpcPeeringConnectionInput{
+		VpcPeeringConnectionId: &id,
+	})
+	if err != nil {
+		if err.(awserr.Error).Code() == "InvalidVpcPeeringConnectionID.NotFound" {
+			return nil
+		}
+		return errors.Wrapf(err, "cannot delete VPC Peering Connection %s", id)
+	}
+	logger.Info("Deleted")
 	return nil
 }
 
@@ -1822,4 +1855,86 @@ func isBucketNotFound(err interface{}) bool {
 		}
 	}
 	return false
+}
+
+func removeSharedTags(ctx context.Context, tagClients []*resourcegroupstaggingapi.ResourceGroupsTaggingAPI, tagClientNames map[*resourcegroupstaggingapi.ResourceGroupsTaggingAPI]string, filters []Filter, logger logrus.FieldLogger) error {
+	for _, filter := range filters {
+		for key, value := range filter {
+			if strings.HasPrefix(key, "kubernetes.io/cluster/") {
+				if value == "owned" {
+					if err := removeSharedTag(ctx, tagClients, tagClientNames, key, logger); err != nil {
+						return err
+					}
+				} else {
+					logger.Warnf("Ignoring non-owned cluster key %s: %s for shared-tag removal", key, value)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func removeSharedTag(ctx context.Context, tagClients []*resourcegroupstaggingapi.ResourceGroupsTaggingAPI, tagClientNames map[*resourcegroupstaggingapi.ResourceGroupsTaggingAPI]string, key string, logger logrus.FieldLogger) error {
+	request := &resourcegroupstaggingapi.UntagResourcesInput{
+		TagKeys: []*string{aws.String(key)},
+	}
+
+	removed := map[string]struct{}{}
+	tagClients = append([]*resourcegroupstaggingapi.ResourceGroupsTaggingAPI(nil), tagClients...)
+	for len(tagClients) > 0 {
+		nextTagClients := tagClients[:0]
+		for _, tagClient := range tagClients {
+			logger.Debugf("Search for and remove tags in %s matching %s: shared", tagClientNames[tagClient], key)
+			arns := []string{}
+			err := tagClient.GetResourcesPages(
+				&resourcegroupstaggingapi.GetResourcesInput{TagFilters: []*resourcegroupstaggingapi.TagFilter{{
+					Key:    aws.String(key),
+					Values: []*string{aws.String("shared")},
+				}}},
+				func(results *resourcegroupstaggingapi.GetResourcesOutput, lastPage bool) bool {
+					for _, resource := range results.ResourceTagMappingList {
+						arn := *resource.ResourceARN
+						if _, ok := removed[arn]; !ok {
+							arns = append(arns, arn)
+						}
+					}
+
+					return !lastPage
+				},
+			)
+			if err != nil {
+				err = errors.Wrap(err, "get tagged resources")
+				logger.Info(err)
+				nextTagClients = append(nextTagClients, tagClient)
+				continue
+			}
+			if len(arns) == 0 {
+				logger.Debugf("No matches in %s for %s: shared, removing client", tagClientNames[tagClient], key)
+				continue
+			}
+			nextTagClients = append(nextTagClients, tagClient)
+
+			for i := 0; i < len(arns); i += 20 {
+				request.ResourceARNList = make([]*string, 0, 20)
+				for j := 0; i+j < len(arns) && j < 20; j++ {
+					request.ResourceARNList = append(request.ResourceARNList, aws.String(arns[i+j]))
+				}
+				_, err = tagClient.UntagResourcesWithContext(ctx, request)
+				if err != nil {
+					err = errors.Wrap(err, "untag shared resources")
+					logger.Info(err)
+					continue
+				}
+				for j := 0; i+j < len(arns) && j < 20; j++ {
+					arn := arns[i+j]
+					logger.WithField("arn", arn).Infof("Removed tag %s: shared", key)
+					removed[arn] = exists
+				}
+			}
+		}
+		tagClients = nextTagClients
+	}
+
+	return nil
 }

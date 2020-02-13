@@ -410,7 +410,11 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 					HostPrefix: 23,
 				},
 			},
-			MachineCIDR: ipnet.MustParseCIDR("10.0.0.0/16"),
+			MachineNetwork: []installertypes.MachineNetworkEntry{
+				{
+					CIDR: *ipnet.MustParseCIDR("10.0.0.0/16"),
+				},
+			},
 		},
 		ControlPlane: &installertypes.MachinePool{
 			Name:     "master",

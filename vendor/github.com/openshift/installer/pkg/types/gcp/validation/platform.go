@@ -1,10 +1,13 @@
 package validation
 
 import (
+	"regexp"
 	"sort"
 
-	"github.com/openshift/installer/pkg/types/gcp"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/openshift/installer/pkg/types/gcp"
 )
 
 var (
@@ -55,5 +58,28 @@ func ValidatePlatform(p *gcp.Platform, fldPath *field.Path) field.ErrorList {
 	if p.DefaultMachinePlatform != nil {
 		allErrs = append(allErrs, ValidateMachinePool(p, p.DefaultMachinePlatform, fldPath.Child("defaultMachinePlatform"))...)
 	}
+	if p.Network != "" {
+		if p.ComputeSubnet == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("computeSubnet"), "must provide a compute subnet when a network is specified"))
+		}
+		if p.ControlPlaneSubnet == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controlPlaneSubnet"), "must provide a control plane subnet when a network is specified"))
+		}
+	}
+	if (p.ComputeSubnet != "" || p.ControlPlaneSubnet != "") && p.Network == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("network"), "must provide a VPC network when supplying subnets"))
+	}
+
 	return allErrs
+}
+
+// ValidateClusterName confirms that the provided cluster name matches GCP naming requirements.
+func ValidateClusterName(clusterName string) error {
+	gcpResourceFmt := `(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)`
+
+	re := regexp.MustCompile("^" + gcpResourceFmt + "$")
+	if !re.MatchString(clusterName) {
+		return errors.Errorf("GCP requires cluster name to match regular expression %s", gcpResourceFmt)
+	}
+	return nil
 }

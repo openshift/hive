@@ -18,14 +18,16 @@
   version = "v0.4.12"
 
 [[projects]]
-  digest = "1:0cef92d816e9d5c9b4fa7908ee401e8993ab33c9952c076589fb3b49b7637414"
+  digest = "1:5632565af39d61cda6897bfe5868bab1c46e5f0b3af603d21364c5d0e89a46c5"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
     "profiles/latest/dns/mgmt/dns",
     "profiles/latest/resources/mgmt/subscriptions",
     "services/dns/mgmt/2017-10-01/dns",
     "services/graphrbac/1.6/graphrbac",
+    "services/network/mgmt/2018-12-01/network",
     "services/preview/dns/mgmt/2018-03-01-preview/dns",
+    "services/privatedns/mgmt/2018-09-01/privatedns",
     "services/resources/mgmt/2018-05-01/resources",
     "services/resources/mgmt/2018-06-01/subscriptions",
     "version",
@@ -97,7 +99,7 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
-  digest = "1:c34d40a8d9bbfc92fb388968f0860deb28921f2d2e0db948df6e73229ac8b810"
+  digest = "1:2579b2256a6988565a5d8fc85fdada14ad13b67c29fdfe8715240941898c155c"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     ".",
@@ -123,9 +125,11 @@
     "internal/ini",
     "internal/s3err",
     "internal/sdkio",
+    "internal/sdkmath",
     "internal/sdkrand",
     "internal/sdkuri",
     "internal/shareddefaults",
+    "internal/strings",
     "private/protocol",
     "private/protocol/ec2query",
     "private/protocol/eventstream",
@@ -148,13 +152,15 @@
     "service/route53",
     "service/route53/route53iface",
     "service/s3",
+    "service/s3/internal/arn",
     "service/s3/s3iface",
     "service/s3/s3manager",
     "service/sts",
+    "service/sts/stsiface",
   ]
   pruneopts = "NUT"
-  revision = "c1afd6c3340feedd0a2c1cd929dcb291d4bd09ba"
-  version = "v1.16.23"
+  revision = "6c32c9957b355491e82635c1d318e7614a997428"
+  version = "v1.28.9"
 
 [[projects]]
   branch = "master"
@@ -849,7 +855,7 @@
   version = "v1.14.0"
 
 [[projects]]
-  digest = "1:bbd46e400a1c01199ba665df8f9f8f03855b0d1a0a1c72130fed3fffb98a99b8"
+  digest = "1:e4a2b34dd07ffeb9282d5ff391f11918ab21d86260c0c21baf1ac5be53ea73b1"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -872,11 +878,12 @@
     "pkg/types/libvirt",
     "pkg/types/none",
     "pkg/types/openstack",
+    "pkg/types/ovirt",
     "pkg/types/vsphere",
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "6fdffbb9c21d90ba97fc79dff3ccbeac22fb2a0e"
+  revision = "725b71dce1d41c98e368ad9277e14c7ce9a9cb25"
 
 [[projects]]
   branch = "master"
@@ -1037,6 +1044,29 @@
   pruneopts = "NUT"
   revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
   version = "v1.4.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:9cf15b82fc5c2c8df2cabcb405cf45ff9f0f3c238aa8982fc4f2c979d614ce92"
+  name = "github.com/vmware/govmomi"
+  packages = [
+    ".",
+    "property",
+    "session",
+    "vapi/internal",
+    "vapi/rest",
+    "vim25",
+    "vim25/debug",
+    "vim25/methods",
+    "vim25/mo",
+    "vim25/progress",
+    "vim25/soap",
+    "vim25/types",
+    "vim25/xml",
+  ]
+  pruneopts = "NUT"
+  revision = "8ddca4d4f35746d2585945f1d4a515bf06ace8ad"
+  source = "https://github.com/vmware/govmomi"
 
 [[projects]]
   digest = "1:9b92a6e1b43f36f3df5c78b3219ad67df94543c0416f3839454ef6c44a3d43aa"
@@ -1293,7 +1323,7 @@
   version = "v1.15.0"
 
 [[projects]]
-  digest = "1:acce65b46e283672291c073e642b3cadbb2817d4689a2f8babc5bad08724c99c"
+  digest = "1:de19d3688bad66ab5567a2e0a12951a6323a48afca7a7e6582a2b9d3a7456c1c"
   name = "gopkg.in/AlecAivazis/survey.v1"
   packages = [
     ".",
@@ -1301,8 +1331,8 @@
     "terminal",
   ]
   pruneopts = "NUT"
-  revision = "ee72c28b95a5ff3e227cfd403f556f0ef4b07ca5"
-  version = "v1.8.2"
+  revision = "e4af3b345125b0903edb492a33a99a23e9eb3487"
+  version = "v1.8.7"
 
 [[projects]]
   digest = "1:1b91ae0dc69a41d4c2ed23ea5cffb721ea63f5037ca4b81e6d6771fbb8f45129"

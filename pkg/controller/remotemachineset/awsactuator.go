@@ -15,7 +15,6 @@ import (
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
-	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesaws "github.com/openshift/installer/pkg/types/aws"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -67,14 +66,6 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		return nil, errors.New("MachinePool is not for AWS")
 	}
 
-	ic := &installertypes.InstallConfig{
-		Platform: installertypes.Platform{
-			AWS: &installertypesaws.Platform{
-				Region: cd.Spec.Platform.AWS.Region,
-			},
-		},
-	}
-
 	computePool := baseMachinePool(pool)
 	computePool.Platform.AWS = &installertypesaws.MachinePool{
 		InstanceType: pool.Spec.Platform.AWS.InstanceType,
@@ -97,7 +88,14 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		computePool.Platform.AWS.Zones = zones
 	}
 
-	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, a.amiID, pool.Spec.Name, "worker-user-data")
+	// Private subnets && userTags are settings available in the installconfig
+	// that we are choosing to ignore for the timebeing. These empty settings
+	// should be updated to feed from the machinepool / installconfig in the
+	// future.
+	subnets := map[string]string{}
+	userTags := map[string]string{}
+
+	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, a.amiID, pool.Spec.Name, "worker-user-data", userTags)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate machinesets")
 	}

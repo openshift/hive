@@ -7,6 +7,7 @@ import (
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/openstack"
+	"github.com/openshift/installer/pkg/types/ovirt"
 	"github.com/openshift/installer/pkg/types/vsphere"
 )
 
@@ -18,6 +19,14 @@ const (
 	HyperthreadingEnabled HyperthreadingMode = "Enabled"
 	// HyperthreadingDisabled indicates that hyperthreading is disabled.
 	HyperthreadingDisabled HyperthreadingMode = "Disabled"
+)
+
+// Architecture is the instruction set architecture for the machines in a pool.
+type Architecture string
+
+const (
+	// ArchitectureAMD64 indicates AMD64 (x86_64).
+	ArchitectureAMD64 = "amd64"
 )
 
 // MachinePool is a pool of machines to be installed.
@@ -38,6 +47,10 @@ type MachinePool struct {
 	// +optional
 	// Default is for hyperthreading to be enabled.
 	Hyperthreading HyperthreadingMode `json:"hyperthreading,omitempty"`
+
+	// Architecture is the instruction set architecture of the machine pool.
+	// Defaults to amd64.
+	Architecture Architecture `json:"architecture,omitempty"`
 }
 
 // MachinePoolPlatform is the platform-specific configuration for a machine
@@ -63,6 +76,9 @@ type MachinePoolPlatform struct {
 
 	// VSphere is the configuration used when installing on vSphere.
 	VSphere *vsphere.MachinePool `json:"vsphere,omitempty"`
+
+	// Ovirt is the configuration used when installing on oVirt.
+	Ovirt *ovirt.MachinePool `json:"ovirt,omitempty"`
 }
 
 // Name returns a string representation of the platform (e.g. "aws" if
@@ -86,6 +102,8 @@ func (p *MachinePoolPlatform) Name() string {
 		return openstack.Name
 	case p.VSphere != nil:
 		return vsphere.Name
+	case p.Ovirt != nil:
+		return ovirt.Name
 	default:
 		return ""
 	}

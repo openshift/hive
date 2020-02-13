@@ -104,7 +104,7 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "6fdffbb9c21d90ba97fc79dff3ccbeac22fb2a0e"
+  revision = "725b71dce1d41c98e368ad9277e14c7ce9a9cb25"
 
 [[override]]
   name = "contrib.go.opencensus.io/exporter/ocagent"

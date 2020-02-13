@@ -55,7 +55,11 @@ func ClusterDeploymentToHiveV1(in *hiveapi.ClusterDeployment, sshKey string, out
 	}
 	installConfig.Networking.NetworkType = string(in.Spec.Networking.Type)
 	installConfig.Networking.ServiceNetwork = []ipnet.IPNet{*parseCIDR(in.Spec.Networking.ServiceCIDR)}
-	installConfig.Networking.MachineCIDR = parseCIDR(in.Spec.Networking.MachineCIDR)
+	installConfig.Networking.MachineNetwork = []installtypes.MachineNetworkEntry{
+		{
+			CIDR: *parseCIDR(in.Spec.Networking.MachineCIDR),
+		},
+	}
 	// installConfig.PullSecret = <filled in by the Hive installmanager>
 	if installConfig.ControlPlane == nil {
 		installConfig.ControlPlane = &installtypes.MachinePool{}
@@ -181,8 +185,8 @@ func ClusterDeploymentFromHiveV1(in *hivev1.ClusterDeployment, installConfig *in
 
 	if installConfig != nil {
 		if networking := installConfig.Networking; networking != nil {
-			if cidr := networking.MachineCIDR; cidr != nil {
-				out.Spec.MachineCIDR = cidr.String()
+			if len(networking.MachineNetwork) > 0 {
+				out.Spec.MachineCIDR = networking.MachineNetwork[0].CIDR.String()
 			} else {
 				out.Spec.MachineCIDR = ""
 			}

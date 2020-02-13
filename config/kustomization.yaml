@@ -33,4 +33,5 @@ resources:
 - ./operator/operator_role.yaml
 - ./operator/operator_role_binding.yaml
 - ./operator/operator_deployment.yaml
-- ./apiserver/hiveapi-cluster-role-binding.yaml
+- ./apiserver/hiveapi_rbac_role.yaml
+- ./apiserver/hiveapi_rbac_role_binding.yaml

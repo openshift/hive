@@ -2,7 +2,8 @@
 // sources:
 // config/apiserver/apiservice.yaml
 // config/apiserver/deployment.yaml
-// config/apiserver/hiveapi-cluster-role-binding.yaml
+// config/apiserver/hiveapi_rbac_role.yaml
+// config/apiserver/hiveapi_rbac_role_binding.yaml
 // config/apiserver/service-account.yaml
 // config/apiserver/service.yaml
 // config/hiveadmission/apiservice.yaml
@@ -189,62 +190,66 @@ func configApiserverDeploymentYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configApiserverHiveapiClusterRoleBindingYaml = []byte(`---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+var _configApiserverHiveapi_rbac_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
-  name: hiveapi-extension-apiserver-authentication-reader
-  namespace: hive
-roleRef:
-  name: extension-apiserver-authentication-reader
-  namespace: kube-system
-  kind: Role
-  apiGroup: rbac.authorization.k8s.io
-subjects:
-- kind: ServiceAccount
-  name: hiveapi-sa
-  namespace: hive
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: hiveapi-auth-delegator
-roleRef:
-  name: system:auth-delegator
-  kind: ClusterRole
-  apiGroup: rbac.authorization.k8s.io
-subjects:
-  - kind: ServiceAccount
-    name: hiveapi-sa
-    namespace: hive
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: hiveapi-manager
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: manager-role
-subjects:
-- kind: ServiceAccount
-  name: hiveapi-sa
-  namespace: hive
+  annotations:
+  name: system:openshift:hive:hiveapi
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+  - apiGroups: ["hive.openshift.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["*"]
 `)
 
-func configApiserverHiveapiClusterRoleBindingYamlBytes() ([]byte, error) {
-	return _configApiserverHiveapiClusterRoleBindingYaml, nil
+func configApiserverHiveapi_rbac_roleYamlBytes() ([]byte, error) {
+	return _configApiserverHiveapi_rbac_roleYaml, nil
 }
 
-func configApiserverHiveapiClusterRoleBindingYaml() (*asset, error) {
-	bytes, err := configApiserverHiveapiClusterRoleBindingYamlBytes()
+func configApiserverHiveapi_rbac_roleYaml() (*asset, error) {
+	bytes, err := configApiserverHiveapi_rbac_roleYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/apiserver/hiveapi-cluster-role-binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/apiserver/hiveapi_rbac_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configApiserverHiveapi_rbac_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hiveapi-hive-hiveapi
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:openshift:hive:hiveapi
+subjects:
+  - kind: ServiceAccount
+    namespace: hive
+    name: hiveapi-sa
+`)
+
+func configApiserverHiveapi_rbac_role_bindingYamlBytes() ([]byte, error) {
+	return _configApiserverHiveapi_rbac_role_bindingYaml, nil
+}
+
+func configApiserverHiveapi_rbac_role_bindingYaml() (*asset, error) {
+	bytes, err := configApiserverHiveapi_rbac_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/apiserver/hiveapi_rbac_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -646,52 +651,18 @@ func configHiveadmissionHiveadmission_rbac_roleYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configHiveadmissionHiveadmission_rbac_role_bindingYaml = []byte(`apiVersion: v1
-kind: List
-items:
-# to delegate authentication and authorization
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRoleBinding
-  metadata:
-    name: auth-delegator-hiveadmission
-  roleRef:
-    kind: ClusterRole
-    apiGroup: rbac.authorization.k8s.io
-    name: system:auth-delegator
-  subjects:
-  - kind: ServiceAccount
-    namespace: hive
-    name: hiveadmission
-
-
-# to let the admission server read the namespace reservations
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRoleBinding
-  metadata:
-    name: hiveadmission-hive-hiveadmission
-  roleRef:
-    kind: ClusterRole
-    apiGroup: rbac.authorization.k8s.io
-    name: system:openshift:hive:hiveadmission
-  subjects:
-  - kind: ServiceAccount
-    namespace: hive
-    name: hiveadmission
-
-# to read the config for terminating authentication
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: RoleBinding
-  metadata:
-    namespace: kube-system
-    name: extension-server-authentication-reader-hiveadmission
-  roleRef:
-    kind: Role
-    apiGroup: rbac.authorization.k8s.io
-    name: extension-apiserver-authentication-reader
-  subjects:
-  - kind: ServiceAccount
-    namespace: hive
-    name: hiveadmission
+var _configHiveadmissionHiveadmission_rbac_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hiveadmission-hive-hiveadmission
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:openshift:hive:hiveadmission
+subjects:
+- kind: ServiceAccount
+  namespace: hive
+  name: hiveadmission
 `)
 
 func configHiveadmissionHiveadmission_rbac_role_bindingYamlBytes() ([]byte, error) {
@@ -5231,7 +5202,8 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"config/apiserver/apiservice.yaml":                          configApiserverApiserviceYaml,
 	"config/apiserver/deployment.yaml":                          configApiserverDeploymentYaml,
-	"config/apiserver/hiveapi-cluster-role-binding.yaml":        configApiserverHiveapiClusterRoleBindingYaml,
+	"config/apiserver/hiveapi_rbac_role.yaml":                   configApiserverHiveapi_rbac_roleYaml,
+	"config/apiserver/hiveapi_rbac_role_binding.yaml":           configApiserverHiveapi_rbac_role_bindingYaml,
 	"config/apiserver/service-account.yaml":                     configApiserverServiceAccountYaml,
 	"config/apiserver/service.yaml":                             configApiserverServiceYaml,
 	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
@@ -5318,11 +5290,12 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
 		"apiserver": {nil, map[string]*bintree{
-			"apiservice.yaml":                   {configApiserverApiserviceYaml, map[string]*bintree{}},
-			"deployment.yaml":                   {configApiserverDeploymentYaml, map[string]*bintree{}},
-			"hiveapi-cluster-role-binding.yaml": {configApiserverHiveapiClusterRoleBindingYaml, map[string]*bintree{}},
-			"service-account.yaml":              {configApiserverServiceAccountYaml, map[string]*bintree{}},
-			"service.yaml":                      {configApiserverServiceYaml, map[string]*bintree{}},
+			"apiservice.yaml":                {configApiserverApiserviceYaml, map[string]*bintree{}},
+			"deployment.yaml":                {configApiserverDeploymentYaml, map[string]*bintree{}},
+			"hiveapi_rbac_role.yaml":         {configApiserverHiveapi_rbac_roleYaml, map[string]*bintree{}},
+			"hiveapi_rbac_role_binding.yaml": {configApiserverHiveapi_rbac_role_bindingYaml, map[string]*bintree{}},
+			"service-account.yaml":           {configApiserverServiceAccountYaml, map[string]*bintree{}},
+			"service.yaml":                   {configApiserverServiceYaml, map[string]*bintree{}},
 		}},
 		"configmaps": {nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},

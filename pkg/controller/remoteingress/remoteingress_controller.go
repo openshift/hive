@@ -49,8 +49,6 @@ const (
 	ingressCertificateNotFoundReason = "IngressCertificateNotFound"
 	ingressCertificateFoundReason    = "IngressCertificateFound"
 
-	ingressSecretTolerationKey = "hive.openshift.io/ingress"
-
 	// requeueAfter2 is just a static 2 minute delay for when to requeue
 	// for the case when a necessary secret is missing
 	requeueAfter2 = time.Minute * 2
@@ -309,30 +307,13 @@ func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.Cluste
 	// if the ingress entry references a certBundle, make sure to put the appropriate looking
 	// entry in the ingressController object
 	if ingress.ServingCertificate != "" {
-		var secretName string
 		for _, cb := range cd.Spec.CertificateBundles {
 			// assume we're going to find the certBundle as we would've errored earlier
 			if cb.Name == ingress.ServingCertificate {
-				secretName = cb.CertificateSecretRef.Name
 				newIngress.Spec.DefaultCertificate = &corev1.LocalObjectReference{
 					Name: remoteSecretNameForCertificateBundleSecret(cb.CertificateSecretRef.Name, cd),
 				}
 				break
-			}
-		}
-
-		// NOTE: This toleration is added to cause a reload of the
-		// IngressController when the certificate secrets are updated.
-		// In the future, this should not be necessary.
-		if len(secretName) != 0 {
-			newIngress.Spec.NodePlacement = &ingresscontroller.NodePlacement{
-				Tolerations: []corev1.Toleration{
-					{
-						Key:      ingressSecretTolerationKey,
-						Operator: corev1.TolerationOpEqual,
-						Value:    secretHash(findSecret(secretName, secrets)),
-					},
-				},
 			}
 		}
 	}
@@ -421,15 +402,6 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 // the original certificateBundle's secret name pre-pended with the clusterDeployment.Name
 func remoteSecretNameForCertificateBundleSecret(secretName string, cd *hivev1.ClusterDeployment) string {
 	return apihelpers.GetResourceName(cd.Name, secretName)
-}
-
-func findSecret(secretName string, secrets []*corev1.Secret) *corev1.Secret {
-	for i, s := range secrets {
-		if s.Name == secretName {
-			return secrets[i]
-		}
-	}
-	return nil
 }
 
 func secretHash(secret *corev1.Secret) string {

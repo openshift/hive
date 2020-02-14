@@ -290,11 +290,6 @@ func (m *InstallManager) Run() error {
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
 
 	if cd.Spec.Provisioning != nil && len(cd.Spec.Provisioning.SSHKnownHosts) > 0 {
-		err = m.setupSSHUser()
-		if err != nil {
-			m.log.WithError(err).Error("error setting up SSH known_hosts")
-			return err
-		}
 		err = m.writeSSHKnownHosts(getHomeDir(), cd.Spec.Provisioning.SSHKnownHosts)
 		if err != nil {
 			m.log.WithError(err).Error("error setting up SSH known_hosts")
@@ -1205,33 +1200,6 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 		},
 	)
 	return errors.Wrap(err, "ClusterProvision did not transition to provisioning stage")
-}
-
-func (m *InstallManager) setupSSHUser() error {
-
-	// Add our potentially random UID to /etc/passwd so ssh works. Need to shell out here as
-	// the go libraries for user info appear to rely on /etc/passwd, which our user is not in.
-	out, err := exec.Command("id", "-u").Output()
-	if err != nil {
-		m.log.WithError(err).Error("error running id -u")
-		return err
-	}
-	uid := strings.TrimSpace(string(out))
-	m.log.Infof("Adding user ID to passwd file: %s", uid)
-	f, err := os.OpenFile("/etc/passwd",
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		m.log.WithError(err).Error("error opening /etc/passwd")
-		return err
-	}
-	defer f.Close()
-	passwdLine := fmt.Sprintf("default:x:%s:0:default user:%s:/sbin/nologin\n", uid, getHomeDir())
-	m.log.Infof("Wrote passwd line: %s", passwdLine)
-	if _, err := f.WriteString(passwdLine); err != nil {
-		m.log.WithError(err).Error("error writing to /etc/passwd")
-		return err
-	}
-	return nil
 }
 
 func (m *InstallManager) writeSSHKnownHosts(homeDir string, knownHosts []string) error {

@@ -9,7 +9,7 @@ GIT_HASH=`git rev-parse --short=7 HEAD`
 GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --count`
 
 # IMPORTANT: DO NOT MERGE THIS CHANGE BACK TO MASTER
-# we need the count to be synced with deploments from master branch.
+# we need the count to be synced with deployments from master branch.
 # since this branch is used temporarily for deploying hotfixes, and we
 # use the number of commits from a past commit for deployment ordering -
 # set this variable to the merge commit into master to help with ordering

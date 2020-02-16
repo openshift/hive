@@ -8,7 +8,7 @@ QUAY_IMAGE="$2"
 GIT_HASH=`git rev-parse --short=7 HEAD`
 GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --count`
 
-# IMPORTANT: DO NOT MERGE THIS CHANGE BACK TO MASTER
+# IMPORTANT: DO NOT MERGE THE BELOW CHANGES BACK TO MASTER
 # we need the count to be synced with deployments from master branch.
 # since this branch is used temporarily for deploying hotfixes, and we
 # use the number of commits from a past commit for deployment ordering -
@@ -16,6 +16,7 @@ GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --
 GIT_COMMIT_CHERRY_PICK="$3"
 GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..$GIT_COMMIT_CHERRY_PICK --count`
 GIT_COMMIT_COUNT=$((GIT_COMMIT_COUNT+1))
+# IMPORTANT: DO NOT MERGE THE ABOVE CHANGES BACK TO MASTER
 
 # clone bundle repo
 SAAS_OPERATOR_DIR="saas-hive-operator-bundle"

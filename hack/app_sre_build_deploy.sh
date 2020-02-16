@@ -32,14 +32,10 @@ skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
 GIT_COMMIT_CHERRY_PICK="ed7dfcb60d719846815e1f7be88a8060cc76949c"
 
 # create and push staging image catalog
-$CURRENT_DIR/app_sre_create_image_catalog.sh \
-    staging "$QUAY_IMAGE" \
-    "$GIT_COMMIT_CHERRY_PICK"
+$CURRENT_DIR/app_sre_create_image_catalog.sh staging "$QUAY_IMAGE" "$GIT_COMMIT_CHERRY_PICK"
 
 # create and push production image catalog
-REMOVE_UNDEPLOYED=true $CURRENT_DIR/app_sre_create_image_catalog.sh \
-    production "$QUAY_IMAGE" \
-    "$GIT_COMMIT_CHERRY_PICK"
+REMOVE_UNDEPLOYED=true $CURRENT_DIR/app_sre_create_image_catalog.sh production "$QUAY_IMAGE" "$GIT_COMMIT_CHERRY_PICK"
 
 exit 0
 # IMPORTANT: DO NOT MERGE THE ABOVE CHANGES BACK TO MASTER

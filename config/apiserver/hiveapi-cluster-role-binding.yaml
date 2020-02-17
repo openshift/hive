@@ -7,6 +7,7 @@ metadata:
 roleRef:
   name: extension-apiserver-authentication-reader
   namespace: kube-system
+  kind: Role
 subjects:
 - kind: ServiceAccount
   name: hiveapi-sa

@@ -7,6 +7,8 @@ metadata:
   name: hive-reader
 roleRef:
   name: hive-reader
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
 groupNames:
 - hive-readers
 subjects:

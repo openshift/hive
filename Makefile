@@ -102,7 +102,7 @@ run-operator: generate fmt vet
 # Install CRDs into a cluster
 .PHONY: install
 install: crd
-	oc apply -f config/crds
+	kubectl apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
@@ -111,7 +111,7 @@ deploy: manifests install generate
 	mkdir -p overlays/deploy
 	cp overlays/template/kustomization.yaml overlays/deploy
 	cd overlays/deploy && kustomize edit set image registry.svc.ci.openshift.org/openshift/hive-v4.0:hive=${DEPLOY_IMAGE}
-	kustomize build overlays/deploy | oc apply -f -
+	kustomize build overlays/deploy | kubectl apply -f -
 	rm -rf overlays/deploy
 
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from

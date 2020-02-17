@@ -7,6 +7,8 @@ metadata:
   name: hive-admin
 roleRef:
   name: hive-admin
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
 groupNames:
 - hive-admins
 subjects:

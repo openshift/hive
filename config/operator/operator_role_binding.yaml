@@ -4,8 +4,8 @@ metadata:
   creationTimestamp: null
   name: hive-operator-rolebinding
 roleRef:
-  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
   name: hive-operator-role
 subjects:
 - kind: ServiceAccount

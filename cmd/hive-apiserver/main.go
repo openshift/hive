@@ -16,6 +16,7 @@ import (
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
+	"github.com/openshift/hive/pkg/certs"
 	"github.com/openshift/hive/pkg/cmd/hive-apiserver"
 )
 
@@ -35,6 +36,10 @@ func main() {
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
+
+	// TODO: Would be better to get this from the --tls-cert-file argument.
+	const certsDir = "/apiserver.local.config/certificates"
+	certs.TerminateOnCertChanges(certsDir)
 
 	command := NewHiveAPIServerCommand(stopCh)
 	if err := command.Execute(); err != nil {

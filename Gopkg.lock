@@ -171,6 +171,14 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
+  digest = "1:45c41cd27a8d986998680bfc86da0bbff5fa4f90d0f446c00636c8b099028ffe"
+  name = "github.com/blang/semver"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "ba2c2ddd89069b46a7011d4106f6868f17ee1705"
+  version = "v3.6.1"
+
+[[projects]]
   digest = "1:8f5acd4d4462b5136af644d25101f0968a7a94ee90fcb2059cec5b7cc42e0b20"
   name = "github.com/census-instrumentation/opencensus-proto"
   packages = [
@@ -887,11 +895,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:dc72947420fba63fc4131bf8474dfed1a837df3c4ba5c8a111d05039eed15c7a"
+  digest = "1:a2c104fe9eddc2d520e60593f73e26c307b5e91cbd5f8c51b7344d0e91646b9e"
   name = "github.com/openshift/library-go"
   packages = [
     "pkg/apiserver/apiserverconfig",
     "pkg/controller",
+    "pkg/controller/fileobserver",
     "pkg/operator/events",
     "pkg/operator/resource/resourcemerge",
     "pkg/operator/resource/resourceread",
@@ -1860,11 +1869,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:95008959442618ead2881a2ad2ff2f7278481aa43b786213f673557c86617220"
+  digest = "1:77465c0539a3ad3995a9f0ca0070da00cbe64e452e83660e88a94e4e1346f5ba"
   name = "k8s.io/component-base"
   packages = [
     "cli/flag",
     "logs",
+    "metrics",
+    "metrics/legacyregistry",
   ]
   pruneopts = "NUT"
   revision = "327675bd8ec35fe34a658207d9c3ecfdf0d6b462"
@@ -2180,6 +2191,7 @@
     "github.com/openshift/installer/pkg/types/gcp",
     "github.com/openshift/library-go/pkg/apiserver/apiserverconfig",
     "github.com/openshift/library-go/pkg/controller",
+    "github.com/openshift/library-go/pkg/controller/fileobserver",
     "github.com/openshift/library-go/pkg/operator/events",
     "github.com/openshift/library-go/pkg/operator/resource/resourcemerge",
     "github.com/openshift/library-go/pkg/operator/resource/resourceread",

@@ -855,7 +855,7 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.Provisioning.ImageSetRef.Name}, imageSet); err != nil {
 		if apierrors.IsNotFound(err) {
 			cdLog.WithField("clusterimageset", cd.Spec.Provisioning.ImageSetRef.Name).Warning("clusterdeployment references non-existent clusterimageset")
-			if err := r.setImageSetNotFoundCondition(cd, false, cdLog); err != nil {
+			if err := r.setImageSetNotFoundCondition(cd, true, cdLog); err != nil {
 				return nil, err
 			}
 		} else {

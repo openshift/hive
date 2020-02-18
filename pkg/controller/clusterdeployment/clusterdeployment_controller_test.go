@@ -1093,6 +1093,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "set ClusterImageSet missing condition",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: "doesntexist"}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, adminSSHKeySecretKey, "fakesshkey"),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.Equal(t, 1, len(cd.Status.Conditions))
+				require.Equal(t, clusterImageSetNotFoundReason, cd.Status.Conditions[0].Reason)
+			},
+		},
 	}
 
 	for _, test := range tests {

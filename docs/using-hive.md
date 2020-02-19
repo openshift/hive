@@ -321,6 +321,106 @@ gcp:
   type: n1-standard-4
 ```
 
+#### Create Cluster on Bare Metal
+
+Hive supports bare metal provisioning as provided by [openshift-install](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md)
+
+At present this feature requires a separate pre-existing libvirt provisioning host to run the bootstrap node. This host will require very specific network configuration that far exceeds the scope of Hive documentation. See [Bare Metal Platform Customization](https://github.com/openshift/installer/blob/master/docs/user/metal/customize_ipi.md#using-a-remote-hypervisor) for more information.
+
+![Bare metal provisioning with one hypervisor host per cluster](hive-baremetal-hypervisor-per-cluster.png)
+
+![Bare metal provisioning with a shared hypervisor host](hive-baremetal-shared-hypervisor.png)
+
+To provision bare metal clusters with Hive:
+
+Create a `Secret` containing a [bare metal enabled InstallConfig](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md#install-config). This `InstallConfig` must contain a `libvirtURI` property pointing to the provisioning host.
+
+Create a `Secret` containing the SSH private key that can connect to your libvirt provisioning host, without a passphrase.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: provisioning-host-ssh-private-key
+  namespace: mynamespace
+stringData:
+  ssh-privatekey: |-
+    -----BEGIN RSA PRIVATE KEY-----
+   REDACTED
+    -----END RSA PRIVATE KEY-----
+type: Opaque
+```
+
+Create a `ConfigMap` for manifests to inject into the installer, containing a nested `ConfigMap` for metal3 config.
+
+*NOTE*: This will no longer be required as of OpenShift 4.4+.
+
+```yaml
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: my-baremetal-cluster-install-manifests
+  namespace: mynamespace
+data:
+  99_metal3-config.yaml: |
+    kind: ConfigMap
+    apiVersion: v1
+    metadata:
+      name: metal3-config
+      namespace: openshift-machine-api
+    data:
+      http_port: "6180"
+      provisioning_interface: "enp1s0"
+      provisioning_ip: "172.22.0.3/24"
+      dhcp_range: "172.22.0.10,172.22.0.100"
+      deploy_kernel_url: "http://172.22.0.3:6180/images/ironic-python-agent.kernel"
+      deploy_ramdisk_url: "http://172.22.0.3:6180/images/ironic-python-agent.initramfs"
+      ironic_endpoint: "http://172.22.0.3:6385/v1/"
+      ironic_inspector_endpoint: "http://172.22.0.3:5050/v1/"
+      cache_url: "http://192.168.111.1/images"
+      rhcos_image_url: "https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.3/43.81.201911192044.0/x86_64/rhcos-43.81.201911192044.0-openstack.x86_64.qcow2.gz"
+```
+
+Create a `ClusterDeployment`, note the `libvirtSSHPrivateKeySecretRef` and `sshKnownHosts` for bare metal:
+
+```yaml
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  name: my-baremetal-cluster
+  namespace: mynamespace
+  annotations:
+    hive.openshift.io/try-install-once: "true"
+spec:
+  baseDomain: test.example.com
+  clusterName: my-baremetal-cluster
+  controlPlaneConfig:
+    servingCertificates: {}
+  platform:
+    bareMetal:
+      libvirtSSHPrivateKeySecretRef:
+        name: provisioning-host-ssh-private-key
+  provisioning:
+    installConfigSecretRef:
+      name: my-baremetal-cluster-install-config
+    sshPrivateKeySecretRef:
+      name: my-baremetal-hosts-ssh-private-key
+    manifestsConfigMapRef:
+      name: my-baremetal-cluster-install-manifests
+    imageSetRef:
+      name: my-clusterimageset
+    sshKnownHosts:
+    # SSH known host info for the libvirt provisioning server to avoid a prompt during non-interactive install:
+    - "10.1.8.90 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBKWjJRzeUVuZs4yxSy4eu45xiANFIIbwE3e1aPzGD58x/NX7Yf+S8eFKq4RrsfSaK2hVJyJjvVIhUsU9z2sBJP8="
+  pullSecretRef:
+    name: my-baremetal-cluster-pull-secret
+```
+
+There is not presently support for `MachinePool` management on bare metal clusters. The pools defined in your `InstallConfig` are authoritative.
+
+There is not presently support for "deprovisioning" a bare metal cluster, as such deleting a bare metal `ClusterDeployment` has no impact on the running cluster, it is simply removed from Hive and the systems would remain running. This may change in the future.
+
+
 ## Monitor the Install Job
 
 * Get the namespace in which your cluster deployment was created

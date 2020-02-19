@@ -20,6 +20,7 @@ In the future Hive will support more cloud providers.
 * [Quick Start Guide](./docs/quick_start.md)
 * [Installation](./docs/install.md)
 * [Using Hive](./docs/using-hive.md)
+* [Hiveutil CLI](./docs/hiveutil.md)
 * [Developing Hive](./docs/developing.md)
 * [Frequently Asked Questions](./docs/FAQs.md)
 * [Troubleshooting](./docs/troubleshooting.md)

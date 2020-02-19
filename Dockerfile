@@ -22,24 +22,14 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-operator /opt/services
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-apiserver /opt/services/
 
-# In the event of failures we run ssh commands to execute the script which gathers logs
-# from all systems in the cluster, and scp's those from the bootstrap node into the
-# /logs volume in the install pod. This requires the current user ID (randomly assigned by
-# the cluster) to be in the passwd file. At runtime we execute with gid 0, so making the
-# file group writable allows our install process to add our install user ID to the passwd
-# file and unblock ssh.
-RUN chmod g+rw /etc/passwd
-
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as
 # we're hitting libvirt over ssh. OpenShift will not let you write these directories
-# by default so we must setup some permissions here, and at runtime add our random UID
-# to /etc/passwd. (in installmanager.go)
+# by default so we must setup some permissions here.
 ENV HOME /home/hive
 RUN mkdir -p /home/hive && \
     chgrp -R 0 /home/hive && \
     chmod -R g=u /home/hive
-RUN chmod g=u /etc/passwd
 
 
 # TODO: should this be the operator?

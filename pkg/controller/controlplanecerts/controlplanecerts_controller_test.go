@@ -404,7 +404,7 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 func fakeSyncSet() *hivev1.SyncSet {
 	ss := &hivev1.SyncSet{}
 	ss.Namespace = fakeNamespace
-	ss.Name = controlPlaneCertsSyncSetName(fakeName)
+	ss.Name = GenerateControlPlaneCertsSyncSetName(fakeName)
 	ss.Spec.Resources = []runtime.RawExtension{
 		{
 			Object: fakeCertSecret("foo1"),

@@ -131,7 +131,7 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 	}
 
 	existingSyncSet := &hivev1.SyncSet{}
-	existingSyncSetNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controlPlaneCertsSyncSetName(cd.Name)}
+	existingSyncSetNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: GenerateControlPlaneCertsSyncSetName(cd.Name)}
 	err = r.Get(context.TODO(), existingSyncSetNamespacedName, existingSyncSet)
 	if err != nil && !apierrors.IsNotFound(err) {
 		cdLog.WithError(err).Error("failed to retrieve existing control plane certs syncset")
@@ -240,7 +240,7 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	cdLog.Debug("generating syncset for control plane secrets")
 	syncSet := &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      controlPlaneCertsSyncSetName(cd.Name),
+			Name:      GenerateControlPlaneCertsSyncSetName(cd.Name),
 			Namespace: cd.Namespace,
 		},
 		Spec: hivev1.SyncSetSpec{
@@ -374,8 +374,9 @@ func certificateBundle(cd *hivev1.ClusterDeployment, name string) *hivev1.Certif
 	return nil
 }
 
-func controlPlaneCertsSyncSetName(name string) string {
-	return apihelpers.GetResourceName(name, "cp-certs")
+// GenerateControlPlaneCertsSyncSetName generates the name of the SyncSet that holds the control plane certificates to sync.
+func GenerateControlPlaneCertsSyncSetName(name string) string {
+	return apihelpers.GetResourceName(name, constants.ControlPlaneCertificateSuffix)
 }
 
 func writeSecretData(w io.Writer, secret *corev1.Secret) {

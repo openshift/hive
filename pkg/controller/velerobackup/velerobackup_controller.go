@@ -12,7 +12,6 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -170,7 +169,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 		}
 	}
 
-	objects, err := r.getRuntimeObjects(hiveNamespaceScopedListTypes, request.Namespace)
+	objects, err := controllerutils.GetRuntimeObjects(r, hiveNamespaceScopedListTypes, request.Namespace)
 	if err != nil {
 		nsLogger.WithError(err).Error("Failed to list hive objects in namespace.")
 		return reconcile.Result{}, err
@@ -233,25 +232,6 @@ func (r *ReconcileBackup) createVeleroBackupObject(namespace string, t metav1.Ti
 	}
 
 	return backupRef, r.Create(context.TODO(), backup)
-}
-
-func (r *ReconcileBackup) getRuntimeObjects(typesToList []runtime.Object, namespace string) ([]runtime.Object, error) {
-	nsObjects := []runtime.Object{}
-
-	for _, t := range typesToList {
-		listObj := t.DeepCopyObject()
-		if err := r.List(context.TODO(), listObj, client.InNamespace(namespace)); err != nil {
-			return nil, err
-		}
-		list, err := meta.ExtractList(listObj)
-		if err != nil {
-			return nil, err
-		}
-
-		nsObjects = append(nsObjects, list...)
-	}
-
-	return nsObjects, nil
 }
 
 func (r *ReconcileBackup) getNamespaceCheckpoint(namespace string, logger log.FieldLogger) (*hivev1.Checkpoint, bool, error) {

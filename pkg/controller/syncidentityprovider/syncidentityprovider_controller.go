@@ -228,6 +228,11 @@ func (r *ReconcileSyncIdentityProviders) createSyncSetSpec(cd *hivev1.ClusterDep
 	}, nil
 }
 
+// GenerateIdentityProviderSyncSetName generates the name of the SyncSet that holds the identity provider information to sync.
+func GenerateIdentityProviderSyncSetName(clusterDeploymentName string) string {
+	return apihelpers.GetResourceName(clusterDeploymentName, constants.IdentityProviderSuffix)
+}
+
 func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.ClusterDeployment) error {
 	contextLogger := addClusterDeploymentLoggerFields(r.logger, cd)
 
@@ -250,7 +255,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 		return err
 	}
 
-	ssName := apihelpers.GetResourceName(cd.Name, "idp")
+	ssName := GenerateIdentityProviderSyncSetName(cd.Name)
 
 	ss := &hivev1.SyncSet{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: ssName, Namespace: cd.Namespace}, ss)

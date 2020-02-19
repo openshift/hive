@@ -52,7 +52,6 @@ const (
 	maxProvisions      = 3
 
 	adminSSHKeySecretKey  = "ssh-publickey"
-	adminKubeconfigKey    = "kubeconfig"
 	rawAdminKubeconfigKey = "raw-kubeconfig"
 
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
@@ -1018,12 +1017,12 @@ func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.S
 
 	rawData, hasRawData := secret.Data[rawAdminKubeconfigKey]
 	if !hasRawData {
-		secret.Data[rawAdminKubeconfigKey] = secret.Data[adminKubeconfigKey]
-		rawData = secret.Data[adminKubeconfigKey]
+		secret.Data[rawAdminKubeconfigKey] = secret.Data[constants.KubeconfigSecretKey]
+		rawData = secret.Data[constants.KubeconfigSecretKey]
 	}
 
 	var err error
-	secret.Data[adminKubeconfigKey], err = controllerutils.FixupKubeconfig(rawData)
+	secret.Data[constants.KubeconfigSecretKey], err = controllerutils.FixupKubeconfig(rawData)
 	if err != nil {
 		cdLog.WithError(err).Errorf("cannot fixup kubeconfig to generate new one")
 		return err

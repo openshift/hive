@@ -190,6 +190,11 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 	return reconcile.Result{}, nil
 }
 
+// GenerateRemoteIngressSyncSetName generates the name of the SyncSet that holds the cluster ingress information to sync.
+func GenerateRemoteIngressSyncSetName(clusterDeploymentName string) string {
+	return apihelpers.GetResourceName(clusterDeploymentName, constants.ClusterIngressSuffix)
+}
+
 // syncClusterIngress will create the syncSet with all the needed secrets and
 // ingressController objects to sync to the remote cluster
 func (r *ReconcileRemoteClusterIngress) syncClusterIngress(rContext *reconcileContext) error {
@@ -253,7 +258,7 @@ func newSyncSetSpec(cd *hivev1.ClusterDeployment, rawExtensions []runtime.RawExt
 
 // syncSyncSet builds up a syncSet object with the passed-in rawExtensions as the spec.Resources
 func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, rawExtensions []runtime.RawExtension, secretMappings []hivev1.SecretMapping) error {
-	ssName := apihelpers.GetResourceName(rContext.clusterDeployment.Name, "clusteringress")
+	ssName := GenerateRemoteIngressSyncSetName(rContext.clusterDeployment.Name)
 
 	newSyncSetSpec := newSyncSetSpec(rContext.clusterDeployment, rawExtensions, secretMappings)
 	syncSet := &hivev1.SyncSet{

@@ -441,10 +441,10 @@ In the event of installation failures, please see [Troubleshooting](./troublesho
 
 ### Cluster Admin Kubeconfig
 
-Once the cluster is provisioned you will see a CLUSTER_NAME-admin-kubeconfig secret. You can use this with:
+Once the cluster is provisioned, the admin kubeconfig will be stored in a secret. You can use this with:
 
 ```bash
-oc get secret `oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.adminKubeconfigSecret.name }'` -o jsonpath='{ .data.kubeconfig }' | base64 --decode > ${CLUSTER_NAME}.kubeconfig
+./hack/get-kubeconfig.sh ${CLUSTER_NAME} > ${CLUSTER_NAME}.kubeconfig
 export KUBECONFIG=${CLUSTER_NAME}.kubeconfig
 oc get nodes
 ```
@@ -458,7 +458,7 @@ oc get nodes
 
 * Retrieve the password for `kubeadmin` user
   ```
-  oc extract secret/$(oc get cd -o jsonpath='{.items[].spec.clusterMetadata.adminPasswordSecretRef.name}') --to=-
+  oc extract secret/$(oc get cd ${CLUSTER_NAME} -o jsonpath='{.spec.clusterMetadata.adminPasswordSecretRef.name}') --to=-
   ```
 
 ## Managed DNS

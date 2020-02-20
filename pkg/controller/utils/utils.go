@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
@@ -9,10 +10,13 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // HasFinalizer returns true if the given object has the given finalizer
@@ -121,4 +125,24 @@ func LogLevel(err error) log.Level {
 		}
 		err = cause
 	}
+}
+
+// GetRuntimeObjects returns a slice of runtime objects returned from the kubernetes client based on the passed in list of types to return.
+func GetRuntimeObjects(c client.Client, typesToList []runtime.Object, namespace string) ([]runtime.Object, error) {
+	nsObjects := []runtime.Object{}
+
+	for _, t := range typesToList {
+		listObj := t.DeepCopyObject()
+		if err := c.List(context.TODO(), listObj, client.InNamespace(namespace)); err != nil {
+			return nil, err
+		}
+		list, err := meta.ExtractList(listObj)
+		if err != nil {
+			return nil, err
+		}
+
+		nsObjects = append(nsObjects, list...)
+	}
+
+	return nsObjects, nil
 }

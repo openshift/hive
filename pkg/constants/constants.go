@@ -118,6 +118,24 @@ const (
 	// LibvirtSSHPrivKeyPathEnvVar is the environment variable Hive will set for the installmanager pod to point to the
 	// path where we mount in the SSH key for connecting to the bare metal libvirt provisioning host.
 	LibvirtSSHPrivKeyPathEnvVar = "LIBVIRT_SSH_PRIV_KEY_PATH"
+
+	// ControlPlaneCertificateSuffix is the suffix used when naming objects having to do control plane certificates.
+	ControlPlaneCertificateSuffix = "cp-certs"
+
+	// ClusterIngressSuffix is the suffix used when naming objects having to do with cluster ingress.
+	ClusterIngressSuffix = "clusteringress"
+
+	// IdentityProviderSuffix is the suffix used when naming objects having to do with identity provider
+	IdentityProviderSuffix = "idp"
+
+	// KubeconfigSecretKey is the key used inside of a secret containing a kubeconfig
+	KubeconfigSecretKey = "kubeconfig"
+
+	// UsernameSecretKey is a key used to store a username inside of a secret containing username / password credentials
+	UsernameSecretKey = "username"
+
+	// PasswordSecretKey is a key used to store a password inside of a secret containing username / password credentials
+	PasswordSecretKey = "password"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

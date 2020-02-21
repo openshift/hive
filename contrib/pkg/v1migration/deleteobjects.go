@@ -134,6 +134,13 @@ func (o *DeleteObjectsOptions) deleteObject(client dynamic.Interface, objFromFil
 	objFromFile.SetOwnerReferences(objFromKube.GetOwnerReferences())
 	objFromFile.SetResourceVersion(objFromKube.GetResourceVersion())
 
+	// For cluster-scoped resources, set the namespace to the empty string so that the deep equal check does not pick
+	// up a difference in the namespace. Setting to an empty string will delete the .metadata.namespace entry from the
+	// unstructured data.
+	if namespace == "" {
+		objFromFile.SetNamespace("")
+	}
+
 	if !reflect.DeepEqual(objFromFile, objFromKube) {
 		logger.Warn("object in JSON file differs from object in the cluster")
 		fmt.Printf("Diff in %s/%s (%s)\n%s\n", kind, name, namespace, diff.ObjectReflectDiff(objFromFile, objFromKube))

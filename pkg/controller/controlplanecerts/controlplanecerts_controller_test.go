@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -26,18 +27,26 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/remoteclient"
+	mockremoteclient "github.com/openshift/hive/pkg/remoteclient/mock"
 	"github.com/openshift/hive/pkg/resource"
 )
 
 const (
-	fakeName      = "fake-cluster"
-	fakeNamespace = "fake-namespace"
-	fakeDomain    = "example.com"
-	fakeAPIURL    = "test-api-url"
+	fakeName         = "fake-cluster"
+	fakeNamespace    = "fake-namespace"
+	fakeDomain       = "example.com"
+	fakeAPIURL       = "https://test-api-url:6443"
+	fakeAPIURLDomain = "test-api-url"
 )
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+}
+
+type fakeRemoteClientResponse struct {
+	apiURL string
+	err    error
 }
 
 func TestReconcileControlPlaneCerts(t *testing.T) {
@@ -45,9 +54,10 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 	openshiftapiv1.Install(scheme.Scheme)
 
 	tests := []struct {
-		name     string
-		existing []runtime.Object
-		validate func(*testing.T, client.Client, []runtime.Object)
+		name                 string
+		existing             []runtime.Object
+		remoteClientResponse *fakeRemoteClientResponse
+		validate             func(*testing.T, client.Client, []runtime.Object)
 	}{
 		{
 			name: "no control plane certs",
@@ -66,10 +76,14 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeClusterDeployment().defaultCert("default-cert", "default-secret").obj(),
 				fakeCertSecret("default-secret"),
 			},
+			remoteClientResponse: &fakeRemoteClientResponse{
+				apiURL: fakeAPIURL,
+			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURL, "default-secret"))
+
+				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURLDomain, "default-secret"))
 
 				ss := applied[0].(metav1.Object)
 				labels := ss.GetLabels()
@@ -99,15 +113,20 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeClusterDeployment().
 					defaultCert("default", "secret0").
 					namedCert("cert1", "foo.com", "secret1").
-					namedCert("cert2", "bar.com", "secret2").obj(),
+					namedCert("cert2", "bar.com", "secret2").
+					obj(),
 				fakeCertSecret("secret0"),
 				fakeCertSecret("secret1"),
 				fakeCertSecret("secret2"),
 			},
+			remoteClientResponse: &fakeRemoteClientResponse{
+				apiURL: fakeAPIURL,
+			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
-				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURL, "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
+
+				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURLDomain, "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
 		{
@@ -158,11 +177,27 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
+
+			mockController := gomock.NewController(t)
+			defer mockController.Finish()
+
+			mockRemoteClientBuilder := mockremoteclient.NewMockBuilder(mockController)
+			if test.remoteClientResponse != nil {
+				mockRemoteClientBuilder.EXPECT().UseSecondaryAPIURL().Return(mockRemoteClientBuilder)
+				mockRemoteClientBuilder.EXPECT().APIURL().Return(
+					test.remoteClientResponse.apiURL,
+					test.remoteClientResponse.err,
+				)
+			}
+
 			applier := &fakeApplier{}
 			r := &ReconcileControlPlaneCerts{
 				Client:  fakeClient,
 				scheme:  scheme.Scheme,
 				applier: applier,
+				remoteClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder {
+					return mockRemoteClientBuilder
+				},
 			}
 
 			_, err := r.Reconcile(reconcile.Request{
@@ -287,6 +322,7 @@ func fakeClusterDeployment() *fakeClusterDeploymentWrapper {
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: fakeName,
 			BaseDomain:  fakeDomain,
+			Installed:   true,
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			APIURL: fakeAPIURL,

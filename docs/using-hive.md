@@ -426,7 +426,7 @@ There is not presently support for "deprovisioning" a bare metal cluster, as suc
 * Get the namespace in which your cluster deployment was created
 * Get the install pod name
   ```bash
-  oc get pods -o json --selector job-name==${CLUSTER_NAME}-install | jq -r '.items | .[].metadata.name'
+  oc get pods -l "hive.openshift.io/job-type=provision,hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME}" -o jsonpath='{.items[0].metadata.name}'
   ```
 * Run following command to watch the cluster deployment
   ```bash

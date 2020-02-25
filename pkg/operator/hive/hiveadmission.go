@@ -47,7 +47,7 @@ var (
 	}
 )
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
 	asset := assets.MustAsset("config/hiveadmission/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
@@ -77,9 +77,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 
-	if len(instance.Spec.ManagedDomains) > 0 {
-		addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec)
-	}
+	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 
 	result, err := h.ApplyRuntimeObject(hiveAdmDeployment, scheme.Scheme)
 	if err != nil {

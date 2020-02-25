@@ -108,6 +108,10 @@ const (
 	// that is a direct child of one of the valid domains.
 	ManagedDomainsFileEnvVar = "MANAGED_DOMAINS_FILE"
 
+	// ManagedDomainsVolumeName is the name of the volume that will point
+	// to the configmap containing the managed domain configuration.
+	ManagedDomainsVolumeName = "managed-domains"
+
 	// GCPCredentialsName is the name of the GCP credentials file or secret key.
 	GCPCredentialsName = "osServiceAccount.json"
 

@@ -272,7 +272,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 					Info("configmap has changed, admission pods will restart on the next sync")
 				instance.Status.AggregatorClientCAHash = caHash
 				cmLog.Debugf("updating status with new aggregator CA configmap hash")
-				err = r.Status().Update(context.TODO(), instance)
+				err := r.updateHiveConfigStatus(instance, cmLog, true)
 				if err != nil {
 					cmLog.WithError(err).Error("cannot update hash in config status")
 				}
@@ -284,34 +284,47 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 
 	h := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
 
-	if err := deployManagedDomainsConfigMap(h, instance); err != nil {
-		hLog.WithError(err).Error("error deploying managed domains configmap")
+	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error setting up managed domains")
+		r.updateHiveConfigStatus(instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, recorder)
+	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
+		r.updateHiveConfigStatus(instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, recorder)
+	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
+		r.updateHiveConfigStatus(instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
 	err = r.deployHiveAPI(hLog, h, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive v1alpha1 aggregated API")
+		r.updateHiveConfigStatus(instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
 	if err := r.teardownLegacyExternalDNS(hLog); err != nil {
 		hLog.WithError(err).Error("error tearing down legacy ExternalDNS")
+		r.updateHiveConfigStatus(instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
+	if err := r.teardownLegacyMangedDomainsConfigMap(hLog); err != nil {
+		hLog.WithError(err).Error("error tearing down legacy managed domains setup")
+		r.updateHiveConfigStatus(instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	r.updateHiveConfigStatus(instance, hLog, true)
 	return reconcile.Result{}, nil
 }
 
@@ -336,4 +349,15 @@ func computeHash(data map[string]string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(fmt.Sprintf("%v", data)))
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func (r *ReconcileHiveConfig) updateHiveConfigStatus(hc *hivev1.HiveConfig, logger log.FieldLogger, succeeded bool) error {
+	hc.Status.ObservedGeneration = hc.Generation
+	hc.Status.ConfigApplied = succeeded
+
+	err := r.Status().Update(context.TODO(), hc)
+	if err != nil {
+		logger.WithError(err).Error("failed to update HiveConfig status")
+	}
+	return err
 }

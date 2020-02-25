@@ -2301,6 +2301,7 @@
     "k8s.io/kubernetes/pkg/apis/core/validation",
     "k8s.io/kubernetes/pkg/capabilities",
     "k8s.io/kubernetes/pkg/client/metrics/prometheus",
+    "k8s.io/kubernetes/pkg/kubectl",
     "k8s.io/kubernetes/pkg/kubectl/cmd/apply",
     "k8s.io/kubernetes/pkg/kubectl/cmd/patch",
     "k8s.io/kubernetes/pkg/kubectl/cmd/util",

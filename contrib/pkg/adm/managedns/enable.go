@@ -11,19 +11,28 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/cache"
+	clientwatch "k8s.io/client-go/tools/watch"
+	"k8s.io/kubernetes/pkg/kubectl"
+
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	contributils "github.com/openshift/hive/contrib/pkg/utils"
+	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hiveclient "github.com/openshift/hive/pkg/client/clientset-generated/clientset"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -38,9 +47,12 @@ managed domains, create a credentials secret for your cloud provider, and link i
 the ExternalDNS section of HiveConfig.
 `
 const (
-	cloudAWS      = "aws"
-	cloudGCP      = "gcp"
-	hiveNamespace = "hive"
+	cloudAWS                = "aws"
+	cloudGCP                = "gcp"
+	hiveNamespace           = "hive"
+	hiveAdmissionDeployment = "hiveadmission"
+	hiveConfigName          = "hive"
+	waitTime                = time.Minute * 2
 )
 
 // Options is the set of options to generate and apply a new cluster deployment
@@ -48,6 +60,9 @@ type Options struct {
 	Cloud     string
 	CredsFile string
 	homeDir   string
+
+	dynamicClient dynamic.Interface
+	hiveClient    *hiveclient.Clientset
 }
 
 // NewEnableManageDNSCommand creates a command that generates and applies artifacts to enable managed
@@ -68,14 +83,13 @@ func NewEnableManageDNSCommand() *cobra.Command {
 			if err := opt.Validate(cmd); err != nil {
 				return
 			}
-			dynClient, err := contributils.GetClient()
-			if err != nil {
-				log.WithError(err).Fatal("error creating kube clients")
+
+			if err := opt.setupLocalClients(); err != nil {
+				log.WithError(err).Fatal("error creating hive client")
 			}
 
-			err = opt.Run(dynClient, args)
-			if err != nil {
-				log.WithError(err).Error("Error")
+			if err := opt.Run(args); err != nil {
+				log.WithError(err).Fatal("Failed while deploying updated managed dns")
 			}
 		},
 	}
@@ -102,7 +116,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 }
 
 // Run executes the command
-func (o *Options) Run(dynClient client.Client, args []string) error {
+func (o *Options) Run(args []string) error {
 	if err := apis.AddToScheme(scheme.Scheme); err != nil {
 		return err
 	}
@@ -113,8 +127,7 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 
 	// Update the current HiveConfig, which should always exist as the operator will
 	// create a default one once run.
-	hc := &hivev1.HiveConfig{}
-	err = dynClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, hc)
+	hc, err := o.hiveClient.HiveV1().HiveConfigs().Get(hiveConfigName, metav1.GetOptions{})
 	if err != nil {
 		log.WithError(err).Fatal("error looking up HiveConfig 'hive'")
 	}
@@ -157,47 +170,122 @@ func (o *Options) Run(dynClient client.Client, args []string) error {
 		log.WithError(err).Fatal("failed to save generated secret")
 	}
 
-	err = dynClient.Update(context.Background(), hc)
+	_, err = o.hiveClient.HiveV1().HiveConfigs().Update(hc)
 	if err != nil {
 		log.WithError(err).Fatal("error updating HiveConfig")
 	}
 	log.Info("updated HiveConfig")
 
 	// Adding manageDNS to HiveConfig triggers a new rollout of the hiveadmission pods.
-	// To know when it's safe to proceed, we will list all hiveadmission pods and ensure
-	// they all have the expected env var set.
-	log.Info("waiting for new hiveadmission pods to deploy")
-	selector := map[string]string{"hiveadmission": "true"}
-	for i := 0; i < 24; i++ {
-		hiveAdmissionPods := &corev1.PodList{}
-		err = dynClient.List(context.Background(), hiveAdmissionPods, client.MatchingLabels(selector))
-		if err != nil {
-			log.WithError(err).Fatal("error listing hiveadmission pods")
-		}
-		podsReady := true
-		for _, p := range hiveAdmissionPods.Items {
-			if !podHasEnvVar(p, "MANAGED_DOMAINS_FILE") {
-				podsReady = false
-				break
-			}
-		}
-		if !podsReady {
-			log.Info("new hiveadmission pods not ready, sleeping 5s")
-			time.Sleep(5 * time.Second)
-		}
-	}
-	log.Info("Hive is now ready to create clusters with manageDNS=true")
+	// To know when it's safe to proceed, we will wait for the HiveConfig to reflect
+	// that it has been processed successfully and then do the equivalent of a
+	// kubectl rollout status --wait
 
+	err = waitForHiveConfigToBeProcessed(o.hiveClient)
+	if err != nil {
+		log.WithError(err).Fatal("gave up waiting for HiveConfig to be processed")
+	}
+
+	if err := waitForHiveAdmissionPods(o.dynamicClient); err != nil {
+		log.WithError(err).Fatal("hive admission pods never became available")
+	}
+
+	log.Info("Hive is now ready to create clusters with manageDNS=true")
 	return nil
 }
 
-func podHasEnvVar(p corev1.Pod, envVar string) bool {
-	for _, ev := range p.Spec.Containers[0].Env {
-		if ev.Name == envVar {
-			return true
-		}
+func waitForHiveAdmissionPods(dynClient dynamic.Interface) error {
+	resourceName := "deployments"
+	gvr := appsv1.SchemeGroupVersion.WithResource(resourceName)
+
+	log.Info("waiting for new hiveadmission pods to deploy")
+
+	statusViewer := &kubectl.DeploymentStatusViewer{}
+
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", hiveAdmissionDeployment).String()
+
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return dynClient.Resource(gvr).Namespace(constants.HiveNamespace).List(options)
+
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return dynClient.Resource(gvr).Namespace(constants.HiveNamespace).Watch(options)
+		},
 	}
-	return false
+
+	ctx, cancel := context.WithTimeout(context.Background(), waitTime)
+	defer cancel()
+
+	_, err := clientwatch.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
+		switch t := e.Type; t {
+		case watch.Added, watch.Modified:
+			unstObj, ok := e.Object.(runtime.Unstructured)
+			if !ok {
+				return true, fmt.Errorf("failed to convert to unstructured runtime object")
+			}
+			_, done, err := statusViewer.Status(unstObj, 0)
+			if err != nil {
+				return false, err
+			}
+			if done {
+				return true, nil
+			}
+
+			return false, nil
+		case watch.Deleted:
+			return true, fmt.Errorf("object has been deleted")
+		default:
+			return true, fmt.Errorf("internal error: unexpected event %#v", e)
+		}
+	})
+
+	log.Debug("done waiting for hiveadmission pods")
+	return err
+}
+
+// wiatForHiveConfigToBeProcessed will wait for the HiveConfig.Status.ObservedGeneration to match
+// the HiveConfig's Generation (and status showing ConfigApplied == true).
+func waitForHiveConfigToBeProcessed(hiveClient *hiveclient.Clientset) error {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", hiveConfigName).String()
+
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return hiveClient.HiveV1().HiveConfigs().List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return hiveClient.HiveV1().HiveConfigs().Watch(options)
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), waitTime)
+	defer cancel()
+
+	_, err := clientwatch.UntilWithSync(ctx, lw, &hivev1.HiveConfig{}, nil, func(e watch.Event) (bool, error) {
+		switch t := e.Type; t {
+		case watch.Added, watch.Modified:
+			hc, ok := e.Object.(*hivev1.HiveConfig)
+			if !ok {
+				return true, fmt.Errorf("failed to convert event object into HiveConfig")
+			}
+			if hc.Generation == hc.Status.ObservedGeneration && hc.Status.ConfigApplied {
+				return true, nil
+			}
+			log.Debug("still waiting for hiveconfig to be processed")
+			return false, nil
+		case watch.Deleted:
+			return true, fmt.Errorf("object has been deleted")
+		default:
+			return true, fmt.Errorf("internal error: unexpected event %#v", e)
+		}
+	})
+
+	log.Debug("done waiting for hiveconfig to be processed")
+	return err
 }
 
 func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
@@ -251,4 +339,29 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 	}
 	helper := resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "adm manage-dns enable"))
 	return helper, nil
+}
+
+func (o *Options) setupLocalClients() error {
+	log.Debug("creating cluster client config")
+	cfg, err := hiveutils.GetClientConfig()
+	if err != nil {
+		log.WithError(err).Error("cannot obtain client config")
+		return err
+	}
+
+	hiveClient, err := hiveclient.NewForConfig(cfg)
+	if err != nil {
+		log.WithError(err).Error("failed to create a hive config client")
+		return err
+	}
+	o.hiveClient = hiveClient
+
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		log.WithError(err).Error("failed to create a dynamic config client")
+		return err
+	}
+	o.dynamicClient = dynamicClient
+
+	return nil
 }

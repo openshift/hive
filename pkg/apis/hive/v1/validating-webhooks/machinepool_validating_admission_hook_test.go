@@ -514,6 +514,20 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 				return pool
 			}(),
 		},
+		{
+			name: "platform changed",
+			old:  testMachinePool(),
+			new:  testGCPMachinePool(),
+		},
+		{
+			name: "instance type changed",
+			old:  testMachinePool(),
+			new: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.InstanceType = "other-instance-type"
+				return pool
+			}(),
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

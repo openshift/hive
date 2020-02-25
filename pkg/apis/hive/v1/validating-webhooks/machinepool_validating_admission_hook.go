@@ -222,6 +222,7 @@ func validateMachinePoolUpdate(old, new *hivev1.MachinePool) field.ErrorList {
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Name, old.Spec.Name, specPath.Child("name"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Labels, old.Spec.Labels, specPath.Child("labels"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Taints, old.Spec.Taints, specPath.Child("taints"))...)
+	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Platform, old.Spec.Platform, specPath.Child("platform"))...)
 	return allErrs
 }
 

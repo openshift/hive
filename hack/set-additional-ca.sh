@@ -13,4 +13,4 @@ fi
 
 oc create secret generic --from-file "ca.crt=${1}" -n hive additional-ca
 
-oc patch hiveconfig/hive --type=json -p '[{"op":"replace", "path":"/spec/additionalCertificateAuthorities", "value":[{"name": "additional-ca"}]}]'
+oc patch hiveconfig/hive --type=json -p '[{"op":"replace", "path":"/spec/additionalCertificateAuthoritiesSecretRef", "value":[{"name": "additional-ca"}]}]'

@@ -58,7 +58,7 @@ oc edit hiveconfig hive
 
 ```yaml
 spec:
-  globalPullSecret:
+  globalPullSecretRef:
     name: global-pull-secret
 ```
 

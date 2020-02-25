@@ -35,7 +35,6 @@ const (
 	testDeploymentName   = "test-deployment"
 	testProvisionName    = "test-provision"
 	testNamespace        = "test-namespace"
-	sshKeySecretName     = "ssh-key"
 	pullSecretSecretName = "pull-secret"
 
 	installerBinary     = "openshift-install"
@@ -156,10 +155,8 @@ func TestInstallManager(t *testing.T) {
 			defer os.RemoveAll(tempDir)
 			defer os.Remove(installerConsoleLogFilePath)
 
-			sshKeySecret := testSecret(corev1.SecretTypeOpaque, sshKeySecretName, adminSSHKeySecretKey, "fakesshkey")
 			pullSecret := testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecretName, corev1.DockerConfigJsonKey, "{}")
 			existing := test.existing
-			existing = append(existing, sshKeySecret)
 			existing = append(existing, pullSecret)
 
 			fakeClient := fake.NewFakeClient(existing...)

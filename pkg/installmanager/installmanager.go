@@ -69,7 +69,6 @@ const (
 	kubeadminUsername                   = "kubeadmin"
 	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"
 	adminPasswordSecretStringTemplate   = "%s-admin-password"
-	adminSSHKeySecretKey                = "ssh-publickey"
 	installerFullLogFile                = ".openshift_install.log"
 	installerConsoleLogFilePath         = "/tmp/openshift-install-console.log"
 	provisioningTransitionTimeout       = 5 * time.Minute

@@ -8,10 +8,10 @@ parameters:
   displayName: Cluster Name
   description: The name to give to the Cluster created. If using real AWS, then this name should include your username so that resources created in AWS can be identified as yours.
   required: true
-- name: SSH_KEY
-  displayName: SSH Key
-  description: Your public SSH key to reach instances.
-  required: true
+- name: SSH_PRIV_KEY
+  displayName: SSH Private Key
+  description: The private key counterpart to the public ssh key to allow pulling logs.
+  required: false
 - name: BASE_DOMAIN
   displayName: Base DNS Domain
   description: Base DNS domain for your cluster. Will be combined with cluster name when creating entries.
@@ -63,7 +63,7 @@ objects:
     name: ${CLUSTER_NAME}-ssh-key
   type: Opaque
   stringData:
-    ssh-publickey: "${SSH_KEY}"
+    ssh-privatekey: "${SSH_PRIV_KEY}"
 
 - apiVersion: hive.openshift.io/v1
   kind: ClusterImageSet

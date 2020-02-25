@@ -75,7 +75,7 @@ func TestAdmission(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			file := filepath.Join("../../../../config/samples", test.file)
+			file := filepath.Join("testdata", test.file)
 			b, err := ioutil.ReadFile(file)
 			if err != nil {
 				t.Fatalf("Unexpected file read error: %v", err)

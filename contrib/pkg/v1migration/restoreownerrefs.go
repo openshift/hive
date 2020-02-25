@@ -178,5 +178,5 @@ func isRefFromPVCToCD(ref ownerRef) bool {
 }
 
 func isRefFromDNSEndpoint(ref ownerRef) bool {
-	return ref.Resource == "dnsendpoint" && ref.Group == hivev1alpha1.GroupName
+	return ref.Resource == "dnsendpoints" && ref.Group == hivev1alpha1.GroupName
 }

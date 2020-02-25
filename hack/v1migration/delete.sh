@@ -61,16 +61,23 @@ fi
 
 delete_jobs() {
   local labels=${1:?must specify a label for the jobs to delete}
-  oc get jobs -l "${labels}" --all-namespaces -ojsonpath='{.items[*].metadata.namespace}' | \
+  oc get jobs -l "${labels}" --all-namespaces -o json | \
+    jq -r '.items[]?.metadata.namespace' | \
     sort -u | \
-    xargs -i oc delete jobs -n {} -l "${labels}" "${dry_run}"
+    xargs -i oc delete jobs -n {} -l "${labels}"
 }
 
 echo "Deleting install jobs"
-delete_jobs "hive.openshift.io/install=true"
+if [[ -z $dry_run ]]
+then
+  delete_jobs "hive.openshift.io/install=true"
+fi
 
 echo "Deleting imageset jobs"
-delete_jobs "hive.openshift.io/imageset=true"
+if [[ -z $dry_run ]]
+then
+  delete_jobs "hive.openshift.io/imageset=true"
+fi
 
 for t in "${HIVE_TYPES[@]}"
 do
@@ -98,17 +105,3 @@ do
 	  oc delete "customresourcedefinition.apiextensions.k8s.io/${t}.hive.openshift.io" $dry_run
 	fi
 done
-
-echo "Deleting webhooks"
-if [[ -z $dry_run ]]
-then
-  oc get validatingwebhookconfiguration -oname | \
-    grep -E -e "\.hive\.openshift\.io$" | \
-    xargs -i oc delete {} $dry_run
-fi
-
-echo "Deleting admission api service"
-if [[ -z $dry_run ]]
-then
-  oc delete apiservice v1alpha1.admission.hive.openshift.io $dry_run
-fi

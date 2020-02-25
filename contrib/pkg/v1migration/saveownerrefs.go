@@ -75,7 +75,7 @@ func (o *SaveOwnerRefsOptions) Run() error {
 	}
 	resources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return errors.Wrap(err, "could discovery the server resources")
+		return errors.Wrap(err, "could not discover the server resources")
 	}
 	client, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {

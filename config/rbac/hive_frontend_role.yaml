@@ -51,6 +51,7 @@ rules:
   - selectorsyncsets
   - syncsets
   - clusterdeprovisions
+  # TODO: remove once v1alpha1 compat removed
   - clusterdeprovisionrequests
   - clusterstates
   verbs:

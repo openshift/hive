@@ -993,6 +993,8 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisions
+  # TODO: remove once v1alpha1 compat removed
+  - clusterdeprovisionrequests
   - clusterstates
   verbs:
   - get
@@ -1497,6 +1499,7 @@ rules:
   - selectorsyncsets
   - syncsets
   - clusterdeprovisions
+  # TODO: remove once v1alpha1 compat removed
   - clusterdeprovisionrequests
   - clusterstates
   verbs:
@@ -1624,6 +1627,8 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisions
+  # TODO: remove once v1alpha1 compat removed
+  - clusterdeprovisionrequests
   - clusterstates
   verbs:
   - get

@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -277,7 +278,11 @@ func createNameServerQuery(c client.Client, logger log.FieldLogger, managedDomai
 	if managedDomain.AWS != nil {
 		secretName := managedDomain.AWS.CredentialsSecretRef.Name
 		logger.Infof("using aws creds for managed domains stored in %q secret", secretName)
-		return nameserver.NewAWSQuery(c, secretName)
+		region := managedDomain.AWS.Region
+		if region == "" {
+			region = constants.AWSRoute53Region
+		}
+		return nameserver.NewAWSQuery(c, secretName, region)
 	}
 	if managedDomain.GCP != nil {
 		secretName := managedDomain.GCP.CredentialsSecretRef.Name

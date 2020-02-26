@@ -14,6 +14,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -27,6 +28,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53/route53iface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -52,7 +55,7 @@ func init() {
 
 // Client is a wrapper object for actual AWS SDK clients to allow for easier testing.
 type Client interface {
-	//EC2
+	// EC2
 	DescribeAvailabilityZones(*ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error)
 	DescribeImages(*ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error)
 	DescribeVpcs(*ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
@@ -62,10 +65,10 @@ type Client interface {
 	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
 	TerminateInstances(*ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
 
-	//ELB
+	// ELB
 	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
 
-	//IAM
+	// IAM
 	CreateAccessKey(*iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error)
 	CreateUser(*iam.CreateUserInput) (*iam.CreateUserOutput, error)
 	DeleteAccessKey(*iam.DeleteAccessKeyInput) (*iam.DeleteAccessKeyOutput, error)
@@ -76,15 +79,15 @@ type Client interface {
 	ListUserPolicies(*iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error)
 	PutUserPolicy(*iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error)
 
-	//S3
+	// S3
 	CreateBucket(*s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
 	DeleteBucket(*s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
 	ListBuckets(*s3.ListBucketsInput) (*s3.ListBucketsOutput, error)
 
-	//Custom
+	// Custom
 	GetS3API() s3iface.S3API
 
-	//Route53
+	// Route53
 	CreateHostedZone(input *route53.CreateHostedZoneInput) (*route53.CreateHostedZoneOutput, error)
 	GetHostedZone(*route53.GetHostedZoneInput) (*route53.GetHostedZoneOutput, error)
 	ListTagsForResource(*route53.ListTagsForResourceInput) (*route53.ListTagsForResourceOutput, error)
@@ -300,7 +303,10 @@ func NewClient(kubeClient client.Client, secretName, namespace, region string) (
 //
 // Pass a nil secret to load credentials from the standard AWS environment variables.
 func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
-	awsConfig := &aws.Config{Region: aws.String(region)}
+	awsConfig := &aws.Config{
+		Region:           aws.String(region),
+		EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
+	}
 
 	// Special case to not use a secret to gather credentials.
 	if secret != nil {
@@ -337,5 +343,16 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 		s3Client:      s3.New(s),
 		route53Client: route53.New(s),
 		tagClient:     resourcegroupstaggingapi.New(s),
+	}, nil
+}
+
+func awsChinaEndpointResolver(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+	if service != route53.EndpointsID || region != constants.AWSChinaRoute53Region {
+		return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
+	}
+
+	return endpoints.ResolvedEndpoint{
+		URL:         "https://route53.amazonaws.com.cn",
+		PartitionID: "aws-cn",
 	}, nil
 }

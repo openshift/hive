@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -1359,9 +1360,14 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 		for k, v := range cd.Spec.Platform.AWS.UserTags {
 			additionalTags = append(additionalTags, hivev1.AWSResourceTag{Key: k, Value: v})
 		}
+		region := ""
+		if strings.HasPrefix(cd.Spec.Platform.AWS.Region, constants.AWSChinaRegionPrefix) {
+			region = constants.AWSChinaRoute53Region
+		}
 		dnsZone.Spec.AWS = &hivev1.AWSDNSZoneSpec{
 			CredentialsSecretRef: cd.Spec.Platform.AWS.CredentialsSecretRef,
 			AdditionalTags:       additionalTags,
+			Region:               region,
 		}
 	case cd.Spec.Platform.GCP != nil:
 		dnsZone.Spec.GCP = &hivev1.GCPDNSZoneSpec{

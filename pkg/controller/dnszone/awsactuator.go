@@ -17,11 +17,11 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
-	hiveDNSZoneAWSTag     = "hive.openshift.io/dnszone"
-	defaultRegionEndpoint = "us-east-1"
+	hiveDNSZoneAWSTag = "hive.openshift.io/dnszone"
 )
 
 // Ensure AWSActuator implements the Actuator interface. This will fail at compile time when false.
@@ -54,9 +54,11 @@ func NewAWSActuator(
 	dnsZone *hivev1.DNSZone,
 	awsClientBuilder awsClientBuilderType,
 ) (*AWSActuator, error) {
-	// Route53 is a regionless service, we specify a default region just for the purpose of creating
-	// our client configuration.
-	awsClient, err := awsClientBuilder(secret, defaultRegionEndpoint)
+	region := dnsZone.Spec.AWS.Region
+	if region == "" {
+		region = constants.AWSRoute53Region
+	}
+	awsClient, err := awsClientBuilder(secret, region)
 	if err != nil {
 		logger.WithError(err).Error("Error creating AWSClient")
 		return nil, err

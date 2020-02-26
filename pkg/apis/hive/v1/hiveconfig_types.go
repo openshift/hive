@@ -129,6 +129,12 @@ type ManageDNSAWSConfig struct {
 	// Secret should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
 	// +optional
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+
+	// Region is the AWS region to use for route53 operations.
+	// This defaults to us-east-1.
+	// For AWS China, use cn-northwest-1.
+	// +optional
+	Region string `json:"region,omitempty"`
 }
 
 // ManageDNSGCPConfig contains GCP-specific info to manage a given domain.

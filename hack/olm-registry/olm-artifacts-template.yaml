@@ -53,7 +53,7 @@ objects:
   metadata:
     name: hive
   spec:
-    additionalCertificateAuthorities:
+    additionalCertificateAuthoritiesSecretRef:
     - name: ${ADDITIONAL_CERTIFICATE_AUTHORITY}
     managedDomains:
     - aws:
@@ -61,5 +61,5 @@ objects:
           name: ${EXTERNAL_DNS_AWS_CREDS}
       domains:
       - ${EXTERNAL_DNS_MANAGED_DOMAIN}
-    globalPullSecret:
+    globalPullSecretRef:
       name: ${GLOBAL_PULL_SECRET}

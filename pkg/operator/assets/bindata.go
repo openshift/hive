@@ -1497,6 +1497,7 @@ rules:
   - selectorsyncsets
   - syncsets
   - clusterdeprovisions
+  - clusterdeprovisionrequests
   - clusterstates
   verbs:
   - get

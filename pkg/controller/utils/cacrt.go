@@ -30,8 +30,8 @@ func SetupAdditionalCA() error {
 	return nil
 }
 
-// FixupKubeconfig adds additional certificate authorities to a given kubeconfig
-func FixupKubeconfig(data []byte) ([]byte, error) {
+// AddAdditionalKubeconfigCAs adds additional certificate authorities to a given kubeconfig
+func AddAdditionalKubeconfigCAs(data []byte) ([]byte, error) {
 	if len(additionalCAData) == 0 {
 		return data, nil
 	}

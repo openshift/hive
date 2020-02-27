@@ -245,6 +245,59 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Add additional CAs to admin kubeconfig",
+			existing: []runtime.Object{
+				testClusterDeploymentWithProvision(),
+				testSuccessfulProvision(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testMetadataConfigMap(),
+			},
+			expectConsoleRouteFetch: true,
+			validate: func(c client.Client, t *testing.T) {
+				// Ensure the admin kubeconfig secret got a copy of the raw data, indicating that we would have
+				// added additional CAs if any were configured.
+				akcSecret := &corev1.Secret{}
+				err := c.Get(context.TODO(), client.ObjectKey{Name: adminKubeconfigSecret, Namespace: testNamespace},
+					akcSecret)
+				require.NoError(t, err)
+				require.NotNil(t, akcSecret)
+				assert.Contains(t, akcSecret.Data, rawAdminKubeconfigKey)
+			},
+		},
+		{
+			name: "Add additional CAs to admin kubeconfig when status URLs set",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						InfraID:                  "fakeinfra",
+						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+					}
+					cd.Status.WebConsoleURL = "https://example.com"
+					cd.Status.APIURL = "https://example.com"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testMetadataConfigMap(),
+			},
+			expectConsoleRouteFetch: false,
+			validate: func(c client.Client, t *testing.T) {
+				// Ensure the admin kubeconfig secret got a copy of the raw data, indicating that we would have
+				// added additional CAs if any were configured.
+				akcSecret := &corev1.Secret{}
+				err := c.Get(context.TODO(), client.ObjectKey{Name: adminKubeconfigSecret, Namespace: testNamespace},
+					akcSecret)
+				require.NoError(t, err)
+				require.NotNil(t, akcSecret)
+				assert.Contains(t, akcSecret.Data, rawAdminKubeconfigKey)
+			},
+		},
+		{
 			name: "Completed provision",
 			existing: []runtime.Object{
 				testClusterDeploymentWithProvision(),

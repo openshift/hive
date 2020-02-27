@@ -285,7 +285,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 	return r.reconcile(request, cd, cdLog)
 }
 
-func (r *ReconcileClusterDeployment) postProcessAdminKubeconfig(cd *hivev1.ClusterDeployment,
+func (r *ReconcileClusterDeployment) addAdditionalKubeconfigCAs(cd *hivev1.ClusterDeployment,
 	cdLog log.FieldLogger) error {
 
 	adminKubeconfigSecret := &corev1.Secret{}
@@ -293,14 +293,34 @@ func (r *ReconcileClusterDeployment) postProcessAdminKubeconfig(cd *hivev1.Clust
 		cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
 		return err
 	}
-	if err := r.fixupAdminKubeconfigSecret(adminKubeconfigSecret, cdLog); err != nil {
-		cdLog.WithError(err).Error("failed to fix up admin kubeconfig secret")
+
+	originalSecret := adminKubeconfigSecret.DeepCopy()
+
+	rawData, hasRawData := adminKubeconfigSecret.Data[rawAdminKubeconfigKey]
+	if !hasRawData {
+		adminKubeconfigSecret.Data[rawAdminKubeconfigKey] = adminKubeconfigSecret.Data[constants.KubeconfigSecretKey]
+		rawData = adminKubeconfigSecret.Data[constants.KubeconfigSecretKey]
+	}
+
+	var err error
+	adminKubeconfigSecret.Data[constants.KubeconfigSecretKey], err = controllerutils.AddAdditionalKubeconfigCAs(rawData)
+	if err != nil {
+		cdLog.WithError(err).Errorf("error adding additional CAs to admin kubeconfig")
 		return err
 	}
-	if err := r.setAdminKubeconfigStatus(cd, cdLog); err != nil {
-		cdLog.WithError(err).Error("failed to set admin kubeconfig status")
+
+	if reflect.DeepEqual(originalSecret.Data, adminKubeconfigSecret.Data) {
+		cdLog.Debug("secret data has not changed, no need to update")
+		return nil
+	}
+
+	cdLog.Info("admin kubeconfig has been modified, updating")
+	err = r.Update(context.TODO(), adminKubeconfigSecret)
+	if err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating admin kubeconfig secret")
 		return err
 	}
+
 	return nil
 }
 
@@ -408,16 +428,21 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		r.cleanupInstallLogPVC(cd, cdLog)
 
 		if cd.Spec.ClusterMetadata != nil &&
-			cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" &&
-			(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+			cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" {
 
-			err := r.postProcessAdminKubeconfig(cd, cdLog)
-			if err != nil {
+			if err := r.addAdditionalKubeconfigCAs(cd, cdLog); err != nil {
 				return reconcile.Result{}, err
 			}
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
-				return reconcile.Result{}, err
+
+			if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
+				if err := r.setClusterStatusURLs(cd, cdLog); err != nil {
+					cdLog.WithError(err).Error("failed to set admin kubeconfig status")
+					return reconcile.Result{}, err
+				}
+				if err := r.Status().Update(context.TODO(), cd); err != nil {
+					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
+					return reconcile.Result{}, err
+				}
 			}
 
 		}
@@ -707,18 +732,24 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		cd.Status.Conditions = conds
 	}
 	if cd.Spec.ClusterMetadata != nil &&
-		cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" &&
-		(cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "") {
+		cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" {
 
-		statusChange = true
-		err := r.postProcessAdminKubeconfig(cd, cdLog)
-		if err != nil {
+		if err := r.addAdditionalKubeconfigCAs(cd, cdLog); err != nil {
 			return reconcile.Result{}, err
 		}
+
+		if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
+			statusChange = true
+			if err := r.setClusterStatusURLs(cd, cdLog); err != nil {
+				cdLog.WithError(err).Error("failed to set cluster status URLs")
+				return reconcile.Result{}, err
+			}
+		}
+
 	}
 	if statusChange {
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set installed status")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
 			return reconcile.Result{}, err
 		}
 	}
@@ -1012,42 +1043,10 @@ func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.Clu
 	return err
 }
 
-func (r *ReconcileClusterDeployment) fixupAdminKubeconfigSecret(secret *corev1.Secret, cdLog log.FieldLogger) error {
-	originalSecret := secret.DeepCopy()
-
-	rawData, hasRawData := secret.Data[rawAdminKubeconfigKey]
-	if !hasRawData {
-		secret.Data[rawAdminKubeconfigKey] = secret.Data[constants.KubeconfigSecretKey]
-		rawData = secret.Data[constants.KubeconfigSecretKey]
-	}
-
-	var err error
-	secret.Data[constants.KubeconfigSecretKey], err = controllerutils.FixupKubeconfig(rawData)
-	if err != nil {
-		cdLog.WithError(err).Errorf("cannot fixup kubeconfig to generate new one")
-		return err
-	}
-
-	if reflect.DeepEqual(originalSecret.Data, secret.Data) {
-		cdLog.Debug("secret data has not changed, no need to update")
-		return nil
-	}
-
-	err = r.Update(context.TODO(), secret)
-	if err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updated admin kubeconfig secret")
-		return err
-	}
-
-	return nil
-}
-
-// setAdminKubeconfigStatus sets all cluster status fields that depend on the admin kubeconfig.
-func (r *ReconcileClusterDeployment) setAdminKubeconfigStatus(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	if cd.Status.WebConsoleURL != "" || cd.Status.APIURL != "" {
-		return nil
-	}
-
+// setClusterStatusURLs fetches the openshift console route from the remote cluster and uses it to determine
+// the correct APIURL and WebConsoleURL, and then set them in the Status. Typically only called if these Status fields
+// are unset.
+func (r *ReconcileClusterDeployment) setClusterStatusURLs(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
 	server, err := remoteClientBuilder.APIURL()
 	if err != nil {

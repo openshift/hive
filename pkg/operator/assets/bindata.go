@@ -151,10 +151,10 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 100Mi
+            memory: 400Mi
           limits:
             cpu: 100m
-            memory: 200Mi
+            memory: 600Mi
         command:
           - "/opt/services/hive-apiserver"
         args:

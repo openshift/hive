@@ -21,6 +21,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -29,10 +30,12 @@ func TestScaleMachinePool(t *testing.T) {
 	cfg := common.MustGetClusterDeploymentClientConfig()
 
 	switch p := cd.Spec.Platform; {
-	case p.AWS == nil:
-	case p.GCP == nil:
+	case p.AWS != nil:
+	case p.Azure != nil:
+	case p.GCP != nil:
 	default:
-		t.Log("Scaling the machine pool is only implemented for AWS and GCP")
+		t.Log("Scaling the machine pool is only implemented for AWS, Azure, and GCP")
+		return
 	}
 
 	c := common.MustGetClient()
@@ -74,11 +77,6 @@ func TestNewMachinePool(t *testing.T) {
 	cd := common.MustGetInstalledClusterDeployment()
 	cfg := common.MustGetClusterDeploymentClientConfig()
 
-	if cd.Spec.Platform.AWS == nil {
-		t.Log("Remote machineset management is only implemented for AWS")
-		return
-	}
-
 	c := common.MustGetClient()
 
 	if pool := common.GetMachinePool(cd, "infra"); pool != nil {
@@ -94,16 +92,6 @@ func TestNewMachinePool(t *testing.T) {
 			ClusterDeploymentRef: corev1.LocalObjectReference{Name: cd.Name},
 			Name:                 "infra",
 			Replicas:             pointer.Int64Ptr(3),
-			Platform: hivev1.MachinePoolPlatform{
-				AWS: &hivev1aws.MachinePoolPlatform{
-					InstanceType: "m4.large",
-					EC2RootVolume: hivev1aws.EC2RootVolume{
-						IOPS: 100,
-						Size: 22,
-						Type: "gp2",
-					},
-				},
-			},
 			Labels: map[string]string{
 				"openshift.io/machine-type": "infra",
 			},
@@ -115,6 +103,32 @@ func TestNewMachinePool(t *testing.T) {
 				},
 			},
 		},
+	}
+
+	switch p := cd.Spec.Platform; {
+	case p.AWS != nil:
+	infraMachinePool.Spec.Platform = hivev1.MachinePoolPlatform{
+		AWS: &hivev1aws.MachinePoolPlatform{
+			InstanceType: "m4.large",
+			EC2RootVolume: hivev1aws.EC2RootVolume{
+				IOPS: 100,
+				Size: 22,
+				Type: "gp2",
+			},
+		},
+	}
+	case p.Azure != nil:
+		infraMachinePool.Spec.Platform = hivev1.MachinePoolPlatform{
+			Azure: &hivev1azure.MachinePool{
+				InstanceType: "Standard_D2s_v3",
+				OSDisk: hivev1azure.OSDisk{
+					DiskSizeGB: 128,
+				},
+			},
+		}
+	default:
+		t.Log("Adding machine pools is only implemented for AWS and Azure")
+		return
 	}
 
 	err := c.Create(context.TODO(), infraMachinePool)
@@ -208,10 +222,11 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	cfg := common.MustGetClusterDeploymentClientConfig()
 
 	switch p := cd.Spec.Platform; {
-	case p.AWS == nil:
-	case p.GCP == nil:
+	case p.AWS != nil:
+	case p.Azure != nil:
+	case p.GCP != nil:
 	default:
-		t.Log("Scaling the machine pool is only implemented for AWS and GCP")
+		t.Log("Scaling the machine pool is only implemented for AWS, Azure, and GCP")
 	}
 
 	c := common.MustGetClient()
@@ -257,8 +272,8 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	}
 
 	// busyboxDeployment creates a large number of pods to place CPU pressure
-	// on the machine pool. With 50 replicas and a CPU request for each pod of
-	// 2, the total CPU request from the deployment is 100. For AWS using m4.xlarge,
+	// on the machine pool. With 100 replicas and a CPU request for each pod of
+	// 1, the total CPU request from the deployment is 100. For AWS using m4.xlarge,
 	// each machine has a CPU limit of 4. For the max replicas of 12, the total
 	// CPU limit is 48.
 	busyboxDeployment := &extensionsv1beta1.Deployment{
@@ -267,7 +282,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 			Name:      "busybox",
 		},
 		Spec: extensionsv1beta1.DeploymentSpec{
-			Replicas: pointer.Int32Ptr(50),
+			Replicas: pointer.Int32Ptr(100),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"scaling-app": "busybox",
@@ -287,7 +302,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceCPU: func() resource.Quantity {
-									q, err := resource.ParseQuantity("2")
+									q, err := resource.ParseQuantity("1")
 									if err != nil {
 										t.Fatalf("could not parse quantity")
 									}
@@ -353,7 +368,7 @@ func waitForMachines(cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName st
 			}
 		}
 		return count == expectedReplicas
-	}, 5*time.Minute)
+	}, 10*time.Minute)
 }
 
 func waitForNodes(cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string, expectedReplicas int, extraChecks ...func(node *corev1.Node) bool) error {

@@ -18,11 +18,12 @@
   version = "v0.4.12"
 
 [[projects]]
-  digest = "1:5632565af39d61cda6897bfe5868bab1c46e5f0b3af603d21364c5d0e89a46c5"
+  digest = "1:30bf7932616fd30848ac8f869c9bdf158ce4d099944f13d8dd8a15243c2cb1ea"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
     "profiles/latest/dns/mgmt/dns",
     "profiles/latest/resources/mgmt/subscriptions",
+    "services/compute/mgmt/2018-10-01/compute",
     "services/dns/mgmt/2017-10-01/dns",
     "services/graphrbac/1.6/graphrbac",
     "services/network/mgmt/2018-12-01/network",
@@ -863,13 +864,14 @@
   version = "v1.14.0"
 
 [[projects]]
-  digest = "1:e4a2b34dd07ffeb9282d5ff391f11918ab21d86260c0c21baf1ac5be53ea73b1"
+  digest = "1:637eaddb8031a33c8b95b667bc28bb0457007c2f54ab9aaeb0a7fe36d1eb4ea9"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
     "pkg/asset/installconfig/azure",
     "pkg/asset/installconfig/gcp",
     "pkg/asset/machines/aws",
+    "pkg/asset/machines/azure",
     "pkg/asset/machines/gcp",
     "pkg/destroy/aws",
     "pkg/destroy/azure",
@@ -2024,6 +2026,15 @@
   source = "github.com/openshift/cluster-api-provider-aws"
 
 [[projects]]
+  branch = "master"
+  digest = "1:9d86fe2d97d035702ab624b98c8bdb64436bafcba5538b26f3263f7e1a053f41"
+  name = "sigs.k8s.io/cluster-api-provider-azure"
+  packages = ["pkg/apis/azureprovider/v1beta1"]
+  pruneopts = "NUT"
+  revision = "832a43a30d7f00cd6774c1f5cd117aeebbe1b730"
+  source = "github.com/openshift/cluster-api-provider-azure"
+
+[[projects]]
   branch = "release-0.2"
   digest = "1:17dba618c5ac6f23b4c3ee0bf056d92a67c437d9f8109b2a041c4e43173b3d05"
   name = "sigs.k8s.io/controller-runtime"
@@ -2135,6 +2146,11 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute",
+    "github.com/Azure/go-autorest/autorest",
+    "github.com/Azure/go-autorest/autorest/azure",
+    "github.com/Azure/go-autorest/autorest/azure/auth",
+    "github.com/Azure/go-autorest/autorest/to",
     "github.com/aws/aws-sdk-go",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/arn",
@@ -2180,6 +2196,7 @@
     "github.com/openshift/generic-admission-server/pkg/cmd",
     "github.com/openshift/installer/pkg/asset/installconfig/azure",
     "github.com/openshift/installer/pkg/asset/machines/aws",
+    "github.com/openshift/installer/pkg/asset/machines/azure",
     "github.com/openshift/installer/pkg/asset/machines/gcp",
     "github.com/openshift/installer/pkg/destroy/aws",
     "github.com/openshift/installer/pkg/destroy/azure",
@@ -2314,6 +2331,7 @@
     "k8s.io/kubernetes/pkg/util/workqueue/prometheus",
     "k8s.io/utils/pointer",
     "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1",
+    "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1",
     "sigs.k8s.io/controller-runtime/pkg/cache",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/apiutil",

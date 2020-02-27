@@ -140,6 +140,15 @@ const (
 
 	// PasswordSecretKey is a key used to store a password inside of a secret containing username / password credentials
 	PasswordSecretKey = "password"
+
+	// AWSRoute53Region is the region to use for route53 operations.
+	AWSRoute53Region = "us-east-1"
+
+	// AWSChinaRoute53Region is the region to use for AWS China route53 operations.
+	AWSChinaRoute53Region = "cn-northwest-1"
+
+	// AWSChinaRegionPrefix is the prefix for regions in AWS China.
+	AWSChinaRegionPrefix = "cn-"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

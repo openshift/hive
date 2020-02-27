@@ -52,6 +52,10 @@ spec:
                   description: CredentialsSecretRef contains a reference to a secret
                     that contains AWS credentials for CRUD operations
                   type: object
+                region:
+                  description: Region is the AWS region to use for route53 operations.
+                    This defaults to us-east-1. For AWS China, use cn-northwest-1.
+                  type: string
               type: object
             gcp:
               description: GCP specifies GCP-specific cloud configuration

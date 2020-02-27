@@ -45,6 +45,12 @@ type AWSDNSZoneSpec struct {
 	// to these tags,the DNS Zone controller will set a hive.openhsift.io/hostedzone tag
 	// identifying the HostedZone record that it belongs to.
 	AdditionalTags []AWSResourceTag `json:"additionalTags,omitempty"`
+
+	// Region is the AWS region to use for route53 operations.
+	// This defaults to us-east-1.
+	// For AWS China, use cn-northwest-1.
+	// +optional
+	Region string `json:"region,omitempty"`
 }
 
 // AWSResourceTag represents a tag that is applied to an AWS cloud resource

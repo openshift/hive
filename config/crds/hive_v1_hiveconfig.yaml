@@ -115,6 +115,10 @@ spec:
                           parent ManageDNSConfig object. Secret should have AWS keys
                           named 'aws_access_key_id' and 'aws_secret_access_key'.
                         type: object
+                      region:
+                        description: Region is the AWS region to use for route53 operations.
+                          This defaults to us-east-1. For AWS China, use cn-northwest-1.
+                        type: string
                     type: object
                   domains:
                     description: Domains is the list of domains that hive will be

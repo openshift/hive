@@ -17,10 +17,10 @@ import (
 )
 
 // NewAWSQuery creates a new name server query for AWS.
-func NewAWSQuery(c client.Client, credsSecretName string) Query {
+func NewAWSQuery(c client.Client, credsSecretName string, region string) Query {
 	return &awsQuery{
 		getAWSClient: func() (awsclient.Client, error) {
-			awsClient, err := awsclient.NewClient(c, credsSecretName, constants.HiveNamespace, "us-east-1")
+			awsClient, err := awsclient.NewClient(c, credsSecretName, constants.HiveNamespace, region)
 			return awsClient, errors.Wrap(err, "error creating AWS client")
 		},
 	}

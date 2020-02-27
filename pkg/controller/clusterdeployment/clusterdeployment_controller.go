@@ -51,7 +51,6 @@ const (
 	defaultRequeueTime = 10 * time.Second
 	maxProvisions      = 3
 
-	adminSSHKeySecretKey  = "ssh-publickey"
 	rawAdminKubeconfigKey = "raw-kubeconfig"
 
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"

@@ -325,7 +325,7 @@ gcp:
 
 Hive supports bare metal provisioning as provided by [openshift-install](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md)
 
-At present this feature requires a separate pre-existing libvirt provisioning host to run the bootstrap node. This host will require very specific network configuration that far exceeds the scope of Hive documentation. See [Bare Metal Platform Customization](https://github.com/openshift/installer/blob/master/docs/user/metal/customize_ipi.md#using-a-remote-hypervisor) for more information.
+At present this feature requires a separate pre-existing libvirt provisioning host to run the bootstrap node. This host will require very specific network configuration that far exceeds the scope of Hive documentation. See [Bare Metal Platform Customization](https://github.com/openshift/installer/blob/master/docs/user/metal/customization_ipi.md#using-a-remote-hypervisor) for more information.
 
 ![Bare metal provisioning with one hypervisor host per cluster](hive-baremetal-hypervisor-per-cluster.png)
 

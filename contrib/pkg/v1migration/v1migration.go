@@ -20,6 +20,7 @@ func NewV1MigrationCommand() *cobra.Command {
 	cmd.AddCommand(NewRestoreOwnerRefsCommand())
 	cmd.AddCommand(NewDeleteObjectsCommand())
 	cmd.AddCommand(NewRecreateObjectsCommand())
+	cmd.AddCommand(NewDiscoverOwnedCommand())
 	return cmd
 }
 

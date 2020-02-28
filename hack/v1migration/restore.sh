@@ -24,6 +24,7 @@ find "${WORKDIR}" -maxdepth 1 -type f \
   -name "*.json" \
   -not -name "hiveconfigs.json" \
   -not -name "dnsendpoints.json" \
+  -not -name "owner-refs.json" \
   -not -empty \
   -exec bin/hiveutil v1migration recreate-objects {} \;
 

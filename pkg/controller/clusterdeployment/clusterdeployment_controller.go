@@ -52,8 +52,6 @@ const (
 	defaultRequeueTime = 10 * time.Second
 	maxProvisions      = 3
 
-	rawAdminKubeconfigKey = "raw-kubeconfig"
-
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
 
@@ -303,9 +301,9 @@ func (r *ReconcileClusterDeployment) addAdditionalKubeconfigCAs(cd *hivev1.Clust
 
 	originalSecret := adminKubeconfigSecret.DeepCopy()
 
-	rawData, hasRawData := adminKubeconfigSecret.Data[rawAdminKubeconfigKey]
+	rawData, hasRawData := adminKubeconfigSecret.Data[constants.RawKubeconfigSecretKey]
 	if !hasRawData {
-		adminKubeconfigSecret.Data[rawAdminKubeconfigKey] = adminKubeconfigSecret.Data[constants.KubeconfigSecretKey]
+		adminKubeconfigSecret.Data[constants.RawKubeconfigSecretKey] = adminKubeconfigSecret.Data[constants.KubeconfigSecretKey]
 		rawData = adminKubeconfigSecret.Data[constants.KubeconfigSecretKey]
 	}
 

@@ -1,13 +1,7 @@
-package createcluster
+package clusterresource
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-
-	log "github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -24,25 +18,18 @@ const (
 	azureInstanceType = "Standard_D2s_v3"
 )
 
-var _ cloudProvider = (*azureCloudProvider)(nil)
+var _ CloudBuilder = (*AzureCloudBuilder)(nil)
 
-type azureCloudProvider struct {
+// AzureCloudBuilder encapsulates cluster artifact generation logic specific to Azure.
+type AzureCloudBuilder struct {
+	// ServicePrincipal is the bytes from a service principal file, typically ~/.azure/osServicePrincipal.json.
+	ServicePrincipal []byte
+
+	// BaseDomainResourceGroupName is the resource group where the base domain for this cluster is configured.
+	BaseDomainResourceGroupName string
 }
 
-func (p *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secret, error) {
-	credsFilePath := filepath.Join(os.Getenv("HOME"), ".azure", azureCredFile)
-	if l := os.Getenv("AZURE_AUTH_LOCATION"); l != "" {
-		credsFilePath = l
-	}
-	if o.CredsFile != "" {
-		credsFilePath = o.CredsFile
-	}
-	log.Infof("Loading Azure service principal from: %s", credsFilePath)
-	spFileContents, err := ioutil.ReadFile(credsFilePath)
-	if err != nil {
-		return nil, err
-	}
-
+func (p *AzureCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -54,50 +41,48 @@ func (p *azureCloudProvider) generateCredentialsSecret(o *Options) (*corev1.Secr
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			azureCredFile: spFileContents,
+			azureCredFile: p.ServicePrincipal,
 		},
-	}, nil
+	}
 }
 
-func (p *azureCloudProvider) addPlatformDetails(
-	o *Options,
-	cd *hivev1.ClusterDeployment,
-	machinePool *hivev1.MachinePool,
-	installConfig *installertypes.InstallConfig,
-) error {
+func (p *AzureCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
 	cd.Spec.Platform = hivev1.Platform{
 		Azure: &hivev1azure.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
 			Region:                      azureRegion,
-			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
+			BaseDomainResourceGroupName: p.BaseDomainResourceGroupName,
 		},
 	}
+}
 
-	machinePool.Spec.Platform.Azure = &hivev1azure.MachinePool{
+func (p *AzureCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+	mp.Spec.Platform.Azure = &hivev1azure.MachinePool{
 		InstanceType: azureInstanceType,
 		OSDisk: hivev1azure.OSDisk{
 			DiskSizeGB: 128,
 		},
 	}
 
+}
+
+func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
 	// Inject platform details into InstallConfig:
-	installConfig.Platform = installertypes.Platform{
+	ic.Platform = installertypes.Platform{
 		Azure: &azureinstallertypes.Platform{
 			Region:                      azureRegion,
-			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
+			BaseDomainResourceGroupName: p.BaseDomainResourceGroupName,
 		},
 	}
 
 	// Used for both control plane and workers.
 	mpp := &azureinstallertypes.MachinePool{}
-	installConfig.ControlPlane.Platform.Azure = mpp
-	installConfig.Compute[0].Platform.Azure = mpp
-
-	return nil
+	ic.ControlPlane.Platform.Azure = mpp
+	ic.Compute[0].Platform.Azure = mpp
 }
 
-func (p *azureCloudProvider) credsSecretName(o *Options) string {
+func (p *AzureCloudBuilder) credsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-azure-creds", o.Name)
 }

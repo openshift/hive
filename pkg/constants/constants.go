@@ -36,6 +36,9 @@ const (
 	// ClusterProvisionNameLabel is the label that is used to identify a relationship to a given cluster provision object.
 	ClusterProvisionNameLabel = "hive.openshift.io/cluster-provision-name"
 
+	// ClusterLeasePoolNameLabel is the label that is used to identify a relationship to a given cluster lease pool.
+	ClusterLeasePoolNameLabel = "hive.openshift.io/cluster-lease-pool-name"
+
 	// SyncSetNameLabel is the label that is used to identify a relationship to a given syncset object.
 	SyncSetNameLabel = "hive.openshift.io/syncset-name"
 

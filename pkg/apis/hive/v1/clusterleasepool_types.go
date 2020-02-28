@@ -7,20 +7,20 @@ import (
 
 // ClusterLeasePoolSpec defines the desired state of the ClusterLeasePool
 type ClusterLeasePoolSpec struct {
+
 	// Platform encompasses the desired platform for the cluster.
 	Platform Platform `json:"platform"`
 
-	// DesiredHotClusterCount is the default number of clusters that we should keep provisioned and waiting for use
-	// if we're not in any of the DesiredHostClusterWindows.
-	DesiredHotClusterCount int `json:"desiredHotClusterCount"`
+	// Size is the default number of clusters that we should keep provisioned and waiting for use.
+	Size int `json:"size"`
 
-	// TODO implement windows of time
+	// TODO: implement windows of time in which the Size may be bigger or smaller.
 
 	// DeleteAfter is a duration of time after the ClusterDeployment's creationTimestamp when we should delete the
 	// cluster. Stored as an annotation on the ClusterDeployment and maybe adjusted and thus overridden by users who
 	// obtain a lease to the cluster.
 	// +optional
-	DeleteAfter *metav1.Time `json:"deleteAfter,omitempty"`
+	DeleteAfter *metav1.Duration `json:"deleteAfter,omitempty"`
 }
 
 // ClusterLeasePoolStatus defines the observed state of ClusterLeasePool

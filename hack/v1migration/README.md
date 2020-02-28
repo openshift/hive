@@ -4,8 +4,10 @@
   1. Create a cluster deployment and wait for completion.
   1. Run `oc patch hiveconfig hive --type='merge' -p $'spec:\n maintenanceMode: true'`
   1. Run `./hack/v1migration/scaledown.sh hive-operator` to scale down Hive operator.
+  1. Run `./hack/v1migration/delete_hive_jobs.sh` to delete any outstanding Hive jobs (imageset, install, uninstall).
+  1. Run `./hack/v1migration/save.sh [workdir]` to backup all data to disk.
   1. Run `./hack/v1migration/remove_hiveadmission.sh` to remove the Hive validation webhooks.
-  1. Run `./hack/v1migration/delete.sh [workdir]` to backup all data to disk and remove Hive resources (CRs, CRDs, and admission webhooks).
+  1. Run `./hack/v1migration/delete.sh [workdir]` to remove Hive resources (CRs and CRDs).
   1. Deploy Hive v1.
   1. If running on a cluster that does not support cert injection, run `./hack/hiveapi-dev-certs.sh` to create the certs for the Hive aggregated API server.
   1. Run `./hack/v1migration/deploy_apiserver.sh` to enabled the Hive aggregated API server.

@@ -24,6 +24,7 @@ func main() {
 	admissionCmd.RunAdmissionServer(
 		hivevalidatingwebhooks.NewDNSZoneValidatingAdmissionHook(decoder),
 		hivevalidatingwebhooks.NewClusterDeploymentValidatingAdmissionHook(decoder),
+		hivevalidatingwebhooks.NewClusterPoolValidatingAdmissionHook(decoder),
 		hivevalidatingwebhooks.NewClusterImageSetValidatingAdmissionHook(decoder),
 		hivevalidatingwebhooks.NewClusterProvisionValidatingAdmissionHook(decoder),
 		hivevalidatingwebhooks.NewMachinePoolValidatingAdmissionHook(decoder),

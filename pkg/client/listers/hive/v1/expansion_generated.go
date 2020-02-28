@@ -30,6 +30,14 @@ type ClusterDeprovisionNamespaceListerExpansion interface{}
 // ClusterImageSetLister.
 type ClusterImageSetListerExpansion interface{}
 
+// ClusterPoolListerExpansion allows custom methods to be added to
+// ClusterPoolLister.
+type ClusterPoolListerExpansion interface{}
+
+// ClusterPoolNamespaceListerExpansion allows custom methods to be added to
+// ClusterPoolNamespaceLister.
+type ClusterPoolNamespaceListerExpansion interface{}
+
 // ClusterProvisionListerExpansion allows custom methods to be added to
 // ClusterProvisionLister.
 type ClusterProvisionListerExpansion interface{}

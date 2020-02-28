@@ -960,6 +960,7 @@ rules:
   - configmaps
   - events
   - persistentvolumeclaims
+  - namespaces
   verbs:
   - get
   - list

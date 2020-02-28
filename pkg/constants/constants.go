@@ -43,6 +43,10 @@ const (
 	// ClusterProvisionNameLabel is the label that is used to identify a relationship to a given cluster provision object.
 	ClusterProvisionNameLabel = "hive.openshift.io/cluster-provision-name"
 
+	// OriginClusterPoolNameLabel is the label that is used to signal that a cluster was originally created for a ClusterPool.
+	// It should always remain set even after a cluster is assigned to fill a request and thus removed from the pool.
+	OriginClusterPoolNameLabel = "hive.openshift.io/origin-cluster-pool-name"
+
 	// SyncSetNameLabel is the label that is used to identify a relationship to a given syncset object.
 	SyncSetNameLabel = "hive.openshift.io/syncset-name"
 
@@ -214,6 +218,12 @@ const (
 	// RawKubeconfigSecretKey is the key we use in a Kubernetes Secret containing the raw (unmodified) form of
 	// an admin kubeconfig. (before Hive injects things such as additional CAs)
 	RawKubeconfigSecretKey = "raw-kubeconfig"
+
+	// AWSAccessKeyIDSecretKey is the key we use in a Kubernetes Secret containing AWS credentials for the access key ID.
+	AWSAccessKeyIDSecretKey = "aws_access_key_id"
+
+	// AWSSecretAccessKeySecretKey is the key we use in a Kubernetes Secret containing AWS credentials for the access key ID.
+	AWSSecretAccessKeySecretKey = "aws_secret_access_key"
 
 	// TLSCrtSecretKey is the key we use in a Kubernetes Secret containing a TLS certificate.
 	TLSCrtSecretKey = "tls.crt"

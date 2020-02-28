@@ -8,6 +8,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/constants"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	awsinstallertypes "github.com/openshift/installer/pkg/types/aws"
@@ -45,8 +46,8 @@ func (p *AWSCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"aws_access_key_id":     p.AccessKeyID,
-			"aws_secret_access_key": p.SecretAccessKey,
+			constants.AWSAccessKeyIDSecretKey:     p.AccessKeyID,
+			constants.AWSSecretAccessKeySecretKey: p.SecretAccessKey,
 		},
 	}
 }

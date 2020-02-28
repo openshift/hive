@@ -45,6 +45,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterDeprovisions().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterimagesets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterImageSets().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("clusterpools"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterPools().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterprovisions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterProvisions().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterrelocates"):

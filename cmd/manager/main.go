@@ -32,6 +32,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
 	"github.com/openshift/hive/pkg/controller/clusterdeprovision"
+	"github.com/openshift/hive/pkg/controller/clusterpool"
 	"github.com/openshift/hive/pkg/controller/clusterprovision"
 	"github.com/openshift/hive/pkg/controller/clusterrelocate"
 	"github.com/openshift/hive/pkg/controller/clusterstate"
@@ -79,6 +80,7 @@ var controllerFuncs = map[string]controllerSetupFunc{
 	syncsetinstance.ControllerName:      syncsetinstance.Add,
 	unreachable.ControllerName:          unreachable.Add,
 	velerobackup.ControllerName:         velerobackup.Add,
+	clusterpool.ControllerName:          clusterpool.Add,
 }
 
 type controllerManagerOptions struct {

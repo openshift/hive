@@ -781,7 +781,8 @@ func (in *ClusterLeasePoolSpec) DeepCopyInto(out *ClusterLeasePoolSpec) {
 	in.Platform.DeepCopyInto(&out.Platform)
 	if in.DeleteAfter != nil {
 		in, out := &in.DeleteAfter, &out.DeleteAfter
-		*out = (*in).DeepCopy()
+		*out = new(metav1.Duration)
+		**out = **in
 	}
 	return
 }

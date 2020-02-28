@@ -1,14 +1,13 @@
-package clusterversion
+package clusterleasepool
 
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/hive/pkg/apis/helpers"
 	"github.com/openshift/hive/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -59,7 +58,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to ClusterLeasePool
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterLeasePool{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -83,11 +82,10 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 	start := time.Now()
 	logger := log.WithFields(log.Fields{
 		"clusterLeasePool": request.Name,
-		"namespace":        request.Namespace,
 		"controller":       controllerName,
 	})
 
-	logger.Info("reconciling cluster lease pool")
+	logger.Infof("reconciling cluster lease pool: %v", request.Name)
 	defer func() {
 		dur := time.Since(start)
 		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
@@ -99,6 +97,7 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 	err := r.Get(context.TODO(), request.NamespacedName, clp)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			logger.Info("pool not found")
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
@@ -117,6 +116,7 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 	leaseCDs := &hivev1.ClusterDeploymentList{}
 	if err := r.Client.List(context.Background(), leaseCDs, client.MatchingLabels(map[string]string{constants.ClusterLeasePoolNameLabel: clp.Name})); err != nil {
 		logger.WithError(err).Error("error listing ClusterDeployments for lease pool")
+		return reconcile.Result{}, err
 	}
 
 	installing := 0
@@ -138,12 +138,13 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 	// If too many, delete some.
 	// TODO: improve logic here, delete oldest, or delete still installing in favor of those that are ready
 	if len(leaseCDs.Items)-deleting > clp.Spec.Size {
-		if err := r.deleteExcessClusters(clp, leaseCDs, logger); err != nil {
+		deletionsNeeded := len(leaseCDs.Items) - deleting - clp.Spec.Size
+		if err := r.deleteExcessClusters(clp, leaseCDs, deletionsNeeded, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	} else if len(leaseCDs.Items)-deleting < clp.Spec.Size {
 		// If too few, create new InstallConfig and ClusterDeployment.
-		if err := r.addClusters(clp, leaseCDs, logger); err != nil {
+		if err := r.addClusters(clp, clp.Spec.Size-len(leaseCDs.Items)+deleting, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -154,11 +155,12 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 
 func (r *ReconcileClusterLeasePool) addClusters(
 	clp *hivev1.ClusterLeasePool,
-	int newClusterCount,
+	newClusterCount int,
 	logger log.FieldLogger) error {
+	logger.Infof("Adding %d clusters", newClusterCount)
 
 	for i := 0; i < newClusterCount; i++ {
-		if err := createCluster(clp, logger); err != nil {
+		if err := r.createCluster(clp, logger); err != nil {
 			return err
 		}
 	}
@@ -172,9 +174,44 @@ func (r *ReconcileClusterLeasePool) createCluster(
 
 	ns, err := r.obtainRandomNamespace(clp)
 	if err != nil {
+		logger.WithError(err).Error("error obtaining random namespace")
 		return err
 	}
-	logger.Info("Creating new cluster in namespace: %s")
+	logger.Infof("Creating new cluster in namespace: %s", ns.Name)
+
+	var cloudPlatform string
+	var credsSecretName string
+	if clp.Spec.Platform.AWS != nil {
+		cloudPlatform = "aws"
+		credsSecretName = clp.Spec.Platform.AWS.CredentialsSecretRef.Name
+	} else if clp.Spec.Platform.GCP != nil {
+		cloudPlatform = "gcp"
+		credsSecretName = clp.Spec.Platform.GCP.CredentialsSecretRef.Name
+	} else if clp.Spec.Platform.Azure != nil {
+		cloudPlatform = "azure"
+		credsSecretName = clp.Spec.Platform.Azure.CredentialsSecretRef.Name
+	}
+
+	// Lookup the platform creds secret for this pool which we are currently assuming
+	// is in the hive namespace:
+	credsSecret := &corev1.Secret{}
+	if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: constants.HiveNamespace, Name: credsSecretName}, credsSecret); err != nil {
+		logger.WithError(err).Error("error looking up credentials secret for pool in hive namespace")
+		return err
+	}
+
+	// Copy the secret to the target namespace:
+	clusterCredsSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      apihelpers.GetResourceName(ns.Name, "cloud-creds"),
+			Namespace: ns.Name,
+		},
+		Data: credsSecret.Data,
+	}
+	if err := r.Client.Create(context.Background(), clusterCredsSecret); err != nil {
+		logger.WithError(err).Error("error copying cloud creds secret to cluster namespace")
+		return err
+	}
 
 	// We will use this unique random namespace name for our cluster name.
 
@@ -182,14 +219,19 @@ func (r *ReconcileClusterLeasePool) createCluster(
 		Name:        ns.Name,
 		Namespace:   ns.Name,
 		BaseDomain:  clp.Spec.BaseDomain,
-		DeleteAfter: clp.Spec.DeleteAfter.String(),
+		DeleteAfter: clp.Spec.DeleteAfter.Duration.String(),
+		Cloud:       cloudPlatform,
+		CredsSecret: clusterCredsSecret.Name,
+		// TODO:
+		ReleaseImage: "quay.io/openshift-release-dev/ocp-release:4.3.3-x86_64",
+		ClusterLabels: map[string]string{
+			constants.ClusterLeasePoolNameLabel: clp.Name,
+		},
 	}
-	if clp.Spec.Platform.AWS != nil {
-		createOpts.Cloud = "aws"
-	} else if clp.Spec.Platform.GCP != nil {
-		createOpts.Cloud = "gcp"
-	} else if clp.Spec.Platform.Azure != nil {
-		createOpts.Cloud = "azure"
+
+	if err := createOpts.Run(); err != nil {
+		logger.WithError(err).Error("error creating cluster artifacts")
+		return err
 	}
 
 	return nil
@@ -209,18 +251,16 @@ func (r *ReconcileClusterLeasePool) obtainRandomNamespace(clp *hivev1.ClusterLea
 	return ns, err
 }
 
-func syncSetInstanceNameForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyncSet *hivev1.SelectorSyncSet) string {
-}
-
 func (r *ReconcileClusterLeasePool) deleteExcessClusters(
 	clp *hivev1.ClusterLeasePool,
 	leaseCDs *hivev1.ClusterDeploymentList,
+	deletionsNeeded int,
 	logger log.FieldLogger) error {
 
-	logger.Info("too many clusters, searching for some to delete")
-	deletionsNeeded := len(leaseCD.Items) - deleting - clp.Spec.Size
+	logger.Infof("too many clusters, searching for %d to delete", deletionsNeeded)
+	counter := 0
 	for _, cd := range leaseCDs.Items {
-		cdLog := logger.WithField("cluster", fmd.Sprintf("%s/%s", cd.Namespace, cd.Name))
+		cdLog := logger.WithField("cluster", fmt.Sprintf("%s/%s", cd.Namespace, cd.Name))
 		if cd.DeletionTimestamp != nil {
 			cdLog.WithFields(log.Fields{"cdName": cd.Name, "cdNamespace": cd.Namespace}).Debug("cluster already deleting")
 			continue
@@ -230,10 +270,10 @@ func (r *ReconcileClusterLeasePool) deleteExcessClusters(
 			cdLog.WithError(err).Error("error deleting cluster deployment")
 			return err
 		}
-		deletionsNeeded -= 1
-		if deletionsNeeded == 0 {
-			cdLog.Info("no more deletions required")
-			continue
+		counter += 1
+		if counter == deletionsNeeded {
+			logger.Info("no more deletions required")
+			break
 		}
 	}
 	return nil

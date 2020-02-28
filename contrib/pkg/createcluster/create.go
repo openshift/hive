@@ -135,6 +135,7 @@ type Options struct {
 	AdoptClusterID           string
 	AdoptAdminUsername       string
 	AdoptAdminPassword       string
+	ClusterLabels            map[string]string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -379,7 +380,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		return nil, err
 	}
 
-	cd, err := o.GenerateClusterDeployment(pullSecretSecret, sshPrivateKeySecret)
+	cd, err := o.GenerateClusterDeployment(pullSecretSecret, sshPrivateKeySecret, o.ClusterLabels)
 	if err != nil {
 		return nil, err
 	}
@@ -754,7 +755,7 @@ func (o *Options) generateManifestsConfigMap() (*corev1.ConfigMap, error) {
 }
 
 // GenerateClusterDeployment generates a new cluster deployment
-func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivateKeySecret *corev1.Secret) (*hivev1.ClusterDeployment, error) {
+func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivateKeySecret *corev1.Secret, labels map[string]string) (*hivev1.ClusterDeployment, error) {
 	cd := &hivev1.ClusterDeployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterDeployment",
@@ -774,6 +775,10 @@ func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivat
 			ManageDNS:    o.ManageDNS,
 			Provisioning: &hivev1.Provisioning{},
 		},
+	}
+
+	for k, v := range labels {
+		cd.Labels[k] = v
 	}
 
 	if sshPrivateKeySecret != nil {

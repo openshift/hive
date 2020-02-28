@@ -352,6 +352,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cdLog.Debugf("found delete after annotation: %s", deleteAfter)
 		dur, err := time.ParseDuration(deleteAfter)
 		if err != nil {
+			cdLog.WithError(err).Errorf("error parsing %s as a duration", deleteAfterAnnotation)
 			return reconcile.Result{}, fmt.Errorf("error parsing %s as a duration: %v", deleteAfterAnnotation, err)
 		}
 		if !cd.CreationTimestamp.IsZero() {

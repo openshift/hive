@@ -41,7 +41,7 @@ type ClusterLeasePoolStatus struct {
 // ClusterLeasePool represents a pool of clusters that should be kept ready to be leased out to users.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=clusterleasepool,shortName=clp
+// +kubebuilder:resource:path=clusterleasepools,shortName=clp
 type ClusterLeasePool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

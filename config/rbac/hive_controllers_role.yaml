@@ -24,6 +24,7 @@ rules:
   - configmaps
   - events
   - persistentvolumeclaims
+  - namespaces
   verbs:
   - get
   - list
@@ -291,3 +292,16 @@ rules:
   - backups
   verbs:
   - create
+- apiGroups:
+    - hive.openshift.io
+  resources:
+    - clusterleasepools
+    - clusterleasepools/status
+  verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete

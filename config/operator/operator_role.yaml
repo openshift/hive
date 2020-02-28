@@ -88,6 +88,8 @@ rules:
   - clusterdeprovisionrequests
   - clusterstates
   - clusterstates/status
+  - clusterleasepools
+  - clusterleasepools/status
   verbs:
   - get
   - list

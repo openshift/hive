@@ -643,7 +643,7 @@ func (o *Options) getSSHPublicKey() (string, error) {
 	}
 
 	log.Error("Cannot determine SSH key to use")
-	return "", fmt.Errorf("no ssh key")
+	return "", nil
 }
 
 func (o *Options) getSSHPrivateKey() (string, error) {

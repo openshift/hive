@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 )
 
@@ -105,6 +106,9 @@ type Builder struct {
 
 	// MachineNetwork is the subnet to use for the cluster's machine network.
 	MachineNetwork string
+
+	// ClusterPool is an optional reference to a ClusterPool this ClusterDeployment is a part of.
+	ClusterPool types.NamespacedName
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -154,7 +158,6 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	}
 
 	var allObjects []runtime.Object
-	allObjects = append(allObjects, o.generateClusterDeployment())
 	allObjects = append(allObjects, o.generateMachinePool())
 	installConfigSecret, err := o.generateInstallConfigSecret()
 	if err != nil {
@@ -192,6 +195,8 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 			allObjects = append(allObjects, o.generateAdoptedAdminPasswordSecret())
 		}
 	}
+
+	allObjects = append(allObjects, o.generateClusterDeployment())
 
 	return allObjects, nil
 }
@@ -275,6 +280,14 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
 	} else if o.ImageSet != "" {
 		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: o.ImageSet}
+	}
+
+	if o.ClusterPool.Name != "" {
+		cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+			Namespace: o.ClusterPool.Namespace,
+			Name:      o.ClusterPool.Name,
+			State:     hivev1.ClusterPoolStateUnclaimed,
+		}
 	}
 
 	cd.Spec.Provisioning.InstallConfigSecretRef = corev1.LocalObjectReference{Name: o.getInstallConfigSecretName()}

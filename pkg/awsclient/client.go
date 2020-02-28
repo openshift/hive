@@ -32,11 +32,6 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
-const (
-	awsCredsSecretIDKey     = "aws_access_key_id"
-	awsCredsSecretAccessKey = "aws_secret_access_key"
-)
-
 var (
 	metricAWSAPICalls = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -310,15 +305,16 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 
 	// Special case to not use a secret to gather credentials.
 	if secret != nil {
-		accessKeyID, ok := secret.Data[awsCredsSecretIDKey]
+		accessKeyID, ok := secret.Data[constants.AWSAccessKeyIDSecretKey]
 		if !ok {
 			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secret.Name, awsCredsSecretIDKey)
+				secret.Name, constants.AWSAccessKeyIDSecretKey)
 		}
-		secretAccessKey, ok := secret.Data[awsCredsSecretAccessKey]
+		secretAccessKey, ok := secret.Data[constants.AWSSecretAccessKeySecretKey]
 		if !ok {
 			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secret.Name, awsCredsSecretAccessKey)
+				secret.Name, constants.AWSSecretAccessKeySecretKey)
+
 		}
 
 		awsConfig.Credentials = credentials.NewStaticCredentials(

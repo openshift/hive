@@ -14,6 +14,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	azureclient "github.com/openshift/hive/pkg/azureclient"
+	"github.com/openshift/hive/pkg/constants"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -88,8 +89,8 @@ var (
 				Namespace: "ns",
 			},
 			Data: map[string][]byte{
-				"aws_access_key_id":     []byte("notrealaccesskey"),
-				"aws_secret_access_key": []byte("notrealsecretaccesskey"),
+				constants.AWSAccessKeyIDSecretKey:     []byte("notrealaccesskey"),
+				constants.AWSSecretAccessKeySecretKey: []byte("notrealsecretaccesskey"),
 			},
 		}
 	}

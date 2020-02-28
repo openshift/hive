@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
+	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -247,13 +247,42 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
+	allErrs = validateClusterPlatform(specPath, newObject.Spec.Platform, allErrs)
+	allErrs = validateCanManageDNSForClusterPlatform(specPath, newObject.Spec, allErrs)
+
+	if newObject.Spec.Provisioning != nil {
+		if newObject.Spec.Provisioning.SSHPrivateKeySecretRef != nil && newObject.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
+		}
+	}
+
+	if newObject.Spec.ClusterPoolRef != nil {
+		if newObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateClaimed {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "state"), newObject.Spec.ClusterPoolRef.State, "cannot create a ClusterDeployment that is already in claimed state"))
+		}
+	}
+
+	if len(allErrs) > 0 {
+		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &status,
+		}
+	}
+
+	// If we get here, then all checks passed, so the object is valid.
+	contextLogger.Info("Successful validation")
+	return &admissionv1beta1.AdmissionResponse{
+		Allowed: true,
+	}
+}
+
+func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, allErrs field.ErrorList) field.ErrorList {
 	platformPath := specPath.Child("platform")
 	numberOfPlatforms := 0
-	canManageDNS := false
-	if newObject.Spec.Platform.AWS != nil {
+	if platform.AWS != nil {
 		numberOfPlatforms++
-		canManageDNS = true
-		aws := newObject.Spec.Platform.AWS
+		aws := platform.AWS
 		awsPath := platformPath.Child("aws")
 		if aws.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsSecretRef", "name"), "must specify secrets for AWS access"))
@@ -262,10 +291,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
 		}
 	}
-	if newObject.Spec.Platform.Azure != nil {
+	if platform.Azure != nil {
 		numberOfPlatforms++
-		canManageDNS = true
-		azure := newObject.Spec.Platform.Azure
+		azure := platform.Azure
 		azurePath := platformPath.Child("azure")
 		if azure.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(azurePath.Child("credentialsSecretRef", "name"), "must specify secrets for Azure access"))
@@ -277,10 +305,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
 		}
 	}
-	if newObject.Spec.Platform.GCP != nil {
+	if platform.GCP != nil {
 		numberOfPlatforms++
-		canManageDNS = true
-		gcp := newObject.Spec.Platform.GCP
+		gcp := platform.GCP
 		gcpPath := platformPath.Child("gcp")
 		if gcp.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("credentialsSecretRef", "name"), "must specify secrets for GCP access"))
@@ -289,9 +316,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
 		}
 	}
-	if newObject.Spec.Platform.OpenStack != nil {
+	if platform.OpenStack != nil {
 		numberOfPlatforms++
-		openstack := newObject.Spec.Platform.OpenStack
+		openstack := platform.OpenStack
 		openstackPath := platformPath.Child("openStack")
 		if openstack.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(openstackPath.Child("credentialsSecretRef", "name"), "must specify secrets for OpenStack access"))
@@ -300,9 +327,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
 		}
 	}
-	if newObject.Spec.Platform.VSphere != nil {
+	if platform.VSphere != nil {
 		numberOfPlatforms++
-		vsphere := newObject.Spec.Platform.VSphere
+		vsphere := platform.VSphere
 		vspherePath := platformPath.Child("vsphere")
 		if vsphere.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
@@ -320,38 +347,33 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
 		}
 	}
-	if newObject.Spec.Platform.BareMetal != nil {
+	if platform.BareMetal != nil {
 		numberOfPlatforms++
 	}
 	switch {
 	case numberOfPlatforms == 0:
 		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))
 	case numberOfPlatforms > 1:
-		allErrs = append(allErrs, field.Invalid(platformPath, newObject.Spec.Platform, "must specify only a single platform"))
+		allErrs = append(allErrs, field.Invalid(platformPath, platform, "must specify only a single platform"))
 	}
-	if !canManageDNS && newObject.Spec.ManageDNS {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), newObject.Spec.ManageDNS, "cannot manage DNS for the selected platform"))
-	}
+	return allErrs
+}
 
-	if newObject.Spec.Provisioning != nil {
-		if newObject.Spec.Provisioning.SSHPrivateKeySecretRef != nil && newObject.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
-		}
+func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.ClusterDeploymentSpec, allErrs field.ErrorList) field.ErrorList {
+	canManageDNS := false
+	if spec.Platform.AWS != nil {
+		canManageDNS = true
 	}
-
-	if len(allErrs) > 0 {
-		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result:  &status,
-		}
+	if spec.Platform.Azure != nil {
+		canManageDNS = true
 	}
-
-	// If we get here, then all checks passed, so the object is valid.
-	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
-		Allowed: true,
+	if spec.Platform.GCP != nil {
+		canManageDNS = true
 	}
+	if !canManageDNS && spec.ManageDNS {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), spec.ManageDNS, "cannot manage DNS for the selected platform"))
+	}
+	return allErrs
 }
 
 // validateUpdate specifically validates update operations for ClusterDeployment objects.
@@ -443,6 +465,21 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		if oldObject.Spec.Installed {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
 		}
+	}
+
+	// Validate the ClusterPoolRef:
+	if oldObject.Spec.ClusterPoolRef != nil {
+		if newObject.Spec.ClusterPoolRef == nil {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newObject.Spec.ClusterPoolRef, "cannot remove clusterPoolRef"))
+		} else {
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterPoolRef.Namespace, oldObject.Spec.ClusterPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterPoolRef.Name, oldObject.Spec.ClusterPoolRef.Name, specPath.Child("clusterPoolRef", "name"))...)
+			if newObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateUnclaimed && oldObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateClaimed {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "state"), newObject.Spec.ClusterPoolRef.State, "cannot move state from claimed back to unclaimed"))
+			}
+		}
+	} else if newObject.Spec.ClusterPoolRef != nil {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newObject.Spec.ClusterPoolRef, "cannot add clusterPoolRef"))
 	}
 
 	if len(allErrs) > 0 {

@@ -10,6 +10,8 @@ type ClusterDeprovisionExpansion interface{}
 
 type ClusterImageSetExpansion interface{}
 
+type ClusterLeasePoolExpansion interface{}
+
 type ClusterProvisionExpansion interface{}
 
 type ClusterStateExpansion interface{}

@@ -28,6 +28,10 @@ func (c *FakeHiveV1) ClusterImageSets() v1.ClusterImageSetInterface {
 	return &FakeClusterImageSets{c}
 }
 
+func (c *FakeHiveV1) ClusterLeasePools() v1.ClusterLeasePoolInterface {
+	return &FakeClusterLeasePools{c}
+}
+
 func (c *FakeHiveV1) ClusterProvisions(namespace string) v1.ClusterProvisionInterface {
 	return &FakeClusterProvisions{c, namespace}
 }

@@ -99,5 +99,8 @@ func (p *azureCloudProvider) addPlatformDetails(
 }
 
 func (p *azureCloudProvider) credsSecretName(o *Options) string {
+	if o.CredsSecret != "" {
+		return o.CredsSecret
+	}
 	return fmt.Sprintf("%s-azure-creds", o.Name)
 }

@@ -112,6 +112,7 @@ type Options struct {
 	PullSecretFile           string
 	Cloud                    string
 	CredsFile                string
+	CredsSecret              string
 	ClusterImageSet          string
 	ReleaseImage             string
 	ReleaseImageSource       string
@@ -194,6 +195,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
+	flags.StringVar(&opt.CredsSecret, "creds-secret", "", "Pre-existing cloud credentials secret in the target namespace to use.")
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
@@ -484,11 +486,14 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			result = append(result, pullSecretSecret)
 		}
 
-		creds, err := o.cloudProvider.generateCredentialsSecret(o)
-		if err != nil {
-			return nil, err
+		// If the user provided a pre-existing creds secret we can skip this step.
+		if o.CredsSecret == "" {
+			creds, err := o.cloudProvider.generateCredentialsSecret(o)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, creds)
 		}
-		result = append(result, creds)
 
 		if sshPrivateKeySecret != nil {
 			result = append(result, sshPrivateKeySecret)

@@ -100,5 +100,8 @@ func (p *awsCloudProvider) addPlatformDetails(
 }
 
 func (p *awsCloudProvider) credsSecretName(o *Options) string {
+	if o.CredsSecret != "" {
+		return o.CredsSecret
+	}
 	return fmt.Sprintf("%s-aws-creds", o.Name)
 }

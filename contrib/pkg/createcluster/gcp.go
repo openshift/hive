@@ -93,5 +93,8 @@ func (p *gcpCloudProvider) addPlatformDetails(
 }
 
 func (p *gcpCloudProvider) credsSecretName(o *Options) string {
+	if o.CredsSecret != "" {
+		return o.CredsSecret
+	}
 	return fmt.Sprintf("%s-gcp-creds", o.Name)
 }

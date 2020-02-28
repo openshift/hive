@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -78,6 +80,13 @@ func (o *RestoreOwnerRefsOptions) Run() error {
 		return errors.Wrap(err, "could not open owner refs file")
 	}
 	defer file.Close()
+	logger := log.StandardLogger()
+	ownerRefChan := make(chan ownerRef)
+	var processWG sync.WaitGroup
+	for i := 0; i < runtime.NumCPU(); i++ {
+		processWG.Add(1)
+		go processOwnerRefs(client, ownerRefChan, &processWG, logger)
+	}
 	decoder := json.NewDecoder(bufio.NewReader(file))
 	for {
 		var ref ownerRef
@@ -87,6 +96,16 @@ func (o *RestoreOwnerRefsOptions) Run() error {
 			}
 			return errors.Wrap(err, "could not decode JSON from file")
 		}
+		ownerRefChan <- ref
+	}
+	close(ownerRefChan)
+	processWG.Wait()
+	return nil
+}
+
+func processOwnerRefs(client dynamic.Interface, ownerRefChan chan ownerRef, wg *sync.WaitGroup, logger log.FieldLogger) {
+	defer wg.Done()
+	for ref := range ownerRefChan {
 		logger := log.WithField("resource", ref.Resource).WithField("name", ref.Name)
 		if ref.Namespace != "" {
 			logger = logger.WithField("namespace", ref.Namespace)
@@ -118,7 +137,6 @@ func (o *RestoreOwnerRefsOptions) Run() error {
 			logger.Info("owner reference already restored")
 		}
 	}
-	return nil
 }
 
 func ownedClient(client dynamic.Interface, ref ownerRef) dynamic.ResourceInterface {

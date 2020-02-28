@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"runtime"
+	"sync"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -73,6 +75,13 @@ func (o *RecreateObjectsOptions) Run() error {
 		errors.Wrap(err, "could not open the JSON file")
 	}
 	defer file.Close()
+	logger := log.StandardLogger()
+	objChan := make(chan *unstructured.Unstructured)
+	var recreateWG sync.WaitGroup
+	for i := 0; i < runtime.NumCPU(); i++ {
+		recreateWG.Add(1)
+		go recreateObjects(client, objChan, &recreateWG, logger)
+	}
 	decoder := json.NewDecoder(bufio.NewReader(file))
 	for {
 		var objFromFile unstructured.Unstructured
@@ -82,58 +91,63 @@ func (o *RecreateObjectsOptions) Run() error {
 			}
 			return errors.Wrap(err, "could not decode JSON from file")
 		}
-		o.recreateObject(client, &objFromFile)
+		objChan <- &objFromFile
 	}
+	close(objChan)
+	recreateWG.Wait()
 	return nil
 }
 
-func (o *RecreateObjectsOptions) recreateObject(client dynamic.Interface, objFromFile *unstructured.Unstructured) {
-	apiVersion := objFromFile.GetAPIVersion()
-	kind := objFromFile.GetKind()
-	namespace := objFromFile.GetNamespace()
-	name := objFromFile.GetName()
-	logger := log.WithFields(log.Fields{
-		"apiVersion": apiVersion,
-		"kind":       kind,
-		"name":       name,
-	})
-	if namespace != "" {
-		logger = logger.WithField("namespace", namespace)
+func recreateObjects(client dynamic.Interface, objChan chan *unstructured.Unstructured, wg *sync.WaitGroup, logger log.FieldLogger) {
+	defer wg.Done()
+	for objFromFile := range objChan {
+		apiVersion := objFromFile.GetAPIVersion()
+		kind := objFromFile.GetKind()
+		namespace := objFromFile.GetNamespace()
+		name := objFromFile.GetName()
+		logger := log.WithFields(log.Fields{
+			"apiVersion": apiVersion,
+			"kind":       kind,
+			"name":       name,
+		})
+		if namespace != "" {
+			logger = logger.WithField("namespace", namespace)
+		}
+		if apiVersion != hivev1alpha1.SchemeGroupVersion.String() {
+			logger.Warn("object in JSON file is not a Hive v1alpha1 resource")
+			continue
+		}
+		switch kind {
+		case "DNSEndpoint":
+			logger.Info("re-creation skipped since not used in v1")
+			continue
+		case "HiveConfig":
+			logger.Info("re-creation skipped since HiveConfig has already been restored")
+			continue
+		}
+		gvr := hivev1alpha1.SchemeGroupVersion.WithResource(resourceForHiveKind(kind))
+		var resourceClient dynamic.ResourceInterface
+		if namespace != "" {
+			resourceClient = client.Resource(gvr).Namespace(namespace)
+		} else {
+			resourceClient = client.Resource(gvr)
+		}
+		clearResourceVersion(objFromFile)
+		removeHiveOwnerReferences(objFromFile)
+		removeKubectlLastAppliedAnnotation(objFromFile)
+		newObj, err := resourceClient.Create(objFromFile, metav1.CreateOptions{})
+		if err != nil {
+			logger.WithError(err).Error("could not create object")
+			continue
+		}
+		objFromFile.SetUID(newObj.GetUID())
+		objFromFile.SetResourceVersion(newObj.GetResourceVersion())
+		if _, err := resourceClient.Update(objFromFile, metav1.UpdateOptions{}); err != nil {
+			logger.WithError(err).Error("could not update re-created object with status")
+			continue
+		}
+		logger.Info("created object")
 	}
-	if apiVersion != hivev1alpha1.SchemeGroupVersion.String() {
-		logger.Warn("object in JSON file is not a Hive v1alpha1 resource")
-		return
-	}
-	switch kind {
-	case "DNSEndpoint":
-		logger.Info("re-creation skipped since not used in v1")
-		return
-	case "HiveConfig":
-		logger.Info("re-creation skipped since HiveConfig has already been restored")
-		return
-	}
-	gvr := hivev1alpha1.SchemeGroupVersion.WithResource(resourceForHiveKind(kind))
-	var resourceClient dynamic.ResourceInterface
-	if namespace != "" {
-		resourceClient = client.Resource(gvr).Namespace(namespace)
-	} else {
-		resourceClient = client.Resource(gvr)
-	}
-	clearResourceVersion(objFromFile)
-	removeHiveOwnerReferences(objFromFile)
-	removeKubectlLastAppliedAnnotation(objFromFile)
-	newObj, err := resourceClient.Create(objFromFile, metav1.CreateOptions{})
-	if err != nil {
-		logger.WithError(err).Error("could not create object")
-		return
-	}
-	objFromFile.SetUID(newObj.GetUID())
-	objFromFile.SetResourceVersion(newObj.GetResourceVersion())
-	if _, err := resourceClient.Update(objFromFile, metav1.UpdateOptions{}); err != nil {
-		logger.WithError(err).Error("could not update re-created object with status")
-		return
-	}
-	logger.Info("created object")
 }
 
 func clearResourceVersion(obj *unstructured.Unstructured) {

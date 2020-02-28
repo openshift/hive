@@ -2,7 +2,13 @@ package clusterversion
 
 import (
 	"context"
+	"fmt"
+	"github.com/openshift/hive/pkg/apis/helpers"
 	"github.com/openshift/hive/pkg/constants"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,6 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/openshift/hive/contrib/pkg/createcluster"
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -135,7 +143,7 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 		}
 	} else if len(leaseCDs.Items)-deleting < clp.Spec.Size {
 		// If too few, create new InstallConfig and ClusterDeployment.
-		if err := r.createNewClusters(clp, leaseCDs, logger); err != nil {
+		if err := r.addClusters(clp, leaseCDs, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -144,11 +152,64 @@ func (r *ReconcileClusterLeasePool) Reconcile(request reconcile.Request) (reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterLeasePool) createNewClusters(
+func (r *ReconcileClusterLeasePool) addClusters(
 	clp *hivev1.ClusterLeasePool,
-	leaseCDs *hivev1.ClusterDeploymentList,
+	int newClusterCount,
 	logger log.FieldLogger) error {
+
+	for i := 0; i < newClusterCount; i++ {
+		if err := createCluster(clp, logger); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (r *ReconcileClusterLeasePool) createCluster(
+	clp *hivev1.ClusterLeasePool,
+	logger log.FieldLogger) error {
+
+	ns, err := r.obtainRandomNamespace(clp)
+	if err != nil {
+		return err
+	}
+	logger.Info("Creating new cluster in namespace: %s")
+
+	// We will use this unique random namespace name for our cluster name.
+
+	createOpts := &createcluster.Options{
+		Name:        ns.Name,
+		Namespace:   ns.Name,
+		BaseDomain:  clp.Spec.BaseDomain,
+		DeleteAfter: clp.Spec.DeleteAfter.String(),
+	}
+	if clp.Spec.Platform.AWS != nil {
+		createOpts.Cloud = "aws"
+	} else if clp.Spec.Platform.GCP != nil {
+		createOpts.Cloud = "gcp"
+	} else if clp.Spec.Platform.Azure != nil {
+		createOpts.Cloud = "azure"
+	}
+
+	return nil
+}
+
+func (r *ReconcileClusterLeasePool) obtainRandomNamespace(clp *hivev1.ClusterLeasePool) (*corev1.Namespace, error) {
+	namespaceName := apihelpers.GetResourceName(clp.Name, utilrand.String(5))
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+			Labels: map[string]string{
+				constants.ClusterLeasePoolNameLabel: clp.Name,
+			},
+		},
+	}
+	err := r.Create(context.Background(), ns)
+	return ns, err
+}
+
+func syncSetInstanceNameForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyncSet *hivev1.SelectorSyncSet) string {
 }
 
 func (r *ReconcileClusterLeasePool) deleteExcessClusters(

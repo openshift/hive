@@ -9,10 +9,16 @@ import (
 type ClusterLeasePoolSpec struct {
 
 	// Platform encompasses the desired platform for the cluster.
+	// +required
 	Platform Platform `json:"platform"`
 
 	// Size is the default number of clusters that we should keep provisioned and waiting for use.
+	// +required
 	Size int `json:"size"`
+
+	// BaseDomain is the base domain to use for all clusters created in this pool.
+	// +required
+	BaseDomain string `json:"baseDomain"`
 
 	// TODO: implement windows of time in which the Size may be bigger or smaller.
 

@@ -243,7 +243,10 @@ func (r *ReconcileClusterLeasePool) obtainRandomNamespace(clp *hivev1.ClusterLea
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
 			Labels: map[string]string{
+				// Will be removed once assigned to a request, removing it from the pool..
 				constants.ClusterLeasePoolNameLabel: clp.Name,
+				// Should never be removed.
+				constants.OriginClusterLeasePoolNameLabel: clp.Name,
 			},
 		},
 	}

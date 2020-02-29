@@ -32,6 +32,10 @@ func (c *FakeHiveV1) ClusterLeasePools() v1.ClusterLeasePoolInterface {
 	return &FakeClusterLeasePools{c}
 }
 
+func (c *FakeHiveV1) ClusterLeaseRequests() v1.ClusterLeaseRequestInterface {
+	return &FakeClusterLeaseRequests{c}
+}
+
 func (c *FakeHiveV1) ClusterProvisions(namespace string) v1.ClusterProvisionInterface {
 	return &FakeClusterProvisions{c, namespace}
 }

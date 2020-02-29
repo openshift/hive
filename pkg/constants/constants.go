@@ -36,8 +36,17 @@ const (
 	// ClusterProvisionNameLabel is the label that is used to identify a relationship to a given cluster provision object.
 	ClusterProvisionNameLabel = "hive.openshift.io/cluster-provision-name"
 
-	// ClusterLeasePoolNameLabel is the label that is used to identify a relationship to a given cluster lease pool.
+	// ClusterLeasePoolNameLabel is the label that is used to signal that a ClusterDeployment is actively in a ClusterLeasePool.
+	// (though it still may be installing or deleting) This annotation is removed once the cluster is used to fill a request.
 	ClusterLeasePoolNameLabel = "hive.openshift.io/cluster-lease-pool-name"
+
+	// OriginClusterLeasePoolNameLabel is the label that is used to signal that a cluster was originally created for a ClusterLeasePool.
+	// It should always remain set even after a cluster is assigned to fill a request and thus removed from the pool.
+	OriginClusterLeasePoolNameLabel = "hive.openshift.io/origin-cluster-lease-pool-name"
+
+	// ClusterLeaseRequestNameLabel is the label that is used to identify that a ClusterDeployment has been assigned to
+	// fill a ClusterLeaseRequest.
+	ClusterLeaseRequestNameLabel = "hive.openshift.io/cluster-lease-request-name"
 
 	// SyncSetNameLabel is the label that is used to identify a relationship to a given syncset object.
 	SyncSetNameLabel = "hive.openshift.io/syncset-name"

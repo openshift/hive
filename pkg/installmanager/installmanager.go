@@ -378,15 +378,6 @@ func (m *InstallManager) Run() error {
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
 
-		// TODO: debugging stuff, remove it later
-		out, err := exec.Command("df", "-m").Output()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("df output:\n\n%s\n", out)
-
-		m.log.Warn("sleeping 1 hour for debugging")
-		time.Sleep(60 * time.Minute)
 		// Fetch logs from all cluster machines:
 		if m.isGatherLogsEnabled() {
 			m.gatherLogs(cd, sshKeyPath, sshAgentSetupErr)

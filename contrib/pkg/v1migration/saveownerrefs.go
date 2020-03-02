@@ -45,6 +45,7 @@ var defaultResources = []schema.GroupVersionResource{
 type SaveOwnerRefsOptions struct {
 	workDir       string
 	resourcesFile string
+	listLimit     int64
 }
 
 // NewSaveOwnerRefsCommand creates a command that executes the migration utility to save owner references to Hive resources.
@@ -72,6 +73,7 @@ func NewSaveOwnerRefsCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&opt.workDir, "work-dir", ".", "Directory in which store owner references file")
 	flags.StringVar(&opt.resourcesFile, "resources", "", "File containing the resources to look at for owner references")
+	flags.Int64Var(&opt.listLimit, "list-limit", 500, "Number of resources to fetch at a time")
 	return cmd
 }
 
@@ -111,14 +113,24 @@ func (o *SaveOwnerRefsOptions) Run() error {
 	writeWG.Add(1)
 	go writeOwnerRefsToFile(filepath.Join(o.workDir, ownerRefsFilename), ownerRefChan, &writeWG, logger)
 	for _, r := range resources {
-		objs, err := client.Resource(r).List(metav1.ListOptions{})
-		if err != nil {
-			logger.WithError(err).WithField("resource", r).Fatal("could not list resource")
-		}
-		for i := range objs.Items {
-			objChan <- objToProcess{
-				gvr: r,
-				obj: &objs.Items[i],
+		continueValue := ""
+		for {
+			objs, err := client.Resource(r).List(metav1.ListOptions{
+				Limit:    o.listLimit,
+				Continue: continueValue,
+			})
+			if err != nil {
+				logger.WithError(err).WithField("resource", r).Fatal("could not list resource")
+			}
+			for i := range objs.Items {
+				objChan <- objToProcess{
+					gvr: r,
+					obj: &objs.Items[i],
+				}
+			}
+			continueValue = objs.GetContinue()
+			if continueValue == "" {
+				break
 			}
 		}
 	}

@@ -19,6 +19,7 @@ import (
 
 // DiscoverOwnedOptions is the set of options for discovering resources with owner references to Hive resources.
 type DiscoverOwnedOptions struct {
+	listLimit int64
 }
 
 // NewDiscoverOwnedCommand creates a command that executes the migration utility to discover resources with owner
@@ -36,6 +37,8 @@ func NewDiscoverOwnedCommand() *cobra.Command {
 			}
 		},
 	}
+	flags := cmd.Flags()
+	flags.Int64Var(&opt.listLimit, "list-limit", 500, "Number of resources to fetch at a time")
 	return cmd
 }
 
@@ -69,15 +72,27 @@ func (o *DiscoverOwnedOptions) Run() error {
 				continue
 			}
 			gvr := gv.WithResource(r.Name)
-			objs, err := client.Resource(gvr).List(metav1.ListOptions{})
-			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "could not list resources %q\n", resourceList.GroupVersion))
-				continue
-			}
-			for _, obj := range objs.Items {
-				if isOwnedByHiveResource(&obj) {
-					fmt.Println(gvr)
-					break
+			keepLooking := true
+			continueValue := ""
+			for keepLooking {
+				objs, err := client.Resource(gvr).List(metav1.ListOptions{
+					Limit:    o.listLimit,
+					Continue: continueValue,
+				})
+				if err != nil {
+					errs = append(errs, errors.Wrapf(err, "could not list resources %q\n", resourceList.GroupVersion))
+					continue
+				}
+				for _, obj := range objs.Items {
+					if isOwnedByHiveResource(&obj) {
+						fmt.Println(gvr)
+						keepLooking = false
+						break
+					}
+				}
+				continueValue = objs.GetContinue()
+				if continueValue == "" {
+					keepLooking = false
 				}
 			}
 		}

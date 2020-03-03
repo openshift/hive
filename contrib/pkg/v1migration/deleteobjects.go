@@ -3,10 +3,10 @@ package v1migration
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
-	"reflect"
+	"runtime"
+	"sync"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -14,7 +14,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
 
@@ -25,7 +24,6 @@ import (
 // DeleteObjectsOptions is the set of options for the deleting Hive objects.
 type DeleteObjectsOptions struct {
 	fileName string
-	dryRun   bool
 }
 
 // NewDeleteObjectsCommand creates a command that executes the migration utility to delete Hive objects stored in a file.
@@ -50,8 +48,6 @@ func NewDeleteObjectsCommand() *cobra.Command {
 			}
 		},
 	}
-	flags := cmd.Flags()
-	flags.BoolVar(&opt.dryRun, "dry-run", false, "Whether this is a dry run")
 	return cmd
 }
 
@@ -81,6 +77,13 @@ func (o *DeleteObjectsOptions) Run() error {
 		errors.Wrap(err, "could not open the JSON file")
 	}
 	defer file.Close()
+	logger := log.StandardLogger()
+	objChan := make(chan *unstructured.Unstructured)
+	var deleteWG sync.WaitGroup
+	for i := 0; i < runtime.NumCPU(); i++ {
+		deleteWG.Add(1)
+		go deleteObjects(client, objChan, &deleteWG, logger)
+	}
 	decoder := json.NewDecoder(bufio.NewReader(file))
 	for {
 		var objFromFile unstructured.Unstructured
@@ -90,68 +93,55 @@ func (o *DeleteObjectsOptions) Run() error {
 			}
 			return errors.Wrap(err, "could not decode JSON from file")
 		}
-		o.deleteObject(client, &objFromFile)
+		objChan <- &objFromFile
 	}
+	close(objChan)
+	deleteWG.Wait()
 	return nil
 }
 
-func (o *DeleteObjectsOptions) deleteObject(client dynamic.Interface, objFromFile *unstructured.Unstructured) {
-	apiVersion := objFromFile.GetAPIVersion()
-	kind := objFromFile.GetKind()
-	namespace := objFromFile.GetNamespace()
-	name := objFromFile.GetName()
-	logger := log.WithFields(log.Fields{
-		"apiVersion": apiVersion,
-		"kind":       kind,
-		"name":       name,
-	})
-	if namespace != "" {
-		logger = logger.WithField("namespace", namespace)
-	}
-	if apiVersion != hivev1alpha1.SchemeGroupVersion.String() {
-		logger.Warn("object in JSON file is not a Hive v1alpha1 resource")
-		return
-	}
-	gvr := hivev1alpha1.SchemeGroupVersion.WithResource(resourceForHiveKind(kind))
-	var resourceClient dynamic.ResourceInterface
-	if namespace != "" {
-		resourceClient = client.Resource(gvr).Namespace(namespace)
-	} else {
-		resourceClient = client.Resource(gvr)
-	}
-	objFromKube, err := resourceClient.Get(name, metav1.GetOptions{})
-	switch {
-	case apierrors.IsNotFound(err):
-		logger.Warn("object not found")
-		return
-	case err != nil:
-		logger.WithError(err).Error("failed to get object")
-		return
-	}
+func deleteObjects(client dynamic.Interface, objChan chan *unstructured.Unstructured, wg *sync.WaitGroup, logger log.FieldLogger) {
+	defer wg.Done()
+	for objFromFile := range objChan {
+		apiVersion := objFromFile.GetAPIVersion()
+		kind := objFromFile.GetKind()
+		namespace := objFromFile.GetNamespace()
+		name := objFromFile.GetName()
+		logger := logger.WithFields(log.Fields{
+			"apiVersion": apiVersion,
+			"kind":       kind,
+			"name":       name,
+		})
+		if namespace != "" {
+			logger = logger.WithField("namespace", namespace)
+		}
+		if apiVersion != hivev1alpha1.SchemeGroupVersion.String() {
+			logger.Warn("object in JSON file is not a Hive v1alpha1 resource")
+			continue
+		}
+		gvr := hivev1alpha1.SchemeGroupVersion.WithResource(resourceForHiveKind(kind))
+		var resourceClient dynamic.ResourceInterface
+		if namespace != "" {
+			resourceClient = client.Resource(gvr).Namespace(namespace)
+		} else {
+			resourceClient = client.Resource(gvr)
+		}
+		objFromKube, err := resourceClient.Get(name, metav1.GetOptions{})
+		switch {
+		case apierrors.IsNotFound(err):
+			logger.Warn("object not found")
+			continue
+		case err != nil:
+			logger.WithError(err).Error("failed to get object")
+			continue
+		}
 
-	// Ignore owner refs and resource version when looking for diffs as some Hive objects may have been orphaned.
-	// TODO: Check changes to owner refs to ensure that the only changes are removals of references to Hive objects.
-	objFromFile.SetOwnerReferences(objFromKube.GetOwnerReferences())
-	objFromFile.SetResourceVersion(objFromKube.GetResourceVersion())
-
-	// For cluster-scoped resources, set the namespace to the empty string so that the deep equal check does not pick
-	// up a difference in the namespace. Setting to an empty string will delete the .metadata.namespace entry from the
-	// unstructured data.
-	if namespace == "" {
-		objFromFile.SetNamespace("")
-	}
-
-	if !reflect.DeepEqual(objFromFile, objFromKube) {
-		logger.Warn("object in JSON file differs from object in the cluster")
-		fmt.Printf("Diff in %s/%s (%s)\n%s\n", kind, name, namespace, diff.ObjectReflectDiff(objFromFile, objFromKube))
-	}
-	if !o.dryRun {
 		if finalizersFromKube := objFromKube.GetFinalizers(); len(finalizersFromKube) > 0 {
 			objFromKube.SetFinalizers(nil)
 			objFromKube, err = resourceClient.Update(objFromKube, metav1.UpdateOptions{})
 			if err != nil {
 				logger.WithError(err).Error("could not remove finalizers")
-				return
+				continue
 			}
 		}
 		uid := objFromKube.GetUID()
@@ -165,7 +155,7 @@ func (o *DeleteObjectsOptions) deleteObject(client dynamic.Interface, objFromFil
 		}
 		if err := resourceClient.Delete(name, deleteOptions); err != nil {
 			logger.WithError(err).Error("could not delete object")
-			return
+			continue
 		}
 		logger.Info("deleted object")
 	}

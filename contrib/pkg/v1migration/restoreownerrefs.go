@@ -1,9 +1,14 @@
 package v1migration
 
 import (
-	"io/ioutil"
+	"bufio"
+	"encoding/json"
+	"io"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -13,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"sigs.k8s.io/yaml"
 
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
@@ -71,15 +75,37 @@ func (o *RestoreOwnerRefsOptions) Run() error {
 	if err != nil {
 		return errors.Wrap(err, "could not create kube client")
 	}
-	ownerRefsData, err := ioutil.ReadFile(filepath.Join(o.workDir, ownerRefsFilename))
+	file, err := os.Open(filepath.Join(o.workDir, ownerRefsFilename))
 	if err != nil {
-		return errors.Wrap(err, "could not read owner refs file")
+		return errors.Wrap(err, "could not open owner refs file")
 	}
-	var refs []ownerRef
-	if err := yaml.Unmarshal(ownerRefsData, &refs); err != nil {
-		return errors.Wrap(err, "could not unmarshal owner refs")
+	defer file.Close()
+	logger := log.StandardLogger()
+	ownerRefChan := make(chan ownerRef)
+	var processWG sync.WaitGroup
+	for i := 0; i < runtime.NumCPU(); i++ {
+		processWG.Add(1)
+		go processOwnerRefs(client, ownerRefChan, &processWG, logger)
 	}
-	for _, ref := range refs {
+	decoder := json.NewDecoder(bufio.NewReader(file))
+	for {
+		var ref ownerRef
+		if err := decoder.Decode(&ref); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return errors.Wrap(err, "could not decode JSON from file")
+		}
+		ownerRefChan <- ref
+	}
+	close(ownerRefChan)
+	processWG.Wait()
+	return nil
+}
+
+func processOwnerRefs(client dynamic.Interface, ownerRefChan chan ownerRef, wg *sync.WaitGroup, logger log.FieldLogger) {
+	defer wg.Done()
+	for ref := range ownerRefChan {
 		logger := log.WithField("resource", ref.Resource).WithField("name", ref.Name)
 		if ref.Namespace != "" {
 			logger = logger.WithField("namespace", ref.Namespace)
@@ -111,7 +137,6 @@ func (o *RestoreOwnerRefsOptions) Run() error {
 			logger.Info("owner reference already restored")
 		}
 	}
-	return nil
 }
 
 func ownedClient(client dynamic.Interface, ref ownerRef) dynamic.ResourceInterface {

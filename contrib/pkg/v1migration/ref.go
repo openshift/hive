@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	ownerRefsFilename = "owner-refs.yaml"
+	ownerRefsFilename = "owner-refs.json"
 )
 
 type ownerRef struct {

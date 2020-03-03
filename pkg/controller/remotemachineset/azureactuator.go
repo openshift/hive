@@ -1,0 +1,117 @@
+package remotemachineset
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/Azure/go-autorest/autorest/to"
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+
+	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
+	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/azureclient"
+)
+
+// AzureActuator encapsulates the pieces necessary to be able to generate
+// a list of MachineSets to sync to the remote cluster.
+type AzureActuator struct {
+	client azureclient.Client
+	logger log.FieldLogger
+}
+
+var _ Actuator = &AzureActuator{}
+
+// NewAzureActuator is the constructor for building a AzureActuator
+func NewAzureActuator(azureCreds *corev1.Secret, logger log.FieldLogger) (*AzureActuator, error) {
+	azureClient, err := azureclient.NewClientFromSecret(azureCreds)
+	if err != nil {
+		logger.WithError(err).Warn("failed to create Azure client with creds in clusterDeployment's secret")
+		return nil, err
+	}
+	actuator := &AzureActuator{
+		client: azureClient,
+		logger: logger,
+	}
+	return actuator, nil
+}
+
+// GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
+// to sync to the remote cluster.
+func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, error) {
+	if cd.Spec.ClusterMetadata == nil {
+		return nil, errors.New("ClusterDeployment does not have cluster metadata")
+	}
+	if cd.Spec.Platform.Azure == nil {
+		return nil, errors.New("ClusterDeployment is not for Azure")
+	}
+	if pool.Spec.Platform.Azure == nil {
+		return nil, errors.New("MachinePool is not for Azure")
+	}
+
+	ic := &installertypes.InstallConfig{
+		Platform: installertypes.Platform{
+			Azure: &installertypesazure.Platform{
+				Region: cd.Spec.Platform.Azure.Region,
+			},
+		},
+	}
+
+	computePool := baseMachinePool(pool)
+	computePool.Platform.Azure = &installertypesazure.MachinePool{
+		Zones:        pool.Spec.Platform.Azure.Zones,
+		InstanceType: pool.Spec.Platform.Azure.InstanceType,
+		OSDisk: installertypesazure.OSDisk{
+			DiskSizeGB: pool.Spec.Platform.Azure.OSDisk.DiskSizeGB,
+		},
+	}
+
+	if len(computePool.Platform.Azure.Zones) == 0 {
+		zones, err := a.getZones(cd.Spec.Platform.Azure.Region, pool.Spec.Platform.Azure.InstanceType)
+		if err != nil {
+			return nil, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
+		}
+		if len(zones) == 0 {
+			return nil, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.Azure.Region)
+		}
+		computePool.Platform.Azure.Zones = zones
+	}
+
+	// The imageID parameter is not used. The image is determined by the infraID.
+	const imageID = ""
+	// The role must be "worker" so that the machines get hooked up to the existing subnet.
+	const role = "worker"
+	// The user data must be "worker-user-data" so that the machines get user data from the MCO.
+	const userData = "worker-user-data"
+
+	installerMachineSets, err := installazure.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, role, userData)
+	return installerMachineSets, errors.Wrap(err, "failed to generate machinesets")
+}
+
+func (a *AzureActuator) getZones(region string, instanceType string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	var res azureclient.ResourceSKUsPage
+	var err error
+	for res, err = a.client.ListResourceSKUs(ctx); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
+		for _, resSku := range res.Values() {
+			if strings.EqualFold(to.String(resSku.Name), instanceType) {
+				for _, locationInfo := range *resSku.LocationInfo {
+					if strings.EqualFold(to.String(locationInfo.Location), region) {
+						return *locationInfo.Zones, nil
+					}
+				}
+			}
+		}
+	}
+
+	return nil, err
+}

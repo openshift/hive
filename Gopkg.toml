@@ -22,7 +22,7 @@ required = [
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/testing_frameworks/integration", # for integration testing
-    "github.com/heptio/velero/pkg/apis/velero/v1",
+    "github.com/heptio/velero/pkg/apis/velero/v1"
 ]
 
 ignored = [
@@ -151,3 +151,7 @@ version="v1.4.7"
 [[override]]
   name = "k8s.io/code-generator"
   version="kubernetes-1.14.1"
+
+[[override]]
+  name = "sigs.k8s.io/cluster-api-provider-azure"
+  source = "github.com/openshift/cluster-api-provider-azure"

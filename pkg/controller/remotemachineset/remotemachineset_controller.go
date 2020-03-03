@@ -771,6 +771,19 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 			return nil, err
 		}
 		return NewGCPActuator(creds, logger)
+	case cd.Spec.Platform.Azure != nil:
+		creds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      cd.Spec.Platform.Azure.CredentialsSecretRef.Name,
+				Namespace: cd.Namespace,
+			},
+			creds,
+		); err != nil {
+			return nil, err
+		}
+		return NewAzureActuator(creds, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

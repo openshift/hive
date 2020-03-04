@@ -104,7 +104,7 @@ type InstallManager struct {
 	readClusterMetadata      func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword      func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
-	readInstallerLog         func(*hivev1.ClusterProvision, *InstallManager) (string, error)
+	readInstallerLog         func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
 	waitForProvisioningStage func(*hivev1.ClusterProvision, *InstallManager) error
 	isGatherLogsEnabled      func() bool
 }
@@ -242,6 +242,13 @@ func (m *InstallManager) Run() error {
 		sshKeyPaths = append(sshKeyPaths, sshKeyPath)
 	}
 
+	// By default we scrub passwords and sensitive looking text from the install log before printing to the pod log.
+	// In rare cases during debugging, a developer may want to disable this via the annotation.
+	scrubInstallLog := true
+	if disable, err := strconv.ParseBool(cd.Annotations[constants.DisableInstallLogPasswordRedactionAnnotation]); err == nil {
+		scrubInstallLog = !disable
+	}
+
 	// setup the bare metal provisioning libvirt ssh key if possible
 	if cd.Spec.Platform.BareMetal != nil {
 		libvirtSSHKeyPath, libvirtSSHAgentSetupErr := m.initSSHKey(constants.LibvirtSSHPrivKeyPathEnvVar)
@@ -269,7 +276,7 @@ func (m *InstallManager) Run() error {
 
 	m.waitForInstallerBinaries()
 
-	go m.tailFullInstallLog()
+	go m.tailFullInstallLog(scrubInstallLog)
 
 	m.log.Info("copying install-config.yaml")
 	icData, err := ioutil.ReadFile(m.InstallConfigMountPath)
@@ -308,7 +315,7 @@ func (m *InstallManager) Run() error {
 	m.log.Info("generating assets")
 	if err := m.generateAssets(provision); err != nil {
 		m.log.Info("reading installer log")
-		installLog, readErr := m.readInstallerLog(provision, m)
+		installLog, readErr := m.readInstallerLog(provision, m, scrubInstallLog)
 		if readErr != nil {
 			m.log.WithError(readErr).Error("error reading asset generation log")
 			return err
@@ -378,6 +385,18 @@ func (m *InstallManager) Run() error {
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
 
+		if pauseDur, ok := cd.Annotations[constants.PauseOnInstallFailureAnnotation]; ok {
+			m.log.Infof("pausing on failure due to annotation %s=%s", constants.PauseOnInstallFailureAnnotation,
+				pauseDur)
+			dur, err := time.ParseDuration(pauseDur)
+			if err != nil {
+				// Not a fatal error.
+				m.log.WithError(err).WithField("pauseDuration", pauseDur).Warn("error parsing pause duration, skipping pause")
+			} else {
+				time.Sleep(dur)
+			}
+		}
+
 		// Fetch logs from all cluster machines:
 		if m.isGatherLogsEnabled() {
 			m.gatherLogs(cd, sshKeyPath, sshAgentSetupErr)
@@ -393,7 +412,7 @@ func (m *InstallManager) Run() error {
 		}
 	}
 
-	if installLog, err := m.readInstallerLog(provision, m); err == nil {
+	if installLog, err := m.readInstallerLog(provision, m, scrubInstallLog); err == nil {
 		if err := m.updateClusterProvision(
 			provision,
 			m,
@@ -634,7 +653,7 @@ func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 
 // tailFullInstallLog streams the full install log to standard out so that
 // the log can be seen from the pods logs.
-func (m *InstallManager) tailFullInstallLog() {
+func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 	logfileName := filepath.Join(m.WorkDir, installerFullLogFile)
 	m.waitForFiles([]string{logfileName})
 
@@ -674,8 +693,12 @@ func (m *InstallManager) tailFullInstallLog() {
 			continue
 		}
 
-		cleanLine := cleanupLogOutput(fullLine)
-		fmt.Println(cleanLine)
+		if scrubInstallLog {
+			cleanLine := cleanupLogOutput(fullLine)
+			fmt.Println(cleanLine)
+		} else {
+			fmt.Println(fullLine)
+		}
 		// clear out the line buffer so we can start again
 		fullLine = ""
 	}
@@ -885,7 +908,7 @@ func (m *InstallManager) initSSHAgent(sshKeyPaths []string) (func(), error) {
 	return sshAgentCleanup, nil
 }
 
-func readInstallerLog(provision *hivev1.ClusterProvision, m *InstallManager) (string, error) {
+func readInstallerLog(provision *hivev1.ClusterProvision, m *InstallManager, scrubInstallLog bool) (string, error) {
 	m.log.Infoln("saving installer output")
 
 	if _, err := os.Stat(installerConsoleLogFilePath); os.IsNotExist(err) {
@@ -899,11 +922,14 @@ func readInstallerLog(provision *hivev1.ClusterProvision, m *InstallManager) (st
 		return "", err
 	}
 
-	logWithoutSensitiveData := cleanupLogOutput(string(logBytes))
+	consoleLog := string(logBytes)
+	if scrubInstallLog {
+		consoleLog = cleanupLogOutput(consoleLog)
+	}
 
-	m.log.Debugf("installer console log: %v", logWithoutSensitiveData)
+	m.log.Debugf("installer console log: %v", consoleLog)
 
-	return logWithoutSensitiveData, nil
+	return consoleLog, nil
 }
 
 func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment, newSSHPrivKeyPath string) error {

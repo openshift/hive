@@ -1546,11 +1546,6 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 		*out = new(gcp.MachinePool)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.BareMetal != nil {
-		in, out := &in.BareMetal, &out.BareMetal
-		*out = new(baremetal.MachinePool)
-		**out = **in
-	}
 	return
 }
 

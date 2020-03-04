@@ -6,7 +6,6 @@ import (
 
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
-	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 )
 
@@ -64,8 +63,6 @@ type MachinePoolPlatform struct {
 	Azure *azure.MachinePool `json:"azure,omitempty"`
 	// GCP is the configuration used when installing on GCP.
 	GCP *gcp.MachinePool `json:"gcp,omitempty"`
-	// BareMetal is the configuration used when installing on bare metal.
-	BareMetal *baremetal.MachinePool `json:"bareMetal,omitempty"`
 }
 
 // MachinePoolStatus defines the observed state of MachinePool

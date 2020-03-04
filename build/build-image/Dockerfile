@@ -23,7 +23,7 @@ RUN export version=1.0.8 && \
 RUN mkdir -p /go && chgrp -R root /go && chmod -R g+rwX /go
 
 RUN export GOLANGCI_LINT_VERSION=v1.17.1 &&\
-    curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s $(GOLANGCI_LINT_VERSION) && \
+    curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s ${GOLANGCI_LINT_VERSION} && \
     mv ./bin/golangci-lint /usr/local/bin/golangci-lint
 
 RUN go get -u github.com/golang/mock/mockgen

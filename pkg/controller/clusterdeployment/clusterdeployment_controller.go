@@ -66,10 +66,10 @@ const (
 
 	platformAWS       = "aws"
 	platformAzure     = "azure"
-	platformGCP       = "GCP"
+	platformGCP       = "hcp"
 	platformBaremetal = "baremetal"
-	platformUnknown   = "unknown platform"
-	regionUnknown     = "unknown region"
+	platformUnknown   = "unknown"
+	regionUnknown     = "unknown"
 )
 
 var (
@@ -363,7 +363,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster region label")
 		}
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, err
 	}
 
 	if cd.DeletionTimestamp != nil {

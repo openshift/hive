@@ -333,7 +333,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "invalid AWS volume IOPS",
 			provision: func() *hivev1.MachinePool {
 				pool := testAWSMachinePool()
-				pool.Spec.Platform.AWS.EC2RootVolume.IOPS = 0
+				pool.Spec.Platform.AWS.EC2RootVolume.IOPS = -1
 				return pool
 			}(),
 		},
@@ -341,7 +341,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "invalid AWS volume size",
 			provision: func() *hivev1.MachinePool {
 				pool := testAWSMachinePool()
-				pool.Spec.Platform.AWS.EC2RootVolume.Size = 0
+				pool.Spec.Platform.AWS.EC2RootVolume.Size = -1
 				return pool
 			}(),
 		},

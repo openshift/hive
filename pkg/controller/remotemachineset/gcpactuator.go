@@ -208,26 +208,23 @@ func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDe
 	err := a.client.List(context.TODO(), leases, client.InNamespace(pool.Namespace),
 		client.MatchingLabels(map[string]string{
 			constants.ClusterDeploymentNameLabel: cd.Name,
-			constants.MachinePoolNameLabel:       pool.Name,
 		}))
 	if err != nil {
 		return "", false, err
 	}
-	logger.Debugf("found %d leases for pool", len(leases.Items))
-	if len(leases.Items) > 1 {
-		return "", false, fmt.Errorf("found %d leases for pool, manual intervention required", len(leases.Items))
-	} else if len(leases.Items) == 1 {
-		l := leases.Items[0]
-		logger.Debugf("machine pool already has lease: %s", l.Name)
-
-		// Ensure the lease name is in the format we expect, we know everything up to
-		// the last character.
-		leaseChar := l.Name[len(l.Name)-1:]
-		expectedLeaseName := fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, leaseChar)
-		if expectedLeaseName != l.Name {
-			return "", false, fmt.Errorf("lease %s did not match expected lease name format (%s[CHAR])", l.Name, expectedLeaseName)
+	logger.Debugf("found %d leases for cluster", len(leases.Items))
+	for _, l := range leases.Items {
+		if l.Labels[constants.MachinePoolNameLabel] == pool.Name {
+			logger.Debugf("machine pool already has lease: %s", l.Name)
+			// Ensure the lease name is in the format we expect, we know everything up to
+			// the last character.
+			leaseChar := l.Name[len(l.Name)-1:]
+			expectedLeaseName := fmt.Sprintf("%s-%s", cd.Spec.ClusterMetadata.InfraID, leaseChar)
+			if expectedLeaseName != l.Name {
+				return "", false, fmt.Errorf("lease %s did not match expected lease name format (%s[CHAR])", l.Name, expectedLeaseName)
+			}
+			return leaseChar, false, nil
 		}
-		return leaseChar, false, nil
 	}
 
 	logger.Debugf("machine pool does not have a lease yet")

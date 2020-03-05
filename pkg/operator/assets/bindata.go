@@ -3034,6 +3034,10 @@ spec:
                       type: boolean
                   type: object
               type: object
+            deprovisionsDisabled:
+              description: DeprovisionsDisabled can be set to true to block deprovision
+                jobs from running.
+              type: boolean
             failedProvisionConfig:
               description: FailedProvisionConfig is used to configure settings related
                 to handling provision failures.

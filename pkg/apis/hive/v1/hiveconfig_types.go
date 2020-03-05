@@ -54,6 +54,9 @@ type HiveConfigSpec struct {
 	// nothing is running that will add or act upon finalizers on Hive types. This should rarely be needed.
 	// Sets replicas to 0 for the hive-controllers deployment to accomplish this.
 	MaintenanceMode *bool `json:"maintenanceMode,omitempty"`
+
+	// DeprovisionsDisabled can be set to true to block deprovision jobs from running.
+	DeprovisionsDisabled *bool `json:"deprovisionsDisabled,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

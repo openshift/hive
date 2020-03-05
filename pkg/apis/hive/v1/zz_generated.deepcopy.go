@@ -1388,6 +1388,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DeprovisionsDisabled != nil {
+		in, out := &in.DeprovisionsDisabled, &out.DeprovisionsDisabled
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

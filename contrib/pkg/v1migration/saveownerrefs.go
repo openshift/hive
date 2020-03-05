@@ -39,6 +39,11 @@ var defaultResources = []schema.GroupVersionResource{
 	corev1.SchemeGroupVersion.WithResource("secrets"),
 	corev1.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 	batchv1.SchemeGroupVersion.WithResource("jobs"),
+	{
+		Group:    "certman.managed.openshift.io",
+		Version:  "v1alpha1",
+		Resource: "certificaterequests",
+	},
 }
 
 // SaveOwnerRefsOptions is the set of options for the saving owner references.

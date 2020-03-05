@@ -215,7 +215,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.failedInstallerLogRead {
-				im.readInstallerLog = func(*hivev1.ClusterProvision, *InstallManager) (string, error) {
+				im.readInstallerLog = func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error) {
 					return "", fmt.Errorf("faiiled to save install log")
 				}
 			}

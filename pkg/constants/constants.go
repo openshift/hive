@@ -102,6 +102,16 @@ const (
 	// SyncsetPauseAnnotation is a annotation used by clusterDeployment, if it's true, then we will disable syncing to a specific cluster
 	SyncsetPauseAnnotation = "hive.openshift.io/syncset-pause"
 
+	// DisableInstallLogPasswordRedactionAnnotation is an annotation used on ClusterDeployments to disable the installmanager
+	// functionality which refuses to print output if it appears to contain a password or sensitive info. This can be
+	// useful in scenarios where debugging is needed and important info is being redacted. Set to "true".
+	DisableInstallLogPasswordRedactionAnnotation = "hive.openshift.io/disable-install-log-password-redaction"
+
+	// PauseOnInstallFailureAnnotation is an annotation used on ClusterDeployments to trigger a sleep after an install
+	// failure for the specified duration. This will keep the install pod running and allow a user to rsh in for debug
+	// purposes. Examples: "1h", "20m".
+	PauseOnInstallFailureAnnotation = "hive.openshift.io/pause-on-install-failure"
+
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

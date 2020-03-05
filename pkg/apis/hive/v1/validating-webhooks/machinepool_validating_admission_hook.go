@@ -320,11 +320,11 @@ func validateAWSMachinePoolPlatformInvariants(platform *hivev1aws.MachinePoolPla
 	}
 	rootVolume := &platform.EC2RootVolume
 	rootVolumePath := fldPath.Child("ec2RootVolume")
-	if rootVolume.IOPS <= 0 {
-		allErrs = append(allErrs, field.Invalid(rootVolumePath.Child("iops"), rootVolume.IOPS, "volume IOPS must be positive"))
+	if rootVolume.IOPS < 0 {
+		allErrs = append(allErrs, field.Invalid(rootVolumePath.Child("iops"), rootVolume.IOPS, "volume IOPS must not be negative"))
 	}
-	if rootVolume.Size <= 0 {
-		allErrs = append(allErrs, field.Invalid(rootVolumePath.Child("size"), rootVolume.IOPS, "volume size must be positive"))
+	if rootVolume.Size < 0 {
+		allErrs = append(allErrs, field.Invalid(rootVolumePath.Child("size"), rootVolume.Size, "volume size must not be negative"))
 	}
 	if rootVolume.Type == "" {
 		allErrs = append(allErrs, field.Required(rootVolumePath.Child("type"), "volume type is required"))

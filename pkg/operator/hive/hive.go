@@ -112,6 +112,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
 	}
 
+	if instance.Spec.DeprovisionsDisabled != nil && *instance.Spec.DeprovisionsDisabled {
+		hLog.Info("deprovisions disabled in hiveconfig")
+		tmpEnvVar := corev1.EnvVar{
+			Name:  hiveconstants.DeprovisionsDisabledEnvVar,
+			Value: "true",
+		}
+		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
+	}
+
 	if instance.Spec.Backup.MinBackupPeriodSeconds != nil {
 		hLog.Infof("MinBackupPeriodSeconds specified.")
 		tmpEnvVar := corev1.EnvVar{

@@ -41,12 +41,13 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name        string
-		deployment  *hivev1.ClusterDeployment
-		deprovision *hivev1.ClusterDeprovision
-		existing    []runtime.Object
-		validate    func(t *testing.T, c client.Client)
-		expectErr   bool
+		name                 string
+		deployment           *hivev1.ClusterDeployment
+		deprovision          *hivev1.ClusterDeprovision
+		existing             []runtime.Object
+		validate             func(t *testing.T, c client.Client)
+		expectErr            bool
+		deprovisionsDisabled bool
 	}{
 		{
 			name: "no-op deleting",
@@ -89,6 +90,15 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			validate: func(t *testing.T, c client.Client) {
 				validateJobExists(t, c)
 			},
+		},
+		{
+			name:        "do not create uninstall job when deprovisions are disabled",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
+			validate: func(t *testing.T, c client.Client) {
+				validateNoJobExists(t, c)
+			},
+			deprovisionsDisabled: true,
 		},
 		{
 			name:        "no-op when job in progress",
@@ -171,8 +181,9 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 
 			fakeClient := fake.NewFakeClient(existing...)
 			r := &ReconcileClusterDeprovision{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:               fakeClient,
+				scheme:               scheme.Scheme,
+				deprovisionsDisabled: test.deprovisionsDisabled,
 			}
 
 			_, err := r.Reconcile(reconcile.Request{

@@ -3,6 +3,8 @@ package clusterdeprovision
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,12 +56,30 @@ func init() {
 // Add creates a new ClusterDeprovision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	r, err := newReconciler(mgr)
+	if err != nil {
+		return err
+	}
+	return add(mgr, r)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterDeprovision{Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName), scheme: mgr.GetScheme()}
+func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
+	deprovisionsDisabled := false
+	if val, ok := os.LookupEnv(constants.DeprovisionsDisabledEnvVar); ok {
+		var err error
+		deprovisionsDisabled, err = strconv.ParseBool(val)
+		if err != nil {
+			log.WithError(err).WithField(constants.DeprovisionsDisabledEnvVar, os.Getenv(constants.DeprovisionsDisabledEnvVar)).
+				Error("error parsing bool from env var")
+			return nil, err
+		}
+	}
+	return &ReconcileClusterDeprovision{
+		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:               mgr.GetScheme(),
+		deprovisionsDisabled: deprovisionsDisabled,
+	}, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -96,7 +116,8 @@ var _ reconcile.Reconciler = &ReconcileClusterDeprovision{}
 // ReconcileClusterDeprovision reconciles a ClusterDeprovision object
 type ReconcileClusterDeprovision struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme               *runtime.Scheme
+	deprovisionsDisabled bool
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeprovision object and makes changes based on the state read
@@ -160,6 +181,12 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 	}
 	if cd.DeletionTimestamp == nil {
 		rLog.Error("ClusterDeprovision created for ClusterDeployment that has not been deleted")
+		return reconcile.Result{}, nil
+	}
+
+	// Check if deprovisions are currently disabled: (originates in HiveConfig in real world)
+	if r.deprovisionsDisabled {
+		rLog.Warn("deprovisions are currently disabled in HiveConfig, skipping")
 		return reconcile.Result{}, nil
 	}
 

@@ -45,15 +45,15 @@ func NewAzureActuator(azureCreds *corev1.Secret, logger log.FieldLogger) (*Azure
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
-func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, error) {
+func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
 	if cd.Spec.ClusterMetadata == nil {
-		return nil, errors.New("ClusterDeployment does not have cluster metadata")
+		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
 	}
 	if cd.Spec.Platform.Azure == nil {
-		return nil, errors.New("ClusterDeployment is not for Azure")
+		return nil, false, errors.New("ClusterDeployment is not for Azure")
 	}
 	if pool.Spec.Platform.Azure == nil {
-		return nil, errors.New("MachinePool is not for Azure")
+		return nil, false, errors.New("MachinePool is not for Azure")
 	}
 
 	ic := &installertypes.InstallConfig{
@@ -76,10 +76,10 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	if len(computePool.Platform.Azure.Zones) == 0 {
 		zones, err := a.getZones(cd.Spec.Platform.Azure.Region, pool.Spec.Platform.Azure.InstanceType)
 		if err != nil {
-			return nil, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
+			return nil, false, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
 		}
 		if len(zones) == 0 {
-			return nil, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.Azure.Region)
+			return nil, false, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.Azure.Region)
 		}
 		computePool.Platform.Azure.Zones = zones
 	}
@@ -92,7 +92,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	const userData = "worker-user-data"
 
 	installerMachineSets, err := installazure.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, role, userData)
-	return installerMachineSets, errors.Wrap(err, "failed to generate machinesets")
+	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
 
 func (a *AzureActuator) getZones(region string, instanceType string) ([]string, error) {

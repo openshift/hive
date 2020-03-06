@@ -42,13 +42,18 @@ const (
 	finalizer            = "hive.openshift.io/remotemachineset"
 )
 
+// controllerKind contains the schema.GroupVersionKind for this controller type.
+var controllerKind = hivev1.SchemeGroupVersion.WithKind("MachinePool")
+
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+	logger := log.WithField("controller", controllerName)
 	r := &ReconcileRemoteMachineSet{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
-		scheme: mgr.GetScheme(),
-		logger: log.WithField("controller", controllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		scheme:       mgr.GetScheme(),
+		logger:       logger,
+		expectations: controllerutils.NewExpectations(logger),
 	}
 	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 		return r.createActuator(cd, remoteMachineSets, logger)
@@ -67,6 +72,11 @@ func Add(mgr manager.Manager) error {
 	err = c.Watch(&source.Kind{Type: &hivev1.MachinePool{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
+	}
+
+	// Watch for MachinePoolNameLeases created for some MachinePools (currently just GCP):
+	if err := r.watchMachinePoolNameLeases(c); err != nil {
+		return errors.Wrap(err, "could not watch MachinePoolNameLeases")
 	}
 
 	// Watch for changes to ClusterDeployment
@@ -124,6 +134,10 @@ type ReconcileRemoteMachineSet struct {
 
 	// actuatorBuilder is a function pointer to the function that builds the actuator
 	actuatorBuilder func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error)
+
+	// A TTLCache of machinepoolnamelease creates each machinepool expects to see. Note that not all actuators make use
+	// of expectations.
+	expectations controllerutils.ExpectationsInterface
 }
 
 // Reconcile reads that state of the cluster for a MachinePool object and makes changes to the
@@ -147,6 +161,8 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	if err := r.Get(context.TODO(), request.NamespacedName, pool); err != nil {
 		if apierrors.IsNotFound(err) {
 			// Object not found, return
+			r.logger.Debug("object no longer exists")
+			r.expectations.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request
@@ -158,6 +174,11 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		if pool.DeletionTimestamp != nil {
 			return reconcile.Result{}, nil
 		}
+	}
+
+	if !r.expectations.SatisfiedExpectations(request.String()) {
+		logger.Debug("waiting for expectations to be satisfied")
+		return reconcile.Result{}, nil
 	}
 
 	cd := &hivev1.ClusterDeployment{}
@@ -225,9 +246,11 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	generatedMachineSets, err := r.generateMachineSets(pool, cd, remoteMachineSets, logger)
+	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, remoteMachineSets, logger)
 	if err != nil {
 		return reconcile.Result{}, err
+	} else if !proceed {
+		return reconcile.Result{}, nil
 	}
 
 	switch result, err := r.ensureEnoughReplicas(pool, generatedMachineSets, logger); {
@@ -282,21 +305,24 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 	cd *hivev1.ClusterDeployment,
 	remoteMachineSets *machineapi.MachineSetList,
 	logger log.FieldLogger,
-) ([]*machineapi.MachineSet, error) {
+) ([]*machineapi.MachineSet, bool, error) {
 	if pool.DeletionTimestamp != nil {
-		return nil, nil
+		return nil, true, nil
 	}
 
 	actuator, err := r.actuatorBuilder(cd, remoteMachineSets.Items, logger)
 	if err != nil {
 		logger.WithError(err).Error("unable to create actuator")
-		return nil, err
+		return nil, false, err
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
-	generatedMachineSets, err := actuator.GenerateMachineSets(cd, pool, logger)
+	generatedMachineSets, proceed, err := actuator.GenerateMachineSets(cd, pool, logger)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not generate machinesets")
+		return nil, false, errors.Wrap(err, "could not generate machinesets")
+	} else if !proceed {
+		logger.Info("actuator indicated not to proceed, returning")
+		return nil, false, nil
 	}
 
 	for i, ms := range generatedMachineSets {
@@ -322,7 +348,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
-	return generatedMachineSets, nil
+	return generatedMachineSets, true, nil
 }
 
 // ensureEnoughReplicas ensures that the min replicas in the machine pool is
@@ -770,7 +796,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewGCPActuator(creds, logger)
+		return NewGCPActuator(r.Client, creds, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.Azure != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(

@@ -29,6 +29,7 @@ rules:
   - clusterprovisions
   - dnszones
   - machinepools
+  - machinepoolnameleases
   - selectorsyncidentityproviders
   - syncidentityproviders
   - syncsets

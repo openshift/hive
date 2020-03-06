@@ -36,12 +36,13 @@ func (m *MockActuator) EXPECT() *MockActuatorMockRecorder {
 }
 
 // GenerateMachineSets mocks base method
-func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.MachinePool, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, error) {
+func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.MachinePool, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateMachineSets", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*v1beta1.MachineSet)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // GenerateMachineSets indicates an expected call of GenerateMachineSets

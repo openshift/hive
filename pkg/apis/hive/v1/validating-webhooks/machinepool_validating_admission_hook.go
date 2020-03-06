@@ -270,9 +270,6 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	}
 	if p := spec.Platform.GCP; p != nil {
 		platforms = append(platforms, "gcp")
-		if spec.Name != defaultWorkerPoolName {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Child("name"), spec.Name, []string{defaultWorkerPoolName}))
-		}
 		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(p, platformPath.Child("gcp"))...)
 		numberOfMachineSets = len(p.Zones)
 	}

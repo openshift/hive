@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"reflect"
 	"testing"
 
@@ -114,6 +115,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		remoteExisting                   []runtime.Object
 		generatedMachineSets             []*machineapi.MachineSet
 		unreachable                      bool
+		actuatorDoNotProceed             bool
 		expectErr                        bool
 		expectNoFinalizer                bool
 		expectedRemoteMachineSets        []*machineapi.MachineSet
@@ -133,6 +135,27 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name:              "No-op",
 			clusterDeployment: testClusterDeployment(),
 			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+		},
+		{
+			name:                 "No-op when actuator says not to proceed",
+			clusterDeployment:    testClusterDeployment(),
+			machinePool:          testMachinePool(),
+			actuatorDoNotProceed: true,
 			remoteExisting: []runtime.Object{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
 				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
@@ -601,21 +624,25 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if test.generatedMachineSets != nil {
 				mockActuator.EXPECT().
 					GenerateMachineSets(test.clusterDeployment, test.machinePool, gomock.Any()).
-					Return(test.generatedMachineSets, nil)
+					Return(test.generatedMachineSets, !test.actuatorDoNotProceed, nil)
 			}
 
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			mockRemoteClientBuilder.EXPECT().Unreachable().Return(test.unreachable).AnyTimes()
 			mockRemoteClientBuilder.EXPECT().Build().Return(remoteFakeClient, nil).AnyTimes()
 
+			logger := log.WithField("controller", "remotemachineset")
+			controllerExpectations := controllerutils.NewExpectations(logger)
+
 			rcd := &ReconcileRemoteMachineSet{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
-				logger:                        log.WithField("controller", "remotemachineset"),
+				logger:                        logger,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				actuatorBuilder: func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
 					return mockActuator, nil
 				},
+				expectations: controllerExpectations,
 			}
 			_, err := rcd.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{

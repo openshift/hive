@@ -138,6 +138,8 @@ rules:
   - machinepools
   - machinepools/status
   - machinepools/finalizers
+  - machinepoolnameleases
+  - machinepoolnameleases/status
   verbs:
   - get
   - list

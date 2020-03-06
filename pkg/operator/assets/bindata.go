@@ -39,6 +39,7 @@
 // config/crds/hive_v1_dnszone.yaml
 // config/crds/hive_v1_hiveconfig.yaml
 // config/crds/hive_v1_machinepool.yaml
+// config/crds/hive_v1_machinepoolnamelease.yaml
 // config/crds/hive_v1_selectorsyncidentityprovider.yaml
 // config/crds/hive_v1_selectorsyncset.yaml
 // config/crds/hive_v1_syncidentityprovider.yaml
@@ -988,6 +989,7 @@ rules:
   - clusterprovisions
   - dnszones
   - machinepools
+  - machinepoolnameleases
   - selectorsyncidentityproviders
   - syncidentityproviders
   - syncsets
@@ -1246,6 +1248,8 @@ rules:
   - machinepools
   - machinepools/status
   - machinepools/finalizers
+  - machinepoolnameleases
+  - machinepoolnameleases/status
   verbs:
   - get
   - list
@@ -3403,6 +3407,72 @@ func configCrdsHive_v1_machinepoolYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configCrdsHive_v1_machinepoolnameleaseYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: machinepoolnameleases.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
+    name: MachinePool
+    type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
+    name: Cluster
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
+  group: hive.openshift.io
+  names:
+    kind: MachinePoolNameLease
+    plural: machinepoolnameleases
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          type: object
+        status:
+          type: object
+  version: v1
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHive_v1_machinepoolnameleaseYamlBytes() ([]byte, error) {
+	return _configCrdsHive_v1_machinepoolnameleaseYaml, nil
+}
+
+func configCrdsHive_v1_machinepoolnameleaseYaml() (*asset, error) {
+	bytes, err := configCrdsHive_v1_machinepoolnameleaseYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive_v1_machinepoolnamelease.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configCrdsHive_v1_selectorsyncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -5258,6 +5328,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive_v1_dnszone.yaml":                          configCrdsHive_v1_dnszoneYaml,
 	"config/crds/hive_v1_hiveconfig.yaml":                       configCrdsHive_v1_hiveconfigYaml,
 	"config/crds/hive_v1_machinepool.yaml":                      configCrdsHive_v1_machinepoolYaml,
+	"config/crds/hive_v1_machinepoolnamelease.yaml":             configCrdsHive_v1_machinepoolnameleaseYaml,
 	"config/crds/hive_v1_selectorsyncidentityprovider.yaml":     configCrdsHive_v1_selectorsyncidentityproviderYaml,
 	"config/crds/hive_v1_selectorsyncset.yaml":                  configCrdsHive_v1_selectorsyncsetYaml,
 	"config/crds/hive_v1_syncidentityprovider.yaml":             configCrdsHive_v1_syncidentityproviderYaml,
@@ -5329,6 +5400,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_v1_dnszone.yaml":                      {configCrdsHive_v1_dnszoneYaml, map[string]*bintree{}},
 			"hive_v1_hiveconfig.yaml":                   {configCrdsHive_v1_hiveconfigYaml, map[string]*bintree{}},
 			"hive_v1_machinepool.yaml":                  {configCrdsHive_v1_machinepoolYaml, map[string]*bintree{}},
+			"hive_v1_machinepoolnamelease.yaml":         {configCrdsHive_v1_machinepoolnameleaseYaml, map[string]*bintree{}},
 			"hive_v1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1_selectorsyncidentityproviderYaml, map[string]*bintree{}},
 			"hive_v1_selectorsyncset.yaml":              {configCrdsHive_v1_selectorsyncsetYaml, map[string]*bintree{}},
 			"hive_v1_syncidentityprovider.yaml":         {configCrdsHive_v1_syncidentityproviderYaml, map[string]*bintree{}},

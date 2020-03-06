@@ -20,6 +20,8 @@ type HiveConfigExpansion interface{}
 
 type MachinePoolExpansion interface{}
 
+type MachinePoolNameLeaseExpansion interface{}
+
 type SelectorSyncIdentityProviderExpansion interface{}
 
 type SelectorSyncSetExpansion interface{}

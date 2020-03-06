@@ -17,20 +17,6 @@ then
   exit 1
 fi
 
-delete_jobs() {
-  local labels=${1:?must specify a label for the jobs to delete}
-  oc get jobs -l "${labels}" --all-namespaces -o json | \
-    jq -r '.items[]?.metadata.namespace' | \
-    sort -u | \
-    xargs -i oc delete jobs -n {} -l "${labels}"
-}
-
-echo "Deleting install jobs"
-delete_jobs "hive.openshift.io/install=true"
-
-echo "Deleting imageset jobs"
-delete_jobs "hive.openshift.io/imageset=true"
-
 # shellcheck source=hivetypes.sh
 source "$(dirname "$0")/hivetypes.sh"
 

@@ -132,7 +132,7 @@ type: Opaque
 
 (Optional) Hive uses the provided ssh key pair to ssh into the machines in the remote cluster. Hive connects via ssh to gather logs in the event of an installation failure. The ssh key pair is optional, but neither the user nor Hive will be able to ssh into the machines if it is not supplied.
 
-Create a Kubernetes secret containing a ssh key pair (typically generated with `ssh-keygen`)
+Create a Kubernetes secret containing a ssh key pair in PEM format (typically generated with `ssh-keygen -m PEM`)
 
 ```yaml
 apiVersion: v1

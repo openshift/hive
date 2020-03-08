@@ -16,6 +16,7 @@
   1. Run `oc patch hiveconfig hive --type='merge' -p $'spec:\n maintenanceMode: true'`
   1. Run `./hack/v1migration/scaledown.sh hive-operator` to scale down Hive operator.
   1. Run `./hack/v1migration/restore.sh [workdir]` to restore all data from disk.
+  1. Run `./hack/v1migration/validate.sh [workdir]` to validate that everything was restored and is not deleted.
   1. Run `./hack/v1migration/scaleup.sh hive-operator` to scale up Hive operator.
   1. Run `oc patch hiveconfig hive --type='merge' -p $'spec:\n maintenanceMode: false'`
 

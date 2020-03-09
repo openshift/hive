@@ -66,7 +66,7 @@ const (
 
 	platformAWS       = "aws"
 	platformAzure     = "azure"
-	platformGCP       = "hcp"
+	platformGCP       = "gcp"
 	platformBaremetal = "baremetal"
 	platformUnknown   = "unknown"
 	regionUnknown     = "unknown"

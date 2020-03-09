@@ -3,6 +3,7 @@ package v1migration
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -51,6 +52,7 @@ type SaveOwnerRefsOptions struct {
 	workDir       string
 	resourcesFile string
 	listLimit     int64
+	outputResources bool
 }
 
 // NewSaveOwnerRefsCommand creates a command that executes the migration utility to save owner references to Hive resources.
@@ -79,6 +81,7 @@ func NewSaveOwnerRefsCommand() *cobra.Command {
 	flags.StringVar(&opt.workDir, "work-dir", ".", "Directory in which store owner references file")
 	flags.StringVar(&opt.resourcesFile, "resources", "", "File containing the resources to look at for owner references")
 	flags.Int64Var(&opt.listLimit, "list-limit", 500, "Number of resources to fetch at a time")
+	flags.BoolVar(&opt.outputResources, "output-resources", false, "Output a file to use as input with the --resources flag")
 	return cmd
 }
 
@@ -89,6 +92,9 @@ func (o *SaveOwnerRefsOptions) Complete(cmd *cobra.Command, args []string) error
 
 // Validate ensures that option values make sense
 func (o *SaveOwnerRefsOptions) Validate(cmd *cobra.Command) error {
+	if o.outputResources {
+		return nil
+	}
 	return validateWorkDir(o.workDir)
 }
 
@@ -97,6 +103,12 @@ func (o *SaveOwnerRefsOptions) Run() error {
 	resources, err := resourcesToSearch(o.resourcesFile)
 	if err != nil {
 		return errors.Wrap(err, "could not determine the resources to search")
+	}
+	if o.outputResources {
+		for _, r := range resources {
+			fmt.Println(r)
+		}
+		return nil
 	}
 	clientConfig, err := contributils.GetClientConfig()
 	if err != nil {

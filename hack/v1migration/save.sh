@@ -5,7 +5,12 @@ set -e
 WORKDIR=${1:?must specify working directory}
 echo "Using workdir: $WORKDIR"
 
-if [[ -z $NO_SCALEDOWN_VERIFY ]]
+if [[ -n "$OWNED_RESOURCES" ]]
+then
+  RESOURCES_ARG="--resources $OWNED_RESOURCES"
+fi
+
+if [[ -z "$NO_SCALEDOWN_VERIFY" ]]
 then
   # shellcheck source=verify_scaledown.sh
   source "$(dirname "$0")/verify_scaledown.sh"
@@ -34,4 +39,4 @@ do
 	oc get "${t}.hive.openshift.io" --all-namespaces -o json | jq .items[] > "${WORKDIR}/${t}.json"
 done
 
-bin/hiveutil v1migration save-owner-refs --work-dir "${WORKDIR}"
+bin/hiveutil v1migration save-owner-refs --work-dir "${WORKDIR}" $RESOURCES_ARG

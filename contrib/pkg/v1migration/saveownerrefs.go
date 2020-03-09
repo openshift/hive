@@ -49,9 +49,9 @@ var defaultResources = []schema.GroupVersionResource{
 
 // SaveOwnerRefsOptions is the set of options for the saving owner references.
 type SaveOwnerRefsOptions struct {
-	workDir       string
-	resourcesFile string
-	listLimit     int64
+	workDir         string
+	resourcesFile   string
+	listLimit       int64
 	outputResources bool
 }
 

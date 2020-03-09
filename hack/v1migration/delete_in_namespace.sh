@@ -2,7 +2,7 @@
 
 set -e
 
-NAMESPACE=${1:?must specificy namespace}
+NAMESPACE=${1:?must specify namespace}
 echo "Using namespace: $NAMESPACE"
 
 # shellcheck source=hivetypes.sh

@@ -3,7 +3,7 @@
 set -e
 
 WORKDIR=${1:?must specify working directory}
-NAMESPACE=${2:?must specificy namespace}
+NAMESPACE=${2:?must specify namespace}
 
 if [[ ! -d "$WORKDIR" ]]
 then

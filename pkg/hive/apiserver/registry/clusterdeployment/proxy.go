@@ -229,6 +229,7 @@ func (s *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 	if err != nil {
 		return nil, err
 	}
+	sortMachinePools(machinePools)
 
 	clusterDeployment := &hiveapi.ClusterDeployment{}
 	if err := util.ClusterDeploymentFromHiveV1(ret, installConfig, machinePools, installConfigSecret.ResourceVersion, clusterDeployment); err != nil {
@@ -450,10 +451,14 @@ func getMachinePools(cdName string, machinePoolClient hivev1client.MachinePoolIn
 		}
 		pools = append(pools, &poolsList.Items[i])
 	}
-	sort.Slice(pools, func(i, j int) bool {
-		return pools[i].Name < pools[j].Name
-	})
+	sortMachinePools(pools)
 	return pools, nil
+}
+
+func sortMachinePools(machinePools []*hivev1.MachinePool) {
+	sort.Slice(machinePools, func(i, j int) bool {
+		return machinePools[i].Name < machinePools[j].Name
+	})
 }
 
 func reconcileMachinePools(

@@ -11,15 +11,16 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
 
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1alpha1 "github.com/openshift/hive/pkg/apis/hive/v1alpha1"
 )
+
+var removeFinalizersPatch = []byte(`{"metadata":{"finalizers":[]}}`)
 
 // DeleteObjectsOptions is the set of options for the deleting Hive objects.
 type DeleteObjectsOptions struct {
@@ -126,31 +127,15 @@ func deleteObjects(client dynamic.Interface, objChan chan *unstructured.Unstruct
 		} else {
 			resourceClient = client.Resource(gvr)
 		}
-		objFromKube, err := resourceClient.Get(name, metav1.GetOptions{})
-		switch {
-		case apierrors.IsNotFound(err):
-			logger.Warn("object not found")
-			continue
-		case err != nil:
-			logger.WithError(err).Error("failed to get object")
-			continue
-		}
 
-		if finalizersFromKube := objFromKube.GetFinalizers(); len(finalizersFromKube) > 0 {
-			objFromKube.SetFinalizers(nil)
-			objFromKube, err = resourceClient.Update(objFromKube, metav1.UpdateOptions{})
-			if err != nil {
+		if finalizersFromKube := objFromFile.GetFinalizers(); len(finalizersFromKube) > 0 {
+			if _, err := resourceClient.Patch(objFromFile.GetName(), types.MergePatchType, []byte(removeFinalizersPatch), metav1.PatchOptions{}); err != nil {
 				logger.WithError(err).Error("could not remove finalizers")
 				continue
 			}
 		}
-		uid := objFromKube.GetUID()
 		propagationPolicy := metav1.DeletePropagationOrphan
 		deleteOptions := &metav1.DeleteOptions{
-			Preconditions: &metav1.Preconditions{
-				UID:             &uid,
-				ResourceVersion: pointer.StringPtr(objFromKube.GetResourceVersion()),
-			},
 			PropagationPolicy: &propagationPolicy,
 		}
 		if err := resourceClient.Delete(name, deleteOptions); err != nil {

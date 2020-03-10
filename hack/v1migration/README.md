@@ -16,5 +16,18 @@
   1. Run `oc patch hiveconfig hive --type='merge' -p $'spec:\n maintenanceMode: true'`
   1. Run `./hack/v1migration/scaledown.sh hive-operator` to scale down Hive operator.
   1. Run `./hack/v1migration/restore.sh [workdir]` to restore all data from disk.
+  1. Run `./hack/v1migration/validate.sh [workdir]` to validate that everything was restored and is not deleted.
   1. Run `./hack/v1migration/scaleup.sh hive-operator` to scale up Hive operator.
   1. Run `oc patch hiveconfig hive --type='merge' -p $'spec:\n maintenanceMode: false'`
+
+
+# Resolving Problems during Restore
+
+If there was a problem during restore, then we should delete the resources in that namesapce
+that were restored, fix the data being restored, and run the restore again for just that namespace.
+
+  1. `./hack/v1migration/hive_resources_in_namespace.sh [workdir] [namespace] > [namespace_workdir]/resources.json`
+  1. `./hack/v1migration/hive_owner_refs_in_namespace.sh [workdir] [namespace] > [namespace_workdir]/owner-ref.json`
+  1. `./hack/v1migration/delete_in_namespace.sh [namespace]`
+  1. Make whatever changes are needed to resources saved in `[namespace_workdir]`.
+  1. `./hack/v1migration/restore.sh [namespace_workdir]`

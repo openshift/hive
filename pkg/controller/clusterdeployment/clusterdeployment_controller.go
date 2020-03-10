@@ -63,6 +63,13 @@ const (
 
 	deleteAfterAnnotation    = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
 	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
+
+	platformAWS       = "aws"
+	platformAzure     = "azure"
+	platformGCP       = "gcp"
+	platformBaremetal = "baremetal"
+	platformUnknown   = "unknown"
+	regionUnknown     = "unknown"
 )
 
 var (
@@ -338,6 +345,23 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		err := r.Update(context.TODO(), cd)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster platform label")
+		}
+		return reconcile.Result{}, err
+	}
+
+	// Set region label on the ClusterDeployment
+	if region := getClusterRegion(cd); cd.Spec.Platform.BareMetal == nil && cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+		if cd.Labels == nil {
+			cd.Labels = make(map[string]string)
+		}
+		if cd.Labels[hivev1.HiveClusterRegionLabel] != "" {
+			cdLog.Warnf("changing the value of %s from %s to %s", hivev1.HiveClusterRegionLabel,
+				cd.Labels[hivev1.HiveClusterRegionLabel], region)
+		}
+		cd.Labels[hivev1.HiveClusterRegionLabel] = region
+		err := r.Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster region label")
 		}
 		return reconcile.Result{}, err
 	}
@@ -1818,13 +1842,26 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		return "aws"
+		return platformAWS
 	case cd.Spec.Platform.Azure != nil:
-		return "azure"
+		return platformAzure
 	case cd.Spec.Platform.GCP != nil:
-		return "gcp"
+		return platformGCP
 	case cd.Spec.Platform.BareMetal != nil:
-		return "baremetal"
+		return platformBaremetal
 	}
-	return "unknown"
+	return platformUnknown
+}
+
+// getClusterRegion returns the region of a given ClusterDeployment
+func getClusterRegion(cd *hivev1.ClusterDeployment) string {
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		return cd.Spec.Platform.AWS.Region
+	case cd.Spec.Platform.Azure != nil:
+		return cd.Spec.Platform.Azure.Region
+	case cd.Spec.Platform.GCP != nil:
+		return cd.Spec.Platform.GCP.Region
+	}
+	return regionUnknown
 }

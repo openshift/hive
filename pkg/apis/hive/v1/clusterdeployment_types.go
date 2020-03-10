@@ -36,6 +36,12 @@ const (
 	// searching and filtering clusters, as well as in SelectorSyncSets to only
 	// target specific cloud platforms.
 	HiveClusterPlatformLabel = "hive.openshift.io/cluster-platform"
+
+	// HiveClusterRegionLabel is a label that is applied to ClusterDeployments
+	// to denote which region the cluster was created in. This can be used in
+	// searching and filtering clusters, as well as in SelectorSyncSets to only
+	// target specific regions of the cluster-platform.
+	HiveClusterRegionLabel = "hive.openshift.io/cluster-region"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment

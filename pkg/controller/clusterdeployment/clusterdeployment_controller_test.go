@@ -1053,6 +1053,19 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Add cluster region label",
+			existing: []runtime.Object{
+				testClusterDeploymentWithoutRegionLabel(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Equal(t, getClusterRegion(cd), cd.Labels[hivev1.HiveClusterRegionLabel], "incorrect cluster region label")
+					assert.Equal(t, getClusterRegion(cd), "us-east-1", "incorrect cluster region label")
+				}
+			},
+		},
+		{
 			name: "Ensure cluster metadata set from provision",
 			existing: []runtime.Object{
 				func() runtime.Object {
@@ -1386,6 +1399,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	cd.Labels[hivev1.HiveClusterPlatformLabel] = "aws"
+	cd.Labels[hivev1.HiveClusterRegionLabel] = "us-east-1"
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		InstallerImage: pointer.StringPtr("installer-image:latest"),
@@ -1413,6 +1427,12 @@ func testClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
 func testClusterDeploymentWithoutPlatformLabel() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	delete(cd.Labels, hivev1.HiveClusterPlatformLabel)
+	return cd
+}
+
+func testClusterDeploymentWithoutRegionLabel() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	delete(cd.Labels, hivev1.HiveClusterRegionLabel)
 	return cd
 }
 

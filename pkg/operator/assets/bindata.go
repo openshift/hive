@@ -5224,6 +5224,20 @@ data:
       - "failed to initialize the cluster: Cluster operator monitoring is still updating"
       installFailingReason: MonitoringOperatorStillUpdating
       installFailingMessage: Timeout waiting for the monitoring operator to become ready
+    # Bare Metal
+    - name: LibvirtSSHKeyPermissionDenied
+      searchRegexStrings:
+      - "platform.baremetal.libvirtURI: Internal error: could not connect to libvirt: virError.Code=38, Domain=7, Message=.Cannot recv data: Permission denied"
+      installFailingReason: LibvirtSSHKeyPermissionDenied
+      installFailingMessage: "Permission denied connecting to libvirt host, check SSH key configuration and pass phrase"
+    # Processing stops at the first match, so this more generic
+    # message about the connection failure must always come after the
+    # more specific message for LibvirtSSHKeyPermissionDenied.
+    - name: LibvirtConnectionFailed
+      searchRegexStrings:
+      - "could not connect to libvirt"
+      installFailingReason: LibvirtConnectionFailed
+      installFailingMessage: "Could not connect to libvirt host"
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

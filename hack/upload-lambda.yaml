@@ -1,0 +1,107 @@
+#!/usr/bin/env -S ansible-playbook
+#
+# Provide a JSON-formated list of recipients and what email to use in the From field (for bounce-back emails).
+# --extra-vars '{"recipeints": ["email@example.com", "email2@example.com"], "fromemail": "reply@example.com"}'
+#
+---
+- hosts: localhost
+  vars:
+    iam_role_name: periodicHiveLambdaRole
+    lambda_function_name: periodicHiveLambdaFunction
+    default_region: us-east-1
+    cloudwatch_rule_name: PeriodicHiveLambdaSchedule
+    cloudwatch_rule_target_event_id: PeriodicHiveID
+  tasks:
+  - name: ensure recipients provided
+    fail:
+      msg: "need to provided json formatted list of email recipients in variable named 'recipients'"
+    when: recipients is undefined
+
+  - name: ensure source email provided
+    fail:
+      msg: "need to provide the source/From email address in variable named 'fromemail'"
+    when: fromemail is undefined
+
+  - name: create lambda role
+    iam_role:
+      name: "{{ iam_role_name }}"
+      assume_role_policy_document: "{{ lookup('file', 'lambda/trustpolicy.json') }}"
+      description: "Periodic Hive Lambda Role"
+    register: iam_role
+
+  - debug:
+      var: iam_role
+      verbosity: 1
+
+  - name: attach permissions to role
+    iam_policy:
+      iam_type: role
+      iam_name: "{{ iam_role_name }}"
+      policy_name: periodicHiveLambdaRolePolicy
+      state: present
+      policy_document: "lambda/rolepolicy.json"
+
+
+  - name: zip up lambda function
+    archive:
+      path: lambda/periodic_lambda_function.py
+      dest: lambda.zip
+      format: zip
+      force_archive: yes
+
+  - name: upload lambda function
+    lambda:
+      name: "{{ lambda_function_name }}"
+      state: present
+      zip_file: lambda.zip
+      runtime: python3.8
+      role: "{{ iam_role.iam_role.role_name }}"
+      handler: periodic_lambda_function.lambda_handler
+      region: "{{ default_region }}"
+      timeout: 15
+    register: lambda_func
+
+  - debug:
+      var: lambda_func
+      verbosity: 1
+
+  - name: cleanup zip file
+    file:
+      state: absent
+      path: lambda.zip
+
+  - name: set event schedule
+    cloudwatchevent_rule:
+      name: "{{ cloudwatch_rule_name }}"
+      state: present
+      #state: disabled
+      region: "{{ default_region }}"
+      description: Run Hive Lambda Function on weekdays
+      schedule_expression: "cron(0 22 ? * MON-FRI *)"
+      #schedule_expression: "cron(0/10 * * * ? *)"
+      targets:
+        - id: "{{ cloudwatch_rule_target_event_id }}"
+          arn: "{{ lambda_func.configuration.function_arn }}"
+          input: ' {"regions": ["us-east-1", "us-east-2"], "emailregion": "{{ default_region }}", "recipients": {{ recipients | to_json }} , "fromemail": "{{ fromemail}}" } '
+    register: event_info
+
+  - debug:
+      var: event_info
+      verbosity: 1
+
+  - name: allow event to call lambda function
+    lambda_policy:
+      state: present
+      statement_id: lambda-cloudwatch-event-rule
+      region: "{{ default_region }}"
+      function_name: "{{ lambda_func.configuration.function_name }}"
+      action: lambda:InvokeFunction
+      principal: events.amazonaws.com
+      source_arn: "{{ event_info.rule.arn }}"
+
+  - name: apply settings to cloudwatch logs
+    cloudwatchlogs_log_group:
+      log_group_name: "/aws/lambda/{{ lambda_function_name }}"
+      state: present
+      retention: 14
+      region: "{{ default_region }}"

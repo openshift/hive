@@ -120,6 +120,10 @@ const (
 	// NotEnoughReplicasMachinePoolCondition is true when the minReplicas field
 	// is set too low for the number of machinesets for the machine pool.
 	NotEnoughReplicasMachinePoolCondition MachinePoolConditionType = "NotEnoughReplicas"
+
+	// NoMachinePoolNameLeasesAvailable is true when the cloud provider requires a name lease for the in-cluster MachineSet, but no
+	// leases are available.
+	NoMachinePoolNameLeasesAvailable MachinePoolConditionType = "NoMachinePoolNameLeasesAvailable"
 )
 
 // +genclient

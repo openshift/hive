@@ -3,18 +3,16 @@ package remotemachineset
 import (
 	"context"
 	"fmt"
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"math/rand"
-
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	installgcp "github.com/openshift/installer/pkg/asset/machines/gcp"
@@ -91,14 +89,13 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		return nil, false, errors.New("MachinePool is not for GCP")
 	}
 
-	leaseChar, leaseCreated, err := a.obtainLease(pool, cd, logger)
+	leaseChar, proceed, err := a.obtainLease(pool, cd, logger)
 	if err != nil {
-		logger.WithError(err).Error("error obtaining pool name lease")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error obtaining pool name lease")
 		return nil, false, err
 	}
 
-	if leaseCreated {
-		logger.Debug("new machine pool name lease created, waiting until creation is observed")
+	if !proceed {
 		return nil, false, nil
 	}
 
@@ -201,7 +198,7 @@ func (a *GCPActuator) getImageID(cd *hivev1.ClusterDeployment, logger log.FieldL
 // for use in the name of the machine pool. We are severely restricted on name lengths on GCP
 // and effectively have one character of flexibility with the naming convention originating in
 // the installer.
-func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (leaseChar string, leaseCreated bool, leaseErr error) {
+func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (leaseChar string, proceed bool, leaseErr error) {
 	logger.Debugf("obtaining lease for pool: %s", pool.Name)
 
 	leases := &hivev1.MachinePoolNameLeaseList{}
@@ -223,7 +220,7 @@ func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDe
 			if expectedLeaseName != l.Name {
 				return "", false, fmt.Errorf("lease %s did not match expected lease name format (%s[CHAR])", l.Name, expectedLeaseName)
 			}
-			return leaseChar, false, nil
+			return leaseChar, true, nil
 		}
 	}
 
@@ -243,6 +240,41 @@ func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDe
 		availLeaseChars, err := a.findAvailableLeaseChars(cd, leases)
 		if err != nil {
 			return "", false, err
+		}
+		if len(availLeaseChars) == 0 {
+			logger.Warn("no GCP MachinePoolNameLease characters available, setting condition")
+			conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+				pool.Status.Conditions,
+				hivev1.NoMachinePoolNameLeasesAvailable,
+				corev1.ConditionTrue,
+				"OutOfMachinePoolNames",
+				"All machine pool names are in use",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+			if changed {
+				pool.Status.Conditions = conds
+				if err := a.client.Status().Update(context.Background(), pool); err != nil {
+					return "", false, err
+				}
+			}
+			// Nothing else we can do, wait for requeue when a lease frees up
+			return "", false, nil
+		}
+		// Ensure the above condition is not set if it shouldn't be.
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.NoMachinePoolNameLeasesAvailable,
+			corev1.ConditionFalse,
+			"MachinePoolNamesAvailable",
+			"Machine pool names available",
+			controllerutils.UpdateConditionNever,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			err := a.client.Status().Update(context.Background(), pool)
+			if err != nil {
+				return "", false, err
+			}
 		}
 
 		// Choose a random entry in the available chars to limit collisions while processing
@@ -282,9 +314,9 @@ func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDe
 		a.expectations.DeleteExpectations(expectKey)
 		return "", false, err
 	}
-	logger.WithField("lease", leaseName).Infof("created lease")
+	logger.WithField("lease", leaseName).Infof("created lease, waiting until creation is observed")
 
-	return string(leaseRune), true, nil
+	return string(leaseRune), false, nil
 }
 
 func stringToRuneSet(s string) map[rune]bool {

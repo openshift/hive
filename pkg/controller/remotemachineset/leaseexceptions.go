@@ -2,7 +2,11 @@ package remotemachineset
 
 import (
 	"context"
+	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,6 +42,46 @@ func (h *machinePoolNameLeaseEventHandler) Create(e event.CreateEvent, q workque
 	h.reconciler.logger.Info("running Create handler for MachinePoolNameLease")
 	h.reconciler.trackLeaseAdd(e.Object)
 	h.EnqueueRequestForOwner.Create(e, q)
+}
+
+// Delete implements handler.EventHandler
+func (h *machinePoolNameLeaseEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	logger := h.reconciler.logger
+	logger.Info("running Delete handler for MachinePoolNameLease, requeuing all pools for cluster")
+	lease, ok := e.Object.(*hivev1.MachinePoolNameLease)
+	if !ok {
+		logger.Warn("Delete handler called for non-MachinePoolNameLease: %v", e.Object)
+		return
+	}
+	if _, ok := lease.Labels[constants.ClusterDeploymentNameLabel]; !ok {
+		logger.WithFields(log.Fields{
+			"lease":     lease.Name,
+			"namespace": lease.Namespace,
+		}).Warnf("deleted lease has no %s label, unable to requeue all pools for cluster", constants.ClusterDeploymentNameLabel)
+		return
+	}
+	logger.Info("listing all pools for cluster deployment")
+
+	// If a lease is deleted, requeue all the pools for the cluster, somebody might be waiting for a lease to free up.
+	// TODO: we do not currently label machine pools as belonging to the cluster, when we do we could use this to filter
+	// during the query itself.
+	clusterMachinePools := &hivev1.MachinePoolList{}
+	err := h.reconciler.List(context.TODO(), clusterMachinePools, client.InNamespace(lease.Namespace))
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err),
+			"unable to list machine pools for cluster")
+		return
+	}
+	logger.Debugf("found %d MachinePools for cluster", len(clusterMachinePools.Items))
+	for _, mp := range clusterMachinePools.Items {
+		if mp.Spec.ClusterDeploymentRef.Name != lease.Labels[constants.ClusterDeploymentNameLabel] {
+			continue
+		}
+		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
+			Name:      mp.Name,
+			Namespace: mp.Namespace,
+		}})
+	}
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,

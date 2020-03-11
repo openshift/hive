@@ -318,6 +318,8 @@ gcp:
   type: n1-standard-4
 ```
 
+WARNING: Due to some naming restrictions on various components in GCP, Hive will restrict you to a max of 35 MachinePools (including the original worker pool created by default). We are left with only a single character to differentiate the machines and nodes from a pool, and 'm' is already reserved for the master hosts, leaving us with a-z (minus m) and 0-9 for a total of 35. Hive will automatically create a MachinePoolNameLease for GCP MachinePools to grab one of the available characters until none are left, at which point your MachinePool will not be provisioned.
+
 #### Create Cluster on Bare Metal
 
 Hive supports bare metal provisioning as provided by [openshift-install](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md)

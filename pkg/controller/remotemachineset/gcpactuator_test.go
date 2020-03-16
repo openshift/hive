@@ -36,13 +36,14 @@ const (
 
 func TestGCPActuator(t *testing.T) {
 	tests := []struct {
-		name                       string
-		pool                       *hivev1.MachinePool
-		existing                   []runtime.Object
-		mockGCPClient              func(*mockgcp.MockClient)
+		name                            string
+		pool                            *hivev1.MachinePool
+		existing                        []runtime.Object
+		mockGCPClient                   func(*mockgcp.MockClient)
+		setupPendingCreationExpectation bool
+
 		expectedMachineSetReplicas map[string]int64
 		expectedErr                bool
-		pendingCreation            bool
 	}{
 		{
 			name: "generate single machineset for single zone",
@@ -151,7 +152,7 @@ func TestGCPActuator(t *testing.T) {
 			pool: testGCPPool(testPoolName),
 			mockGCPClient: func(client *mockgcp.MockClient) {
 			},
-			pendingCreation: true,
+			setupPendingCreationExpectation: true,
 		},
 	}
 
@@ -167,7 +168,7 @@ func TestGCPActuator(t *testing.T) {
 
 			logger := log.WithField("actuator", "gcpactuator")
 			controllerExpectations := controllerutils.NewExpectations(logger)
-			if test.pendingCreation {
+			if test.setupPendingCreationExpectation {
 				controllerExpectations.ExpectCreations(types.NamespacedName{
 					Name:      test.pool.Name,
 					Namespace: testNamespace,
@@ -313,11 +314,15 @@ func TestObtainLeaseChar(t *testing.T) {
 		existingCD *hivev1.ClusterDeployment
 		existing   []runtime.Object
 
-		expectedCharIn      string
-		expectedInfraID     string
-		expectErr           bool
-		expectLeaseCreation bool
-		pendingCreation     bool
+		expectedCharIn  string
+		expectedInfraID string
+
+		expectCondition *hivev1.MachinePoolCondition
+
+		expectErr             bool
+		expectProceed         bool
+		expectationsSatisfied bool
+		pendingCreation       bool
 	}{
 		{
 			name:       "worker pool needs lease for w",
@@ -327,9 +332,10 @@ func TestObtainLeaseChar(t *testing.T) {
 				testGCPPoolForCluster(cluster1Pool1Name, cluster1Pool1SpecName, cluster1Name),
 			},
 			// "w" should always be selected for the original worker pool
-			expectedCharIn:      "w",
-			expectedInfraID:     cluster1InfraID,
-			expectLeaseCreation: true,
+			expectedCharIn:        "w",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         false,
+			expectationsSatisfied: false,
 		},
 		{
 			name:       "worker pool has lease",
@@ -339,9 +345,10 @@ func TestObtainLeaseChar(t *testing.T) {
 				testGCPPoolForCluster(cluster1Pool1Name, cluster1Pool1SpecName, cluster1Name),
 				testPoolLease(cluster1Pool1Name, cluster1Name, cluster1InfraID, "w"),
 			},
-			expectedCharIn:      "w",
-			expectedInfraID:     cluster1InfraID,
-			expectLeaseCreation: false,
+			expectedCharIn:        "w",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         true,
+			expectationsSatisfied: true,
 		},
 		{
 			name:       "additional pool needs lease",
@@ -350,9 +357,29 @@ func TestObtainLeaseChar(t *testing.T) {
 			existing: []runtime.Object{
 				testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name),
 			},
-			expectedCharIn:      "abcdefghijklnopqrstuvxyz0123456789",
-			expectedInfraID:     cluster1InfraID,
-			expectLeaseCreation: true,
+			expectedCharIn:        "abcdefghijklnopqrstuvxyz0123456789",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         false,
+			expectationsSatisfied: false,
+		},
+		{
+			name:       "additional pool needs lease clear no lease available condition",
+			poolName:   cluster1Pool2Name,
+			existingCD: testGCPClusterDeployment(cluster1Name, cluster1InfraID),
+			existing: []runtime.Object{
+				func() *hivev1.MachinePool {
+					p := testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name)
+					p.Status.Conditions = []hivev1.MachinePoolCondition{
+						{Type: hivev1.NoMachinePoolNameLeasesAvailable, Status: corev1.ConditionTrue},
+					}
+					return p
+				}(),
+			},
+			expectedCharIn:        "abcdefghijklnopqrstuvxyz0123456789",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         false,
+			expectCondition:       &hivev1.MachinePoolCondition{Type: hivev1.NoMachinePoolNameLeasesAvailable, Status: corev1.ConditionFalse},
+			expectationsSatisfied: false,
 		},
 		{
 			name:       "additional pool needs lease expecting creation",
@@ -361,10 +388,11 @@ func TestObtainLeaseChar(t *testing.T) {
 			existing: []runtime.Object{
 				testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name),
 			},
-			expectedCharIn:      "abcdefghijklnopqrstuvxyz0123456789",
-			expectedInfraID:     cluster1InfraID,
-			expectLeaseCreation: true,
-			pendingCreation:     true,
+			expectedCharIn:        "abcdefghijklnopqrstuvxyz0123456789",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         false,
+			pendingCreation:       true,
+			expectationsSatisfied: false,
 		},
 		{
 			name:       "additional pool has lease",
@@ -374,9 +402,10 @@ func TestObtainLeaseChar(t *testing.T) {
 				testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name),
 				testPoolLease(cluster1Pool2Name, cluster1Name, cluster1InfraID, "q"),
 			},
-			expectedCharIn:      "q",
-			expectedInfraID:     cluster1InfraID,
-			expectLeaseCreation: false,
+			expectedCharIn:        "q",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         true,
+			expectationsSatisfied: true,
 		},
 		{
 			name:       "additional pool has lease with malformed name",
@@ -386,8 +415,9 @@ func TestObtainLeaseChar(t *testing.T) {
 				testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name),
 				testPoolLease(cluster1Pool2Name, cluster1Name, "badinfraid", "q"),
 			},
-			expectErr:           true,
-			expectLeaseCreation: false,
+			expectErr:             true,
+			expectProceed:         false,
+			expectationsSatisfied: true,
 		},
 		{
 			name:       "additional pool needs lease some exist",
@@ -399,9 +429,52 @@ func TestObtainLeaseChar(t *testing.T) {
 				testPoolLease(cluster1Pool3Name, cluster1Name, cluster1InfraID, "s"),
 				testPoolLease(cluster1Pool4Name, cluster1Name, cluster1InfraID, "t"),
 			},
-			expectedCharIn:      "abcdefghijklnopqruvxyz0123456789",
-			expectedInfraID:     cluster1InfraID,
-			expectLeaseCreation: true,
+			expectedCharIn:        "abcdefghijklnopqruvxyz0123456789",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         false,
+			expectationsSatisfied: false,
+		},
+		{
+			name:       "all lease chars but one in use",
+			poolName:   cluster1Pool2Name,
+			existingCD: testGCPClusterDeployment(cluster1Name, cluster1InfraID),
+			existing: func() []runtime.Object {
+				objects := []runtime.Object{
+					testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name),
+					testPoolLease(cluster1Pool1Name, cluster1Name, cluster1InfraID, "w"),
+				}
+				// '9' is free:
+				for _, c := range "abcdefghijklnopqrstuvxyz012345678" {
+					objects = append(objects, testPoolLease(fmt.Sprintf("%s-pool-%s", cluster1Name, string(c)), cluster1Name, cluster1InfraID, string(c)))
+				}
+				return objects
+			}(),
+			expectedCharIn:        "9",
+			expectedInfraID:       cluster1InfraID,
+			expectProceed:         false,
+			expectationsSatisfied: false,
+		},
+		{
+			name:       "all lease chars in use",
+			poolName:   cluster1Pool2Name,
+			existingCD: testGCPClusterDeployment(cluster1Name, cluster1InfraID),
+			existing: func() []runtime.Object {
+				objects := []runtime.Object{
+					testGCPPoolForCluster(cluster1Pool2Name, cluster1Pool2SpecName, cluster1Name),
+					testPoolLease(cluster1Pool1Name, cluster1Name, cluster1InfraID, "w"),
+				}
+				for _, c := range "abcdefghijklnopqrstuvxyz0123456789" {
+					objects = append(objects, testPoolLease(fmt.Sprintf("%s-pool-%s", cluster1Name, string(c)), cluster1Name, cluster1InfraID, string(c)))
+				}
+				return objects
+			}(),
+			expectErr:     false,
+			expectProceed: false,
+			expectCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.NoMachinePoolNameLeasesAvailable,
+				Status: corev1.ConditionTrue,
+			},
+			expectationsSatisfied: true,
 		},
 	}
 
@@ -432,46 +505,49 @@ func TestObtainLeaseChar(t *testing.T) {
 			pool := &hivev1.MachinePool{}
 			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: test.poolName}, pool)
 			require.NoError(t, err)
-			leaseChar, newLeaseCreated, err := ga.obtainLease(pool, test.existingCD, log.WithField("test", test.name))
+			leaseChar, proceed, err := ga.obtainLease(pool, test.existingCD, log.WithField("test", test.name))
 			if test.expectErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, test.expectLeaseCreation, newLeaseCreated, "unexpected lease creation result")
-			if test.expectLeaseCreation {
-				// If we expect creation, our expectations should not be satisfied
-				assert.Equal(t, test.expectLeaseCreation, !controllerExpectations.SatisfiedExpectations(
-					types.NamespacedName{Namespace: testNamespace, Name: test.poolName}.String()), "unexpected expectations result")
-			} else if !test.expectErr {
-				// If we do not expect creation or an error, expectations should be satisfied
-				assert.True(t, controllerExpectations.SatisfiedExpectations(
-					types.NamespacedName{Namespace: testNamespace, Name: test.poolName}.String()), "expectations should be satisfied")
-			}
+			require.Equal(t, test.expectProceed, proceed, "unexpected proceed result")
+
+			assert.Equal(t, test.expectationsSatisfied, controllerExpectations.SatisfiedExpectations(
+				types.NamespacedName{Namespace: testNamespace, Name: test.poolName}.String()), "unexpected expectations result")
+
 			require.Contains(t, test.expectedCharIn, string(leaseChar))
 
-			// ensure the lease exists:
-			lease := &hivev1.MachinePoolNameLease{}
-			err = fakeClient.Get(context.TODO(), types.NamespacedName{
-				Namespace: testNamespace,
-				Name:      fmt.Sprintf("%s-%s", test.expectedInfraID, string(leaseChar)),
-			}, lease)
-			require.NoError(t, err)
+			if test.expectCondition != nil {
+				for _, cond := range pool.Status.Conditions {
+					assert.Equal(t, cond.Type, test.expectCondition.Type)
+					assert.Equal(t, cond.Status, test.expectCondition.Status)
+				}
+			} else {
+				// Assuming if you didn't expect a condition, there shouldn't be any.
+				assert.Equal(t, 0, len(pool.Status.Conditions))
+			}
 
-			// ensure labels we expect are set
-			require.Equal(t, test.poolName, lease.Labels[constants.MachinePoolNameLabel])
-			require.Equal(t, test.existingCD.Name, lease.Labels[constants.ClusterDeploymentNameLabel])
+			if test.expectProceed {
+				// ensure the lease exists:
+				lease := &hivev1.MachinePoolNameLease{}
+				err = fakeClient.Get(context.TODO(), types.NamespacedName{
+					Namespace: testNamespace,
+					Name:      fmt.Sprintf("%s-%s", test.expectedInfraID, string(leaseChar)),
+				}, lease)
+				require.NoError(t, err)
 
-			// ensure owner reference is correct
-			require.Equal(t, 1, len(lease.OwnerReferences), "unexpected ownerreferences count")
-			require.Equal(t, "hive.openshift.io/v1", lease.OwnerReferences[0].APIVersion)
-			require.Equal(t, "MachinePool", lease.OwnerReferences[0].Kind)
-			require.Equal(t, test.poolName, lease.OwnerReferences[0].Name)
+				// ensure labels we expect are set
+				require.Equal(t, test.poolName, lease.Labels[constants.MachinePoolNameLabel])
+				require.Equal(t, test.existingCD.Name, lease.Labels[constants.ClusterDeploymentNameLabel])
 
-			// If we expected a lease creation, expectations should not be satisfied as we're waiting to observe,
-			// and vice versa.
-			require.Equal(t, test.expectLeaseCreation, !controllerExpectations.SatisfiedExpectations(expectationsKey),
-				"unexpected expectations")
+				// ensure owner reference is correct
+				require.Equal(t, 1, len(lease.OwnerReferences), "unexpected ownerreferences count")
+				require.Equal(t, "hive.openshift.io/v1", lease.OwnerReferences[0].APIVersion)
+				require.Equal(t, "MachinePool", lease.OwnerReferences[0].Kind)
+				require.Equal(t, test.poolName, lease.OwnerReferences[0].Name)
+			}
+
 		})
 	}
 }

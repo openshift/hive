@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -79,6 +80,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	r.(*ReconcileHiveConfig).apiextClient, err = apiextclientv1beta1.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		return err
+	}
+
+	r.(*ReconcileHiveConfig).discoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
@@ -208,6 +214,7 @@ type ReconcileHiveConfig struct {
 	kubeClient            kubernetes.Interface
 	apiextClient          *apiextclientv1beta1.ApiextensionsV1beta1Client
 	apiregClient          *apiregclientv1.ApiregistrationV1Client
+	discoveryClient       discovery.DiscoveryInterface
 	dynamicClient         dynamic.Interface
 	restConfig            *rest.Config
 	hiveImage             string

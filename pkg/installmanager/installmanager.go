@@ -1260,9 +1260,20 @@ func updateClusterProvisionWithRetries(provision *hivev1.ClusterProvision, m *In
 }
 
 func cleanupLogOutput(fullLog string) string {
-	var cleanedString string
+	// The console log may have carriage returns as well as newlines,
+	// and they may be escaped (this especially happens with the
+	// baremetal IPI installer when libvirt.so emits errors). Wrap the
+	// string in quotes, then use Unquote() to interpret it as a go
+	// literal to unescape any escaped characters. If that process
+	// fails because the reformatted string doesn't match the expected
+	// syntax, ignore the error and apply the later cleanning steps to
+	// the original string.
+	cleanedString, err := strconv.Unquote(fmt.Sprintf("\"%s\"", fullLog))
+	if err != nil {
+		cleanedString = fullLog
+	}
 
-	cleanedString = multiLineRedactLinesWithPassword.ReplaceAllString(fullLog, "REDACTED LINE OF OUTPUT")
+	cleanedString = multiLineRedactLinesWithPassword.ReplaceAllString(cleanedString, "REDACTED LINE OF OUTPUT")
 
 	return cleanedString
 }

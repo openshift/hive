@@ -10,14 +10,17 @@ parameters:
   value: staging
 - name: IMAGE_TAG
   value: latest
-- name: EXTERNAL_DNS_AWS_CREDS
-  value: external-dns-route53-admin
-- name: EXTERNAL_DNS_MANAGED_DOMAIN
-  value: s1.openshiftapps.com
 - name: ADDITIONAL_CERTIFICATE_AUTHORITY
   value: letsencrypt-ca
 - name: GLOBAL_PULL_SECRET
   value: ""
+- name: MANAGED_DOMAINS
+  value:
+  - aws:
+      credentialsSecretRef:
+        name: my-dns-creds
+    domains:
+    - openshift.example.com
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -55,11 +58,6 @@ objects:
   spec:
     additionalCertificateAuthoritiesSecretRef:
     - name: ${ADDITIONAL_CERTIFICATE_AUTHORITY}
-    managedDomains:
-    - aws:
-        credentialsSecretRef:
-          name: ${EXTERNAL_DNS_AWS_CREDS}
-      domains:
-      - ${EXTERNAL_DNS_MANAGED_DOMAIN}
+    managedDomains: "${{MANAGED_DOMAINS}}"
     globalPullSecretRef:
       name: ${GLOBAL_PULL_SECRET}

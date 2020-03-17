@@ -15,12 +15,7 @@ parameters:
 - name: GLOBAL_PULL_SECRET
   value: ""
 - name: MANAGED_DOMAINS
-  value:
-  - aws:
-      credentialsSecretRef:
-        name: my-dns-creds
-    domains:
-    - openshift.example.com
+  value: "[]"
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1

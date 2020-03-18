@@ -63,7 +63,12 @@ func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h 
 	// the cluster CA and inject into the APIServer.
 	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
 	// secret, see hack/hiveapi-dev-cert.sh.
-	if !r.runningOnOpenShift(hLog) || is311 {
+	isOpenShift, err := r.runningOnOpenShift(hLog)
+	if err != nil {
+		return err
+	}
+
+	if !isOpenShift || is311 {
 		hLog.Debug("non-OpenShift 4.x cluster detected, modifying apiservice")
 		serviceCA, _, err := r.getCACerts(hLog)
 		if err != nil {

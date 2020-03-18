@@ -150,6 +150,7 @@ func (o *ClusterUninstaller) Run() error {
 		return err
 	}
 
+	tracker := new(errorTracker)
 	tagClientStack := append([]*resourcegroupstaggingapi.ResourceGroupsTaggingAPI(nil), tagClients...)
 	err = wait.PollImmediateInfinite(
 		time.Second*10,
@@ -183,7 +184,7 @@ func (o *ClusterUninstaller) Run() error {
 
 									err = deleteARN(awsSession, parsed, filter, arnLogger)
 									if err != nil {
-										arnLogger.Debug(err)
+										tracker.suppressWarning(arnString, err, arnLogger)
 										err = errors.Wrapf(err, "deleting %s", arnString)
 										continue
 									}
@@ -240,7 +241,7 @@ func (o *ClusterUninstaller) Run() error {
 
 					err = deleteARN(awsSession, parsed, nil, arnLogger)
 					if err != nil {
-						arnLogger.Debug(err)
+						tracker.suppressWarning(arnString, err, arnLogger)
 						err = errors.Wrapf(err, "deleting %s", arnString)
 						loopError = err
 						continue
@@ -559,6 +560,8 @@ func deleteEC2(session *session.Session, arn arn.ARN, filter Filter, logger logr
 		return deleteEC2Volume(client, id, logger)
 	case "vpc":
 		return deleteEC2VPC(client, elb.New(session), elbv2.New(session), id, logger)
+	case "vpc-endpoint":
+		return deleteEC2VPCEndpoint(client, id, logger)
 	case "vpc-peering-connection":
 		return deleteEC2VPCPeeringConnection(client, id, logger)
 	default:
@@ -685,7 +688,7 @@ func terminateEC2InstanceByInstance(ec2Client *ec2.EC2, iamClient *iam.IAM, inst
 		return err
 	}
 
-	logger.Info("Terminating")
+	logger.Debug("Terminating")
 	return nil
 }
 
@@ -733,7 +736,7 @@ func terminateEC2InstancesByTags(ec2Client *ec2.EC2, iamClient *iam.IAM, filters
 								if *instance.State.Name == "terminated" {
 									arn := fmt.Sprintf("arn:%s:ec2:%s:%s:instance/%s", partition.ID(), *ec2Client.Config.Region, *reservation.OwnerId, *instance.InstanceId)
 									if _, ok := terminated[arn]; !ok {
-										instanceLogger.Debug("Terminated")
+										instanceLogger.Info("Terminated")
 										terminated[arn] = exists
 									}
 									continue

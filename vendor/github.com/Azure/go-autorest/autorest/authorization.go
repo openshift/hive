@@ -15,6 +15,7 @@ package autorest
 //  limitations under the License.
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -22,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/Azure/go-autorest/tracing"
 )
 
 const (
@@ -149,11 +149,11 @@ type BearerAuthorizerCallback struct {
 
 // NewBearerAuthorizerCallback creates a bearer authorization callback.  The callback
 // is invoked when the HTTP request is submitted.
-func NewBearerAuthorizerCallback(sender Sender, callback BearerAuthorizerCallbackFunc) *BearerAuthorizerCallback {
-	if sender == nil {
-		sender = &http.Client{Transport: tracing.Transport}
+func NewBearerAuthorizerCallback(s Sender, callback BearerAuthorizerCallbackFunc) *BearerAuthorizerCallback {
+	if s == nil {
+		s = sender(tls.RenegotiateNever)
 	}
-	return &BearerAuthorizerCallback{sender: sender, callback: callback}
+	return &BearerAuthorizerCallback{sender: s, callback: callback}
 }
 
 // WithAuthorization returns a PrepareDecorator that adds an HTTP Authorization header whose value
@@ -171,20 +171,21 @@ func (bacb *BearerAuthorizerCallback) WithAuthorization() PrepareDecorator {
 				removeRequestBody(&rCopy)
 
 				resp, err := bacb.sender.Do(&rCopy)
-				if err == nil && resp.StatusCode == 401 {
-					defer resp.Body.Close()
-					if hasBearerChallenge(resp) {
-						bc, err := newBearerChallenge(resp)
+				if err != nil {
+					return r, err
+				}
+				DrainResponseBody(resp)
+				if resp.StatusCode == 401 && hasBearerChallenge(resp.Header) {
+					bc, err := newBearerChallenge(resp.Header)
+					if err != nil {
+						return r, err
+					}
+					if bacb.callback != nil {
+						ba, err := bacb.callback(bc.values[tenantID], bc.values["resource"])
 						if err != nil {
 							return r, err
 						}
-						if bacb.callback != nil {
-							ba, err := bacb.callback(bc.values[tenantID], bc.values["resource"])
-							if err != nil {
-								return r, err
-							}
-							return Prepare(r, ba.WithAuthorization())
-						}
+						return Prepare(r, ba.WithAuthorization())
 					}
 				}
 			}
@@ -194,8 +195,8 @@ func (bacb *BearerAuthorizerCallback) WithAuthorization() PrepareDecorator {
 }
 
 // returns true if the HTTP response contains a bearer challenge
-func hasBearerChallenge(resp *http.Response) bool {
-	authHeader := resp.Header.Get(bearerChallengeHeader)
+func hasBearerChallenge(header http.Header) bool {
+	authHeader := header.Get(bearerChallengeHeader)
 	if len(authHeader) == 0 || strings.Index(authHeader, bearer) < 0 {
 		return false
 	}
@@ -206,8 +207,8 @@ type bearerChallenge struct {
 	values map[string]string
 }
 
-func newBearerChallenge(resp *http.Response) (bc bearerChallenge, err error) {
-	challenge := strings.TrimSpace(resp.Header.Get(bearerChallengeHeader))
+func newBearerChallenge(header http.Header) (bc bearerChallenge, err error) {
+	challenge := strings.TrimSpace(header.Get(bearerChallengeHeader))
 	trimmedChallenge := challenge[len(bearer)+1:]
 
 	// challenge is a set of key=value pairs that are comma delimited

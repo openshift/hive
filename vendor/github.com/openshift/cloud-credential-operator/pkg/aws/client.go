@@ -42,6 +42,7 @@ type Client interface {
 	PutUserPolicy(*iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error)
 	GetUserPolicy(*iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error)
 	SimulatePrincipalPolicy(*iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error)
+	SimulatePrincipalPolicyPages(*iam.SimulatePrincipalPolicyInput, func(*iam.SimulatePolicyResponse, bool) bool) error
 	TagUser(*iam.TagUserInput) (*iam.TagUserOutput, error)
 }
 
@@ -92,13 +93,21 @@ func (c *awsClient) SimulatePrincipalPolicy(input *iam.SimulatePrincipalPolicyIn
 	return c.iamClient.SimulatePrincipalPolicy(input)
 }
 
+func (c *awsClient) SimulatePrincipalPolicyPages(input *iam.SimulatePrincipalPolicyInput, fn func(*iam.SimulatePolicyResponse, bool) bool) error {
+	return c.iamClient.SimulatePrincipalPolicyPages(input, fn)
+}
+
 func (c *awsClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error) {
 	return c.iamClient.TagUser(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
-func NewClient(accessKeyID, secretAccessKey []byte, infraName string) (Client, error) {
+func NewClient(accessKeyID, secretAccessKey []byte, region, infraName string) (Client, error) {
 	awsConfig := &awssdk.Config{}
+
+	if region != "" {
+		awsConfig.Region = &region
+	}
 
 	awsConfig.Credentials = credentials.NewStaticCredentials(
 		string(accessKeyID), string(secretAccessKey), "")
@@ -112,7 +121,12 @@ func NewClient(accessKeyID, secretAccessKey []byte, infraName string) (Client, e
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Version, infraName),
 	})
 
+	return NewClientFromIAMClient(iam.New(s))
+}
+
+// NewClientFromIAMClient create a client from AWS IAM client.
+func NewClientFromIAMClient(client iamiface.IAMAPI) (Client, error) {
 	return &awsClient{
-		iamClient: iam.New(s),
+		iamClient: client,
 	}, nil
 }

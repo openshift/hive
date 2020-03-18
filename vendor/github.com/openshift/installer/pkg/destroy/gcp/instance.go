@@ -14,8 +14,9 @@ import (
 // https://www.googleapis.com/compute/v1/projects/project-id/zones/us-central1-a/instances/instance-name
 // After trimming the service's base path, you get:
 // project-id/zones/us-central1-a/instances/instance-name
+// TODO: Find a better way to get the instance name and zone to account for changes in base path
 func (o *ClusterUninstaller) getInstanceNameAndZone(instanceURL string) (string, string) {
-	path := strings.TrimLeft(instanceURL, o.computeSvc.BasePath)
+	path := strings.TrimLeft(instanceURL, "https://www.googleapis.com/compute/v1/projects/")
 	parts := strings.Split(path, "/")
 	if len(parts) >= 5 {
 		return parts[4], parts[2]
@@ -24,7 +25,16 @@ func (o *ClusterUninstaller) getInstanceNameAndZone(instanceURL string) (string,
 }
 
 func (o *ClusterUninstaller) listInstances() ([]cloudResource, error) {
-	return o.listInstancesWithFilter("items/*/instances(name,zone,status),nextPageToken", o.clusterIDFilter(), nil)
+	byName, err := o.listInstancesWithFilter("items/*/instances(name,zone,status),nextPageToken", o.clusterIDFilter(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	byLabel, err := o.listInstancesWithFilter("items/*/instances(name,zone,status),nextPageToken", o.clusterLabelFilter(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return append(byName, byLabel...), nil
 }
 
 // listInstancesWithFilter lists instances in the project that satisfy the filter criteria.

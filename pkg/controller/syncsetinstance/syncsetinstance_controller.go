@@ -619,7 +619,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 func (r *ReconcileSyncSetInstance) reconcileDeleted(deleteTerm string, applyMode hivev1.SyncSetResourceApplyMode, dynamicClient dynamic.Interface, existingStatusList, newStatusList []hivev1.SyncStatus, err error, ssiLog log.FieldLogger) []hivev1.SyncStatus {
 	ssiLog.Debugf("reconciling syncset %ss, existing: %d, actual: %d", deleteTerm, len(existingStatusList), len(newStatusList))
 	if applyMode == "" || applyMode == hivev1.UpsertResourceApplyMode {
-		ssiLog.Debugf("apply mode is upsert, remote %ss will not be deleted", deleteTerm)
+		ssiLog.Debugf("resourceApplyMode is Upsert, remote %ss will not be deleted", deleteTerm)
 		return newStatusList
 	}
 

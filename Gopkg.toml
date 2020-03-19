@@ -104,7 +104,17 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "725b71dce1d41c98e368ad9277e14c7ce9a9cb25"
+  revision = "344e38f31fb65dfd27184bee420e6ec0043618b7"
+
+# Transient dep from installer, no longer detected automatically due to their switch to go modules.
+[[override]]
+  name = "github.com/openshift/cloud-credential-operator"
+  revision = "9cc1c1abf898cfa08429d465da0f02d064bd89ee"
+
+# Transient dep from installer, no longer detected automatically due to their switch to go modules.
+[[override]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  revision = "v38.1.0"
 
 [[override]]
   name = "contrib.go.opencensus.io/exporter/ocagent"
@@ -130,7 +140,7 @@ version="v1.4.7"
 [[override]]
   name = "sigs.k8s.io/cluster-api-provider-aws"
   source = "github.com/openshift/cluster-api-provider-aws"
-  revision = "15fe4b4ea5636f8516c238490fc6a85d44161181"
+  revision = "923caeb1d0d82c42968465262387111753bda78a"
 
 [[override]]
   name = "github.com/docker/docker"

@@ -366,9 +366,17 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
+	// Clear any provision underway metrics if we're installed or deleted.
+	if cd.Spec.Installed || cd.DeletionTimestamp != nil {
+		clearProvisionUnderwaySecondsMetric(cd, cdLog)
+	}
+
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-			clearUnderwaySecondsMetrics(cd)
+			// Make sure we have no deprovision underway metric even though this was probably cleared when we
+			// removed the finalizer.
+			clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
+
 			return reconcile.Result{}, nil
 		}
 
@@ -378,15 +386,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cd.Namespace,
 			hivemetrics.GetClusterDeploymentType(cd)).Set(
 			time.Since(cd.DeletionTimestamp.Time).Seconds())
-
-		// If the cluster never made it to installed, make sure we clear the provisioning
-		// underway metric.
-		if !cd.Spec.Installed {
-			hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-				cd.Name,
-				cd.Namespace,
-				hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
-		}
 
 		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
@@ -802,13 +801,6 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
 		Observe(float64(cd.Status.InstallRestarts))
 
-	// Clear the install underway seconds metric. After this no-one should be reporting
-	// this metric for this cluster.
-	hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-		cd.Name,
-		cd.Namespace,
-		hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
-
 	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 
 	return reconcile.Result{}, nil
@@ -1160,7 +1152,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		if cd.Spec.Installed {
 			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
 			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-				err = r.removeClusterDeploymentFinalizer(cd)
+				err = r.removeClusterDeploymentFinalizer(cd, cdLog)
 				if err != nil {
 					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 				}
@@ -1175,7 +1167,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 
 	if cd.Spec.ClusterMetadata == nil {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
-		err = r.removeClusterDeploymentFinalizer(cd)
+		err = r.removeClusterDeploymentFinalizer(cd, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
@@ -1185,7 +1177,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	// We do not yet support deprovision for BareMetal, for now skip deprovision and remove finalizer.
 	if cd.Spec.Platform.BareMetal != nil {
 		cdLog.Info("skipping deprovision for BareMetal cluster, removing finalizer")
-		err := r.removeClusterDeploymentFinalizer(cd)
+		err := r.removeClusterDeploymentFinalizer(cd, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
@@ -1229,7 +1221,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			}
 			if ns.DeletionTimestamp != nil {
 				cdLog.Warn("detected a namespace deleted before deprovision request could be created, giving up on deprovision and removing finalizer")
-				err = r.removeClusterDeploymentFinalizer(cd)
+				err = r.removeClusterDeploymentFinalizer(cd, cdLog)
 				if err != nil {
 					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 				}
@@ -1246,7 +1238,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	// Deprovision request exists, check whether it has completed
 	if existingRequest.Status.Completed {
 		cdLog.Infof("deprovision request completed, removing finalizer")
-		err = r.removeClusterDeploymentFinalizer(cd)
+		err = r.removeClusterDeploymentFinalizer(cd, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
@@ -1264,7 +1256,7 @@ func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.Cl
 	return r.Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
+func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 
 	cd = cd.DeepCopy()
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
@@ -1272,7 +1264,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 		return err
 	}
 
-	clearUnderwaySecondsMetrics(cd)
+	clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
 
 	// Increment the clusters deleted counter:
 	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
@@ -1537,20 +1529,25 @@ func dnsReadyTransitionTime(dnsZone *hivev1.DNSZone) *time.Time {
 	return nil
 }
 
-func clearUnderwaySecondsMetrics(cd *hivev1.ClusterDeployment) {
-	// If we've successfully cleared the deprovision finalizer we know this is a good time to
-	// reset the underway metric to 0, after which it will no longer be reported.
-	hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
-		cd.Name,
-		cd.Namespace,
-		hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+func clearDeprovisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
+	cleared := hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.Delete(map[string]string{
+		"cluster_deployment": cd.Name,
+		"namespace":          cd.Namespace,
+		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd),
+	})
+	if cleared {
+		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds)
+	}
+}
 
-	// Clear the install underway seconds metric if this cluster was still installing.
-	if !cd.Spec.Installed {
-		hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-			cd.Name,
-			cd.Namespace,
-			hivemetrics.GetClusterDeploymentType(cd)).Set(0.0)
+func clearProvisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
+	cleared := hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.Delete(map[string]string{
+		"cluster_deployment": cd.Name,
+		"namespace":          cd.Namespace,
+		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd),
+	})
+	if cleared {
+		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds)
 	}
 }
 

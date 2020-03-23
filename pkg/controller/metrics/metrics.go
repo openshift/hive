@@ -83,7 +83,7 @@ var (
 	MetricClusterDeploymentProvisionUnderwaySeconds = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "hive_cluster_deployment_provision_underway_seconds",
-			Help: "Length of time a cluster has been provisioning. Goes to 0 on successful install and then will no longer be reported.",
+			Help: "Length of time a cluster has been provisioning.",
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
@@ -93,7 +93,7 @@ var (
 		prometheus.GaugeOpts{
 			Name: "hive_cluster_deployment_deprovision_underway_seconds",
 			// Will clear once hive restarts.
-			Help: "Length of time a cluster has been deprovisioning. Goes to 0 on successful deprovision and then will no longer be reported.",
+			Help: "Length of time a cluster has been deprovisioning.",
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
@@ -187,16 +187,25 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 
 				if cd.DeletionTimestamp == nil {
 					if !cd.Spec.Installed {
-						// Similarly for installing clusters we report the seconds since
-						// cluster was created. clusterdeployment_controller should set to 0
-						// once we know we've first observed install success, and then this
-						// metric should no longer be reported.
+						// For installing clusters we report the seconds since
+						// cluster was created. clusterdeployment_controller should delete this for any cluster
+						// that is installed or deleted.
 						MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
 							cd.Name,
 							cd.Namespace,
 							GetClusterDeploymentType(&cd)).Set(
 							time.Since(cd.CreationTimestamp.Time).Seconds())
 					}
+				} else {
+
+					// For deprovisioning clusters we report the seconds since
+					// cluster was deleted. clusterdeployment_controller should delete this
+					// when removing the finalizer.
+					MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
+						cd.Name,
+						cd.Namespace,
+						GetClusterDeploymentType(&cd)).Set(
+						time.Since(cd.CreationTimestamp.Time).Seconds())
 				}
 			}
 

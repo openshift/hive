@@ -5,39 +5,34 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
-	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/yaml"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	imageapi "github.com/openshift/api/image/v1"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-var (
-	releaseInfoCommandTimeout = 5 * time.Minute
-	pollInterval              = 1 * time.Second
-)
-
 const (
 	installerImageResolvedReason         = "InstallerImageResolved"
 	installerImageResolvedMessage        = "InstallerImage is resolved."
 	installerImageResolutionFailedReason = "InstallerImageResolutionFailed"
+	imageReferencesFilename              = "image-references"
 )
 
 // UpdateInstallerImageOptions contains options for running the command
@@ -57,20 +52,20 @@ func NewUpdateInstallerImageCommand() *cobra.Command {
 	opt := &UpdateInstallerImageOptions{}
 	cmd := &cobra.Command{
 		Use:   "update-installer-image OPTIONS",
-		Short: "Updates the installer image and related status on a clusterdeployment based on results from 'oc adm release info'",
+		Short: "Updates the installer image and related status on a clusterdeployment'",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := opt.Complete(); err != nil {
-				log.WithError(err).Error("cannot complete command")
+				log.WithError(err).Fatal("cannot complete command")
 				return
 			}
 
 			if err := opt.Validate(); err != nil {
-				log.WithError(err).Error("invalid command options")
+				log.WithError(err).Fatal("invalid command options")
 				return
 			}
 
 			if err := opt.Run(); err != nil {
-				log.WithError(err).Fatal("runtime error")
+				log.WithError(err).Fatal("failed to set images")
 			}
 		},
 	}
@@ -101,18 +96,6 @@ func (o *UpdateInstallerImageOptions) Complete() error {
 		Level: level,
 	})
 
-	if len(o.WorkDir) == 0 {
-		log.Error("work directory not set")
-	}
-	absPath, err := filepath.Abs(o.WorkDir)
-	if err != nil {
-		o.log.WithError(err).Fatalf("error finding absolute workdir path")
-	}
-	o.WorkDir = absPath
-	if _, err := os.Stat(o.WorkDir); os.IsNotExist(err) {
-		o.log.WithField("workdir", o.WorkDir).Fatalf("workdir does not exist")
-	}
-
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
 	cfg, err := kubeconfig.ClientConfig()
@@ -137,91 +120,71 @@ func (o *UpdateInstallerImageOptions) Validate() error {
 	if o.ClusterDeploymentNamespace == "" {
 		return fmt.Errorf("--cluster-deployment-namespace is required")
 	}
+	if len(o.WorkDir) == 0 {
+		return errors.New("--workdir is required")
+	}
+	fi, err := os.Stat(o.WorkDir)
+	if err != nil {
+		return errors.New("could not access workdir")
+	}
+	if !fi.IsDir() {
+		return errors.New("workdir is not a directory")
+	}
+	if _, err := os.Stat(filepath.Join(o.WorkDir, imageReferencesFilename)); err != nil {
+		return errors.Errorf("could not get %s file in workdir", imageReferencesFilename)
+	}
 	return nil
 }
 
-// Run updates the given ClusterImageSet based on the results of the 'oc adm release info'
-// This command does the following:
-// 1. Wait for the existence of ${workdir}/success
-// 2. Determine based on the contents of that file whether the command was successful or not
-// 3. If successful, obtain install image from ${workdir}/installer-image.txt
-// 4. If failed, obtain error log from ${workdir}/error.log
-// 3. Update the status of the ClusterImageSet based on those results
-func (o *UpdateInstallerImageOptions) Run() error {
-	successFileName := path.Join(o.WorkDir, "success")
-	success := false
-	o.log.Debug("starting to wait for success result")
-	err := wait.PollImmediate(pollInterval, releaseInfoCommandTimeout, func() (bool, error) {
-		_, err := os.Stat(successFileName)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				o.log.WithError(err).Warningf("unexpected error trying to stat %s", successFileName)
-			}
-			return false, nil
-		}
-		result, err := ioutil.ReadFile(successFileName)
-		if err != nil {
-			o.log.WithError(err).Warningf("unexpected error trying to read %s", successFileName)
-			return false, nil
-		}
-		if len(string(result)) == 0 {
-			// keep waiting for content
-			return false, nil
-		}
-		o.log.Debugf("contents of success file: %s", strings.TrimSpace(string(result)))
-		success = strings.TrimSpace(string(result)) == "1"
-		return true, nil
-	})
-	if err != nil {
-		o.log.WithError(err).Error("timed out waiting for result")
-		return err
-	}
-
-	if success {
-		o.log.Debugf("the oc release info command was successful")
-		installerImageFileName := path.Join(o.WorkDir, "installer-image.txt")
-		installerImageBytes, err := ioutil.ReadFile(installerImageFileName)
-		if err != nil {
-			o.log.WithError(err).Error("could not read install image file")
-			return err
-		}
-		installerImage := strings.TrimSpace(string(installerImageBytes))
-		o.log.Debugf("contents of installer-image.txt: %s", installerImage)
-
-		cliImageFileName := path.Join(o.WorkDir, "cli-image.txt")
-		cliImageBytes, err := ioutil.ReadFile(cliImageFileName)
-		if err != nil {
-			o.log.WithError(err).Error("could not read install image file")
-			return err
-		}
-		cliImage := strings.TrimSpace(string(cliImageBytes))
-		o.log.Debugf("contents of cli-image.txt: %s", cliImage)
-
-		return o.updateInstallerImage(installerImage, cliImage)
-	}
-
-	o.log.Debugf("the oc release info command failed")
-	errorLogFileName := path.Join(o.WorkDir, "error.log")
-	errorLogBytes, err := ioutil.ReadFile(errorLogFileName)
-	if err != nil {
-		o.log.WithError(err).Error("could not read error log")
-		return err
-	}
-	errorLog := string(errorLogBytes)
-	o.log.Debugf("the contents of the error log: %s", errorLog)
-	return o.setImageResolutionErrorCondition(errorLog)
-}
-
-func (o *UpdateInstallerImageOptions) updateInstallerImage(installerImage, cliImage string) error {
+// Run updates the given ClusterDeployment based on the image-references file.
+func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 	cd := &hivev1.ClusterDeployment{}
 	cdName := types.NamespacedName{Namespace: o.ClusterDeploymentNamespace, Name: o.ClusterDeploymentName}
 	logger := o.log.WithField("clusterdeployment", cdName)
 	logger.Debug("fetching clusterdeployment")
 	err := o.client.Get(context.TODO(), cdName, cd)
 	if err != nil {
-		logger.WithError(err).Error("failed to get ClusterDeployment")
-		return err
+		return errors.Wrap(err, "failed to get ClusterDeployment")
 	}
+
+	defer func() {
+		if returnErr == nil {
+			return
+		}
+		o.setImageResolutionErrorCondition(cd, returnErr)
+	}()
+
+	imageStreamData, err := ioutil.ReadFile(filepath.Join(o.WorkDir, imageReferencesFilename))
+	if err != nil {
+		return errors.Wrapf(err, "could not read %s file", imageReferencesFilename)
+	}
+	is := &imageapi.ImageStream{}
+	if err := yaml.Unmarshal(imageStreamData, &is); err != nil {
+		return errors.Wrap(err, "unable to load release image-references")
+	}
+	if is.Kind != "ImageStream" || is.APIVersion != "image.openshift.io/v1" {
+		return errors.Wrap(err, "unrecognized image-references in release payload")
+	}
+
+	installerTagName := "installer"
+	// If this is a bare metal install, we need to get the openshift-install binary from a different image with
+	// bare metal functionality compiled in. The binary is named the same and in the same location, so after swapping
+	// out what image to get it from, we can proceed with the code as we normally would.
+	if cd.Spec.Platform.BareMetal != nil {
+		installerTagName = "baremetal-installer"
+	}
+	installerImage, err := findImageSpec(is, installerTagName)
+	if err != nil {
+		return errors.Wrap(err, "could not get installer image")
+	}
+	o.log.WithField("installerImage", installerImage).Info("installer image found")
+
+	cliImage, err := findImageSpec(is, "cli")
+	if err != nil {
+		return errors.Wrap(err, "could not get cli image")
+	}
+	o.log.WithField("cliImage", cliImage).Info("cli image found")
+
 	cd.Status.InstallerImage = &installerImage
 	cd.Status.CLIImage = &cliImage
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
@@ -233,30 +196,36 @@ func (o *UpdateInstallerImageOptions) updateInstallerImage(installerImage, cliIm
 		controllerutils.UpdateConditionNever)
 
 	logger.Debug("updating clusterdeployment status")
-	return o.client.Status().Update(context.TODO(), cd)
+	return errors.Wrap(
+		o.client.Status().Update(context.TODO(), cd),
+		"could not update clusterdeployment with images",
+	)
 }
 
-func (o *UpdateInstallerImageOptions) setImageResolutionErrorCondition(errorLog string) error {
-	cd := &hivev1.ClusterDeployment{}
-	cdName := types.NamespacedName{Namespace: o.ClusterDeploymentNamespace, Name: o.ClusterDeploymentName}
-	logger := o.log.WithField("clusterdeployment", cdName)
-	logger.Debug("fetching clusterdeployment")
-	err := o.client.Get(context.TODO(), cdName, cd)
-	if err != nil {
-		logger.WithError(err).Errorf("failed to get ClusterDeployment")
-		return err
+func findImageSpec(image *imageapi.ImageStream, tagName string) (string, error) {
+	for _, tag := range image.Spec.Tags {
+		if tag.Name == tagName {
+			if tag.From != nil && tag.From.Kind == "DockerImage" && len(tag.From.Name) > 0 {
+				return tag.From.Name, nil
+			}
+		}
 	}
-	message := fmt.Sprintf("Failed to resolve image: %s", errorLog)
+	return "", fmt.Errorf("no image tag %q exists in the release image", tagName)
+}
+
+func (o *UpdateInstallerImageOptions) setImageResolutionErrorCondition(cd *hivev1.ClusterDeployment, err error) {
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
 		cd.Status.Conditions,
 		hivev1.InstallerImageResolutionFailedCondition,
 		corev1.ConditionTrue,
 		installerImageResolutionFailedReason,
-		message,
+		err.Error(),
 		controllerutils.UpdateConditionAlways)
 
-	logger.Debug("updating cluster deployment status")
-	return o.client.Status().Update(context.TODO(), cd)
+	o.log.Debug("updating cluster deployment status")
+	if err := o.client.Status().Update(context.TODO(), cd); err != nil {
+		o.log.WithError(err).Error("could not update clusterdeployment with error condition")
+	}
 }
 
 func getClient(kubeConfig *rest.Config) (client.Client, error) {

@@ -169,6 +169,19 @@ const (
 
 	// AWSChinaRegionPrefix is the prefix for regions in AWS China.
 	AWSChinaRegionPrefix = "cn-"
+
+	// SSHPrivateKeySecretKey is the key we use in a Kubernetes Secret containing an SSH private key.
+	SSHPrivateKeySecretKey = "ssh-privatekey"
+
+	// RawKubeconfigSecretKey is the key we use in a Kubernetes Secret containing the raw (unmodified) form of
+	// an admin kubeconfig. (before Hive injects things such as additional CAs)
+	RawKubeconfigSecretKey = "raw-kubeconfig"
+
+	// TLSCrtSecretKey is the key we use in a Kubernetes Secret containing a TLS certificate.
+	TLSCrtSecretKey = "tls.crt"
+
+	// TLSKeySecretKey is the key we use in a Kubernetes Secret containing a TLS certificate key.
+	TLSKeySecretKey = "tls.key"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

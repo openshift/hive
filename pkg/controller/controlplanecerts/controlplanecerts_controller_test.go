@@ -377,8 +377,8 @@ func fakeCertSecret(name string) *corev1.Secret {
 	s.Name = name
 	s.Namespace = fakeNamespace
 	s.Data = map[string][]byte{
-		"tls.key": []byte("blah"),
-		"tls.crt": []byte("blah"),
+		constants.TLSKeySecretKey: []byte("blah"),
+		constants.TLSCrtSecretKey: []byte("blah"),
 	}
 	s.Type = corev1.SecretTypeTLS
 	return s

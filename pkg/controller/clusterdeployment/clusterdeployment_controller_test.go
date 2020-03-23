@@ -263,7 +263,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					akcSecret)
 				require.NoError(t, err)
 				require.NotNil(t, akcSecret)
-				assert.Contains(t, akcSecret.Data, rawAdminKubeconfigKey)
+				assert.Contains(t, akcSecret.Data, constants.RawKubeconfigSecretKey)
 			},
 		},
 		{
@@ -294,7 +294,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					akcSecret)
 				require.NoError(t, err)
 				require.NotNil(t, akcSecret)
-				assert.Contains(t, akcSecret.Data, rawAdminKubeconfigKey)
+				assert.Contains(t, akcSecret.Data, constants.RawKubeconfigSecretKey)
 			},
 		},
 		{

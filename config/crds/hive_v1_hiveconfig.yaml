@@ -89,10 +89,6 @@ spec:
               description: HiveAPIEnabled is a boolean controlling whether or not
                 the Hive operator will start up the v1alpha1 aggregated API server.
               type: boolean
-            imageExtractionCLIImage:
-              description: ImageExtractionCLIImage can be set to override the location
-                of the image with the oc command line tool.
-              type: string
             logLevel:
               description: LogLevel is the level of logging to use for the Hive controllers.
                 Acceptable levels, from coarsest to finest, are panic, fatal, error,

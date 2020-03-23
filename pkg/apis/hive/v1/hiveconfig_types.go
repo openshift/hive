@@ -57,10 +57,6 @@ type HiveConfigSpec struct {
 
 	// DeprovisionsDisabled can be set to true to block deprovision jobs from running.
 	DeprovisionsDisabled *bool `json:"deprovisionsDisabled,omitempty"`
-
-	// ImageExtractionCLIImage can be set to override the location of
-	// the image with the oc command line tool.
-	ImageExtractionCLIImage string `json:"imageExtractionCLIImage,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

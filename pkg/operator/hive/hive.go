@@ -46,15 +46,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 	hiveContainer := &hiveDeployment.Spec.Template.Spec.Containers[0]
 
-	cliImage := images.DefaultCLIImage
-	if instance.Spec.ImageExtractionCLIImage != "" {
-		cliImage = instance.Spec.ImageExtractionCLIImage
-	}
-	hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
-		Name:  images.CLIImageEnvVar,
-		Value: cliImage,
-	})
-
 	if r.hiveImage != "" {
 		hiveContainer.Image = r.hiveImage
 		hiveImageEnvVar := corev1.EnvVar{

@@ -4,25 +4,12 @@ import (
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
-const (
-	testCLIImage           = "registry.io/cli-image:latest"
-	testCLIImagePullPolicy = corev1.PullNever
-)
-
-var (
-	testCLIImageSpec = ImageSpec{
-		Image:      testCLIImage,
-		PullPolicy: testCLIImagePullPolicy,
-	}
-)
-
 func TestGenerateImageSetJob(t *testing.T) {
-	job := GenerateImageSetJob(testClusterDeployment(), testImageSet().Spec.ReleaseImage, "test-service-account", testCLIImageSpec)
+	job := GenerateImageSetJob(testClusterDeployment(), testImageSet().Spec.ReleaseImage, "test-service-account")
 	validateJob(t, job)
 }
 
@@ -47,37 +34,15 @@ func validateJob(t *testing.T, job *batchv1.Job) {
 	if job.Namespace != testClusterDeployment().Namespace {
 		t.Errorf("unexpected job namespace: %s", job.Namespace)
 	}
-	if len(job.Spec.Template.Spec.Containers) != 2 {
-		t.Errorf("unexpected number of containers")
+	if len(job.Spec.Template.Spec.InitContainers) != 1 {
+		t.Errorf("unexpected number of init containers")
 	}
-	if !hasVariable(job, "RELEASE_IMAGE") {
-		t.Errorf("missing RELEASE_IMAGE environment variable")
+	if len(job.Spec.Template.Spec.Containers) != 1 {
+		t.Errorf("unexpected number of containers")
 	}
 	if !hasVolume(job, "common") {
 		t.Errorf("missing common volume")
 	}
-	if !hasVariable(job, "PULL_SECRET") {
-		t.Errorf("missing PULL_SECRET env var")
-	}
-	if !hasVolume(job, "pullsecret") {
-		t.Errorf("missing pull secret volume")
-	}
-}
-
-func hasVariable(job *batchv1.Job, name string) bool {
-	for _, c := range job.Spec.Template.Spec.Containers {
-		found := false
-		for _, e := range c.Env {
-			if e.Name == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 func hasVolume(job *batchv1.Job, name string) bool {

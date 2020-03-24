@@ -6,8 +6,10 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -24,7 +26,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -164,25 +166,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/rbac/hive_frontend_role_binding.yaml",
 		"config/rbac/hive_frontend_serviceaccount.yaml",
 
-		// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
-		// the latest in the operator to ensure updates roll out.
-		// TODO: Attempt removing this once Hive is running purely on 4.x,
-		// as it requires a significant privilege escalation we would rather
-		// leave in the hands of OLM.
-		"config/crds/hive_v1_checkpoint.yaml",
-		"config/crds/hive_v1_clusterdeployment.yaml",
-		"config/crds/hive_v1_clusterdeprovision.yaml",
-		"config/crds/hive_v1_clusterimageset.yaml",
-		"config/crds/hive_v1_clusterprovision.yaml",
-		"config/crds/hive_v1_clusterstate.yaml",
-		"config/crds/hive_v1_dnszone.yaml",
-		"config/crds/hive_v1_hiveconfig.yaml",
-		"config/crds/hive_v1_selectorsyncidentityprovider.yaml",
-		"config/crds/hive_v1_selectorsyncset.yaml",
-		"config/crds/hive_v1_syncidentityprovider.yaml",
-		"config/crds/hive_v1_syncset.yaml",
-		"config/crds/hive_v1_syncsetinstance.yaml",
-
 		"config/configmaps/install-log-regexes-configmap.yaml",
 	}
 
@@ -202,6 +185,22 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		}
 	}
 
+	// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
+	// the latest in the operator to ensure updates roll out.
+	// TODO: Attempt removing this once Hive is running purely on 4.x,
+	// as it requires a significant privilege escalation we would rather
+	// leave in the hands of OLM.
+	crdFiles, err := assets.AssetDir("config/crds")
+	if err != nil {
+		return errors.Wrap(err, "error listing CRD asset files")
+	}
+	for _, a := range crdFiles {
+		crdPath := filepath.Join("config/crds", a)
+		if err := util.ApplyAsset(h, crdPath, hLog); err != nil {
+			return errors.Wrapf(err, "unable to apply CRD %s", crdPath)
+		}
+	}
+
 	isOpenShift, err := r.runningOnOpenShift(hLog)
 	if err != nil {
 		return err
@@ -216,32 +215,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		}
 	} else {
 		hLog.Warn("hive is not running on OpenShift, some optional assets will not be deployed")
-	}
-
-	// Remove legacy ClusterImageSets we do not want installable anymore.
-	removeImageSets := []string{
-		"openshift-v4.0-beta3",
-		"openshift-v4.0-beta4",
-		"openshift-v4.0-latest",
-	}
-	for _, isName := range removeImageSets {
-		clusterImageSet := &hivev1.ClusterImageSet{}
-		err := r.Get(context.Background(), types.NamespacedName{Name: isName}, clusterImageSet)
-		if err != nil && !errors.IsNotFound(err) {
-			hLog.WithError(err).Error("error looking for obsolete ClusterImageSet")
-			return err
-		} else if err != nil {
-			hLog.WithField("clusterImageSet", isName).Debug("legacy ClusterImageSet does not exist")
-		} else {
-			err = r.Delete(context.Background(), clusterImageSet)
-			if err != nil {
-				hLog.WithError(err).WithField("clusterImageSet", clusterImageSet).Error(
-					"error deleting outdated ClusterImageSet")
-				return err
-			}
-			hLog.WithField("clusterImageSet", isName).Info("deleted outdated ClusterImageSet")
-		}
-
 	}
 
 	hLog.Info("all hive components successfully reconciled")
@@ -340,7 +313,7 @@ func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) (bool, er
 	deploymentConfigGroupVersion := oappsv1.GroupVersion.String()
 	list, err := r.discoveryClient.ServerResourcesForGroupVersion(deploymentConfigGroupVersion)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			hLog.WithError(err).Debug("DeploymentConfig objects not found, not running on OpenShift")
 			return false, nil
 		}

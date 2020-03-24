@@ -286,6 +286,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
 		}
 	}
+	if newObject.Spec.Platform.OpenStack != nil {
+		numberOfPlatforms++
+		openstack := newObject.Spec.Platform.OpenStack
+		openstackPath := platformPath.Child("openStack")
+		if openstack.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(openstackPath.Child("credentialsSecretRef", "name"), "must specify secrets for OpenStack access"))
+		}
+		if openstack.Cloud == "" {
+			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
+		}
+	}
 	if newObject.Spec.Platform.BareMetal != nil {
 		numberOfPlatforms++
 	}

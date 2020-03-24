@@ -18,6 +18,7 @@ import (
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -83,6 +84,15 @@ func validAzureClusterDeployment() *hivev1.ClusterDeployment {
 		CredentialsSecretRef:        corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		Region:                      "test-region",
 		BaseDomainResourceGroupName: "os4-common",
+	}
+	return cd
+}
+
+func validOpenStackClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.OpenStack = &hivev1openstack.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		Cloud:                "somecloud",
 	}
 	return cd
 }
@@ -641,6 +651,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			}(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
+		},
+		{
+			name:            "OpenStack create valid",
+			newObject:       validOpenStackClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
 		},
 	}
 

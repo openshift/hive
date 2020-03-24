@@ -7,6 +7,7 @@ import (
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/apis/hive/v1/openstack"
 )
 
 // MachinePoolSpec defines the desired state of MachinePool
@@ -63,6 +64,8 @@ type MachinePoolPlatform struct {
 	Azure *azure.MachinePool `json:"azure,omitempty"`
 	// GCP is the configuration used when installing on GCP.
 	GCP *gcp.MachinePool `json:"gcp,omitempty"`
+	// OpenStack is the configuration used when installing on OpenStack.
+	OpenStack *openstack.MachinePool `json:"openstack,omitempty"`
 }
 
 // MachinePoolStatus defines the observed state of MachinePool

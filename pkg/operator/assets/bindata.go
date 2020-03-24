@@ -2032,6 +2032,19 @@ spec:
                         will be created.
                       type: string
                   type: object
+                openstack:
+                  description: OpenStack is the configuration used when installing
+                    on OpenStack
+                  properties:
+                    cloud:
+                      description: Cloud will be used to indicate the OS_CLOUD value
+                        to use the right section from the cloud.yaml in the CredentialsSecretRef.
+                      type: string
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
+                        the OpenStack account access credentials.
+                      type: object
+                  type: object
               type: object
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
@@ -2454,6 +2467,18 @@ spec:
                     region:
                       description: Region is the GCP region for this deprovision
                       type: string
+                  type: object
+                openstack:
+                  description: OpenStack contains OpenStack-specific deprovision settings
+                  properties:
+                    cloud:
+                      description: Cloud is the secion in the clouds.yaml secret below
+                        to use for auth/connectivity.
+                      type: string
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the OpenStack account credentials
+                        to use for deprovisioning the cluster
+                      type: object
                   type: object
               type: object
           type: object
@@ -3308,6 +3333,29 @@ spec:
                       items:
                         type: string
                       type: array
+                  type: object
+                openstack:
+                  description: OpenStack is the configuration used when installing
+                    on OpenStack.
+                  properties:
+                    rootVolume:
+                      description: RootVolume defines the root volume for instances
+                        in the machine pool. The instances use ephemeral disks if
+                        not set.
+                      properties:
+                        size:
+                          description: Size defines the size of the volume in gibibytes
+                            (GiB). Required
+                          format: int64
+                          type: integer
+                        type:
+                          description: Type defines the type of the volume. Required
+                          type: string
+                      type: object
+                    type:
+                      description: FlavorName defines the OpenStack Nova flavor. eg.
+                        m1.large
+                      type: string
                   type: object
               type: object
             replicas:

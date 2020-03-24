@@ -15,5 +15,6 @@ func NewDeprovisionCommand() *cobra.Command {
 	}
 	cmd.AddCommand(NewDeprovisionAzureCommand())
 	cmd.AddCommand(NewDeprovisionGCPCommand())
+	cmd.AddCommand(NewDeprovisionOpenStackCommand())
 	return cmd
 }

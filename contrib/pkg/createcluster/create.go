@@ -5,6 +5,7 @@ import (
 	"fmt"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"io/ioutil"
@@ -78,6 +79,7 @@ const (
 	cloudAWS             = "aws"
 	cloudAzure           = "azure"
 	cloudGCP             = "gcp"
+	cloudOpenStack       = "openstack"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -91,9 +93,10 @@ type: TestFailResource
 
 var (
 	validClouds = map[string]bool{
-		cloudAWS:   true,
-		cloudAzure: true,
-		cloudGCP:   true,
+		cloudAWS:       true,
+		cloudAzure:     true,
+		cloudGCP:       true,
+		cloudOpenStack: true,
 	}
 )
 
@@ -131,9 +134,17 @@ type Options struct {
 	AdoptClusterID           string
 	AdoptAdminUsername       string
 	AdoptAdminPassword       string
+	MachineNetwork           string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
+
+	// OpenStack
+	OpenStackCloud           string
+	OpenStackExternalNetwork string
+	OpenStackMasterFlavor    string
+	OpenStackComputeFlavor   string
+	OpenStackAPIFloatingIP   string
 
 	homeDir string
 }
@@ -160,7 +171,8 @@ func NewCreateClusterCommand() *cobra.Command {
 		Use: `create-cluster CLUSTER_DEPLOYMENT_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -181,7 +193,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp)")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp|openstack)")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -196,7 +208,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
 	flags.StringVar(&opt.ServingCert, "serving-cert", "", "Serving certificate for control plane and routes")
 	flags.StringVar(&opt.ServingCertKey, "serving-cert-key", "", "Serving certificate key for control plane and routes")
-	flags.BoolVar(&opt.ManageDNS, "manage-dns", false, "Manage this cluster's DNS. This is only available for AWS.")
+	flags.BoolVar(&opt.ManageDNS, "manage-dns", false, "Manage this cluster's DNS. This is only available for AWS and GCP.")
 	flags.BoolVar(&opt.UseClusterImageSet, "use-image-set", true, "If true(default), use a cluster image set for this cluster")
 	flags.StringVarP(&opt.Output, "output", "o", "", "Output of this command (nothing will be created on cluster). Valid values: yaml,json")
 	flags.BoolVar(&opt.IncludeSecrets, "include-secrets", true, "Include secrets along with ClusterDeployment")
@@ -206,6 +218,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 	flags.Int64Var(&opt.WorkerNodesCount, "workers", 3, "Number of worker nodes to create.")
 	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
+	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -217,6 +230,13 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
+
+	// OpenStack flags
+	flags.StringVar(&opt.OpenStackCloud, "openstack-cloud", "openstack", "Section of clouds.yaml to use for API/auth")
+	flags.StringVar(&opt.OpenStackExternalNetwork, "openstack-external-network", "provider_net_shared_3", "External OpenStack network name to deploy into")
+	flags.StringVar(&opt.OpenStackMasterFlavor, "openstack-master-flavor", "ci.m4.xlarge", "Compute flavor to use for master nodes")
+	flags.StringVar(&opt.OpenStackComputeFlavor, "openstack-compute-flavor", "m1.large", "Compute flavor to use for worker nodes")
+	flags.StringVar(&opt.OpenStackAPIFloatingIP, "openstack-api-floating-ip", "", "Floating IP address to use for cluster's API")
 
 	return cmd
 }
@@ -248,6 +268,16 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		cmd.Usage()
 		log.Infof("Unsupported cloud: %s", o.Cloud)
 		return fmt.Errorf("unsupported cloud: %s", o.Cloud)
+	}
+	if o.Cloud == cloudOpenStack {
+		if o.OpenStackAPIFloatingIP == "" {
+			log.Info("Missing openstack-api-floating-ip parameter")
+			return fmt.Errorf("Missing openstack-api-floating-ip parameter")
+		}
+		if o.OpenStackCloud == "" {
+			log.Info("Missing openstack-cloud parameter")
+			return fmt.Errorf("Missing openstack-cloud parameter")
+		}
 	}
 
 	if o.Adopt {
@@ -373,6 +403,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			hiveutilCreatedLabel: "true",
 		},
 		InstallerManifests: manifestFileData,
+		MachineNetwork:     o.MachineNetwork,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
@@ -433,6 +464,22 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			ServiceAccount: creds,
 		}
 		builder.CloudBuilder = gcpProvider
+	case cloudOpenStack:
+		cloudsYAMLContent, err := openstackutils.GetCreds(o.CredsFile)
+		if err != nil {
+			return nil, err
+		}
+		openStackProvider := &clusterresource.OpenStackCloudBuilder{
+			Cloud:             o.OpenStackCloud,
+			CloudsYAMLContent: cloudsYAMLContent,
+			ExternalNetwork:   o.OpenStackExternalNetwork,
+			ComputeFlavor:     o.OpenStackComputeFlavor,
+			MasterFlavor:      o.OpenStackMasterFlavor,
+			APIFloatingIP:     o.OpenStackAPIFloatingIP,
+		}
+		builder.SkipMachinePoolGeneration = true
+		builder.CloudBuilder = openStackProvider
+
 	}
 
 	if len(o.ServingCert) != 0 {

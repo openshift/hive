@@ -140,6 +140,29 @@ spec:
                         type: string
                       type: array
                   type: object
+                openstack:
+                  description: OpenStack is the configuration used when installing
+                    on OpenStack.
+                  properties:
+                    rootVolume:
+                      description: RootVolume defines the root volume for instances
+                        in the machine pool. The instances use ephemeral disks if
+                        not set.
+                      properties:
+                        size:
+                          description: Size defines the size of the volume in gibibytes
+                            (GiB). Required
+                          format: int64
+                          type: integer
+                        type:
+                          description: Type defines the type of the volume. Required
+                          type: string
+                      type: object
+                    type:
+                      description: FlavorName defines the OpenStack Nova flavor. eg.
+                        m1.large
+                      type: string
+                  type: object
               type: object
             replicas:
               description: Replicas is the count of machines for this machine pool.

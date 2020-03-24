@@ -396,7 +396,7 @@ spec:
   controlPlaneConfig:
     servingCertificates: {}
   platform:
-    bareMetal:
+    baremetal:
       libvirtSSHPrivateKeySecretRef:
         name: provisioning-host-ssh-private-key
   provisioning:

@@ -320,7 +320,7 @@ type Platform struct {
 	GCP *gcp.Platform `json:"gcp,omitempty"`
 
 	// BareMetal is the configuration used when installing on bare metal.
-	BareMetal *baremetal.Platform `json:"bareMetal,omitempty"`
+	BareMetal *baremetal.Platform `json:"baremetal,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

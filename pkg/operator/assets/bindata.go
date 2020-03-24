@@ -2007,7 +2007,7 @@ spec:
                         will be created.
                       type: string
                   type: object
-                bareMetal:
+                baremetal:
                   description: BareMetal is the configuration used when installing
                     on bare metal.
                   properties:

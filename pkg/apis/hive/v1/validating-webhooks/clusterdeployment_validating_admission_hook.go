@@ -1,7 +1,6 @@
 package validatingwebhooks
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -19,9 +18,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-
 	"github.com/openshift/hive/pkg/manageddns"
 )
 
@@ -40,11 +39,12 @@ var (
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterDeploymentValidatingAdmissionHook struct {
+	decoder             *admission.Decoder
 	validManagedDomains []string
 }
 
 // NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
-func NewClusterDeploymentValidatingAdmissionHook() *ClusterDeploymentValidatingAdmissionHook {
+func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *ClusterDeploymentValidatingAdmissionHook {
 	logger := log.WithField("validating_webhook", "clusterdeployment")
 	managedDomains, err := manageddns.ReadManagedDomainsFile()
 	if err != nil {
@@ -56,6 +56,7 @@ func NewClusterDeploymentValidatingAdmissionHook() *ClusterDeploymentValidatingA
 	}
 	logger.WithField("managedDomains", domains).Info("Read managed domains")
 	return &ClusterDeploymentValidatingAdmissionHook{
+		decoder:             decoder,
 		validManagedDomains: domains,
 	}
 }
@@ -169,8 +170,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	})
 
 	newObject := &hivev1.ClusterDeployment{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -331,8 +331,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	})
 
 	newObject := &hivev1.ClusterDeployment{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -347,8 +346,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	contextLogger.Data["object.Name"] = newObject.Name
 
 	oldObject := &hivev1.ClusterDeployment{}
-	err = json.Unmarshal(admissionSpec.OldObject.Raw, oldObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling OldObject: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

@@ -57,7 +57,7 @@ func Test_MachinePoolAdmission_Validate_Kind(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &MachinePoolValidatingAdmissionHook{}
+			cut := NewMachinePoolValidatingAdmissionHook(createDecoder(t))
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -95,7 +95,7 @@ func Test_MachinePoolAdmission_Validate_Operation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &MachinePoolValidatingAdmissionHook{}
+			cut := NewMachinePoolValidatingAdmissionHook(createDecoder(t))
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -440,7 +440,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &MachinePoolValidatingAdmissionHook{}
+			cut := NewMachinePoolValidatingAdmissionHook(createDecoder(t))
 			cut.Initialize(nil, nil)
 			rawProvision, err := json.Marshal(tc.provision)
 			if !assert.NoError(t, err, "unexpected error marshalling provision") {
@@ -531,7 +531,7 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &MachinePoolValidatingAdmissionHook{}
+			cut := NewMachinePoolValidatingAdmissionHook(createDecoder(t))
 			cut.Initialize(nil, nil)
 			oldAsJSON, err := json.Marshal(tc.old)
 			if !assert.NoError(t, err, "unexpected error marshalling old provision") {

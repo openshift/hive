@@ -2,12 +2,9 @@ package validatingwebhooks
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
-
 	"net/http"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -15,9 +12,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 const (
@@ -45,7 +44,12 @@ var (
 
 // ClusterProvisionValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterProvisionValidatingAdmissionHook struct {
-	decoder runtime.Decoder
+	decoder *admission.Decoder
+}
+
+// NewClusterProvisionValidatingAdmissionHook constructs a new ClusterProvisionValidatingAdmissionHook
+func NewClusterProvisionValidatingAdmissionHook(decoder *admission.Decoder) *ClusterProvisionValidatingAdmissionHook {
+	return &ClusterProvisionValidatingAdmissionHook{decoder: decoder}
 }
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
@@ -74,10 +78,6 @@ func (a *ClusterProvisionValidatingAdmissionHook) Initialize(kubeClientConfig *r
 		"version":  "v1",
 		"resource": "clusterprovisionvalidator",
 	}).Info("Initializing validation REST resource")
-
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	a.decoder = serializer.NewCodecFactory(scheme).UniversalDecoder(hivev1.SchemeGroupVersion)
 
 	return nil // No initialization needed right now.
 }
@@ -146,7 +146,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) shouldValidate(request *admiss
 func (a *ClusterProvisionValidatingAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) *admissionv1beta1.AdmissionResponse {
 	logger = logger.WithField("method", "validateCreateRequest")
 
-	newObject, resp := a.decode(&request.Object, logger.WithField("decode", "Object"))
+	newObject, resp := a.decode(request.Object, logger.WithField("decode", "Object"))
 	if resp != nil {
 		return resp
 	}
@@ -175,7 +175,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateCreateRequest(request 
 func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) *admissionv1beta1.AdmissionResponse {
 	logger = logger.WithField("method", "validateUpdateRequest")
 
-	newObject, resp := a.decode(&request.Object, logger.WithField("decode", "Object"))
+	newObject, resp := a.decode(request.Object, logger.WithField("decode", "Object"))
 	if resp != nil {
 		return resp
 	}
@@ -184,7 +184,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request 
 		WithField("object.Name", newObject.Name).
 		WithField("object.Namespace", newObject.Namespace)
 
-	oldObject, resp := a.decode(&request.OldObject, logger.WithField("decode", "OldObject"))
+	oldObject, resp := a.decode(request.OldObject, logger.WithField("decode", "OldObject"))
 	if resp != nil {
 		return resp
 	}
@@ -205,9 +205,9 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request 
 	}
 }
 
-func (a *ClusterProvisionValidatingAdmissionHook) decode(raw *runtime.RawExtension, logger log.FieldLogger) (*hivev1.ClusterProvision, *admissionv1beta1.AdmissionResponse) {
+func (a *ClusterProvisionValidatingAdmissionHook) decode(raw runtime.RawExtension, logger log.FieldLogger) (*hivev1.ClusterProvision, *admissionv1beta1.AdmissionResponse) {
 	obj := &hivev1.ClusterProvision{}
-	if _, _, err := a.decoder.Decode(raw.Raw, nil, obj); err != nil {
+	if err := a.decoder.DecodeRaw(raw, obj); err != nil {
 		logger.WithError(err).Error("failed to decode")
 		return nil, &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

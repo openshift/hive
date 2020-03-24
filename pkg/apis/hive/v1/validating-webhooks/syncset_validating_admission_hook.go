@@ -2,12 +2,9 @@ package validatingwebhooks
 
 import (
 	"encoding/json"
-
-	log "github.com/sirupsen/logrus"
-
 	"net/http"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 const (
@@ -43,7 +43,14 @@ var validPatchTypes = map[string]bool{
 var validPatchTypeSlice = []string{"json", "merge", "strategic"}
 
 // SyncSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-type SyncSetValidatingAdmissionHook struct{}
+type SyncSetValidatingAdmissionHook struct {
+	decoder *admission.Decoder
+}
+
+// NewSyncSetValidatingAdmissionHook constructs a new SyncSetValidatingAdmissionHook
+func NewSyncSetValidatingAdmissionHook(decoder *admission.Decoder) *SyncSetValidatingAdmissionHook {
+	return &SyncSetValidatingAdmissionHook{decoder: decoder}
+}
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
@@ -153,8 +160,7 @@ func (a *SyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	})
 
 	newObject := &hivev1.SyncSet{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -200,8 +206,7 @@ func (a *SyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	})
 
 	newObject := &hivev1.SyncSet{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

@@ -1,19 +1,18 @@
 package validatingwebhooks
 
 import (
-	"encoding/json"
+	"net/http"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
-
-	"net/http"
-
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 const (
@@ -23,7 +22,14 @@ const (
 )
 
 // ClusterImageSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-type ClusterImageSetValidatingAdmissionHook struct{}
+type ClusterImageSetValidatingAdmissionHook struct {
+	decoder *admission.Decoder
+}
+
+// NewClusterImageSetValidatingAdmissionHook constructs a new ClusterImageSetValidatingAdmissionHook
+func NewClusterImageSetValidatingAdmissionHook(decoder *admission.Decoder) *ClusterImageSetValidatingAdmissionHook {
+	return &ClusterImageSetValidatingAdmissionHook{decoder: decoder}
+}
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
@@ -133,8 +139,7 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	})
 
 	newObject := &hivev1.ClusterImageSet{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -178,8 +183,7 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	})
 
 	newObject := &hivev1.ClusterImageSet{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -194,8 +198,7 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	contextLogger.Data["object.Name"] = newObject.Name
 
 	oldObject := &hivev1.ClusterImageSet{}
-	err = json.Unmarshal(admissionSpec.OldObject.Raw, oldObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling OldObject: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

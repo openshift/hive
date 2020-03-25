@@ -158,6 +158,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec").Child("resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec").Child("patches"))...)
 	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec").Child("secretMappings"))...)
+	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
@@ -204,6 +205,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec", "resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec", "patches"))...)
 	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec", "secretReferences"))...)
+	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()

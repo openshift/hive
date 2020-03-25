@@ -130,9 +130,9 @@ type SyncSetObjectStatus struct {
 	// +optional
 	Resources []SyncStatus `json:"resources,omitempty"`
 
-	// ResourceApplyMode indicates if the Resource apply mode is "upsert" (default) or "sync".
-	// ApplyMode "upsert" indicates create and update.
-	// ApplyMode "sync" indicates create, update and delete.
+	// ResourceApplyMode indicates if the Resource apply mode is "Upsert" (default) or "Sync".
+	// ApplyMode "Upsert" indicates create and update.
+	// ApplyMode "Sync" indicates create, update and delete.
 	// +optional
 	ResourceApplyMode SyncSetResourceApplyMode `json:"resourceApplyMode,omitempty"`
 
@@ -185,9 +185,9 @@ type SyncSetCommonSpec struct {
 	// +optional
 	Resources []runtime.RawExtension `json:"resources,omitempty"`
 
-	// ResourceApplyMode indicates if the Resource apply mode is "upsert" (default) or "sync".
-	// ApplyMode "upsert" indicates create and update.
-	// ApplyMode "sync" indicates create, update and delete.
+	// ResourceApplyMode indicates if the Resource apply mode is "Upsert" (default) or "Sync".
+	// ApplyMode "Upsert" indicates create and update.
+	// ApplyMode "Sync" indicates create, update and delete.
 	// +optional
 	ResourceApplyMode SyncSetResourceApplyMode `json:"resourceApplyMode,omitempty"`
 

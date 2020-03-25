@@ -42,6 +42,21 @@ var validPatchTypes = map[string]bool{
 
 var validPatchTypeSlice = []string{"json", "merge", "strategic"}
 
+var (
+	validResourceApplyModes = map[hivev1.SyncSetResourceApplyMode]bool{
+		hivev1.UpsertResourceApplyMode: true,
+		hivev1.SyncResourceApplyMode:   true,
+	}
+
+	validResourceApplyModeSlice = func() []string {
+		v := make([]string, 0, len(validResourceApplyModes))
+		for m := range validResourceApplyModes {
+			v = append(v, string(m))
+		}
+		return v
+	}()
+)
+
 // SyncSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type SyncSetValidatingAdmissionHook struct {
 	decoder *admission.Decoder
@@ -178,6 +193,7 @@ func (a *SyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec").Child("resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec").Child("patches"))...)
 	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec").Child("secretMappings"))...)
+	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
@@ -224,6 +240,7 @@ func (a *SyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec", "resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec", "patches"))...)
 	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec", "secretMappings"))...)
+	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
@@ -248,6 +265,14 @@ func validatePatches(patches []hivev1.SyncObjectPatch, fldPath *field.Path) fiel
 		if !validPatchTypes[patch.PatchType] {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("PatchType"), patch.PatchType, validPatchTypeSlice))
 		}
+	}
+	return allErrs
+}
+
+func validateResourceApplyMode(resourceApplyMode hivev1.SyncSetResourceApplyMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if resourceApplyMode != "" && !validResourceApplyModes[resourceApplyMode] {
+		allErrs = append(allErrs, field.NotSupported(fldPath, resourceApplyMode, validResourceApplyModeSlice))
 	}
 	return allErrs
 }

@@ -4108,8 +4108,8 @@ spec:
               type: array
             resourceApplyMode:
               description: ResourceApplyMode indicates if the Resource apply mode
-                is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
-                and update. ApplyMode "sync" indicates create, update and delete.
+                is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
+                and update. ApplyMode "Sync" indicates create, update and delete.
               type: string
             resources:
               description: Resources is the list of objects to sync from RawExtension
@@ -4811,8 +4811,8 @@ spec:
               type: array
             resourceApplyMode:
               description: ResourceApplyMode indicates if the Resource apply mode
-                is "upsert" (default) or "sync". ApplyMode "upsert" indicates create
-                and update. ApplyMode "sync" indicates create, update and delete.
+                is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
+                and update. ApplyMode "Sync" indicates create, update and delete.
               type: string
             resources:
               description: Resources is the list of objects to sync from RawExtension

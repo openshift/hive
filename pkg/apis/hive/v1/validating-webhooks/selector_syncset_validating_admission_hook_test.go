@@ -149,6 +149,86 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name:      "Test valid empty string resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = ""
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid empty string resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = ""
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Upsert resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Upsert"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Upsert resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Upsert"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Sync resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Sync"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Sync resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Sync"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test invalid resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "sync"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "sync"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
 			name:            "Test invalid unmarshalable TypeMeta Resource create",
 			operation:       admissionv1beta1.Create,
 			selectorSyncSet: testSelectorSyncSetWithResources(`{"apiVersion": 798786}`),

@@ -245,7 +245,7 @@ func newSyncSetSpec(cd *hivev1.ClusterDeployment, rawExtensions []runtime.RawExt
 		SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
 			Resources:         rawExtensions,
 			Secrets:           secretMappings,
-			ResourceApplyMode: "sync",
+			ResourceApplyMode: hivev1.SyncResourceApplyMode,
 		},
 		ClusterDeploymentRefs: []corev1.LocalObjectReference{
 			{

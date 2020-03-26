@@ -296,7 +296,9 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 
 	ssiLog.Info("done reconciling syncsetinstance")
 	if applyErr != nil {
-		return reconcile.Result{}, applyErr
+		ssiLog.WithError(applyErr).Warn("failed to apply, requeueing")
+		// Set requeue to true instead of returning the applyErr to requeue the syncsetinstance.
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	reapplyDuration := r.ssiReapplyDuration(ssi)
@@ -426,7 +428,7 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetIns
 			WithField("kind", resourceStatus.Kind)
 		gv, err := schema.ParseGroupVersion(resourceStatus.APIVersion)
 		if err != nil {
-			itemLog.WithError(err).Error("cannot parse resource apiVersion, skipping deletion")
+			itemLog.WithError(err).Warn("cannot parse resource apiVersion, skipping deletion")
 			continue
 		}
 		gvr := gv.WithResource(resourceStatus.Resource)
@@ -437,10 +439,10 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetIns
 			case errors.IsNotFound(err):
 				itemLog.Debug("resource not found, nothing to do")
 			case errors.IsForbidden(err):
-				itemLog.WithError(err).Error("forbidden resource deletion, skipping")
+				itemLog.WithError(err).Warn("forbidden resource deletion, skipping")
 			default:
 				lastError = err
-				itemLog.WithError(err).Error("error deleting resource")
+				itemLog.WithError(err).Warn("error deleting resource")
 				ssi.Status.Resources[index].Conditions = r.setDeletionFailedSyncCondition(ssi.Status.Resources[index].Conditions, fmt.Errorf("failed to delete resource: %v", err))
 			}
 		}
@@ -456,7 +458,7 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetSecrets(ssi *hivev1.SyncSetInsta
 			WithField("kind", secretStatus.Kind)
 		gv, err := schema.ParseGroupVersion(secretStatus.APIVersion)
 		if err != nil {
-			secretLog.WithError(err).Error("cannot parse secret apiVersion, skipping deletion")
+			secretLog.WithError(err).Warn("cannot parse secret apiVersion, skipping deletion")
 			continue
 		}
 		gvr := gv.WithResource(secretStatus.Resource)
@@ -467,10 +469,10 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetSecrets(ssi *hivev1.SyncSetInsta
 			case errors.IsNotFound(err):
 				secretLog.Debug("secret not found, nothing to do")
 			case errors.IsForbidden(err):
-				secretLog.WithError(err).Error("forbidden secret deletion, skipping")
+				secretLog.WithError(err).Warn("forbidden secret deletion, skipping")
 			default:
 				lastError = err
-				secretLog.WithError(err).Error("error deleting secret")
+				secretLog.WithError(err).Warn("error deleting secret")
 				ssi.Status.Secrets[index].Conditions = r.setDeletionFailedSyncCondition(ssi.Status.Secrets[index].Conditions, fmt.Errorf("failed to delete secret: %v", err))
 			}
 		}
@@ -663,7 +665,7 @@ func (r *ReconcileSyncSetInstance) reconcileDeleted(applyMode hivev1.SyncSetReso
 			WithField("syncKind", deletedStatus.Kind)
 		gv, err := schema.ParseGroupVersion(deletedStatus.APIVersion)
 		if err != nil {
-			itemLog.WithError(err).Error("unable to delete, cannot parse group version")
+			itemLog.WithError(err).Warn("unable to delete, cannot parse group version")
 			deletedStatus.Conditions = r.setDeletionFailedSyncCondition(deletedStatus.Conditions, err)
 			newStatusList = append(newStatusList, deletedStatus)
 			continue
@@ -693,7 +695,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 
 		b, err := json.Marshal(ssPatch)
 		if err != nil {
-			ssiLog.WithError(err).Error("cannot serialize syncset patch")
+			ssiLog.WithError(err).Warn("cannot serialize syncset patch")
 			return err
 		}
 		patchSyncStatus := hivev1.SyncStatus{
@@ -789,7 +791,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 		var hash string
 		hash, applyErr = controllerutils.GetChecksumOfObject(secret)
 		if applyErr != nil {
-			ssiLog.WithError(applyErr).Error("unable to compute secret hash")
+			ssiLog.WithError(applyErr).Warn("unable to compute secret hash")
 			secretSyncStatus.Conditions = r.setApplySyncConditions(secretSyncConditions, applyErr)
 			syncStatusList = append(syncStatusList, secretSyncStatus)
 			break

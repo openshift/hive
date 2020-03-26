@@ -57,7 +57,7 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 	if err != nil {
 		r.logger.WithError(err).
 			WithField("stdout", ioStreams.Out.(*bytes.Buffer).String()).
-			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Error("running the apply command failed")
+			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Warn("running the apply command failed")
 		return "", err
 	}
 	return changeTracker.GetResult(), nil
@@ -67,7 +67,7 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
 	data, err := r.Serialize(obj, scheme)
 	if err != nil {
-		r.logger.WithError(err).Error("cannot serialize runtime object")
+		r.logger.WithError(err).Warn("cannot serialize runtime object")
 		return "", err
 	}
 	return r.Apply(data)

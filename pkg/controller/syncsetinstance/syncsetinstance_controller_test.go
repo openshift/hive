@@ -84,7 +84,7 @@ func TestSyncSetReconcile(t *testing.T) {
 		isDeleted              bool
 		expectDeleted          []deletedItemInfo
 		expectSSIDeleted       bool
-		expectErr              bool
+		expectRequeue          bool
 		expectApplied          bool
 	}{
 		{
@@ -167,7 +167,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateUnknownObjectCondition(t, ssi.Status)
 			},
-			expectErr: true,
+			expectRequeue: true,
 		},
 		{
 			name: "Stop applying resources when error occurs",
@@ -187,7 +187,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				).Resources...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
-			expectErr: true,
+			expectRequeue: true,
 		},
 		{
 			name: "Stop applying resources when have annotation: hive.openshift.io/syncset-pause=true",
@@ -205,7 +205,6 @@ func TestSyncSetReconcile(t *testing.T) {
 					t.Fatalf("conditions should be nil")
 				}
 			},
-			expectErr: false,
 		},
 		{
 			name: "selectorsyncset: apply single resource",
@@ -281,7 +280,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				}).Patches...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
-			expectErr: true,
+			expectRequeue: true,
 		},
 		{
 			name: "No patches applied when resource error occurs",
@@ -306,7 +305,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				).Resources...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
-			expectErr: true,
+			expectRequeue: true,
 		},
 		{
 			name: "resource sync mode, remove resources",
@@ -377,9 +376,8 @@ func TestSyncSetReconcile(t *testing.T) {
 			expectApplied: true,
 		},
 		{
-			name:      "Local secret does not exist",
-			syncSet:   testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
-			expectErr: true,
+			name:    "Local secret does not exist",
+			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				status := hivev1.SyncSetInstanceStatus{}
 				status.Secrets = append(status.Secrets, applyFailedSecretStatus("ss1",
@@ -387,6 +385,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				).Secrets...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
+			expectRequeue: true,
 		},
 		{
 			name: "Local secret has OwnerReference",
@@ -640,23 +639,23 @@ func TestSyncSetReconcile(t *testing.T) {
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				reapplyInterval:               2 * time.Hour,
 			}
-			_, err := r.Reconcile(reconcile.Request{
+			rec, err := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      ssi.Name,
 					Namespace: ssi.Namespace,
 				},
 			})
-			if !test.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			} else if test.expectErr && err == nil {
-				t.Fatal("expected error not returned")
-			}
+
+			assert.Equal(t, err, nil)
+
+			assert.Equal(t, test.expectRequeue, rec.Requeue)
+
 			validateDeletedItems(t, dynamicClient.deletedItems, test.expectDeleted)
 			if test.expectSSIDeleted {
 				result := &hivev1.SyncSetInstance{}
-				err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: ssi.Name, Namespace: ssi.Namespace}, result)
+				err := fakeClient.Get(context.TODO(), types.NamespacedName{Name: ssi.Name, Namespace: ssi.Namespace}, result)
 				if !errors.IsNotFound(err) {
-					t.Errorf("expected syncset instance to be deleted")
+					t.Errorf("expected syncsetinstance to be deleted")
 				}
 				return
 			}

@@ -3,11 +3,14 @@ package imageset
 import (
 	"context"
 	"io/ioutil"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	imageapi "github.com/openshift/api/image/v1"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,12 +21,13 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
 	testInstallerImage = "registry.io/test-installer-image:latest"
-	testErrorMessage   = "failed to obtain installer image because of an error"
+	testCLIImage       = "registry.io/test-cli-image:latest"
 )
 
 func TestUpdateInstallerImageCommand(t *testing.T) {
@@ -39,20 +43,50 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 		{
 			name:                      "successful execution",
 			existingClusterDeployment: testClusterDeployment(),
-			setupWorkDir:              setupSuccessfulExecutionWorkDir,
+			setupWorkDir: writeImageReferencesFile(
+				map[string]string{
+					"installer": testInstallerImage,
+					"cli":       testCLIImage,
+				},
+			),
 			validateClusterDeployment: validateSuccessfulExecution,
 		},
 		{
 			name:                      "failure execution",
 			existingClusterDeployment: testClusterDeployment(),
-			setupWorkDir:              setupFailureExecutionWorkDir,
+			setupWorkDir: writeImageReferencesFile(
+				map[string]string{
+					"installer": testInstallerImage,
+				},
+			),
 			validateClusterDeployment: validateFailureExecution,
+			expectError:               true,
 		},
 		{
 			name:                      "successful execution after failure",
 			existingClusterDeployment: testClusterDeploymentWithErrorCondition(),
-			setupWorkDir:              setupSuccessfulExecutionWorkDir,
+			setupWorkDir: writeImageReferencesFile(
+				map[string]string{
+					"installer": testInstallerImage,
+					"cli":       testCLIImage,
+				},
+			),
 			validateClusterDeployment: validateSuccessfulExecutionAfterFailure,
+		},
+		{
+			name: "baremetal",
+			existingClusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform.BareMetal = &baremetal.Platform{}
+				return cd
+			}(),
+			setupWorkDir: writeImageReferencesFile(
+				map[string]string{
+					"baremetal-installer": testInstallerImage,
+					"cli":                 testCLIImage,
+				},
+			),
+			validateClusterDeployment: validateSuccessfulExecution,
 		},
 	}
 
@@ -100,40 +134,10 @@ func testClusterDeploymentWithErrorCondition() *hivev1.ClusterDeployment {
 			Status:             corev1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Reason:             "FailedToResolve",
-			Message:            testErrorMessage,
+			Message:            "sample failure message",
 		},
 	}
 	return cis
-}
-
-func setupWorkDir(t *testing.T, dir, success, installerImage, cliImage, errorMessage string) {
-	err := ioutil.WriteFile(path.Join(dir, "success"), []byte(success), 0666)
-	if err != nil {
-		t.Fatalf("error writing file: %v", err)
-	}
-	if len(installerImage) != 0 {
-		err = ioutil.WriteFile(path.Join(dir, "installer-image.txt"), []byte(testInstallerImage), 0666)
-		if err != nil {
-			t.Fatalf("error writing file: %v", err)
-		}
-	}
-	if len(cliImage) != 0 {
-		err = ioutil.WriteFile(path.Join(dir, "cli-image.txt"), []byte(testCLIImage), 0666)
-		if err != nil {
-			t.Fatalf("error writing file: %v", err)
-		}
-	}
-	if len(errorMessage) != 0 {
-		err = ioutil.WriteFile(path.Join(dir, "error.log"), []byte(errorMessage), 0666)
-		if err != nil {
-			t.Fatalf("error writing file: %v", err)
-		}
-	}
-
-}
-
-func setupSuccessfulExecutionWorkDir(t *testing.T, dir string) {
-	setupWorkDir(t, dir, "1", testInstallerImage, testCLIImage, "")
 }
 
 func validateSuccessfulExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
@@ -164,10 +168,6 @@ func validateSuccessfulExecutionAfterFailure(t *testing.T, clusterDeployment *hi
 	}
 }
 
-func setupFailureExecutionWorkDir(t *testing.T, dir string) {
-	setupWorkDir(t, dir, "0", "", "", testErrorMessage)
-}
-
 func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
 	condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
 	if condition == nil {
@@ -177,7 +177,34 @@ func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDep
 	if condition.Status != corev1.ConditionTrue {
 		t.Errorf("unexpected condition status")
 	}
-	if !strings.Contains(condition.Message, testErrorMessage) {
+	if !strings.Contains(condition.Message, "could not get cli image") {
 		t.Errorf("condition message does not contain expected error message: %s", condition.Message)
+	}
+}
+
+func writeImageReferencesFile(images map[string]string) func(*testing.T, string) {
+	return func(t *testing.T, dir string) {
+		imageStream := &imageapi.ImageStream{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ImageStream",
+				APIVersion: imageapi.GroupVersion.String(),
+			},
+		}
+		imageStream.Spec.Tags = make([]imageapi.TagReference, len(images))
+		for k, v := range images {
+			imageStream.Spec.Tags = append(imageStream.Spec.Tags,
+				imageapi.TagReference{
+					Name: k,
+					From: &corev1.ObjectReference{
+						Kind: "DockerImage",
+						Name: v,
+					},
+				},
+			)
+		}
+		imageStreamData, err := yaml.Marshal(imageStream)
+		require.NoError(t, err, "failed to marshal image stream")
+		err = ioutil.WriteFile(filepath.Join(dir, imageReferencesFilename), imageStreamData, 0644)
+		require.NoError(t, err, "failed to write image references file")
 	}
 }

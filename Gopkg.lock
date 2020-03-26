@@ -745,12 +745,15 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7473d8f99b75046eba98ae72d19988a349e939210bd0757e86a6bd0fbf886e6c"
+  digest = "1:b2aa6e21bff2ff7de74a677cb8c4c01de29148978a70117e0ef754afd5bc1c61"
   name = "github.com/openshift/api"
   packages = [
     "apps/v1",
     "authorization/v1",
     "config/v1",
+    "image/docker10",
+    "image/dockerpre012",
+    "image/v1",
     "operator/v1",
     "pkg/serialization",
     "project/v1",
@@ -2138,6 +2141,7 @@
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",
     "github.com/openshift/api/config/v1",
+    "github.com/openshift/api/image/v1",
     "github.com/openshift/api/operator/v1",
     "github.com/openshift/api/route/v1",
     "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1",

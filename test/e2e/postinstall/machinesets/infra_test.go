@@ -10,8 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -298,12 +298,12 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	// 1, the total CPU request from the deployment is 100. For AWS using m4.xlarge,
 	// each machine has a CPU limit of 4. For the max replicas of 12, the total
 	// CPU limit is 48.
-	busyboxDeployment := &extensionsv1beta1.Deployment{
+	busyboxDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "busybox",
 		},
-		Spec: extensionsv1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: pointer.Int32Ptr(100),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{

@@ -270,7 +270,7 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	// Using SecretMapping to sync secrets
 	secretMappings := []hivev1.SecretMapping{}
 	for _, secret := range secrets {
-		cdLog.WithField("secret", secret.Name).Debug("adding secret to secretReferences list")
+		cdLog.WithField("secret", secret.Name).Debug("adding secret to secretMappings list")
 		secretMapping := hivev1.SecretMapping{
 			SourceRef: hivev1.SecretReference{
 				Namespace: secret.Namespace,

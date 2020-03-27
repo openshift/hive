@@ -204,7 +204,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec", "resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec", "patches"))...)
-	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec", "secretReferences"))...)
+	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec", "secretMappings"))...)
 	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {

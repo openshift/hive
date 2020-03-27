@@ -31,6 +31,7 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
@@ -59,6 +60,11 @@ const (
     certificate-authority-data: JUNK
     server: https://bar-api.clusters.example.com:6443
   name: bar
+contexts:
+- context:
+    cluster: bar
+  name: admin
+current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 
@@ -206,23 +212,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Parse server URL from admin kubeconfig",
 			existing: []runtime.Object{
-				testClusterDeploymentWithProvision(),
-				testSuccessfulProvision(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testMetadataConfigMap(),
-			},
-			expectConsoleRouteFetch: true,
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				assert.Equal(t, "https://bar-api.clusters.example.com:6443", cd.Status.APIURL)
-				assert.Equal(t, "https://bar-api.clusters.example.com:6443/console", cd.Status.WebConsoleURL)
-			},
-		},
-		{
-			name: "Parse server URL from admin kubeconfig for adopted cluster",
-			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
 					cd.Spec.Installed = true
@@ -230,6 +219,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						InfraID:                  "fakeinfra",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 					}
+					cd.Status.Conditions = append(cd.Status.Conditions,
+						hivev1.ClusterDeploymentCondition{
+							Type:   hivev1.UnreachableCondition,
+							Status: corev1.ConditionFalse,
+						},
+					)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
@@ -246,28 +241,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		},
 		{
 			name: "Add additional CAs to admin kubeconfig",
-			existing: []runtime.Object{
-				testClusterDeploymentWithProvision(),
-				testSuccessfulProvision(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testMetadataConfigMap(),
-			},
-			expectConsoleRouteFetch: true,
-			validate: func(c client.Client, t *testing.T) {
-				// Ensure the admin kubeconfig secret got a copy of the raw data, indicating that we would have
-				// added additional CAs if any were configured.
-				akcSecret := &corev1.Secret{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: adminKubeconfigSecret, Namespace: testNamespace},
-					akcSecret)
-				require.NoError(t, err)
-				require.NotNil(t, akcSecret)
-				assert.Contains(t, akcSecret.Data, constants.RawKubeconfigSecretKey)
-			},
-		},
-		{
-			name: "Add additional CAs to admin kubeconfig when status URLs set",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
@@ -307,7 +280,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
-			expectConsoleRouteFetch: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
@@ -1166,7 +1138,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			}
 
 			if test.expectConsoleRouteFetch {
-				mockRemoteClientBuilder.EXPECT().APIURL().Return("https://bar-api.clusters.example.com:6443", nil)
 				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(), nil)
 			}
 

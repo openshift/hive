@@ -36,7 +36,6 @@ import (
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/images"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
@@ -951,8 +950,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			return &reconcile.Result{}, r.statusUpdate(cd, cdLog)
 		}
 
-		cliImage := images.GetCLIImage()
-		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName, imageset.AlwaysPullImage(cliImage))
+		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)

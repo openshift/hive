@@ -12,6 +12,15 @@ BUILD_CMD ?= imagebuilder
 
 DOCKER_CMD ?= docker
 
+# Namespace hive-operator will run:
+HIVE_OPERATOR_NS ?= hive
+
+# Namespace hive-controllers/hiveadmission/etc will run:
+HIVE_NS ?= hive
+
+# Log level that should be used when running hive from source, or with make deploy.
+LOG_LEVEL ?= debug
+
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
@@ -105,12 +114,12 @@ hive-apiserver:
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
 run: generate fmt vet
-	go run $(GO_MOD_FLAGS) ./cmd/manager/main.go --log-level=debug
+	go run $(GO_MOD_FLAGS) ./cmd/manager/main.go --log-level=${LOG_LEVEL}
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run-operator
 run-operator: generate fmt vet
-	go run $(GO_MOD_FLAGS) ./cmd/operator/main.go --log-level=debug
+	go run $(GO_MOD_FLAGS) ./cmd/operator/main.go --log-level=${LOG_LEVEL}
 
 # Install CRDs into a cluster
 .PHONY: install
@@ -121,11 +130,14 @@ install: crd
 .PHONY: deploy
 deploy: manifests install generate
 	# Deploy the operator manifests:
+	oc create namespace ${HIVE_OPERATOR_NS} || true
 	mkdir -p overlays/deploy
 	cp overlays/template/kustomization.yaml overlays/deploy
-	cd overlays/deploy && kustomize edit set image registry.svc.ci.openshift.org/openshift/hive-v4.0:hive=${DEPLOY_IMAGE}
+	cd overlays/deploy && kustomize edit set image registry.svc.ci.openshift.org/openshift/hive-v4.0:hive=${DEPLOY_IMAGE} && kustomize edit set namespace ${HIVE_OPERATOR_NS}
 	kustomize build overlays/deploy | oc apply -f -
 	rm -rf overlays/deploy
+	# Create a default basic HiveConfig so the operator will deploy Hive
+	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -
 
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
 # the locations kubebuilder generates them.

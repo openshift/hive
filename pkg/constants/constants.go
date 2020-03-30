@@ -100,8 +100,13 @@ const (
 	// GlobalPullSecret is the environment variable for controllers to get the global pull secret
 	GlobalPullSecret = "GLOBAL_PULL_SECRET"
 
-	// HiveNamespace is the name of Hive operator namespace
-	HiveNamespace = "hive"
+	// DefaultHiveNamespace is the default namespace where core hive components will run. It is used if the environment variable is not defined.
+	DefaultHiveNamespace = "hive"
+
+	// HiveNamespaceEnvVar is the environment variable for the namespace where the core hive-controllers and hiveadmission will run.
+	// This is set on the deployments by the hive-operator which deploys them, based on the targetNamespace defined in HiveConfig.
+	// The default is defined above.
+	HiveNamespaceEnvVar = "HIVE_NS"
 
 	// CheckpointName is the name of the object in each namespace in which the namespace's backup information is stored.
 	CheckpointName = "hive"

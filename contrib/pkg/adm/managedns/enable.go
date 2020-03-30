@@ -49,7 +49,6 @@ the ExternalDNS section of HiveConfig.
 const (
 	cloudAWS                = "aws"
 	cloudGCP                = "gcp"
-	hiveNamespace           = "hive"
 	hiveAdmissionDeployment = "hiveadmission"
 	hiveConfigName          = "hive"
 	waitTime                = time.Minute * 2
@@ -164,8 +163,13 @@ func (o *Options) Run(args []string) error {
 	log.Debug("adding new ManagedDomain config to existing HiveConfig")
 	hc.Spec.ManagedDomains = append(hc.Spec.ManagedDomains, dnsConf)
 
+	hiveNSName := hc.Spec.TargetNamespace
+	if hiveNSName == "" {
+		hiveNSName = constants.DefaultHiveNamespace
+	}
+
 	log.Infof("created cloud credentials secret: %s", credsSecret.Name)
-	credsSecret.Namespace = hiveNamespace
+	credsSecret.Namespace = hiveNSName
 	if _, err := rh.ApplyRuntimeObject(credsSecret, scheme.Scheme); err != nil {
 		log.WithError(err).Fatal("failed to save generated secret")
 	}
@@ -186,7 +190,7 @@ func (o *Options) Run(args []string) error {
 		log.WithError(err).Fatal("gave up waiting for HiveConfig to be processed")
 	}
 
-	if err := waitForHiveAdmissionPods(o.dynamicClient); err != nil {
+	if err := waitForHiveAdmissionPods(o.dynamicClient, hiveNSName); err != nil {
 		log.WithError(err).Fatal("hive admission pods never became available")
 	}
 
@@ -194,7 +198,7 @@ func (o *Options) Run(args []string) error {
 	return nil
 }
 
-func waitForHiveAdmissionPods(dynClient dynamic.Interface) error {
+func waitForHiveAdmissionPods(dynClient dynamic.Interface, hiveNSName string) error {
 	resourceName := "deployments"
 	gvr := appsv1.SchemeGroupVersion.WithResource(resourceName)
 
@@ -207,12 +211,12 @@ func waitForHiveAdmissionPods(dynClient dynamic.Interface) error {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return dynClient.Resource(gvr).Namespace(constants.HiveNamespace).List(options)
+			return dynClient.Resource(gvr).Namespace(hiveNSName).List(options)
 
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return dynClient.Resource(gvr).Namespace(constants.HiveNamespace).Watch(options)
+			return dynClient.Resource(gvr).Namespace(hiveNSName).Watch(options)
 		},
 	}
 
@@ -300,8 +304,7 @@ func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("aws-dns-creds-%s", uuid.New().String()[:5]),
-			Namespace: hiveNamespace,
+			Name: fmt.Sprintf("aws-dns-creds-%s", uuid.New().String()[:5]),
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
@@ -322,8 +325,7 @@ func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("gcp-dns-creds-%s", uuid.New().String()[:5]),
-			Namespace: hiveNamespace,
+			Name: fmt.Sprintf("gcp-dns-creds-%s", uuid.New().String()[:5]),
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{

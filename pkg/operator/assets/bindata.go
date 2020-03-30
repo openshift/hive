@@ -19,12 +19,13 @@
 // config/hiveadmission/service-account.yaml
 // config/hiveadmission/service.yaml
 // config/hiveadmission/syncset-webhook.yaml
-// config/manager/deployment.yaml
-// config/manager/service.yaml
+// config/controllers/deployment.yaml
+// config/controllers/hive_controllers_role.yaml
+// config/controllers/hive_controllers_role_binding.yaml
+// config/controllers/hive_controllers_serviceaccount.yaml
+// config/controllers/service.yaml
 // config/rbac/hive_admin_role.yaml
 // config/rbac/hive_admin_role_binding.yaml
-// config/rbac/hive_controllers_role.yaml
-// config/rbac/hive_controllers_role_binding.yaml
 // config/rbac/hive_frontend_role.yaml
 // config/rbac/hive_frontend_role_binding.yaml
 // config/rbac/hive_frontend_serviceaccount.yaml
@@ -768,7 +769,6 @@ var _configHiveadmissionServiceAccountYaml = []byte(`---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: hive
   name: hiveadmission
 `)
 
@@ -859,7 +859,7 @@ func configHiveadmissionSyncsetWebhookYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configManagerDeploymentYaml = []byte(`apiVersion: apps/v1
+var _configControllersDeploymentYaml = []byte(`apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hive-controllers
@@ -880,7 +880,7 @@ spec:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
-      serviceAccountName: default
+      serviceAccountName: hive-controllers
       volumes:
       - name: kubectl-cache
         emptyDir: {}
@@ -911,22 +911,159 @@ spec:
       terminationGracePeriodSeconds: 10
 `)
 
-func configManagerDeploymentYamlBytes() ([]byte, error) {
-	return _configManagerDeploymentYaml, nil
+func configControllersDeploymentYamlBytes() ([]byte, error) {
+	return _configControllersDeploymentYaml, nil
 }
 
-func configManagerDeploymentYaml() (*asset, error) {
-	bytes, err := configManagerDeploymentYamlBytes()
+func configControllersDeploymentYaml() (*asset, error) {
+	bytes, err := configControllersDeploymentYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/manager/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/controllers/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configManagerServiceYaml = []byte(`apiVersion: v1
+var _configControllersHive_controllers_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: hive-controllers
+rules:
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  - secrets
+  - configmaps
+  - events
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - create
+`)
+
+func configControllersHive_controllers_roleYamlBytes() ([]byte, error) {
+	return _configControllersHive_controllers_roleYaml, nil
+}
+
+func configControllersHive_controllers_roleYaml() (*asset, error) {
+	bytes, err := configControllersHive_controllers_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/controllers/hive_controllers_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configControllersHive_controllers_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: hive-controllers
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hive-controllers
+subjects:
+- kind: ServiceAccount
+  name: hive-controllers
+  namespace: system
+`)
+
+func configControllersHive_controllers_role_bindingYamlBytes() ([]byte, error) {
+	return _configControllersHive_controllers_role_bindingYaml, nil
+}
+
+func configControllersHive_controllers_role_bindingYaml() (*asset, error) {
+	bytes, err := configControllersHive_controllers_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/controllers/hive_controllers_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configControllersHive_controllers_serviceaccountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hive-controllers
+  namespace: hive
+`)
+
+func configControllersHive_controllers_serviceaccountYamlBytes() ([]byte, error) {
+	return _configControllersHive_controllers_serviceaccountYaml, nil
+}
+
+func configControllersHive_controllers_serviceaccountYaml() (*asset, error) {
+	bytes, err := configControllersHive_controllers_serviceaccountYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/controllers/hive_controllers_serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configControllersServiceYaml = []byte(`apiVersion: v1
 kind: Service
 metadata:
   name: hive-controllers
@@ -943,17 +1080,17 @@ spec:
     port: 2112
 `)
 
-func configManagerServiceYamlBytes() ([]byte, error) {
-	return _configManagerServiceYaml, nil
+func configControllersServiceYamlBytes() ([]byte, error) {
+	return _configControllersServiceYaml, nil
 }
 
-func configManagerServiceYaml() (*asset, error) {
-	bytes, err := configManagerServiceYamlBytes()
+func configControllersServiceYaml() (*asset, error) {
+	bytes, err := configControllersServiceYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/manager/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/controllers/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1104,348 +1241,6 @@ func configRbacHive_admin_role_bindingYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/rbac/hive_admin_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configRbacHive_controllers_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  creationTimestamp: null
-  name: manager-role
-rules:
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  - secrets
-  - configmaps
-  - events
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  - rolebindings
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  - clusterdeployments/status
-  - clusterdeployments/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterprovisions
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterimagesets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterimagesets/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeprovisions
-  - clusterdeprovisions/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeprovisions/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterprovisions
-  - clusterprovisions/status
-  - clusterprovisions/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - machinepools
-  - machinepools/status
-  - machinepools/finalizers
-  - machinepoolnameleases
-  - machinepoolnameleases/status
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterstates
-  - clusterstates/status
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - dnszones
-  - dnszones/status
-  - dnszones/finalizers
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  verbs:
-  - get
-  - watch
-  - update
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - syncsets
-  verbs:
-  - get
-  - create
-  - update
-  - delete
-  - patch
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - syncidentityproviders
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - selectorsyncidentityproviders
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - syncsets
-  verbs:
-  - get
-  - create
-  - update
-  - delete
-  - patch
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - selectorsyncsets
-  verbs:
-  - get
-  - create
-  - update
-  - delete
-  - patch
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - syncsetinstances
-  - syncsetinstances/status
-  verbs:
-  - get
-  - create
-  - update
-  - delete
-  - patch
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  - syncsets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-- apiGroups:
-  - velero.io
-  resources:
-  - backups
-  verbs:
-  - create
-`)
-
-func configRbacHive_controllers_roleYamlBytes() ([]byte, error) {
-	return _configRbacHive_controllers_roleYaml, nil
-}
-
-func configRbacHive_controllers_roleYaml() (*asset, error) {
-	bytes, err := configRbacHive_controllers_roleYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/rbac/hive_controllers_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configRbacHive_controllers_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  creationTimestamp: null
-  name: manager-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: manager-role
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: system
-`)
-
-func configRbacHive_controllers_role_bindingYamlBytes() ([]byte, error) {
-	return _configRbacHive_controllers_role_bindingYaml, nil
-}
-
-func configRbacHive_controllers_role_bindingYaml() (*asset, error) {
-	bytes, err := configRbacHive_controllers_role_bindingYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/rbac/hive_controllers_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -3008,7 +2803,7 @@ spec:
           properties:
             additionalCertificateAuthoritiesSecretRef:
               description: AdditionalCertificateAuthoritiesSecretRef is a list of
-                references to secrets in the 'hive' namespace that contain an additional
+                references to secrets in the TargetNamespace that contain an additional
                 Certificate Authority to use when communicating with target clusters.
                 These certificate authorities will be used in addition to any self-signed
                 CA generated by each cluster on installation.
@@ -3059,7 +2854,7 @@ spec:
                 cluster deployment, the contents of GlobalPullSecret will be merged
                 with the specific pull secret for a cluster deployment(if specified),
                 with precedence given to the contents of the pull secret for the cluster
-                deployment.
+                deployment. The global pull secret is assumed to be in the TargetNamespace.
               type: object
             hiveAPIEnabled:
               description: HiveAPIEnabled is a boolean controlling whether or not
@@ -3089,11 +2884,11 @@ spec:
                     description: AWS contains AWS-specific settings for external DNS
                     properties:
                       credentialsSecretRef:
-                        description: CredentialsSecretRef references a secret that
-                          will be used to authenticate with AWS Route53. It will need
-                          permission to manage entries for the domain listed in the
-                          parent ManageDNSConfig object. Secret should have AWS keys
-                          named 'aws_access_key_id' and 'aws_secret_access_key'.
+                        description: CredentialsSecretRef references a secret in the
+                          TargetNamespace that will be used to authenticate with AWS
+                          Route53. It will need permission to manage entries for the
+                          domain listed in the parent ManageDNSConfig object. Secret
+                          should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
                         type: object
                       region:
                         description: Region is the AWS region to use for route53 operations.
@@ -3110,11 +2905,11 @@ spec:
                     description: GCP contains GCP-specific settings for external DNS
                     properties:
                       credentialsSecretRef:
-                        description: CredentialsSecretRef references a secret that
-                          will be used to authenticate with GCP DNS. It will need
-                          permission to manage entries in each of the managed domains
-                          for this cluster. listed in the parent ManageDNSConfig object.
-                          Secret should have a key named 'osServiceAccount.json'.
+                        description: CredentialsSecretRef references a secret in the
+                          TargetNamespace that will be used to authenticate with GCP
+                          DNS. It will need permission to manage entries in each of
+                          the managed domains for this cluster. listed in the parent
+                          ManageDNSConfig object. Secret should have a key named 'osServiceAccount.json'.
                           The credentials must specify the project to use.
                         type: object
                     type: object
@@ -3124,6 +2919,12 @@ spec:
               description: SyncSetReapplyInterval is a string duration indicating
                 how much time must pass before SyncSet resources will be reapplied.
                 The default reapply interval is two hours.
+              type: string
+            targetNamespace:
+              description: TargetNamespace is the namespace where the core Hive components
+                should be run. Defaults to "hive". Will be created if it does not
+                already exist. All resource references in HiveConfig can be assumed
+                to be in the TargetNamespace.
               type: string
           type: object
         status:
@@ -5326,12 +5127,13 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
 	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
 	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
-	"config/manager/deployment.yaml":                            configManagerDeploymentYaml,
-	"config/manager/service.yaml":                               configManagerServiceYaml,
+	"config/controllers/deployment.yaml":                        configControllersDeploymentYaml,
+	"config/controllers/hive_controllers_role.yaml":             configControllersHive_controllers_roleYaml,
+	"config/controllers/hive_controllers_role_binding.yaml":     configControllersHive_controllers_role_bindingYaml,
+	"config/controllers/hive_controllers_serviceaccount.yaml":   configControllersHive_controllers_serviceaccountYaml,
+	"config/controllers/service.yaml":                           configControllersServiceYaml,
 	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
 	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
-	"config/rbac/hive_controllers_role.yaml":                    configRbacHive_controllers_roleYaml,
-	"config/rbac/hive_controllers_role_binding.yaml":            configRbacHive_controllers_role_bindingYaml,
 	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
 	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
 	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
@@ -5408,6 +5210,13 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"configmaps": {nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},
+		"controllers": {nil, map[string]*bintree{
+			"deployment.yaml":                      {configControllersDeploymentYaml, map[string]*bintree{}},
+			"hive_controllers_role.yaml":           {configControllersHive_controllers_roleYaml, map[string]*bintree{}},
+			"hive_controllers_role_binding.yaml":   {configControllersHive_controllers_role_bindingYaml, map[string]*bintree{}},
+			"hive_controllers_serviceaccount.yaml": {configControllersHive_controllers_serviceaccountYaml, map[string]*bintree{}},
+			"service.yaml":                         {configControllersServiceYaml, map[string]*bintree{}},
+		}},
 		"crds": {nil, map[string]*bintree{
 			"hive_v1_checkpoint.yaml":                   {configCrdsHive_v1_checkpointYaml, map[string]*bintree{}},
 			"hive_v1_clusterdeployment.yaml":            {configCrdsHive_v1_clusterdeploymentYaml, map[string]*bintree{}},
@@ -5440,20 +5249,14 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service.yaml":                         {configHiveadmissionServiceYaml, map[string]*bintree{}},
 			"syncset-webhook.yaml":                 {configHiveadmissionSyncsetWebhookYaml, map[string]*bintree{}},
 		}},
-		"manager": {nil, map[string]*bintree{
-			"deployment.yaml": {configManagerDeploymentYaml, map[string]*bintree{}},
-			"service.yaml":    {configManagerServiceYaml, map[string]*bintree{}},
-		}},
 		"rbac": {nil, map[string]*bintree{
-			"hive_admin_role.yaml":               {configRbacHive_admin_roleYaml, map[string]*bintree{}},
-			"hive_admin_role_binding.yaml":       {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
-			"hive_controllers_role.yaml":         {configRbacHive_controllers_roleYaml, map[string]*bintree{}},
-			"hive_controllers_role_binding.yaml": {configRbacHive_controllers_role_bindingYaml, map[string]*bintree{}},
-			"hive_frontend_role.yaml":            {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
-			"hive_frontend_role_binding.yaml":    {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
-			"hive_frontend_serviceaccount.yaml":  {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},
-			"hive_reader_role.yaml":              {configRbacHive_reader_roleYaml, map[string]*bintree{}},
-			"hive_reader_role_binding.yaml":      {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
+			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},
+			"hive_admin_role_binding.yaml":      {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
+			"hive_frontend_role.yaml":           {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
+			"hive_frontend_role_binding.yaml":   {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
+			"hive_frontend_serviceaccount.yaml": {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},
+			"hive_reader_role.yaml":             {configRbacHive_reader_roleYaml, map[string]*bintree{}},
+			"hive_reader_role_binding.yaml":     {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

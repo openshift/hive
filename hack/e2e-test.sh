@@ -61,9 +61,6 @@ if [ $i -ge ${max_tries} ] ; then
 fi
 
 
-# Install Hive
-make deploy DEPLOY_IMAGE="${HIVE_IMAGE}"
-
 CLOUD_CREDS_DIR="${CLOUD_CREDS_DIR:-/tmp/cluster}"
 
 # Create a new cluster deployment
@@ -72,6 +69,12 @@ export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]'
 export ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp}"
 export SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLOUD_CREDS_DIR}/ssh-publickey}"
 export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLOUD_CREDS_DIR}/pull-secret}"
+export HIVE_NS="hive-e2e"
+export HIVE_OPERATOR_NS="hive-operator"
+
+# Install Hive
+DEPLOY_IMAGE="${HIVE_IMAGE}" make deploy
+
 
 function teardown() {
 	echo ""

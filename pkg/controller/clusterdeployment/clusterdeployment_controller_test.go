@@ -1716,7 +1716,7 @@ func createGlobalPullSecretObj(secretType corev1.SecretType, name, key, value st
 		Type: secretType,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: constants.HiveNamespace,
+			Namespace: constants.DefaultHiveNamespace,
 		},
 		Data: map[string][]byte{
 			key: []byte(value),

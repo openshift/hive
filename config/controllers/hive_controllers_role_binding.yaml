@@ -2,12 +2,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   creationTimestamp: null
-  name: manager-rolebinding
+  name: hive-controllers
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: manager-role
+  name: hive-controllers
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: hive-controllers
   namespace: system

@@ -19,7 +19,7 @@ spec:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
-      serviceAccountName: default
+      serviceAccountName: hive-controllers
       volumes:
       - name: kubectl-cache
         emptyDir: {}

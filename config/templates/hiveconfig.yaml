@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: hive-config
+
+parameters:
+  - name: HIVE_NS
+    displayName: Hive Namespace
+    description: Namespace where core hive components will run.
+    value: hive
+  - name: LOG_LEVEL
+    displayName: Log level
+    value: info
+
+objects:
+  - apiVersion: hive.openshift.io/v1
+    kind: HiveConfig
+    metadata:
+      name: hive
+    spec:
+      logLevel: ${LOG_LEVEL}
+      targetNamespace: ${HIVE_NS}

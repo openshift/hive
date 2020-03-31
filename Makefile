@@ -3,6 +3,10 @@ SRC_DIRS = pkg contrib
 GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata | grep -v generated)
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
+# See pkg/version/version.go for details
+GIT_COMMIT=$(shell git rev-parse --verify 'HEAD^{commit}')
+LDFLAGS=-ldflags "-X github.com/openshift/hive/pkg/version.Raw=$(shell git describe --always --abbrev=40 --dirty) -X github.com/openshift/hive/pkg/version.Commit=${GIT_COMMIT}"
+
 # To use docker build, specify BUILD_CMD="docker build"
 BUILD_CMD ?= imagebuilder
 
@@ -68,26 +72,26 @@ build: manager hiveutil hiveadmission operator hive-apiserver
 # Build manager binary
 .PHONY: manager
 manager: generate
-	go build -o bin/manager github.com/openshift/hive/cmd/manager
+	go build -o bin/manager $(LDFLAGS) github.com/openshift/hive/cmd/manager
 
 .PHONY: operator
 operator: generate
-	go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
+	go build -o bin/hive-operator $(LDFLAGS) github.com/openshift/hive/cmd/operator
 
 # Build hiveutil binary
 .PHONY: hiveutil
 hiveutil: generate
-	go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
+	go build -o bin/hiveutil $(LDFLAGS) github.com/openshift/hive/contrib/cmd/hiveutil
 
 # Build hiveadmission binary
 .PHONY: hiveadmission
 hiveadmission:
-	go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
+	go build -o bin/hiveadmission $(LDFLAGS) github.com/openshift/hive/cmd/hiveadmission
 
 # Build v1alpha1 aggregated API server
 .PHONY: hive-apiserver
 hive-apiserver:
-	go build -o bin/hive-apiserver github.com/openshift/hive/cmd/hive-apiserver
+	go build -o bin/hive-apiserver $(LDFLAGS) github.com/openshift/hive/cmd/hive-apiserver
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run

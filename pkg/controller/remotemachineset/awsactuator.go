@@ -68,6 +68,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.AWS = &installertypesaws.MachinePool{
+		AMIID:        a.amiID,
 		InstanceType: pool.Spec.Platform.AWS.InstanceType,
 		EC2RootVolume: installertypesaws.EC2RootVolume{
 			IOPS: pool.Spec.Platform.AWS.EC2RootVolume.IOPS,
@@ -95,7 +96,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	subnets := map[string]string{}
 	userTags := map[string]string{}
 
-	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, a.amiID, pool.Spec.Name, "worker-user-data", userTags)
+	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, pool.Spec.Name, "worker-user-data", userTags)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}

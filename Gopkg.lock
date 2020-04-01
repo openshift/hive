@@ -825,7 +825,7 @@
   version = "v1.14.0"
 
 [[projects]]
-  digest = "1:b2529db5ae80ee70c4421ee9f156ba9c1e41614857543b1967f7a0a42b226019"
+  digest = "1:88a56cea65cfaab55b9d3628080a0ff4e38faeafd300abe9ff470692e84a9550"
   name = "github.com/openshift/installer"
   packages = [
     "pkg/asset/installconfig/aws",
@@ -854,7 +854,7 @@
     "pkg/version",
   ]
   pruneopts = "NUT"
-  revision = "344e38f31fb65dfd27184bee420e6ec0043618b7"
+  revision = "d200b241c1844edc8609d1865bf9eeda1de95f85"
 
 [[projects]]
   branch = "master"
@@ -2192,7 +2192,6 @@
     "k8s.io/api/apps/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
-    "k8s.io/api/extensions/v1beta1",
     "k8s.io/api/rbac/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
@@ -2306,6 +2305,7 @@
     "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/controller-runtime/pkg/webhook",
+    "sigs.k8s.io/controller-runtime/pkg/webhook/admission",
     "sigs.k8s.io/testing_frameworks/integration",
     "sigs.k8s.io/yaml",
   ]

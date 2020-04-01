@@ -104,7 +104,7 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/openshift/installer"
-  revision = "344e38f31fb65dfd27184bee420e6ec0043618b7"
+  revision = "d200b241c1844edc8609d1865bf9eeda1de95f85"
 
 # Transient dep from installer, no longer detected automatically due to their switch to go modules.
 [[override]]

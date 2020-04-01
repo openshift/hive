@@ -1,8 +1,8 @@
 // Generate deepcopy for apis
-//go:generate go run ../../vendor/k8s.io/code-generator/cmd/deepcopy-gen/main.go -O zz_generated.deepcopy -i ./... -h ./../../hack/boilerplate.go.txt
+//go:generate go run k8s.io/code-generator/cmd/deepcopy-gen -O zz_generated.deepcopy -i ./... -h ./../../hack/boilerplate.go.txt
 
 // Generate clientset for apis
-//go:generate go run ../../vendor/k8s.io/code-generator/cmd/client-gen/main.go --clientset-name "clientset" --input "github.com/openshift/hive/pkg/apis/hive/v1" --input-base "" --output-package "github.com/openshift/hive/pkg/client/clientset-generated" -h ./../../hack/boilerplate.go.txt
+//go:generate go run k8s.io/code-generator/cmd/client-gen --clientset-name "clientset" --input "github.com/openshift/hive/pkg/apis/hive/v1" --input-base "" --output-package "github.com/openshift/hive/pkg/client/clientset-generated" -h ./../../hack/boilerplate.go.txt
 
 // Package apis contains Kubernetes API groups.
 package apis

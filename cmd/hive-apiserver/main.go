@@ -17,7 +17,8 @@ import (
 	"k8s.io/component-base/logs"
 
 	"github.com/openshift/hive/pkg/certs"
-	"github.com/openshift/hive/pkg/cmd/hive-apiserver"
+	hiveapiserver "github.com/openshift/hive/pkg/cmd/hive-apiserver"
+	"github.com/openshift/hive/pkg/version"
 )
 
 func main() {
@@ -30,6 +31,8 @@ func main() {
 
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	log.Infof("Version: %s @ %s", version.String, version.Commit)
 
 	log.SetLevel(log.InfoLevel)
 

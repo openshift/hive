@@ -10,9 +10,11 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivevalidatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
 	"github.com/openshift/hive/pkg/certs"
+	"github.com/openshift/hive/pkg/version"
 )
 
 func main() {
+	log.Infof("Version: %s @ %s", version.String, version.Commit)
 	log.Info("Starting CRD Validation Webhooks.")
 
 	// TODO: figure out a way to combine logrus and klog logging levels. The team has decided that hardcoding this is ok for now.

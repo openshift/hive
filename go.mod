@@ -93,5 +93,6 @@ replace (
 	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20200120114645-8a9592f1f87b // Pin OpenShift fork
 	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20200130125124-ef82ce374112 // Pin OpenShift fork
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.2.0-beta.3 // v0.2.0-beta.3
+	sigs.k8s.io/controller-tools => github.com/openshift/kubernetes-sigs-controller-tools v0.1.10-0.20190430113700-72ae52c08b9d // origin-4.1-kubernetes-1.13.4
 	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v0.0.0-20190302045857-e85c7b244fd2 // commit corresponding to kube 1.14.1
 )

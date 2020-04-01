@@ -127,7 +127,7 @@ manifests: crd
 .PHONY: crd
 crd:
 	# The apis-path is explicitly specified so that CRDs are not created for v1alpha1
-	go run tools/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd --apis-path=pkg/apis/hive/v1
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd --apis-path=pkg/apis/hive/v1
 
 # Run go fmt against code
 .PHONY: fmt

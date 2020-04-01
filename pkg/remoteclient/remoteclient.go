@@ -4,8 +4,10 @@ package remoteclient
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
@@ -20,10 +22,9 @@ import (
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 )
-
-const adminKubeconfigKey = "kubeconfig"
 
 // Builder is used to build API clients to the remote cluster
 type Builder interface {
@@ -32,14 +33,6 @@ type Builder interface {
 
 	// BuildDynamic will return a dynamic kubeclient for the remote cluster.
 	BuildDynamic() (dynamic.Interface, error)
-
-	// Unreachable returns true if Hive has not been able to reach the remote cluster.
-	// Note that this function will not attempt to reach the remote cluster. It only checks the current conditions on
-	// the ClusterDeployment to determine if the remote cluster is reachable.
-	Unreachable() bool
-
-	// APIURL returns the API URL used to connect to the remote cluster.
-	APIURL() (string, error)
 
 	// RESTConfig returns the config for a REST client that connects to the remote cluster.
 	RESTConfig() (*rest.Config, error)
@@ -65,6 +58,137 @@ func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName st
 	}
 }
 
+// ConnectToRemoteCluster connects to a remote cluster using the specified builder.
+// If the ClusterDeployment is marked as unreachable, then no connection will be made.
+// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
+func ConnectToRemoteCluster(
+	cd *hivev1.ClusterDeployment,
+	remoteClientBuilder Builder,
+	localClient client.Client,
+	logger log.FieldLogger,
+) (remoteClient client.Client, unreachable, requeue bool) {
+	var rawRemoteClient interface{}
+	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
+		cd,
+		remoteClientBuilder,
+		localClient,
+		logger,
+		func(builder Builder) (interface{}, error) { return builder.Build() },
+	)
+	if unreachable {
+		return
+	}
+	remoteClient = rawRemoteClient.(client.Client)
+	return
+}
+
+// ConnectToRemoteClusterWithDynamicClient connects to a remote cluster using the specified builder and builds a dynamic client.
+// If the ClusterDeployment is marked as unreachable, then no connection will be made.
+// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
+func ConnectToRemoteClusterWithDynamicClient(
+	cd *hivev1.ClusterDeployment,
+	remoteClientBuilder Builder,
+	localClient client.Client,
+	logger log.FieldLogger,
+) (remoteClient dynamic.Interface, unreachable, requeue bool) {
+	var rawRemoteClient interface{}
+	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
+		cd,
+		remoteClientBuilder,
+		localClient,
+		logger,
+		func(builder Builder) (interface{}, error) { return builder.BuildDynamic() },
+	)
+	if unreachable {
+		return
+	}
+	remoteClient = rawRemoteClient.(dynamic.Interface)
+	return
+}
+
+func connectToRemoteCluster(
+	cd *hivev1.ClusterDeployment,
+	remoteClientBuilder Builder,
+	localClient client.Client,
+	logger log.FieldLogger,
+	buildFunc func(builder Builder) (interface{}, error),
+) (remoteClient interface{}, unreachable, requeue bool) {
+	if u, _ := Unreachable(cd); u {
+		logger.Debug("skipping cluster with unreachable condition")
+		unreachable = true
+		return
+	}
+	var err error
+	remoteClient, err = buildFunc(remoteClientBuilder)
+	if err == nil {
+		return
+	}
+	unreachable = true
+	logger.WithError(err).Info("remote cluster is unreachable")
+	SetUnreachableCondition(cd, err)
+	if err := localClient.Update(context.Background(), cd); err != nil {
+		logger.WithError(err).Log(utils.LogLevel(err), "could not update clusterdeployment with unreachable condition")
+		requeue = true
+	}
+	return
+}
+
+// InitialURL returns the initial API URL for the ClusterDeployment.
+func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
+	cfg, err := restConfig(c, cd)
+	if err != nil {
+		return "", err
+	}
+	return cfg.Host, nil
+}
+
+// Unreachable returns true if Hive has not been able to reach the remote cluster.
+// Note that this function will not attempt to reach the remote cluster. It only checks the current conditions on
+// the ClusterDeployment to determine if the remote cluster is reachable.
+func Unreachable(cd *hivev1.ClusterDeployment) (unreachable bool, lastCheck time.Time) {
+	cond := utils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
+	if cond == nil {
+		unreachable = true
+		return
+	}
+	return cond.Status == corev1.ConditionTrue, cond.LastProbeTime.Time
+}
+
+// IsPrimaryURLActive returns true if the remote cluster is reachable via the primary API URL.
+func IsPrimaryURLActive(cd *hivev1.ClusterDeployment) bool {
+	if cd.Spec.ControlPlaneConfig.APIURLOverride == "" {
+		return true
+	}
+	cond := utils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition)
+	return cond != nil && cond.Status == corev1.ConditionTrue
+}
+
+// SetUnreachableCondition sets the Unreachable condition on the ClusterDeployment based on the specified error
+// encountered when attempting to connect to the remote cluster.
+func SetUnreachableCondition(cd *hivev1.ClusterDeployment, connectionError error) (changed bool) {
+	status := corev1.ConditionFalse
+	reason := "ClusterReachable"
+	message := "cluster is reachable"
+	// This needs to always update so that the probe time is updated. The probe time is used to determine when to
+	// perform the next connectivity check.
+	updateCheck := utils.UpdateConditionAlways
+	if connectionError != nil {
+		status = corev1.ConditionTrue
+		reason = "ErrorConnectingToCluster"
+		message = connectionError.Error()
+		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+	}
+	cd.Status.Conditions, changed = utils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.UnreachableCondition,
+		status,
+		reason,
+		message,
+		updateCheck,
+	)
+	return
+}
+
 type builder struct {
 	c              client.Client
 	cd             *hivev1.ClusterDeployment
@@ -77,11 +201,6 @@ const (
 	primaryURL
 	secondaryURL
 )
-
-func (b *builder) Unreachable() bool {
-	cond := utils.FindClusterDeploymentCondition(b.cd.Status.Conditions, hivev1.UnreachableCondition)
-	return cond != nil && cond.Status == corev1.ConditionTrue
-}
 
 func (b *builder) Build() (client.Client, error) {
 	cfg, err := b.RESTConfig()
@@ -143,9 +262,9 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 	); err != nil {
 		return nil, errors.Wrap(err, "could not get admin kubeconfig secret")
 	}
-	kubeconfigData, ok := kubeconfigSecret.Data[adminKubeconfigKey]
+	kubeconfigData, ok := kubeconfigSecret.Data[constants.KubeconfigSecretKey]
 	if !ok {
-		return nil, errors.Errorf("admin kubeconfig secret does not contain %q data", adminKubeconfigKey)
+		return nil, errors.Errorf("admin kubeconfig secret does not contain %q data", constants.KubeconfigSecretKey)
 	}
 
 	config, err := clientcmd.Load(kubeconfigData)
@@ -161,30 +280,33 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 	utils.AddControllerMetricsTransportWrapper(cfg, b.controllerName, true)
 
 	if override := b.cd.Spec.ControlPlaneConfig.APIURLOverride; override != "" {
-		useOverrideURL := false
-		switch b.urlToUse {
-		case activeURL:
-			useOverrideURL = b.apiURLOverrideActive()
-		case primaryURL:
-			useOverrideURL = true
-		}
-		if useOverrideURL {
-			cfg.Host = b.cd.Spec.ControlPlaneConfig.APIURLOverride
+		if b.urlToUse == primaryURL ||
+			(b.urlToUse == activeURL && IsPrimaryURLActive(b.cd)) {
+			cfg.Host = override
 		}
 	}
 
 	return cfg, nil
 }
 
-func (b *builder) APIURL() (string, error) {
-	cfg, err := b.RESTConfig()
-	if err != nil {
-		return "", err
+func restConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, error) {
+	kubeconfigSecret := &corev1.Secret{}
+	if err := c.Get(
+		context.Background(),
+		client.ObjectKey{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name},
+		kubeconfigSecret,
+	); err != nil {
+		return nil, errors.Wrap(err, "could not get admin kubeconfig secret")
 	}
-	return cfg.Host, nil
-}
+	kubeconfigData, ok := kubeconfigSecret.Data[constants.KubeconfigSecretKey]
+	if !ok {
+		return nil, errors.Errorf("admin kubeconfig secret does not contain %q data", constants.KubeconfigSecretKey)
+	}
 
-func (b *builder) apiURLOverrideActive() bool {
-	cond := utils.FindClusterDeploymentCondition(b.cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition)
-	return cond != nil && cond.Status == corev1.ConditionTrue
+	config, err := clientcmd.Load(kubeconfigData)
+	if err != nil {
+		return nil, err
+	}
+	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
+	return kubeConfig.ClientConfig()
 }

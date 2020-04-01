@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
@@ -86,7 +87,6 @@ func TestClusterVersionReconcile(t *testing.T) {
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if !test.noRemoteCall {
-				mockRemoteClientBuilder.EXPECT().Unreachable().Return(false)
 				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(), nil)
 			}
 			rcd := &ReconcileClusterVersion{
@@ -150,6 +150,12 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				},
 			},
 			Installed: true,
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			Conditions: []hivev1.ClusterDeploymentCondition{{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}},
 		},
 	}
 	return cd

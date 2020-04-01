@@ -245,10 +245,8 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, nil
 	}
 
-	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
-
 	// If the cluster is unreachable, return from here.
-	if remoteClientBuilder.Unreachable() {
+	if unreachable, _ := remoteclient.Unreachable(cd); unreachable {
 		ssiLog.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
@@ -266,16 +264,23 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		}
 		return reconcile.Result{}, err
 	}
-	dynamicClient, err := remoteClientBuilder.BuildDynamic()
-	if err != nil {
-		ssiLog.WithError(err).Error("unable to build dynamic client")
-		return reconcile.Result{}, err
+
+	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
+	dynamicClient, unreachable, requeue := remoteclient.ConnectToRemoteClusterWithDynamicClient(
+		cd,
+		remoteClientBuilder,
+		r.Client,
+		ssiLog,
+	)
+	if unreachable {
+		return reconcile.Result{Requeue: requeue}, nil
 	}
 	restConfig, err := remoteClientBuilder.RESTConfig()
 	if err != nil {
 		ssiLog.WithError(err).Error("unable to get REST config")
 		return reconcile.Result{}, err
 	}
+
 	ssiLog.Debug("applying sync set")
 	original := ssi.DeepCopy()
 
@@ -365,18 +370,14 @@ func (r *ReconcileSyncSetInstance) syncDeletedSyncSetInstance(ssi *hivev1.SyncSe
 		return reconcile.Result{}, r.removeSyncSetInstanceFinalizer(ssi, ssiLog)
 	}
 
-	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
-
-	// If the cluster is unreachable, do not reconcile.
-	if remoteClientBuilder.Unreachable() {
-		ssiLog.Debug("skipping cluster with unreachable condition")
-		return reconcile.Result{}, nil
-	}
-
-	dynamicClient, err := remoteClientBuilder.BuildDynamic()
-	if err != nil {
-		ssiLog.WithError(err).Error("unable to build dynamic client")
-		return reconcile.Result{}, err
+	dynamicClient, unreachable, requeue := remoteclient.ConnectToRemoteClusterWithDynamicClient(
+		cd,
+		r.remoteClusterAPIClientBuilder(cd),
+		r.Client,
+		ssiLog,
+	)
+	if unreachable {
+		return reconcile.Result{Requeue: requeue}, nil
 	}
 
 	ssiLog.Info("deleting syncset resources on target cluster")

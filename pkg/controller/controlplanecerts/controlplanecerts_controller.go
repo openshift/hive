@@ -73,9 +73,6 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 		scheme:  mgr.GetScheme(),
 		applier: helper,
 	}
-	r.remoteClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
-	}
 
 	return r
 }
@@ -102,9 +99,8 @@ var _ reconcile.Reconciler = &ReconcileControlPlaneCerts{}
 // ReconcileControlPlaneCerts reconciles a ClusterDeployment object
 type ReconcileControlPlaneCerts struct {
 	client.Client
-	scheme              *runtime.Scheme
-	applier             applier
-	remoteClientBuilder func(*hivev1.ClusterDeployment) remoteclient.Builder
+	scheme  *runtime.Scheme
+	applier applier
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -380,11 +376,9 @@ func (r *ReconcileControlPlaneCerts) setCertsNotFoundCondition(cd *hivev1.Cluste
 // defaultControlPlaneDomain will attempt to return the domain/hostname for the secondary API URL
 // for the cluster based on the contents of the clusterDeployment's adminKubeConfig secret.
 func (r *ReconcileControlPlaneCerts) defaultControlPlaneDomain(cd *hivev1.ClusterDeployment) (string, error) {
-	remoteClient := r.remoteClientBuilder(cd)
-
-	apiurl, err := remoteClient.UseSecondaryAPIURL().APIURL()
+	apiurl, err := remoteclient.InitialURL(r.Client, cd)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to fetch secondary API URL")
+		return "", errors.Wrap(err, "failed to fetch initial API URL")
 	}
 
 	u, err := url.Parse(apiurl)

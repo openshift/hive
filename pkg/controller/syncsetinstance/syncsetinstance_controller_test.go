@@ -628,7 +628,6 @@ func TestSyncSetReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
-			mockRemoteClientBuilder.EXPECT().Unreachable().Return(false).AnyTimes()
 			mockRemoteClientBuilder.EXPECT().RESTConfig().Return(nil, nil).AnyTimes()
 			mockRemoteClientBuilder.EXPECT().BuildDynamic().Return(dynamicClient, nil).AnyTimes()
 
@@ -721,6 +720,12 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			},
 			Installed: true,
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			Conditions: []hivev1.ClusterDeploymentCondition{{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}},
 		},
 	}
 

@@ -163,7 +163,6 @@ func TestClusterStateReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
-			mockRemoteClientBuilder.EXPECT().Unreachable().Return(false)
 			if !test.noRemoteCall {
 				mockRemoteClientBuilder.EXPECT().Build().Return(fake.NewFakeClient(test.remote...), nil)
 			}
@@ -233,6 +232,12 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				},
 			},
 			Installed: true,
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			Conditions: []hivev1.ClusterDeploymentCondition{{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}},
 		},
 	}
 }

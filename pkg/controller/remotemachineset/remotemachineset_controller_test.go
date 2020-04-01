@@ -114,7 +114,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		machinePool                      *hivev1.MachinePool
 		remoteExisting                   []runtime.Object
 		generatedMachineSets             []*machineapi.MachineSet
-		unreachable                      bool
 		actuatorDoNotProceed             bool
 		expectErr                        bool
 		expectNoFinalizer                bool
@@ -222,10 +221,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool: testMachinePool(),
 		},
 		{
-			name:              "Skip create missing machine set when cluster is unreachable",
-			clusterDeployment: testClusterDeployment(),
-			machinePool:       testMachinePool(),
-			unreachable:       true,
+			name: "Skip create missing machine set when cluster is unreachable",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
+				cond.Status = corev1.ConditionTrue
+				return cd
+			}(),
+			machinePool: testMachinePool(),
 		},
 		{
 			name:              "Delete extra machine set",
@@ -628,7 +631,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}
 
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
-			mockRemoteClientBuilder.EXPECT().Unreachable().Return(test.unreachable).AnyTimes()
 			mockRemoteClientBuilder.EXPECT().Build().Return(remoteFakeClient, nil).AnyTimes()
 
 			logger := log.WithField("controller", "remotemachineset")
@@ -901,6 +903,12 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				InfraID:                  testInfraID,
 			},
 			Installed: true,
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			Conditions: []hivev1.ClusterDeploymentCondition{{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}},
 		},
 	}
 }

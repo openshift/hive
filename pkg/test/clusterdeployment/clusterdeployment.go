@@ -24,3 +24,16 @@ func Generic(opt generic.Option) Option {
 		opt(clusterDeployment)
 	}
 }
+
+// WithCondition adds the specified condition to the ClusterDeployment
+func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		for i, c := range clusterDeployment.Status.Conditions {
+			if c.Type == cond.Type {
+				clusterDeployment.Status.Conditions[i] = cond
+				return
+			}
+		}
+		clusterDeployment.Status.Conditions = append(clusterDeployment.Status.Conditions, cond)
+	}
+}

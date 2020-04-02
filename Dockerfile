@@ -2,11 +2,11 @@ FROM openshift/origin-release:golang-1.13 as builder
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
-RUN go build -o bin/manager github.com/openshift/hive/cmd/manager
-RUN go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
-RUN go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
-RUN go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
-RUN go build -o bin/hive-apiserver github.com/openshift/hive/cmd/hive-apiserver
+RUN go build -mod=vendor -o bin/manager github.com/openshift/hive/cmd/manager
+RUN go build -mod=vendor -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
+RUN go build -mod=vendor -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
+RUN go build -mod=vendor -o bin/hive-operator github.com/openshift/hive/cmd/operator
+RUN go build -mod=vendor -o bin/hive-apiserver github.com/openshift/hive/cmd/hive-apiserver
 
 FROM centos:7
 

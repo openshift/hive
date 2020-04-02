@@ -5,9 +5,6 @@ FROM openshift/origin-release:golang-1.13
 ENV GIT_COMMITTER_NAME hive-team
 ENV GIT_COMMITTER_EMAIL hive-team@redhat.com
 
-# Install the golint, use this to check our source for niceness
-RUN go get -u golang.org/x/lint/golint
-
 # Basic Debug Tools
 RUN yum -y install strace tcping && yum clean all
 
@@ -21,9 +18,3 @@ RUN export version=1.0.8 && \
 
 # Get rid of "go: disabling cache ..." errors.
 RUN mkdir -p /go && chgrp -R root /go && chmod -R g+rwX /go
-
-RUN export GOLANGCI_LINT_VERSION=v1.17.1 &&\
-    curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s ${GOLANGCI_LINT_VERSION} && \
-    mv ./bin/golangci-lint /usr/local/bin/golangci-lint
-
-RUN go get -u github.com/golang/mock/mockgen

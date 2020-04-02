@@ -1,11 +1,11 @@
 // Generate deepcopy for apis
-//go:generate go run k8s.io/code-generator/cmd/deepcopy-gen -O zz_generated.deepcopy -i ./... -h ../../../../hack/boilerplate.go.txt
+//go:generate deepcopy-gen -O zz_generated.deepcopy -i ./... -h ../../../../hack/boilerplate.go.txt
 
 // Generate conversion for apis
-//go:generate go run k8s.io/code-generator/cmd/conversion-gen -O zz_generated.conversion -i ./v1alpha1 -h ../../../../hack/boilerplate.go.txt
+//go:generate conversion-gen -O zz_generated.conversion -i ./v1alpha1 -h ../../../../hack/boilerplate.go.txt
 
 // Generate defaults for apis
-//go:generate go run k8s.io/code-generator/cmd/defaulter-gen -O zz_generated.defaults -i ./v1alpha1 -h ../../../../hack/boilerplate.go.txt
+//go:generate defaulter-gen -O zz_generated.defaults -i ./v1alpha1 -h ../../../../hack/boilerplate.go.txt
 
 // +k8s:deepcopy-gen=package,register
 

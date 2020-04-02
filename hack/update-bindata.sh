@@ -7,7 +7,7 @@ SRC_DIR="$(git rev-parse --show-toplevel)"
 OUTPUT_FILE="${OUTPUT_FILE:-./pkg/operator/assets/bindata.go}"
 
 # go-bindata generates code assets from the yaml we want to deploy by the operator.
-go run github.com/jteeuwen/go-bindata/go-bindata \
+go-bindata \
         -nocompress \
 	-nometadata \
         -pkg "assets" \

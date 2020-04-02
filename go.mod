@@ -13,10 +13,12 @@ require (
 	github.com/evanphx/json-patch v4.5.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/golang/mock v1.3.1
+	github.com/golangci/golangci-lint v1.23.8
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
 	github.com/heptio/velero v1.0.0
 	github.com/json-iterator/go v1.1.8
+	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
 	github.com/miekg/dns v1.1.15
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/onsi/gomega v1.8.1
@@ -34,7 +36,7 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/tools v0.0.0-20200331202046-9d5940d49312 // indirect
@@ -49,6 +51,7 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cloud-provider v0.0.0-00010101000000-000000000000 // indirect
 	k8s.io/cluster-registry v0.0.6
+	k8s.io/code-generator v0.17.2
 	k8s.io/component-base v0.17.1
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.17.1
@@ -57,6 +60,7 @@ require (
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/controller-runtime v0.4.0
+	sigs.k8s.io/controller-tools v0.2.4
 	sigs.k8s.io/yaml v1.1.0
 )
 

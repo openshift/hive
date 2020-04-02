@@ -83,21 +83,27 @@ test-e2e-postinstall:
 
 # Builds all of hive's binaries (including utils).
 .PHONY: build
-build: manager hiveutil hiveadmission operator hive-apiserver
+build: generate binaries
+
+# Target for building the binaries without running generate, since the
+# tools for that are not present in the builder image used by the
+# Dockerfile.
+.PHONY: binaries
+binaries: manager hiveutil hiveadmission operator hive-apiserver
 
 
 # Build manager binary
 .PHONY: manager
-manager: generate
+manager:
 	go build $(GO_MOD_FLAGS) -o bin/manager $(LDFLAGS) github.com/openshift/hive/cmd/manager
 
 .PHONY: operator
-operator: generate
+operator:
 	go build $(GO_MOD_FLAGS) -o bin/hive-operator $(LDFLAGS) github.com/openshift/hive/cmd/operator
 
 # Build hiveutil binary
 .PHONY: hiveutil
-hiveutil: generate
+hiveutil:
 	go build $(GO_MOD_FLAGS) -o bin/hiveutil $(LDFLAGS) github.com/openshift/hive/contrib/cmd/hiveutil
 
 # Build hiveadmission binary

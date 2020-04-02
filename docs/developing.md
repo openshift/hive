@@ -4,11 +4,12 @@
 
 - [Developing Hive](#developing-hive)
   - [Prerequisites](#prerequisites)
-  - [External tools](#external-tools)
+    - [External tools](#external-tools)
   - [Build and run tests](#build-and-run-tests)
   - [Setting up the development environment](#setting-up-the-development-environment)
     - [Cloning the repository](#cloning-the-repository)
   - [Deploying with Kubernetes In Docker (kind)](#deploying-with-kubernetes-in-docker-kind)
+  - [Adopting ClusterDeployments](#adopting-clusterdeployments)
   - [Writing/Testing Code](#writingtesting-code)
     - [Run Hive Operator](#run-hive-operator)
       - [Directly from source](#directly-from-source)
@@ -20,11 +21,10 @@
     - [Generating a Certificate](#generating-a-certificate)
     - [Using Generated Certificate](#using-generated-certificate)
   - [Dependency management](#dependency-management)
-    - [Installing Dep](#installing-dep)
     - [Updating Dependencies](#updating-dependencies)
     - [Re-creating vendor Directory](#re-creating-vendor-directory)
-    - [Running the e2e test locally](#running-the-e2e-test-locally)
-    - [TIP](#tip)
+  - [Running the e2e test locally](#running-the-e2e-test-locally)
+  - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -34,30 +34,11 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.12)
+- A recent Go distribution (>=1.13)
 
 ### External tools
 
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
-- [mockgen](https://github.com/golang/mock)
-- [golangci-lint](https://github.com/golangci/golangci-lint)
-
-If you do not care to install those tools locally, then you can use them from the Hive build image.
-
-To build the image, run:
-
-```bash
-go get -u github.com/openshift/imagebuilder/cmd/imagebuilder  # if you don't have imagebuilder
-make build-build-image
-```
-
-Then, replace executions of `make` with executions of `hack/make`.
-
-For example, to run the tests you would run the following.
-
-```bash
-hack/make test
-```
 
 ## Build and run tests
 
@@ -120,8 +101,8 @@ export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
 **NOTE:** If you do not have `cfssljson` and `cfssl` installed, run the following command to install, otherwise, ignore this.
 
 ```bash
-go get -u github.com/cloudflare/cfssl/cmd/cfssljson
-go get -u github.com/cloudflare/cfssl/cmd/cfssl
+go install github.com/cloudflare/cfssl/cmd/cfssljson
+go install github.com/cloudflare/cfssl/cmd/cfssl
 ```
 
 You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
@@ -259,33 +240,21 @@ Example:
 
 ## Dependency management
 
-### Installing Dep
-
-Before you can use Dep you need to download and install it from GitHub:
-
-```
- go get github.com/golang/dep/cmd/dep
-```
-
-This will install the `dep` binary into *_$GOPATH/bin_*.
-
-Alternatively, if you would rather not install Dep, you can run from a container using the Hive build image as described in the [External tools](#external-tools) section.
-
 ### Updating Dependencies
 
-If your work requires a change to the dependencies, you need to update the Dep configuration.
+If your work requires a change to the dependencies, you need to update the modules.
 
-* Edit *_Gopkg.toml_* to change the dependencies as needed.
+* If you are upgrading an existing dependency, run `go get [module]`. If you are adding a dependency, then you should
+not need to do anything explicit for this step. The go tooling should pick up the dependency from the include directives
+that you added in code.
 
 * Run `make vendor` to fetch changed dependencies.
 
 * Test that everything still compiles with changed files in place by running `make clean && make`.
 
-**Refer dep documents for more information.**
+**Refer Go modules documents for more information.**
 
-* [dep document about updating dependencies](https://golang.github.io/dep/docs/daily-dep.html#updating-dependencies)
-
-* [dep document about adding a dependency](https://golang.github.io/dep/docs/daily-dep.html#adding-a-new-dependency)
+* [go modules wiki](https://github.com/golang/go/wiki/Modules)
 
 ### Re-creating vendor Directory
 
@@ -296,18 +265,6 @@ To recreate *_vendor_* directory, you can run the following command:
 ```
 make vendor
 ```
-
-This command calls and runs Dep.
-Alternatively, you can run the Dep command directly.
-
-```
-dep ensure -v
-```
-
-### TIP
-
-* The Dep cache located under *_$GOPATH/pkg/dep_*.
-* If you see any Dep errors during `make vendor`, you can remove local cached directory and try again.
 
 ## Running the e2e test locally
 

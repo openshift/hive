@@ -162,8 +162,7 @@ manifests: crd
 # Generate CRD yaml from our api types:
 .PHONY: crd
 crd: install-tools
-	# The apis-path is explicitly specified so that CRDs are not created for v1alpha1
-	controller-gen crd --apis-path=pkg/apis/hive/v1
+	controller-gen crd paths=./pkg/apis/hive
 
 # Run go fmt against code
 .PHONY: fmt

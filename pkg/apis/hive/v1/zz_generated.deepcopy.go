@@ -220,7 +220,7 @@ func (in *Checkpoint) DeepCopyObject() runtime.Object {
 func (in *CheckpointList) DeepCopyInto(out *CheckpointList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Checkpoint, len(*in))
@@ -333,7 +333,7 @@ func (in *ClusterDeploymentCondition) DeepCopy() *ClusterDeploymentCondition {
 func (in *ClusterDeploymentList) DeepCopyInto(out *ClusterDeploymentList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClusterDeployment, len(*in))
@@ -487,7 +487,7 @@ func (in *ClusterDeprovision) DeepCopyObject() runtime.Object {
 func (in *ClusterDeprovisionList) DeepCopyInto(out *ClusterDeprovisionList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClusterDeprovision, len(*in))
@@ -617,7 +617,7 @@ func (in *ClusterImageSet) DeepCopyObject() runtime.Object {
 func (in *ClusterImageSetList) DeepCopyInto(out *ClusterImageSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClusterImageSet, len(*in))
@@ -811,7 +811,7 @@ func (in *ClusterProvisionCondition) DeepCopy() *ClusterProvisionCondition {
 func (in *ClusterProvisionList) DeepCopyInto(out *ClusterProvisionList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClusterProvision, len(*in))
@@ -958,7 +958,7 @@ func (in *ClusterState) DeepCopyObject() runtime.Object {
 func (in *ClusterStateList) DeepCopyInto(out *ClusterStateList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClusterState, len(*in))
@@ -1134,7 +1134,7 @@ func (in *DNSZoneCondition) DeepCopy() *DNSZoneCondition {
 func (in *DNSZoneList) DeepCopyInto(out *DNSZoneList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]DNSZone, len(*in))
@@ -1338,7 +1338,7 @@ func (in *HiveConfig) DeepCopyObject() runtime.Object {
 func (in *HiveConfigList) DeepCopyInto(out *HiveConfigList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]HiveConfig, len(*in))
@@ -1510,7 +1510,7 @@ func (in *MachinePoolCondition) DeepCopy() *MachinePoolCondition {
 func (in *MachinePoolList) DeepCopyInto(out *MachinePoolList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MachinePool, len(*in))
@@ -1571,7 +1571,7 @@ func (in *MachinePoolNameLease) DeepCopyObject() runtime.Object {
 func (in *MachinePoolNameLeaseList) DeepCopyInto(out *MachinePoolNameLeaseList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MachinePoolNameLease, len(*in))
@@ -1991,7 +1991,7 @@ func (in *SelectorSyncIdentityProvider) DeepCopyObject() runtime.Object {
 func (in *SelectorSyncIdentityProviderList) DeepCopyInto(out *SelectorSyncIdentityProviderList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SelectorSyncIdentityProvider, len(*in))
@@ -2070,7 +2070,7 @@ func (in *SelectorSyncSet) DeepCopyObject() runtime.Object {
 func (in *SelectorSyncSetList) DeepCopyInto(out *SelectorSyncSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SelectorSyncSet, len(*in))
@@ -2222,7 +2222,7 @@ func (in *SyncIdentityProviderCommonSpec) DeepCopy() *SyncIdentityProviderCommon
 func (in *SyncIdentityProviderList) DeepCopyInto(out *SyncIdentityProviderList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SyncIdentityProvider, len(*in))
@@ -2382,7 +2382,7 @@ func (in *SyncSetInstance) DeepCopyObject() runtime.Object {
 func (in *SyncSetInstanceList) DeepCopyInto(out *SyncSetInstanceList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SyncSetInstance, len(*in))
@@ -2486,7 +2486,7 @@ func (in *SyncSetInstanceStatus) DeepCopy() *SyncSetInstanceStatus {
 func (in *SyncSetList) DeepCopyInto(out *SyncSetList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]SyncSet, len(*in))

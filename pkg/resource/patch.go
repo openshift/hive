@@ -7,8 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	kcmdpatch "k8s.io/kubernetes/pkg/kubectl/cmd/patch"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kcmdpatch "k8s.io/kubectl/pkg/cmd/patch"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 var (

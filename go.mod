@@ -45,14 +45,14 @@ require (
 	k8s.io/apiextensions-apiserver v0.17.1
 	k8s.io/apimachinery v0.17.3
 	k8s.io/apiserver v0.17.1 // indirect
-	k8s.io/cli-runtime v0.0.0-20200124034138-fea5ca65697c
+	k8s.io/cli-runtime v0.17.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
 	k8s.io/code-generator v0.17.2
 	k8s.io/component-base v0.17.1 // indirect
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.17.1
-	k8s.io/kubernetes v1.14.1
+	k8s.io/kubectl v0.17.1
 	k8s.io/utils v0.0.0-20191217005138-9e5e9d854fcc
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
@@ -76,7 +76,7 @@ replace (
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v0.9.2 // v0.9.2
 	github.com/terraform-providers/terraform-provider-azurerm => github.com/openshift/terraform-provider-azurerm v1.41.1-openshift-3 // Pin to openshift fork with IPv6 fixes
 	google.golang.org/api => google.golang.org/api v0.13.0 // Pin to version required by tf-provider-google
-	k8s.io/api => k8s.io/api v0.0.0-20190409021203-6e4e0e4f393b // kubernetes-1.14.1
+	k8s.io/api => k8s.io/api v0.16.4 // v0.16.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190409022649-727a075fdec8 // kubernetes-1.14.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190404173353-6a84e37a896d // kubernetes-1.14.1
 	k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190409021813-1ec86e4da56c // kubernetes-1.14.1
@@ -87,6 +87,7 @@ replace (
 	k8s.io/cri-api => k8s.io/cri-api v0.0.0-20190326082326-5c2568eea0b8 // kubernetes-1.14.0-alpha.3
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.0.0-20190409022021-00b8e31abe9d // kubernetes-1.14.1
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20190425185145-07b897206552 // commit corresponding to kube 1.14.1
+	k8s.io/kubectl => k8s.io/kubectl v0.16.4 // v0.16.4
 	k8s.io/kubernetes => k8s.io/kubernetes v1.14.1 // v1.14.1
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190409022812-850dadb8b49c // kubernetes-1.14.1
 	k8s.io/utils => k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a // commit corresponding to kube 1.14.1

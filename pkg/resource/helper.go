@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/client-go/rest"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (

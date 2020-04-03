@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
-	k8slabels "k8s.io/kubernetes/pkg/util/labels"
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/client-go/kubernetes/scheme"

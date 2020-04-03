@@ -3,7 +3,7 @@ package generic
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	k8slabels "k8s.io/kubernetes/pkg/util/labels"
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 

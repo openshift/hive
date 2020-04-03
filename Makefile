@@ -98,7 +98,7 @@ build: generate binaries
 # tools for that are not present in the builder image used by the
 # Dockerfile.
 .PHONY: binaries
-binaries: manager hiveutil hiveadmission operator hive-apiserver
+binaries: manager hiveutil hiveadmission operator
 
 
 # Build manager binary
@@ -119,11 +119,6 @@ hiveutil:
 .PHONY: hiveadmission
 hiveadmission:
 	go build $(GO_MOD_FLAGS) -o bin/hiveadmission $(LDFLAGS) github.com/openshift/hive/cmd/hiveadmission
-
-# Build v1alpha1 aggregated API server
-.PHONY: hive-apiserver
-hive-apiserver:
-	go build $(GO_MOD_FLAGS) -o bin/hive-apiserver $(LDFLAGS) github.com/openshift/hive/cmd/hive-apiserver
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
@@ -161,7 +156,6 @@ manifests: crd
 # Generate CRD yaml from our api types:
 .PHONY: crd
 crd: install-tools
-	# The apis-path is explicitly specified so that CRDs are not created for v1alpha1
 	controller-gen crd --apis-path=pkg/apis/hive/v1
 
 # Run go fmt against code
@@ -193,10 +187,6 @@ verify-lint: install-tools
 	@echo Verifying golint
 	@sh -c \
 	  'for file in $(GOFILES) ; do \
-	     if [[ $$file == "pkg/api/validation"* ]]; then continue; fi; \
-	     if [[ $$file == "pkg/hive/apis/hive/hiveconfig_types.go" ]]; then continue; fi; \
-	     if [[ $$file == "pkg/hive/apis/hive/hiveconversion/"* ]]; then continue; fi; \
-	     if [[ $$file == "pkg/hive/apiserver/registry/"* ]]; then continue; fi; \
 	     golint --set_exit_status $$file || exit 1 ; \
 	   done'
 

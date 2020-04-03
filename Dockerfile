@@ -18,7 +18,6 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-operator /opt/services
-COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-apiserver /opt/services/
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as

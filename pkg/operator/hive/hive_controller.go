@@ -327,9 +327,9 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAPI(hLog, h, instance)
+	err = r.tearDownLegacyHiveAPI(hLog, hiveNSName)
 	if err != nil {
-		hLog.WithError(err).Error("error deploying Hive v1alpha1 aggregated API")
+		hLog.WithError(err).Error("error tearing down Hive v1alpha1 aggregated API")
 		r.updateHiveConfigStatus(instance, hLog, false)
 		return reconcile.Result{}, err
 	}

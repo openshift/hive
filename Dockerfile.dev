@@ -12,7 +12,6 @@ ADD bin/hiveadmission /opt/services/
 ADD bin/hive-operator /opt/services/
 ADD bin/manager /opt/services/
 ADD bin/hiveutil /usr/bin/
-ADD bin/hive-apiserver /opt/services
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as

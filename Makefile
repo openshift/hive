@@ -156,7 +156,7 @@ manifests: crd
 # Generate CRD yaml from our api types:
 .PHONY: crd
 crd: install-tools
-	controller-gen crd --apis-path=pkg/apis/hive/v1
+	controller-gen crd paths=./pkg/apis/hive
 
 # Run go fmt against code
 .PHONY: fmt

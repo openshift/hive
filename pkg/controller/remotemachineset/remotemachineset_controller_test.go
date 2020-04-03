@@ -71,9 +71,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		rMSL := &machineapi.MachineSetList{}
 		tm := metav1.TypeMeta{}
 		tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("MachineSet"))
-		err := rc.List(context.TODO(), rMSL, client.UseListOptions(&client.ListOptions{
-			Raw: &metav1.ListOptions{TypeMeta: tm},
-		}))
+		err := rc.List(context.TODO(), rMSL, &client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}})
 		if err == nil {
 			return rMSL, err
 		}
@@ -85,9 +83,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		rMAL := &autoscalingv1beta1.MachineAutoscalerList{}
 		tm := metav1.TypeMeta{}
 		tm.SetGroupVersionKind(autoscalingv1beta1.SchemeGroupVersion.WithKind("MachineAutoscaler"))
-		err := rc.List(context.TODO(), rMAL, client.UseListOptions(&client.ListOptions{
-			Raw: &metav1.ListOptions{TypeMeta: tm},
-		}))
+		err := rc.List(context.TODO(), rMAL, &client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}})
 		if err == nil {
 			return rMAL, err
 		}
@@ -99,9 +95,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		rCAL := &autoscalingv1.ClusterAutoscalerList{}
 		tm := metav1.TypeMeta{}
 		tm.SetGroupVersionKind(autoscalingv1.SchemeGroupVersion.WithKind("ClusterAutoscaler"))
-		err := rc.List(context.TODO(), rCAL, client.UseListOptions(&client.ListOptions{
-			Raw: &metav1.ListOptions{TypeMeta: tm},
-		}))
+		err := rc.List(context.TODO(), rCAL, &client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}})
 		if err == nil {
 			return rCAL, err
 		}

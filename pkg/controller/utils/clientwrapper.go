@@ -154,7 +154,7 @@ type hiveStatusWriter struct {
 }
 
 // Update implements StatusWriter.Update
-func (sw *hiveStatusWriter) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOptionFunc) error {
+func (sw *hiveStatusWriter) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
 	switch t := obj.(type) {
 	case *hivev1.ClusterDeployment:
 		// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates

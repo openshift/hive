@@ -1622,8 +1622,6 @@ github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200128081049-840376ca
 github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480 h1:iIrMvq8qRMfmuhw/TVB4usRN/BlH2huBKgtrRjucOU4=
 github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480/go.mod h1:/XmV44Fh28Vo3Ye93qFrxAbcFJ/Uy+7LPD+jGjmfJYc=
 github.com/openshift/cluster-etcd-operator v0.0.0-alpha.0.0.20191025163650-5854b5c48ce4/go.mod h1:vcBAUefK8pQmTPQ3jlCemORXhnRnq3aTsfOSVeaWliY=
-github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e h1:d+HIsGZbd33eAmkrrQE22YD2PywTf9WxVeNrxam0Jag=
-github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e/go.mod h1:M9dusM6U0OOmpKjTacoXquDKPhRPu23PvFA/ws8QML0=
 github.com/openshift/cluster-version-operator v3.11.1-0.20190629164025-08cac1c02538+incompatible/go.mod h1:0BbpR1mrN0F2ZRae5N1XHcytmkvVPaeKgSQwRRBWugc=
 github.com/openshift/generic-admission-server v1.14.0 h1:GAQy5JNVcbmUuIpPvLd39+2rPecxEm7WQ2sP7ACrse4=
 github.com/openshift/generic-admission-server v1.14.0/go.mod h1:GD9KN/W4KxqRQGVMbqQHpHzb2XcQVvLCaBaSciqXvfM=
@@ -2556,8 +2554,6 @@ k8s.io/cli-runtime v0.0.0-20190409023024-d644b00f3b79 h1:bZyxc0wzVA5KgUfAXZA6z87
 k8s.io/cli-runtime v0.0.0-20190409023024-d644b00f3b79/go.mod h1:qWnH3/b8sp/l7EvlDh7ulDU3UWA4P4N1NFbEEP791tM=
 k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible h1:U5Bt+dab9K8qaUmXINrkXO135kA11/i5Kg1RUydgaMQ=
 k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible/go.mod h1:7vJpHMYJwNQCWgzmNV+VYUl1zCObLyodBc8nIyt8L5s=
-k8s.io/cloud-provider v0.0.0-20190409023720-1bc0c81fa51d h1:ad7UpNUGRx6FbYoK4+xIYyeS2CUShjNKY45YN1ipjLI=
-k8s.io/cloud-provider v0.0.0-20190409023720-1bc0c81fa51d/go.mod h1:LlIffnLBu+GG7d4ppPzC8UnA1Ex8S+ntmSRVsnr7Xy4=
 k8s.io/cluster-registry v0.0.6 h1:zSzuBlDybN72jty3veddOALhWyzeXfF80u8NZg3FMFM=
 k8s.io/cluster-registry v0.0.6/go.mod h1:/F+o1rvzjBdLbg782rR8eKrOb20hPy7us+Zu/pjBtAY=
 k8s.io/code-generator v0.0.0-20190311093542-50b561225d70 h1:lgPp615xLHxN84RBd+viA/oHzJfI0miFYFH4T9wpPQ4=

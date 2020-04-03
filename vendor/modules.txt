@@ -111,8 +111,6 @@ github.com/beorn7/perks/quantile
 github.com/blang/semver
 # github.com/bombsimon/wsl/v2 v2.0.0
 github.com/bombsimon/wsl/v2
-# github.com/certifi/gocertifi v0.0.0-20190506164543-d2eda7129713
-github.com/certifi/gocertifi
 # github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
@@ -149,8 +147,6 @@ github.com/dgrijalva/jwt-go
 github.com/dimchansky/utfbom
 # github.com/docker/distribution v2.7.1+incompatible
 github.com/docker/distribution/context
-github.com/docker/distribution/digestset
-github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
 github.com/docker/distribution/uuid
 # github.com/docker/docker v0.7.3-0.20190410184157-6d18c6a06295
@@ -158,8 +154,6 @@ github.com/docker/docker/pkg/term
 github.com/docker/docker/pkg/term/windows
 # github.com/docker/go-healthcheck v0.1.0
 github.com/docker/go-healthcheck
-# github.com/docker/go-units v0.4.0
-github.com/docker/go-units
 # github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
@@ -176,8 +170,6 @@ github.com/fatih/camelcase
 github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
-# github.com/getsentry/raven-go v0.2.0
-github.com/getsentry/raven-go
 # github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 github.com/ghodss/yaml
 # github.com/go-critic/go-critic v0.4.1
@@ -407,8 +399,6 @@ github.com/kisielk/gotool
 github.com/kisielk/gotool/internal/load
 # github.com/konsorten/go-windows-terminal-sequences v1.0.2
 github.com/konsorten/go-windows-terminal-sequences
-# github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
-github.com/liggitt/tabwriter
 # github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
 # github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e
@@ -485,18 +475,13 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/opencontainers/go-digest v1.0.0-rc1
-github.com/opencontainers/go-digest
 # github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible => github.com/openshift/api v0.0.0-20190627141250-de5ca909c732
 github.com/openshift/api/apps/v1
-github.com/openshift/api/authorization/v1
 github.com/openshift/api/config/v1
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
 github.com/openshift/api/image/v1
 github.com/openshift/api/operator/v1
-github.com/openshift/api/pkg/serialization
-github.com/openshift/api/project/v1
 github.com/openshift/api/route/v1
 # github.com/openshift/cloud-credential-operator v0.0.0-20200316201045-d10080b52c9e
 github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
@@ -510,8 +495,6 @@ github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
 # github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1
-# github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e
-github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1
 # github.com/openshift/generic-admission-server v1.14.0
 github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
@@ -544,13 +527,10 @@ github.com/openshift/installer/pkg/types/ovirt
 github.com/openshift/installer/pkg/types/vsphere
 github.com/openshift/installer/pkg/version
 # github.com/openshift/library-go v0.0.0-20200210105614-4bf528465627 => github.com/openshift/library-go v0.0.0-20200106191802-9821002633e8
-github.com/openshift/library-go/pkg/apiserver/apiserverconfig
-github.com/openshift/library-go/pkg/controller
 github.com/openshift/library-go/pkg/controller/fileobserver
 github.com/openshift/library-go/pkg/operator/events
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/resource/resourceread
-github.com/openshift/library-go/pkg/serviceability
 # github.com/openshift/machine-api-operator v0.2.1-0.20200310180732-c63fa2b143f0
 github.com/openshift/machine-api-operator/pkg/apis/machine
 github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1
@@ -562,8 +542,6 @@ github.com/pelletier/go-toml
 github.com/peterbourgon/diskv
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
-# github.com/pkg/profile v1.3.0
-github.com/pkg/profile
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v1.2.1 => github.com/prometheus/client_golang v0.9.2
@@ -949,17 +927,13 @@ k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-k8s.io/apiextensions-apiserver/pkg/features
 # k8s.io/apimachinery v0.17.3 => k8s.io/apimachinery v0.0.0-20190404173353-6a84e37a896d
-k8s.io/apimachinery/pkg/api/apitesting
-k8s.io/apimachinery/pkg/api/apitesting/fuzzer
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
 k8s.io/apimachinery/pkg/api/resource
 k8s.io/apimachinery/pkg/api/validation
 k8s.io/apimachinery/pkg/api/validation/path
-k8s.io/apimachinery/pkg/apis/meta/fuzzer
 k8s.io/apimachinery/pkg/apis/meta/internalversion
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
@@ -1289,8 +1263,6 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/cloud-provider v0.0.0-00010101000000-000000000000 => k8s.io/cloud-provider v0.0.0-20190409023720-1bc0c81fa51d
-k8s.io/cloud-provider/features
 # k8s.io/cluster-registry v0.0.6
 k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1
 # k8s.io/code-generator v0.17.2 => k8s.io/code-generator v0.0.0-20190311093542-50b561225d70
@@ -1343,22 +1315,6 @@ k8s.io/kube-openapi/pkg/util
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/proto/validation
 # k8s.io/kubernetes v1.14.1 => k8s.io/kubernetes v1.14.1
-k8s.io/kubernetes/pkg/api/legacyscheme
-k8s.io/kubernetes/pkg/api/service
-k8s.io/kubernetes/pkg/apis/apps
-k8s.io/kubernetes/pkg/apis/autoscaling
-k8s.io/kubernetes/pkg/apis/core
-k8s.io/kubernetes/pkg/apis/core/helper
-k8s.io/kubernetes/pkg/apis/core/install
-k8s.io/kubernetes/pkg/apis/core/pods
-k8s.io/kubernetes/pkg/apis/core/v1
-k8s.io/kubernetes/pkg/apis/core/v1/helper
-k8s.io/kubernetes/pkg/apis/core/validation
-k8s.io/kubernetes/pkg/apis/scheduling
-k8s.io/kubernetes/pkg/capabilities
-k8s.io/kubernetes/pkg/client/metrics/prometheus
-k8s.io/kubernetes/pkg/features
-k8s.io/kubernetes/pkg/fieldpath
 k8s.io/kubernetes/pkg/kubectl
 k8s.io/kubernetes/pkg/kubectl/apps
 k8s.io/kubernetes/pkg/kubectl/cmd/apply
@@ -1389,23 +1345,13 @@ k8s.io/kubernetes/pkg/kubectl/util/storage
 k8s.io/kubernetes/pkg/kubectl/util/templates
 k8s.io/kubernetes/pkg/kubectl/util/term
 k8s.io/kubernetes/pkg/kubectl/validation
-k8s.io/kubernetes/pkg/kubelet/types
-k8s.io/kubernetes/pkg/master/ports
-k8s.io/kubernetes/pkg/printers
-k8s.io/kubernetes/pkg/printers/storage
-k8s.io/kubernetes/pkg/security/apparmor
 k8s.io/kubernetes/pkg/util/interrupt
 k8s.io/kubernetes/pkg/util/labels
-k8s.io/kubernetes/pkg/util/parsers
-k8s.io/kubernetes/pkg/util/reflector/prometheus
-k8s.io/kubernetes/pkg/util/workqueue/prometheus
 k8s.io/kubernetes/pkg/version
 # k8s.io/utils v0.0.0-20191217005138-9e5e9d854fcc => k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
 k8s.io/utils/buffer
 k8s.io/utils/exec
 k8s.io/utils/integer
-k8s.io/utils/net
-k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/trace
 # mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed

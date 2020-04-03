@@ -1345,7 +1345,6 @@ k8s.io/kubernetes/pkg/kubectl/util/templates
 k8s.io/kubernetes/pkg/kubectl/util/term
 k8s.io/kubernetes/pkg/kubectl/validation
 k8s.io/kubernetes/pkg/util/interrupt
-k8s.io/kubernetes/pkg/util/labels
 k8s.io/kubernetes/pkg/version
 # k8s.io/utils v0.0.0-20191217005138-9e5e9d854fcc => k8s.io/utils v0.0.0-20190607212802-c55fbcfc754a
 k8s.io/utils/buffer

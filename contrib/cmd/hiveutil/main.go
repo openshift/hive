@@ -11,7 +11,6 @@ import (
 	"github.com/openshift/hive/contrib/pkg/certificate"
 	"github.com/openshift/hive/contrib/pkg/createcluster"
 	"github.com/openshift/hive/contrib/pkg/deprovision"
-	"github.com/openshift/hive/contrib/pkg/labelobjects"
 	"github.com/openshift/hive/contrib/pkg/report"
 	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
@@ -52,7 +51,6 @@ func newHiveutilCommand() *cobra.Command {
 	cmd.AddCommand(report.NewClusterReportCommand())
 	cmd.AddCommand(certificate.NewCertificateCommand())
 	cmd.AddCommand(adm.NewAdmCommand())
-	cmd.AddCommand(labelobjects.NewLabelObjectsCommand())
 	cmd.AddCommand(version.NewVersionCommand())
 
 	return cmd

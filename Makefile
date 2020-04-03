@@ -42,6 +42,14 @@ else
 GO_MOD_FLAGS ?=-mod=vendor
 endif
 
+ifeq "$(GO_MOD_FLAGS)" "-mod=vendor"
+	ifeq "$(GOFLAGS)" ""
+		GOFLAGS_FOR_GENERATE ?= GOFLAGS=-mod=vendor
+	else
+		GOFLAGS_FOR_GENERATE ?= GOFLAGS=-mod=vendor,$(GOFLAGS)
+	endif
+endif
+
 .PHONY: default
 default: all
 
@@ -195,7 +203,7 @@ verify-generated: install-tools
 # Generate code
 .PHONY: generate
 generate: install-tools
-	go generate $(GO_MOD_FLAGS) ./pkg/... ./cmd/...
+	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
 	hack/update-bindata.sh
 
 # Build the docker image

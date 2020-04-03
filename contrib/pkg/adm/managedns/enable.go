@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubectl/pkg/polymorphichelpers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -204,7 +204,7 @@ func waitForHiveAdmissionPods(dynClient dynamic.Interface, hiveNSName string) er
 
 	log.Info("waiting for new hiveadmission pods to deploy")
 
-	statusViewer := &kubectl.DeploymentStatusViewer{}
+	statusViewer := &polymorphichelpers.DeploymentStatusViewer{}
 
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", hiveAdmissionDeployment).String()
 

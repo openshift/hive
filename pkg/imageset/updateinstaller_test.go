@@ -98,10 +98,11 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				t.Fatalf("error creating test directory: %v", err)
 			}
 			opt := UpdateInstallerImageOptions{
-				ClusterDeploymentName: testClusterDeployment().Name,
-				WorkDir:               workDir,
-				log:                   log.WithField("test", test.name),
-				client:                client,
+				ClusterDeploymentName:      testClusterDeployment().Name,
+				ClusterDeploymentNamespace: "test-namespace",
+				WorkDir:                    workDir,
+				log:                        log.WithField("test", test.name),
+				client:                     client,
 			}
 
 			test.setupWorkDir(t, workDir)

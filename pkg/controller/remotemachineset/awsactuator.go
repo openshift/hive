@@ -33,16 +33,21 @@ type AWSActuator struct {
 var _ Actuator = &AWSActuator{}
 
 // NewAWSActuator is the constructor for building a AWSActuator
-func NewAWSActuator(awsCreds *corev1.Secret, region string, remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (*AWSActuator, error) {
+func NewAWSActuator(awsCreds *corev1.Secret, region string, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (*AWSActuator, error) {
 	awsClient, err := awsclient.NewClientFromSecret(awsCreds, region)
 	if err != nil {
 		logger.WithError(err).Warn("failed to create AWS client")
 		return nil, err
 	}
-	amiID, err := getAWSAMIID(remoteMachineSets, scheme, logger)
-	if err != nil {
-		logger.WithError(err).Warn("failed to get AMI ID")
-		return nil, err
+	amiID := pool.Annotations[hivev1.MachinePoolImageIDOverrideAnnotation]
+	if amiID != "" {
+		log.Infof("using AMI override from %s annotation: %s", hivev1.MachinePoolImageIDOverrideAnnotation, amiID)
+	} else {
+		amiID, err = getAWSAMIID(remoteMachineSets, scheme, logger)
+		if err != nil {
+			logger.WithError(err).Warn("failed to get AMI ID")
+			return nil, err
+		}
 	}
 	actuator := &AWSActuator{
 		client: awsClient,

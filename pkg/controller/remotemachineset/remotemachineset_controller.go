@@ -55,8 +55,8 @@ func Add(mgr manager.Manager) error {
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
-	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
-		return r.createActuator(cd, remoteMachineSets, logger)
+	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
+		return r.createActuator(cd, pool, remoteMachineSets, logger)
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, controllerName)
@@ -133,7 +133,7 @@ type ReconcileRemoteMachineSet struct {
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 
 	// actuatorBuilder is a function pointer to the function that builds the actuator
-	actuatorBuilder func(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error)
+	actuatorBuilder func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error)
 
 	// A TTLCache of machinepoolnamelease creates each machinepool expects to see. Note that not all actuators make use
 	// of expectations.
@@ -306,7 +306,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 		return nil, true, nil
 	}
 
-	actuator, err := r.actuatorBuilder(cd, remoteMachineSets.Items, logger)
+	actuator, err := r.actuatorBuilder(cd, pool, remoteMachineSets.Items, logger)
 	if err != nil {
 		logger.WithError(err).Error("unable to create actuator")
 		return nil, false, err
@@ -765,7 +765,7 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 	return errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
 }
 
-func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
+func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		creds := &corev1.Secret{}
@@ -779,7 +779,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewAWSActuator(creds, cd.Spec.Platform.AWS.Region, remoteMachineSets, r.scheme, logger)
+		return NewAWSActuator(creds, cd.Spec.Platform.AWS.Region, pool, remoteMachineSets, r.scheme, logger)
 	case cd.Spec.Platform.GCP != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(

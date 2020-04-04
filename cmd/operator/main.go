@@ -3,32 +3,30 @@ package main
 import (
 	"flag"
 	golog "log"
-	"net/http"
 	"os"
 	"time"
 
-	_ "github.com/docker/go-healthcheck"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/klog"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+
+	oappsv1 "github.com/openshift/api/apps/v1"
+	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/operator"
 	"github.com/openshift/hive/pkg/operator/hive"
 	"github.com/openshift/hive/pkg/version"
-
-	oappsv1 "github.com/openshift/api/apps/v1"
-
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
-
-	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 )
 
 const (
@@ -93,6 +91,8 @@ func newRootCommand() *cobra.Command {
 				LeaseDuration:           &leaseDuration,
 				RenewDeadline:           &renewDeadline,
 				RetryPeriod:             &retryPeriod,
+				MetricsBindAddress:      "0",
+				HealthProbeBindAddress:  ":8080",
 			})
 			if err != nil {
 				log.Fatal(err)
@@ -122,10 +122,8 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
-			// Start http server which will enable the /debug/health handler from go-healthcheck
-			log.Info("Starting debug/health endpoint.")
-
-			go http.ListenAndServe(":8080", nil)
+			mgr.AddReadyzCheck("ping", healthz.Ping)
+			mgr.AddHealthzCheck("ping", healthz.Ping)
 
 			log.Info("Starting the Cmd.")
 

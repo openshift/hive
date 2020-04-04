@@ -2,36 +2,35 @@ package main
 
 import (
 	"flag"
-	"github.com/openshift/hive/pkg/constants"
 	golog "log"
 	"math/rand"
-	"net/http"
 	"os"
 	"time"
 
-	_ "github.com/docker/go-healthcheck"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
 
-	"github.com/openshift/hive/pkg/apis"
-	"github.com/openshift/hive/pkg/controller"
-	"github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/version"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
+	"k8s.io/klog"
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
 
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller"
+	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/version"
 )
 
 const (
@@ -90,13 +89,14 @@ func newRootCommand() *cobra.Command {
 
 			// Create a new Cmd to provide shared dependencies and start components
 			mgr, err := manager.New(cfg, manager.Options{
-				MetricsBindAddress:      ":2112",
 				LeaderElection:          true,
 				LeaderElectionNamespace: hiveNSName,
 				LeaderElectionID:        leaderElectionConfigMap,
 				LeaseDuration:           &leaseDuration,
 				RenewDeadline:           &renewDeadline,
 				RetryPeriod:             &retryPeriod,
+				MetricsBindAddress:      ":2112",
+				HealthProbeBindAddress:  ":8080",
 			})
 			if err != nil {
 				log.Fatal(err)
@@ -138,10 +138,8 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
-			// Start http server which will enable the /debug/health handler from go-healthcheck
-			log.Info("Starting debug/health endpoint.")
-
-			go http.ListenAndServe(":8080", nil)
+			mgr.AddReadyzCheck("ping", healthz.Ping)
+			mgr.AddHealthzCheck("ping", healthz.Ping)
 
 			log.Info("Starting the Cmd.")
 

@@ -10,6 +10,7 @@ type MyOperatorResource struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
+	// +kubebuilder:validation:Required
 	// +required
 	Spec   MyOperatorResourceSpec   `json:"spec"`
 	Status MyOperatorResourceStatus `json:"status"`
@@ -23,7 +24,7 @@ type MyOperatorResourceStatus struct {
 	OperatorStatus `json:",inline"`
 }
 
-// +kubebuilder:validation:Pattern=^(Managed|Unmanaged|Force|Removed)$
+// +kubebuilder:validation:Pattern=`^(Managed|Unmanaged|Force|Removed)$`
 type ManagementState string
 
 var (
@@ -65,12 +66,14 @@ type OperatorSpec struct {
 	// 3. unsupportedConfigOverrides
 	// +optional
 	// +nullable
+	// +kubebuilder:pruning:PreserveUnknownFields
 	UnsupportedConfigOverrides runtime.RawExtension `json:"unsupportedConfigOverrides"`
 
 	// observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because
 	// it is an input to the level for the operator
 	// +optional
 	// +nullable
+	// +kubebuilder:pruning:PreserveUnknownFields
 	ObservedConfig runtime.RawExtension `json:"observedConfig"`
 }
 

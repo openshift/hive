@@ -13,6 +13,7 @@ type KubeAPIServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
+	// +kubebuilder:validation:Required
 	// +required
 	Spec KubeAPIServerSpec `json:"spec"`
 	// +optional
@@ -32,8 +33,8 @@ type KubeAPIServerStatus struct {
 // KubeAPIServerList is a collection of items
 type KubeAPIServerList struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
 	metav1.ListMeta `json:"metadata"`
+
 	// Items contains the items
 	Items []KubeAPIServer `json:"items"`
 }

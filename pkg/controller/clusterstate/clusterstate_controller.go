@@ -8,11 +8,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"

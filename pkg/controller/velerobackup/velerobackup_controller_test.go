@@ -70,7 +70,9 @@ func TestReconcile(t *testing.T) {
 						testclusterdeployment.Build(clusterDeploymentBase()),
 						testsyncset.Build(syncSetBase()),
 						testdnszone.Build(dnsZoneBase()),
-					}))),
+					})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 		},
 		{
@@ -88,7 +90,9 @@ func TestReconcile(t *testing.T) {
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
 							testclusterdeployment.Build(clusterDeploymentBase()),
-						}))),
+						})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
@@ -99,7 +103,9 @@ func TestReconcile(t *testing.T) {
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
 							testclusterdeployment.Build(clusterDeploymentBase()),
-						}))),
+						})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 		},
 		{
@@ -118,7 +124,9 @@ func TestReconcile(t *testing.T) {
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
 							testclusterdeployment.Build(clusterDeploymentBase()),
-						}))),
+						})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 			expectedResult: reconcile.Result{
 				RequeueAfter: ((3 * time.Minute) - twoMinuteDuration),
@@ -132,7 +140,9 @@ func TestReconcile(t *testing.T) {
 					testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 						[]runtime.Object{
 							testclusterdeployment.Build(clusterDeploymentBase()),
-						}))),
+						})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 		},
 		{
@@ -148,7 +158,9 @@ func TestReconcile(t *testing.T) {
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
-					}))),
+					})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
@@ -158,7 +170,10 @@ func TestReconcile(t *testing.T) {
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
 						testsyncset.Build(syncSetBase()),
-					}))),
+					})),
+					testcheckpoint.WithResourceVersion("2"),
+					testcheckpoint.WithTypeMeta(),
+				),
 			},
 		},
 		{
@@ -174,7 +189,9 @@ func TestReconcile(t *testing.T) {
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
-					}))),
+					})),
+					testcheckpoint.WithResourceVersion("1"),
+				),
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
@@ -184,7 +201,10 @@ func TestReconcile(t *testing.T) {
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
 						testsyncset.Build(syncSetBase()),
-					}))),
+					})),
+					testcheckpoint.WithResourceVersion("2"),
+					testcheckpoint.WithTypeMeta(),
+				),
 			},
 		},
 	}
@@ -309,7 +329,7 @@ func TestGetNamespaceCheckpoint(t *testing.T) {
 			name:               "Existing Checkpoint",
 			expectedFound:      true,
 			existingObjects:    []runtime.Object{testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"))},
-			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL")),
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"), testcheckpoint.WithTypeMeta()),
 			expectedError:      nil,
 		},
 	}
@@ -347,17 +367,17 @@ func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
 			found:              false,
 			checkpoint:         testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL")),
 			existingObjects:    emptyRuntimeObjectSlice,
-			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL")),
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"), testcheckpoint.WithResourceVersion("1"), testcheckpoint.WithTypeMeta()),
 			expectedError:      nil,
 		},
 		{
 			name:       "Update Checkpoint",
 			found:      true,
-			checkpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER")),
+			checkpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER"), testcheckpoint.WithResourceVersion("1")),
 			existingObjects: []runtime.Object{
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
 			},
-			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER")),
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER"), testcheckpoint.WithResourceVersion("2"), testcheckpoint.WithTypeMeta()),
 			expectedError:      nil,
 		},
 		{
@@ -367,7 +387,7 @@ func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
 			},
-			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE"), testcheckpoint.WithTypeMeta()),
 			expectedError:      statusErr,
 		},
 		{

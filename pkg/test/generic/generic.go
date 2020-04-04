@@ -1,9 +1,12 @@
 package generic
 
 import (
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
+
+	"strconv"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -57,5 +60,24 @@ func WithLabel(key, value string) Option {
 		labels := meta.GetLabels()
 		labels = k8slabels.AddLabel(labels, key, value)
 		meta.SetLabels(labels)
+	}
+}
+
+// WithResourceVersion sets the specified resource version on the supplied object.
+func WithResourceVersion(resourceVersion string) Option {
+	return func(meta metav1.Object) {
+		meta.SetResourceVersion(resourceVersion)
+	}
+}
+
+// WithIncrementedResourceVersion increments by one the resource version on the supplied object.
+// If the resource version is not an integer, then the new resource version will be set to 1.
+func WithIncrementedResourceVersion() Option {
+	return func(meta metav1.Object) {
+		rv, err := strconv.Atoi(meta.GetResourceVersion())
+		if err != nil {
+			rv = 0
+		}
+		meta.SetResourceVersion(strconv.Itoa(rv + 1))
 	}
 }

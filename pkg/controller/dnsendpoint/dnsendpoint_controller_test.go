@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -383,6 +384,12 @@ func (fm *fakeManager) Add(mgr manager.Runnable) error {
 	return nil
 }
 func (*fakeManager) SetFields(interface{}) error {
+	panic("not implemented")
+}
+func (*fakeManager) AddHealthzCheck(name string, check healthz.Checker) error {
+	panic("not implemented")
+}
+func (*fakeManager) AddReadyzCheck(name string, check healthz.Checker) error {
 	panic("not implemented")
 }
 func (*fakeManager) Start(<-chan struct{}) error {

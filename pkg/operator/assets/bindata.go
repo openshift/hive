@@ -382,6 +382,8 @@ rules:
   - configmaps
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:

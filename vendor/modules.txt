@@ -129,15 +129,9 @@ github.com/davecgh/go-spew/spew
 github.com/dgrijalva/jwt-go
 # github.com/dimchansky/utfbom v1.1.0
 github.com/dimchansky/utfbom
-# github.com/docker/distribution v2.7.1+incompatible
-github.com/docker/distribution/context
-github.com/docker/distribution/registry/api/errcode
-github.com/docker/distribution/uuid
 # github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 github.com/docker/docker/pkg/term
 github.com/docker/docker/pkg/term/windows
-# github.com/docker/go-healthcheck v0.1.0
-github.com/docker/go-healthcheck
 # github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
@@ -331,8 +325,6 @@ github.com/gophercloud/gophercloud/pagination
 # github.com/gophercloud/utils v0.0.0-20191212191830-4533a07bd492
 github.com/gophercloud/utils/env
 github.com/gophercloud/utils/openstack/clientconfig
-# github.com/gorilla/mux v1.7.2
-github.com/gorilla/mux
 # github.com/gostaticanalysis/analysisutil v0.0.0-20190318220348-4088753ea4d3
 github.com/gostaticanalysis/analysisutil
 # github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7

@@ -4,7 +4,7 @@
 
 * [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
 * [oc](https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/)
-* [go (version 1.12)](https://github.com/golang/go)
+* [go (version 1.13)](https://github.com/golang/go)
 
 ## Deployment Options
 

@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"reflect"
 	"regexp"
@@ -298,25 +299,27 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, applyErr
 	}
 
-	reapplyDuration := ssiReapplyDuration(ssi, r.reapplyInterval)
+	reapplyDuration := r.ssiReapplyDuration(ssi)
 	return reconcile.Result{RequeueAfter: reapplyDuration}, nil
 }
 
 // ssiReapplyDuration returns the shortest time.Duration to meet reapplyInterval from successfully applied
 // resources, patches and secrets in the SyncSetInstance status.
-func ssiReapplyDuration(ssi *hivev1.SyncSetInstance, reapplyInterval time.Duration) time.Duration {
-	timeSinceOldestApply := time.Duration(0)
+func (r *ReconcileSyncSetInstance) ssiReapplyDuration(ssi *hivev1.SyncSetInstance) time.Duration {
+	var nextApplyTime time.Time
 	for _, statuses := range [][]hivev1.SyncStatus{ssi.Status.Resources, ssi.Status.Patches, ssi.Status.Secrets} {
 		for _, status := range statuses {
-			if applySuccessCondition := controllerutils.FindSyncCondition(status.Conditions, hivev1.ApplySuccessSyncCondition); applySuccessCondition != nil {
-				since := time.Since(applySuccessCondition.LastProbeTime.Time)
-				if since > timeSinceOldestApply {
-					timeSinceOldestApply = since
-				}
+			reapplyTime := r.reapplyTime(status)
+			if nextApplyTime.IsZero() || reapplyTime.Before(nextApplyTime) {
+				nextApplyTime = reapplyTime
 			}
 		}
 	}
-	return reapplyInterval - timeSinceOldestApply
+	wait := time.Until(nextApplyTime)
+	if wait < 0 {
+		return 0
+	}
+	return wait + time.Duration(0.1*rand.Float64()*r.reapplyInterval.Seconds())*time.Second
 }
 
 func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInstance, ssiLog log.FieldLogger) (*hivev1.ClusterDeployment, error) {
@@ -523,32 +526,38 @@ func findSyncStatus(status hivev1.SyncStatus, statusList []hivev1.SyncStatus) *h
 }
 
 // needToReapply determines if the provided status indicates that the resource, secret or patch needs to be re-applied
-func (r *ReconcileSyncSetInstance) needToReapply(applyTerm string, newStatus, existingStatus hivev1.SyncStatus, ssiLog log.FieldLogger) bool {
+func (r *ReconcileSyncSetInstance) needToReapply(newStatus, existingStatus hivev1.SyncStatus, ssiLog log.FieldLogger) bool {
 	// Re-apply if hash has changed
 	if existingStatus.Hash != newStatus.Hash {
-		ssiLog.Debugf("%s %s/%s (%s) has changed, will re-apply", applyTerm, newStatus.Namespace, newStatus.Name, newStatus.Kind)
+		ssiLog.Debug("hash has changed, will re-apply")
 		return true
 	}
 	// Re-apply if failure occurred
 	if failureCondition := controllerutils.FindSyncCondition(existingStatus.Conditions, hivev1.ApplyFailureSyncCondition); failureCondition != nil {
 		if failureCondition.Status == corev1.ConditionTrue {
-			ssiLog.Debugf("%s %s/%s (%s) failed last time, will re-apply", applyTerm, newStatus.Namespace, newStatus.Name, newStatus.Kind)
+			ssiLog.Debug("failed last time, will re-apply")
 			return true
 		}
 	}
-	// Re-apply if past reapplyInterval
-	if applySuccessCondition := controllerutils.FindSyncCondition(existingStatus.Conditions, hivev1.ApplySuccessSyncCondition); applySuccessCondition != nil {
-		since := time.Since(applySuccessCondition.LastProbeTime.Time)
-		if since > r.reapplyInterval {
-			ssiLog.Debugf("It has been %v since %s %s/%s (%s) was last applied, will re-apply", applyTerm, since, newStatus.Namespace, newStatus.Name, newStatus.Kind)
-			return true
-		}
+	if r.reapplyTime(existingStatus).Before(time.Now()) {
+		ssiLog.Debug("re-apply duration has elapsed, will re-apply")
+		return true
 	}
 	return false
 }
 
+func (r *ReconcileSyncSetInstance) reapplyTime(status hivev1.SyncStatus) time.Time {
+	applySuccessCondition := controllerutils.FindSyncCondition(status.Conditions, hivev1.ApplySuccessSyncCondition)
+	if applySuccessCondition == nil {
+		return time.Now()
+	}
+	return applySuccessCondition.LastProbeTime.Add(r.reapplyInterval)
+}
+
 // applySyncSetResources evaluates resource objects from RawExtension and applies them to the cluster identified by kubeConfig
 func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInstance, resources []runtime.RawExtension, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
+	ssiLog = ssiLog.WithField("applyTerm", "resource")
+
 	// determine if we can gather info for all resources
 	infos := []hiveresource.Info{}
 	for i, resource := range resources {
@@ -575,9 +584,14 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 			Hash:       r.hash(resource.Raw),
 		}
 
-		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply("resource", resourceSyncStatus, *rss, ssiLog) {
+		ssiLog := ssiLog.WithField("syncNamespace", resourceSyncStatus.Namespace).
+			WithField("syncName", resourceSyncStatus.Name).
+			WithField("syncAPIVersion", resourceSyncStatus.APIVersion).
+			WithField("syncKind", resourceSyncStatus.Kind)
+
+		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply(resourceSyncStatus, *rss, ssiLog) {
 			// Apply resource
-			ssiLog.Debugf("applying resource: %s/%s (%s)", resourceSyncStatus.Namespace, resourceSyncStatus.Name, resourceSyncStatus.Kind)
+			ssiLog.Debug("applying resource")
 			var applyResult hiveresource.ApplyResult
 			applyResult, applyErr = h.Apply(resource.Raw)
 
@@ -588,13 +602,13 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 			resourceSyncStatus.Conditions = r.setApplySyncConditions(resourceSyncConditions, applyErr)
 
 			if applyErr != nil {
-				ssiLog.WithError(applyErr).Warnf("error applying resource %s/%s (%s)", resourceSyncStatus.Namespace, resourceSyncStatus.Name, resourceSyncStatus.Kind)
+				ssiLog.WithError(applyErr).Warn("error applying resource")
 			} else {
-				ssiLog.Debugf("resource %s/%s (%s): %s", resourceSyncStatus.Namespace, resourceSyncStatus.Name, resourceSyncStatus.Kind, applyResult)
+				ssiLog.WithField("applyResult", applyResult).Debug("resource applied")
 			}
 		} else {
 			// Do not apply resource
-			ssiLog.Debugf("resource %s/%s (%s) has not changed, will not apply", resourceSyncStatus.Namespace, resourceSyncStatus.Name, resourceSyncStatus.Kind)
+			ssiLog.Debug("resource has not changed, will not apply")
 			resourceSyncStatus.Conditions = rss.Conditions
 		}
 
@@ -606,7 +620,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 		}
 	}
 
-	ssi.Status.Resources = r.reconcileDeleted("resource", ssi.Spec.ResourceApplyMode, dynamicClient, ssi.Status.Resources, syncStatusList, applyErr, ssiLog)
+	ssi.Status.Resources = r.reconcileDeleted(ssi.Spec.ResourceApplyMode, dynamicClient, ssi.Status.Resources, syncStatusList, applyErr, ssiLog)
 
 	// Return applyErr for the controller to trigger retries and go into exponential backoff
 	// if the problem does not resolve itself.
@@ -617,50 +631,53 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	return nil
 }
 
-func (r *ReconcileSyncSetInstance) reconcileDeleted(deleteTerm string, applyMode hivev1.SyncSetResourceApplyMode, dynamicClient dynamic.Interface, existingStatusList, newStatusList []hivev1.SyncStatus, err error, ssiLog log.FieldLogger) []hivev1.SyncStatus {
-	ssiLog.Debugf("reconciling syncset %ss, existing: %d, actual: %d", deleteTerm, len(existingStatusList), len(newStatusList))
+func (r *ReconcileSyncSetInstance) reconcileDeleted(applyMode hivev1.SyncSetResourceApplyMode, dynamicClient dynamic.Interface, existingStatusList, newStatusList []hivev1.SyncStatus, err error, ssiLog log.FieldLogger) []hivev1.SyncStatus {
+	ssiLog.WithField("existing", len(existingStatusList)).WithField("new", len(newStatusList)).Debug("reconciling syncset")
 	if applyMode == "" || applyMode == hivev1.UpsertResourceApplyMode {
-		ssiLog.Debugf("resourceApplyMode is Upsert, remote %ss will not be deleted", deleteTerm)
+		ssiLog.Debug("resourceApplyMode is Upsert, remote will not be deleted")
 		return newStatusList
 	}
 
 	deletedStatusList := []hivev1.SyncStatus{}
 	for _, existingStatus := range existingStatusList {
 		if ss := findSyncStatus(existingStatus, newStatusList); ss == nil {
-			ssiLog.WithField(deleteTerm, fmt.Sprintf("%s/%s", existingStatus.Namespace, existingStatus.Name)).
-				WithField("apiversion", existingStatus.APIVersion).
-				WithField("kind", existingStatus.Kind).Debugf("%s not found in updated status, will queue up for deletion", deleteTerm)
+			ssiLog.WithField("syncNamespace", existingStatus.Namespace).
+				WithField("syncName", existingStatus.Name).
+				WithField("syncAPIVersion", existingStatus.APIVersion).
+				WithField("syncKind", existingStatus.Kind).
+				Debug("not found in updated status, will queue up for deletion")
 			deletedStatusList = append(deletedStatusList, existingStatus)
 		}
 	}
 
 	// If an error occurred applying resources, do not delete yet
 	if err != nil {
-		ssiLog.Debugf("an error occurred applying %ss, will preserve all syncset status items", deleteTerm)
+		ssiLog.Debug("an error occurred applying, will preserve all syncset status items")
 		return append(newStatusList, deletedStatusList...)
 	}
 
 	for _, deletedStatus := range deletedStatusList {
-		itemLog := ssiLog.WithField(deleteTerm, fmt.Sprintf("%s/%s", deletedStatus.Namespace, deletedStatus.Name)).
-			WithField("apiversion", deletedStatus.APIVersion).
-			WithField("kind", deletedStatus.Kind)
+		itemLog := ssiLog.WithField("syncNamespace", deletedStatus.Namespace).
+			WithField("syncName", deletedStatus.Name).
+			WithField("syncAPIVersion", deletedStatus.APIVersion).
+			WithField("syncKind", deletedStatus.Kind)
 		gv, err := schema.ParseGroupVersion(deletedStatus.APIVersion)
 		if err != nil {
-			itemLog.WithError(err).Errorf("unable to delete %s, cannot parse group version", deleteTerm)
+			itemLog.WithError(err).Error("unable to delete, cannot parse group version")
 			deletedStatus.Conditions = r.setDeletionFailedSyncCondition(deletedStatus.Conditions, err)
 			newStatusList = append(newStatusList, deletedStatus)
 			continue
 		}
 		gvr := gv.WithResource(deletedStatus.Resource)
-		itemLog.Debugf("deleting %s", deleteTerm)
+		itemLog.Debug("deleting")
 		err = dynamicClient.Resource(gvr).Namespace(deletedStatus.Namespace).Delete(deletedStatus.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
-				itemLog.WithError(err).Warnf("error deleting %s", deleteTerm)
+				itemLog.WithError(err).Warn("error deleting")
 				deletedStatus.Conditions = r.setDeletionFailedSyncCondition(deletedStatus.Conditions, err)
 				newStatusList = append(newStatusList, deletedStatus)
 			} else {
-				itemLog.Debugf("%s not found, nothing to do", deleteTerm)
+				itemLog.Debug("not found, nothing to do")
 			}
 		}
 	}
@@ -670,6 +687,8 @@ func (r *ReconcileSyncSetInstance) reconcileDeleted(deleteTerm string, applyMode
 
 // applySyncSetPatches applies patches to cluster identified by kubeConfig
 func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstance, ssPatches []hivev1.SyncObjectPatch, h Applier, ssiLog log.FieldLogger) error {
+	ssiLog = ssiLog.WithField("applyTerm", "patch")
+
 	for _, ssPatch := range ssPatches {
 
 		b, err := json.Marshal(ssPatch)
@@ -685,9 +704,14 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 			Hash:       r.hash(b),
 		}
 
-		if pss := findSyncStatus(patchSyncStatus, ssi.Status.Patches); pss == nil || r.needToReapply("patch", patchSyncStatus, *pss, ssiLog) {
+		if pss := findSyncStatus(patchSyncStatus, ssi.Status.Patches); pss == nil || r.needToReapply(patchSyncStatus, *pss, ssiLog) {
+			ssiLog := ssiLog.WithField("syncNamespace", ssPatch.Namespace).
+				WithField("syncName", ssPatch.Name).
+				WithField("syncAPIVersion", ssPatch.APIVersion).
+				WithField("syncKind", ssPatch.Kind)
+
 			// Apply patch
-			ssiLog.Debugf("applying patch: %s/%s (%s)", ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
+			ssiLog.Debug("applying patch")
 			namespacedName := types.NamespacedName{
 				Name:      ssPatch.Name,
 				Namespace: ssPatch.Namespace,
@@ -702,12 +726,12 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 
 			ssi.Status.Patches = appendOrUpdateSyncStatus(ssi.Status.Patches, patchSyncStatus)
 			if err != nil {
-				ssiLog.WithError(err).Warnf("error applying patch: %s/%s (%s)", ssPatch.Namespace, ssPatch.Name, ssPatch.Kind)
+				ssiLog.WithError(err).Warn("error applying patch")
 				return err
 			}
 		} else {
 			// Do not apply patch
-			ssiLog.Debugf("patch %s/%s (%s) has not changed, will not apply", patchSyncStatus.Namespace, patchSyncStatus.Name, patchSyncStatus.Kind)
+			ssiLog.Debug("patch has not changed, will not apply")
 			patchSyncStatus.Conditions = pss.Conditions
 		}
 	}
@@ -716,6 +740,8 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 
 // applySyncSetSecretMappings evaluates secret mappings and applies them to the cluster identified by kubeConfig
 func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSetInstance, secretMappings []hivev1.SecretMapping, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
+	ssiLog = ssiLog.WithField("applyTerm", "secret")
+
 	syncStatusList := []hivev1.SyncStatus{}
 
 	var applyErr error
@@ -727,6 +753,11 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 			Namespace:  secretMapping.TargetRef.Namespace,
 			Resource:   secretsResource,
 		}
+
+		ssiLog := ssiLog.WithField("syncNamespace", secretSyncStatus.Namespace).
+			WithField("syncName", secretSyncStatus.Name).
+			WithField("syncAPIVersion", secretSyncStatus.APIVersion).
+			WithField("syncKind", secretSyncStatus.Kind)
 
 		rss := findSyncStatus(secretSyncStatus, ssi.Status.Secrets)
 		var secretSyncConditions []hivev1.SyncCondition
@@ -741,7 +772,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 			if errors.IsNotFound(applyErr) {
 				logLevel = log.InfoLevel
 			}
-			ssiLog.WithError(applyErr).WithField("secret", fmt.Sprintf("%s/%s", secretMapping.SourceRef.Namespace, secretMapping.SourceRef.Name)).Log(logLevel, "cannot read secret")
+			ssiLog.WithError(applyErr).Log(logLevel, "cannot read secret")
 			secretSyncStatus.Conditions = r.setApplySyncConditions(secretSyncConditions, applyErr)
 			syncStatusList = append(syncStatusList, secretSyncStatus)
 			break
@@ -758,16 +789,16 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 		var hash string
 		hash, applyErr = controllerutils.GetChecksumOfObject(secret)
 		if applyErr != nil {
-			ssiLog.WithError(applyErr).WithField("secret", fmt.Sprintf("%s/%s", secretMapping.SourceRef.Name, secretMapping.SourceRef.Namespace)).Error("unable to compute secret hash")
+			ssiLog.WithError(applyErr).Error("unable to compute secret hash")
 			secretSyncStatus.Conditions = r.setApplySyncConditions(secretSyncConditions, applyErr)
 			syncStatusList = append(syncStatusList, secretSyncStatus)
 			break
 		}
 		secretSyncStatus.Hash = hash
 
-		if rss == nil || r.needToReapply("secret", secretSyncStatus, *rss, ssiLog) {
+		if rss == nil || r.needToReapply(secretSyncStatus, *rss, ssiLog) {
 			// Apply secret
-			ssiLog.Debugf("applying secret: %s/%s (%s)", secret.Namespace, secret.Name, secret.Kind)
+			ssiLog.Debug("applying secret")
 			var result hiveresource.ApplyResult
 			result, applyErr = h.ApplyRuntimeObject(secret, scheme.Scheme)
 
@@ -778,13 +809,13 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 			secretSyncStatus.Conditions = r.setApplySyncConditions(secretSyncConditions, applyErr)
 
 			if applyErr != nil {
-				ssiLog.WithError(applyErr).Warnf("error applying secret %s/%s (%s)", secret.Namespace, secret.Name, secret.Kind)
+				ssiLog.WithError(applyErr).Warn("error applying secret")
 			} else {
-				ssiLog.Debugf("resource %s/%s (%s): %s", secret.Namespace, secret.Name, secret.Kind, result)
+				ssiLog.WithField("applyResult", result).Debug("resource applied")
 			}
 		} else {
 			// Do not apply secret
-			ssiLog.Debugf("resource %s/%s (%s) has not changed, will not apply", secret.Namespace, secret.Name, secret.Kind)
+			ssiLog.Debug("resource has not changed, will not apply")
 			secretSyncStatus.Conditions = rss.Conditions
 		}
 
@@ -796,7 +827,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 		}
 	}
 
-	ssi.Status.Secrets = r.reconcileDeleted("secret", ssi.Spec.ResourceApplyMode, dynamicClient, ssi.Status.Secrets, syncStatusList, applyErr, ssiLog)
+	ssi.Status.Secrets = r.reconcileDeleted(ssi.Spec.ResourceApplyMode, dynamicClient, ssi.Status.Secrets, syncStatusList, applyErr, ssiLog)
 
 	// Return applyErr for the controller to trigger retries nd go into exponential backoff
 	// if the problem does not resolve itself.

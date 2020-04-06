@@ -1548,6 +1548,7 @@ func TestSSIReApplyDuration(t *testing.T) {
 		testCM("foo1", "bar", "baz"),
 		testCM("foo2", "bar", "baz"),
 		testCM("foo3", "bar", "baz"),
+		testCM("foo4", "bar", "baz"),
 	}
 
 	cd := testClusterDeployment()
@@ -1555,25 +1556,26 @@ func TestSSIReApplyDuration(t *testing.T) {
 	ssi := syncSetInstanceForSyncSet(cd, ss)
 	ssi.Status = successfulResourceStatus(resources...)
 
-	tenMinutesAgo := metav1.NewTime(time.Now().Add(-10 * time.Minute))
-	fortyFiveMinutesAgo := metav1.NewTime(time.Now().Add(-45 * time.Minute))
-	ninetyMinutesAgo := metav1.NewTime(time.Now().Add(-90 * time.Minute))
-	oldestResourceApplyTimes := []time.Time{
-		tenMinutesAgo.Time,
-		fortyFiveMinutesAgo.Time,
-		ninetyMinutesAgo.Time,
+	staleDurations := []time.Duration{
+		10 * time.Minute,
+		45 * time.Minute,
+		90 * time.Minute,
+		3 * time.Hour,
 	}
 
-	for i, oldestResourceApplyTime := range oldestResourceApplyTimes {
-		ssi.Status.Resources[i].Conditions[0].LastProbeTime = metav1.NewTime(oldestResourceApplyTime)
-		requeueAfter := ssiReapplyDuration(ssi, defaultReapplyInterval)
-		endProbe := time.Now()
+	for i, staleDuration := range staleDurations {
+		t.Run(fmt.Sprintf("%v", staleDuration), func(t *testing.T) {
+			ssi.Status.Resources[i].Conditions[0].LastProbeTime = metav1.NewTime(startProbe.Add(-staleDuration))
+			requeueAfter := (&ReconcileSyncSetInstance{reapplyInterval: defaultReapplyInterval}).ssiReapplyDuration(ssi)
+			endProbe := time.Now()
 
-		maxRequeueAfter := defaultReapplyInterval - startProbe.Sub(oldestResourceApplyTime)
-		minRequeueAfter := defaultReapplyInterval - endProbe.Sub(oldestResourceApplyTime)
-		if maxRequeueAfter < requeueAfter || minRequeueAfter > requeueAfter {
-			t.Fatalf("requeueAfter did not fall between expected times, actual: %v, expected between %v and %v", requeueAfter, minRequeueAfter, maxRequeueAfter)
-		}
+			if staleDuration < defaultReapplyInterval {
+				assert.LessOrEqual(t, requeueAfter.Seconds(), (defaultReapplyInterval-staleDuration).Seconds()+0.1*defaultReapplyInterval.Seconds())
+				assert.GreaterOrEqual(t, requeueAfter.Seconds(), (defaultReapplyInterval - staleDuration - endProbe.Sub(startProbe)).Seconds())
+			} else {
+				assert.Zero(t, requeueAfter.Seconds())
+			}
+		})
 	}
 }
 

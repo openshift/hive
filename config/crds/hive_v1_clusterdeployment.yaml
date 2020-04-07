@@ -251,6 +251,19 @@ spec:
                         will be created.
                       type: string
                   type: object
+                openstack:
+                  description: OpenStack is the configuration used when installing
+                    on OpenStack
+                  properties:
+                    cloud:
+                      description: Cloud will be used to indicate the OS_CLOUD value
+                        to use the right section from the cloud.yaml in the CredentialsSecretRef.
+                      type: string
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef refers to a secret that contains
+                        the OpenStack account access credentials.
+                      type: object
+                  type: object
               type: object
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster

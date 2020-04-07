@@ -21,6 +21,7 @@ import (
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
 )
 
 const (
@@ -268,16 +269,22 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		allErrs = append(allErrs, validateAWSMachinePoolPlatformInvariants(p, platformPath.Child("aws"))...)
 		numberOfMachineSets = len(p.Zones)
 	}
-	if p := spec.Platform.GCP; p != nil {
-		platforms = append(platforms, "gcp")
-		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(p, platformPath.Child("gcp"))...)
-		numberOfMachineSets = len(p.Zones)
-	}
 	if p := spec.Platform.Azure; p != nil {
 		platforms = append(platforms, "azure")
 		allErrs = append(allErrs, validateAzureMachinePoolPlatformInvariants(p, platformPath.Child("azure"))...)
 		numberOfMachineSets = len(p.Zones)
 	}
+	if p := spec.Platform.GCP; p != nil {
+		platforms = append(platforms, "gcp")
+		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(p, platformPath.Child("gcp"))...)
+		numberOfMachineSets = len(p.Zones)
+	}
+	if p := spec.Platform.OpenStack; p != nil {
+		platforms = append(platforms, "openstack")
+		allErrs = append(allErrs, validateOpenStackMachinePoolPlatformInvariants(p, platformPath.Child("openstack"))...)
+		numberOfMachineSets = 1 // no zone support on OpenStack
+	}
+
 	switch len(platforms) {
 	case 0:
 		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))
@@ -356,6 +363,14 @@ func validateAzureMachinePoolPlatformInvariants(platform *hivev1azure.MachinePoo
 	osDiskPath := fldPath.Child("osDisk")
 	if osDisk.DiskSizeGB <= 0 {
 		allErrs = append(allErrs, field.Invalid(osDiskPath.Child("iops"), osDisk.DiskSizeGB, "disk size must be positive"))
+	}
+	return allErrs
+}
+
+func validateOpenStackMachinePoolPlatformInvariants(platform *hivev1openstack.MachinePool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if platform.FlavorName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "flavor name is required"))
 	}
 	return allErrs
 }

@@ -32,6 +32,8 @@ type ClusterDeprovisionPlatform struct {
 	Azure *AzureClusterDeprovision `json:"azure,omitempty"`
 	// GCP contains GCP-specific deprovision settings
 	GCP *GCPClusterDeprovision `json:"gcp,omitempty"`
+	// OpenStack contains OpenStack-specific deprovision settings
+	OpenStack *OpenStackClusterDeprovision `json:"openstack,omitempty"`
 }
 
 // AWSClusterDeprovision contains AWS-specific configuration for a ClusterDeprovision
@@ -54,6 +56,14 @@ type GCPClusterDeprovision struct {
 	// Region is the GCP region for this deprovision
 	Region string `json:"region"`
 	// CredentialsSecretRef is the GCP account credentials to use for deprovisioning the cluster
+	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+}
+
+// OpenStackClusterDeprovision contains OpenStack-specific configuration for a ClusterDeprovision
+type OpenStackClusterDeprovision struct {
+	// Cloud is the secion in the clouds.yaml secret below to use for auth/connectivity.
+	Cloud string `json:"cloud"`
+	// CredentialsSecretRef is the OpenStack account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 }
 

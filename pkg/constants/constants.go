@@ -135,6 +135,9 @@ const (
 	// AzureCredentialsName is the name of the Azure credentials file or secret key.
 	AzureCredentialsName = "osServicePrincipal.json"
 
+	// OpenStackCredentialsName is the name of the OpenStack credentials file.
+	OpenStackCredentialsName = "clouds.yaml"
+
 	// SSHPrivKeyPathEnvVar is the environment variable Hive will set for the installmanager pod to point to the
 	// path where we mount in the SSH key to be configured on the cluster hosts.
 	SSHPrivKeyPathEnvVar = "SSH_PRIV_KEY_PATH"

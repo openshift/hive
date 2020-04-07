@@ -87,6 +87,18 @@ spec:
                       description: Region is the GCP region for this deprovision
                       type: string
                   type: object
+                openstack:
+                  description: OpenStack contains OpenStack-specific deprovision settings
+                  properties:
+                    cloud:
+                      description: Cloud is the secion in the clouds.yaml secret below
+                        to use for auth/connectivity.
+                      type: string
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the OpenStack account credentials
+                        to use for deprovisioning the cluster
+                      type: object
+                  type: object
               type: object
           type: object
         status:

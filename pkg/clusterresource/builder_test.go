@@ -33,6 +33,8 @@ const (
 	adoptAdminKubeconfig             = "adopted-admin-kubeconfig"
 	adoptClusterID                   = "adopted-cluster-id"
 	adoptInfraID                     = "adopted-infra-id"
+	machineNetwork                   = "10.0.0.0/16"
+	fakeOpenStackCloudsYAML          = "fakeYAML"
 )
 
 func createTestBuilder() *Builder {
@@ -50,8 +52,9 @@ func createTestBuilder() *Builder {
 		InstallerManifests: map[string][]byte{
 			fakeManifestFile: []byte(fakeManifestFileContents),
 		},
-		DeleteAfter: deleteAfter,
-		ImageSet:    imageSetName,
+		DeleteAfter:    deleteAfter,
+		ImageSet:       imageSetName,
+		MachineNetwork: machineNetwork,
 	}
 	return b
 }
@@ -79,6 +82,14 @@ func createGCPClusterBuilder() *Builder {
 	b.CloudBuilder = &GCPCloudBuilder{
 		ServiceAccount: []byte(fakeGCPServiceAccount),
 		ProjectID:      fakeGCPProjectID,
+	}
+	return b
+}
+
+func createOpenStackClusterBuilder() *Builder {
+	b := createTestBuilder()
+	b.CloudBuilder = &OpenStackCloudBuilder{
+		CloudsYAMLContent: []byte(fakeOpenStackCloudsYAML),
 	}
 	return b
 }
@@ -154,6 +165,18 @@ func TestBuildClusterResources(t *testing.T) {
 				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.GCP.CredentialsSecretRef.Name)
 
 				assert.Equal(t, gcpInstanceType, workerPool.Spec.Platform.GCP.InstanceType)
+			},
+		},
+		{
+			name:    "OpenStack cluster",
+			builder: createOpenStackClusterBuilder(),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+				cd := findClusterDeployment(allObjects, clusterName)
+
+				credsSecretName := fmt.Sprintf("%s-openstack-creds", clusterName)
+				credsSecret := findSecret(allObjects, credsSecretName)
+				require.NotNil(t, credsSecret)
+				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.OpenStack.CredentialsSecretRef.Name)
 			},
 		},
 	}

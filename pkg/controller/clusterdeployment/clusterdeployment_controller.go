@@ -64,6 +64,7 @@ const (
 	platformAWS       = "aws"
 	platformAzure     = "azure"
 	platformGCP       = "gcp"
+	platformOpenStack = "openstack"
 	platformBaremetal = "baremetal"
 	platformUnknown   = "unknown"
 	regionUnknown     = "unknown"
@@ -1481,6 +1482,11 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			Region:               cd.Spec.Platform.GCP.Region,
 			CredentialsSecretRef: &cd.Spec.Platform.GCP.CredentialsSecretRef,
 		}
+	case cd.Spec.Platform.OpenStack != nil:
+		req.Spec.Platform.OpenStack = &hivev1.OpenStackClusterDeprovision{
+			Cloud:                cd.Spec.Platform.OpenStack.Cloud,
+			CredentialsSecretRef: &cd.Spec.Platform.OpenStack.CredentialsSecretRef,
+		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
 	}
@@ -1830,6 +1836,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return platformAzure
 	case cd.Spec.Platform.GCP != nil:
 		return platformGCP
+	case cd.Spec.Platform.OpenStack != nil:
+		return platformOpenStack
 	case cd.Spec.Platform.BareMetal != nil:
 		return platformBaremetal
 	}

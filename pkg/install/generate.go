@@ -22,10 +22,11 @@ const (
 	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
 	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 
-	azureAuthDir  = "/.azure"
-	azureAuthFile = azureAuthDir + "/osServicePrincipal.json"
-	gcpAuthDir    = "/.gcp"
-	gcpAuthFile   = gcpAuthDir + "/" + constants.GCPCredentialsName
+	azureAuthDir       = "/.azure"
+	azureAuthFile      = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir         = "/.gcp"
+	gcpAuthFile        = gcpAuthDir + "/" + constants.GCPCredentialsName
+	openStackCloudsDir = "/etc/openstack"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -167,6 +168,27 @@ func InstallerPodSpec(
 			Name:  "GOOGLE_CREDENTIALS",
 			Value: gcpAuthFile,
 		})
+	case cd.Spec.Platform.OpenStack != nil:
+		volumes = append(volumes, corev1.Volume{
+			Name: "openstack",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.OpenStack.CredentialsSecretRef.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "openstack",
+			MountPath: openStackCloudsDir,
+		})
+
+		// TODO: design/implement a system to sync over ClusterImageSet base OS images into OpenStack
+		// so that each cluster install doesn't involve copying down, then uploading 2GB QCOW
+		// images.
+		// env = append(env, corev1.EnvVar{
+		// 	Name:  "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE",
+		// 	Value: "jdiaz-rhcos-4.3",
+		// })
 	}
 
 	if releaseImage != "" {
@@ -408,6 +430,8 @@ func GenerateUninstallerJobForDeprovision(
 		completeAzureDeprovisionJob(req, job)
 	case req.Spec.Platform.GCP != nil:
 		completeGCPDeprovisionJob(req, job)
+	case req.Spec.Platform.OpenStack != nil:
+		completeOpenStackDeprovisionJob(req, job)
 	default:
 		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
@@ -544,6 +568,45 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"debug",
 				"--region",
 				req.Spec.Platform.GCP.Region,
+				req.Spec.InfraID,
+			},
+			VolumeMounts: volumeMounts,
+		},
+	}
+	job.Spec.Template.Spec.Containers = containers
+	job.Spec.Template.Spec.Volumes = volumes
+}
+
+func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+	env := []corev1.EnvVar{}
+	volumes = append(volumes, corev1.Volume{
+		Name: "openstack",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: req.Spec.Platform.OpenStack.CredentialsSecretRef.Name,
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "openstack",
+		MountPath: openStackCloudsDir,
+	})
+	containers := []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Env:             env,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"deprovision",
+				"openstack",
+				"--loglevel",
+				"debug",
+				"--cloud",
+				req.Spec.Platform.OpenStack.Cloud,
 				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,

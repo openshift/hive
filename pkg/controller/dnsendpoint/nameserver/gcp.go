@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 )
@@ -25,7 +24,7 @@ func NewGCPQuery(c client.Client, credsSecretName string) Query {
 			credsSecret := &corev1.Secret{}
 			if err := c.Get(
 				context.Background(),
-				client.ObjectKey{Namespace: constants.HiveNamespace, Name: credsSecretName},
+				client.ObjectKey{Namespace: controllerutils.GetHiveNamespace(), Name: credsSecretName},
 				credsSecret,
 			); err != nil {
 				return nil, errors.Wrap(err, "could not get the creds secret")

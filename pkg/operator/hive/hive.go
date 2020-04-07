@@ -43,11 +43,12 @@ const (
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
 
-	asset := assets.MustAsset("config/manager/deployment.yaml")
+	asset := assets.MustAsset("config/controllers/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 	hiveContainer := &hiveDeployment.Spec.Template.Spec.Containers[0]
 
+	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {
 		hiveContainer.Image = r.hiveImage
 		hiveImageEnvVar := corev1.EnvVar{
@@ -89,12 +90,20 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 
 	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, mdConfigMap.Name)
 
+	hiveNSName := getHiveNamespace(instance)
+
 	// By default we will try to gather logs on failed installs:
 	logsEnvVar := corev1.EnvVar{
 		Name:  constants.SkipGatherLogsEnvVar,
 		Value: strconv.FormatBool(instance.Spec.FailedProvisionConfig.SkipGatherLogs),
 	}
 	hiveContainer.Env = append(hiveContainer.Env, logsEnvVar)
+
+	hiveNSEnvVar := corev1.EnvVar{
+		Name:  constants.HiveNamespaceEnvVar,
+		Value: hiveNSName,
+	}
+	hiveContainer.Env = append(hiveContainer.Env, hiveNSEnvVar)
 
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{
@@ -143,37 +152,43 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveDeployment.Spec.Replicas = &replicas
 	}
 
-	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying deployment")
-		return err
-	}
-	hLog.Infof("deployment applied (%s)", result)
-
-	applyAssets := []string{
-		"config/manager/service.yaml",
-
-		"config/rbac/hive_frontend_role.yaml",
-		"config/rbac/hive_frontend_role_binding.yaml",
-		"config/rbac/hive_frontend_serviceaccount.yaml",
-
+	// Load namespaced assets, decode them, set to our target namespace, and apply:
+	namespacedAssets := []string{
+		"config/controllers/service.yaml",
 		"config/configmaps/install-log-regexes-configmap.yaml",
+		"config/rbac/hive_frontend_serviceaccount.yaml",
+		"config/controllers/hive_controllers_serviceaccount.yaml",
 	}
-
-	// In very rare cases we use OpenShift specific types which will not apply if running on
-	// vanilla Kubernetes. Detect this and skip if so.
-	openshiftSpecificAssets := []string{
-		"config/rbac/hive_admin_role.yaml",
-		"config/rbac/hive_admin_role_binding.yaml",
-		"config/rbac/hive_reader_role.yaml",
-		"config/rbac/hive_reader_role_binding.yaml",
-	}
-
-	for _, a := range applyAssets {
-		err = util.ApplyAsset(h, a, hLog)
-		if err != nil {
+	for _, assetPath := range namespacedAssets {
+		if err := applyAssetWithNamespaceOverride(h, assetPath, hiveNSName); err != nil {
+			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
+		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
+	}
+
+	// Apply global non-namespaced assets:
+	applyAssets := []string{
+		"config/rbac/hive_frontend_role.yaml",
+		"config/controllers/hive_controllers_role.yaml",
+	}
+	for _, a := range applyAssets {
+		if err := util.ApplyAsset(h, a, hLog); err != nil {
+			return err
+		}
+	}
+
+	// Apply global ClusterRoleBindings which may need Subject namespace overrides for their ServiceAccounts.
+	clusterRoleBindingAssets := []string{
+		"config/rbac/hive_frontend_role_binding.yaml",
+		"config/controllers/hive_controllers_role_binding.yaml",
+	}
+	for _, crbAsset := range clusterRoleBindingAssets {
+		if err := applyClusterRoleBindingAssetWithSubjectNamespaceOverride(h, crbAsset, hiveNSName); err != nil {
+			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
+			return err
+		}
+		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
 	}
 
 	// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
@@ -192,6 +207,16 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		}
 	}
 
+	// In very rare cases we use OpenShift specific types which will not apply if running on
+	// vanilla Kubernetes. Detect this and skip if so.
+	// NOTE: We are configuring two role bindings here, but they do not use namespaced ServiceAccount subjects.
+	// (rather global OpenShift groups), thus they do not need namespace override behavior.
+	openshiftSpecificAssets := []string{
+		"config/rbac/hive_admin_role.yaml",
+		"config/rbac/hive_reader_role.yaml",
+		"config/rbac/hive_admin_role_binding.yaml",
+		"config/rbac/hive_reader_role_binding.yaml",
+	}
 	isOpenShift, err := r.runningOnOpenShift(hLog)
 	if err != nil {
 		return err
@@ -208,6 +233,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hLog.Warn("hive is not running on OpenShift, some optional assets will not be deployed")
 	}
 
+	hiveDeployment.Namespace = hiveNSName
+	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
+	if err != nil {
+		hLog.WithError(err).Error("error applying deployment")
+		return err
+	}
+	hLog.Infof("hive-controllers deployment applied (%s)", result)
+
 	hLog.Info("all hive components successfully reconciled")
 	return nil
 }
@@ -216,7 +249,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
 		caSecret := &corev1.Secret{}
-		err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.HiveNamespace, Name: clientCARef.Name}, caSecret)
+		err := r.Get(context.TODO(), types.NamespacedName{Namespace: getHiveNamespace(instance), Name: clientCARef.Name}, caSecret)
 		if err != nil {
 			hLog.WithError(err).WithField("secret", clientCARef.Name).Errorf("Cannot read client CA secret")
 			continue
@@ -230,11 +263,11 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 
 	if additionalCA.Len() == 0 {
 		caSecret := &corev1.Secret{}
-		err := r.Get(context.TODO(), types.NamespacedName{Namespace: constants.HiveNamespace, Name: hiveAdditionalCASecret}, caSecret)
+		err := r.Get(context.TODO(), types.NamespacedName{Namespace: getHiveNamespace(instance), Name: hiveAdditionalCASecret}, caSecret)
 		if err == nil {
 			err = r.Delete(context.TODO(), caSecret)
 			if err != nil {
-				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", constants.HiveNamespace, hiveAdditionalCASecret)).
+				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", getHiveNamespace(instance), hiveAdditionalCASecret)).
 					Error("cannot delete hive additional ca secret")
 				return err
 			}
@@ -244,7 +277,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 
 	caSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: constants.HiveNamespace,
+			Namespace: getHiveNamespace(instance),
 			Name:      hiveAdditionalCASecret,
 		},
 		Data: map[string][]byte{

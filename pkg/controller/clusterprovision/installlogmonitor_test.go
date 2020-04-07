@@ -64,7 +64,7 @@ func TestParseInstallLog(t *testing.T) {
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
-					Namespace: constants.HiveNamespace,
+					Namespace: constants.DefaultHiveNamespace,
 				},
 			}},
 			expectedReason: unknownReason,
@@ -75,7 +75,7 @@ func TestParseInstallLog(t *testing.T) {
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
-					Namespace: constants.HiveNamespace,
+					Namespace: constants.DefaultHiveNamespace,
 				},
 				BinaryData: map[string][]byte{
 					"regexes": []byte("malformed"),
@@ -89,7 +89,7 @@ func TestParseInstallLog(t *testing.T) {
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
-					Namespace: constants.HiveNamespace,
+					Namespace: constants.DefaultHiveNamespace,
 				},
 				Data: map[string]string{
 					"regexes": `
@@ -114,7 +114,7 @@ func TestParseInstallLog(t *testing.T) {
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
-					Namespace: constants.HiveNamespace,
+					Namespace: constants.DefaultHiveNamespace,
 				},
 				Data: map[string]string{
 					"regexes": `
@@ -149,7 +149,7 @@ func buildRegexConfigMap() *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      regexConfigMapName,
-			Namespace: constants.HiveNamespace,
+			Namespace: constants.DefaultHiveNamespace,
 		},
 		Data: map[string]string{
 			"regexes": `

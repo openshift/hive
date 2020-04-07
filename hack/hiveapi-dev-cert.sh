@@ -1,16 +1,18 @@
 #!/bin/bash
 set -e
 
+HIVE_NS="${HIVE_NS:-hive}"
+
 mkdir hiveapi-certs
 pushd hiveapi-certs
 
 cat <<EOF | cfssl genkey - | cfssljson -bare server
 {
   "hosts": [
-    "hiveapi.hive.svc",
-    "hiveapi.hive.svc.cluster.local"
+    "hiveapi.${HIVE_NS}.svc",
+    "hiveapi.${HIVE_NS}.svc.cluster.local"
   ],
-  "CN": "hiveapi.hive.svc",
+  "CN": "hiveapi.${HIVE_NS}.svc",
   "key": {
     "algo": "ecdsa",
     "size": 256
@@ -23,7 +25,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: certificates.k8s.io/v1beta1
 kind: CertificateSigningRequest
 metadata:
-  name: hiveapi.hive
+  name: hiveapi.${HIVE_NS}
 spec:
   request: $(cat server.csr | base64 | tr -d '\n')
   usages:
@@ -32,10 +34,10 @@ spec:
   - server auth
 EOF
 
-kubectl certificate approve hiveapi.hive
+kubectl certificate approve hiveapi.${HIVE_NS}
 
 sleep 5
-kubectl get csr hiveapi.hive -o jsonpath='{.status.certificate}' | base64 --decode > server.crt
+kubectl get csr hiveapi.${HIVE_NS} -o jsonpath='{.status.certificate}' | base64 --decode > server.crt
 
 cat server.crt
 
@@ -47,7 +49,7 @@ data:
   tls.key: $(cat server-key.pem | base64 | tr -d '\n')
 metadata:
   name: hiveapi-serving-cert
-  namespace: hive
+  namespace: ${HIVE_NS}
 type: kubernetes.io/tls
 EOF
 

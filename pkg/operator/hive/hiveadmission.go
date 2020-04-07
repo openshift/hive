@@ -3,12 +3,9 @@ package hive
 import (
 	"context"
 	"fmt"
-
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
-
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
@@ -16,14 +13,11 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	admregv1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -35,33 +29,51 @@ const (
 )
 
 const (
-	aggregatorClientCAHashAnnotation           = "hive.openshift.io/ca-hash"
-	deprecatedClusterDeploymentMutatingWebhook = "mutateclusterdeployments.admission.hive.openshift.io"
-)
-
-var (
-	mutatingWebhookConfigurationResource = schema.GroupVersionResource{
-		Group:    "admissionregistration.k8s.io",
-		Version:  "v1beta1",
-		Resource: "mutatingwebhookconfigurations",
-	}
+	aggregatorClientCAHashAnnotation = "hive.openshift.io/ca-hash"
 )
 
 func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
+	hiveNSName := getHiveNamespace(instance)
+
+	// Load namespaced assets, decode them, set to our target namespace, and apply:
+	namespacedAssets := []string{
+		"config/hiveadmission/service.yaml",
+		"config/hiveadmission/service-account.yaml",
+	}
+	for _, assetPath := range namespacedAssets {
+		if err := applyAssetWithNamespaceOverride(h, assetPath, hiveNSName); err != nil {
+			hLog.WithError(err).Error("error applying object with namespace override")
+			return err
+		}
+		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
+	}
+
+	// Apply global non-namespaced assets:
+	applyAssets := []string{
+		"config/hiveadmission/hiveadmission_rbac_role.yaml",
+	}
+	for _, a := range applyAssets {
+		if err := util.ApplyAsset(h, a, hLog); err != nil {
+			return err
+		}
+	}
+
+	// Apply global ClusterRoleBindings which may need Subject namespace overrides for their ServiceAccounts.
+	clusterRoleBindingAssets := []string{
+		"config/hiveadmission/hiveadmission_rbac_role_binding.yaml",
+	}
+	for _, crbAsset := range clusterRoleBindingAssets {
+		if err := applyClusterRoleBindingAssetWithSubjectNamespaceOverride(h, crbAsset, hiveNSName); err != nil {
+			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
+			return err
+		}
+		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
+	}
+
 	asset := assets.MustAsset("config/hiveadmission/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
-
-	err := util.ApplyAsset(h, "config/hiveadmission/service.yaml", hLog)
-	if err != nil {
-		return err
-	}
-
-	err = util.ApplyAsset(h, "config/hiveadmission/service-account.yaml", hLog)
-	if err != nil {
-		return err
-	}
-
+	hiveAdmDeployment.Namespace = hiveNSName
 	if r.hiveImage != "" {
 		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
 	}
@@ -84,11 +96,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
-	hLog.Infof("deployment applied (%s)", result)
-
-	hLog.Debug("reading apiservice")
-	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
-	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
+	hLog.WithField("result", result).Info("hiveadmission deployment applied")
 
 	webhooks := map[string]runtime.Object{}
 	validatingWebhooks := []*admregv1.ValidatingWebhookConfiguration{}
@@ -107,6 +115,11 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		validatingWebhooks = append(validatingWebhooks, wh)
 	}
 
+	hLog.Debug("reading apiservice")
+	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
+	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
+	apiService.Spec.Service.Namespace = hiveNSName
+
 	// If on 3.11 we need to set the service CA on the apiservice.
 	is311, err := r.is311(hLog)
 	if err != nil {
@@ -124,7 +137,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 	}
 	if !isOpenShift || is311 {
 		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
-		err = r.injectCerts(apiService, validatingWebhooks, nil, hLog)
+		err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
 		if err != nil {
 			hLog.WithError(err).Error("error injecting certs")
 			return err
@@ -147,51 +160,16 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		hLog.Infof("validating webhook %q applied (%s)", webhookFile, result)
 	}
 
-	if _, err = r.dynamicClient.Resource(mutatingWebhookConfigurationResource).Get(deprecatedClusterDeploymentMutatingWebhook, metav1.GetOptions{}); err == nil {
-		err = r.dynamicClient.Resource(mutatingWebhookConfigurationResource).Delete(deprecatedClusterDeploymentMutatingWebhook, &metav1.DeleteOptions{})
-		if err != nil {
-			hLog.WithError(err).Error("error deleting deprecated mutating webhook configuration for cluster deployments")
-			return err
-		}
-		hLog.Infof("deprecated mutating webhook configuration (%s) removed", deprecatedClusterDeploymentMutatingWebhook)
-	}
-
-	// Remove outdated validatingwebhookconfigurations
-	removeValidatingWebhooks := []string{
-		"clusterdeployments.admission.hive.openshift.io",
-		"clusterimagesets.admission.hive.openshift.io",
-		"dnszones.admission.hive.openshift.io",
-		"selectorsyncsets.admission.hive.openshift.io",
-		"syncsets.admission.hive.openshift.io",
-	}
-	for _, webhookName := range removeValidatingWebhooks {
-		webhookConfig := &admissionregistrationv1beta1.ValidatingWebhookConfiguration{}
-		err := r.Get(context.Background(), types.NamespacedName{Name: webhookName}, webhookConfig)
-		if err != nil && !errors.IsNotFound(err) {
-			hLog.WithError(err).Error("error looking for obsolete ValidatingWebhookConfiguration")
-			return err
-		}
-		if err == nil {
-			err = r.Delete(context.Background(), webhookConfig)
-			if err != nil {
-				hLog.WithError(err).WithField("ValidatingWebhookConfiguration", webhookConfig).Error(
-					"error deleting outdated ValidatingWebhookConfiguration")
-				return err
-			}
-			hLog.WithField("ValidatingWebhookConfiguration", webhookName).Info("deleted outdated ValidatingWebhookConfiguration")
-		}
-	}
-
 	hLog.Info("hiveadmission components reconciled successfully")
 	return nil
 }
 
-func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger) ([]byte, []byte, error) {
+func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
-	hLog.Debug("listing secrets in hive namespace")
+	hLog.Debugf("listing secrets in %s namespace", hiveNSName)
 	secrets := &corev1.SecretList{}
-	err := r.Client.List(context.Background(), secrets, client.InNamespace(constants.HiveNamespace))
+	err := r.Client.List(context.Background(), secrets, client.InNamespace(hiveNSName))
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
 		return nil, nil, err
@@ -224,8 +202,8 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger) ([]byte, []byte, 
 	return serviceCA, kubeCA, nil
 }
 
-func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hLog log.FieldLogger) error {
-	serviceCA, kubeCA, err := r.getCACerts(hLog)
+func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hiveNS string, hLog log.FieldLogger) error {
+	serviceCA, kubeCA, err := r.getCACerts(hLog, hiveNS)
 	if err != nil {
 		return err
 	}

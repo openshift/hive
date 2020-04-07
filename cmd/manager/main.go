@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"github.com/openshift/hive/pkg/constants"
 	golog "log"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 
 	_ "github.com/docker/go-healthcheck"
@@ -14,7 +16,6 @@ import (
 	"k8s.io/klog"
 
 	"github.com/openshift/hive/pkg/apis"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/version"
@@ -80,11 +81,18 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
+			if os.Getenv(constants.HiveNamespaceEnvVar) == "" {
+				log.Warnf("%s env var is not defined, using default: %s", constants.HiveNamespaceEnvVar,
+					constants.DefaultHiveNamespace)
+			}
+			hiveNSName := utils.GetHiveNamespace()
+			log.Infof("hive namespace: %s", hiveNSName)
+
 			// Create a new Cmd to provide shared dependencies and start components
 			mgr, err := manager.New(cfg, manager.Options{
 				MetricsBindAddress:      ":2112",
 				LeaderElection:          true,
-				LeaderElectionNamespace: constants.HiveNamespace,
+				LeaderElectionNamespace: hiveNSName,
 				LeaderElectionID:        leaderElectionConfigMap,
 				LeaseDuration:           &leaseDuration,
 				RenewDeadline:           &renewDeadline,

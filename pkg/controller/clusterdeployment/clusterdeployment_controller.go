@@ -1570,7 +1570,7 @@ func (r *ReconcileClusterDeployment) mergePullSecrets(cd *hivev1.ClusterDeployme
 	globalPullSecretName := os.Getenv(constants.GlobalPullSecret)
 	var globalPullSecret string
 	if len(globalPullSecretName) != 0 {
-		globalPullSecret, err = controllerutils.LoadSecretData(r.Client, globalPullSecretName, constants.HiveNamespace, corev1.DockerConfigJsonKey)
+		globalPullSecret, err = controllerutils.LoadSecretData(r.Client, globalPullSecretName, controllerutils.GetHiveNamespace(), corev1.DockerConfigJsonKey)
 		if err != nil {
 			return "", errors.Wrap(err, "global pull secret could not be retrieved")
 		}

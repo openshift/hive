@@ -14,7 +14,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
@@ -24,33 +23,63 @@ import (
 
 func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.Helper, hiveConfig *hivev1.HiveConfig) error {
 
+	hiveNSName := getHiveNamespace(hiveConfig)
+
 	if !hiveConfig.Spec.HiveAPIEnabled {
-		return r.tearDownHiveAPI(hLog)
+		return r.tearDownHiveAPI(hLog, hiveNSName)
 	}
 
-	if err := util.ApplyAsset(h, "config/apiserver/service.yaml", hLog); err != nil {
+	// Load namespaced assets, decode them, set to our target namespace, and apply:
+	namespacedAssets := []string{
+		"config/apiserver/service.yaml",
+		"config/apiserver/service-account.yaml",
+	}
+	for _, assetPath := range namespacedAssets {
+		if err := applyAssetWithNamespaceOverride(h, assetPath, hiveNSName); err != nil {
+			hLog.WithError(err).Error("error applying object with namespace override")
+			return err
+		}
+		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
+	}
+
+	// Apply global non-namespaced assets:
+	applyAssets := []string{
+		"config/apiserver/hiveapi_rbac_role.yaml",
+	}
+	for _, a := range applyAssets {
+		if err := util.ApplyAsset(h, a, hLog); err != nil {
+			return err
+		}
+	}
+
+	// Apply global ClusterRoleBindings which may need Subject namespace overrides for their ServiceAccounts.
+	clusterRoleBindingAssets := []string{
+		"config/apiserver/hiveapi_rbac_role_binding.yaml",
+	}
+	for _, crbAsset := range clusterRoleBindingAssets {
+		if err := applyClusterRoleBindingAssetWithSubjectNamespaceOverride(h, crbAsset, hiveNSName); err != nil {
+			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
+			return err
+		}
+		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
+	}
+
+	if err := r.createHiveAPIDeployment(hLog, h, hiveNSName); err != nil {
 		return err
 	}
 
-	if err := util.ApplyAsset(h, "config/apiserver/service-account.yaml", hLog); err != nil {
-		return err
-	}
-
-	if err := r.createHiveAPIDeployment(hLog, h); err != nil {
-		return err
-	}
-
-	if err := r.createAPIServerAPIService(hLog, h); err != nil {
+	if err := r.createAPIServerAPIService(hLog, h, hiveNSName); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h *resource.Helper) error {
+func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h *resource.Helper, hiveNSName string) error {
 	hLog.Debug("reading apiservice")
 	asset := assets.MustAsset("config/apiserver/apiservice.yaml")
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
+	apiService.Spec.Service.Namespace = hiveNSName
 
 	// If on 3.11 we need to set the service CA on the apiservice
 	is311, err := r.is311(hLog)
@@ -70,7 +99,7 @@ func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h 
 
 	if !isOpenShift || is311 {
 		hLog.Debug("non-OpenShift 4.x cluster detected, modifying apiservice")
-		serviceCA, _, err := r.getCACerts(hLog)
+		serviceCA, _, err := r.getCACerts(hLog, hiveNSName)
 		if err != nil {
 			return err
 		}
@@ -87,10 +116,11 @@ func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h 
 	return nil
 }
 
-func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *resource.Helper) error {
+func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *resource.Helper, hiveNSName string) error {
 	asset := assets.MustAsset("config/apiserver/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveAPIDeployment := resourceread.ReadDeploymentV1OrDie(asset)
+	hiveAPIDeployment.Namespace = hiveNSName
 
 	if r.hiveImage != "" {
 		hiveAPIDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
@@ -110,14 +140,14 @@ func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *r
 	return nil
 }
 
-func (r *ReconcileHiveConfig) tearDownHiveAPI(hLog log.FieldLogger) error {
+func (r *ReconcileHiveConfig) tearDownHiveAPI(hLog log.FieldLogger, hiveNSName string) error {
 
 	objects := []struct {
 		key    client.ObjectKey
 		object runtime.Object
 	}{
 		{
-			key:    client.ObjectKey{Namespace: constants.HiveNamespace, Name: "hiveapi"},
+			key:    client.ObjectKey{Namespace: hiveNSName, Name: "hiveapi"},
 			object: &appsv1.Deployment{},
 		},
 		{
@@ -125,11 +155,11 @@ func (r *ReconcileHiveConfig) tearDownHiveAPI(hLog log.FieldLogger) error {
 			object: &apiregistrationv1.APIService{},
 		},
 		{
-			key:    client.ObjectKey{Namespace: constants.HiveNamespace, Name: "hiveapi"},
+			key:    client.ObjectKey{Namespace: hiveNSName, Name: "hiveapi"},
 			object: &corev1.Service{},
 		},
 		{
-			key:    client.ObjectKey{Namespace: constants.HiveNamespace, Name: "hiveapi-sa"},
+			key:    client.ObjectKey{Namespace: hiveNSName, Name: "hiveapi-sa"},
 			object: &corev1.ServiceAccount{},
 		},
 	}

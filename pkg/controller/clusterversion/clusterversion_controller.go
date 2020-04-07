@@ -6,8 +6,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -19,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -98,7 +98,7 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
@@ -122,18 +122,14 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
-
-	// If the cluster is unreachable, do not reconcile.
-	if remoteClientBuilder.Unreachable() {
-		cdLog.Debug("skipping cluster with unreachable condition")
-		return reconcile.Result{}, nil
-	}
-
-	remoteClient, err := remoteClientBuilder.Build()
-	if err != nil {
-		cdLog.WithError(err).Error("error building remote cluster-api client connection")
-		return reconcile.Result{}, err
+	remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
+		cd,
+		r.remoteClusterAPIClientBuilder(cd),
+		r.Client,
+		cdLog,
+	)
+	if unreachable {
+		return reconcile.Result{Requeue: requeue}, nil
 	}
 
 	clusterVersion := &openshiftapiv1.ClusterVersion{}

@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/operator"
+	"github.com/openshift/hive/pkg/version"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 
@@ -53,6 +54,7 @@ func newRootCommand() *cobra.Command {
 				log.WithError(err).Fatal("Cannot parse log level")
 			}
 			log.SetLevel(level)
+			log.Infof("Version: %s @ %s", version.String, version.Commit)
 			log.Debug("debug logging enabled")
 
 			// Parse leader election options

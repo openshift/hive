@@ -46,9 +46,9 @@ type SyncSetInstanceSpec struct {
 	// +optional
 	SelectorSyncSetRef *SelectorSyncSetReference `json:"selectorSyncSetRef,omitempty"`
 
-	// ResourceApplyMode indicates if the resource apply mode is "upsert" (default) or "sync".
-	// ApplyMode "upsert" indicates create and update.
-	// ApplyMode "sync" indicates create, update and delete.
+	// ResourceApplyMode indicates if the resource apply mode is "Upsert" (default) or "Sync".
+	// ApplyMode "Upsert" indicates create and update.
+	// ApplyMode "Sync" indicates create, update and delete.
 	// +optional
 	ResourceApplyMode SyncSetResourceApplyMode `json:"resourceApplyMode,omitempty"`
 

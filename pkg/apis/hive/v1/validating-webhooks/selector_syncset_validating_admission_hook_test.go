@@ -14,7 +14,7 @@ import (
 
 func TestSelectorSyncSetValidatingResource(t *testing.T) {
 	// Arrange
-	data := SelectorSyncSetValidatingAdmissionHook{}
+	data := NewSelectorSyncSetValidatingAdmissionHook(createDecoder(t))
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1",
@@ -32,7 +32,7 @@ func TestSelectorSyncSetValidatingResource(t *testing.T) {
 
 func TestSelectorSyncSetInitialize(t *testing.T) {
 	// Arrange
-	data := SelectorSyncSetValidatingAdmissionHook{}
+	data := NewSelectorSyncSetValidatingAdmissionHook(createDecoder(t))
 
 	// Act
 	err := data.Initialize(nil, nil)
@@ -144,6 +144,86 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 			selectorSyncSet: func() *hivev1.SelectorSyncSet {
 				ss := testSecretReferenceSelectorSyncSet()
 				ss.Spec.Secrets[0].TargetRef.Name = ""
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test valid empty string resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = ""
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid empty string resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = ""
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Upsert resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Upsert"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Upsert resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Upsert"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Sync resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Sync"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test valid Sync resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "Sync"
+				return ss
+			}(),
+			expectedAllowed: true,
+		},
+		{
+			name:      "Test invalid resourceApplyMode create",
+			operation: admissionv1beta1.Create,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "sync"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid resourceApplyMode update",
+			operation: admissionv1beta1.Update,
+			selectorSyncSet: func() *hivev1.SelectorSyncSet {
+				ss := testSelectorSyncSet()
+				ss.Spec.ResourceApplyMode = "sync"
 				return ss
 			}(),
 			expectedAllowed: false,
@@ -280,7 +360,7 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			data := SelectorSyncSetValidatingAdmissionHook{}
+			data := NewSelectorSyncSetValidatingAdmissionHook(createDecoder(t))
 
 			objectRaw, _ := json.Marshal(tc.selectorSyncSet)
 

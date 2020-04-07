@@ -23,30 +23,36 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/remoteclient"
-	mockremoteclient "github.com/openshift/hive/pkg/remoteclient/mock"
 	"github.com/openshift/hive/pkg/resource"
+	testsecret "github.com/openshift/hive/pkg/test/secret"
 )
 
 const (
-	fakeName         = "fake-cluster"
-	fakeNamespace    = "fake-namespace"
-	fakeDomain       = "example.com"
-	fakeAPIURL       = "https://test-api-url:6443"
-	fakeAPIURLDomain = "test-api-url"
+	fakeName             = "fake-cluster"
+	fakeNamespace        = "fake-namespace"
+	fakeDomain           = "example.com"
+	fakeAPIURL           = "https://test-api-url:6443"
+	fakeAPIURLDomain     = "test-api-url"
+	kubeconfigSecretName = "test-kubeconfig"
+	adminKubeconfig      = `clusters:
+- cluster:
+    server: https://test-api-url:6443
+  name: bar
+contexts:
+- context:
+    cluster: bar
+  name: admin
+current-context: admin
+`
 )
 
 func init() {
 	log.SetLevel(log.DebugLevel)
-}
-
-type fakeRemoteClientResponse struct {
-	apiURL string
-	err    error
 }
 
 func TestReconcileControlPlaneCerts(t *testing.T) {
@@ -54,10 +60,9 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 	openshiftapiv1.Install(scheme.Scheme)
 
 	tests := []struct {
-		name                 string
-		existing             []runtime.Object
-		remoteClientResponse *fakeRemoteClientResponse
-		validate             func(*testing.T, client.Client, []runtime.Object)
+		name     string
+		existing []runtime.Object
+		validate func(*testing.T, client.Client, []runtime.Object)
 	}{
 		{
 			name: "no control plane certs",
@@ -67,7 +72,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Empty(t, applied, "no syncset should be applied")
-				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
+				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
 			},
 		},
 		{
@@ -76,12 +81,9 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeClusterDeployment().defaultCert("default-cert", "default-secret").obj(),
 				fakeCertSecret("default-secret"),
 			},
-			remoteClientResponse: &fakeRemoteClientResponse{
-				apiURL: fakeAPIURL,
-			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
-				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
+				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
 
 				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURLDomain, "default-secret"))
 
@@ -103,7 +105,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
-				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
+				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
 				validateAppliedSyncSet(t, applied, "", additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
@@ -119,12 +121,9 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeCertSecret("secret1"),
 				fakeCertSecret("secret2"),
 			},
-			remoteClientResponse: &fakeRemoteClientResponse{
-				apiURL: fakeAPIURL,
-			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
-				assert.Empty(t, cd.Status.Conditions, "no conditions should be set")
+				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
 
 				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURLDomain, "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
@@ -142,10 +141,10 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				assert.Empty(t, applied)
 				cd := getFakeClusterDeployment(t, c)
-				assert.Equal(t, 1, len(cd.Status.Conditions))
+				assert.Equal(t, 2, len(cd.Status.Conditions), "unexpected number of conditions")
 				notFoundCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ControlPlaneCertificateNotFoundCondition)
-				assert.NotNil(t, notFoundCondition)
-				assert.Equal(t, notFoundCondition.Status, corev1.ConditionTrue)
+				assert.NotNil(t, notFoundCondition, "expected a NotFound condition")
+				assert.Equal(t, notFoundCondition.Status, corev1.ConditionTrue, "expected NotFound condition to be True")
 			},
 		},
 		{
@@ -166,38 +165,33 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
-				assert.Equal(t, 1, len(cd.Status.Conditions))
+				assert.Equal(t, 2, len(cd.Status.Conditions), "unexpected number of conditions")
 				notFoundCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ControlPlaneCertificateNotFoundCondition)
-				assert.NotNil(t, notFoundCondition)
-				assert.Equal(t, string(corev1.ConditionFalse), string(notFoundCondition.Status))
+				assert.NotNil(t, notFoundCondition, "expected a NotFound condition")
+				assert.Equal(t, string(corev1.ConditionFalse), string(notFoundCondition.Status), "unexpected NotFound status")
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test.existing = append(test.existing,
+				testsecret.Build(
+					testsecret.WithName(kubeconfigSecretName),
+					testsecret.WithNamespace(fakeNamespace),
+					testsecret.WithDataKeyValue(constants.KubeconfigSecretKey, []byte(adminKubeconfig)),
+				),
+			)
 			fakeClient := fake.NewFakeClient(test.existing...)
 
 			mockController := gomock.NewController(t)
 			defer mockController.Finish()
-
-			mockRemoteClientBuilder := mockremoteclient.NewMockBuilder(mockController)
-			if test.remoteClientResponse != nil {
-				mockRemoteClientBuilder.EXPECT().UseSecondaryAPIURL().Return(mockRemoteClientBuilder)
-				mockRemoteClientBuilder.EXPECT().APIURL().Return(
-					test.remoteClientResponse.apiURL,
-					test.remoteClientResponse.err,
-				)
-			}
 
 			applier := &fakeApplier{}
 			r := &ReconcileControlPlaneCerts{
 				Client:  fakeClient,
 				scheme:  scheme.Scheme,
 				applier: applier,
-				remoteClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder {
-					return mockRemoteClientBuilder
-				},
 			}
 
 			_, err := r.Reconcile(reconcile.Request{
@@ -323,9 +317,16 @@ func fakeClusterDeployment() *fakeClusterDeploymentWrapper {
 			ClusterName: fakeName,
 			BaseDomain:  fakeDomain,
 			Installed:   true,
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: kubeconfigSecretName},
+			},
 		},
 		Status: hivev1.ClusterDeploymentStatus{
 			APIURL: fakeAPIURL,
+			Conditions: []hivev1.ClusterDeploymentCondition{{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}},
 		},
 	}
 	return &fakeClusterDeploymentWrapper{cd: cd}
@@ -377,8 +378,8 @@ func fakeCertSecret(name string) *corev1.Secret {
 	s.Name = name
 	s.Namespace = fakeNamespace
 	s.Data = map[string][]byte{
-		"tls.key": []byte("blah"),
-		"tls.crt": []byte("blah"),
+		constants.TLSKeySecretKey: []byte("blah"),
+		constants.TLSCrtSecretKey: []byte("blah"),
 	}
 	s.Type = corev1.SecretTypeTLS
 	return s

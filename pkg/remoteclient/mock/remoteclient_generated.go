@@ -66,35 +66,6 @@ func (mr *MockBuilderMockRecorder) BuildDynamic() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildDynamic", reflect.TypeOf((*MockBuilder)(nil).BuildDynamic))
 }
 
-// Unreachable mocks base method
-func (m *MockBuilder) Unreachable() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Unreachable")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// Unreachable indicates an expected call of Unreachable
-func (mr *MockBuilderMockRecorder) Unreachable() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unreachable", reflect.TypeOf((*MockBuilder)(nil).Unreachable))
-}
-
-// APIURL mocks base method
-func (m *MockBuilder) APIURL() (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "APIURL")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// APIURL indicates an expected call of APIURL
-func (mr *MockBuilderMockRecorder) APIURL() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "APIURL", reflect.TypeOf((*MockBuilder)(nil).APIURL))
-}
-
 // RESTConfig mocks base method
 func (m *MockBuilder) RESTConfig() (*rest.Config, error) {
 	m.ctrl.T.Helper()

@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -130,10 +131,8 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil
 	}
 
-	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
-
 	// If the cluster is unreachable, do not reconcile.
-	if remoteClientBuilder.Unreachable() {
+	if unreachable, _ := remoteclient.Unreachable(cd); unreachable {
 		logger.Debug("skipping cluster with unreachable condition")
 		return reconcile.Result{}, nil
 	}
@@ -178,11 +177,16 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 
-	remoteClient, err := remoteClientBuilder.Build()
-	if err != nil {
-		logger.WithError(err).Error("error building remote cluster client connection")
-		return reconcile.Result{}, err
+	remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
+		cd,
+		r.remoteClusterAPIClientBuilder(cd),
+		r.Client,
+		logger,
+	)
+	if unreachable {
+		return reconcile.Result{Requeue: requeue}, nil
 	}
+
 	clusterOperators := &configv1.ClusterOperatorList{}
 	err = remoteClient.List(context.TODO(), clusterOperators)
 	if err != nil {

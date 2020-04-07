@@ -1,8 +1,9 @@
 package secret
 
 import (
-	"github.com/openshift/hive/pkg/test/generic"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/openshift/hive/pkg/test/generic"
 )
 
 // Option defines a function signature for any function that wants to be passed into Build
@@ -23,6 +24,16 @@ func Generic(opt generic.Option) Option {
 	return func(obj *corev1.Secret) {
 		opt(obj)
 	}
+}
+
+// WithName sets the object.Name field when building an object with Build.
+func WithName(name string) Option {
+	return Generic(generic.WithName(name))
+}
+
+// WithNamespace sets the object.Namespace field when building an object with Build.
+func WithNamespace(namespace string) Option {
+	return Generic(generic.WithNamespace(namespace))
 }
 
 // WithDataKeyValue adds the key and value to the secret's data section.

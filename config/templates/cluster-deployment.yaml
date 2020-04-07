@@ -86,7 +86,6 @@ objects:
     annotations:
       hive.openshift.io/delete-after: "8h"
       hive.openshift.io/try-install-once: "${TRY_INSTALL_ONCE}"
-      hive.openshift.io/try-uninstall-once: "${TRY_UNINSTALL_ONCE}"
     name: ${CLUSTER_NAME}
   spec:
     platformSecrets:

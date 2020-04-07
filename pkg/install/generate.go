@@ -22,28 +22,24 @@ const (
 	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
 	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
 
-	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
-	azureAuthDir               = "/.azure"
-	azureAuthFile              = azureAuthDir + "/osServicePrincipal.json"
-	gcpAuthDir                 = "/.gcp"
-	gcpAuthFile                = gcpAuthDir + "/" + constants.GCPCredentialsName
+	azureAuthDir  = "/.azure"
+	azureAuthFile = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir    = "/.gcp"
+	gcpAuthFile   = gcpAuthDir + "/" + constants.GCPCredentialsName
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
 
 	// LibvirtSSHPrivateKeyDir is the directory where the generated Job will mount the libvirt ssh secret to
 	LibvirtSSHPrivateKeyDir = "/libvirtsshkeys"
-
-	// SSHSecretPrivateKeyName is the key name holding the private key in the SSH secret
-	SSHSecretPrivateKeyName = "ssh-privatekey"
 )
 
 var (
 	// SSHPrivateKeyFilePath is the path to the private key contents (from the SSH secret)
-	SSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", SSHPrivateKeyDir, SSHSecretPrivateKeyName)
+	SSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", SSHPrivateKeyDir, constants.SSHPrivateKeySecretKey)
 
 	// LibvirtSSHPrivateKeyFilePath is the path to the private key contents (from the libvirt SSH secret)
-	LibvirtSSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", LibvirtSSHPrivateKeyDir, SSHSecretPrivateKeyName)
+	LibvirtSSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", LibvirtSSHPrivateKeyDir, constants.SSHPrivateKeySecretKey)
 )
 
 // InstallerPodSpec generates a spec for an installer pod.
@@ -378,16 +374,7 @@ func GetUninstallJobName(name string) string {
 func GenerateUninstallerJobForDeprovision(
 	req *hivev1.ClusterDeprovision) (*batchv1.Job, error) {
 
-	tryOnce := false
-	if req.Annotations != nil {
-		value, exists := req.Annotations[tryUninstallOnceAnnotation]
-		tryOnce = exists && value == "true"
-	}
-
 	restartPolicy := corev1.RestartPolicyOnFailure
-	if tryOnce {
-		restartPolicy = corev1.RestartPolicyNever
-	}
 
 	podSpec := corev1.PodSpec{
 		DNSPolicy:     corev1.DNSClusterFirst,

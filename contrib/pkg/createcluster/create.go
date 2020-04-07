@@ -3,6 +3,10 @@ package createcluster
 import (
 	"encoding/json"
 	"fmt"
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/gcpclient"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -10,7 +14,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -22,11 +25,7 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-
-	"github.com/openshift/installer/pkg/ipnet"
-	installertypes "github.com/openshift/installer/pkg/types"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -75,13 +74,10 @@ obtained from a the following URL:
 https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
 `
 const (
-	deleteAfterAnnotation      = "hive.openshift.io/delete-after"
-	tryInstallOnceAnnotation   = "hive.openshift.io/try-install-once"
-	tryUninstallOnceAnnotation = "hive.openshift.io/try-uninstall-once"
-	hiveutilCreatedLabel       = "hive.openshift.io/hiveutil-created"
-	cloudAWS                   = "aws"
-	cloudAzure                 = "azure"
-	cloudGCP                   = "gcp"
+	hiveutilCreatedLabel = "hive.openshift.io/hiveutil-created"
+	cloudAWS             = "aws"
+	cloudAzure           = "azure"
+	cloudGCP             = "gcp"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -90,6 +86,7 @@ metadata:
   namespace: bar
 type: TestFailResource
 `
+	azureCredFile = "osServicePrincipal.json"
 )
 
 var (
@@ -125,7 +122,7 @@ type Options struct {
 	InstallOnce              bool
 	UninstallOnce            bool
 	SimulateBootstrapFailure bool
-	WorkerNodes              int64
+	WorkerNodesCount         int64
 	CreateSampleSyncsets     bool
 	ManifestsDir             string
 	Adopt                    bool
@@ -138,8 +135,7 @@ type Options struct {
 	// Azure
 	AzureBaseDomainResourceGroupName string
 
-	homeDir       string
-	cloudProvider cloudProvider
+	homeDir string
 }
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
@@ -207,7 +203,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp`,
 	flags.BoolVar(&opt.InstallOnce, "install-once", false, "Run the install only one time and fail if not successful")
 	flags.BoolVar(&opt.UninstallOnce, "uninstall-once", false, "Run the uninstall only one time and fail if not successful")
 	flags.BoolVar(&opt.SimulateBootstrapFailure, "simulate-bootstrap-failure", false, "Simulate an install bootstrap failure by injecting an invalid manifest.")
-	flags.Int64Var(&opt.WorkerNodes, "workers", 3, "Number of worker nodes to create.")
+	flags.Int64Var(&opt.WorkerNodesCount, "workers", 3, "Number of worker nodes to create.")
 	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 
@@ -251,12 +247,12 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 	if !validClouds[o.Cloud] {
 		cmd.Usage()
 		log.Infof("Unsupported cloud: %s", o.Cloud)
-		return fmt.Errorf("Unsupported cloud: %s", o.Cloud)
+		return fmt.Errorf("unsupported cloud: %s", o.Cloud)
 	}
 
 	if o.Adopt {
 		if o.AdoptAdminKubeConfig == "" || o.AdoptInfraID == "" || o.AdoptClusterID == "" {
-			return fmt.Errorf("Must specify the following options when using --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id")
+			return fmt.Errorf("must specify the following options when using --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id")
 		}
 
 		if _, err := os.Stat(o.AdoptAdminKubeConfig); os.IsNotExist(err) {
@@ -269,36 +265,16 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		}
 	} else {
 		if o.AdoptAdminKubeConfig != "" || o.AdoptInfraID != "" || o.AdoptClusterID != "" || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
-			return fmt.Errorf("Cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-admin-username, --adopt-admin-password")
+			return fmt.Errorf("cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-admin-username, --adopt-admin-password")
 		}
 	}
 	return nil
-}
-
-type cloudProvider interface {
-	generateCredentialsSecret(o *Options) (*corev1.Secret, error)
-
-	addPlatformDetails(
-		o *Options,
-		cd *hivev1.ClusterDeployment,
-		machinePool *hivev1.MachinePool,
-		installConfig *installertypes.InstallConfig,
-	) error
 }
 
 // Run executes the command
 func (o *Options) Run() error {
 	if err := apis.AddToScheme(scheme.Scheme); err != nil {
 		return err
-	}
-
-	switch o.Cloud {
-	case cloudAWS:
-		o.cloudProvider = &awsCloudProvider{}
-	case cloudAzure:
-		o.cloudProvider = &azureCloudProvider{}
-	case cloudGCP:
-		o.cloudProvider = &gcpCloudProvider{}
 	}
 
 	objs, err := o.GenerateObjects()
@@ -360,34 +336,15 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 
 // GenerateObjects generates resources for a new cluster deployment
 func (o *Options) GenerateObjects() ([]runtime.Object, error) {
-	result := []runtime.Object{}
 
 	pullSecret, err := o.getPullSecret()
 	if err != nil {
 		return nil, err
 	}
 
-	pullSecretSecret, err := o.generatePullSecret(pullSecret)
+	sshPrivateKey, err := o.getSSHPrivateKey()
 	if err != nil {
 		return nil, err
-	}
-
-	sshPrivateKeySecret, err := o.generateSSHPrivateKeySecret()
-	if err != nil {
-		return nil, err
-	}
-
-	cd, err := o.GenerateClusterDeployment(pullSecretSecret, sshPrivateKeySecret)
-	if err != nil {
-		return nil, err
-	}
-
-	if o.Adopt {
-		newObjects, err := o.addAdoptionInfo(cd)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, newObjects...)
 	}
 
 	sshPublicKey, err := o.getSSHPublicKey()
@@ -395,188 +352,122 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		return nil, err
 	}
 
-	// Platform info will be injected by o.cloudProvider
-	installConfig := &installertypes.InstallConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: o.Name,
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: installertypes.InstallConfigVersion,
-		},
-		SSHKey:     sshPublicKey,
-		BaseDomain: o.BaseDomain,
-		Networking: &installertypes.Networking{
-			NetworkType:    "OpenShiftSDN",
-			ServiceNetwork: []ipnet.IPNet{*ipnet.MustParseCIDR("172.30.0.0/16")},
-			ClusterNetwork: []installertypes.ClusterNetworkEntry{
-				{
-					CIDR:       *ipnet.MustParseCIDR("10.128.0.0/14"),
-					HostPrefix: 23,
-				},
-			},
-			MachineNetwork: []installertypes.MachineNetworkEntry{
-				{
-					CIDR: *ipnet.MustParseCIDR("10.0.0.0/16"),
-				},
-			},
-		},
-		ControlPlane: &installertypes.MachinePool{
-			Name:     "master",
-			Replicas: pointer.Int64Ptr(3),
-		},
-		Compute: []installertypes.MachinePool{
-			{
-				Name:     "worker",
-				Replicas: &o.WorkerNodes,
-			},
-		},
-	}
-
-	computePool := &hivev1.MachinePool{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "MachinePool",
-			APIVersion: hivev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-worker", o.Name),
-			Namespace: o.Namespace,
-		},
-		Spec: hivev1.MachinePoolSpec{
-			ClusterDeploymentRef: corev1.LocalObjectReference{
-				Name: o.Name,
-			},
-			Name:     "worker",
-			Replicas: pointer.Int64Ptr(o.WorkerNodes),
-		},
-	}
-
-	if err := o.cloudProvider.addPlatformDetails(o, cd, computePool, installConfig); err != nil {
-		return nil, err
-	}
-
-	installConfigSecret, err := o.generateInstallConfigSecret(installConfig)
+	// Load installer manifest files:
+	manifestFileData, err := o.getManifestFileBytes()
 	if err != nil {
 		return nil, err
 	}
-	cd.Spec.Provisioning.InstallConfigSecretRef = corev1.LocalObjectReference{Name: installConfigSecret.Name}
 
-	manifestsConfigMap, err := o.generateManifestsConfigMap()
-	if err != nil {
-		return nil, err
+	builder := &clusterresource.Builder{
+		Name:             o.Name,
+		Namespace:        o.Namespace,
+		WorkerNodesCount: o.WorkerNodesCount,
+		PullSecret:       pullSecret,
+		SSHPrivateKey:    sshPrivateKey,
+		SSHPublicKey:     sshPublicKey,
+		InstallOnce:      o.InstallOnce,
+		BaseDomain:       o.BaseDomain,
+		ManageDNS:        o.ManageDNS,
+		DeleteAfter:      o.DeleteAfter,
+		Labels: map[string]string{
+			hiveutilCreatedLabel: "true",
+		},
+		InstallerManifests: manifestFileData,
 	}
-	if manifestsConfigMap != nil {
-		cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{
-			Name: manifestsConfigMap.Name,
+	if o.Adopt {
+		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
+		if err != nil {
+			return nil, err
 		}
-		result = append(result, manifestsConfigMap)
+		builder.Adopt = o.Adopt
+		builder.AdoptInfraID = o.AdoptInfraID
+		builder.AdoptClusterID = o.AdoptClusterID
+		builder.AdoptAdminKubeconfig = kubeconfigBytes
+		builder.AdoptAdminUsername = o.AdoptAdminUsername
+		builder.AdoptAdminPassword = o.AdoptAdminPassword
 	}
 
-	imageSet, err := o.configureImages(cd)
+	switch o.Cloud {
+	case cloudAWS:
+		defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
+		accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
+		if err != nil {
+			return nil, err
+		}
+		awsProvider := &clusterresource.AWSCloudBuilder{
+			AccessKeyID:     accessKeyID,
+			SecretAccessKey: secretAccessKey,
+		}
+		builder.CloudBuilder = awsProvider
+	case cloudAzure:
+		credsFilePath := filepath.Join(os.Getenv("HOME"), ".azure", azureCredFile)
+		if l := os.Getenv("AZURE_AUTH_LOCATION"); l != "" {
+			credsFilePath = l
+		}
+		if o.CredsFile != "" {
+			credsFilePath = o.CredsFile
+		}
+		log.Infof("Loading Azure service principal from: %s", credsFilePath)
+		spFileContents, err := ioutil.ReadFile(credsFilePath)
+		if err != nil {
+			return nil, err
+		}
+
+		azureProvider := &clusterresource.AzureCloudBuilder{
+			ServicePrincipal:            spFileContents,
+			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
+		}
+		builder.CloudBuilder = azureProvider
+	case cloudGCP:
+		creds, err := gcputils.GetCreds(o.CredsFile)
+		if err != nil {
+			return nil, err
+		}
+		projectID, err := gcpclient.ProjectID(creds)
+		if err != nil {
+			return nil, err
+		}
+
+		gcpProvider := &clusterresource.GCPCloudBuilder{
+			ProjectID:      projectID,
+			ServiceAccount: creds,
+		}
+		builder.CloudBuilder = gcpProvider
+	}
+
+	if len(o.ServingCert) != 0 {
+		servingCert, err := ioutil.ReadFile(o.ServingCert)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %v", o.ServingCert, err)
+		}
+		builder.ServingCert = string(servingCert)
+		servingCertKey, err := ioutil.ReadFile(o.ServingCertKey)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %v", o.ServingCertKey, err)
+		}
+		builder.ServingCertKey = string(servingCertKey)
+	}
+
+	imageSet, err := o.configureImages(builder)
 	if err != nil {
 		return nil, err
 	}
+
+	result, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	// Add some additional objects we don't yet want to move to the cluster builder library.
 	if imageSet != nil {
 		result = append(result, imageSet)
 	}
-
-	if o.IncludeSecrets {
-		if pullSecretSecret != nil {
-			result = append(result, pullSecretSecret)
-		}
-
-		creds, err := o.cloudProvider.generateCredentialsSecret(o)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, creds)
-
-		if sshPrivateKeySecret != nil {
-			result = append(result, sshPrivateKeySecret)
-		}
-
-		servingCertSecret, err := o.generateServingCertSecret()
-		if err != nil {
-			return nil, err
-		}
-		if servingCertSecret != nil {
-			result = append(result, servingCertSecret)
-		}
-	}
-
-	result = append(result, installConfigSecret, cd, computePool)
 
 	if o.CreateSampleSyncsets {
 		result = append(result, o.generateSampleSyncSets()...)
 	}
 
-	return result, err
-}
-
-func (o *Options) addAdoptionInfo(cd *hivev1.ClusterDeployment) ([]runtime.Object, error) {
-	objectsToCreate := []runtime.Object{}
-	cd.Spec.Installed = true
-
-	kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
-	if err != nil {
-		return objectsToCreate, err
-	}
-
-	adminKubeconfigSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-adopted-admin-kubeconfig", cd.Name),
-			Namespace: cd.Namespace,
-		},
-		Data: map[string][]byte{
-			"kubeconfig":     kubeconfigBytes,
-			"raw-kubeconfig": kubeconfigBytes,
-		},
-	}
-	objectsToCreate = append(objectsToCreate, adminKubeconfigSecret)
-	cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
-		ClusterID:                o.AdoptClusterID,
-		InfraID:                  o.AdoptInfraID,
-		AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret.Name},
-	}
-
-	if o.AdoptAdminUsername != "" {
-		adminPasswordSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-adopted-admin-password", cd.Name),
-				Namespace: cd.Namespace,
-			},
-			StringData: map[string]string{
-				"username": o.AdoptAdminUsername,
-				"password": o.AdoptAdminPassword,
-			},
-		}
-		objectsToCreate = append(objectsToCreate, adminPasswordSecret)
-		cd.Spec.ClusterMetadata.AdminPasswordSecretRef = corev1.LocalObjectReference{
-			Name: adminPasswordSecret.Name,
-		}
-	}
-
-	return objectsToCreate, nil
-}
-
-func (o *Options) generateInstallConfigSecret(ic *installertypes.InstallConfig) (*corev1.Secret, error) {
-	d, err := yaml.Marshal(ic)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-install-config", o.Name),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"install-config.yaml": d,
-		},
-	}, nil
+	return result, nil
 }
 
 func (o *Options) getPullSecret() (string, error) {
@@ -599,26 +490,6 @@ func (o *Options) getPullSecret() (string, error) {
 	return "", nil
 }
 
-func (o *Options) generatePullSecret(pullSecret string) (*corev1.Secret, error) {
-	if len(pullSecret) == 0 {
-		return nil, nil
-	}
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-pull-secret", o.Name),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeDockerConfigJson,
-		StringData: map[string]string{
-			corev1.DockerConfigJsonKey: pullSecret,
-		},
-	}, nil
-}
-
 func (o *Options) getSSHPublicKey() (string, error) {
 	sshPublicKey := os.Getenv("PUBLIC_SSH_KEY")
 	if len(sshPublicKey) > 0 {
@@ -638,7 +509,7 @@ func (o *Options) getSSHPublicKey() (string, error) {
 	}
 
 	log.Error("Cannot determine SSH key to use")
-	return "", fmt.Errorf("no ssh key")
+	return "", nil
 }
 
 func (o *Options) getSSHPrivateKey() (string, error) {
@@ -655,80 +526,16 @@ func (o *Options) getSSHPrivateKey() (string, error) {
 	return "", nil
 }
 
-func (o *Options) generateSSHPrivateKeySecret() (*corev1.Secret, error) {
-	sshPrivateKey, err := o.getSSHPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	if sshPrivateKey == "" {
-		return nil, nil
-	}
-
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-ssh-private-key", o.Name),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"ssh-privatekey": sshPrivateKey,
-		},
-	}, nil
-}
-
-func (o *Options) generateServingCertSecret() (*corev1.Secret, error) {
-	if len(o.ServingCert) == 0 {
-		return nil, nil
-	}
-	servingCert, err := ioutil.ReadFile(o.ServingCert)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", o.ServingCert, err)
-	}
-	servingCertKey, err := ioutil.ReadFile(o.ServingCertKey)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", o.ServingCertKey, err)
-	}
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-serving-cert", o.Name),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeTLS,
-		StringData: map[string]string{
-			"tls.crt": string(servingCert),
-			"tls.key": string(servingCertKey),
-		},
-	}, nil
-}
-
-func (o *Options) generateManifestsConfigMap() (*corev1.ConfigMap, error) {
+func (o *Options) getManifestFileBytes() (map[string][]byte, error) {
 	if o.ManifestsDir == "" && !o.SimulateBootstrapFailure {
 		return nil, nil
 	}
-	cm := &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-manifests", o.Name),
-			Namespace: o.Namespace,
-		},
-	}
+	fileData := map[string][]byte{}
 	if o.ManifestsDir != "" {
 		files, err := ioutil.ReadDir(o.ManifestsDir)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not read manifests directory")
 		}
-		cm.BinaryData = make(map[string][]byte, len(files))
 		for _, file := range files {
 			if file.IsDir() {
 				continue
@@ -737,98 +544,33 @@ func (o *Options) generateManifestsConfigMap() (*corev1.ConfigMap, error) {
 			if err != nil {
 				return nil, errors.Wrapf(err, "could not read manifest file %q", file.Name())
 			}
-			cm.BinaryData[file.Name()] = data
+			fileData[file.Name()] = data
 		}
 	}
 	if o.SimulateBootstrapFailure {
-		cm.Data = map[string]string{
-			"failure-test.yaml": testFailureManifest,
-		}
+		fileData["failure-test.yaml"] = []byte(testFailureManifest)
 	}
-	return cm, nil
+	return fileData, nil
 }
 
-// GenerateClusterDeployment generates a new cluster deployment
-func (o *Options) GenerateClusterDeployment(pullSecret *corev1.Secret, sshPrivateKeySecret *corev1.Secret) (*hivev1.ClusterDeployment, error) {
-	cd := &hivev1.ClusterDeployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterDeployment",
-			APIVersion: hivev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        o.Name,
-			Namespace:   o.Namespace,
-			Annotations: map[string]string{},
-			Labels: map[string]string{
-				hiveutilCreatedLabel: "true",
-			},
-		},
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName:  o.Name,
-			BaseDomain:   o.BaseDomain,
-			ManageDNS:    o.ManageDNS,
-			Provisioning: &hivev1.Provisioning{},
-		},
-	}
-
-	if sshPrivateKeySecret != nil {
-		cd.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{Name: sshPrivateKeySecret.Name}
-	}
-
-	if o.InstallOnce {
-		cd.Annotations[tryInstallOnceAnnotation] = "true"
-	}
-	if o.UninstallOnce {
-		cd.Annotations[tryUninstallOnceAnnotation] = "true"
-	}
-	if pullSecret != nil {
-		cd.Spec.PullSecretRef = &corev1.LocalObjectReference{Name: pullSecret.Name}
-	}
-	if len(o.ServingCert) > 0 {
-		cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{
-			{
-				Name: "serving-cert",
-				CertificateSecretRef: corev1.LocalObjectReference{
-					Name: fmt.Sprintf("%s-serving-cert", o.Name),
-				},
-			},
-		}
-		cd.Spec.ControlPlaneConfig.ServingCertificates.Default = "serving-cert"
-		cd.Spec.Ingress = []hivev1.ClusterIngress{
-			{
-				Name:               "default",
-				Domain:             fmt.Sprintf("apps.%s.%s", o.Name, o.BaseDomain),
-				ServingCertificate: "serving-cert",
-			},
-		}
-	}
-
-	if o.DeleteAfter != "" {
-		cd.ObjectMeta.Annotations[deleteAfterAnnotation] = o.DeleteAfter
-	}
-
-	return cd, nil
-}
-
-func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.ClusterImageSet, error) {
+func (o *Options) configureImages(generator *clusterresource.Builder) (*hivev1.ClusterImageSet, error) {
 	if len(o.ClusterImageSet) > 0 {
-		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{
-			Name: o.ClusterImageSet,
-		}
+		generator.ImageSet = o.ClusterImageSet
 		return nil, nil
 	}
+	// TODO: move release image lookup code to the cluster library
 	if o.ReleaseImage == "" {
 		if o.ReleaseImageSource == "" {
-			return nil, fmt.Errorf("Specify either a release image or a release image source")
+			return nil, fmt.Errorf("specify either a release image or a release image source")
 		}
 		var err error
 		o.ReleaseImage, err = determineReleaseImageFromSource(o.ReleaseImageSource)
 		if err != nil {
-			return nil, fmt.Errorf("Cannot determine release image: %v", err)
+			return nil, fmt.Errorf("cannot determine release image: %v", err)
 		}
 	}
 	if !o.UseClusterImageSet {
-		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
+		generator.ReleaseImage = o.ReleaseImage
 		return nil, nil
 	}
 
@@ -844,15 +586,12 @@ func (o *Options) configureImages(cd *hivev1.ClusterDeployment) (*hivev1.Cluster
 			ReleaseImage: o.ReleaseImage,
 		},
 	}
-	cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{
-		Name: imageSet.Name,
-	}
-
+	generator.ImageSet = imageSet.Name
 	return imageSet, nil
 }
 
 func (o *Options) generateSampleSyncSets() []runtime.Object {
-	syncsets := []runtime.Object{}
+	var syncsets []runtime.Object
 	for i := range [10]int{} {
 		syncsets = append(syncsets, sampleSyncSet(fmt.Sprintf("%s-sample-syncset%d", o.Name, i), o.Namespace, o.Name))
 		syncsets = append(syncsets, sampleSelectorSyncSet(fmt.Sprintf("sample-selector-syncset%d", i), o.Name))

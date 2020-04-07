@@ -1,12 +1,10 @@
-FROM openshift/origin-release:golang-1.12 as builder
+FROM openshift/origin-release:golang-1.13 as builder
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
-RUN go build -o bin/manager github.com/openshift/hive/cmd/manager
-RUN go build -o bin/hiveutil github.com/openshift/hive/contrib/cmd/hiveutil
-RUN go build -o bin/hiveadmission github.com/openshift/hive/cmd/hiveadmission
-RUN go build -o bin/hive-operator github.com/openshift/hive/cmd/operator
-RUN go build -o bin/hive-apiserver github.com/openshift/hive/cmd/hive-apiserver
+# Use 'binaries' target instead of 'build' to skip the generate step,
+# because those tools are not present.
+RUN make binaries
 
 FROM centos:7
 

@@ -1,22 +1,20 @@
 package validatingwebhooks
 
 import (
-	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
-	"net/http"
-
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-
-	dnsvalidation "k8s.io/apimachinery/pkg/util/validation"
-
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	dnsvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 const (
@@ -26,7 +24,14 @@ const (
 )
 
 // DNSZoneValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-type DNSZoneValidatingAdmissionHook struct{}
+type DNSZoneValidatingAdmissionHook struct {
+	decoder *admission.Decoder
+}
+
+// NewDNSZoneValidatingAdmissionHook constructs a new DNSZoneValidatingAdmissionHook
+func NewDNSZoneValidatingAdmissionHook(decoder *admission.Decoder) *DNSZoneValidatingAdmissionHook {
+	return &DNSZoneValidatingAdmissionHook{decoder: decoder}
+}
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
@@ -136,8 +141,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	})
 
 	newObject := &hivev1.DNSZone{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -182,8 +186,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	})
 
 	newObject := &hivev1.DNSZone{}
-	err := json.Unmarshal(admissionSpec.Object.Raw, newObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -198,8 +201,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	contextLogger.Data["object.Name"] = newObject.Name
 
 	oldObject := &hivev1.DNSZone{}
-	err = json.Unmarshal(admissionSpec.OldObject.Raw, oldObject)
-	if err != nil {
+	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling OldObject: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

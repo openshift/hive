@@ -2,10 +2,9 @@ package validatingwebhooks
 
 import (
 	"fmt"
+	"net/http"
 
 	log "github.com/sirupsen/logrus"
-
-	"net/http"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,9 +13,9 @@ import (
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
@@ -35,7 +34,12 @@ const (
 
 // MachinePoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type MachinePoolValidatingAdmissionHook struct {
-	decoder runtime.Decoder
+	decoder *admission.Decoder
+}
+
+// NewMachinePoolValidatingAdmissionHook constructs a new MachinePoolValidatingAdmissionHook
+func NewMachinePoolValidatingAdmissionHook(decoder *admission.Decoder) *MachinePoolValidatingAdmissionHook {
+	return &MachinePoolValidatingAdmissionHook{decoder: decoder}
 }
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
@@ -64,10 +68,6 @@ func (a *MachinePoolValidatingAdmissionHook) Initialize(kubeClientConfig *rest.C
 		"version":  "v1",
 		"resource": "machinepoolvalidator",
 	}).Info("Initializing validation REST resource")
-
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	a.decoder = serializer.NewCodecFactory(scheme).UniversalDecoder(hivev1.SchemeGroupVersion)
 
 	return nil // No initialization needed right now.
 }
@@ -136,7 +136,7 @@ func (a *MachinePoolValidatingAdmissionHook) shouldValidate(request *admissionv1
 func (a *MachinePoolValidatingAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) *admissionv1beta1.AdmissionResponse {
 	logger = logger.WithField("method", "validateCreateRequest")
 
-	newObject, resp := a.decode(&request.Object, logger.WithField("decode", "Object"))
+	newObject, resp := a.decode(request.Object, logger.WithField("decode", "Object"))
 	if resp != nil {
 		return resp
 	}
@@ -165,7 +165,7 @@ func (a *MachinePoolValidatingAdmissionHook) validateCreateRequest(request *admi
 func (a *MachinePoolValidatingAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) *admissionv1beta1.AdmissionResponse {
 	logger = logger.WithField("method", "validateUpdateRequest")
 
-	newObject, resp := a.decode(&request.Object, logger.WithField("decode", "Object"))
+	newObject, resp := a.decode(request.Object, logger.WithField("decode", "Object"))
 	if resp != nil {
 		return resp
 	}
@@ -174,7 +174,7 @@ func (a *MachinePoolValidatingAdmissionHook) validateUpdateRequest(request *admi
 		WithField("object.Name", newObject.Name).
 		WithField("object.Namespace", newObject.Namespace)
 
-	oldObject, resp := a.decode(&request.OldObject, logger.WithField("decode", "OldObject"))
+	oldObject, resp := a.decode(request.OldObject, logger.WithField("decode", "OldObject"))
 	if resp != nil {
 		return resp
 	}
@@ -195,9 +195,9 @@ func (a *MachinePoolValidatingAdmissionHook) validateUpdateRequest(request *admi
 	}
 }
 
-func (a *MachinePoolValidatingAdmissionHook) decode(raw *runtime.RawExtension, logger log.FieldLogger) (*hivev1.MachinePool, *admissionv1beta1.AdmissionResponse) {
+func (a *MachinePoolValidatingAdmissionHook) decode(raw runtime.RawExtension, logger log.FieldLogger) (*hivev1.MachinePool, *admissionv1beta1.AdmissionResponse) {
 	obj := &hivev1.MachinePool{}
-	if _, _, err := a.decoder.Decode(raw.Raw, nil, obj); err != nil {
+	if err := a.decoder.DecodeRaw(raw, obj); err != nil {
 		logger.WithError(err).Error("failed to decode")
 		return nil, &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

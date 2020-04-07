@@ -225,18 +225,14 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
-
-	// If the cluster is unreachable, do not reconcile.
-	if remoteClientBuilder.Unreachable() {
-		logger.Debug("skipping cluster with unreachable condition")
-		return reconcile.Result{}, nil
-	}
-
-	remoteClusterAPIClient, err := remoteClientBuilder.Build()
-	if err != nil {
-		logger.WithError(err).Error("error building remote cluster-api client connection")
-		return reconcile.Result{}, err
+	remoteClusterAPIClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
+		cd,
+		r.remoteClusterAPIClientBuilder(cd),
+		r.Client,
+		logger,
+	)
+	if unreachable {
+		return reconcile.Result{Requeue: requeue}, nil
 	}
 
 	logger.Info("reconciling machine pool for cluster deployment")

@@ -17,6 +17,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller"
 	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/version"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -56,6 +57,7 @@ func newRootCommand() *cobra.Command {
 				log.WithError(err).Fatal("Cannot parse log level")
 			}
 			log.SetLevel(level)
+			log.Infof("Version: %s @ %s", version.String, version.Commit)
 			log.Debug("debug logging enabled")
 
 			// Parse leader election options

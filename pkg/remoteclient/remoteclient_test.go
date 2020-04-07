@@ -4,9 +4,9 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/utils/pointer"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
+	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 )
 
 const (
@@ -37,13 +39,12 @@ func TestNewBuilder(t *testing.T) {
 	assert.Equal(t, expected, actual, "unexpected builder")
 }
 
-func Test_builder_APIURL(t *testing.T) {
+func Test_InitialURL(t *testing.T) {
 	cd := testClusterDeployment()
 	kubeconfigSecret := testKubeconfigSecret(t)
 	c := fakeClient(cd, kubeconfigSecret)
-	builder := NewBuilder(c, cd, "test-controller-name")
 	expected := apiURL
-	actual, err := builder.APIURL()
+	actual, err := InitialURL(c, cd)
 	assert.NoError(t, err, "unexpected error getting API URL")
 	assert.Equal(t, expected, actual, "unexpected API URL")
 }
@@ -132,37 +133,37 @@ func Test_builder_RESTConfig(t *testing.T) {
 	}
 }
 
-func Test_builder_Unreachable(t *testing.T) {
+func Test_Unreachable(t *testing.T) {
+	probeTime := time.Unix(123456789, 0)
 	cases := []struct {
-		name        string
-		unreachable *bool
-		expected    bool
+		name                string
+		cd                  *hivev1.ClusterDeployment
+		expectedUnreachable bool
+		expectedLastCheck   time.Time
 	}{
 		{
-			name:     "unreachable unset",
-			expected: false,
+			name:                "unreachable unset",
+			cd:                  testcd.Build(),
+			expectedUnreachable: true,
 		},
 		{
-			name:        "unreachable true",
-			unreachable: pointer.BoolPtr(true),
-			expected:    true,
+			name:                "unreachable true",
+			cd:                  testcd.Build(withUnreachableCondition(corev1.ConditionTrue, probeTime)),
+			expectedUnreachable: true,
+			expectedLastCheck:   probeTime,
 		},
 		{
-			name:        "unreachable false",
-			unreachable: pointer.BoolPtr(false),
-			expected:    false,
+			name:                "unreachable false",
+			cd:                  testcd.Build(withUnreachableCondition(corev1.ConditionFalse, probeTime)),
+			expectedUnreachable: false,
+			expectedLastCheck:   probeTime,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cd := testClusterDeployment()
-			if tc.unreachable != nil {
-				setUnreachable(cd, *tc.unreachable)
-			}
-			c := fakeClient(cd)
-			builder := NewBuilder(c, cd, "test-controller-name")
-			actual := builder.Unreachable()
-			assert.Equal(t, tc.expected, actual, "unexpected unreachable")
+			actualUnreachable, actualLastCheck := Unreachable(tc.cd)
+			assert.Equal(t, tc.expectedUnreachable, actualUnreachable, "unexpected unreachable")
+			assert.Equal(t, tc.expectedLastCheck, actualLastCheck, "unexpected last check")
 		})
 	}
 }
@@ -254,15 +255,12 @@ func setOverrideActive(cd *hivev1.ClusterDeployment) {
 	)
 }
 
-func setUnreachable(cd *hivev1.ClusterDeployment, unreachable bool) {
-	status := corev1.ConditionFalse
-	if unreachable {
-		status = corev1.ConditionTrue
-	}
-	cd.Status.Conditions = append(cd.Status.Conditions,
+func withUnreachableCondition(status corev1.ConditionStatus, probeTime time.Time) testcd.Option {
+	return testcd.WithCondition(
 		hivev1.ClusterDeploymentCondition{
-			Type:   hivev1.UnreachableCondition,
-			Status: status,
+			Type:          hivev1.UnreachableCondition,
+			Status:        status,
+			LastProbeTime: metav1.NewTime(probeTime),
 		},
 	)
 }
@@ -278,6 +276,6 @@ func testKubeconfigSecret(t *testing.T) *corev1.Secret {
 			Namespace: testNamespace,
 			Name:      testKubeconfigSecretName,
 		},
-		Data: map[string][]byte{adminKubeconfigKey: kubeconfig},
+		Data: map[string][]byte{constants.KubeconfigSecretKey: kubeconfig},
 	}
 }

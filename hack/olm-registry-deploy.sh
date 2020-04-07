@@ -32,7 +32,7 @@ USE_CHANNEL=${CHANNEL:-staging}
 # Use a fake replaces version, we will not be using this.
 ./hack/generate-operator-bundle.py bundle/ 0.1.5-4b53b492 $GIT_COMMIT_COUNT $GIT_HASH $DEPLOY_IMG
 
-CSV_FILE="bundle/0.1.$GIT_COMMIT_COUNT-$GIT_HASH/hive-operator.v0.1.$GIT_COMMIT_COUNT-$GIT_HASH.clusterserviceversion.yaml"
+CSV_FILE="bundle/0.1.$GIT_COMMIT_COUNT-sha$GIT_HASH/hive-operator.v0.1.$GIT_COMMIT_COUNT-sha$GIT_HASH.clusterserviceversion.yaml"
 
 CSV_NAME=`yq r $CSV_FILE metadata.name`
 echo "ClusterServiceVersion name: $CSV_NAME"

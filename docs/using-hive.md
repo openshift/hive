@@ -75,7 +75,7 @@ kind: ClusterImageSet
 metadata:
   name: openshift-v4.3.0
 spec:
-  releaseImage: quay.io/openshift-release-dev/ocp-release:4.3.0
+  releaseImage: quay.io/openshift-release-dev/ocp-release:4.3.0-x86_64
 ```
 
 ### Cloud credentials

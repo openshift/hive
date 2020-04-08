@@ -1,6 +1,6 @@
 BINDIR = bin
 SRC_DIRS = pkg contrib
-GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata | grep -v generated)
+GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata | grep -v generated | grep -v v1alpha1apiserver)
 VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
 
 # See pkg/version/version.go for details
@@ -68,6 +68,7 @@ all: fmt vet generate verify test build
 .PHONY: vendor
 vendor:
 	go mod vendor
+	cd v1alpha1apiserver && go mod vendor
 
 # Run tests
 .PHONY: test
@@ -123,7 +124,7 @@ hiveadmission:
 # Build v1alpha1 aggregated API server
 .PHONY: hive-apiserver
 hive-apiserver:
-	go build $(GO_MOD_FLAGS) -o bin/hive-apiserver $(LDFLAGS) github.com/openshift/hive/cmd/hive-apiserver
+	cd v1alpha1apiserver && go build $(GO_MOD_FLAGS) -o ../bin/hive-apiserver $(LDFLAGS) github.com/openshift/hive/v1alpha1apiserver/cmd/hive-apiserver
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 .PHONY: run
@@ -173,6 +174,7 @@ fmt:
 .PHONY: vet
 vet:
 	go vet $(GO_MOD_FLAGS) ./pkg/... ./cmd/... ./contrib/...
+	cd v1alpha1apiserver && go vet $(GO_MOD_FLAGS) ./cmd/... ./pkg/...
 
 # Run verification tests
 .PHONY: verify
@@ -193,10 +195,6 @@ verify-lint: install-tools
 	@echo Verifying golint
 	@sh -c \
 	  'for file in $(GOFILES) ; do \
-	     if [[ $$file == "pkg/api/validation"* ]]; then continue; fi; \
-	     if [[ $$file == "pkg/hive/apis/hive/hiveconfig_types.go" ]]; then continue; fi; \
-	     if [[ $$file == "pkg/hive/apis/hive/hiveconversion/"* ]]; then continue; fi; \
-	     if [[ $$file == "pkg/hive/apiserver/registry/"* ]]; then continue; fi; \
 	     golint --set_exit_status $$file || exit 1 ; \
 	   done'
 
@@ -213,6 +211,7 @@ verify-gofmt:
 verify-go-vet: generate
 	@echo Verifying go vet
 	@go vet $(GO_MOD_FLAGS) ./cmd/... ./contrib/... $(go list ./pkg/... | grep -v _generated)
+	@cd v1alpha1apiserver && go vet $(GO_MOD_FLAGS) ./cmd/... $(go list ./pkg/... | grep -v _generated)
 
 .PHONY: verify-generated
 verify-generated: install-tools
@@ -222,6 +221,7 @@ verify-generated: install-tools
 .PHONY: generate
 generate: install-tools
 	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
+	cd v1alpha1apiserver && $(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
 	hack/update-bindata.sh
 
 # Build the docker image

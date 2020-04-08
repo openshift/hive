@@ -9,12 +9,11 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.3.1-0.20191028180845-3492b2aff503
 	github.com/aws/aws-sdk-go v1.29.24
 	github.com/docker/go-healthcheck v0.1.0
-	github.com/docker/go-units v0.4.0
 	github.com/evanphx/json-patch v4.5.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/golang/mock v1.3.1
 	github.com/golangci/golangci-lint v1.23.8
-	github.com/google/gofuzz v1.1.0
+	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/heptio/velero v1.0.0
 	github.com/json-iterator/go v1.1.8
@@ -26,7 +25,6 @@ require (
 	github.com/openshift/cluster-api v0.0.0-20191129101638-b09907ac6668
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
-	github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e
 	github.com/openshift/generic-admission-server v1.14.0
 	github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54
 	github.com/openshift/library-go v0.0.0-20200210105614-4bf528465627
@@ -46,13 +44,12 @@ require (
 	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.17.1
 	k8s.io/apimachinery v0.17.3
-	k8s.io/apiserver v0.17.1
+	k8s.io/apiserver v0.17.1 // indirect
 	k8s.io/cli-runtime v0.0.0-20200124034138-fea5ca65697c
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/cloud-provider v0.0.0-00010101000000-000000000000 // indirect
 	k8s.io/cluster-registry v0.0.6
 	k8s.io/code-generator v0.17.2
-	k8s.io/component-base v0.17.1
+	k8s.io/component-base v0.17.1 // indirect
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.17.1
 	k8s.io/kubernetes v1.14.1

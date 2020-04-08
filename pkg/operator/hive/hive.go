@@ -99,12 +99,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 	hiveContainer.Env = append(hiveContainer.Env, logsEnvVar)
 
-	hiveNSEnvVar := corev1.EnvVar{
-		Name:  constants.HiveNamespaceEnvVar,
-		Value: hiveNSName,
-	}
-	hiveContainer.Env = append(hiveContainer.Env, hiveNSEnvVar)
-
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{
 			Name:  dnsServersEnvVar,

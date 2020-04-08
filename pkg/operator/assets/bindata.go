@@ -4735,6 +4735,10 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: syncsetinstances.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.applied
+    name: Applied
+    type: boolean
   group: hive.openshift.io
   names:
     kind: SyncSetInstance

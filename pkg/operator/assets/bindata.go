@@ -901,6 +901,10 @@ spec:
         env:
         - name: CLI_CACHE_DIR
           value: /var/cache/kubectl
+        - name: HIVE_NS
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         livenessProbe:
           httpGet:
             path: /debug/health

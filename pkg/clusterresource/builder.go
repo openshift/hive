@@ -101,6 +101,12 @@ type Builder struct {
 	// ReleaseImage is a specific OpenShift release image to install this cluster with. Will override
 	// ImageSet.
 	ReleaseImage string
+
+	// MachineNetwork is the subnet to use for the cluster's machine network.
+	MachineNetwork string
+
+	// SkipMachinePoolGeneration is set to skip generating MachinePool objects
+	SkipMachinePoolGeneration bool
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -151,7 +157,9 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 
 	var allObjects []runtime.Object
 	allObjects = append(allObjects, o.generateClusterDeployment())
-	allObjects = append(allObjects, o.generateMachinePool())
+	if !o.SkipMachinePoolGeneration {
+		allObjects = append(allObjects, o.generateMachinePool())
+	}
 	installConfigSecret, err := o.generateInstallConfigSecret()
 	if err != nil {
 		return nil, err
@@ -295,7 +303,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 			},
 			MachineNetwork: []installertypes.MachineNetworkEntry{
 				{
-					CIDR: *ipnet.MustParseCIDR("10.0.0.0/16"),
+					CIDR: *ipnet.MustParseCIDR(o.MachineNetwork),
 				},
 			},
 		},

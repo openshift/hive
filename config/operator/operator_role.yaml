@@ -5,6 +5,18 @@ metadata:
   name: hive-operator-role
 rules:
 - apiGroups:
+  - hive.openshift.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - create
+- apiGroups:
   - ""
   resources:
   - serviceaccounts
@@ -16,14 +28,9 @@ rules:
   - events
   - configmaps
   - namespaces
+  - persistentvolumeclaims
   verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
+  - "*"
 - apiGroups:
   - apiregistration.k8s.io
   resources:
@@ -65,39 +72,6 @@ rules:
   - update
   - patch
   - delete
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - hiveconfigs
-  - hiveconfigs/finalizers
-  - hiveconfigs/status
-  - clusterdeployments
-  - clusterprovisions
-  - dnszones
-  - dnsendpoints
-  - machinepools
-  - machinepoolnameleases
-  - machinepoolnameleases/status
-  - selectorsyncidentityproviders
-  - selectorsyncsets
-  - syncidentityproviders
-  - syncsetinstances
-  - syncsetinstances/status
-  - syncsets
-  - clusterimagesets
-  - clusterdeprovisions
-  # TODO: remove once v1alpha1 compat removed
-  - clusterdeprovisionrequests
-  - clusterstates
-  - clusterstates/status
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
 # Allow get on CRDs so we can check for 4.x ClusterVersion to determine if running on 3.11 or not.
 # Allow create and update until the OLM CRD update bug is fixed.
 - apiGroups:
@@ -118,6 +92,8 @@ rules:
   resources:
   - clusterroles
   - clusterrolebindings
+  - roles
+  - rolebindings
   verbs:
   - get
   - list
@@ -149,13 +125,17 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - batch
+    - batch
   resources:
-  - jobs
+    - jobs
   verbs:
-  - get
-  - list
-  - watch
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
 - apiGroups:
   - ""
   resources:
@@ -168,18 +148,32 @@ rules:
 - apiGroups:
   - admission.hive.openshift.io
   resources:
-  - clusterdeployments
-  - clusterimagesets
-  - clusterprovisions
   - dnszones
-  - machinepools
-  - selectorsyncsets
-  - syncsets
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
   - create
-  - update
-  - patch
-  - delete
+- apiGroups:
+    - admission.hive.openshift.io
+  resources:
+    - clusterdeployments
+    - clusterimagesets
+    - clusterprovisions
+    - dnszones
+    - machinepools
+    - selectorsyncsets
+    - syncsets
+  verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete

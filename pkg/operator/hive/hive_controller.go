@@ -5,12 +5,12 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -21,8 +21,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -30,8 +32,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
-
 	"k8s.io/client-go/tools/cache"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -48,6 +50,9 @@ const (
 
 	managedConfigNamespace    = "openshift-config-managed"
 	aggregatorCAConfigMapName = "kube-apiserver-aggregator-client-ca"
+
+	// HiveOperatorNamespaceEnvVar is the environment variable we expect to be given with the namespace the hive-operator is running in.
+	HiveOperatorNamespaceEnvVar = "HIVE_OPERATOR_NS"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -100,6 +105,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	hiveOperatorNS := os.Getenv(HiveOperatorNamespaceEnvVar)
+	r.(*ReconcileHiveConfig).hiveOperatorNamespace = hiveOperatorNS
+	log.Infof("hive operator NS: %s", hiveOperatorNS)
 
 	// Determine if the openshift-config-managed namespace exists (> v4.0). If so, setup a watch
 	// for configmaps in that namespace.
@@ -161,29 +170,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// If no HiveConfig exists, the operator should create a default one, giving the controller
-	// something to sync on.
-	log.Debug("checking if HiveConfig 'hive' exists")
-	instance := &hivev1.HiveConfig{}
-	err = tempClient.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName}, instance)
-	if err != nil && errors.IsNotFound(err) {
-		log.Info("no HiveConfig exists, creating default")
-		instance = &hivev1.HiveConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: hiveConfigName,
-			},
-		}
-		err = tempClient.Create(context.TODO(), instance)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Lookup the hive-operator Deployment image, we will assume hive components should all be
 	// using the same image as the operator.
 	operatorDeployment := &appsv1.Deployment{}
 	err = tempClient.Get(context.Background(),
-		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: constants.HiveNamespace},
+		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: hiveOperatorNS},
 		operatorDeployment)
 	if err == nil {
 		img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
@@ -192,7 +183,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		r.(*ReconcileHiveConfig).hiveImage = img
 		r.(*ReconcileHiveConfig).hiveImagePullPolicy = pullPolicy
 	} else {
-		log.WithError(err).Warn("unable to lookup hive image from hive-operator Deployment, image overriding disabled")
+		log.WithError(err).Fatal("unable to lookup hive image from hive-operator Deployment, image overriding disabled")
 	}
 
 	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,
@@ -218,6 +209,7 @@ type ReconcileHiveConfig struct {
 	dynamicClient         dynamic.Interface
 	restConfig            *rest.Config
 	hiveImage             string
+	hiveOperatorNamespace string
 	hiveImagePullPolicy   corev1.PullPolicy
 	syncAggregatorCA      bool
 	managedConfigCMLister corev1listers.ConfigMapLister
@@ -254,10 +246,28 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
-	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(constants.HiveNamespace), "hive-operator", &corev1.ObjectReference{
+	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(r.hiveOperatorNamespace), "hive-operator", &corev1.ObjectReference{
 		Name:      request.Name,
-		Namespace: constants.HiveNamespace,
+		Namespace: r.hiveOperatorNamespace,
 	})
+
+	// Ensure the target namespace for hive components exists and create if not:
+	hiveNSName := getHiveNamespace(instance)
+	hiveNamespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hiveNSName,
+		},
+	}
+	if err := r.Client.Create(context.Background(), hiveNamespace); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			hLog.WithField("hiveNS", hiveNSName).Debug("target namespace already exists")
+		} else {
+			hLog.WithError(err).Error("error creating hive target namespace")
+			return reconcile.Result{}, err
+		}
+	} else {
+		hLog.WithField("hiveNS", hiveNSName).Info("target namespace created")
+	}
 
 	if r.syncAggregatorCA {
 		// We use the configmap lister and not the regular client which only watches resources in the hive namespace
@@ -305,6 +315,11 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Cleanup legacy objects:
+	if err := r.cleanupLegacyObjects(hLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
@@ -319,20 +334,28 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	if err := r.teardownLegacyExternalDNS(hLog); err != nil {
-		hLog.WithError(err).Error("error tearing down legacy ExternalDNS")
-		r.updateHiveConfigStatus(instance, hLog, false)
-		return reconcile.Result{}, err
-	}
-
-	if err := r.teardownLegacyMangedDomainsConfigMap(hLog); err != nil {
-		hLog.WithError(err).Error("error tearing down legacy managed domains setup")
-		r.updateHiveConfigStatus(instance, hLog, false)
-		return reconcile.Result{}, err
-	}
-
 	r.updateHiveConfigStatus(instance, hLog, true)
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileHiveConfig) cleanupLegacyObjects(hLog log.FieldLogger) error {
+	clusterRoleGVR := schema.GroupVersionResource{
+		Group:    "rbac.authorization.k8s.io",
+		Version:  "v1",
+		Resource: "clusterroles",
+	}
+	clusterRoleBindingGVR := schema.GroupVersionResource{
+		Group:    "rbac.authorization.k8s.io",
+		Version:  "v1",
+		Resource: "clusterrolebindings",
+	}
+	if err := dynamicDelete(r.dynamicClient, clusterRoleGVR, "manager-role", hLog); err != nil {
+		return err
+	}
+	if err := dynamicDelete(r.dynamicClient, clusterRoleBindingGVR, "manager-rolebinding", hLog); err != nil {
+		return err
+	}
+	return nil
 }
 
 type informerRunnable struct {

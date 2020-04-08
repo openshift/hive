@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -31,7 +31,7 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 
 	// Load the regex configmap, if we don't have one, there's not much point proceeding here.
 	regexCM := &corev1.ConfigMap{}
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: regexConfigMapName, Namespace: constants.HiveNamespace}, regexCM); err != nil {
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: regexConfigMapName, Namespace: controllerutils.GetHiveNamespace()}, regexCM); err != nil {
 		pLog.WithError(err).Errorf("error loading %s configmap", regexConfigMapName)
 		// Even if the error was a transient error in fetching the configmap, we should not block
 		// the continuation of deploying the cluster just so that we can potentially get a

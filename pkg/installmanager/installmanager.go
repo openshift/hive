@@ -55,8 +55,10 @@ import (
 	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
+	"github.com/openshift/installer/pkg/destroy/openstack"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
+	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 )
 
 const (
@@ -557,6 +559,23 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			},
 		}
 		uninstaller, err := gcp.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+		return uninstaller.Run()
+	case cd.Spec.Platform.OpenStack != nil:
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				OpenStack: &installertypesopenstack.Metadata{
+					Cloud: cd.Spec.Platform.OpenStack.Cloud,
+					Identifier: map[string]string{
+						"openshiftClusterID": infraID,
+					},
+				},
+			},
+		}
+		uninstaller, err := openstack.New(logger, metadata)
 		if err != nil {
 			return err
 		}

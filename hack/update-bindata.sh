@@ -14,5 +14,5 @@ go-bindata \
         -o "${OUTPUT_FILE}" \
         -ignore "OWNERS" \
         -ignore ".*\.sw.?" \
-        ./config/apiserver/... ./config/hiveadmission/... ./config/manager/... ./config/rbac/... ./config/crds/... ./config/configmaps/... && \
+        ./config/apiserver/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/crds/... ./config/configmaps/... && \
 gofmt -s -w "${OUTPUT_FILE}"

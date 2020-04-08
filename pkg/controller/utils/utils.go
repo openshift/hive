@@ -5,6 +5,8 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/hive/pkg/constants"
+	"os"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -145,4 +147,15 @@ func GetRuntimeObjects(c client.Client, typesToList []runtime.Object, namespace 
 	}
 
 	return nsObjects, nil
+}
+
+// GetHiveNamespace determines the namespace where core hive components run (hive-controllers, hiveadmission), by checking
+// for the required environment variable.
+func GetHiveNamespace() string {
+	envNamespace := os.Getenv(constants.HiveNamespaceEnvVar)
+	if envNamespace != "" {
+		return envNamespace
+	}
+	// Returning a default here, mostly for unit test simplicity and to avoid having to pass this around to all controllers and libraries..
+	return constants.DefaultHiveNamespace
 }

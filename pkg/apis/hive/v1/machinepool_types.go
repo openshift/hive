@@ -7,6 +7,15 @@ import (
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+)
+
+const (
+	// MachinePoolImageIDOverrideAnnotation can be applied to MachinePools to control the precise image ID to be used
+	// for the MachineSets we reconcile for this pool. This feature is presently only implemented for AWS, and
+	// is intended for very limited use cases we do not recommend pursuing regularly. As such it is not currently
+	// part of our official API.
+	MachinePoolImageIDOverrideAnnotation = "hive.openshift.io/image-id-override"
 )
 
 // MachinePoolSpec defines the desired state of MachinePool
@@ -63,6 +72,8 @@ type MachinePoolPlatform struct {
 	Azure *azure.MachinePool `json:"azure,omitempty"`
 	// GCP is the configuration used when installing on GCP.
 	GCP *gcp.MachinePool `json:"gcp,omitempty"`
+	// OpenStack is the configuration used when installing on OpenStack.
+	OpenStack *openstack.MachinePool `json:"openstack,omitempty"`
 }
 
 // MachinePoolStatus defines the observed state of MachinePool

@@ -17,14 +17,13 @@ import (
 )
 
 const (
-	hiveNamespace             = "hive"
 	hiveControllersDeployment = "hive-controllers"
 	hiveControllersService    = "hive-controllers"
 )
 
 func waitForManager(t *testing.T) bool {
 	kubeClient := common.MustGetKubernetesClient()
-	err := common.WaitForDeploymentReady(kubeClient, hiveNamespace, hiveControllersDeployment, 10*time.Minute)
+	err := common.WaitForDeploymentReady(kubeClient, common.GetHiveNamespaceOrDie(), hiveControllersDeployment, 10*time.Minute)
 	if err != nil {
 		t.Errorf("Failed waiting for hive controllers deployment: %v", err)
 		return false
@@ -39,7 +38,7 @@ func TestHiveControllersDeployment(t *testing.T) {
 	// Ensure that the deployment has 1 available replica
 	c := common.MustGetClient()
 	deployment := &appsv1.Deployment{}
-	err := c.Get(context.TODO(), types.NamespacedName{Name: hiveControllersDeployment, Namespace: hiveNamespace}, deployment)
+	err := c.Get(context.TODO(), types.NamespacedName{Name: hiveControllersDeployment, Namespace: common.GetHiveNamespaceOrDie()}, deployment)
 	if err != nil {
 		t.Errorf("Failed to get hive controllers deployment: %v", err)
 		return
@@ -56,7 +55,7 @@ func TestHiveControllersMetrics(t *testing.T) {
 
 	c := common.MustGetClient()
 	service := &corev1.Service{}
-	err := c.Get(context.TODO(), types.NamespacedName{Name: hiveControllersService, Namespace: hiveNamespace}, service)
+	err := c.Get(context.TODO(), types.NamespacedName{Name: hiveControllersService, Namespace: common.GetHiveNamespaceOrDie()}, service)
 	if err != nil {
 		t.Errorf("Failed to get hive controllers service: %v", err)
 		return
@@ -76,7 +75,7 @@ func TestHiveControllersMetrics(t *testing.T) {
 	kubeClient := common.MustGetKubernetesClient()
 
 	// Query the metrics port in the hive-controllers service using the apiserver proxy
-	body, err := kubeClient.CoreV1().RESTClient().Get().Namespace(hiveNamespace).Name(fmt.Sprintf("%s:%d", hiveControllersService, metricsPort)).Resource("services").SubResource("proxy").Suffix("metrics").DoRaw()
+	body, err := kubeClient.CoreV1().RESTClient().Get().Namespace(common.GetHiveNamespaceOrDie()).Name(fmt.Sprintf("%s:%d", hiveControllersService, metricsPort)).Resource("services").SubResource("proxy").Suffix("metrics").DoRaw()
 	if err != nil {
 		t.Errorf("failed to reach metrics endpoint: %v", err)
 		return

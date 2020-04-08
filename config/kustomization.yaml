@@ -18,20 +18,9 @@ namespace: hive
 # YAML string, with resources separated by document
 # markers ("---").
 #
-# General rule here is anything deployed by OLM bundles should go here as well,
-# this is used in "make deploy" for developers and should mimic what OLM deploys
-# for you. CRDs are an exception to this as we don't want to have to list them all
-# here. These are deployed via a "make install" dependency.
+# This kustomize configuration mimic's what is deployed by OLM, essentially *only* what is required
+# for the hive-operator.
 resources:
-- ./namespace.yaml
-- ./rbac/hive_controllers_role.yaml
-- ./rbac/hive_controllers_role_binding.yaml
-- ./rbac/hive_frontend_role.yaml
-- ./rbac/hive_frontend_role_binding.yaml
-- ./hiveadmission/hiveadmission_rbac_role.yaml
-- ./hiveadmission/hiveadmission_rbac_role_binding.yaml
 - ./operator/operator_role.yaml
 - ./operator/operator_role_binding.yaml
 - ./operator/operator_deployment.yaml
-- ./apiserver/hiveapi_rbac_role.yaml
-- ./apiserver/hiveapi_rbac_role_binding.yaml

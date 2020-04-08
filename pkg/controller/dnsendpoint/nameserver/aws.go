@@ -11,8 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	awsclient "github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/constants"
-
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -20,7 +18,7 @@ import (
 func NewAWSQuery(c client.Client, credsSecretName string, region string) Query {
 	return &awsQuery{
 		getAWSClient: func() (awsclient.Client, error) {
-			awsClient, err := awsclient.NewClient(c, credsSecretName, constants.HiveNamespace, region)
+			awsClient, err := awsclient.NewClient(c, credsSecretName, controllerutils.GetHiveNamespace(), region)
 			return awsClient, errors.Wrap(err, "error creating AWS client")
 		},
 	}

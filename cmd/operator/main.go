@@ -4,6 +4,7 @@ import (
 	"flag"
 	golog "log"
 	"net/http"
+	"os"
 	"time"
 
 	_ "github.com/docker/go-healthcheck"
@@ -13,8 +14,8 @@ import (
 	"k8s.io/klog"
 
 	"github.com/openshift/hive/pkg/apis"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/operator"
+	"github.com/openshift/hive/pkg/operator/hive"
 	"github.com/openshift/hive/pkg/version"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -77,11 +78,17 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
+			// We must be provided an env var indicating where the hive-operator is running. Normally
+			// passed by the hive-operator Deployment using the kube downward API.
+			operatorNS := os.Getenv(hive.HiveOperatorNamespaceEnvVar)
+			if operatorNS == "" {
+				log.Fatalf("%s env var is unset, unable to determine namespace operator is running in", hive.HiveOperatorNamespaceEnvVar)
+			}
+
 			// Create a new Cmd to provide shared dependencies and start components
 			mgr, err := manager.New(cfg, manager.Options{
-				Namespace:               constants.HiveNamespace,
+				LeaderElectionNamespace: operatorNS,
 				LeaderElection:          true,
-				LeaderElectionNamespace: constants.HiveNamespace,
 				LeaderElectionID:        leaderElectionConfigMap,
 				LeaseDuration:           &leaseDuration,
 				RenewDeadline:           &renewDeadline,

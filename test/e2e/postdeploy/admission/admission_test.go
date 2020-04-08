@@ -15,14 +15,13 @@ import (
 )
 
 const (
-	hiveNamespace           = "hive"
 	hiveAdmissionDeployment = "hiveadmission"
 	hiveAdmissionAPIService = "v1.admission.hive.openshift.io"
 )
 
 func waitForAdmissionDeployment(t *testing.T) bool {
 	client := common.MustGetKubernetesClient()
-	err := common.WaitForDeploymentReady(client, hiveNamespace, hiveAdmissionDeployment, 10*time.Minute)
+	err := common.WaitForDeploymentReady(client, common.GetHiveNamespaceOrDie(), hiveAdmissionDeployment, 10*time.Minute)
 	if err != nil {
 		t.Errorf("Failed waiting for hive admission deployment: %v", err)
 		return false

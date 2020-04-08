@@ -61,33 +61,6 @@ with open('config/operator/operator_role.yaml', 'r') as stream:
             'serviceAccountName': 'hive-operator',
         })
 
-# Add our hive-controllers role to the CSV:
-with open('config/rbac/hive_controllers_role.yaml', 'r') as stream:
-    hive_role = yaml.load(stream, Loader=yaml.SafeLoader)
-    csv['spec']['install']['spec']['clusterPermissions'].append(
-        {
-            'rules': hive_role['rules'],
-            'serviceAccountName': 'default',
-        })
-
-# Add our hiveadmission role to the CSV:
-with open('config/hiveadmission/hiveadmission_rbac_role.yaml', 'r') as stream:
-    hiveadmission_role = yaml.load(stream, Loader=yaml.SafeLoader)
-    csv['spec']['install']['spec']['clusterPermissions'].append(
-        {
-            'rules': hiveadmission_role['rules'],
-            'serviceAccountName': 'hiveadmission',
-        })
-
-# Add our hiveapi role to the CSV:
-with open('config/apiserver/hiveapi_rbac_role.yaml', 'r') as stream:
-    hiveapi_role = yaml.load(stream, Loader=yaml.SafeLoader)
-    csv['spec']['install']['spec']['clusterPermissions'].append(
-        {
-            'rules': hiveapi_role['rules'],
-            'serviceAccountName': 'hiveapi-sa',
-        })
-
 # Add our deployment spec for the hive operator:
 with open('config/operator/operator_deployment.yaml', 'r') as stream:
     operator_components = []

@@ -9,15 +9,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/resource"
 )
 
 const (
@@ -26,29 +22,6 @@ const (
 	configMapLabel                    = "managed-domains"
 	configMapMountPath                = "/data/config"
 )
-
-func (r *ReconcileHiveConfig) teardownLegacyExternalDNS(hLog log.FieldLogger) error {
-	key := client.ObjectKey{Namespace: constants.HiveNamespace, Name: "external-dns"}
-	for _, obj := range []runtime.Object{
-		&appsv1.Deployment{},
-		&corev1.ServiceAccount{},
-		&rbacv1.ClusterRoleBinding{},
-		&rbacv1.ClusterRole{},
-	} {
-		if err := resource.DeleteAnyExistingObject(r, key, obj, hLog); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ReconcileHiveConfig) teardownLegacyMangedDomainsConfigMap(hLog log.FieldLogger) error {
-	key := client.ObjectKey{Namespace: constants.HiveNamespace, Name: "managed-domains"}
-	if err := resource.DeleteAnyExistingObject(r, key, &corev1.ConfigMap{}, hLog); err != nil {
-		hLog.WithError(err).Error("failed to delete legacy managed domains configmap")
-	}
-	return nil
-}
 
 // configureManagedDomains will create a new configmap holding the managed domains settings (if necessary), or simply
 // return the current configmap of the current deployment if the settings it contains match the desired settings.
@@ -60,7 +33,7 @@ func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, in
 
 	newConfigMapData := map[string]string{managedDomainsConfigMapKey: string(domains)}
 
-	currentConfigMap, err := r.getCurrentConfigMap(newConfigMapData, logger)
+	currentConfigMap, err := r.getCurrentConfigMap(newConfigMapData, getHiveNamespace(instance), logger)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +45,7 @@ func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, in
 		mdConfigMap.Kind = "ConfigMap"
 		mdConfigMap.APIVersion = "v1"
 		mdConfigMap.GenerateName = managedDomainsConfigMapNamePrefix
-		mdConfigMap.Namespace = constants.HiveNamespace
+		mdConfigMap.Namespace = getHiveNamespace(instance)
 		mdConfigMap.Labels = map[string]string{configMapLabel: "true"}
 
 		mdConfigMap.Data = newConfigMapData
@@ -96,11 +69,12 @@ func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, in
 // getCurrentConfigMap will see if any existing configmap (for managed domains) already has the necessary
 // settings. It will also delete any configmaps (for managed domains) that have out-of-date contents
 // (so that the configmaps are not orphaned as config changes happen).
-func (r *ReconcileHiveConfig) getCurrentConfigMap(cmData map[string]string, logger log.FieldLogger) (*corev1.ConfigMap, error) {
+func (r *ReconcileHiveConfig) getCurrentConfigMap(cmData map[string]string, hiveNSName string, logger log.FieldLogger) (*corev1.ConfigMap, error) {
 	configMapList := &corev1.ConfigMapList{}
 	labelSelector := map[string]string{configMapLabel: "true"}
 
-	err := r.List(context.TODO(), configMapList, client.MatchingLabels(labelSelector))
+	err := r.List(context.TODO(), configMapList, client.MatchingLabels(labelSelector),
+		client.InNamespace(hiveNSName))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list config maps for managed domains")
 	}

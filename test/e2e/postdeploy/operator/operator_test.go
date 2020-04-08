@@ -21,7 +21,6 @@ import (
 )
 
 const (
-	hiveNamespace          = "hive"
 	hiveOperatorDeployment = "hive-operator"
 	hiveConfigName         = "hive"
 	hiveManagerService     = "hive-controllers"
@@ -33,7 +32,7 @@ const (
 // it's available.
 func TestOperatorDeployment(t *testing.T) {
 	kubeClient := common.MustGetKubernetesClient()
-	err := common.WaitForDeploymentReady(kubeClient, hiveNamespace, hiveOperatorDeployment, 5*time.Minute)
+	err := common.WaitForDeploymentReady(kubeClient, common.GetHiveOperatorNamespaceOrDie(), hiveOperatorDeployment, 5*time.Minute)
 	if err != nil {
 		t.Errorf("Failed waiting for hive operator deployment: %v", err)
 		return
@@ -42,7 +41,7 @@ func TestOperatorDeployment(t *testing.T) {
 	// Ensure that the deployment has 1 available replica
 	c := common.MustGetClient()
 	operatorDeployment := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: hiveOperatorDeployment, Namespace: hiveNamespace}, operatorDeployment)
+	err = c.Get(context.TODO(), types.NamespacedName{Name: hiveOperatorDeployment, Namespace: common.GetHiveOperatorNamespaceOrDie()}, operatorDeployment)
 	if err != nil {
 		t.Errorf("Failed to get hive operator deployment: %v", err)
 		return
@@ -151,7 +150,7 @@ func TestHiveConfig(t *testing.T) {
 
 		secret := &corev1.Secret{}
 		secretKey := types.NamespacedName{
-			Namespace: hiveNamespace,
+			Namespace: common.GetHiveNamespaceOrDie(),
 			Name:      secretName,
 		}
 		err := c.Get(context.TODO(), secretKey, secret)

@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/apis/hive/v1/openstack"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -315,12 +316,15 @@ type Platform struct {
 	// +optional
 	Azure *azure.Platform `json:"azure,omitempty"`
 
+	// BareMetal is the configuration used when installing on bare metal.
+	BareMetal *baremetal.Platform `json:"baremetal,omitempty"`
+
 	// GCP is the configuration used when installing on Google Cloud Platform.
 	// +optional
 	GCP *gcp.Platform `json:"gcp,omitempty"`
 
-	// BareMetal is the configuration used when installing on bare metal.
-	BareMetal *baremetal.Platform `json:"baremetal,omitempty"`
+	// OpenStack is the configuration used when installing on OpenStack
+	OpenStack *openstack.Platform `json:"openstack,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

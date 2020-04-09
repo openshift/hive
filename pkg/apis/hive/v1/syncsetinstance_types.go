@@ -93,6 +93,7 @@ type SyncSetInstanceStatus struct {
 // SyncSetInstance is the Schema for the syncsetinstances API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:resource:path=syncsetinstances,shortName=ssi
 type SyncSetInstance struct {
 	metav1.TypeMeta   `json:",inline"`

@@ -39,6 +39,7 @@
 ### External tools
 
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
+- [imagebuilder](https://github.com/openshift/imagebuilder)
 
 ## Build and run tests
 
@@ -58,10 +59,9 @@ make test
 
 ### Cloning the repository
 
-Get the sources from GitHub into the right place under $GOPATH (building anywhere else doesn't work presently):
+Get the sources from GitHub:
 
 ```bash
-cd $GOPATH/src/github.com/openshift
 git clone https://github.com/openshift/hive.git
 ```
 
@@ -159,10 +159,11 @@ make run-operator
 
 #### Run Hive Operator Using Custom Images
 
- 1. Build and publish a custom Hive image from your current working dir: `$ IMG=quay.io/{username}/hive:latest make buildah-dev-push`
- 2. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/{username}/hive:latest make deploy`
- 3. After code changes you need to rebuild the Hive images as mentioned in step 1.
- 4. Delete the running Hive pods using following command, so that the new pods will be running using the latest images built in the previous step.
+ 1. Build a custom Hive image from your current working dir: `$ IMG=quay.io/{username}/hive:latest make image-hive`
+ 1. Publish your custom image: `$ IMG=quay.io/{username}/hive:latest make buildah-push`
+ 1. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/{username}/hive:latest make deploy`
+ 1. After code changes you need to rebuild the Hive images as mentioned in step 1.
+ 1. Delete the running Hive pods using following command, so that the new pods will be running using the latest images built in the previous step.
 
 ```bash
 oc delete pods --all -n hive
@@ -185,7 +186,7 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
    1. Scale down the hive-controllers so they are no longer running: `$ oc scale -n hive deployment.v1.apps/hive-controllers --replicas=0`
    2. Delete the install job: `$ oc delete job ${CLUSTER_NAME}-install`
  2. Make a temporary working directory in your hive checkout: `$ mkdir temp`
- 3. Compile your hiveutil changes: `$ make hiveutil`
+ 3. Compile your hiveutil changes: `$ make build`
  4. Set your pull secret as an env var to match the pod: `$ export PULL_SECRET=$(cat ~/pull-secret)`
  5. Run: `/bin/hiveutil install-manager --work-dir $GOPATH/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
 
@@ -250,7 +251,7 @@ that you added in code.
 
 * Run `make vendor` to fetch changed dependencies.
 
-* Test that everything still compiles with changed files in place by running `make clean && make`.
+* Test that everything still compiles with changed files in place by running `make`.
 
 **Refer Go modules documents for more information.**
 

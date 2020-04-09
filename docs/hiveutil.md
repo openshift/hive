@@ -2,7 +2,7 @@
 
 The `hiveutil` CLI offers several commands to help manage clusters with Hive.
 
-To build the `hiveutil` binary, run `make hiveutil`.
+To build the `hiveutil` binary, run `make build`.
 
 ### Create Cluster
 

@@ -17,7 +17,7 @@ After deleting your cluster deployment you will see an uninstall job created. If
  1. Delete the uninstall job. It will be recreated and tried again.
  2. Manually delete the uninstall finalizer allowing the cluster deployment to be deleted, but note that this may leave artifacts in your AWS account.
  3. You can manually run the uninstall code with `hiveutil` to delete AWS resources based on their tags.
-    * Run `make hiveutil`
+    * Run `make build`
     * Get your cluster tag i.e. `infraID` from the following command output.
       ```bash
       $ oc get cd ${CLUSTER_NAME} -o jsonpath='{ .status.infraID }'

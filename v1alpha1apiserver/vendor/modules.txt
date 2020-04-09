@@ -135,6 +135,15 @@ github.com/openshift/api/authorization/v1
 github.com/openshift/api/config/v1
 github.com/openshift/api/pkg/serialization
 github.com/openshift/api/project/v1
+# github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160
+github.com/openshift/build-machinery-go
+github.com/openshift/build-machinery-go/make
+github.com/openshift/build-machinery-go/make/lib
+github.com/openshift/build-machinery-go/make/targets
+github.com/openshift/build-machinery-go/make/targets/golang
+github.com/openshift/build-machinery-go/make/targets/openshift
+github.com/openshift/build-machinery-go/make/targets/openshift/operator
+github.com/openshift/build-machinery-go/scripts
 # github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e
 github.com/openshift/cluster-network-operator/pkg/apis/networkoperator/v1
 # github.com/openshift/hive v1.0.1-0.20200407224824-6e5b27e17d44

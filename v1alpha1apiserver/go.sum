@@ -1539,6 +1539,8 @@ github.com/openshift-metal3/terraform-provider-ironic v0.1.9/go.mod h1:gYfx1iogl
 github.com/openshift/api v0.0.0-20190627141250-de5ca909c732 h1:YlY2WLM8FtygfxXViYbCnZJraqh9AhOzHbdoeD+lwrg=
 github.com/openshift/api v0.0.0-20190627141250-de5ca909c732/go.mod h1:dh9o4Fs58gpFXGSYfnVxGR9PnV53I8TW84pQaJDdGiY=
 github.com/openshift/baremetal-operator v0.0.0-20200206190020-71b826cc0f0a/go.mod h1:cXwn0hhgHpORjBasg0RnZwhKaJGy9+r6qgj0HCXrs/Y=
+github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160 h1:V4E6yt4XWiBEPKnJbs/E8pgUq9AjZqzQfsL3eeT84Qs=
+github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160/go.mod h1:1CkcsT3aVebzRBzVTSbiKSkJMsC/CASqxesfqEMfJEc=
 github.com/openshift/client-go v0.0.0-20190617165122-8892c0adc000/go.mod h1:6rzn+JTr7+WYS2E1TExP4gByoABxMznR6y2SnUIkmxk=
 github.com/openshift/client-go v0.0.0-20191001081553-3b0e988f8cb0/go.mod h1:6rzn+JTr7+WYS2E1TExP4gByoABxMznR6y2SnUIkmxk=
 github.com/openshift/client-go v0.0.0-20191216194936-57f413491e9e/go.mod h1:nLJaHFCQ5Mavh98g2ejEnWYFWBMGVdphrKNjLErOn/w=

@@ -13,7 +13,7 @@ IMG="${BASE_IMG}:latest"
 GIT_HASH=`git rev-parse --short=7 HEAD`
 
 # build the image
-BUILD_CMD="docker build" IMG="$IMG" make docker-build
+BUILD_CMD="docker build" IMG="$IMG" make GO_REQUIRED_MIN_VERSION:= docker-build
 
 # push the image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \

@@ -15,31 +15,55 @@ spec:
   scope: Namespaced
   validation:
     openAPIV3Schema:
+      description: SyncSet is the Schema for the SyncSet API
+      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
+          description: SyncSetSpec defines the SyncSetCommonSpec resources and patches
+            to sync along with ClusterDeploymentRefs indicating which clusters the
+            SyncSet applies to in the SyncSet's namespace.
+          type: object
+          required:
+          - clusterDeploymentRefs
           properties:
             clusterDeploymentRefs:
               description: ClusterDeploymentRefs is the list of LocalObjectReference
                 indicating which clusters the SyncSet applies to in the SyncSet's
                 namespace.
-              items:
-                type: object
               type: array
+              items:
+                description: LocalObjectReference contains enough information to let
+                  you locate the referenced object inside the same namespace.
+                type: object
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
             patches:
               description: Patches is the list of patches to apply.
+              type: array
               items:
+                description: SyncObjectPatch represents a patch to be applied to a
+                  specific object
+                type: object
+                required:
+                - apiVersion
+                - kind
+                - name
+                - patch
                 properties:
                   apiVersion:
                     description: APIVersion is the Group and Version of the object
@@ -62,8 +86,6 @@ spec:
                     description: PatchType indicates the PatchType as "strategic"
                       (default), "json", or "merge".
                     type: string
-                type: object
-              type: array
             resourceApplyMode:
               description: ResourceApplyMode indicates if the Resource apply mode
                 is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
@@ -72,17 +94,27 @@ spec:
             resources:
               description: Resources is the list of objects to sync from RawExtension
                 definitions.
+              type: array
               items:
                 type: object
-              type: array
             secretMappings:
               description: Secrets is the list of secrets to sync along with their
                 respective destinations.
+              type: array
               items:
+                description: SecretMapping defines a source and destination for a
+                  secret to be synced by a SyncSet
+                type: object
+                required:
+                - sourceRef
+                - targetRef
                 properties:
                   sourceRef:
                     description: SourceRef specifies the name and namespace of a secret
                       on the management cluster
+                    type: object
+                    required:
+                    - name
                     properties:
                       name:
                         description: Name is the name of the secret
@@ -92,10 +124,12 @@ spec:
                           If not present for the source secret reference, it is assumed
                           to be the same namespace as the syncset with the reference.
                         type: string
-                    type: object
                   targetRef:
                     description: TargetRef specifies the target name and namespace
                       of the secret on the target cluster
+                    type: object
+                    required:
+                    - name
                     properties:
                       name:
                         description: Name is the name of the secret
@@ -105,13 +139,8 @@ spec:
                           If not present for the source secret reference, it is assumed
                           to be the same namespace as the syncset with the reference.
                         type: string
-                    type: object
-                type: object
-              type: array
-          required:
-          - clusterDeploymentRefs
-          type: object
         status:
+          description: SyncSetStatus defines the observed state of a SyncSet
           type: object
   version: v1
 status:

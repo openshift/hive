@@ -13,36 +13,59 @@ spec:
   scope: Namespaced
   validation:
     openAPIV3Schema:
+      description: SyncIdentityProvider is the Schema for the SyncIdentityProvider
+        API
+      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
+          description: SyncIdentityProviderSpec defines the SyncIdentityProviderCommonSpec
+            identity providers to sync along with ClusterDeploymentRefs indicating
+            which clusters the SyncIdentityProvider applies to in the SyncIdentityProvider's
+            namespace.
+          type: object
+          required:
+          - clusterDeploymentRefs
+          - identityProviders
           properties:
             clusterDeploymentRefs:
               description: ClusterDeploymentRefs is the list of LocalObjectReference
                 indicating which clusters the SyncSet applies to in the SyncSet's
                 namespace.
-              items:
-                type: object
               type: array
+              items:
+                description: LocalObjectReference contains enough information to let
+                  you locate the referenced object inside the same namespace.
+                type: object
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
             identityProviders:
               description: IdentityProviders is an ordered list of ways for a user
                 to identify themselves
+              type: array
               items:
+                description: IdentityProvider provides identities for users authenticating
+                  using credentials
+                type: object
                 properties:
                   basicAuth:
                     description: basicAuth contains configuration options for the
                       BasicAuth IdP
+                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -54,12 +77,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
                           by name that contains the PEM-encoded TLS client certificate
@@ -69,12 +94,14 @@ spec:
                           honored. If the specified certificate data is not valid,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
                           by name that contains the PEM-encoded TLS private key for
@@ -84,18 +111,20 @@ spec:
                           is not honored. If the specified certificate data is not
                           valid, the identity provider is not honored. The namespace
                           for this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    type: object
                   github:
                     description: github enables user authentication using GitHub credentials
+                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -108,12 +137,14 @@ spec:
                           not honored. If empty, the default system roots are used.
                           This can only be configured when hostname is set to a non-empty
                           value. The namespace for this config map is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -123,12 +154,14 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
                           for use with a hosted instance of GitHub Enterprise. It
@@ -138,18 +171,18 @@ spec:
                       organizations:
                         description: organizations optionally restricts which organizations
                           are allowed to log in
+                        type: array
                         items:
                           type: string
-                        type: array
                       teams:
                         description: teams optionally restricts which teams are allowed
                           to log in. Format is <org>/<team>.
+                        type: array
                         items:
                           type: string
-                        type: array
-                    type: object
                   gitlab:
                     description: gitlab enables user authentication using GitLab credentials
+                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -161,12 +194,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -176,18 +211,20 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       url:
                         description: url is the oauth server base URL
                         type: string
-                    type: object
                   google:
                     description: google enables user authentication using Google credentials
+                    type: object
                     properties:
                       clientID:
                         description: clientID is the oauth client ID
@@ -198,20 +235,22 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
                           (e.g. "mycompany.com") to restrict logins to
                         type: string
-                    type: object
                   htpasswd:
                     description: htpasswd enables user authentication using an HTPasswd
                       file to validate credentials
+                    type: object
                     properties:
                       fileData:
                         description: fileData is a required reference to a secret
@@ -221,16 +260,18 @@ spec:
                           honored. If the specified htpasswd data is not valid, the
                           identity provider is not honored. The namespace for this
                           secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
-                    type: object
                   keystone:
                     description: keystone enables user authentication using keystone
                       password credentials
+                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -242,12 +283,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       domainName:
                         description: domainName is required for keystone v3
                         type: string
@@ -260,12 +303,14 @@ spec:
                           honored. If the specified certificate data is not valid,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
                           by name that contains the PEM-encoded TLS private key for
@@ -275,54 +320,56 @@ spec:
                           is not honored. If the specified certificate data is not
                           valid, the identity provider is not honored. The namespace
                           for this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
-                    type: object
                   ldap:
                     description: ldap enables user authentication using LDAP credentials
+                    type: object
                     properties:
                       attributes:
                         description: attributes maps LDAP attributes to identities
+                        type: object
                         properties:
                           email:
                             description: email is the list of attributes whose values
                               should be used as the email address. Optional. If unspecified,
                               no email is set for the identity
+                            type: array
                             items:
                               type: string
-                            type: array
                           id:
                             description: id is the list of attributes whose values
                               should be used as the user ID. Required. First non-empty
                               attribute is used. At least one attribute is required.
                               If none of the listed attribute have a value, authentication
                               fails. LDAP standard identity attribute is "dn"
+                            type: array
                             items:
                               type: string
-                            type: array
                           name:
                             description: name is the list of attributes whose values
                               should be used as the display name. Optional. If unspecified,
                               no display name is set for the identity LDAP standard
                               display name attribute is "cn"
+                            type: array
                             items:
                               type: string
-                            type: array
                           preferredUsername:
                             description: preferredUsername is the list of attributes
                               whose values should be used as the preferred username.
                               LDAP standard login attribute is "uid"
+                            type: array
                             items:
                               type: string
-                            type: array
-                        type: object
                       bindDN:
                         description: bindDN is an optional DN to bind with during
                           the search phase.
@@ -334,12 +381,14 @@ spec:
                           If specified and the secret or expected key is not found,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       ca:
                         description: ca is an optional reference to a config map by
                           name containing the PEM-encoded CA bundle. It is used as
@@ -350,12 +399,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
                           should not use TLS WARNING: Should not be set to `true`
@@ -369,7 +420,6 @@ spec:
                         description: 'url is an RFC 2255 URL which specifies the LDAP
                           search parameters to use. The syntax of the URL is: ldap://host:port/basedn?attribute?scope?filter'
                         type: string
-                    type: object
                   mappingMethod:
                     description: mappingMethod determines how identities from this
                       provider are mapped to users Defaults to "claim"
@@ -383,6 +433,7 @@ spec:
                     type: string
                   openID:
                     description: openID enables user authentication using OpenID credentials
+                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -394,38 +445,40 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       claims:
                         description: claims mappings
+                        type: object
                         properties:
                           email:
                             description: email is the list of claims whose values
                               should be used as the email address. Optional. If unspecified,
                               no email is set for the identity
+                            type: array
                             items:
                               type: string
-                            type: array
                           name:
                             description: name is the list of claims whose values should
                               be used as the display name. Optional. If unspecified,
                               no display name is set for the identity
+                            type: array
                             items:
                               type: string
-                            type: array
                           preferredUsername:
                             description: preferredUsername is the list of claims whose
                               values should be used as the preferred username. If
                               unspecified, the preferred username is determined from
                               the value of the sub claim
+                            type: array
                             items:
                               type: string
-                            type: array
-                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -435,31 +488,35 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
-                        type: object
                       extraAuthorizeParameters:
                         description: extraAuthorizeParameters are any custom parameters
                           to add to the authorize request.
                         type: object
+                        additionalProperties:
+                          type: string
                       extraScopes:
                         description: extraScopes are any scopes to request in addition
                           to the standard "openid" scope.
+                        type: array
                         items:
                           type: string
-                        type: array
                       issuer:
                         description: issuer is the URL that the OpenID Provider asserts
                           as its Issuer Identifier. It must use the https scheme with
                           no query or fragment component.
                         type: string
-                    type: object
                   requestHeader:
                     description: requestHeader enables user authentication using request
                       header credentials
+                    type: object
                     properties:
                       ca:
                         description: ca is a required reference to a config map by
@@ -472,12 +529,14 @@ spec:
                           honored. If the specified ca data is not valid, the identity
                           provider is not honored. The namespace for this config map
                           is openshift-config.
+                        type: object
+                        required:
+                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
-                        type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
                           /authorize requests to Unauthenticated requests from OAuth
@@ -491,21 +550,21 @@ spec:
                         description: clientCommonNames is an optional list of common
                           names to require a match from. If empty, any client certificate
                           validated against the clientCA bundle is considered authoritative.
+                        type: array
                         items:
                           type: string
-                        type: array
                       emailHeaders:
                         description: emailHeaders is the set of headers to check for
                           the email address
+                        type: array
                         items:
                           type: string
-                        type: array
                       headers:
                         description: headers is the set of headers to check for identity
                           information
+                        type: array
                         items:
                           type: string
-                        type: array
                       loginURL:
                         description: loginURL is a URL to redirect unauthenticated
                           /authorize requests to Unauthenticated requests from OAuth
@@ -518,27 +577,21 @@ spec:
                       nameHeaders:
                         description: nameHeaders is the set of headers to check for
                           the display name
+                        type: array
                         items:
                           type: string
-                        type: array
                       preferredUsernameHeaders:
                         description: preferredUsernameHeaders is the set of headers
                           to check for the preferred username
+                        type: array
                         items:
                           type: string
-                        type: array
-                    type: object
                   type:
                     description: type identifies the identity provider type for this
                       entry.
                     type: string
-                type: object
-              type: array
-          required:
-          - identityProviders
-          - clusterDeploymentRefs
-          type: object
         status:
+          description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
   version: v1
 status:

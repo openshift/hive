@@ -6,6 +6,7 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
+	github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160
 	github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e
 	github.com/openshift/hive v1.0.1-0.20200407224824-6e5b27e17d44
 	github.com/openshift/installer v0.9.0-master.0.20200331173433-d200b241c184

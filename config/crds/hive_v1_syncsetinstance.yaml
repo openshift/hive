@@ -21,25 +21,36 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
+      description: SyncSetInstance is the Schema for the syncsetinstances API
+      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
         spec:
+          description: SyncSetInstanceSpec defines the desired state of SyncSetInstance
+          type: object
+          required:
+          - clusterDeploymentRef
           properties:
             clusterDeploymentRef:
               description: ClusterDeployment is a reference to to the clusterdeployment
                 for this syncsetinstance.
               type: object
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
             resourceApplyMode:
               description: ResourceApplyMode indicates if the resource apply mode
                 is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
@@ -48,11 +59,13 @@ spec:
             selectorSyncSetRef:
               description: SelectorSyncSetRef is a reference to the selectorsyncset
                 for this syncsetinstance.
+              type: object
+              required:
+              - name
               properties:
                 name:
                   description: Name is the name of the SelectorSyncSet
                   type: string
-              type: object
             syncSetHash:
               description: SyncSetHash is a hash of the contents of the syncset or
                 selectorsyncset spec. Its purpose is to cause a syncset instance update
@@ -61,8 +74,16 @@ spec:
             syncSetRef:
               description: SyncSet is a reference to the syncset for this syncsetinstance.
               type: object
-          type: object
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
         status:
+          description: SyncSetInstanceStatus defines the observed state of SyncSetInstance
+          type: object
+          required:
+          - applied
           properties:
             applied:
               description: Applied will be true if all resources, patches, or secrets
@@ -72,17 +93,23 @@ spec:
               description: Conditions is the list of SyncConditions used to indicate
                 UnknownObject when a resource type cannot be determined from a SyncSet
                 resource.
+              type: array
               items:
+                description: SyncCondition is a condition in a SyncStatus
+                type: object
+                required:
+                - status
+                - type
                 properties:
                   lastProbeTime:
                     description: LastProbeTime is the last time we probed the condition.
-                    format: date-time
                     type: string
+                    format: date-time
                   lastTransitionTime:
                     description: LastTransitionTime is the last time the condition
                       transitioned from one status to another.
-                    format: date-time
                     type: string
+                    format: date-time
                   message:
                     description: Message is a human-readable message indicating details
                       about last transition.
@@ -97,12 +124,22 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
-                type: object
-              type: array
             patches:
               description: Patches is the list of SyncStatus for patches that have
                 been applied.
+              type: array
               items:
+                description: SyncStatus describes objects that have been created or
+                  patches that have been applied using the unique md5 sum of the object
+                  or patch.
+                type: object
+                required:
+                - apiVersion
+                - conditions
+                - hash
+                - kind
+                - name
+                - namespace
                 properties:
                   apiVersion:
                     description: APIVersion is the Group and Version of the object
@@ -112,18 +149,24 @@ spec:
                     description: Conditions is the list of conditions indicating success
                       or failure of object create, update and delete as well as patch
                       application.
+                    type: array
                     items:
+                      description: SyncCondition is a condition in a SyncStatus
+                      type: object
+                      required:
+                      - status
+                      - type
                       properties:
                         lastProbeTime:
                           description: LastProbeTime is the last time we probed the
                             condition.
-                          format: date-time
                           type: string
+                          format: date-time
                         lastTransitionTime:
                           description: LastTransitionTime is the last time the condition
                             transitioned from one status to another.
-                          format: date-time
                           type: string
+                          format: date-time
                         message:
                           description: Message is a human-readable message indicating
                             details about last transition.
@@ -138,8 +181,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      type: object
-                    type: array
                   hash:
                     description: Hash is the unique md5 hash of the resource or patch.
                     type: string
@@ -159,12 +200,22 @@ spec:
                     description: Resource is the resource name for the object that
                       was synced. This will be populated for resources, but not patches
                     type: string
-                type: object
-              type: array
             resources:
               description: Resources is the list of SyncStatus for objects that have
                 been synced.
+              type: array
               items:
+                description: SyncStatus describes objects that have been created or
+                  patches that have been applied using the unique md5 sum of the object
+                  or patch.
+                type: object
+                required:
+                - apiVersion
+                - conditions
+                - hash
+                - kind
+                - name
+                - namespace
                 properties:
                   apiVersion:
                     description: APIVersion is the Group and Version of the object
@@ -174,18 +225,24 @@ spec:
                     description: Conditions is the list of conditions indicating success
                       or failure of object create, update and delete as well as patch
                       application.
+                    type: array
                     items:
+                      description: SyncCondition is a condition in a SyncStatus
+                      type: object
+                      required:
+                      - status
+                      - type
                       properties:
                         lastProbeTime:
                           description: LastProbeTime is the last time we probed the
                             condition.
-                          format: date-time
                           type: string
+                          format: date-time
                         lastTransitionTime:
                           description: LastTransitionTime is the last time the condition
                             transitioned from one status to another.
-                          format: date-time
                           type: string
+                          format: date-time
                         message:
                           description: Message is a human-readable message indicating
                             details about last transition.
@@ -200,8 +257,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      type: object
-                    type: array
                   hash:
                     description: Hash is the unique md5 hash of the resource or patch.
                     type: string
@@ -221,12 +276,22 @@ spec:
                     description: Resource is the resource name for the object that
                       was synced. This will be populated for resources, but not patches
                     type: string
-                type: object
-              type: array
             secretReferences:
               description: Secrets is the list of SyncStatus for secrets that have
                 been synced.
+              type: array
               items:
+                description: SyncStatus describes objects that have been created or
+                  patches that have been applied using the unique md5 sum of the object
+                  or patch.
+                type: object
+                required:
+                - apiVersion
+                - conditions
+                - hash
+                - kind
+                - name
+                - namespace
                 properties:
                   apiVersion:
                     description: APIVersion is the Group and Version of the object
@@ -236,18 +301,24 @@ spec:
                     description: Conditions is the list of conditions indicating success
                       or failure of object create, update and delete as well as patch
                       application.
+                    type: array
                     items:
+                      description: SyncCondition is a condition in a SyncStatus
+                      type: object
+                      required:
+                      - status
+                      - type
                       properties:
                         lastProbeTime:
                           description: LastProbeTime is the last time we probed the
                             condition.
-                          format: date-time
                           type: string
+                          format: date-time
                         lastTransitionTime:
                           description: LastTransitionTime is the last time the condition
                             transitioned from one status to another.
-                          format: date-time
                           type: string
+                          format: date-time
                         message:
                           description: Message is a human-readable message indicating
                             details about last transition.
@@ -262,8 +333,6 @@ spec:
                         type:
                           description: Type is the type of the condition.
                           type: string
-                      type: object
-                    type: array
                   hash:
                     description: Hash is the unique md5 hash of the resource or patch.
                     type: string
@@ -283,9 +352,6 @@ spec:
                     description: Resource is the resource name for the object that
                       was synced. This will be populated for resources, but not patches
                     type: string
-                type: object
-              type: array
-          type: object
   version: v1
 status:
   acceptedNames:

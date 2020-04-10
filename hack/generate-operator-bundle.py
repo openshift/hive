@@ -117,7 +117,9 @@ def generate_csv_base(version, prev_version, hive_image):
     csv['spec']['replaces'] = "hive-operator.v%s" % prev_version
 
     # Update the deployment to use the defined image:
-    image_ref = "%s:v%s" % (hive_image, version)
+    image_ref = hive_image
+    if not ":" in image_ref:
+        image_ref = "%s:v%s" % (hive_image, version)
     csv['spec']['install']['spec']['deployments'][0]['spec']['template']['spec']['containers'][0]['image'] = image_ref
     csv['metadata']['annotations']['containerImage'] = image_ref
 

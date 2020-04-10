@@ -1,61 +1,67 @@
-#!/bin/sh
-#
-# This script generates a full OLM ClusterServiceVersion, bundle and package for your
-# current git HEAD.
-#
-# Requires yq: https://github.com/mikefarah/yq
-set -e
+#!/bin/bash
 
+# This developer script:
+# - builds a hive image from git HEAD
+# - publishes it (HIVE_IMAGE)
+# - generates a full OLM ClusterServiceVersion, bundle, and package ad builds a registry image
+# - publishes it (REGISTRY_IMG)
+# - applies the operator using `oc process`
+#
+# This is run ad-hoc by developers, not by CI.
+
+set -exv
+
+if [ -z "$HIVE_IMAGE" ]
+then
+      echo "Please specify the operand HIVE_IMAGE to deploy, for example quay.io/<yourname>/hive (no tag)"
+      exit 1
+fi
 
 if [ -z "$REGISTRY_IMG" ]
 then
-      echo "Please specify REGISTRY_IMG"
+      echo "Please specify where to push the registry image as REGISTRY_IMG, for example quay.io/<yourname>/hive-registry"
       exit 1
 fi
 
-if [ -z "$DEPLOY_IMG" ]
+if [ ! -d "bundle" ]
 then
-      echo "Please specify DEPLOY_IMG"
+      echo "Can't find bundle directory. Please run this script from the hive code directory root."
       exit 1
 fi
 
-oc project hive
+oc project ${NAMESPACE:-hive}
 
-# Use commits since some revision/tag to get an ever increasing version number:
-GIT_COMMIT_COUNT=`git rev-list 9c56c62c6d0180c27e1cc9cf195f4bbfd7a617dd..HEAD --count`
+GIT_HASH=`git rev-parse --short=7 HEAD`
+IMG="${HIVE_IMAGE}:${GIT_HASH}"
 
-# Git hash is appended to our version:
-GIT_HASH=`git rev-parse --short HEAD`
+# build the image
+printf "\n\n\n*** NOTE: sometimes buildah takes a while on the copy. Please be patient...\n\n\n\n"
+#BUILD_CMD="buildah bud" IMG="${IMG}" make docker-build
+
+# push the image
+podman push "${IMG}"
 
 USE_CHANNEL=${CHANNEL:-staging}
 
-# Use a fake replaces version, we will not be using this.
-./hack/generate-operator-bundle.py bundle/ 0.1.5-4b53b492 $GIT_COMMIT_COUNT $GIT_HASH $DEPLOY_IMG
+./hack/generate-operator-bundle.py osd --previous-version 0.0.1 --hive-image ${IMG} --channel ${USE_CHANNEL}
 
-CSV_FILE="bundle/0.1.$GIT_COMMIT_COUNT-sha$GIT_HASH/hive-operator.v0.1.$GIT_COMMIT_COUNT-sha$GIT_HASH.clusterserviceversion.yaml"
+NEW_VERSION=$((cd bundle && find -type d | xargs -n 1 basename) | sort -V  | tail -n 1)
 
-CSV_NAME=`yq r $CSV_FILE metadata.name`
-echo "ClusterServiceVersion name: $CSV_NAME"
-
-# Remove the replaces field, this script is just for dev testing, we don't plan to update a version:
-yq d -i $CSV_FILE spec.replaces
-
-cat <<EOF > bundle/hive.package.yaml
-packageName: hive-operator
-channels:
-- name: staging
-  currentCSV: $CSV_NAME
-EOF
-
-echo "OLM Operator Package written to: bundle/"
-
-REGISTRY_IMG_PATH="${REGISTRY_IMG}:${USE_CHANNEL}-latest"
+# grab the bundle we just created -- don't need all of them
+TMP_DIR=$(mktemp -d)
+mkdir -p "${TMP_DIR}/bundle"
+cp -ax "bundle/${NEW_VERSION}" "${TMP_DIR}/bundle"
+cp bundle/hive.package.yaml "${TMP_DIR}/bundle"
+CSV_FILE=$(ls -1 "${TMP_DIR}/bundle/${NEW_VERSION}" | grep clusterserviceversion.yaml | head -n 1 )
+# remove the replaces field -- this is a fresh install in OLM
+podman run --rm -v "${TMP_DIR}/bundle/${NEW_VERSION}":/workdir mikefarah/yq yq d -i ${CSV_FILE} spec.replaces
 
 # Build the registry image:
-sudo buildah bud --file build/olm-registry/Dockerfile --tag "${REGISTRY_IMG_PATH}" .
+REGISTRY_IMG_PATH="${REGISTRY_IMG}:${USE_CHANNEL}-latest"
+buildah bud --file build/olm-registry/Dockerfile --tag "${REGISTRY_IMG_PATH}" "${TMP_DIR}"
 
 # Push the registry image:
-sudo podman push "${REGISTRY_IMG_PATH}"
+podman push "${REGISTRY_IMG_PATH}"
 
 # Create the remaining OLM artifacts to subscribe to the operator:
 oc process -f hack/olm-registry/olm-artifacts-template.yaml REGISTRY_IMG=$REGISTRY_IMG CHANNEL=$USE_CHANNEL | kubectl apply -f -

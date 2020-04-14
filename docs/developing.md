@@ -67,7 +67,7 @@ git clone https://github.com/openshift/hive.git
 
 ## Deploying with Kubernetes In Docker (kind)
 
-[Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
+[Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. Currently, we support 0.5.1 version of Kind. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
 
 This approach requires [Docker](https://docs.docker.com/install). At present we do not have kind working with podman.
 

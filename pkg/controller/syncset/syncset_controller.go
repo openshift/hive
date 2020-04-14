@@ -163,6 +163,13 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		"clusterDeployment": request.NamespacedName,
 	})
 
+	// Ensure owner references are correctly set
+	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("Error reconciling object ownership")
+		return reconcile.Result{}, err
+	}
+
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		cdLog.Debug("clusterdeployment is being deleted, nothing to do")
@@ -479,4 +486,15 @@ func syncSetInstanceNameForSyncSet(cd *hivev1.ClusterDeployment, syncSet *hivev1
 func syncSetInstanceNameForSelectorSyncSet(cd *hivev1.ClusterDeployment, selectorSyncSet *hivev1.SelectorSyncSet) string {
 	syncSetPart := helpers.GetName(selectorSyncSet.Name, "selector-syncset", validation.DNS1123SubdomainMaxLength-validation.DNS1123LabelMaxLength)
 	return fmt.Sprintf("%s-%s", cd.Name, syncSetPart)
+}
+
+func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
+	return []*controllerutils.OwnershipUniqueKey{
+		{
+			TypeToList: &hivev1.SyncSetInstanceList{},
+			LabelSelector: map[string]string{
+				constants.ClusterDeploymentNameLabel: owner.GetName(),
+			},
+		},
+	}
 }

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -197,7 +198,7 @@ func TestReconcile(t *testing.T) {
 
 			// Act
 			actualResult, actualError := r.Reconcile(test.request)
-			actualObjects, err := controllerutils.GetRuntimeObjects(r, types, namespace)
+			actualObjects, err := controllerutils.ListRuntimeObjects(r, types, client.InNamespace(namespace))
 			lastBackupName, lastBackupTimestamp := ignoreUncomparedFields(test.expectedObjects, actualObjects)
 
 			// Assert
@@ -277,7 +278,7 @@ func TestGetRuntimeObjects(t *testing.T) {
 			r := fakeClientReconcileBackup(test.existingObjects)
 
 			// Act
-			actualObjects, actualError := controllerutils.GetRuntimeObjects(r, hiveNamespaceScopedListTypes, namespace)
+			actualObjects, actualError := controllerutils.ListRuntimeObjects(r, hiveNamespaceScopedListTypes, client.InNamespace(namespace))
 
 			// Assert
 			assert.NoError(t, actualError)

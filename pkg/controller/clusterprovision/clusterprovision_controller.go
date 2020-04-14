@@ -145,6 +145,13 @@ func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
+	// Ensure owner references are correctly set
+	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, pLog)
+	if err != nil {
+		pLog.WithError(err).Error("Error reconciling object ownership")
+		return reconcile.Result{}, err
+	}
+
 	if !instance.DeletionTimestamp.IsZero() {
 		pLog.Debug("ClusterProvision being deleted, skipping")
 		return reconcile.Result{}, nil
@@ -419,6 +426,32 @@ func clusterDeploymentWatchHandler(a handler.MapObject) []reconcile.Request {
 			NamespacedName: types.NamespacedName{
 				Name:      cd.Status.ProvisionRef.Name,
 				Namespace: cd.Namespace,
+			},
+		},
+	}
+}
+
+func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
+	return []*controllerutils.OwnershipUniqueKey{
+		{
+			TypeToList: &batchv1.JobList{},
+			LabelSelector: map[string]string{
+				constants.ClusterProvisionNameLabel: owner.GetName(),
+				constants.JobTypeLabel:              constants.JobTypeProvision,
+			},
+		},
+		{
+			TypeToList: &corev1.SecretList{},
+			LabelSelector: map[string]string{
+				constants.ClusterProvisionNameLabel: owner.GetName(),
+				constants.SecretTypeLabel:           constants.SecretTypeKubeConfig,
+			},
+		},
+		{
+			TypeToList: &corev1.SecretList{},
+			LabelSelector: map[string]string{
+				constants.ClusterProvisionNameLabel: owner.GetName(),
+				constants.SecretTypeLabel:           constants.SecretTypeKubeAdminCreds,
 			},
 		},
 	}

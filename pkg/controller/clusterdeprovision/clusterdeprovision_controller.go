@@ -150,13 +150,6 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, err
 	}
 
-	// Ensure owner references are correctly set
-	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, rLog)
-	if err != nil {
-		rLog.WithError(err).Error("Error reconciling object ownership")
-		return reconcile.Result{}, err
-	}
-
 	if !instance.DeletionTimestamp.IsZero() {
 		rLog.Debug("clusterdeprovision being deleted, skipping")
 		return reconcile.Result{}, nil
@@ -283,16 +276,4 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 
 	rLog.Infof("uninstall job not yet successful")
 	return reconcile.Result{}, nil
-}
-
-func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
-	return []*controllerutils.OwnershipUniqueKey{
-		{
-			TypeToList: &batchv1.JobList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeprovisionNameLabel: owner.GetName(),
-				constants.JobTypeLabel:                constants.JobTypeDeprovision,
-			},
-		},
-	}
 }

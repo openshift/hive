@@ -129,13 +129,13 @@ func LogLevel(err error) log.Level {
 	}
 }
 
-// ListRuntimeObjects returns a slice of runtime objects returned from the kubernetes client based on the passed in list of types to return and list options.
-func ListRuntimeObjects(c client.Client, typesToList []runtime.Object, opts ...client.ListOptionFunc) ([]runtime.Object, error) {
+// GetRuntimeObjects returns a slice of runtime objects returned from the kubernetes client based on the passed in list of types to return.
+func GetRuntimeObjects(c client.Client, typesToList []runtime.Object, namespace string) ([]runtime.Object, error) {
 	nsObjects := []runtime.Object{}
 
 	for _, t := range typesToList {
 		listObj := t.DeepCopyObject()
-		if err := c.List(context.TODO(), listObj, opts...); err != nil {
+		if err := c.List(context.TODO(), listObj, client.InNamespace(namespace)); err != nil {
 			return nil, err
 		}
 		list, err := meta.ExtractList(listObj)

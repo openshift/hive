@@ -16,7 +16,6 @@ import (
 	"github.com/openshift/hive/pkg/test/persistentvolumeclaim"
 	"github.com/openshift/hive/pkg/test/secret"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	log "github.com/sirupsen/logrus"
@@ -262,7 +261,7 @@ func TestLabelClusterProvisions(t *testing.T) {
 
 			// Act
 			actualError := l.labelClusterProvisions()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.ClusterProvisionList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.ClusterProvisionList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -311,7 +310,7 @@ func TestLabelInstallLogPVCs(t *testing.T) {
 
 			// Act
 			actualError := l.labelInstallLogPVCs()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&corev1.PersistentVolumeClaimList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&corev1.PersistentVolumeClaimList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -360,7 +359,7 @@ func TestLabelImageSetJobs(t *testing.T) {
 
 			// Act
 			actualError := l.labelImageSetJobs()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&batchv1.JobList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&batchv1.JobList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -405,7 +404,7 @@ func TestLabelClusterDeprovisionRequests(t *testing.T) {
 
 			// Act
 			actualError := l.labelClusterDeprovisionsRequests()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.ClusterDeprovisionRequestList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.ClusterDeprovisionRequestList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -451,7 +450,7 @@ func TestLabelDNSZones(t *testing.T) {
 
 			// Act
 			actualError := l.labelDNSZones()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.DNSZoneList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.DNSZoneList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -503,7 +502,7 @@ func TestLabelMergedPullSecrets(t *testing.T) {
 
 			// Act
 			actualError := l.labelMergedPullSecrets()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&corev1.SecretList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&corev1.SecretList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -554,7 +553,7 @@ func TestLabelClusterDeprovisionJobs(t *testing.T) {
 
 			// Act
 			actualError := l.labelClusterDeprovisionJobs()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&batchv1.JobList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&batchv1.JobList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -605,7 +604,7 @@ func TestLabelClusterProvisionJobs(t *testing.T) {
 
 			// Act
 			actualError := l.labelClusterProvisionJobs()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&batchv1.JobList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&batchv1.JobList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -650,7 +649,7 @@ func TestLabelClusterState(t *testing.T) {
 
 			// Act
 			actualError := l.labelClusterStates()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.ClusterStateList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.ClusterStateList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -700,7 +699,7 @@ func TestLabelControlPlaneCertificateSyncSets(t *testing.T) {
 
 			// Act
 			actualError := l.labelControlPlaneCertificateSyncSets()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -750,7 +749,7 @@ func TestLabelRemoteIngressSyncSets(t *testing.T) {
 
 			// Act
 			actualError := l.labelRemoteIngressSyncSets()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -800,7 +799,7 @@ func TestLabelIdentityProviderSyncSets(t *testing.T) {
 
 			// Act
 			actualError := l.labelIdentityProviderSyncSets()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -850,7 +849,7 @@ func TestLabelKubeconfigSecrets(t *testing.T) {
 
 			// Act
 			actualError := l.labelKubeconfigSecrets()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&corev1.SecretList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&corev1.SecretList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -902,7 +901,7 @@ func TestLabelKubeAdminCredsSecrets(t *testing.T) {
 
 			// Act
 			actualError := l.labelKubeAdminCredsSecrets()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&corev1.SecretList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&corev1.SecretList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -952,7 +951,7 @@ func TestLabelSyncSetInstances(t *testing.T) {
 
 			// Act
 			actualError := l.labelSyncSetInstances()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetInstanceList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetInstanceList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)
@@ -1002,7 +1001,7 @@ func TestLabelSelectorSyncSetInstances(t *testing.T) {
 
 			// Act
 			actualError := l.labelSelectorSyncSetInstances()
-			actualObjects, _ := controllerutils.ListRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetInstanceList{}}, client.InNamespace(namespace))
+			actualObjects, _ := controllerutils.GetRuntimeObjects(l.client, []runtime.Object{&hivev1alpha1.SyncSetInstanceList{}}, namespace)
 
 			// Assert
 			assert.Equal(t, test.expectedError, actualError)

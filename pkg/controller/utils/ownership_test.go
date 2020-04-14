@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	testName = "foo-lqmsh"
+	testName           = "foo-lqmsh"
+	differentNamespace = "differentns"
 )
 
 func validOwnershipUniqueKey(owner *hivev1.ClusterDeployment) *OwnershipUniqueKey {
@@ -39,11 +40,11 @@ func validOwnershipUniqueKeys(owner *hivev1.ClusterDeployment) []*OwnershipUniqu
 	}
 }
 
-func validClusterDeployment() *hivev1.ClusterDeployment {
+func validClusterDeployment(namespace string) *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testName,
-			Namespace:   testNamespace,
+			Namespace:   namespace,
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
 			Labels:      map[string]string{},
@@ -51,11 +52,11 @@ func validClusterDeployment() *hivev1.ClusterDeployment {
 	}
 }
 
-func validOtherClusterDeployment() *hivev1.ClusterDeployment {
+func validOtherClusterDeployment(namespace string) *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testName + "-other",
-			Namespace:   testNamespace,
+			Namespace:   namespace,
 			UID:         types.UID("abcd"),
 			Annotations: map[string]string{},
 			Labels:      map[string]string{},
@@ -63,11 +64,11 @@ func validOtherClusterDeployment() *hivev1.ClusterDeployment {
 	}
 }
 
-func validDNSZoneWithLabelOwner(labelOwner hivev1.MetaRuntimeObject, scheme *runtime.Scheme) *hivev1.DNSZone {
+func validDNSZoneWithLabelOwner(labelOwner hivev1.MetaRuntimeObject, scheme *runtime.Scheme, namespace string) *hivev1.DNSZone {
 	zone := &hivev1.DNSZone{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "dnszoneobject",
-			Namespace:  "ns",
+			Namespace:  namespace,
 			Generation: 6,
 			Finalizers: []string{hivev1.FinalizerDNSZone},
 			UID:        types.UID("abcdef"),
@@ -100,13 +101,13 @@ func validDNSZoneWithLabelOwner(labelOwner hivev1.MetaRuntimeObject, scheme *run
 	return zone
 }
 
-func validDNSZoneWithMissingOwnership(owner hivev1.MetaRuntimeObject, scheme *runtime.Scheme) *hivev1.DNSZone {
-	zone := validDNSZoneWithLabelOwner(owner, scheme)
+func validDNSZoneWithMissingOwnership(owner hivev1.MetaRuntimeObject, scheme *runtime.Scheme, namespace string) *hivev1.DNSZone {
+	zone := validDNSZoneWithLabelOwner(owner, scheme, namespace)
 	return zone
 }
 
-func validDNSZoneWithControllerOwnership(labelOwner, controllerOwner hivev1.MetaRuntimeObject, scheme *runtime.Scheme) *hivev1.DNSZone {
-	zone := validDNSZoneWithLabelOwner(labelOwner, scheme)
+func validDNSZoneWithControllerOwnership(labelOwner, controllerOwner hivev1.MetaRuntimeObject, scheme *runtime.Scheme, namespace string) *hivev1.DNSZone {
+	zone := validDNSZoneWithLabelOwner(labelOwner, scheme, namespace)
 	controllerutil.SetControllerReference(controllerOwner, zone, scheme)
 	return zone
 }
@@ -125,44 +126,50 @@ func TestReconcile(t *testing.T) {
 	}{
 		{
 			name:                                 "no objects in kube (do nothing)",
-			owner:                                validClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment()),
+			owner:                                validClusterDeployment(testNamespace),
+			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
+			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 		},
 		{
 			name:                                 "ownership set correctly (do nothing)",
-			owner:                                validClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment()),
+			owner:                                validClusterDeployment(testNamespace),
+			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
+			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 			existingObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(), validClusterDeployment(), testscheme),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validClusterDeployment(differentNamespace), testscheme, differentNamespace),
 			},
 			expectedObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(), validClusterDeployment(), testscheme),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validClusterDeployment(differentNamespace), testscheme, differentNamespace),
 			},
 		},
 		{
 			name:                                 "ownership missing (add ownership back)",
-			owner:                                validClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment()),
+			owner:                                validClusterDeployment(testNamespace),
+			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
+			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 			existingObjects: []runtime.Object{
-				validDNSZoneWithMissingOwnership(validClusterDeployment(), testscheme),
+				validDNSZoneWithMissingOwnership(validClusterDeployment(testNamespace), testscheme, testNamespace),
+				validDNSZoneWithMissingOwnership(validClusterDeployment(differentNamespace), testscheme, differentNamespace),
 			},
 			expectedObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(), validClusterDeployment(), testscheme),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
+				validDNSZoneWithMissingOwnership(validClusterDeployment(differentNamespace), testscheme, differentNamespace),
 			},
 		},
 		{
 			name:                                 "ownership incorrect (fix it)",
-			owner:                                validClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment()),
+			owner:                                validClusterDeployment(testNamespace),
+			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
+			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 			existingObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(), validOtherClusterDeployment(), testscheme),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validOtherClusterDeployment(testNamespace), testscheme, testNamespace),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validOtherClusterDeployment(differentNamespace), testscheme, differentNamespace),
 			},
 			expectedObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(), validClusterDeployment(), testscheme),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
+				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validOtherClusterDeployment(differentNamespace), testscheme, differentNamespace),
 			},
 		},
 	}

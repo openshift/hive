@@ -29,7 +29,7 @@ func ReconcileOwnerReferences(owner hivev1.MetaRuntimeObject, ownershipKeys []*O
 	errlist := []error{}
 
 	for _, ownershipKey := range ownershipKeys {
-		objects, err := ListRuntimeObjects(kubeclient, []runtime.Object{ownershipKey.TypeToList}, client.MatchingLabels(ownershipKey.LabelSelector))
+		objects, err := ListRuntimeObjects(kubeclient, []runtime.Object{ownershipKey.TypeToList}, client.MatchingLabels(ownershipKey.LabelSelector), client.InNamespace(owner.GetNamespace()))
 		if err != nil {
 			errlist = append(errlist, errors.Wrap(err, "failed listing objects owned by clusterdeployment according to label"))
 			continue

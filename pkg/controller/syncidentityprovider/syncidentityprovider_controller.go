@@ -186,6 +186,13 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 		return reconcile.Result{}, err
 	}
 
+	// Ensure owner references are correctly set
+	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, contextLogger)
+	if err != nil {
+		contextLogger.WithError(err).Error("Error reconciling object ownership")
+		return reconcile.Result{}, err
+	}
+
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil
@@ -375,4 +382,16 @@ func addSelectorSyncIdentityProviderLoggerFields(logger log.FieldLogger, ssidp *
 		"Kind": ssidp.Kind,
 		"Name": ssidp.Name,
 	})
+}
+
+func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
+	return []*controllerutils.OwnershipUniqueKey{
+		{
+			TypeToList: &hivev1.SyncSetList{},
+			LabelSelector: map[string]string{
+				constants.ClusterDeploymentNameLabel: owner.GetName(),
+				constants.SyncSetTypeLabel:           constants.SyncSetTypeIdentityProvider,
+			},
+		},
+	}
 }

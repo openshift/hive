@@ -32,7 +32,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -70,7 +70,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", controllerName)
 	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), controllerName, logger)
 	return &ReconcileRemoteClusterIngress{
-		Client:  utils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:  mgr.GetScheme(),
 		logger:  log.WithField("controller", controllerName),
 		kubeCLI: helper,
@@ -80,7 +80,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("remoteingress-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: utils.GetConcurrentReconciles()})
+	c, err := controller.New("remoteingress-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
 	}
@@ -142,6 +142,13 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{}, err
 	}
 	rContext.clusterDeployment = cd
+
+	// Ensure owner references are correctly set
+	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("Error reconciling object ownership")
+		return reconcile.Result{}, err
+	}
 
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
@@ -373,7 +380,7 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 	var (
 		msg, reason string
 		status      corev1.ConditionStatus
-		updateCheck utils.UpdateConditionCheck
+		updateCheck controllerutils.UpdateConditionCheck
 	)
 
 	origCD := rContext.clusterDeployment.DeepCopy()
@@ -382,20 +389,20 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 		msg = missingSecretMessage
 		status = corev1.ConditionTrue
 		reason = ingressCertificateNotFoundReason
-		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+		updateCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
 	} else {
 		msg = fmt.Sprintf("all secrets for ingress found")
 		status = corev1.ConditionFalse
 		reason = ingressCertificateFoundReason
-		updateCheck = utils.UpdateConditionNever
+		updateCheck = controllerutils.UpdateConditionNever
 	}
 
-	rContext.clusterDeployment.Status.Conditions = utils.SetClusterDeploymentCondition(rContext.clusterDeployment.Status.Conditions,
+	rContext.clusterDeployment.Status.Conditions = controllerutils.SetClusterDeploymentCondition(rContext.clusterDeployment.Status.Conditions,
 		hivev1.IngressCertificateNotFoundCondition, status, reason, msg, updateCheck)
 
 	if !reflect.DeepEqual(rContext.clusterDeployment.Status.Conditions, origCD.Status.Conditions) {
 		if err := r.Status().Update(context.TODO(), rContext.clusterDeployment); err != nil {
-			rContext.logger.WithError(err).Log(utils.LogLevel(err), "error updating clusterDeployment condition")
+			rContext.logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterDeployment condition")
 			return err
 		}
 	}
@@ -428,4 +435,16 @@ func secretHash(secret *corev1.Secret) string {
 		b.Write([]byte("\n"))
 	}
 	return fmt.Sprintf("%x", md5.Sum(b.Bytes()))
+}
+
+func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
+	return []*controllerutils.OwnershipUniqueKey{
+		{
+			TypeToList: &hivev1.SyncSetList{},
+			LabelSelector: map[string]string{
+				constants.ClusterDeploymentNameLabel: owner.GetName(),
+				constants.SyncSetTypeLabel:           constants.SyncSetTypeRemoteIngress,
+			},
+		},
+	}
 }

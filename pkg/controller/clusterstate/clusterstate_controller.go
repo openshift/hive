@@ -117,6 +117,14 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		logger.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
+
+	// Ensure owner references are correctly set
+	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, logger)
+	if err != nil {
+		logger.WithError(err).Error("Error reconciling object ownership")
+		return reconcile.Result{}, err
+	}
+
 	if !cd.DeletionTimestamp.IsZero() {
 		logger.Debug("ClusterDeployment resource has been deleted")
 		return reconcile.Result{}, nil
@@ -319,4 +327,15 @@ func indexOfCondition(conditions []configv1.ClusterOperatorStatusCondition, ctyp
 
 func updateClusterStateStatus(c client.Client, cs *hivev1.ClusterState) error {
 	return c.Status().Update(context.Background(), cs)
+}
+
+func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
+	return []*controllerutils.OwnershipUniqueKey{
+		{
+			TypeToList: &hivev1.ClusterStateList{},
+			LabelSelector: map[string]string{
+				constants.ClusterDeploymentNameLabel: owner.GetName(),
+			},
+		},
+	}
 }

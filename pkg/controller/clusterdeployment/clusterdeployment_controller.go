@@ -287,57 +287,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 		return reconcile.Result{}, err
 	}
 
-	// Ensure owner references are correctly set
-	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, r.logger)
-	if err != nil {
-		cdLog.WithError(err).Error("Error reconciling object ownership")
-		return reconcile.Result{}, err
-	}
-
 	return r.reconcile(request, cd, cdLog)
-}
-
-func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
-	return []*controllerutils.OwnershipUniqueKey{
-		{
-			TypeToList:    &hivev1.ClusterProvisionList{},
-			LabelSelector: map[string]string{constants.ClusterDeploymentNameLabel: owner.GetName()},
-		},
-		{
-			TypeToList: &corev1.PersistentVolumeClaimList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeploymentNameLabel: owner.GetName(),
-				constants.PVCTypeLabel:               constants.PVCTypeInstallLogs,
-			},
-		},
-		{
-			TypeToList: &batchv1.JobList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeploymentNameLabel: owner.GetName(),
-				constants.JobTypeLabel:               constants.JobTypeImageSet,
-			},
-		},
-		{
-			TypeToList: &hivev1.ClusterDeprovisionList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeploymentNameLabel: owner.GetName(),
-			},
-		},
-		{
-			TypeToList: &hivev1.DNSZoneList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeploymentNameLabel: owner.GetName(),
-				constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
-			},
-		},
-		{
-			TypeToList: &corev1.SecretList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeploymentNameLabel: owner.GetName(),
-				constants.SecretTypeLabel:            constants.SecretTypeMergedPullSecret,
-			},
-		},
-	}
 }
 
 func (r *ReconcileClusterDeployment) addAdditionalKubeconfigCAs(cd *hivev1.ClusterDeployment,

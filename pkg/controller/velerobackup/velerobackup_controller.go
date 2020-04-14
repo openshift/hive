@@ -169,7 +169,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 		}
 	}
 
-	objects, err := controllerutils.ListRuntimeObjects(r, hiveNamespaceScopedListTypes, client.InNamespace(request.Namespace))
+	objects, err := controllerutils.GetRuntimeObjects(r, hiveNamespaceScopedListTypes, request.Namespace)
 	if err != nil {
 		nsLogger.WithError(err).Error("Failed to list hive objects in namespace.")
 		return reconcile.Result{}, err

@@ -1630,8 +1630,8 @@ github.com/openshift/generic-admission-server v1.14.0/go.mod h1:GD9KN/W4KxqRQGVM
 github.com/openshift/hashicorp-terraform v0.12.20-openshift-2/go.mod h1:R/dUWEZVB5itR8fNzx3g8QZMIwwWuI8rcwF8SbL1sq4=
 github.com/openshift/hashicorp-terraform-plugin-sdk v1.6.0-openshift/go.mod h1:H5QLx/uhwfxBZ59Bc5SqT19M4i+fYt7LZjHTpbLZiAg=
 github.com/openshift/imagebuilder v1.1.0/go.mod h1:9aJRczxCH0mvT6XQ+5STAQaPWz7OsWcU5/mRkt8IWeo=
-github.com/openshift/installer v0.9.0-master.0.20200331173433-d200b241c184 h1:3XqXC/+0p8IK9VTXTTLXL5NgBz6YKJJQfjssls8il4U=
-github.com/openshift/installer v0.9.0-master.0.20200331173433-d200b241c184/go.mod h1:/Lb0nchkM3FqZG+QFIjkrbMjOK1HbDMEChDUVqElPGA=
+github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54 h1:ZM2Ls7AWBAmuHrXTc7WcWc9N1JZHa4srXWREb2B+0o8=
+github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54/go.mod h1:1P8vZ6l52a7h5TFU6lNh2B4fBdeAnPCbcvd4IF6/dyE=
 github.com/openshift/kubernetes-sigs-controller-tools v0.1.10-0.20190430113700-72ae52c08b9d h1:16Ir1BGrBeAg8nzGhOPp4v3K2EadssC/E9zXDWMu4gw=
 github.com/openshift/kubernetes-sigs-controller-tools v0.1.10-0.20190430113700-72ae52c08b9d/go.mod h1:ATWLRP3WGxuAN9HcT2LaKHReXIH+EZGzRuMHuxjXfhQ=
 github.com/openshift/library-go v0.0.0-20200106191802-9821002633e8 h1:gjmVJ0XiETkdUbVm4Fu5Hg7S9mlXcEuG6DztuQ4KiYM=

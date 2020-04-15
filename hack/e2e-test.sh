@@ -7,8 +7,15 @@ sleep_between_tries=10
 component=hive
 local_hive_image=$(eval "echo $IMAGE_FORMAT")
 export HIVE_IMAGE="${HIVE_IMAGE:-$local_hive_image}"
-export RELEASE_IMAGE="${RELEASE_IMAGE:-registry.svc.ci.openshift.org/${OPENSHIFT_BUILD_NAMESPACE}/release:latest}"
+
+# Replace stable:hive with release:latest in the IMAGE_FORMAT we're given by the ci-operator:
+local_release_image="${HIVE_IMAGE/stable:hive/release:latest}"
+export RELEASE_IMAGE="${RELEASE_IMAGE:-$local_release_image}"
+
 export CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-cluster-test}"
+
+echo "Running e2e with HIVE_IMAGE ${HIVE_IMAGE}"
+echo "Running e2e with RELEASE_IMAGE ${RELEASE_IMAGE}"
 
 if ! which kustomize > /dev/null; then
   kustomize_dir="$(mktemp -d)"
@@ -187,13 +194,19 @@ fi
 sleep 120
 
 echo "Deployments in hive namespace"
-oc get deployments -n hive
+oc get deployments -n ${HIVE_NS}
 echo ""
 echo "Pods in hive namespace"
-oc get pods -n hive
+oc get pods -n ${HIVE_NS}
+echo ""
+echo "Pods in cluster namespace"
+oc get pods -n ${CLUSTER_NAMESPACE}
 echo ""
 echo "Events in hive namespace"
-oc get events -n hive
+oc get events -n ${HIVE_NS}
+echo ""
+echo "Events in cluster namespace"
+oc get events -n ${CLUSTER_NAMESPACE}
 
 echo "Waiting for install job to start and complete"
 
@@ -205,10 +218,15 @@ then
 fi
 
 # Capture install logs
-if INSTALL_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/install=true" -o name) && [ "${INSTALL_JOB_NAME}" ]
+if IMAGESET_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/imageset=true" -o name -n ${CLUSTER_NAMESPACE}) && [ "${IMAGESET_JOB_NAME}" ]
 then
-	oc logs -c hive ${INSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_install_job.log" || true
-	oc get ${INSTALL_JOB_NAME} -o yaml &> "${ARTIFACT_DIR}/hive_install_job.yaml" || true
+	oc logs -c hive -n ${CLUSTER_NAMESPACE} ${IMAGESET_JOB_NAME} &> "${ARTIFACT_DIR}/hive_imageset_job.log" || true
+	oc get ${IMAGESET_JOB_NAME} -n ${CLUSTER_NAMESPACE} -o yaml &> "${ARTIFACT_DIR}/hive_imageset_job.yaml" || true
+fi
+if INSTALL_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/install=true" -o name -n ${CLUSTER_NAMESPACE}) && [ "${INSTALL_JOB_NAME}" ]
+then
+	oc logs -c hive -n ${CLUSTER_NAMESPACE} ${INSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_install_job.log" || true
+	oc get ${INSTALL_JOB_NAME} -n ${CLUSTER_NAMESPACE} -o yaml &> "${ARTIFACT_DIR}/hive_install_job.yaml" || true
 fi
 oc get clusterdeployment -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterdeployment.yaml" || true
 oc get clusterimageset -o yaml &> "${ARTIFACT_DIR}/hive_clusterimagesets.yaml" || true

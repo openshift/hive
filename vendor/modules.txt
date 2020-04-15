@@ -2,8 +2,6 @@
 cloud.google.com/go/compute/metadata
 # github.com/Azure/azure-sdk-for-go v38.1.0+incompatible
 github.com/Azure/azure-sdk-for-go/profiles/latest/dns/mgmt/dns
-github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources
-github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/subscriptions
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute
 github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns
 github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac
@@ -517,7 +515,7 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
-# github.com/openshift/installer v0.9.0-master.0.20200331173433-d200b241c184
+# github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure
 github.com/openshift/installer/pkg/asset/installconfig/gcp

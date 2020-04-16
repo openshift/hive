@@ -5081,6 +5081,16 @@ data:
       - "failed to initialize the cluster: Cluster operator monitoring is still updating"
       installFailingReason: MonitoringOperatorStillUpdating
       installFailingMessage: Timeout waiting for the monitoring operator to become ready
+    - name: SimulatorThrottling
+      searchRegexStrings:
+      - "validate AWS credentials: checking install permissions: error simulating policy: Throttling: Rate exceeded"
+      installFailingReason: AWSAPIRateLimitExceeded
+      installFailingMessage: AWS API rate limit exceeded while simulating policy
+    - name: GeneralThrottling
+      searchRegexStrings:
+      - "Throttling: Rate exceeded"
+      installFailingReason: AWSAPIRateLimitExceeded
+      installFailingMessage: AWS API rate limit exceeded
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:

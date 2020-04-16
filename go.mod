@@ -28,7 +28,7 @@ require (
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/cluster-network-operator v0.0.0-20190207145423-c226dcab667e
 	github.com/openshift/generic-admission-server v1.14.0
-	github.com/openshift/installer v0.9.0-master.0.20200331173433-d200b241c184
+	github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54
 	github.com/openshift/library-go v0.0.0-20200210105614-4bf528465627
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.2.1

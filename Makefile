@@ -172,7 +172,7 @@ fmt:
 # Run go vet against code
 .PHONY: vet
 vet:
-	go vet ./pkg/... ./cmd/... ./contrib/...
+	go vet $(GO_MOD_FLAGS) ./pkg/... ./cmd/... ./contrib/...
 
 # Run verification tests
 .PHONY: verify
@@ -212,7 +212,7 @@ verify-gofmt:
 .PHONY: verify-go-vet
 verify-go-vet: generate
 	@echo Verifying go vet
-	@go vet ./cmd/... ./contrib/... $(go list ./pkg/... | grep -v _generated)
+	@go vet $(GO_MOD_FLAGS) ./cmd/... ./contrib/... $(go list ./pkg/... | grep -v _generated)
 
 .PHONY: verify-generated
 verify-generated: install-tools

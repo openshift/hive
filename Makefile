@@ -180,7 +180,8 @@ buildah-push:
 .PHONY: lint
 lint: install-tools
 	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
-verify: lint
+# Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
+#verify: lint
 
 .PHONY: install-tools
 install-tools:

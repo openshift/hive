@@ -91,6 +91,7 @@ type ClusterDeploymentSpec struct {
 	ClusterMetadata *ClusterMetadata `json:"clusterMetadata,omitempty"`
 
 	// Installed is true if the cluster has been installed
+	// +optional
 	Installed bool `json:"installed"`
 
 	// Provisioning contains settings used only for initial cluster provisioning.
@@ -166,7 +167,7 @@ type ClusterDeploymentStatus struct {
 	InstallRestarts int `json:"installRestarts,omitempty"`
 
 	// ClusterVersionStatus will hold a copy of the remote cluster's ClusterVersion.Status
-	ClusterVersionStatus openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus,omitempty"`
+	ClusterVersionStatus *openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus,omitempty"`
 
 	// APIURL is the URL where the cluster's API can be accessed.
 	APIURL string `json:"apiURL,omitempty"`

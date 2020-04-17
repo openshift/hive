@@ -84,7 +84,8 @@ type SyncSetInstanceStatus struct {
 	Conditions []SyncCondition `json:"conditions,omitempty"`
 
 	// Applied will be true if all resources, patches, or secrets have successfully been applied on last attempt.
-	Applied bool `json:"applied"`
+	// +optional
+	Applied bool `json:"applied,omitempty"`
 }
 
 // +genclient

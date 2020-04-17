@@ -237,8 +237,6 @@ spec:
         status:
           description: MachinePoolStatus defines the observed state of MachinePool
           type: object
-          required:
-          - replicas
           properties:
             conditions:
               description: Conditions includes more detailed status for the cluster

@@ -103,8 +103,6 @@ spec:
         status:
           description: DNSZoneStatus defines the observed state of DNSZone
           type: object
-          required:
-          - lastSyncGeneration
           properties:
             aws:
               description: AWSDNSZoneStatus contains status information specific to

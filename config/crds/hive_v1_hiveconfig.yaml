@@ -33,8 +33,6 @@ spec:
         spec:
           description: HiveConfigSpec defines the desired state of Hive
           type: object
-          required:
-          - failedProvisionConfig
           properties:
             additionalCertificateAuthoritiesSecretRef:
               description: AdditionalCertificateAuthoritiesSecretRef is a list of

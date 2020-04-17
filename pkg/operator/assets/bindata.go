@@ -1652,7 +1652,6 @@ spec:
           required:
           - baseDomain
           - clusterName
-          - installed
           - platform
           properties:
             baseDomain:
@@ -8631,8 +8630,6 @@ spec:
         status:
           description: DNSZoneStatus defines the observed state of DNSZone
           type: object
-          required:
-          - lastSyncGeneration
           properties:
             aws:
               description: AWSDNSZoneStatus contains status information specific to
@@ -8758,8 +8755,6 @@ spec:
         spec:
           description: HiveConfigSpec defines the desired state of Hive
           type: object
-          required:
-          - failedProvisionConfig
           properties:
             additionalCertificateAuthoritiesSecretRef:
               description: AdditionalCertificateAuthoritiesSecretRef is a list of
@@ -9192,8 +9187,6 @@ spec:
         status:
           description: MachinePoolStatus defines the observed state of MachinePool
           type: object
-          required:
-          - replicas
           properties:
             conditions:
               description: Conditions includes more detailed status for the cluster
@@ -11080,8 +11073,6 @@ spec:
         status:
           description: SyncSetInstanceStatus defines the observed state of SyncSetInstance
           type: object
-          required:
-          - applied
           properties:
             applied:
               description: Applied will be true if all resources, patches, or secrets

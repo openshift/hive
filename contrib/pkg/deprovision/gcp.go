@@ -27,7 +27,7 @@ type gcpOptions struct {
 func NewDeprovisionGCPCommand() *cobra.Command {
 	opt := &gcpOptions{}
 	cmd := &cobra.Command{
-		Use:   "gcp INFRAID --region=REGION --gcp-project-id=GCP_PROJECT_ID",
+		Use:   "gcp INFRAID --region=REGION",
 		Short: "Deprovision GCP assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

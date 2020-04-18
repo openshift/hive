@@ -612,6 +612,8 @@ rules:
   - configmaps
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
@@ -905,13 +907,14 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
         livenessProbe:
           httpGet:
-            path: /debug/health
+            path: /healthz
             port: 8080
-          initialDelaySeconds: 10
-          failureThreshold: 1
-          periodSeconds: 10
       terminationGracePeriodSeconds: 10
 `)
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // Info contains information obtained from a resource submitted to the Apply function

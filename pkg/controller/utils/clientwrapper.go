@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
@@ -154,7 +155,7 @@ type hiveStatusWriter struct {
 }
 
 // Update implements StatusWriter.Update
-func (sw *hiveStatusWriter) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOptionFunc) error {
+func (sw *hiveStatusWriter) Update(ctx context.Context, obj runtime.Object, opts ...client.UpdateOption) error {
 	switch t := obj.(type) {
 	case *hivev1.ClusterDeployment:
 		// Fetching clusterVersion object can result in nil clusterVersion.Status.AvailableUpdates

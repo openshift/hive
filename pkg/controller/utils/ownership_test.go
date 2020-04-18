@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -16,7 +19,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -64,52 +66,37 @@ func validOtherClusterDeployment(namespace string) *hivev1.ClusterDeployment {
 	}
 }
 
-func validDNSZoneWithLabelOwner(labelOwner hivev1.MetaRuntimeObject, scheme *runtime.Scheme, namespace string) *hivev1.DNSZone {
-	zone := &hivev1.DNSZone{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "dnszoneobject",
-			Namespace:  namespace,
-			Generation: 6,
-			Finalizers: []string{hivev1.FinalizerDNSZone},
-			UID:        types.UID("abcdef"),
-			Labels: map[string]string{
-				constants.ClusterDeploymentNameLabel: labelOwner.GetName(),
-				constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
-			},
-		},
-		Spec: hivev1.DNSZoneSpec{
-			Zone: "blah.example.com",
-			AWS: &hivev1.AWSDNSZoneSpec{
-				CredentialsSecretRef: corev1.LocalObjectReference{
-					Name: "somesecret",
-				},
-				AdditionalTags: []hivev1.AWSResourceTag{
-					{
-						Key:   "foo",
-						Value: "bar",
+func validDNSZone(namespace string, options ...testdnszone.Option) *hivev1.DNSZone {
+	options = append(
+		[]testdnszone.Option{
+			testdnszone.WithTypeMeta(),
+			testdnszone.WithResourceVersion("1"),
+			func(dnsZone *hivev1.DNSZone) {
+				dnsZone.Name = "dnszoneobject"
+				dnsZone.Namespace = namespace
+				dnsZone.Generation = 6
+				dnsZone.Finalizers = []string{hivev1.FinalizerDNSZone}
+				dnsZone.UID = types.UID("abcdef")
+				dnsZone.Spec.Zone = "blah.example.com"
+				dnsZone.Spec.AWS = &hivev1.AWSDNSZoneSpec{
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "somesecret",
 					},
-				},
+					AdditionalTags: []hivev1.AWSResourceTag{
+						{
+							Key:   "foo",
+							Value: "bar",
+						},
+					},
+				}
+				dnsZone.Status.AWS = &hivev1.AWSDNSZoneStatus{
+					ZoneID: aws.String("1234"),
+				}
 			},
 		},
-		Status: hivev1.DNSZoneStatus{
-			AWS: &hivev1.AWSDNSZoneStatus{
-				ZoneID: aws.String("1234"),
-			},
-		},
-	}
-
-	return zone
-}
-
-func validDNSZoneWithMissingOwnership(owner hivev1.MetaRuntimeObject, scheme *runtime.Scheme, namespace string) *hivev1.DNSZone {
-	zone := validDNSZoneWithLabelOwner(owner, scheme, namespace)
-	return zone
-}
-
-func validDNSZoneWithControllerOwnership(labelOwner, controllerOwner hivev1.MetaRuntimeObject, scheme *runtime.Scheme, namespace string) *hivev1.DNSZone {
-	zone := validDNSZoneWithLabelOwner(labelOwner, scheme, namespace)
-	controllerutil.SetControllerReference(controllerOwner, zone, scheme)
-	return zone
+		options...,
+	)
+	return testdnszone.Build(options...)
 }
 
 func TestReconcile(t *testing.T) {
@@ -136,12 +123,24 @@ func TestReconcile(t *testing.T) {
 			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
 			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 			existingObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
-				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validClusterDeployment(differentNamespace), testscheme, differentNamespace),
+				validDNSZone(testNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(testNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(testNamespace)),
+				),
+				validDNSZone(differentNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(differentNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(differentNamespace)),
+				),
 			},
 			expectedObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
-				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validClusterDeployment(differentNamespace), testscheme, differentNamespace),
+				validDNSZone(testNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(testNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(testNamespace)),
+				),
+				validDNSZone(differentNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(differentNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(differentNamespace)),
+				),
 			},
 		},
 		{
@@ -150,12 +149,24 @@ func TestReconcile(t *testing.T) {
 			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
 			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 			existingObjects: []runtime.Object{
-				validDNSZoneWithMissingOwnership(validClusterDeployment(testNamespace), testscheme, testNamespace),
-				validDNSZoneWithMissingOwnership(validClusterDeployment(differentNamespace), testscheme, differentNamespace),
+				validDNSZone(testNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(testNamespace)),
+				),
+				validDNSZone(differentNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(differentNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(testNamespace)),
+				),
 			},
 			expectedObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
-				validDNSZoneWithMissingOwnership(validClusterDeployment(differentNamespace), testscheme, differentNamespace),
+				validDNSZone(testNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(testNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(testNamespace)),
+					testdnszone.WithIncrementedResourceVersion(),
+				),
+				validDNSZone(differentNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(differentNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(testNamespace)),
+				),
 			},
 		},
 		{
@@ -164,12 +175,25 @@ func TestReconcile(t *testing.T) {
 			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(validClusterDeployment(testNamespace)),
 			ownershipUniqueKeys:                  validOwnershipUniqueKeys(validClusterDeployment(testNamespace)),
 			existingObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validOtherClusterDeployment(testNamespace), testscheme, testNamespace),
-				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validOtherClusterDeployment(differentNamespace), testscheme, differentNamespace),
+				validDNSZone(testNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(testNamespace)),
+					testdnszone.WithControllerOwnerReference(validOtherClusterDeployment(testNamespace)),
+				),
+				validDNSZone(differentNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(differentNamespace)),
+					testdnszone.WithControllerOwnerReference(validOtherClusterDeployment(differentNamespace)),
+				),
 			},
 			expectedObjects: []runtime.Object{
-				validDNSZoneWithControllerOwnership(validClusterDeployment(testNamespace), validClusterDeployment(testNamespace), testscheme, testNamespace),
-				validDNSZoneWithControllerOwnership(validClusterDeployment(differentNamespace), validOtherClusterDeployment(differentNamespace), testscheme, differentNamespace),
+				validDNSZone(testNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(testNamespace)),
+					testdnszone.WithControllerOwnerReference(validClusterDeployment(testNamespace)),
+					testdnszone.WithIncrementedResourceVersion(),
+				),
+				validDNSZone(differentNamespace,
+					testdnszone.WithLabelOwner(validClusterDeployment(differentNamespace)),
+					testdnszone.WithControllerOwnerReference(validOtherClusterDeployment(differentNamespace)),
+				),
 			},
 		},
 	}

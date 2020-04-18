@@ -29,6 +29,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
-	k8slabels "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/client-go/kubernetes/scheme"

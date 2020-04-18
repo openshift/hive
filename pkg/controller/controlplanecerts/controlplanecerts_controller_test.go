@@ -85,7 +85,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
 
-				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURLDomain, "default-secret"))
+				validateAppliedSyncSet(t, applied, additionalCert(fakeAPIURLDomain, "default-secret"))
 
 				ss := applied[0].(metav1.Object)
 				labels := ss.GetLabels()
@@ -106,7 +106,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
-				validateAppliedSyncSet(t, applied, "", additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
+				validateAppliedSyncSet(t, applied, additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
 		{
@@ -125,7 +125,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				cd := getFakeClusterDeployment(t, c)
 				assert.Len(t, cd.Status.Conditions, 1, "no conditions should be added")
 
-				validateAppliedSyncSet(t, applied, "", additionalCert(fakeAPIURLDomain, "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
+				validateAppliedSyncSet(t, applied, additionalCert(fakeAPIURLDomain, "secret0"), additionalCert("foo.com", "secret1"), additionalCert("bar.com", "secret2"))
 			},
 		},
 		{
@@ -154,7 +154,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeSyncSet(),
 			},
 			validate: func(t *testing.T, c client.Client, applied []runtime.Object) {
-				validateAppliedSyncSet(t, applied, "")
+				validateAppliedSyncSet(t, applied)
 			},
 		},
 		{
@@ -397,7 +397,7 @@ func additionalCert(domain, secret string) additionalCertSpec {
 	}
 }
 
-func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret string, additional ...additionalCertSpec) {
+func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, additional ...additionalCertSpec) {
 	assert.Len(t, objs, 1, "single syncset expected")
 	assert.IsType(t, &hivev1.SyncSet{}, objs[0], "syncset object expected")
 	ss := objs[0].(*hivev1.SyncSet)
@@ -414,14 +414,6 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 	names := secretNames(secretMappings)
 	assert.Equal(t, sets.NewString(names...).Len(), len(names))
 
-	if defaultSecret != "" {
-		s := findSecret(secretMappings, defaultSecret)
-		assert.NotNil(t, s)
-		assert.Equal(t, apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name, s)
-	} else {
-		assert.Empty(t, apiServerConfig.Spec.ServingCerts.DefaultServingCertificate.Name)
-	}
-
 	for i, c := range additional {
 		s := findSecret(secretMappings, c.secret)
 		assert.NotNil(t, s)
@@ -433,7 +425,7 @@ func validateAppliedSyncSet(t *testing.T, objs []runtime.Object, defaultSecret s
 	}
 
 	// If not setting any secrets, ensure they're empty
-	if defaultSecret == "" && len(additional) == 0 {
+	if len(additional) == 0 {
 		assert.Empty(t, secretMappings)
 	}
 }

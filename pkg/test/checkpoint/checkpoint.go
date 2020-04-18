@@ -26,6 +26,19 @@ func Generic(opt generic.Option) Option {
 	}
 }
 
+// WithResourceVersion sets the specified resource version on the supplied object.
+func WithResourceVersion(resourceVersion string) Option {
+	return Generic(generic.WithResourceVersion(resourceVersion))
+}
+
+// WithTypeMeta populates the type meta for the object.
+func WithTypeMeta() Option {
+	return func(checkpoint *hivev1.Checkpoint) {
+		checkpoint.APIVersion = hivev1.SchemeGroupVersion.String()
+		checkpoint.Kind = "Checkpoint"
+	}
+}
+
 // WithLastBackupChecksum sets the checksum for all Hive objects backed up in the last backup object.
 func WithLastBackupChecksum(lastBackupChecksum string) Option {
 	return func(checkpoint *hivev1.Checkpoint) {

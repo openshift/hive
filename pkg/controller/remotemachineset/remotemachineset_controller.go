@@ -287,7 +287,7 @@ func (r *ReconcileRemoteMachineSet) getRemoteMachineSets(
 	if err := remoteClusterAPIClient.List(
 		context.Background(),
 		remoteMachineSets,
-		client.UseListOptions(&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}}),
+		&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}},
 	); err != nil {
 		logger.WithError(err).Error("unable to fetch remote machine sets")
 		return nil, err
@@ -554,7 +554,7 @@ func (r *ReconcileRemoteMachineSet) syncMachineAutoscalers(
 	if err := remoteClusterAPIClient.List(
 		context.Background(),
 		remoteMachineAutoscalers,
-		client.UseListOptions(&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}}),
+		&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}},
 	); err != nil {
 		logger.WithError(err).Error("unable to fetch remote machine autoscalers")
 		return err
@@ -686,7 +686,7 @@ func (r *ReconcileRemoteMachineSet) syncClusterAutoscaler(
 	if err := remoteClusterAPIClient.List(
 		context.Background(),
 		remoteClusterAutoscalers,
-		client.UseListOptions(&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}}),
+		&client.ListOptions{Raw: &metav1.ListOptions{TypeMeta: tm}},
 	); err != nil {
 		logger.WithError(err).Error("unable to fetch remote cluster autoscalers")
 		return err

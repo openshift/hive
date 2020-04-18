@@ -7,9 +7,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
-	kcmdapply "k8s.io/kubernetes/pkg/kubectl/cmd/apply"
+	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
 
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // ApplyResult indicates what type of change was performed

@@ -854,6 +854,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() runtime.Object {
 					cd := testClusterDeploymentWithProvision()
 					cd.CreationTimestamp = metav1.Now()
+					if cd.Annotations == nil {
+						cd.Annotations = make(map[string]string, 1)
+					}
 					cd.Annotations[deleteAfterAnnotation] = "8h"
 					return cd
 				}(),
@@ -869,6 +872,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() runtime.Object {
 					cd := testClusterDeploymentWithProvision()
 					cd.CreationTimestamp = metav1.Now()
+					if cd.Annotations == nil {
+						cd.Annotations = make(map[string]string, 1)
+					}
 					cd.Annotations[deleteAfterAnnotation] = "8h"
 					return cd
 				}(),
@@ -1330,13 +1336,15 @@ func TestDeleteStaleProvisions(t *testing.T) {
 
 func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 	cd := &hivev1.ClusterDeployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: hivev1.SchemeGroupVersion.String(),
+			Kind:       "ClusterDeployment",
+		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        testName,
-			Namespace:   testNamespace,
-			Finalizers:  []string{hivev1.FinalizerDeprovision},
-			UID:         types.UID("1234"),
-			Annotations: map[string]string{},
-			Labels:      map[string]string{},
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{hivev1.FinalizerDeprovision},
+			UID:        types.UID("1234"),
 		},
 	}
 	return cd
@@ -1369,6 +1377,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 	}
 
+	if cd.Labels == nil {
+		cd.Labels = make(map[string]string, 2)
+	}
 	cd.Labels[hivev1.HiveClusterPlatformLabel] = "aws"
 	cd.Labels[hivev1.HiveClusterRegionLabel] = "us-east-1"
 
@@ -1425,6 +1436,9 @@ func testDeletedClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
 func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(-60 * time.Minute)}
+	if cd.Annotations == nil {
+		cd.Annotations = make(map[string]string, 1)
+	}
 	cd.Annotations[deleteAfterAnnotation] = "5m"
 	return cd
 }

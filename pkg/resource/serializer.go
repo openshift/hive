@@ -44,12 +44,12 @@ func (e *metaTimeExtension) Encode(ptr unsafe.Pointer, stream *json.Stream) {
 	metaTime := reflect2.TypeOf(metav1.Time{}).UnsafeIndirect(ptr).(metav1.Time)
 	data, err := metaTime.MarshalJSON()
 	if err != nil {
-		log.Errorf("cannot marshal %#v as meta time: %v", ptr, err)
+		log.Warnf("cannot marshal %#v as meta time: %v", ptr, err)
 		return
 	}
 	_, err = stream.Write(data)
 	if err != nil {
-		log.Errorf("cannot write serialized time (%s): %v", string(data), err)
+		log.Warnf("cannot write serialized time (%s): %v", string(data), err)
 	}
 }
 
@@ -77,7 +77,7 @@ func (r *Helper) Serialize(obj runtime.Object, scheme *runtime.Scheme) ([]byte, 
 	printer := printers.NewTypeSetter(scheme).ToPrinter(&jsonPrinter{})
 	buf := &bytes.Buffer{}
 	if err := printer.PrintObj(obj, buf); err != nil {
-		r.logger.WithError(err).Errorf("cannot serialize runtime object of type %T", obj)
+		r.logger.WithError(err).Warnf("cannot serialize runtime object of type %T", obj)
 		return nil, err
 	}
 	return buf.Bytes(), nil

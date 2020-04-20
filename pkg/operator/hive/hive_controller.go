@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -339,21 +338,15 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 }
 
 func (r *ReconcileHiveConfig) cleanupLegacyObjects(hLog log.FieldLogger) error {
-	clusterRoleGVR := schema.GroupVersionResource{
-		Group:    "rbac.authorization.k8s.io",
-		Version:  "v1",
-		Resource: "clusterroles",
+	gvrNSNames := []gvrNSName{
+		{group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterroles", name: "manager-role"},
+		{group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterrolebindings", name: "manager-rolebinding"},
 	}
-	clusterRoleBindingGVR := schema.GroupVersionResource{
-		Group:    "rbac.authorization.k8s.io",
-		Version:  "v1",
-		Resource: "clusterrolebindings",
-	}
-	if err := dynamicDelete(r.dynamicClient, clusterRoleGVR, "manager-role", hLog); err != nil {
-		return err
-	}
-	if err := dynamicDelete(r.dynamicClient, clusterRoleBindingGVR, "manager-rolebinding", hLog); err != nil {
-		return err
+
+	for _, gvrnsn := range gvrNSNames {
+		if err := dynamicDelete(r.dynamicClient, gvrnsn, hLog); err != nil {
+			return err
+		}
 	}
 	return nil
 }

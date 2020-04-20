@@ -426,6 +426,10 @@ spec:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                    trunkSupport:
+                      description: TrunkSupport indicates whether or not to use trunk
+                        ports in your OpenShift cluster.
+                      type: boolean
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
                 from Hive without deprovisioning it

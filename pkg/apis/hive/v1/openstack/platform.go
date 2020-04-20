@@ -13,4 +13,8 @@ type Platform struct {
 	// Cloud will be used to indicate the OS_CLOUD value to use the right section
 	// from the cloud.yaml in the CredentialsSecretRef.
 	Cloud string `json:"cloud"`
+
+	// TrunkSupport indicates whether or not to use trunk ports in your OpenShift cluster.
+	// +optional
+	TrunkSupport bool `json:"trunkSupport,omitempty"`
 }

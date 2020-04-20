@@ -28,10 +28,6 @@ const (
 	// Omit m, the installer used this for the master machines. w is also removed as this is implicitly used
 	// by the installer for the original worker pool.
 	validLeaseChars = "abcdefghijklnopqrstuvxyz0123456789"
-
-	// workerRole is assumed role name for workers, used to locate several resources the installer
-	// would have created in GCP.
-	workerRole = "worker"
 )
 
 // GCPActuator encapsulates the pieces necessary to be able to generate
@@ -135,7 +131,7 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	// so we need to fake it to get it to use our leaseChar.
 	computePool.Name = string(leaseChar)
 	// Assuming all machine pools are workers at this time.
-	installerMachineSets, err := installgcp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, workerRole, "worker-user-data")
+	installerMachineSets, err := installgcp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, workerRole, workerUserData)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
 

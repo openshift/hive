@@ -369,7 +369,7 @@ func validateAzureMachinePoolPlatformInvariants(platform *hivev1azure.MachinePoo
 
 func validateOpenStackMachinePoolPlatformInvariants(platform *hivev1openstack.MachinePool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if platform.FlavorName == "" {
+	if platform.Flavor == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "flavor name is required"))
 	}
 	return allErrs

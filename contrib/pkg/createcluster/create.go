@@ -477,7 +477,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			MasterFlavor:      o.OpenStackMasterFlavor,
 			APIFloatingIP:     o.OpenStackAPIFloatingIP,
 		}
-		builder.SkipMachinePoolGeneration = true
 		builder.CloudBuilder = openStackProvider
 
 	}

@@ -806,6 +806,8 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 			return nil, err
 		}
 		return NewAzureActuator(creds, logger)
+	case cd.Spec.Platform.OpenStack != nil:
+		return NewOpenStackActuator(logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

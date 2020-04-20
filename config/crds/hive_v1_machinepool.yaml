@@ -176,8 +176,15 @@ spec:
                     on OpenStack.
                   type: object
                   required:
-                  - type
+                  - flavor
                   properties:
+                    flavor:
+                      description: Flavor defines the OpenStack Nova flavor. eg. m1.large
+                        The json key here differs from the installer which uses both
+                        "computeFlavor" and type "type" depending on which type you're
+                        looking at, and the resulting field on the MachineSet is "flavor".
+                        We are opting to stay consistent with the end result.
+                      type: string
                     rootVolume:
                       description: RootVolume defines the root volume for instances
                         in the machine pool. The instances use ephemeral disks if
@@ -194,10 +201,6 @@ spec:
                         type:
                           description: Type defines the type of the volume. Required
                           type: string
-                    type:
-                      description: FlavorName defines the OpenStack Nova flavor. eg.
-                        m1.large
-                      type: string
             replicas:
               description: Replicas is the count of machines for this machine pool.
                 Replicas and autoscaling cannot be used together. Default is 1, if

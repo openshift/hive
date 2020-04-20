@@ -247,3 +247,8 @@ fi
 
 echo "Running post-install tests"
 make test-e2e-postinstall
+
+echo "Uninstalling hive and validating cleanup"
+make test-e2e-uninstallhive
+
+

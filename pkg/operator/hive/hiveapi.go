@@ -35,7 +35,7 @@ func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.He
 		"config/apiserver/service-account.yaml",
 	}
 	for _, assetPath := range namespacedAssets {
-		if err := applyAssetWithNamespaceOverride(h, assetPath, hiveNSName); err != nil {
+		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, hiveConfig); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -47,7 +47,7 @@ func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.He
 		"config/apiserver/hiveapi_rbac_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if err := util.ApplyAsset(h, a, hLog); err != nil {
+		if err := util.ApplyAssetWithGC(h, a, hiveConfig, hLog); err != nil {
 			return err
 		}
 	}
@@ -57,25 +57,25 @@ func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.He
 		"config/apiserver/hiveapi_rbac_role_binding.yaml",
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
-		if err := applyClusterRoleBindingAssetWithSubjectNamespaceOverride(h, crbAsset, hiveNSName); err != nil {
+		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, hiveConfig); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
 		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
 	}
 
-	if err := r.createHiveAPIDeployment(hLog, h, hiveNSName); err != nil {
+	if err := r.createHiveAPIDeployment(hLog, h, hiveNSName, hiveConfig); err != nil {
 		return err
 	}
 
-	if err := r.createAPIServerAPIService(hLog, h, hiveNSName); err != nil {
+	if err := r.createAPIServerAPIService(hLog, h, hiveNSName, hiveConfig); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h *resource.Helper, hiveNSName string) error {
+func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h *resource.Helper, hiveNSName string, hiveConfig *hivev1.HiveConfig) error {
 	hLog.Debug("reading apiservice")
 	asset := assets.MustAsset("config/apiserver/apiservice.yaml")
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
@@ -106,7 +106,7 @@ func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h 
 		apiService.Spec.CABundle = serviceCA
 	}
 
-	result, err := h.ApplyRuntimeObject(apiService, scheme.Scheme)
+	result, err := util.ApplyRuntimeObjectWithGC(h, apiService, hiveConfig)
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
 		return err
@@ -116,7 +116,7 @@ func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h 
 	return nil
 }
 
-func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *resource.Helper, hiveNSName string) error {
+func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *resource.Helper, hiveNSName string, hiveConfig *hivev1.HiveConfig) error {
 	asset := assets.MustAsset("config/apiserver/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveAPIDeployment := resourceread.ReadDeploymentV1OrDie(asset)
@@ -130,7 +130,7 @@ func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *r
 		hiveAPIDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = r.hiveImagePullPolicy
 	}
 
-	result, err := h.ApplyRuntimeObject(hiveAPIDeployment, scheme.Scheme)
+	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAPIDeployment, hiveConfig)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -164,7 +164,7 @@ func (r *ReconcileHiveConfig) tearDownHiveAPI(hLog log.FieldLogger, hiveNSName s
 		},
 	}
 
-	errorList := []error{}
+	var errorList []error
 	for _, obj := range objects {
 		if err := resource.DeleteAnyExistingObject(r, obj.key, obj.object, hLog); err != nil {
 			errorList = append(errorList, err)

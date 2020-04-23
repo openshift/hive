@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -79,5 +80,12 @@ func WithIncrementedResourceVersion() Option {
 			rv = 0
 		}
 		meta.SetResourceVersion(strconv.Itoa(rv + 1))
+	}
+}
+
+// WithUID sets the Metadata UID on the supplied object.
+func WithUID(uid string) Option {
+	return func(meta metav1.Object) {
+		meta.SetUID(types.UID(uid))
 	}
 }

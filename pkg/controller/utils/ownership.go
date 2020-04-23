@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -80,10 +81,12 @@ func SyncControllerReference(owner hivev1.MetaRuntimeObject, object hivev1.MetaR
 		"objectNamespacedName": objectNamespacedName,
 	})
 
+	ownerRef := metav1.NewControllerRef(owner, ownerGVK)
+
 	// Remove any other controller ref (librarygocontroller doesn't look at controller references, so it won't do this).
 	for i, ref := range object.GetOwnerReferences() {
 		if ref.Controller != nil && *ref.Controller {
-			if ref.UID != owner.GetUID() {
+			if !equality.Semantic.DeepEqual(&ref, ownerRef) {
 				ownerRefs := object.GetOwnerReferences()
 				ownerRefs[i] = ownerRefs[len(ownerRefs)-1]              // Copy last element in the slice over the top of the controller owner reference.
 				object.SetOwnerReferences(ownerRefs[:len(ownerRefs)-1]) // Remove the last element (since it's now in the position pointed to i)
@@ -93,7 +96,6 @@ func SyncControllerReference(owner hivev1.MetaRuntimeObject, object hivev1.MetaR
 	}
 
 	// Add the controller reference if it doesn't already exist.
-	ownerRef := metav1.NewControllerRef(owner, ownerGVK)
 	ownerRefsChanged := librarygocontroller.EnsureOwnerRef(object, *ownerRef)
 
 	if !ownerRefsChanged {

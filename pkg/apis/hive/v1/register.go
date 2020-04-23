@@ -14,8 +14,14 @@ import (
 )
 
 var (
+	// HiveAPIGroup is the group that all hive objects belong to in the API server.
+	HiveAPIGroup = "hive.openshift.io"
+
+	// HiveAPIVersion is the api version that all hive objects are currently at.
+	HiveAPIVersion = "v1"
+
 	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: "hive.openshift.io", Version: "v1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: HiveAPIGroup, Version: HiveAPIVersion}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}

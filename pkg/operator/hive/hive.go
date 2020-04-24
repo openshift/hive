@@ -29,7 +29,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -160,7 +159,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/controllers/hive_controllers_serviceaccount.yaml",
 	}
 	for _, assetPath := range namespacedAssets {
-		if err := applyAssetWithNamespaceOverride(h, assetPath, hiveNSName); err != nil {
+		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -173,7 +172,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/controllers/hive_controllers_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if err := util.ApplyAsset(h, a, hLog); err != nil {
+		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
+			hLog.WithField("asset", a).WithError(err).Error("error applying asset")
 			return err
 		}
 	}
@@ -184,7 +184,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		"config/controllers/hive_controllers_role_binding.yaml",
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
-		if err := applyClusterRoleBindingAssetWithSubjectNamespaceOverride(h, crbAsset, hiveNSName); err != nil {
+
+		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -202,6 +203,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 	for _, a := range crdFiles {
 		crdPath := filepath.Join("config/crds", a)
+		// WARNING: we explicitly do not use the apply with garbage collection here as we do not want
+		// CRDs to be cleaned up if HiveConfig is deleted, which could be extremely destructive.
 		if err := util.ApplyAsset(h, crdPath, hLog); err != nil {
 			return errors.Wrapf(err, "unable to apply CRD %s", crdPath)
 		}
@@ -224,7 +227,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	if isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
-			err = util.ApplyAsset(h, a, hLog)
+			err = util.ApplyAssetWithGC(h, a, instance, hLog)
 			if err != nil {
 				return err
 			}
@@ -234,7 +237,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 	}
 
 	hiveDeployment.Namespace = hiveNSName
-	result, err := h.ApplyRuntimeObject(hiveDeployment, scheme.Scheme)
+	result, err := util.ApplyRuntimeObjectWithGC(h, hiveDeployment, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -284,7 +287,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h *reso
 			"ca.crt": additionalCA.Bytes(),
 		},
 	}
-	result, err := h.ApplyRuntimeObject(caSecret, scheme.Scheme)
+	result, err := util.ApplyRuntimeObjectWithGC(h, caSecret, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying additional cert secret")
 		return err

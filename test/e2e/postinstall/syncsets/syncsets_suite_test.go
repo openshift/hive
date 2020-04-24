@@ -437,7 +437,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 })
 
 func waitForSyncSetInstanceApplied(namespace, syncsetname, syncsettype string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
 	gvk, err := apiutil.GVKForObject(&hivev1.SyncSetInstance{}, scheme.Scheme)
@@ -473,7 +473,7 @@ func waitForSyncSetInstanceApplied(namespace, syncsetname, syncsettype string) e
 }
 
 func waitForSyncSetDeleted(namespace, syncsetname string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
 	gvk, err := apiutil.GVKForObject(&hivev1.SyncSet{}, scheme.Scheme)
@@ -499,10 +499,10 @@ func waitForSyncSetDeleted(namespace, syncsetname string) error {
 }
 
 func waitForSyncSetInstanceDeleted(namespace, syncsetname, syncsettype string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
-	gvk, err := apiutil.GVKForObject(&hivev1.SyncSet{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hivev1.SyncSetInstance{}, scheme.Scheme)
 	if err != nil {
 		return err
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/openshift/hive/pkg/version"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
+	orbacv1 "github.com/openshift/api/authorization/v1"
 
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -113,7 +114,11 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
-			if err := oappsv1.AddToScheme(mgr.GetScheme()); err != nil {
+			if err := oappsv1.Install(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := orbacv1.Install(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

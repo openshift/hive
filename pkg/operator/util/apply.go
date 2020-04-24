@@ -6,7 +6,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/utils/pointer"
 
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -110,7 +109,6 @@ func ApplyRuntimeObjectWithGC(h *resource.Helper, runtimeObj runtime.Object, hc 
 }
 
 func readRuntimeObject(assetPath string) (runtime.Object, error) {
-	codec := serializer.NewCodecFactory(scheme.Scheme)
-	// Additional SchemeGroupVersions may need to be added here if the operator needs to start deploying new types.
-	return runtime.Decode(codec.UniversalDecoder(rbacv1.SchemeGroupVersion), assets.MustAsset(assetPath))
+	obj, _, err := coreDeserializer.Decode(assets.MustAsset(assetPath), nil, nil)
+	return obj, err
 }

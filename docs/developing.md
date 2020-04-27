@@ -98,11 +98,12 @@ Configure kubectl/oc to talk to your new cluster:
 export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
 ```
 
-**NOTE:** If you do not have `cfssljson` and `cfssl` installed, run the following command to install, otherwise, ignore this.
+**NOTE:** If you do not have `cfssljson`, `cfssl`, or `kind` installed, run the following command to install, otherwise, ignore this.
 
 ```bash
 go install github.com/cloudflare/cfssl/cmd/cfssljson
 go install github.com/cloudflare/cfssl/cmd/cfssl
+GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1
 ```
 
 You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
@@ -130,7 +131,7 @@ To create a kind cluster and adopt:
 
 ```bash
 ./hack/create-kind-cluster.sh cluster1
-bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=$(kind get kubeconfig-path --name="cluster1") --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
+bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --cloud=local --adopt-admin-kubeconfig=$(kind get kubeconfig-path --name="cluster1") --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
 ```
 
 NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)

@@ -3,17 +3,18 @@ package createcluster
 import (
 	"encoding/json"
 	"fmt"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
-	"github.com/openshift/hive/pkg/clusterresource"
-	"github.com/openshift/hive/pkg/gcpclient"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
+	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/gcpclient"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -79,6 +80,7 @@ const (
 	cloudAWS             = "aws"
 	cloudAzure           = "azure"
 	cloudGCP             = "gcp"
+	cloudLocal           = "local"
 	cloudOpenStack       = "openstack"
 
 	testFailureManifest = `apiVersion: v1
@@ -96,6 +98,7 @@ var (
 		cloudAWS:       true,
 		cloudAzure:     true,
 		cloudGCP:       true,
+		cloudLocal:     true,
 		cloudOpenStack: true,
 	}
 )
@@ -128,13 +131,15 @@ type Options struct {
 	WorkerNodesCount         int64
 	CreateSampleSyncsets     bool
 	ManifestsDir             string
-	Adopt                    bool
-	AdoptAdminKubeConfig     string
-	AdoptInfraID             string
-	AdoptClusterID           string
-	AdoptAdminUsername       string
-	AdoptAdminPassword       string
-	MachineNetwork           string
+
+	Adopt                bool
+	AdoptAdminKubeConfig string
+	AdoptInfraID         string
+	AdoptClusterID       string
+	AdoptAdminUsername   string
+	AdoptAdminPassword   string
+
+	MachineNetwork string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -193,7 +198,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floatin
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp|openstack)")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp|local|openstack)")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -464,6 +469,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			ServiceAccount: creds,
 		}
 		builder.CloudBuilder = gcpProvider
+	case cloudLocal:
+		builder.CloudBuilder = &clusterresource.LocalCloudBuilder{}
+		builder.SkipMachinePoolGeneration = true
 	case cloudOpenStack:
 		cloudsYAMLContent, err := openstackutils.GetCreds(o.CredsFile)
 		if err != nil {

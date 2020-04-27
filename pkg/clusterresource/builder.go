@@ -2,6 +2,7 @@ package clusterresource
 
 import (
 	"fmt"
+
 	"github.com/ghodss/yaml"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"

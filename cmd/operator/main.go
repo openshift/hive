@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
+	orbacv1 "github.com/openshift/api/authorization/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
 	"github.com/openshift/hive/pkg/apis"
@@ -113,7 +114,11 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
-			if err := oappsv1.AddToScheme(mgr.GetScheme()); err != nil {
+			if err := oappsv1.Install(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := orbacv1.Install(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

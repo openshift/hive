@@ -3,6 +3,7 @@ package clusterprovision
 import (
 	"context"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -46,17 +47,17 @@ func TestClusterProvisionReconcile(t *testing.T) {
 	routev1.Install(scheme.Scheme)
 
 	tests := []struct {
-		name                    string
-		existing                []runtime.Object
-		pendingCreation         bool
-		expectedReconcileResult reconcile.Result
-		expectErr               bool
-		expectedStage           hivev1.ClusterProvisionStage
-		expectedFailReason      string
-		expectNoJob             bool
-		expectNoJobReference    bool
-		expectPendingCreation   bool
-		validate                func(client.Client, *testing.T)
+		name                  string
+		existing              []runtime.Object
+		pendingCreation       bool
+		expectErr             bool
+		expectedStage         hivev1.ClusterProvisionStage
+		expectedFailReason    string
+		expectNoJob           bool
+		expectNoJobReference  bool
+		expectPendingCreation bool
+		validateRequeueAfter  func(time.Duration, client.Client, *testing.T)
+		validate              func(client.Client, *testing.T)
 	}{
 		{
 			name: "create job",
@@ -128,12 +129,28 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			expectedFailReason: unknownReason,
 		},
 		{
-			name: "keep job after success",
+			name: "keep job for 24 hours after success",
 			existing: []runtime.Object{
-				testProvision(succeeded(), withJob()),
+				testProvision(succeeded(), withJob(), withCreationTime(time.Now())),
 				testJob(),
 			},
+			validateRequeueAfter: func(requeueAfter time.Duration, c client.Client, t *testing.T) {
+				testProvisionCreationTime := getProvision(c).CreationTimestamp.Time
+				assert.Less(t, requeueAfter.Nanoseconds(), 24*time.Hour.Nanoseconds(), "unexpected requeue after duration")
+				assert.Greater(t, requeueAfter.Nanoseconds(), testProvisionCreationTime.Add(24*time.Hour).Sub(time.Now()).Nanoseconds(),
+					"unexpected requeue after duration")
+			},
 			expectedStage: hivev1.ClusterProvisionStageComplete,
+		},
+		{
+			name: "removed job 24 hours after success",
+			existing: []runtime.Object{
+				testProvision(succeeded(), withJob(), withCreationTime(time.Now().Add(-24*time.Hour))),
+				testJob(),
+			},
+			expectedStage:        hivev1.ClusterProvisionStageComplete,
+			expectNoJob:          true,
+			expectNoJobReference: true,
 		},
 		{
 			name: "keep job after failure",
@@ -198,7 +215,9 @@ func TestClusterProvisionReconcile(t *testing.T) {
 
 			result, err := rcp.Reconcile(reconcileRequest)
 
-			assert.Equal(t, test.expectedReconcileResult, result, "unexpected reconcile result")
+			if test.validateRequeueAfter != nil {
+				test.validateRequeueAfter(result.RequeueAfter, fakeClient, t)
+			}
 
 			if test.expectErr {
 				assert.Error(t, err, "expected error from reconcile")
@@ -292,6 +311,12 @@ func withJob() provisionOption {
 		p.Status.JobRef = &corev1.LocalObjectReference{
 			Name: installJobName,
 		}
+	}
+}
+
+func withCreationTime(creationTime time.Time) provisionOption {
+	return func(p *hivev1.ClusterProvision) {
+		p.CreationTimestamp.Time = creationTime
 	}
 }
 

@@ -173,7 +173,15 @@ func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconc
 			return r.reconcileRunningJob(instance, pLog)
 		}
 		return r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, "NoJobReference", "Missing reference to install job", pLog)
-	case hivev1.ClusterProvisionStageComplete, hivev1.ClusterProvisionStageFailed:
+	case hivev1.ClusterProvisionStageComplete:
+		pLog.Debugf("ClusterProvision is %s", instance.Spec.Stage)
+		if instance.Status.JobRef != nil && time.Since(instance.CreationTimestamp.Time) > (24*time.Hour) {
+			return r.deleteInstallJob(instance, pLog)
+		}
+		// installJobDeletionRecheckDelay will be duration between current time and expected install job deletion time (provision creation time + 24 hours)
+		installJobDeletionRecheckDelay := instance.CreationTimestamp.Time.Add(24 * time.Hour).Sub(time.Now())
+		return reconcile.Result{RequeueAfter: installJobDeletionRecheckDelay}, nil
+	case hivev1.ClusterProvisionStageFailed:
 		pLog.Debugf("ClusterProvision is %s. Nothing more to do", instance.Spec.Stage)
 		return reconcile.Result{}, nil
 	default:
@@ -455,4 +463,31 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			},
 		},
 	}
+}
+
+// deleteInstallJob deletes the install job of a successful provision
+func (r *ReconcileClusterProvision) deleteInstallJob(provision *hivev1.ClusterProvision, pLog log.FieldLogger) (reconcile.Result, error) {
+	pLog.Info("deleting successful install job")
+	job := &batchv1.Job{}
+	switch err := r.Get(context.TODO(), types.NamespacedName{Name: provision.Status.JobRef.Name, Namespace: provision.Namespace}, job); {
+	case apierrors.IsNotFound(err):
+		pLog.Info("install job has already been deleted")
+	case err != nil:
+		pLog.WithError(err).Log(controllerutils.LogLevel(err), "could not get install job")
+		return reconcile.Result{}, err
+	default:
+		// deleting install job with background propagation policy to cascade delete install pod
+		if err := r.Delete(context.TODO(), job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+			pLog.WithField("job", job.Name).WithError(err).Log(controllerutils.LogLevel(err), "error deleting successful install job")
+			return reconcile.Result{}, err
+		}
+	}
+	// clearing job reference after the install job has been deleted
+	pLog.Info("clearing job reference after the install job has been deleted")
+	provision.Status.JobRef = nil
+	if err := r.Status().Update(context.TODO(), provision); err != nil {
+		pLog.WithError(err).Log(controllerutils.LogLevel(err), "error clearing job reference after the install job has been deleted")
+		return reconcile.Result{}, err
+	}
+	return reconcile.Result{}, nil
 }

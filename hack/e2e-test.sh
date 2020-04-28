@@ -4,6 +4,11 @@ set -e
 
 max_tries=60
 sleep_between_tries=10
+# Set timeout for the cluster deployment to install
+# timeout = sleep_between_cluster_deployment_status_checks * max_cluster_deployment_status_checks
+max_cluster_deployment_status_checks=90
+sleep_between_cluster_deployment_status_checks="1m"
+
 component=hive
 local_hive_image=$(eval "echo $IMAGE_FORMAT")
 export HIVE_IMAGE="${HIVE_IMAGE:-$local_hive_image}"
@@ -208,13 +213,26 @@ echo ""
 echo "Events in cluster namespace"
 oc get events -n ${CLUSTER_NAMESPACE}
 
-echo "Waiting for install job to start and complete"
-
+echo "Waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
 INSTALL_RESULT=""
-if go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" "${CLUSTER_NAME}" "install"
+
+i=1
+while [ $i -le ${max_cluster_deployment_status_checks} ]; do
+  IS_CLUSTER_DEPLOYMENT_INSTALLED=$(oc get cd ${CLUSTER_NAME} -n ${CLUSTER_NAMESPACE} -o json | jq .spec.installed )
+  if [[ "${IS_CLUSTER_DEPLOYMENT_INSTALLED}" == "true" ]] ; then
+    INSTALL_RESULT="success"
+    break
+  fi
+  sleep ${sleep_between_cluster_deployment_status_checks}
+  echo "Still waiting for the ClusterDeployment ${CLUSTER_NAME} to install. Status check #${i}/${max_cluster_deployment_status_checks}... "
+  i=$((i + 1))
+done
+
+if [[ "${INSTALL_RESULT}" == "success" ]]
 then
-	echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
-	INSTALL_RESULT="success"
+  echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
+else
+  echo "Timed out waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
 fi
 
 # Capture install logs

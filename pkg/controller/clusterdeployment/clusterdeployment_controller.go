@@ -495,6 +495,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, nil
 		}
 
+		// delete failed provisions which are more than 7 days old
+		existingProvisions, err := r.existingProvisions(cd, cdLog)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		r.deleteOldFailedProvisions(existingProvisions, cdLog)
+
 		cdLog.Debug("cluster is already installed, no processing of provision needed")
 		r.cleanupInstallLogPVC(cd, cdLog)
 
@@ -1767,6 +1774,20 @@ func (r *ReconcileClusterDeployment) deleteStaleProvisions(provs []*hivev1.Clust
 		pLog.Info("Deleting old provision")
 		if err := r.Delete(context.TODO(), provision); err != nil {
 			pLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to delete old provision")
+		}
+	}
+}
+
+// deleteOldFailedProvisions deletes the failed provisions which are more than 7 days old
+func (r *ReconcileClusterDeployment) deleteOldFailedProvisions(provs []*hivev1.ClusterProvision, cdLog log.FieldLogger) {
+	cdLog.Debugf("Deleting failed provisions which are more than 7 days old")
+	for _, provision := range provs {
+		if provision.Spec.Stage == hivev1.ClusterProvisionStageFailed && time.Since(provision.CreationTimestamp.Time) > (7*24*time.Hour) {
+			pLog := cdLog.WithField("provision", provision.Name)
+			pLog.Info("Deleting failed provision")
+			if err := r.Delete(context.TODO(), provision); err != nil {
+				pLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to delete failed provision")
+			}
 		}
 	}
 }

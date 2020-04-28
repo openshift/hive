@@ -4,23 +4,86 @@ metadata:
   name: hive-operator-0.0.1
   namespace: placeholder
   annotations:
-    categories: A list of comma separated categories that your operator falls under.
+    capabilities: Seamless Upgrades
+    categories: OpenShift Optional
     certified: "false"
     description: OpenShift cluster provisioning and management at scale.
-    containerImage: quay.io/dgoodwin/hive:latest
+    containerImage: quay.io/openshift-hive/hive:v0.0.1
     createdAt: "2019-02-25T14:29:00Z"
-    support: Devan Goodwin
+    repository: https://github.com/openshift/hive
+    support: Hive Team
+    alm-examples: |-
+      [{"apiVersion":"hive.openshift.io/v1","kind":"HiveConfig","metadata":{"name":"hive"},"spec":{"managedDomains":[{"aws":{"credentialsSecretRef":{"name":"my-route53-creds"}},"domains":["my-base-domain.example.com"]}]}}]
 spec:
-  displayName: Hive
-  description: OpenShift cluster provisioning and management at scale.
+  displayName: Hive for Red Hat OpenShift
+  description: |-
+    Hive for Red Hat OpenShift is an operator that runs on top of Kubernetes/OpenShift. Hive can be used to provision
+    and perform initial configuration of OpenShift clusters.
+
+    For provisioning OpenShift, Hive uses the [OpenShift installer](https://github.com/openshift/installer).
+
+    ### Supported cloud providers
+    * AWS
+    * Azure
+    * Google Cloud Platform
+    * Red Hat OpenStack
+
+    In the future Hive will support more cloud providers.
+
+    ## Documentation
+
+    * [Quick Start Guide](https://github.com/openshift/hive/blob/master/docs/quick_start.md)
+    * [Using Hive](https://github.com/openshift/hive/blob/master/docs/using-hive.md)
+    * [Hiveutil CLI](https://github.com/openshift/hive/blob/master/docs/hiveutil.md)
+    * [Frequently Asked Questions](https://github.com/openshift/hive/blob/master/docs/FAQs.md)
+    * [Architecture](https://github.com/openshift/hive/blob/master/docs/architecture.md)
+
+    See the [project README](https://github.com/openshift/hive#documentation) for more documentation.
+
+    ## Post Install Configuration
+
+    After installing the Hive for Red Hat OpenShift operator, create a cluster-scoped `HiveConfig` CR to configure Hive.
+    Upon creation of `HiveConfig`, the operator will create the necessary Kubernetes resources to launch Hive.
+
+    Example `HiveConfig`:
+    ```yaml
+    ---
+      apiVersion: hive.openshift.io/v1
+      kind: HiveConfig
+      metadata:
+        name: hive
+      spec:
+        managedDomains:
+        - aws:
+            credentialsSecretRef:
+              name: my-route53-creds
+          domains:
+          - my-base-domain.example.com
+    ```
+
+    ## Create a cluster
+
+    To create a cluster with Hive, create a `ClusterDeployment` CR. You can also use the
+    [`hiveutil` tool](https://github.com/openshift/hive/blob/master/docs/hiveutil.md)'s `create-cluster` command
+    to create clusters.
   keywords:
   - kubernetes
   - openshift
   - multi-cluster
   - cluster
+  links:
+  - name: Hive GitHub
+    url: https://github.com/openshift/hive
+  - name: "Hive: Cluster-as-a-Service"
+    url: https://www.openshift.com/blog/openshift-hive-cluster-as-a-service
+  - name: OpenShift
+    url: https://www.openshift.com/
+  maintainers:
+    - email: openshift-hive-team@redhat.com
+      name: Hive Team
   version: 0.0.1
   provider:
-    name: Red Hat, Inc
+    name: Red Hat
   maturity: alpha
   installModes:
   - type: OwnNamespace
@@ -28,32 +91,22 @@ spec:
   - type: SingleNamespace
     supported: true
   - type: MultiNamespace
-    supported: false
+    supported: true
   - type: AllNamespaces
-    supported: false
+    supported: true
   install:
     strategy: deployment
     spec:
       clusterPermissions:
       - serviceAccountName: hive-operator
-        # Rules will be added here by the generate-csv.py script.
+        # Rules will be added here by the generate-operator-bundle.py script.
       deployments:
       - name: hive-operator
-        # Deployment spec will be added here by the generate-csv.py script.
+        # Deployment spec will be added here by the generate-operator-bundle.py script.
   customresourcedefinitions:
     owned:
     - description: Configuration for the Hive Operator
       displayName: Hive Config
       kind: HiveConfig
       name: hiveconfigs.hive.openshift.io
-      version: v1
-    - description: Defines an OpenShift cluster to be created.
-      displayName: Cluster Deployment
-      kind: ClusterDeployment
-      name: clusterdeployments.hive.openshift.io
-      version: v1
-    - description: Defines a DNSZone to be managed in a cloud provider.
-      displayName: DNS Zone
-      kind: DNSZone
-      name: dnszones.hive.openshift.io
       version: v1

@@ -2,11 +2,14 @@ package hive
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
@@ -25,11 +28,13 @@ import (
 )
 
 const (
-	clusterVersionCRDName = "clusterversions.config.openshift.io"
+	clusterVersionCRDName              = "clusterversions.config.openshift.io"
+	hiveAdmissionServingCertSecretName = "hiveadmission-serving-cert"
 )
 
 const (
 	aggregatorClientCAHashAnnotation = "hive.openshift.io/ca-hash"
+	servingCertSecretHashAnnotation  = "hive.openshift.io/serving-cert-secret-hash"
 )
 
 var webhookAssets = []string{
@@ -101,13 +106,6 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 
-	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAdmDeployment, instance)
-	if err != nil {
-		hLog.WithError(err).Error("error applying deployment")
-		return err
-	}
-	hLog.WithField("result", result).Info("hiveadmission deployment applied")
-
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
 		asset = assets.MustAsset(yaml)
@@ -144,6 +142,26 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		}
 	}
 
+	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
+	servingCertSecret := &corev1.Secret{}
+	if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: hiveNSName, Name: hiveAdmissionServingCertSecretName}, servingCertSecret); err != nil {
+		hLog.WithError(err).WithField("secretName", hiveAdmissionServingCertSecretName).Log(
+			controllerutils.LogLevel(err), "error getting serving cert secret")
+	}
+	hLog.Info("Hashing serving cert secret onto a hiveadmission deployment annotation")
+	certSecretHash := computeSecretDataHash(servingCertSecret.Data)
+	if hiveAdmDeployment.Spec.Template.Annotations == nil {
+		hiveAdmDeployment.Spec.Template.Annotations = map[string]string{}
+	}
+	hiveAdmDeployment.Spec.Template.Annotations[servingCertSecretHashAnnotation] = certSecretHash
+
+	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAdmDeployment, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error applying deployment")
+		return err
+	}
+	hLog.WithField("result", result).Info("hiveadmission deployment applied")
+
 	result, err = util.ApplyRuntimeObjectWithGC(h, apiService, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
@@ -162,6 +180,12 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 	hLog.Info("hiveadmission components reconciled successfully")
 	return nil
+}
+
+func computeSecretDataHash(data map[string][]byte) string {
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%v", data)))
+	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {

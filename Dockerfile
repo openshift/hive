@@ -6,6 +6,10 @@ RUN make build
 
 FROM centos:7
 
+# CentOS images do not get updates as they are meant to mirror ISO content, and thus this update
+# is strongly recommended for security updates.
+RUN yum -y update && yum clean all
+
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clean all && rm -rf /var/cache/yum/*; fi
 

@@ -54,7 +54,7 @@ func newRootCommand() *cobra.Command {
 				log.WithError(err).Fatal("Cannot parse log level")
 			}
 			log.SetLevel(level)
-			log.Infof("Version: %s @ %s", version.String, version.Commit)
+			log.Infof("Version: %s", version.String())
 			log.Debug("debug logging enabled")
 
 			// Parse leader election options

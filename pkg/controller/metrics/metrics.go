@@ -334,6 +334,15 @@ func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
 	}
 	for k, v := range sssInstancesTotal {
 		metricSelectorSyncSetClustersTotal.WithLabelValues(k).Set(float64(v))
+		// If this selector sync set currently has no unapplied instances, ensure any past unapplied metric is cleared:
+		if sssInstancesUnappliedTotal[k] == 0 {
+			cleared := metricSelectorSyncSetClustersUnappliedTotal.Delete(map[string]string{
+				"name": k,
+			})
+			if cleared {
+				mcLog.Debugf("cleared selector syncset clusters unapplied metric for cluster: %s", k)
+			}
+		}
 	}
 	for k, v := range sssInstancesUnappliedTotal {
 		metricSelectorSyncSetClustersUnappliedTotal.WithLabelValues(k).Set(float64(v))

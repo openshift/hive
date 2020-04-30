@@ -1,14 +1,14 @@
-BINDIR = bin
-SRC_DIRS = pkg contrib
-GOFILES = $(shell find $(SRC_DIRS) -name '*.go' | grep -v bindata | grep -v generated | grep -v v1alpha1apiserver)
-VERIFY_IMPORTS_CONFIG = build/verify-imports/import-rules.yaml
+.PHONY: all
+all: vendor update test build
 
-# See pkg/version/version.go for details
-GIT_COMMIT=$(shell git rev-parse --verify 'HEAD^{commit}')
-LDFLAGS=-ldflags "-X github.com/openshift/hive/pkg/version.Raw=$(shell git describe --always --abbrev=40 --dirty) -X github.com/openshift/hive/pkg/version.Commit=${GIT_COMMIT}"
-
-# To use docker build, specify BUILD_CMD="docker build"
-BUILD_CMD ?= imagebuilder
+# Include the library makefile
+include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
+	golang.mk \
+	targets/openshift/bindata.mk \
+	targets/openshift/crd-schema-gen.mk \
+	targets/openshift/deps.mk \
+	targets/openshift/images.mk \
+)
 
 DOCKER_CMD ?= docker
 
@@ -27,6 +27,20 @@ IMG ?= hive-controller:latest
 # Image to use when deploying
 DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
 
+GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out vendor/,$(filter-out v1alpha1apiserver/,$(wildcard */)))))
+GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
+GO_BUILD_BINDIR :=bin
+# Exclude e2e tests from unit testing
+GO_TEST_PACKAGES :=./pkg/... ./cmd/... ./contrib/...
+
+ifeq "$(GO_MOD_FLAGS)" "-mod=vendor"
+	ifeq "$(GOFLAGS)" ""
+		GOFLAGS_FOR_GENERATE ?= GOFLAGS=-mod=vendor
+	else
+		GOFLAGS_FOR_GENERATE ?= GOFLAGS=-mod=vendor,$(GOFLAGS)
+	endif
+endif
+
 # Look up distro name (e.g. Fedora)
 DISTRO ?= $(shell if which lsb_release &> /dev/null; then lsb_release -si; else echo "Unknown"; fi)
 
@@ -37,43 +51,24 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
-# set the cache directory to an accessible location
-ifeq ($(XDG_CACHE_HOME),)
-	export XDG_CACHE_HOME:=/tmp
-endif
+BINDATA_INPUTS :=./config/apiserver/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/crds/... ./config/configmaps/...
+$(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
-# Conditional to avoid Go 1.13 bug on false double flag https://github.com/golang/go/issues/32471
-# TODO: Drop the contitional when golang is fixed so we can see the flag being explicitelly set in logs.
-GOFLAGS ?=$(shell go env GOFLAGS)
-ifeq "$(findstring -mod=vendor,$(GOFLAGS))" "-mod=vendor"
-GO_MOD_FLAGS ?=
-else
-GO_MOD_FLAGS ?=-mod=vendor
-endif
+$(call build-image,hive,$(IMG),./Dockerfile,.)
+$(call build-image,hive-dev,$(IMG),./Dockerfile.dev,.)
+$(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
-ifeq "$(GO_MOD_FLAGS)" "-mod=vendor"
-	ifeq "$(GOFLAGS)" ""
-		GOFLAGS_FOR_GENERATE ?= GOFLAGS=-mod=vendor
-	else
-		GOFLAGS_FOR_GENERATE ?= GOFLAGS=-mod=vendor,$(GOFLAGS)
-	endif
-endif
+CRD_APIS :=$(addprefix ./pkg/apis/hive/,v1)
+$(call add-crd-gen,hive,$(CRD_APIS),./config/crds,./config/crds)
 
-.PHONY: default
-default: all
-
-.PHONY: all
-all: fmt vet generate verify test build
+clean:
+	rm -rf $(GO_BUILD_BINDIR)
 
 .PHONY: vendor
 vendor:
+	go mod tidy
 	go mod vendor
-	cd v1alpha1apiserver && go mod vendor
-
-# Run tests
-.PHONY: test
-test: generate fmt vet crd lint
-	go test $(GO_MOD_FLAGS) ./pkg/... ./cmd/... ./contrib/... -coverprofile cover.out
+	$(MAKE) -C v1alpha1apiserver vendor
 
 .PHONY: test-integration
 test-integration: generate
@@ -95,59 +90,26 @@ test-e2e-postinstall:
 test-e2e-uninstallhive:
 	go test $(GO_MOD_FLAGS) -timeout 0 -count=1 ./test/e2e/uninstallhive/...
 
-# Builds all of hive's binaries (including utils).
-.PHONY: build
-build: generate binaries
+.PHONY: build-apiserver
+build-apiserver:
+	$(MAKE) -C v1alpha1apiserver build
+build: build-apiserver
 
-# Target for building the binaries without running generate, since the
-# tools for that are not present in the builder image used by the
-# Dockerfile.
-.PHONY: binaries
-binaries: manager hiveutil hiveadmission operator hive-apiserver
+# Run against the configured cluster in ~/.kube/config
+run: build
+	./bin/manager --log-level=${LOG_LEVEL}
 
-
-# Build manager binary
-.PHONY: manager
-manager:
-	go build $(GO_MOD_FLAGS) -o bin/manager $(LDFLAGS) github.com/openshift/hive/cmd/manager
-
-.PHONY: operator
-operator:
-	go build $(GO_MOD_FLAGS) -o bin/hive-operator $(LDFLAGS) github.com/openshift/hive/cmd/operator
-
-# Build hiveutil binary
-.PHONY: hiveutil
-hiveutil:
-	go build $(GO_MOD_FLAGS) -o bin/hiveutil $(LDFLAGS) github.com/openshift/hive/contrib/cmd/hiveutil
-
-# Build hiveadmission binary
-.PHONY: hiveadmission
-hiveadmission:
-	go build $(GO_MOD_FLAGS) -o bin/hiveadmission $(LDFLAGS) github.com/openshift/hive/cmd/hiveadmission
-
-# Build v1alpha1 aggregated API server
-.PHONY: hive-apiserver
-hive-apiserver:
-	cd v1alpha1apiserver && go build $(GO_MOD_FLAGS) -o ../bin/hive-apiserver $(LDFLAGS) github.com/openshift/hive/v1alpha1apiserver/cmd/hive-apiserver
-
-# Run against the configured Kubernetes cluster in ~/.kube/config
-.PHONY: run
-run: generate fmt vet
-	go run $(GO_MOD_FLAGS) ./cmd/manager/main.go --log-level=${LOG_LEVEL}
-
-# Run against the configured Kubernetes cluster in ~/.kube/config
-.PHONY: run-operator
-run-operator: generate fmt vet
-	go run $(GO_MOD_FLAGS) ./cmd/operator/main.go --log-level=${LOG_LEVEL}
+# Run against the configured cluster in ~/.kube/config
+run-operator: build
+	./bin/operator --log-level=${LOG_LEVEL}
 
 # Install CRDs into a cluster
-.PHONY: install
-install: crd
+install: update-codegen-crds
 	oc apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: manifests install generate
+deploy: install
 	# Deploy the operator manifests:
 	oc create namespace ${HIVE_OPERATOR_NS} || true
 	mkdir -p overlays/deploy
@@ -158,41 +120,25 @@ deploy: manifests install generate
 	# Create a default basic HiveConfig so the operator will deploy Hive
 	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -
 
-# Update the manifest directory of artifacts OLM will deploy. Copies files in from
-# the locations kubebuilder generates them.
-.PHONY: manifests
-manifests: crd
+verify-codegen:
+	bash -x hack/verify-codegen.sh
+verify: verify-codegen
 
-# Generate CRD yaml from our api types:
-.PHONY: crd
-crd: install-tools
-	controller-gen crd paths=./pkg/apis/hive
-
-# Run go fmt against code
-.PHONY: fmt
-fmt:
-	gofmt -w -s $(SRC_DIRS)
-
-# Run go vet against code
-.PHONY: vet
-vet:
-	go vet $(GO_MOD_FLAGS) ./pkg/... ./cmd/... ./contrib/...
-	cd v1alpha1apiserver && go vet $(GO_MOD_FLAGS) ./cmd/... ./pkg/...
-
-# Run verification tests
-.PHONY: verify
-verify: verify-generated verify-imports verify-gofmt verify-lint verify-go-vet
+update-codegen:
+	hack/update-codegen.sh
+update: update-codegen
 
 # Check import naming
 .PHONY: verify-imports
-verify-imports: hiveutil
+verify-imports: build
 	@echo "Verifying import naming"
 	@sh -c \
 	  'for file in $(GOFILES) ; do \
 	     $(BINDIR)/hiveutil verify-imports -c $(VERIFY_IMPORTS_CONFIG) $$file || exit 1 ; \
 	   done'
+verify: verify-imports
 
-# Check import naming
+# Check lint
 .PHONY: verify-lint
 verify-lint: install-tools
 	@echo Verifying golint
@@ -200,87 +146,45 @@ verify-lint: install-tools
 	  'for file in $(GOFILES) ; do \
 	     golint --set_exit_status $$file || exit 1 ; \
 	   done'
-
-.PHONY: verify-gofmt
-verify-gofmt:
-	@echo Verifying gofmt
-	@gofmt -l -s $(SRC_DIRS)>.out 2>&1 || true
-	@[ ! -s .out ] || \
-	  (echo && echo "*** Please run 'make fmt' in order to fix the following:" && \
-	  cat .out && echo && rm .out && false)
-	@rm .out
-
-.PHONY: verify-go-vet
-verify-go-vet: generate
-	@echo Verifying go vet
-	@go vet $(GO_MOD_FLAGS) ./cmd/... ./contrib/... $(go list ./pkg/... | grep -v _generated)
-	@cd v1alpha1apiserver && go vet $(GO_MOD_FLAGS) ./cmd/... $(go list ./pkg/... | grep -v _generated)
-
-.PHONY: verify-generated
-verify-generated: install-tools
-	hack/verify-generated.sh
+verify: verify-lint
 
 # Generate code
 .PHONY: generate
 generate: install-tools
 	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
-	cd v1alpha1apiserver && $(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
-	hack/update-bindata.sh
+update: generate
 
 # Build the docker image
 .PHONY: docker-build
 docker-build:
-	$(BUILD_CMD) -t ${IMG} .
-
-# Build the docker image
-.PHONY: docker-dev-push
-docker-dev-push: build
-	$(DOCKER_CMD) build -t ${IMG} -f Dockerfile.dev .
-	$(DOCKER_CMD) push ${IMG}
+	@echo "*** DEPRECATED: Use the image-hive target instead ***"
+	docker build -t ${IMG} .
 
 # Push the docker image
 .PHONY: docker-push
 docker-push:
 	$(DOCKER_CMD) push ${IMG}
 
-# Build the image with buildah
-.PHONY: buildah-build
-buildah-build:
-	$(SUDO_CMD) buildah bud --tag ${IMG} .
-
-# Build the code locally and build+push an image with the local binaries rather than doing a full in-container compile.
-.PHONY: buildah-dev-push
-buildah-dev-push: build
-	$(SUDO_CMD) buildah bud -f Dockerfile.dev --tag ${IMG} .
-	$(SUDO_CMD) buildah push ${IMG}
+# Build and push the docker dev image
+.PHONY: docker-dev-push
+docker-dev-push: build image-hive-dev docker-push
 
 # Push the buildah image
 .PHONY: buildah-push
-buildah-push: buildah-build
+buildah-push:
+	$(SUDO_CMD) buildah pull ${IMG}
 	$(SUDO_CMD) buildah push ${IMG}
-
-.PHONY: clean ## Remove all build artifacts
-clean:
-	rm -rf $(BINDIR)
 
 # Run golangci-lint against code
 # TODO replace verify (except verify-generated), vet, fmt targets with lint as it covers all of it
 .PHONY: lint
 lint: install-tools
 	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
-
-# Build the build image so that it can be used locally for performing builds.
-build-build-image: build/build-image/Dockerfile
-	$(BUILD_CMD) -t "hive-build:latest" -f build/build-image/Dockerfile .
+# Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
+#verify: lint
 
 .PHONY: install-tools
 install-tools:
-	go install $(GO_MOD_FLAGS) k8s.io/code-generator/cmd/deepcopy-gen
-	go install $(GO_MOD_FLAGS) k8s.io/code-generator/cmd/conversion-gen
-	go install $(GO_MOD_FLAGS) k8s.io/code-generator/cmd/defaulter-gen
-	go install $(GO_MOD_FLAGS) k8s.io/code-generator/cmd/client-gen
-	go install $(GO_MOD_FLAGS) sigs.k8s.io/controller-tools/cmd/controller-gen
-	go install $(GO_MOD_FLAGS) github.com/jteeuwen/go-bindata/go-bindata
 	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen
 	go install $(GO_MOD_FLAGS) golang.org/x/lint/golint
 	go install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint

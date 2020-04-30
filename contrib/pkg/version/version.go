@@ -15,7 +15,7 @@ func NewVersionCommand() *cobra.Command {
 		Short: "Prints version information for the command",
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
-			log.Infof("%s @ %s", pkgversion.String, pkgversion.Commit)
+			log.Info(pkgversion.String())
 		},
 	}
 	return cmd

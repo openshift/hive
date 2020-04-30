@@ -959,15 +959,6 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			return nil, nil
 		}
 
-		// If the .status.clusterVersionsStatus.availableUpdates field is nil,
-		// do a status update to set it to an empty list. All status updates
-		// done by controllers set this automatically. However, the imageset
-		// job does not. If the field is still nil when the imageset job tries
-		// to update the status, then the update will fail validation.
-		if cd.Status.ClusterVersionStatus.AvailableUpdates == nil {
-			return &reconcile.Result{}, r.statusUpdate(cd, cdLog)
-		}
-
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")

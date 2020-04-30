@@ -79,7 +79,8 @@ type MachinePoolPlatform struct {
 // MachinePoolStatus defines the observed state of MachinePool
 type MachinePoolStatus struct {
 	// Replicas is the current number of replicas for the machine pool.
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
 
 	// MachineSets is the status of the machine sets for the machine pool on the remote cluster.
 	MachineSets []MachineSetStatus `json:"machineSets,omitempty"`

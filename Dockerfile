@@ -2,9 +2,7 @@ FROM openshift/origin-release:golang-1.13 as builder
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
-# Use 'binaries' target instead of 'build' to skip the generate step,
-# because those tools are not present.
-RUN make binaries
+RUN make build
 
 FROM centos:7
 
@@ -17,7 +15,7 @@ RUN if ! rpm -q libvirt-devel; then yum install -y libvirt-devel && yum clean al
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
-COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-operator /opt/services
+COPY --from=builder /go/src/github.com/openshift/hive/bin/operator /opt/services/hive-operator
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-apiserver /opt/services/
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.

@@ -1,18 +1,42 @@
-// Package version includes the version information.
 package version
 
-import "fmt"
+import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/version"
+)
 
 var (
-	// Raw is the string representation of the version. This will be replaced
-	// with the calculated version at build time.
-	// set in the Makefile.
-	Raw = "was not built with version info"
-
-	// String is the human-friendly representation of the version.
-	String = fmt.Sprintf("openshift/hive %s", Raw)
-
-	// Commit is the commit hash from which the software was built.
-	// Set via LDFLAGS in Makefile.
-	Commit = ""
+	// commitFromGit is a constant representing the source version that
+	// generated this build. It should be set during build via -ldflags.
+	commitFromGit string
+	// versionFromGit is a constant representing the version tag that
+	// generated this build. It should be set during build via -ldflags.
+	versionFromGit = "unknown"
+	// major version
+	majorFromGit string
+	// minor version
+	minorFromGit string
+	// build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+	buildDate string
+	// state of git tree, either "clean" or "dirty"
+	gitTreeState string
 )
+
+// Get returns the overall codebase version. It's for detecting
+// what code a binary was built from.
+func Get() version.Info {
+	return version.Info{
+		Major:        majorFromGit,
+		Minor:        minorFromGit,
+		GitCommit:    commitFromGit,
+		GitVersion:   versionFromGit,
+		GitTreeState: gitTreeState,
+		BuildDate:    buildDate,
+	}
+}
+
+// String returns a human-friendly version.
+func String() string {
+	return fmt.Sprintf("openshfit/hive %s", versionFromGit)
+}

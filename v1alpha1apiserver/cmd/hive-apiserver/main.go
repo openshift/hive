@@ -17,8 +17,8 @@ import (
 	"k8s.io/component-base/logs"
 
 	"github.com/openshift/hive/pkg/certs"
-	hiveapiserver "github.com/openshift/hive/v1alpha1apiserver/pkg/cmd/hive-apiserver"
 	"github.com/openshift/hive/pkg/version"
+	hiveapiserver "github.com/openshift/hive/v1alpha1apiserver/pkg/cmd/hive-apiserver"
 )
 
 func main() {

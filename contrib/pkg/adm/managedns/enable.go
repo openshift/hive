@@ -32,7 +32,7 @@ import (
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hiveclient "github.com/openshift/hive/pkg/client/clientset-generated/clientset"
+	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
 )

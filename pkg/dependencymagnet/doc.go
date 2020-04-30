@@ -6,21 +6,17 @@
 package dependencymagnet
 
 import (
-	// Used to generate deep copy functions for custom resources
-	_ "k8s.io/code-generator/cmd/deepcopy-gen"
-	// Used to generate conversion functions for custom resources
-	_ "k8s.io/code-generator/cmd/conversion-gen"
-	// Used to generate defaulter functions for custom resources
-	_ "k8s.io/code-generator/cmd/defaulter-gen"
-	// Used to generate go client for custom resources
-	_ "k8s.io/code-generator/cmd/client-gen"
+	// Used for Makefile
+	_ "github.com/openshift/build-machinery-go"
+	// Used to generate code for custom resources
+	_ "k8s.io/code-generator"
 	// Used to generated CRDs
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 	// Used to generate bindata
 	_ "github.com/jteeuwen/go-bindata/go-bindata"
 	// Used to generate mocks
 	_ "github.com/golang/mock/mockgen"
-	// Used to ling code
+	// Used to lint code
 	_ "golang.org/x/lint/golint"
 	// Used to lint code
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"

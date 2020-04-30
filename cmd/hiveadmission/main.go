@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	log.Infof("Version: %s @ %s", version.String, version.Commit)
+	log.Infof("Version: %s", version.String())
 	log.Info("Starting CRD Validation Webhooks.")
 
 	// TODO: figure out a way to combine logrus and klog logging levels. The team has decided that hardcoding this is ok for now.

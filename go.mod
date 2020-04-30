@@ -21,6 +21,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
+	github.com/openshift/build-machinery-go v0.0.0-20200205161356-ef115f5adc73
 	github.com/openshift/cluster-api v0.0.0-20191129101638-b09907ac6668
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480

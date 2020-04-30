@@ -191,14 +191,14 @@ func testRemoteClusterAPIClient() client.Client {
 			Name: remoteClusterVersionObjectName,
 		},
 	}
-	remoteClusterVersion.Status = testRemoteClusterVersionStatus()
+	remoteClusterVersion.Status = *testRemoteClusterVersionStatus()
 
 	return fake.NewFakeClient(remoteClusterVersion)
 }
 
-func testRemoteClusterVersionStatus() configv1.ClusterVersionStatus {
+func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {
 	zeroTime := metav1.NewTime(time.Unix(0, 0))
-	status := configv1.ClusterVersionStatus{
+	return &configv1.ClusterVersionStatus{
 		History: []configv1.UpdateHistory{
 			{
 				State:          configv1.CompletedUpdate,
@@ -210,5 +210,4 @@ func testRemoteClusterVersionStatus() configv1.ClusterVersionStatus {
 		ObservedGeneration: 123456789,
 		VersionHash:        "TESTVERSIONHASH",
 	}
-	return status
 }

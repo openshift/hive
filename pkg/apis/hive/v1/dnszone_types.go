@@ -78,7 +78,8 @@ type DNSZoneStatus struct {
 
 	// LastSyncGeneration is the generation of the zone resource that was last sync'd. This is used to know
 	// if the Object has changed and we should sync immediately.
-	LastSyncGeneration int64 `json:"lastSyncGeneration"`
+	// +optional
+	LastSyncGeneration int64 `json:"lastSyncGeneration,omitempty"`
 
 	// NameServers is a list of nameservers for this DNS zone
 	// +optional

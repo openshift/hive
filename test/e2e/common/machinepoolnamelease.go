@@ -3,7 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
-	hiveclient "github.com/openshift/hive/pkg/client/clientset-generated/clientset"
+	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

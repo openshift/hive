@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -21,15 +22,15 @@ type MachinePoolsGetter interface {
 
 // MachinePoolInterface has methods to work with MachinePool resources.
 type MachinePoolInterface interface {
-	Create(*v1.MachinePool) (*v1.MachinePool, error)
-	Update(*v1.MachinePool) (*v1.MachinePool, error)
-	UpdateStatus(*v1.MachinePool) (*v1.MachinePool, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.MachinePool, error)
-	List(opts metav1.ListOptions) (*v1.MachinePoolList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.MachinePool, err error)
+	Create(ctx context.Context, machinePool *v1.MachinePool, opts metav1.CreateOptions) (*v1.MachinePool, error)
+	Update(ctx context.Context, machinePool *v1.MachinePool, opts metav1.UpdateOptions) (*v1.MachinePool, error)
+	UpdateStatus(ctx context.Context, machinePool *v1.MachinePool, opts metav1.UpdateOptions) (*v1.MachinePool, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.MachinePool, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.MachinePoolList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MachinePool, err error)
 	MachinePoolExpansion
 }
 
@@ -48,20 +49,20 @@ func newMachinePools(c *HiveV1Client, namespace string) *machinePools {
 }
 
 // Get takes name of the machinePool, and returns the corresponding machinePool object, and an error if there is any.
-func (c *machinePools) Get(name string, options metav1.GetOptions) (result *v1.MachinePool, err error) {
+func (c *machinePools) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.MachinePool, err error) {
 	result = &v1.MachinePool{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("machinepools").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of MachinePools that match those selectors.
-func (c *machinePools) List(opts metav1.ListOptions) (result *v1.MachinePoolList, err error) {
+func (c *machinePools) List(ctx context.Context, opts metav1.ListOptions) (result *v1.MachinePoolList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -72,13 +73,13 @@ func (c *machinePools) List(opts metav1.ListOptions) (result *v1.MachinePoolList
 		Resource("machinepools").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested machinePools.
-func (c *machinePools) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *machinePools) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,87 +90,90 @@ func (c *machinePools) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("machinepools").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a machinePool and creates it.  Returns the server's representation of the machinePool, and an error, if there is any.
-func (c *machinePools) Create(machinePool *v1.MachinePool) (result *v1.MachinePool, err error) {
+func (c *machinePools) Create(ctx context.Context, machinePool *v1.MachinePool, opts metav1.CreateOptions) (result *v1.MachinePool, err error) {
 	result = &v1.MachinePool{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("machinepools").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(machinePool).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a machinePool and updates it. Returns the server's representation of the machinePool, and an error, if there is any.
-func (c *machinePools) Update(machinePool *v1.MachinePool) (result *v1.MachinePool, err error) {
+func (c *machinePools) Update(ctx context.Context, machinePool *v1.MachinePool, opts metav1.UpdateOptions) (result *v1.MachinePool, err error) {
 	result = &v1.MachinePool{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("machinepools").
 		Name(machinePool.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(machinePool).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *machinePools) UpdateStatus(machinePool *v1.MachinePool) (result *v1.MachinePool, err error) {
+func (c *machinePools) UpdateStatus(ctx context.Context, machinePool *v1.MachinePool, opts metav1.UpdateOptions) (result *v1.MachinePool, err error) {
 	result = &v1.MachinePool{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("machinepools").
 		Name(machinePool.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(machinePool).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the machinePool and deletes it. Returns an error if one occurs.
-func (c *machinePools) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *machinePools) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("machinepools").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *machinePools) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *machinePools) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("machinepools").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched machinePool.
-func (c *machinePools) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.MachinePool, err error) {
+func (c *machinePools) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MachinePool, err error) {
 	result = &v1.MachinePool{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("machinepools").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

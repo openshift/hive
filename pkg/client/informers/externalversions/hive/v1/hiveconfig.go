@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	time "time"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -44,13 +45,13 @@ func NewFilteredHiveConfigInformer(client versioned.Interface, resyncPeriod time
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.HiveV1().HiveConfigs().List(options)
+				return client.HiveV1().HiveConfigs().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.HiveV1().HiveConfigs().Watch(options)
+				return client.HiveV1().HiveConfigs().Watch(context.TODO(), options)
 			},
 		},
 		&hivev1.HiveConfig{},

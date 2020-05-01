@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	time "time"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -45,13 +46,13 @@ func NewFilteredSyncIdentityProviderInformer(client versioned.Interface, namespa
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.HiveV1().SyncIdentityProviders(namespace).List(options)
+				return client.HiveV1().SyncIdentityProviders(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.HiveV1().SyncIdentityProviders(namespace).Watch(options)
+				return client.HiveV1().SyncIdentityProviders(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&hivev1.SyncIdentityProvider{},

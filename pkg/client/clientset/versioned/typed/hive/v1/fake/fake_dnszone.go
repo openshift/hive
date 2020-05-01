@@ -3,6 +3,8 @@
 package fake
 
 import (
+	"context"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -23,7 +25,7 @@ var dnszonesResource = schema.GroupVersionResource{Group: "hive.openshift.io", V
 var dnszonesKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "DNSZone"}
 
 // Get takes name of the dNSZone, and returns the corresponding dNSZone object, and an error if there is any.
-func (c *FakeDNSZones) Get(name string, options v1.GetOptions) (result *hivev1.DNSZone, err error) {
+func (c *FakeDNSZones) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.DNSZone, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(dnszonesResource, c.ns, name), &hivev1.DNSZone{})
 
@@ -34,7 +36,7 @@ func (c *FakeDNSZones) Get(name string, options v1.GetOptions) (result *hivev1.D
 }
 
 // List takes label and field selectors, and returns the list of DNSZones that match those selectors.
-func (c *FakeDNSZones) List(opts v1.ListOptions) (result *hivev1.DNSZoneList, err error) {
+func (c *FakeDNSZones) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.DNSZoneList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(dnszonesResource, dnszonesKind, c.ns, opts), &hivev1.DNSZoneList{})
 
@@ -56,14 +58,14 @@ func (c *FakeDNSZones) List(opts v1.ListOptions) (result *hivev1.DNSZoneList, er
 }
 
 // Watch returns a watch.Interface that watches the requested dNSZones.
-func (c *FakeDNSZones) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeDNSZones) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(dnszonesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a dNSZone and creates it.  Returns the server's representation of the dNSZone, and an error, if there is any.
-func (c *FakeDNSZones) Create(dNSZone *hivev1.DNSZone) (result *hivev1.DNSZone, err error) {
+func (c *FakeDNSZones) Create(ctx context.Context, dNSZone *hivev1.DNSZone, opts v1.CreateOptions) (result *hivev1.DNSZone, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(dnszonesResource, c.ns, dNSZone), &hivev1.DNSZone{})
 
@@ -74,7 +76,7 @@ func (c *FakeDNSZones) Create(dNSZone *hivev1.DNSZone) (result *hivev1.DNSZone, 
 }
 
 // Update takes the representation of a dNSZone and updates it. Returns the server's representation of the dNSZone, and an error, if there is any.
-func (c *FakeDNSZones) Update(dNSZone *hivev1.DNSZone) (result *hivev1.DNSZone, err error) {
+func (c *FakeDNSZones) Update(ctx context.Context, dNSZone *hivev1.DNSZone, opts v1.UpdateOptions) (result *hivev1.DNSZone, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(dnszonesResource, c.ns, dNSZone), &hivev1.DNSZone{})
 
@@ -86,7 +88,7 @@ func (c *FakeDNSZones) Update(dNSZone *hivev1.DNSZone) (result *hivev1.DNSZone, 
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDNSZones) UpdateStatus(dNSZone *hivev1.DNSZone) (*hivev1.DNSZone, error) {
+func (c *FakeDNSZones) UpdateStatus(ctx context.Context, dNSZone *hivev1.DNSZone, opts v1.UpdateOptions) (*hivev1.DNSZone, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(dnszonesResource, "status", c.ns, dNSZone), &hivev1.DNSZone{})
 
@@ -97,7 +99,7 @@ func (c *FakeDNSZones) UpdateStatus(dNSZone *hivev1.DNSZone) (*hivev1.DNSZone, e
 }
 
 // Delete takes name of the dNSZone and deletes it. Returns an error if one occurs.
-func (c *FakeDNSZones) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeDNSZones) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(dnszonesResource, c.ns, name), &hivev1.DNSZone{})
 
@@ -105,15 +107,15 @@ func (c *FakeDNSZones) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeDNSZones) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(dnszonesResource, c.ns, listOptions)
+func (c *FakeDNSZones) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(dnszonesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &hivev1.DNSZoneList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched dNSZone.
-func (c *FakeDNSZones) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *hivev1.DNSZone, err error) {
+func (c *FakeDNSZones) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.DNSZone, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(dnszonesResource, c.ns, name, pt, data, subresources...), &hivev1.DNSZone{})
 

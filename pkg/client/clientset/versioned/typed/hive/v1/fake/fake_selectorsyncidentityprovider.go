@@ -3,6 +3,8 @@
 package fake
 
 import (
+	"context"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -22,7 +24,7 @@ var selectorsyncidentityprovidersResource = schema.GroupVersionResource{Group: "
 var selectorsyncidentityprovidersKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "SelectorSyncIdentityProvider"}
 
 // Get takes name of the selectorSyncIdentityProvider, and returns the corresponding selectorSyncIdentityProvider object, and an error if there is any.
-func (c *FakeSelectorSyncIdentityProviders) Get(name string, options v1.GetOptions) (result *hivev1.SelectorSyncIdentityProvider, err error) {
+func (c *FakeSelectorSyncIdentityProviders) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.SelectorSyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(selectorsyncidentityprovidersResource, name), &hivev1.SelectorSyncIdentityProvider{})
 	if obj == nil {
@@ -32,7 +34,7 @@ func (c *FakeSelectorSyncIdentityProviders) Get(name string, options v1.GetOptio
 }
 
 // List takes label and field selectors, and returns the list of SelectorSyncIdentityProviders that match those selectors.
-func (c *FakeSelectorSyncIdentityProviders) List(opts v1.ListOptions) (result *hivev1.SelectorSyncIdentityProviderList, err error) {
+func (c *FakeSelectorSyncIdentityProviders) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.SelectorSyncIdentityProviderList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(selectorsyncidentityprovidersResource, selectorsyncidentityprovidersKind, opts), &hivev1.SelectorSyncIdentityProviderList{})
 	if obj == nil {
@@ -53,13 +55,13 @@ func (c *FakeSelectorSyncIdentityProviders) List(opts v1.ListOptions) (result *h
 }
 
 // Watch returns a watch.Interface that watches the requested selectorSyncIdentityProviders.
-func (c *FakeSelectorSyncIdentityProviders) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeSelectorSyncIdentityProviders) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(selectorsyncidentityprovidersResource, opts))
 }
 
 // Create takes the representation of a selectorSyncIdentityProvider and creates it.  Returns the server's representation of the selectorSyncIdentityProvider, and an error, if there is any.
-func (c *FakeSelectorSyncIdentityProviders) Create(selectorSyncIdentityProvider *hivev1.SelectorSyncIdentityProvider) (result *hivev1.SelectorSyncIdentityProvider, err error) {
+func (c *FakeSelectorSyncIdentityProviders) Create(ctx context.Context, selectorSyncIdentityProvider *hivev1.SelectorSyncIdentityProvider, opts v1.CreateOptions) (result *hivev1.SelectorSyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(selectorsyncidentityprovidersResource, selectorSyncIdentityProvider), &hivev1.SelectorSyncIdentityProvider{})
 	if obj == nil {
@@ -69,7 +71,7 @@ func (c *FakeSelectorSyncIdentityProviders) Create(selectorSyncIdentityProvider 
 }
 
 // Update takes the representation of a selectorSyncIdentityProvider and updates it. Returns the server's representation of the selectorSyncIdentityProvider, and an error, if there is any.
-func (c *FakeSelectorSyncIdentityProviders) Update(selectorSyncIdentityProvider *hivev1.SelectorSyncIdentityProvider) (result *hivev1.SelectorSyncIdentityProvider, err error) {
+func (c *FakeSelectorSyncIdentityProviders) Update(ctx context.Context, selectorSyncIdentityProvider *hivev1.SelectorSyncIdentityProvider, opts v1.UpdateOptions) (result *hivev1.SelectorSyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(selectorsyncidentityprovidersResource, selectorSyncIdentityProvider), &hivev1.SelectorSyncIdentityProvider{})
 	if obj == nil {
@@ -80,7 +82,7 @@ func (c *FakeSelectorSyncIdentityProviders) Update(selectorSyncIdentityProvider 
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSelectorSyncIdentityProviders) UpdateStatus(selectorSyncIdentityProvider *hivev1.SelectorSyncIdentityProvider) (*hivev1.SelectorSyncIdentityProvider, error) {
+func (c *FakeSelectorSyncIdentityProviders) UpdateStatus(ctx context.Context, selectorSyncIdentityProvider *hivev1.SelectorSyncIdentityProvider, opts v1.UpdateOptions) (*hivev1.SelectorSyncIdentityProvider, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateSubresourceAction(selectorsyncidentityprovidersResource, "status", selectorSyncIdentityProvider), &hivev1.SelectorSyncIdentityProvider{})
 	if obj == nil {
@@ -90,22 +92,22 @@ func (c *FakeSelectorSyncIdentityProviders) UpdateStatus(selectorSyncIdentityPro
 }
 
 // Delete takes name of the selectorSyncIdentityProvider and deletes it. Returns an error if one occurs.
-func (c *FakeSelectorSyncIdentityProviders) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeSelectorSyncIdentityProviders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(selectorsyncidentityprovidersResource, name), &hivev1.SelectorSyncIdentityProvider{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSelectorSyncIdentityProviders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(selectorsyncidentityprovidersResource, listOptions)
+func (c *FakeSelectorSyncIdentityProviders) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(selectorsyncidentityprovidersResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &hivev1.SelectorSyncIdentityProviderList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched selectorSyncIdentityProvider.
-func (c *FakeSelectorSyncIdentityProviders) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *hivev1.SelectorSyncIdentityProvider, err error) {
+func (c *FakeSelectorSyncIdentityProviders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.SelectorSyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(selectorsyncidentityprovidersResource, name, pt, data, subresources...), &hivev1.SelectorSyncIdentityProvider{})
 	if obj == nil {

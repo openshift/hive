@@ -231,8 +231,7 @@ spec:
                     type: string
                     format: date-time
                   value:
-                    description: Required. The taint value corresponding to the taint
-                      key.
+                    description: The taint value corresponding to the taint key.
                     type: string
         status:
           description: MachinePoolStatus defines the observed state of MachinePool

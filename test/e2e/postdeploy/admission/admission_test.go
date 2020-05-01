@@ -1,17 +1,19 @@
 package admission
 
 import (
+	"context"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
 	"time"
 
-	webhook "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
-	"github.com/openshift/hive/test/e2e/common"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
+
+	webhook "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
+	"github.com/openshift/hive/test/e2e/common"
 )
 
 const (
@@ -84,7 +86,7 @@ func TestAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected unmarshal error: %v", err)
 			}
-			result, err := c.Resource(gvr).Create(obj, metav1.CreateOptions{})
+			result, err := c.Resource(gvr).Create(context.Background(), obj, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Unexpected create error: %v", err)
 			}

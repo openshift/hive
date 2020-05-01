@@ -30,7 +30,7 @@ func WaitForMachineSets(cfg *rest.Config, testFunc func([]*machinev1.MachineSet)
 	if err != nil {
 		return err
 	}
-	informer, err := internalCache.GetInformer(&machinev1.MachineSet{})
+	informer, err := internalCache.GetInformer(context.Background(), &machinev1.MachineSet{})
 	if err != nil {
 		return err
 	}

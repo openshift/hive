@@ -13,7 +13,7 @@ import (
 	// Used to generated CRDs
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 	// Used to generate bindata
-	_ "github.com/jteeuwen/go-bindata/go-bindata"
+	_ "github.com/go-bindata/go-bindata/go-bindata"
 	// Used to generate mocks
 	_ "github.com/golang/mock/mockgen"
 	// Used to lint code

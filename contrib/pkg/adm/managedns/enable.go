@@ -126,7 +126,7 @@ func (o *Options) Run(args []string) error {
 
 	// Update the current HiveConfig, which should always exist as the operator will
 	// create a default one once run.
-	hc, err := o.hiveClient.HiveV1().HiveConfigs().Get(hiveConfigName, metav1.GetOptions{})
+	hc, err := o.hiveClient.HiveV1().HiveConfigs().Get(context.Background(), hiveConfigName, metav1.GetOptions{})
 	if err != nil {
 		log.WithError(err).Fatal("error looking up HiveConfig 'hive'")
 	}
@@ -174,7 +174,7 @@ func (o *Options) Run(args []string) error {
 		log.WithError(err).Fatal("failed to save generated secret")
 	}
 
-	_, err = o.hiveClient.HiveV1().HiveConfigs().Update(hc)
+	_, err = o.hiveClient.HiveV1().HiveConfigs().Update(context.Background(), hc, metav1.UpdateOptions{})
 	if err != nil {
 		log.WithError(err).Fatal("error updating HiveConfig")
 	}
@@ -211,12 +211,12 @@ func waitForHiveAdmissionPods(dynClient dynamic.Interface, hiveNSName string) er
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return dynClient.Resource(gvr).Namespace(hiveNSName).List(options)
+			return dynClient.Resource(gvr).Namespace(hiveNSName).List(context.Background(), options)
 
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return dynClient.Resource(gvr).Namespace(hiveNSName).Watch(options)
+			return dynClient.Resource(gvr).Namespace(hiveNSName).Watch(context.Background(), options)
 		},
 	}
 
@@ -258,11 +258,11 @@ func waitForHiveConfigToBeProcessed(hiveClient *hiveclient.Clientset) error {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return hiveClient.HiveV1().HiveConfigs().List(options)
+			return hiveClient.HiveV1().HiveConfigs().List(context.Background(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return hiveClient.HiveV1().HiveConfigs().Watch(options)
+			return hiveClient.HiveV1().HiveConfigs().Watch(context.Background(), options)
 		},
 	}
 

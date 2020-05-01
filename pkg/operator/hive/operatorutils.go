@@ -1,6 +1,8 @@
 package hive
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,7 +26,7 @@ func getHiveNamespace(config *hivev1.HiveConfig) string {
 func dynamicDelete(dynamicClient dynamic.Interface, gvrnsn gvrNSName, hLog log.FieldLogger) error {
 	rLog := hLog.WithField("resource", gvrnsn)
 	gvr := schema.GroupVersionResource{Group: gvrnsn.group, Version: gvrnsn.version, Resource: gvrnsn.resource}
-	if err := dynamicClient.Resource(gvr).Namespace(gvrnsn.namespace).Delete(gvrnsn.name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+	if err := dynamicClient.Resource(gvr).Namespace(gvrnsn.namespace).Delete(context.Background(), gvrnsn.name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		rLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting resource")
 		return err
 	}

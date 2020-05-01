@@ -23,7 +23,7 @@ func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut 
 	if err != nil {
 		return err
 	}
-	informer, err := internalCache.GetInformer(&corev1.Node{})
+	informer, err := internalCache.GetInformer(context.Background(), &corev1.Node{})
 	if err != nil {
 		return err
 	}

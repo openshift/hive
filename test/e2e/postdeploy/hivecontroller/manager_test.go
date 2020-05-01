@@ -75,7 +75,7 @@ func TestHiveControllersMetrics(t *testing.T) {
 	kubeClient := common.MustGetKubernetesClient()
 
 	// Query the metrics port in the hive-controllers service using the apiserver proxy
-	body, err := kubeClient.CoreV1().RESTClient().Get().Namespace(common.GetHiveNamespaceOrDie()).Name(fmt.Sprintf("%s:%d", hiveControllersService, metricsPort)).Resource("services").SubResource("proxy").Suffix("metrics").DoRaw()
+	body, err := kubeClient.CoreV1().RESTClient().Get().Namespace(common.GetHiveNamespaceOrDie()).Name(fmt.Sprintf("%s:%d", hiveControllersService, metricsPort)).Resource("services").SubResource("proxy").Suffix("metrics").DoRaw(context.Background())
 	if err != nil {
 		t.Errorf("failed to reach metrics endpoint: %v", err)
 		return

@@ -41,7 +41,7 @@ def generate_operatorhub_version(prev_version=current_operatorhub_version()):
 
 
 def generate_osd_version():
-    result = subprocess.check_output("git describe", shell=True).strip()
+    result = subprocess.check_output("git describe --abbrev=7", shell=True).strip()
     print(result)
     # remove the v -- OLM bundles need to start with the digit
     if result[0] == 'v':

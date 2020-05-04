@@ -194,6 +194,40 @@ spec:
                   required:
                   - flavor
                   type: object
+                vsphere:
+                  description: VSphere is the configuration used when installing on
+                    vSphere
+                  properties:
+                    coresPerSocket:
+                      description: NumCoresPerSocket is the number of cores per socket
+                        in a vm. The number of vCPUs on the vm will be NumCPUs/NumCoresPerSocket.
+                      format: int32
+                      type: integer
+                    cpus:
+                      description: NumCPUs is the total number of virtual processor
+                        cores to assign a vm.
+                      format: int32
+                      type: integer
+                    memoryMB:
+                      description: Memory is the size of a VM's memory in MB.
+                      format: int64
+                      type: integer
+                    osDisk:
+                      description: OSDisk defines the storage for instance.
+                      properties:
+                        diskSizeGB:
+                          description: DiskSizeGB defines the size of disk in GB.
+                          format: int32
+                          type: integer
+                      required:
+                      - diskSizeGB
+                      type: object
+                  required:
+                  - coresPerSocket
+                  - cpus
+                  - memoryMB
+                  - osDisk
+                  type: object
               type: object
             replicas:
               description: Replicas is the count of machines for this machine pool.

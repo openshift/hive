@@ -2,6 +2,7 @@ package clusterresource
 
 import (
 	"fmt"
+
 	"github.com/ghodss/yaml"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -104,6 +105,9 @@ type Builder struct {
 
 	// MachineNetwork is the subnet to use for the cluster's machine network.
 	MachineNetwork string
+
+	// SkipMachinePoolGeneration is set to skip generating MachinePool objects
+	SkipMachinePoolGeneration bool
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -154,7 +158,9 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 
 	var allObjects []runtime.Object
 	allObjects = append(allObjects, o.generateClusterDeployment())
-	allObjects = append(allObjects, o.generateMachinePool())
+	if !o.SkipMachinePoolGeneration {
+		allObjects = append(allObjects, o.generateMachinePool())
+	}
 	installConfigSecret, err := o.generateInstallConfigSecret()
 	if err != nil {
 		return nil, err
@@ -174,6 +180,11 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	cloudCredsSecret := o.CloudBuilder.generateCredentialsSecret(o)
 	if cloudCredsSecret != nil {
 		allObjects = append(allObjects, cloudCredsSecret)
+	}
+
+	cloudCertificatesSecret := o.CloudBuilder.generateCloudCertificatesSecret(o)
+	if cloudCertificatesSecret != nil {
+		allObjects = append(allObjects, cloudCertificatesSecret)
 	}
 
 	if o.InstallerManifests != nil {
@@ -493,4 +504,5 @@ type CloudBuilder interface {
 	addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool)
 	addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig)
 	generateCredentialsSecret(o *Builder) *corev1.Secret
+	generateCloudCertificatesSecret(o *Builder) *corev1.Secret
 }

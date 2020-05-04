@@ -34,6 +34,8 @@ type ClusterDeprovisionPlatform struct {
 	GCP *GCPClusterDeprovision `json:"gcp,omitempty"`
 	// OpenStack contains OpenStack-specific deprovision settings
 	OpenStack *OpenStackClusterDeprovision `json:"openstack,omitempty"`
+	// VSphere contains VMWare vSphere-specific deprovision settings
+	VSphere *VSphereClusterDeprovision `json:"vsphere,omitempty"`
 }
 
 // AWSClusterDeprovision contains AWS-specific configuration for a ClusterDeprovision
@@ -65,6 +67,17 @@ type OpenStackClusterDeprovision struct {
 	Cloud string `json:"cloud"`
 	// CredentialsSecretRef is the OpenStack account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+}
+
+// VSphereClusterDeprovision contains VMware vSphere-specific configuration for a ClusterDeprovision
+type VSphereClusterDeprovision struct {
+	// CredentialsSecretRef is the vSphere account credentials to use for deprovisioning the cluster
+	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	// CertificatesSecretRef refers to a secret that contains the vSphere CA certificates
+	// necessary for communicating with the VCenter.
+	CertificatesSecretRef *corev1.LocalObjectReference `json:"certificatesSecretRef"`
+	// VCenter is the vSphere vCenter hostname.
+	VCenter string `json:"vCenter"`
 }
 
 // +genclient

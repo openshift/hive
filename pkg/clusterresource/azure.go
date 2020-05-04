@@ -2,6 +2,7 @@ package clusterresource
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -44,6 +45,10 @@ func (p *AzureCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret
 			azureCredFile: p.ServicePrincipal,
 		},
 	}
+}
+
+func (p *AzureCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
+	return nil
 }
 
 func (p *AzureCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {

@@ -1,6 +1,7 @@
 package createcluster
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,6 +31,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -70,6 +72,14 @@ AWS credentials. These are only relevant for creating a cluster on AWS. If
 --creds-file is used it will take precedence over these environment
 variables.
 
+GOVC_USERNAME and GOVC_PASSWORD - Are used to determine your vSphere 
+credentials.
+GOVC_TLS_CA_CERTS - Is used to provide CA certificates for communicating
+with the vSphere API.
+GOVC_NETWORK, GOVC_DATACENTER, GOVC_DATASTORE and GOVC_HOST (vCenter host)
+can be used as alternatives to the associated commandline argument. 
+These are only relevant for creating a cluster on vSphere.
+
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
 obtained from a the following URL:
@@ -81,6 +91,7 @@ const (
 	cloudAzure           = "azure"
 	cloudGCP             = "gcp"
 	cloudOpenStack       = "openstack"
+	cloudVSphere         = "vsphere"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -97,6 +108,7 @@ var (
 		cloudAzure:     true,
 		cloudGCP:       true,
 		cloudOpenStack: true,
+		cloudVSphere:   true,
 	}
 )
 
@@ -146,6 +158,17 @@ type Options struct {
 	OpenStackComputeFlavor   string
 	OpenStackAPIFloatingIP   string
 
+	// VSphere
+	VSphereVCenter          string
+	VSphereDatacenter       string
+	VSphereDefaultDataStore string
+	VSphereFolder           string
+	VSphereCluster          string
+	VSphereAPIVIP           string
+	VSphereIngressVIP       string
+	VSphereNetwork          string
+	VSphereCACerts          string
+
 	homeDir string
 }
 
@@ -172,7 +195,8 @@ func NewCreateClusterCommand() *cobra.Command {
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vcsa.vmware.devcluster.openshift.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -237,6 +261,17 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floatin
 	flags.StringVar(&opt.OpenStackMasterFlavor, "openstack-master-flavor", "ci.m4.xlarge", "Compute flavor to use for master nodes")
 	flags.StringVar(&opt.OpenStackComputeFlavor, "openstack-compute-flavor", "m1.large", "Compute flavor to use for worker nodes")
 	flags.StringVar(&opt.OpenStackAPIFloatingIP, "openstack-api-floating-ip", "", "Floating IP address to use for cluster's API")
+
+	// vSphere flags
+	flags.StringVar(&opt.VSphereVCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
+	flags.StringVar(&opt.VSphereDatacenter, "vsphere-datacenter", "", "Datacenter to use in the vCenter")
+	flags.StringVar(&opt.VSphereDefaultDataStore, "vsphere-default-datastore", "", "Default datastore to use for provisioning volumes")
+	flags.StringVar(&opt.VSphereFolder, "vsphere-folder", "", "Folder that will be used and/or created for virtual machines")
+	flags.StringVar(&opt.VSphereCluster, "vsphere-cluster", "", "Cluster virtual machines will be cloned into")
+	flags.StringVar(&opt.VSphereAPIVIP, "vsphere-api-vip", "", "Virtual IP address for the api endpoint")
+	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
+	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
+	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
 
 	return cmd
 }
@@ -471,7 +506,77 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			APIFloatingIP:     o.OpenStackAPIFloatingIP,
 		}
 		builder.CloudBuilder = openStackProvider
+	case cloudVSphere:
+		vsphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
+		if vsphereUsername == "" {
+			return nil, fmt.Errorf("No %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
+		}
 
+		vspherePassword := os.Getenv(constants.VSpherePasswordEnvVar)
+		if vspherePassword == "" {
+			return nil, fmt.Errorf("No %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
+		}
+
+		vsphereCACerts := os.Getenv(constants.VSphereTLSCACertsEnvVar)
+		if o.VSphereCACerts != "" {
+			vsphereCACerts = o.VSphereCACerts
+		}
+		if vsphereCACerts == "" {
+			return nil, fmt.Errorf("must provide --vsphere-ca-certs or set %s env var set", constants.VSphereTLSCACertsEnvVar)
+		}
+		caCerts := [][]byte{}
+		for _, cert := range filepath.SplitList(vsphereCACerts) {
+			caCert, err := ioutil.ReadFile(cert)
+			if err != nil {
+				return nil, fmt.Errorf("error reading %s: %w", cert, err)
+			}
+			caCerts = append(caCerts, caCert)
+		}
+
+		vSphereNetwork := os.Getenv(constants.VSphereNetworkEnvVar)
+		if o.VSphereNetwork != "" {
+			vSphereNetwork = o.VSphereNetwork
+		}
+
+		vSphereDatacenter := os.Getenv(constants.VSphereDataCenterEnvVar)
+		if o.VSphereDatacenter != "" {
+			vSphereDatacenter = o.VSphereDatacenter
+		}
+		if vSphereDatacenter == "" {
+			return nil, fmt.Errorf("must provide --vsphere-datacenter or set %s env var", constants.VSphereDataCenterEnvVar)
+		}
+
+		vSphereDatastore := os.Getenv(constants.VSphereDataStoreEnvVar)
+		if o.VSphereDefaultDataStore != "" {
+			vSphereDatastore = o.VSphereDefaultDataStore
+		}
+		if vSphereDatastore == "" {
+			return nil, fmt.Errorf("must provide --vsphere-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
+		}
+
+		vSphereVCenter := os.Getenv(constants.VSphereVCenterEnvVar)
+		if o.VSphereVCenter != "" {
+			vSphereVCenter = o.VSphereVCenter
+		}
+		if vSphereVCenter == "" {
+			return nil, fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
+		}
+
+		vsphereProvider := &clusterresource.VSphereCloudBuilder{
+			VCenter:          vSphereVCenter,
+			Username:         vsphereUsername,
+			Password:         vspherePassword,
+			Datacenter:       vSphereDatacenter,
+			DefaultDatastore: vSphereDatastore,
+			Folder:           o.VSphereFolder,
+			Cluster:          o.VSphereCluster,
+			APIVIP:           o.VSphereAPIVIP,
+			IngressVIP:       o.VSphereIngressVIP,
+			Network:          vSphereNetwork,
+			CACert:           bytes.Join(caCerts[:], []byte("\n")),
+		}
+		builder.SkipMachinePoolGeneration = true
+		builder.CloudBuilder = vsphereProvider
 	}
 
 	if len(o.ServingCert) != 0 {

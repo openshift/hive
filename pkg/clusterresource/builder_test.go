@@ -2,6 +2,8 @@ package clusterresource
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
@@ -9,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"testing"
 )
 
 const (
@@ -90,6 +91,23 @@ func createOpenStackClusterBuilder() *Builder {
 	b := createTestBuilder()
 	b.CloudBuilder = &OpenStackCloudBuilder{
 		CloudsYAMLContent: []byte(fakeOpenStackCloudsYAML),
+	}
+	return b
+}
+
+func createVSphereClusterBuilder() *Builder {
+	b := createTestBuilder()
+	b.CloudBuilder = &VSphereCloudBuilder{
+		VCenter:          "test",
+		Username:         "test",
+		Password:         "test",
+		Datacenter:       "test",
+		DefaultDatastore: "test",
+		Folder:           "test",
+		Cluster:          "test",
+		APIVIP:           "192.168.0.2",
+		IngressVIP:       "192.168.0.3",
+		CACert:           []byte{},
 	}
 	return b
 }
@@ -177,6 +195,23 @@ func TestBuildClusterResources(t *testing.T) {
 				credsSecret := findSecret(allObjects, credsSecretName)
 				require.NotNil(t, credsSecret)
 				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.OpenStack.CredentialsSecretRef.Name)
+			},
+		},
+		{
+			name:    "vSphere cluster",
+			builder: createVSphereClusterBuilder(),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+				cd := findClusterDeployment(allObjects, clusterName)
+
+				credsSecretName := fmt.Sprintf("%s-vsphere-creds", clusterName)
+				credsSecret := findSecret(allObjects, credsSecretName)
+				require.NotNil(t, credsSecret)
+				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.VSphere.CredentialsSecretRef.Name)
+
+				certSecretName := fmt.Sprintf("%s-vsphere-certs", clusterName)
+				certSecret := findSecret(allObjects, certSecretName)
+				require.NotNil(t, certSecret)
+				assert.Equal(t, certSecret.Name, cd.Spec.Platform.VSphere.CertificatesSecretRef.Name)
 			},
 		},
 	}

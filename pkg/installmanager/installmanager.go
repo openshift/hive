@@ -56,9 +56,11 @@ import (
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/openstack"
+	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
+	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 )
 
 const (
@@ -128,7 +130,7 @@ func NewInstallManagerCommand() *cobra.Command {
 
 			if len(args) != 2 {
 				cmd.Help()
-				im.log.Fatal("invalid command arguments")
+				im.log.WithField("args", args).Fatal("invalid command arguments")
 			}
 			// Parse the namespace/name for our cluster provision:
 			im.Namespace, im.ClusterProvisionName = args[0], args[1]
@@ -612,6 +614,30 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			},
 		}
 		uninstaller, err := openstack.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+		return uninstaller.Run()
+	case cd.Spec.Platform.VSphere != nil:
+		vSphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
+		if vSphereUsername == "" {
+			return fmt.Errorf("No %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
+		}
+		vSpherePassword := os.Getenv(constants.VSpherePasswordEnvVar)
+		if vSpherePassword == "" {
+			return fmt.Errorf("No %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
+		}
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				VSphere: &installertypesvsphere.Metadata{
+					VCenter:  cd.Spec.Platform.VSphere.VCenter,
+					Username: vSphereUsername,
+					Password: vSpherePassword,
+				},
+			},
+		}
+		uninstaller, err := vsphere.New(logger, metadata)
 		if err != nil {
 			return err
 		}

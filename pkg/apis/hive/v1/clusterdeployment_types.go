@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	"github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -330,6 +331,9 @@ type Platform struct {
 
 	// OpenStack is the configuration used when installing on OpenStack
 	OpenStack *openstack.Platform `json:"openstack,omitempty"`
+
+	// VSphere is the configuration used when installing on vSphere
+	VSphere *vsphere.Platform `json:"vsphere,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

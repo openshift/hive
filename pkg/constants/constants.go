@@ -206,6 +206,27 @@ const (
 
 	// TLSKeySecretKey is the key we use in a Kubernetes Secret containing a TLS certificate key.
 	TLSKeySecretKey = "tls.key"
+
+	// VSphereUsernameEnvVar is the environent variable specifying the vSphere username.
+	VSphereUsernameEnvVar = "GOVC_USERNAME"
+
+	// VSpherePasswordEnvVar is the environment variable specifying the vSphere password.
+	VSpherePasswordEnvVar = "GOVC_PASSWORD"
+
+	// VSphereVCenterEnvVar is the environment variable specifying the vSphere vCenter host.
+	VSphereVCenterEnvVar = "GOVC_HOST"
+
+	// VSphereTLSCACertsEnvVar is the environment variable containing : delimited paths to vSphere CA certificates.
+	VSphereTLSCACertsEnvVar = "GOVC_TLS_CA_CERTS"
+
+	// VSphereNetworkEnvVar is the environment variable specifying the vSphere network.
+	VSphereNetworkEnvVar = "GOVC_NETWORK"
+
+	// VSphereDataCenterEnvVar is the environment variable specifying the vSphere datacenter.
+	VSphereDataCenterEnvVar = "GOVC_DATACENTER"
+
+	// VSphereDataStoreEnvVar is the environment variable specifying the vSphere default datastore.
+	VSphereDataStoreEnvVar = "GOVC_DATASTORE"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

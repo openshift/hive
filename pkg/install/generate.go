@@ -27,6 +27,7 @@ const (
 	gcpAuthDir         = "/.gcp"
 	gcpAuthFile        = gcpAuthDir + "/" + constants.GCPCredentialsName
 	openStackCloudsDir = "/etc/openstack"
+	vsphereCloudsDir   = "/vsphere"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -189,6 +190,20 @@ func InstallerPodSpec(
 		// 	Name:  "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE",
 		// 	Value: "jdiaz-rhcos-4.3",
 		// })
+	case cd.Spec.Platform.VSphere != nil:
+		volumes = append(volumes, corev1.Volume{
+			Name: "vsphere-certificates",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.VSphere.CertificatesSecretRef.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "vsphere-certificates",
+			MountPath: vsphereCloudsDir,
+		})
+		env = append(env, vSphereCredsEnvVars(cd.Spec.Platform.VSphere.CredentialsSecretRef.Name)...)
 	}
 
 	if releaseImage != "" {
@@ -294,6 +309,12 @@ func InstallerPodSpec(
 	}
 	cliImage := *cd.Status.CLIImage
 
+	hiveArg := fmt.Sprintf("/usr/bin/hiveutil install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)
+	if cd.Spec.Platform.VSphere != nil {
+		// Add vsphere certificates to CA trust.
+		hiveArg = fmt.Sprintf("cp -v %s/.cacert /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", vsphereCloudsDir, hiveArg)
+	}
+
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
@@ -324,13 +345,9 @@ func InstallerPodSpec(
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             append(env, cd.Spec.Provisioning.InstallerEnv...),
-			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{"install-manager",
-				"--work-dir", "/output",
-				"--log-level", "debug",
-				cd.Namespace, provisionName,
-			},
-			VolumeMounts: volumeMounts,
+			Command:         []string{"/bin/sh", "-c"},
+			Args:            []string{hiveArg},
+			VolumeMounts:    volumeMounts,
 		},
 	}
 
@@ -432,6 +449,8 @@ func GenerateUninstallerJobForDeprovision(
 		completeGCPDeprovisionJob(req, job)
 	case req.Spec.Platform.OpenStack != nil:
 		completeOpenStackDeprovisionJob(req, job)
+	case req.Spec.Platform.VSphere != nil:
+		completeVSphereDeprovisionJob(req, job)
 	default:
 		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
@@ -614,4 +633,63 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 	}
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
+}
+
+func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+	volumes = append(volumes, corev1.Volume{
+		Name: "vsphere-certificates",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: req.Spec.Platform.VSphere.CertificatesSecretRef.Name,
+			},
+		},
+	})
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "vsphere-certificates",
+		MountPath: vsphereCloudsDir,
+	})
+
+	env := vSphereCredsEnvVars(req.Spec.Platform.VSphere.CredentialsSecretRef.Name)
+
+	containers := []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Env:             env,
+			Command:         []string{"/bin/sh", "-c"},
+			Args:            []string{fmt.Sprintf("cp -v /vsphere/.cacert /etc/pki/ca-trust/source/anchors/ && update-ca-trust && /usr/bin/hiveutil deprovision vsphere --vsphere-vcenter %s --loglevel debug %s", req.Spec.Platform.VSphere.VCenter, req.Spec.InfraID)},
+			VolumeMounts:    volumeMounts,
+		},
+	}
+	job.Spec.Template.Spec.Containers = containers
+	job.Spec.Template.Spec.Volumes = volumes
+}
+
+func vSphereCredsEnvVars(credentialsSecret string) []corev1.EnvVar {
+	env := []corev1.EnvVar{}
+	env = append(
+		env,
+		corev1.EnvVar{
+			Name: constants.VSphereUsernameEnvVar,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
+					Key:                  constants.UsernameSecretKey,
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: constants.VSpherePasswordEnvVar,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
+					Key:                  constants.PasswordSecretKey,
+				},
+			},
+		},
+	)
+	return env
 }

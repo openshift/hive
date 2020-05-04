@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"testing"
 
@@ -383,7 +384,13 @@ func (fm *fakeManager) Add(mgr manager.Runnable) error {
 	}
 	return nil
 }
+func (*fakeManager) Elected() <-chan struct{} {
+	panic("not implemented")
+}
 func (*fakeManager) SetFields(interface{}) error {
+	panic("not implemented")
+}
+func (*fakeManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
 	panic("not implemented")
 }
 func (*fakeManager) AddHealthzCheck(name string, check healthz.Checker) error {

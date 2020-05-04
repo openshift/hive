@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -49,7 +50,7 @@ func DynamicWaitForDeletion(dynamicClient dynamic.Interface, gvr schema.GroupVer
 			rLog.Error("resource not deleted before timeout")
 			return fmt.Errorf("resource not deleted before timeout")
 		}
-		_, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(name, metav1.GetOptions{})
+		_, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			// resource does not exist
 			rLog.Info("resource successfully deleted")

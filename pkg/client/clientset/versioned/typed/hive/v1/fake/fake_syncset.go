@@ -3,6 +3,8 @@
 package fake
 
 import (
+	"context"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -23,7 +25,7 @@ var syncsetsResource = schema.GroupVersionResource{Group: "hive.openshift.io", V
 var syncsetsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "SyncSet"}
 
 // Get takes name of the syncSet, and returns the corresponding syncSet object, and an error if there is any.
-func (c *FakeSyncSets) Get(name string, options v1.GetOptions) (result *hivev1.SyncSet, err error) {
+func (c *FakeSyncSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.SyncSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(syncsetsResource, c.ns, name), &hivev1.SyncSet{})
 
@@ -34,7 +36,7 @@ func (c *FakeSyncSets) Get(name string, options v1.GetOptions) (result *hivev1.S
 }
 
 // List takes label and field selectors, and returns the list of SyncSets that match those selectors.
-func (c *FakeSyncSets) List(opts v1.ListOptions) (result *hivev1.SyncSetList, err error) {
+func (c *FakeSyncSets) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.SyncSetList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(syncsetsResource, syncsetsKind, c.ns, opts), &hivev1.SyncSetList{})
 
@@ -56,14 +58,14 @@ func (c *FakeSyncSets) List(opts v1.ListOptions) (result *hivev1.SyncSetList, er
 }
 
 // Watch returns a watch.Interface that watches the requested syncSets.
-func (c *FakeSyncSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeSyncSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(syncsetsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a syncSet and creates it.  Returns the server's representation of the syncSet, and an error, if there is any.
-func (c *FakeSyncSets) Create(syncSet *hivev1.SyncSet) (result *hivev1.SyncSet, err error) {
+func (c *FakeSyncSets) Create(ctx context.Context, syncSet *hivev1.SyncSet, opts v1.CreateOptions) (result *hivev1.SyncSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(syncsetsResource, c.ns, syncSet), &hivev1.SyncSet{})
 
@@ -74,7 +76,7 @@ func (c *FakeSyncSets) Create(syncSet *hivev1.SyncSet) (result *hivev1.SyncSet, 
 }
 
 // Update takes the representation of a syncSet and updates it. Returns the server's representation of the syncSet, and an error, if there is any.
-func (c *FakeSyncSets) Update(syncSet *hivev1.SyncSet) (result *hivev1.SyncSet, err error) {
+func (c *FakeSyncSets) Update(ctx context.Context, syncSet *hivev1.SyncSet, opts v1.UpdateOptions) (result *hivev1.SyncSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(syncsetsResource, c.ns, syncSet), &hivev1.SyncSet{})
 
@@ -86,7 +88,7 @@ func (c *FakeSyncSets) Update(syncSet *hivev1.SyncSet) (result *hivev1.SyncSet, 
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSyncSets) UpdateStatus(syncSet *hivev1.SyncSet) (*hivev1.SyncSet, error) {
+func (c *FakeSyncSets) UpdateStatus(ctx context.Context, syncSet *hivev1.SyncSet, opts v1.UpdateOptions) (*hivev1.SyncSet, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(syncsetsResource, "status", c.ns, syncSet), &hivev1.SyncSet{})
 
@@ -97,7 +99,7 @@ func (c *FakeSyncSets) UpdateStatus(syncSet *hivev1.SyncSet) (*hivev1.SyncSet, e
 }
 
 // Delete takes name of the syncSet and deletes it. Returns an error if one occurs.
-func (c *FakeSyncSets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeSyncSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(syncsetsResource, c.ns, name), &hivev1.SyncSet{})
 
@@ -105,15 +107,15 @@ func (c *FakeSyncSets) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSyncSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(syncsetsResource, c.ns, listOptions)
+func (c *FakeSyncSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(syncsetsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &hivev1.SyncSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched syncSet.
-func (c *FakeSyncSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *hivev1.SyncSet, err error) {
+func (c *FakeSyncSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.SyncSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(syncsetsResource, c.ns, name, pt, data, subresources...), &hivev1.SyncSet{})
 

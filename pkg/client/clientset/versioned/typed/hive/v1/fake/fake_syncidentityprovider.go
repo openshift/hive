@@ -3,6 +3,8 @@
 package fake
 
 import (
+	"context"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -23,7 +25,7 @@ var syncidentityprovidersResource = schema.GroupVersionResource{Group: "hive.ope
 var syncidentityprovidersKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "SyncIdentityProvider"}
 
 // Get takes name of the syncIdentityProvider, and returns the corresponding syncIdentityProvider object, and an error if there is any.
-func (c *FakeSyncIdentityProviders) Get(name string, options v1.GetOptions) (result *hivev1.SyncIdentityProvider, err error) {
+func (c *FakeSyncIdentityProviders) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.SyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(syncidentityprovidersResource, c.ns, name), &hivev1.SyncIdentityProvider{})
 
@@ -34,7 +36,7 @@ func (c *FakeSyncIdentityProviders) Get(name string, options v1.GetOptions) (res
 }
 
 // List takes label and field selectors, and returns the list of SyncIdentityProviders that match those selectors.
-func (c *FakeSyncIdentityProviders) List(opts v1.ListOptions) (result *hivev1.SyncIdentityProviderList, err error) {
+func (c *FakeSyncIdentityProviders) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.SyncIdentityProviderList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(syncidentityprovidersResource, syncidentityprovidersKind, c.ns, opts), &hivev1.SyncIdentityProviderList{})
 
@@ -56,14 +58,14 @@ func (c *FakeSyncIdentityProviders) List(opts v1.ListOptions) (result *hivev1.Sy
 }
 
 // Watch returns a watch.Interface that watches the requested syncIdentityProviders.
-func (c *FakeSyncIdentityProviders) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeSyncIdentityProviders) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(syncidentityprovidersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a syncIdentityProvider and creates it.  Returns the server's representation of the syncIdentityProvider, and an error, if there is any.
-func (c *FakeSyncIdentityProviders) Create(syncIdentityProvider *hivev1.SyncIdentityProvider) (result *hivev1.SyncIdentityProvider, err error) {
+func (c *FakeSyncIdentityProviders) Create(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProvider, opts v1.CreateOptions) (result *hivev1.SyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(syncidentityprovidersResource, c.ns, syncIdentityProvider), &hivev1.SyncIdentityProvider{})
 
@@ -74,7 +76,7 @@ func (c *FakeSyncIdentityProviders) Create(syncIdentityProvider *hivev1.SyncIden
 }
 
 // Update takes the representation of a syncIdentityProvider and updates it. Returns the server's representation of the syncIdentityProvider, and an error, if there is any.
-func (c *FakeSyncIdentityProviders) Update(syncIdentityProvider *hivev1.SyncIdentityProvider) (result *hivev1.SyncIdentityProvider, err error) {
+func (c *FakeSyncIdentityProviders) Update(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProvider, opts v1.UpdateOptions) (result *hivev1.SyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(syncidentityprovidersResource, c.ns, syncIdentityProvider), &hivev1.SyncIdentityProvider{})
 
@@ -86,7 +88,7 @@ func (c *FakeSyncIdentityProviders) Update(syncIdentityProvider *hivev1.SyncIden
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSyncIdentityProviders) UpdateStatus(syncIdentityProvider *hivev1.SyncIdentityProvider) (*hivev1.SyncIdentityProvider, error) {
+func (c *FakeSyncIdentityProviders) UpdateStatus(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProvider, opts v1.UpdateOptions) (*hivev1.SyncIdentityProvider, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(syncidentityprovidersResource, "status", c.ns, syncIdentityProvider), &hivev1.SyncIdentityProvider{})
 
@@ -97,7 +99,7 @@ func (c *FakeSyncIdentityProviders) UpdateStatus(syncIdentityProvider *hivev1.Sy
 }
 
 // Delete takes name of the syncIdentityProvider and deletes it. Returns an error if one occurs.
-func (c *FakeSyncIdentityProviders) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeSyncIdentityProviders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(syncidentityprovidersResource, c.ns, name), &hivev1.SyncIdentityProvider{})
 
@@ -105,15 +107,15 @@ func (c *FakeSyncIdentityProviders) Delete(name string, options *v1.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSyncIdentityProviders) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(syncidentityprovidersResource, c.ns, listOptions)
+func (c *FakeSyncIdentityProviders) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(syncidentityprovidersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &hivev1.SyncIdentityProviderList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched syncIdentityProvider.
-func (c *FakeSyncIdentityProviders) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *hivev1.SyncIdentityProvider, err error) {
+func (c *FakeSyncIdentityProviders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.SyncIdentityProvider, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(syncidentityprovidersResource, c.ns, name, pt, data, subresources...), &hivev1.SyncIdentityProvider{})
 

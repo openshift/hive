@@ -3,6 +3,8 @@
 package fake
 
 import (
+	"context"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -23,7 +25,7 @@ var machinepoolsResource = schema.GroupVersionResource{Group: "hive.openshift.io
 var machinepoolsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "MachinePool"}
 
 // Get takes name of the machinePool, and returns the corresponding machinePool object, and an error if there is any.
-func (c *FakeMachinePools) Get(name string, options v1.GetOptions) (result *hivev1.MachinePool, err error) {
+func (c *FakeMachinePools) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.MachinePool, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(machinepoolsResource, c.ns, name), &hivev1.MachinePool{})
 
@@ -34,7 +36,7 @@ func (c *FakeMachinePools) Get(name string, options v1.GetOptions) (result *hive
 }
 
 // List takes label and field selectors, and returns the list of MachinePools that match those selectors.
-func (c *FakeMachinePools) List(opts v1.ListOptions) (result *hivev1.MachinePoolList, err error) {
+func (c *FakeMachinePools) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.MachinePoolList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(machinepoolsResource, machinepoolsKind, c.ns, opts), &hivev1.MachinePoolList{})
 
@@ -56,14 +58,14 @@ func (c *FakeMachinePools) List(opts v1.ListOptions) (result *hivev1.MachinePool
 }
 
 // Watch returns a watch.Interface that watches the requested machinePools.
-func (c *FakeMachinePools) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeMachinePools) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(machinepoolsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a machinePool and creates it.  Returns the server's representation of the machinePool, and an error, if there is any.
-func (c *FakeMachinePools) Create(machinePool *hivev1.MachinePool) (result *hivev1.MachinePool, err error) {
+func (c *FakeMachinePools) Create(ctx context.Context, machinePool *hivev1.MachinePool, opts v1.CreateOptions) (result *hivev1.MachinePool, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(machinepoolsResource, c.ns, machinePool), &hivev1.MachinePool{})
 
@@ -74,7 +76,7 @@ func (c *FakeMachinePools) Create(machinePool *hivev1.MachinePool) (result *hive
 }
 
 // Update takes the representation of a machinePool and updates it. Returns the server's representation of the machinePool, and an error, if there is any.
-func (c *FakeMachinePools) Update(machinePool *hivev1.MachinePool) (result *hivev1.MachinePool, err error) {
+func (c *FakeMachinePools) Update(ctx context.Context, machinePool *hivev1.MachinePool, opts v1.UpdateOptions) (result *hivev1.MachinePool, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(machinepoolsResource, c.ns, machinePool), &hivev1.MachinePool{})
 
@@ -86,7 +88,7 @@ func (c *FakeMachinePools) Update(machinePool *hivev1.MachinePool) (result *hive
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeMachinePools) UpdateStatus(machinePool *hivev1.MachinePool) (*hivev1.MachinePool, error) {
+func (c *FakeMachinePools) UpdateStatus(ctx context.Context, machinePool *hivev1.MachinePool, opts v1.UpdateOptions) (*hivev1.MachinePool, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(machinepoolsResource, "status", c.ns, machinePool), &hivev1.MachinePool{})
 
@@ -97,7 +99,7 @@ func (c *FakeMachinePools) UpdateStatus(machinePool *hivev1.MachinePool) (*hivev
 }
 
 // Delete takes name of the machinePool and deletes it. Returns an error if one occurs.
-func (c *FakeMachinePools) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeMachinePools) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(machinepoolsResource, c.ns, name), &hivev1.MachinePool{})
 
@@ -105,15 +107,15 @@ func (c *FakeMachinePools) Delete(name string, options *v1.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeMachinePools) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(machinepoolsResource, c.ns, listOptions)
+func (c *FakeMachinePools) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(machinepoolsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &hivev1.MachinePoolList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched machinePool.
-func (c *FakeMachinePools) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *hivev1.MachinePool, err error) {
+func (c *FakeMachinePools) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.MachinePool, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(machinepoolsResource, c.ns, name, pt, data, subresources...), &hivev1.MachinePool{})
 

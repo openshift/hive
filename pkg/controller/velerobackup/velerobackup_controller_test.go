@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -16,8 +16,6 @@ import (
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 
-	"github.com/openshift/hive/pkg/test/generic"
-	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,6 +23,9 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openshift/hive/pkg/test/generic"
+	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 )
 
 func TestReconcile(t *testing.T) {
@@ -375,7 +376,7 @@ func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
 			found:      true,
 			checkpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER"), testcheckpoint.WithResourceVersion("1")),
 			existingObjects: []runtime.Object{
-				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
+				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE"), testcheckpoint.WithResourceVersion("1")),
 			},
 			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-AFTER"), testcheckpoint.WithResourceVersion("2"), testcheckpoint.WithTypeMeta()),
 			expectedError:      nil,

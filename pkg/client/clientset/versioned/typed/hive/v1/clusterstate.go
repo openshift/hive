@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -21,15 +22,15 @@ type ClusterStatesGetter interface {
 
 // ClusterStateInterface has methods to work with ClusterState resources.
 type ClusterStateInterface interface {
-	Create(*v1.ClusterState) (*v1.ClusterState, error)
-	Update(*v1.ClusterState) (*v1.ClusterState, error)
-	UpdateStatus(*v1.ClusterState) (*v1.ClusterState, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.ClusterState, error)
-	List(opts metav1.ListOptions) (*v1.ClusterStateList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterState, err error)
+	Create(ctx context.Context, clusterState *v1.ClusterState, opts metav1.CreateOptions) (*v1.ClusterState, error)
+	Update(ctx context.Context, clusterState *v1.ClusterState, opts metav1.UpdateOptions) (*v1.ClusterState, error)
+	UpdateStatus(ctx context.Context, clusterState *v1.ClusterState, opts metav1.UpdateOptions) (*v1.ClusterState, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterState, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterStateList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterState, err error)
 	ClusterStateExpansion
 }
 
@@ -48,20 +49,20 @@ func newClusterStates(c *HiveV1Client, namespace string) *clusterStates {
 }
 
 // Get takes name of the clusterState, and returns the corresponding clusterState object, and an error if there is any.
-func (c *clusterStates) Get(name string, options metav1.GetOptions) (result *v1.ClusterState, err error) {
+func (c *clusterStates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterState, err error) {
 	result = &v1.ClusterState{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("clusterstates").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ClusterStates that match those selectors.
-func (c *clusterStates) List(opts metav1.ListOptions) (result *v1.ClusterStateList, err error) {
+func (c *clusterStates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterStateList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -72,13 +73,13 @@ func (c *clusterStates) List(opts metav1.ListOptions) (result *v1.ClusterStateLi
 		Resource("clusterstates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clusterStates.
-func (c *clusterStates) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *clusterStates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,87 +90,90 @@ func (c *clusterStates) Watch(opts metav1.ListOptions) (watch.Interface, error) 
 		Resource("clusterstates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a clusterState and creates it.  Returns the server's representation of the clusterState, and an error, if there is any.
-func (c *clusterStates) Create(clusterState *v1.ClusterState) (result *v1.ClusterState, err error) {
+func (c *clusterStates) Create(ctx context.Context, clusterState *v1.ClusterState, opts metav1.CreateOptions) (result *v1.ClusterState, err error) {
 	result = &v1.ClusterState{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("clusterstates").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterState).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a clusterState and updates it. Returns the server's representation of the clusterState, and an error, if there is any.
-func (c *clusterStates) Update(clusterState *v1.ClusterState) (result *v1.ClusterState, err error) {
+func (c *clusterStates) Update(ctx context.Context, clusterState *v1.ClusterState, opts metav1.UpdateOptions) (result *v1.ClusterState, err error) {
 	result = &v1.ClusterState{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("clusterstates").
 		Name(clusterState.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterState).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *clusterStates) UpdateStatus(clusterState *v1.ClusterState) (result *v1.ClusterState, err error) {
+func (c *clusterStates) UpdateStatus(ctx context.Context, clusterState *v1.ClusterState, opts metav1.UpdateOptions) (result *v1.ClusterState, err error) {
 	result = &v1.ClusterState{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("clusterstates").
 		Name(clusterState.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterState).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the clusterState and deletes it. Returns an error if one occurs.
-func (c *clusterStates) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *clusterStates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("clusterstates").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterStates) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *clusterStates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("clusterstates").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched clusterState.
-func (c *clusterStates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterState, err error) {
+func (c *clusterStates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterState, err error) {
 	result = &v1.ClusterState{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("clusterstates").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

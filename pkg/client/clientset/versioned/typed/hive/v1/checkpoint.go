@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -21,15 +22,15 @@ type CheckpointsGetter interface {
 
 // CheckpointInterface has methods to work with Checkpoint resources.
 type CheckpointInterface interface {
-	Create(*v1.Checkpoint) (*v1.Checkpoint, error)
-	Update(*v1.Checkpoint) (*v1.Checkpoint, error)
-	UpdateStatus(*v1.Checkpoint) (*v1.Checkpoint, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Checkpoint, error)
-	List(opts metav1.ListOptions) (*v1.CheckpointList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Checkpoint, err error)
+	Create(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.CreateOptions) (*v1.Checkpoint, error)
+	Update(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.UpdateOptions) (*v1.Checkpoint, error)
+	UpdateStatus(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.UpdateOptions) (*v1.Checkpoint, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Checkpoint, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.CheckpointList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Checkpoint, err error)
 	CheckpointExpansion
 }
 
@@ -48,20 +49,20 @@ func newCheckpoints(c *HiveV1Client, namespace string) *checkpoints {
 }
 
 // Get takes name of the checkpoint, and returns the corresponding checkpoint object, and an error if there is any.
-func (c *checkpoints) Get(name string, options metav1.GetOptions) (result *v1.Checkpoint, err error) {
+func (c *checkpoints) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Checkpoint, err error) {
 	result = &v1.Checkpoint{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("checkpoints").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Checkpoints that match those selectors.
-func (c *checkpoints) List(opts metav1.ListOptions) (result *v1.CheckpointList, err error) {
+func (c *checkpoints) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CheckpointList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -72,13 +73,13 @@ func (c *checkpoints) List(opts metav1.ListOptions) (result *v1.CheckpointList, 
 		Resource("checkpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested checkpoints.
-func (c *checkpoints) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *checkpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,87 +90,90 @@ func (c *checkpoints) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("checkpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a checkpoint and creates it.  Returns the server's representation of the checkpoint, and an error, if there is any.
-func (c *checkpoints) Create(checkpoint *v1.Checkpoint) (result *v1.Checkpoint, err error) {
+func (c *checkpoints) Create(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.CreateOptions) (result *v1.Checkpoint, err error) {
 	result = &v1.Checkpoint{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("checkpoints").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(checkpoint).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a checkpoint and updates it. Returns the server's representation of the checkpoint, and an error, if there is any.
-func (c *checkpoints) Update(checkpoint *v1.Checkpoint) (result *v1.Checkpoint, err error) {
+func (c *checkpoints) Update(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.UpdateOptions) (result *v1.Checkpoint, err error) {
 	result = &v1.Checkpoint{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("checkpoints").
 		Name(checkpoint.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(checkpoint).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *checkpoints) UpdateStatus(checkpoint *v1.Checkpoint) (result *v1.Checkpoint, err error) {
+func (c *checkpoints) UpdateStatus(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.UpdateOptions) (result *v1.Checkpoint, err error) {
 	result = &v1.Checkpoint{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("checkpoints").
 		Name(checkpoint.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(checkpoint).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the checkpoint and deletes it. Returns an error if one occurs.
-func (c *checkpoints) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *checkpoints) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("checkpoints").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *checkpoints) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *checkpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("checkpoints").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched checkpoint.
-func (c *checkpoints) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Checkpoint, err error) {
+func (c *checkpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Checkpoint, err error) {
 	result = &v1.Checkpoint{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("checkpoints").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

@@ -433,7 +433,7 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetIns
 		}
 		gvr := gv.WithResource(resourceStatus.Resource)
 		itemLog.Debug("deleting resource")
-		err = dynamicClient.Resource(gvr).Namespace(resourceStatus.Namespace).Delete(resourceStatus.Name, &metav1.DeleteOptions{})
+		err = dynamicClient.Resource(gvr).Namespace(resourceStatus.Namespace).Delete(context.Background(), resourceStatus.Name, metav1.DeleteOptions{})
 		if err != nil {
 			switch {
 			case errors.IsNotFound(err):
@@ -463,7 +463,7 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetSecrets(ssi *hivev1.SyncSetInsta
 		}
 		gvr := gv.WithResource(secretStatus.Resource)
 		secretLog.Debug("deleting secret")
-		err = dynamicClient.Resource(gvr).Namespace(secretStatus.Namespace).Delete(secretStatus.Name, &metav1.DeleteOptions{})
+		err = dynamicClient.Resource(gvr).Namespace(secretStatus.Namespace).Delete(context.Background(), secretStatus.Name, metav1.DeleteOptions{})
 		if err != nil {
 			switch {
 			case errors.IsNotFound(err):
@@ -672,7 +672,7 @@ func (r *ReconcileSyncSetInstance) reconcileDeleted(applyMode hivev1.SyncSetReso
 		}
 		gvr := gv.WithResource(deletedStatus.Resource)
 		itemLog.Debug("deleting")
-		err = dynamicClient.Resource(gvr).Namespace(deletedStatus.Namespace).Delete(deletedStatus.Name, &metav1.DeleteOptions{})
+		err = dynamicClient.Resource(gvr).Namespace(deletedStatus.Namespace).Delete(context.Background(), deletedStatus.Name, metav1.DeleteOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				itemLog.WithError(err).Warn("error deleting")

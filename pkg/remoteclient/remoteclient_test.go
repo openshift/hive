@@ -1,6 +1,7 @@
 package remoteclient
 
 import (
+	"context"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
@@ -211,7 +212,7 @@ func Test_builder_Build(t *testing.T) {
 				rc, buildErr := builder.BuildDynamic()
 				assert.NoError(t, buildErr, "unexpected error building dynamic client")
 				_, err = rc.Resource(hivev1.Resource("ClusterDeployment").WithVersion("v1")).
-					Get("bad-name", metav1.GetOptions{})
+					Get(context.Background(), "bad-name", metav1.GetOptions{})
 			}
 			if assert.Error(t, err, "expected error building") {
 				assert.Contains(t, err.Error(), tc.expectedHost, "expected to find host in error")

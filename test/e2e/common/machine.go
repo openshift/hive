@@ -31,7 +31,7 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 	if err != nil {
 		return err
 	}
-	informer, err := internalCache.GetInformer(&machinev1.Machine{})
+	informer, err := internalCache.GetInformer(context.Background(), &machinev1.Machine{})
 	if err != nil {
 		return err
 	}

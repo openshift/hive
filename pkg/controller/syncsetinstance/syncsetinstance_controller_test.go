@@ -1431,19 +1431,19 @@ func (c *fakeNamespaceableClient) Namespace(ns string) dynamic.ResourceInterface
 	}
 }
 
-func (c *fakeNamespaceableClient) Create(obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *fakeNamespaceableClient) Create(_ context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) Update(obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *fakeNamespaceableClient) Update(_ context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) UpdateStatus(obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error) {
+func (c *fakeNamespaceableClient) UpdateStatus(_ context.Context, obj *unstructured.Unstructured, options metav1.UpdateOptions) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) Delete(name string, options *metav1.DeleteOptions, subresources ...string) error {
+func (c *fakeNamespaceableClient) Delete(_ context.Context, name string, options metav1.DeleteOptions, subresources ...string) error {
 	if name == "delete-error" {
 		return fmt.Errorf("cannot delete resource")
 	}
@@ -1458,23 +1458,23 @@ func (c *fakeNamespaceableClient) Delete(name string, options *metav1.DeleteOpti
 	return nil
 }
 
-func (c *fakeNamespaceableClient) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *fakeNamespaceableClient) DeleteCollection(_ context.Context, options metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return nil
 }
 
-func (c *fakeNamespaceableClient) Get(name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *fakeNamespaceableClient) Get(_ context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) List(opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (c *fakeNamespaceableClient) List(_ context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *fakeNamespaceableClient) Watch(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return nil, nil
 }
 
-func (c *fakeNamespaceableClient) Patch(name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *fakeNamespaceableClient) Patch(_ context.Context, name string, pt types.PatchType, data []byte, options metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	return nil, nil
 }
 

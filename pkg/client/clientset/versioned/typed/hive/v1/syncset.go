@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -21,15 +22,15 @@ type SyncSetsGetter interface {
 
 // SyncSetInterface has methods to work with SyncSet resources.
 type SyncSetInterface interface {
-	Create(*v1.SyncSet) (*v1.SyncSet, error)
-	Update(*v1.SyncSet) (*v1.SyncSet, error)
-	UpdateStatus(*v1.SyncSet) (*v1.SyncSet, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.SyncSet, error)
-	List(opts metav1.ListOptions) (*v1.SyncSetList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.SyncSet, err error)
+	Create(ctx context.Context, syncSet *v1.SyncSet, opts metav1.CreateOptions) (*v1.SyncSet, error)
+	Update(ctx context.Context, syncSet *v1.SyncSet, opts metav1.UpdateOptions) (*v1.SyncSet, error)
+	UpdateStatus(ctx context.Context, syncSet *v1.SyncSet, opts metav1.UpdateOptions) (*v1.SyncSet, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.SyncSet, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.SyncSetList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.SyncSet, err error)
 	SyncSetExpansion
 }
 
@@ -48,20 +49,20 @@ func newSyncSets(c *HiveV1Client, namespace string) *syncSets {
 }
 
 // Get takes name of the syncSet, and returns the corresponding syncSet object, and an error if there is any.
-func (c *syncSets) Get(name string, options metav1.GetOptions) (result *v1.SyncSet, err error) {
+func (c *syncSets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.SyncSet, err error) {
 	result = &v1.SyncSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("syncsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of SyncSets that match those selectors.
-func (c *syncSets) List(opts metav1.ListOptions) (result *v1.SyncSetList, err error) {
+func (c *syncSets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.SyncSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -72,13 +73,13 @@ func (c *syncSets) List(opts metav1.ListOptions) (result *v1.SyncSetList, err er
 		Resource("syncsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested syncSets.
-func (c *syncSets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *syncSets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,87 +90,90 @@ func (c *syncSets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("syncsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a syncSet and creates it.  Returns the server's representation of the syncSet, and an error, if there is any.
-func (c *syncSets) Create(syncSet *v1.SyncSet) (result *v1.SyncSet, err error) {
+func (c *syncSets) Create(ctx context.Context, syncSet *v1.SyncSet, opts metav1.CreateOptions) (result *v1.SyncSet, err error) {
 	result = &v1.SyncSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("syncsets").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(syncSet).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a syncSet and updates it. Returns the server's representation of the syncSet, and an error, if there is any.
-func (c *syncSets) Update(syncSet *v1.SyncSet) (result *v1.SyncSet, err error) {
+func (c *syncSets) Update(ctx context.Context, syncSet *v1.SyncSet, opts metav1.UpdateOptions) (result *v1.SyncSet, err error) {
 	result = &v1.SyncSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("syncsets").
 		Name(syncSet.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(syncSet).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *syncSets) UpdateStatus(syncSet *v1.SyncSet) (result *v1.SyncSet, err error) {
+func (c *syncSets) UpdateStatus(ctx context.Context, syncSet *v1.SyncSet, opts metav1.UpdateOptions) (result *v1.SyncSet, err error) {
 	result = &v1.SyncSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("syncsets").
 		Name(syncSet.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(syncSet).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the syncSet and deletes it. Returns an error if one occurs.
-func (c *syncSets) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *syncSets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("syncsets").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *syncSets) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *syncSets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("syncsets").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched syncSet.
-func (c *syncSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.SyncSet, err error) {
+func (c *syncSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.SyncSet, err error) {
 	result = &v1.SyncSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("syncsets").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

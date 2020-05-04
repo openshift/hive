@@ -38,5 +38,5 @@ func Get() version.Info {
 
 // String returns a human-friendly version.
 func String() string {
-	return fmt.Sprintf("openshfit/hive %s", versionFromGit)
+	return fmt.Sprintf("openshift/hive %s", versionFromGit)
 }

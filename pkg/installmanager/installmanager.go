@@ -89,26 +89,27 @@ var (
 // InstallManager coordinates executing the openshift-install binary, modifying
 // generated assets, and uploading artifacts to the kube API after completion.
 type InstallManager struct {
-	log                      log.FieldLogger
-	LogLevel                 string
-	WorkDir                  string
-	LogsDir                  string
-	ClusterID                string
-	ClusterName              string
-	ClusterProvisionName     string
-	Namespace                string
-	InstallConfigMountPath   string
-	PullSecretMountPath      string
-	ManifestsMountPath       string
-	DynamicClient            client.Client
-	cleanupFailedProvision   func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
-	updateClusterProvision   func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
-	readClusterMetadata      func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
-	uploadAdminKubeconfig    func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
-	uploadAdminPassword      func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
-	readInstallerLog         func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
-	waitForProvisioningStage func(*hivev1.ClusterProvision, *InstallManager) error
-	isGatherLogsEnabled      func() bool
+	log                              log.FieldLogger
+	LogLevel                         string
+	WorkDir                          string
+	LogsDir                          string
+	ClusterID                        string
+	ClusterName                      string
+	ClusterProvisionName             string
+	Namespace                        string
+	InstallConfigMountPath           string
+	PullSecretMountPath              string
+	ManifestsMountPath               string
+	DynamicClient                    client.Client
+	cleanupFailedProvision           func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
+	updateClusterProvision           func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
+	readClusterMetadata              func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
+	uploadAdminKubeconfig            func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
+	uploadAdminPassword              func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
+	readInstallerLog                 func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
+	waitForProvisioningStage         func(*hivev1.ClusterProvision, *InstallManager) error
+	isGatherLogsEnabled              func() bool
+	waitForInstallCompleteExecutions int
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -383,6 +384,15 @@ func (m *InstallManager) Run() error {
 	}
 
 	m.log.Info("provisioning cluster")
+
+	if waitForInstallCompleteExecutions, ok := cd.Annotations[constants.WaitForInstallCompleteExecutionsAnnotation]; ok {
+		m.waitForInstallCompleteExecutions, err = strconv.Atoi(waitForInstallCompleteExecutions)
+		if err != nil {
+			m.log.WithField("value", waitForInstallCompleteExecutions).WithError(err).
+				Errorf("error parsing integer from %s annotation", constants.WaitForInstallCompleteExecutionsAnnotation)
+		}
+	}
+
 	installErr := m.provisionCluster()
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
@@ -625,9 +635,12 @@ func (m *InstallManager) provisionCluster() error {
 	m.log.Info("running openshift-install create cluster")
 
 	if err := m.runOpenShiftInstallCommand("create", "cluster"); err != nil {
-		if m.isBootstrapComplete() {
-			m.log.WithError(err).Warn("provisioning cluster failed after completing bootstrapping, waiting longer for install to complete")
-			err = m.runOpenShiftInstallCommand("wait-for", "install-complete")
+		if (m.waitForInstallCompleteExecutions > 0) && m.isBootstrapComplete() {
+			for i := 0; i < m.waitForInstallCompleteExecutions; i++ {
+				m.log.WithField("waitIteration", i).WithError(err).
+					Warn("provisioning cluster failed after completing bootstrapping, waiting longer for install to complete")
+				err = m.runOpenShiftInstallCommand("wait-for", "install-complete")
+			}
 		}
 		if err != nil {
 			m.log.WithError(err).Error("error provisioning cluster")

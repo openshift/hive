@@ -101,7 +101,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	subnets := map[string]string{}
 	userTags := map[string]string{}
 
-	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, pool.Spec.Name, "worker-user-data", userTags)
+	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, pool.Spec.Name, workerUserData, userTags)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}

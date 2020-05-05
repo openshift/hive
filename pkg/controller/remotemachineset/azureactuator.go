@@ -86,12 +86,8 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 
 	// The imageID parameter is not used. The image is determined by the infraID.
 	const imageID = ""
-	// The role must be "worker" so that the machines get hooked up to the existing subnet.
-	const role = "worker"
-	// The user data must be "worker-user-data" so that the machines get user data from the MCO.
-	const userData = "worker-user-data"
 
-	installerMachineSets, err := installazure.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, role, userData)
+	installerMachineSets, err := installazure.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, workerRole, workerUserData)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
 

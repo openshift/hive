@@ -284,7 +284,6 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="ClusterName",type="string",JSONPath=".spec.clusterName"
-// +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels[hive.openshift.io/cluster-type]"
 // +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
 // +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".spec.installed"
 // +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".spec.clusterMetadata.infraID"

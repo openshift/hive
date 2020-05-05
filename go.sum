@@ -1574,7 +1574,8 @@ github.com/openshift/cluster-api-provider-baremetal v0.0.0-20190821174549-a2a477
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156 h1:FigvMhtTF7jCNkKvSwE3xP583ylW/CFcr0Jr6ZH698o=
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156/go.mod h1:KCyjaBfEkifs9bqV1HEXDJUyQylgeLSqiqt2QnMn7is=
 github.com/openshift/cluster-api-provider-libvirt v0.2.1-0.20191219173431-2336783d4603/go.mod h1:7pQ9Bzha+ug/5zd+0ufbDEcnn2OnNlPwRwYrzhXk4NM=
-github.com/openshift/cluster-api-provider-openstack v0.0.0-20200130125124-ef82ce374112/go.mod h1:ntMRKZlv++TExGO4g2jgsVIaHKJt8kKe72BAvMPV5vA=
+github.com/openshift/cluster-api-provider-openstack v0.0.0-20200323110431-3311de91e078 h1:Irj9ROcWhbeH6t2DEUDIpdIJgSLBaXww6AP/FMCmGmw=
+github.com/openshift/cluster-api-provider-openstack v0.0.0-20200323110431-3311de91e078/go.mod h1:ntMRKZlv++TExGO4g2jgsVIaHKJt8kKe72BAvMPV5vA=
 github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200128081049-840376ca5c09/go.mod h1:NcvJT99IauPosghKCineBG8yswe9JjuddiWuvsqge64=
 github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480 h1:iIrMvq8qRMfmuhw/TVB4usRN/BlH2huBKgtrRjucOU4=
 github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480/go.mod h1:/XmV44Fh28Vo3Ye93qFrxAbcFJ/Uy+7LPD+jGjmfJYc=

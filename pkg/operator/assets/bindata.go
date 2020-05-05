@@ -2030,6 +2030,10 @@ spec:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                    trunkSupport:
+                      description: TrunkSupport indicates whether or not to use trunk
+                        ports in your OpenShift cluster.
+                      type: boolean
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
                 from Hive without deprovisioning it
@@ -9120,8 +9124,15 @@ spec:
                     on OpenStack.
                   type: object
                   required:
-                  - type
+                  - flavor
                   properties:
+                    flavor:
+                      description: Flavor defines the OpenStack Nova flavor. eg. m1.large
+                        The json key here differs from the installer which uses both
+                        "computeFlavor" and type "type" depending on which type you're
+                        looking at, and the resulting field on the MachineSet is "flavor".
+                        We are opting to stay consistent with the end result.
+                      type: string
                     rootVolume:
                       description: RootVolume defines the root volume for instances
                         in the machine pool. The instances use ephemeral disks if
@@ -9138,10 +9149,6 @@ spec:
                         type:
                           description: Type defines the type of the volume. Required
                           type: string
-                    type:
-                      description: FlavorName defines the OpenStack Nova flavor. eg.
-                        m1.large
-                      type: string
             replicas:
               description: Replicas is the count of machines for this machine pool.
                 Replicas and autoscaling cannot be used together. Default is 1, if

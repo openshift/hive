@@ -68,7 +68,7 @@ func (p *OpenStackCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hiv
 
 func (p *OpenStackCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.OpenStack = &hivev1openstack.MachinePool{
-		FlavorName: p.ComputeFlavor,
+		Flavor: p.ComputeFlavor,
 	}
 }
 
@@ -79,6 +79,7 @@ func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *install
 			ExternalNetwork: p.ExternalNetwork,
 			FlavorName:      p.ComputeFlavor,
 			LbFloatingIP:    p.APIFloatingIP,
+			OctaviaSupport:  "0",
 		},
 	}
 

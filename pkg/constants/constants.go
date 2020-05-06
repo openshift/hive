@@ -124,6 +124,10 @@ const (
 	// purposes. Examples: "1h", "20m".
 	PauseOnInstallFailureAnnotation = "hive.openshift.io/pause-on-install-failure"
 
+	// WaitForInstallCompleteExecutionsAnnotation is an annotation used on ClusterDeployments to set additional waits
+	// for the cluster provision to complete by running `openshift-install wait-for install-complete` command.
+	WaitForInstallCompleteExecutionsAnnotation = "hive.openshift.io/wait-for-install-complete-executions"
+
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

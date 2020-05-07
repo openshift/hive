@@ -154,22 +154,28 @@ generate: install-tools
 	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
 update: generate
 
-# Build the docker image
+# Build the image using docker
 .PHONY: docker-build
 docker-build:
 	@echo "*** DEPRECATED: Use the image-hive target instead ***"
-	docker build -t ${IMG} .
+	$(DOCKER_CMD) build -t ${IMG} .
 
-# Push the docker image
+# Build the dev image using docker
+.PHONY: docker-dev-build
+docker-dev-build: build
+	@echo "*** DEPRECATED: Use the image-hive-dev target instead ***"
+	$(DOCKER_CMD) build -t ${IMG} -f Dockerfile.dev .
+
+# Push the image using docker
 .PHONY: docker-push
 docker-push:
 	$(DOCKER_CMD) push ${IMG}
 
-# Build and push the docker dev image
+# Build and push the dev image
 .PHONY: docker-dev-push
 docker-dev-push: build image-hive-dev docker-push
 
-# Push the buildah image
+# Push the image using buildah
 .PHONY: buildah-push
 buildah-push:
 	$(SUDO_CMD) buildah pull ${IMG}

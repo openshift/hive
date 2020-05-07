@@ -2,10 +2,14 @@ package hive
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
@@ -17,7 +21,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -25,12 +28,24 @@ import (
 )
 
 const (
-	clusterVersionCRDName = "clusterversions.config.openshift.io"
+	clusterVersionCRDName              = "clusterversions.config.openshift.io"
+	hiveAdmissionServingCertSecretName = "hiveadmission-serving-cert"
 )
 
 const (
 	aggregatorClientCAHashAnnotation = "hive.openshift.io/ca-hash"
+	servingCertSecretHashAnnotation  = "hive.openshift.io/serving-cert-secret-hash"
 )
+
+var webhookAssets = []string{
+	"config/hiveadmission/clusterdeployment-webhook.yaml",
+	"config/hiveadmission/clusterimageset-webhook.yaml",
+	"config/hiveadmission/clusterprovision-webhook.yaml",
+	"config/hiveadmission/dnszones-webhook.yaml",
+	"config/hiveadmission/machinepool-webhook.yaml",
+	"config/hiveadmission/syncset-webhook.yaml",
+	"config/hiveadmission/selectorsyncset-webhook.yaml",
+}
 
 func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
 	hiveNSName := getHiveNamespace(instance)
@@ -41,7 +56,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		"config/hiveadmission/service-account.yaml",
 	}
 	for _, assetPath := range namespacedAssets {
-		if err := applyAssetWithNamespaceOverride(h, assetPath, hiveNSName); err != nil {
+		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -53,7 +68,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		"config/hiveadmission/hiveadmission_rbac_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if err := util.ApplyAsset(h, a, hLog); err != nil {
+		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
 			return err
 		}
 	}
@@ -63,7 +78,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		"config/hiveadmission/hiveadmission_rbac_role_binding.yaml",
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
-		if err := applyClusterRoleBindingAssetWithSubjectNamespaceOverride(h, crbAsset, hiveNSName); err != nil {
+		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -91,28 +106,11 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 
-	result, err := h.ApplyRuntimeObject(hiveAdmDeployment, scheme.Scheme)
-	if err != nil {
-		hLog.WithError(err).Error("error applying deployment")
-		return err
-	}
-	hLog.WithField("result", result).Info("hiveadmission deployment applied")
-
-	webhooks := map[string]runtime.Object{}
-	validatingWebhooks := []*admregv1.ValidatingWebhookConfiguration{}
-	for _, yaml := range []string{
-		"config/hiveadmission/clusterdeployment-webhook.yaml",
-		"config/hiveadmission/clusterimageset-webhook.yaml",
-		"config/hiveadmission/clusterprovision-webhook.yaml",
-		"config/hiveadmission/dnszones-webhook.yaml",
-		"config/hiveadmission/machinepool-webhook.yaml",
-		"config/hiveadmission/syncset-webhook.yaml",
-		"config/hiveadmission/selectorsyncset-webhook.yaml",
-	} {
+	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
+	for i, yaml := range webhookAssets {
 		asset = assets.MustAsset(yaml)
 		wh := util.ReadValidatingWebhookConfigurationV1Beta1OrDie(asset, scheme.Scheme)
-		webhooks[yaml] = wh
-		validatingWebhooks = append(validatingWebhooks, wh)
+		validatingWebhooks[i] = wh
 	}
 
 	hLog.Debug("reading apiservice")
@@ -144,24 +142,50 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h *resou
 		}
 	}
 
-	result, err = h.ApplyRuntimeObject(apiService, scheme.Scheme)
+	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
+	servingCertSecret := &corev1.Secret{}
+	if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: hiveNSName, Name: hiveAdmissionServingCertSecretName}, servingCertSecret); err != nil {
+		hLog.WithError(err).WithField("secretName", hiveAdmissionServingCertSecretName).Log(
+			controllerutils.LogLevel(err), "error getting serving cert secret")
+	}
+	hLog.Info("Hashing serving cert secret onto a hiveadmission deployment annotation")
+	certSecretHash := computeSecretDataHash(servingCertSecret.Data)
+	if hiveAdmDeployment.Spec.Template.Annotations == nil {
+		hiveAdmDeployment.Spec.Template.Annotations = map[string]string{}
+	}
+	hiveAdmDeployment.Spec.Template.Annotations[servingCertSecretHashAnnotation] = certSecretHash
+
+	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAdmDeployment, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error applying deployment")
+		return err
+	}
+	hLog.WithField("result", result).Info("hiveadmission deployment applied")
+
+	result, err = util.ApplyRuntimeObjectWithGC(h, apiService, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
 		return err
 	}
 	hLog.Infof("apiservice applied (%s)", result)
 
-	for webhookFile, webhook := range webhooks {
-		result, err = h.ApplyRuntimeObject(webhook, scheme.Scheme)
+	for _, webhook := range validatingWebhooks {
+		result, err = util.ApplyRuntimeObjectWithGC(h, webhook, instance)
 		if err != nil {
-			hLog.WithError(err).Errorf("error applying validating webhook %q", webhookFile)
+			hLog.WithField("webhook", webhook.Name).WithError(err).Errorf("error applying validating webhook")
 			return err
 		}
-		hLog.Infof("validating webhook %q applied (%s)", webhookFile, result)
+		hLog.WithField("webhook", webhook.Name).Infof("validating webhook: %s", result)
 	}
 
 	hLog.Info("hiveadmission components reconciled successfully")
 	return nil
+}
+
+func computeSecretDataHash(data map[string][]byte) string {
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%v", data)))
+	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {

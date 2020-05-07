@@ -91,6 +91,10 @@ test-e2e-postdeploy:
 test-e2e-postinstall:
 	go test $(GO_MOD_FLAGS) -timeout 0 -count=1 ./test/e2e/postinstall/...
 
+.PHONY: test-e2e-uninstallhive
+test-e2e-uninstallhive:
+	go test $(GO_MOD_FLAGS) -timeout 0 -count=1 ./test/e2e/uninstallhive/...
+
 # Builds all of hive's binaries (including utils).
 .PHONY: build
 build: generate binaries

@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -33,11 +32,14 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -53,6 +55,9 @@ const (
 
 	// HiveOperatorNamespaceEnvVar is the environment variable we expect to be given with the namespace the hive-operator is running in.
 	HiveOperatorNamespaceEnvVar = "HIVE_OPERATOR_NS"
+
+	// watchResyncInterval is used for a couple handcrafted watches we do with our own informers.
+	watchResyncInterval = 30 * time.Minute
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -63,7 +68,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileHiveConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme(), restConfig: mgr.GetConfig()}
+	return &ReconcileHiveConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme(), restConfig: mgr.GetConfig(), mgr: mgr}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -73,6 +78,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	// Provide a ref to the controller on the reconciler, which is used to establish a watch on
+	// secrets in the hive namespace, which isn't known until we have a HiveConfig.
+	r.(*ReconcileHiveConfig).ctrlr = c
 
 	r.(*ReconcileHiveConfig).kubeClient, err = kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
@@ -122,7 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err == nil {
 		log.Debugf("the %s namespace exists, setting up a watch for configmaps on it", managedConfigNamespace)
 		// Create an informer that only listens to events in the OpenShift managed namespace
-		kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(r.(*ReconcileHiveConfig).kubeClient, 10*time.Minute, kubeinformers.WithNamespace(managedConfigNamespace))
+		kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(r.(*ReconcileHiveConfig).kubeClient, watchResyncInterval, kubeinformers.WithNamespace(managedConfigNamespace))
 		configMapInformer := kubeInformerFactory.Core().V1().ConfigMaps().Informer()
 		mgr.Add(&informerRunnable{informer: configMapInformer})
 
@@ -201,29 +210,40 @@ var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 // ReconcileHiveConfig reconciles a Hive object
 type ReconcileHiveConfig struct {
 	client.Client
-	scheme                *runtime.Scheme
-	kubeClient            kubernetes.Interface
-	apiextClient          *apiextclientv1beta1.ApiextensionsV1beta1Client
-	apiregClient          *apiregclientv1.ApiregistrationV1Client
-	discoveryClient       discovery.DiscoveryInterface
-	dynamicClient         dynamic.Interface
-	restConfig            *rest.Config
-	hiveImage             string
-	hiveOperatorNamespace string
-	hiveImagePullPolicy   corev1.PullPolicy
-	syncAggregatorCA      bool
-	managedConfigCMLister corev1listers.ConfigMapLister
+	scheme                            *runtime.Scheme
+	kubeClient                        kubernetes.Interface
+	apiextClient                      *apiextclientv1beta1.ApiextensionsV1beta1Client
+	apiregClient                      *apiregclientv1.ApiregistrationV1Client
+	discoveryClient                   discovery.DiscoveryInterface
+	dynamicClient                     dynamic.Interface
+	restConfig                        *rest.Config
+	hiveImage                         string
+	hiveOperatorNamespace             string
+	hiveImagePullPolicy               corev1.PullPolicy
+	syncAggregatorCA                  bool
+	managedConfigCMLister             corev1listers.ConfigMapLister
+	ctrlr                             controller.Controller
+	servingCertSecretWatchEstablished bool
+	mgr                               manager.Manager
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
 // and what is in the Hive.Spec
 func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-
 	hLog := log.WithField("controller", "hive")
 	hLog.Info("Reconciling Hive components")
 
 	// Fetch the Hive instance
 	instance := &hivev1.HiveConfig{}
+
+	// We only support one HiveConfig per cluster, and it must be called "hive". This prevents installing
+	// Hive more than once in the cluster.
+	if request.NamespacedName.Name != hiveConfigName {
+		hLog.WithField("hiveConfig", request.NamespacedName.Name).Warn(
+			"invalid HiveConfig name, only one HiveConfig supported per cluster and must be named 'hive'")
+		return reconcile.Result{}, nil
+	}
+
 	// NOTE: ignoring the Namespace that seems to get set on request when syncing on namespaced objects,
 	// when our HiveConfig is ClusterScoped.
 	err := r.Get(context.TODO(), types.NamespacedName{Name: request.NamespacedName.Name}, instance)
@@ -232,6 +252,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			hLog.Debug("HiveConfig not found, deleted?")
+			r.servingCertSecretWatchEstablished = false
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -239,11 +260,10 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	// We only support one HiveConfig per cluster, and it must be called "hive". This prevents installing
-	// Hive more than once in the cluster.
-	if instance.Name != hiveConfigName {
-		hLog.WithField("hiveConfig", instance.Name).Warn("invalid HiveConfig name, only one HiveConfig supported per cluster and must be named 'hive'")
-		return reconcile.Result{}, nil
+	hiveNSName := getHiveNamespace(instance)
+
+	if err := r.establishSecretWatch(hLog, hiveNSName); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(r.hiveOperatorNamespace), "hive-operator", &corev1.ObjectReference{
@@ -252,7 +272,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	})
 
 	// Ensure the target namespace for hive components exists and create if not:
-	hiveNSName := getHiveNamespace(instance)
 	hiveNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: hiveNSName,
@@ -338,22 +357,63 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	return reconcile.Result{}, nil
 }
 
+func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName string) error {
+	// We need to establish a watch on Secret in the Hive namespace, one time only. We do not know this namespace until
+	// we have a HiveConfig.
+	if !r.servingCertSecretWatchEstablished {
+		hLog.WithField("namespace", hiveNSName).Info("establishing watch on secrets in hive namespace")
+
+		// Create an informer that only listens to events in the OpenShift managed namespace
+		kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(r.kubeClient, watchResyncInterval,
+			kubeinformers.WithNamespace(hiveNSName))
+		secretsInformer := kubeInformerFactory.Core().V1().Secrets().Informer()
+		if err := r.mgr.Add(&informerRunnable{informer: secretsInformer}); err != nil {
+			hLog.WithError(err).Error("error adding secret informer to manager")
+			return err
+		}
+
+		// Watch Secrets in hive namespace, so we can detect changes to the hiveadmission serving cert secret and
+		// force a deployment rollout.
+		err := r.ctrlr.Watch(&source.Informer{Informer: secretsInformer}, handler.Funcs{
+			CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+				hLog.Debug("eventHandler CreateFunc")
+				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: hiveConfigName}})
+			},
+			UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+				hLog.Debug("eventHandler UpdateFunc")
+				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: hiveConfigName}})
+			},
+		}, predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				hLog.WithField("predicateResponse", e.Meta.GetName() == hiveAdmissionServingCertSecretName).Debug("secret CreateEvent")
+				return e.Meta.GetName() == hiveAdmissionServingCertSecretName
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				hLog.WithField("predicateResponse", e.MetaNew.GetName() == hiveAdmissionServingCertSecretName).Debug("secret UpdateEvent")
+				return e.MetaNew.GetName() == hiveAdmissionServingCertSecretName
+			},
+		})
+		if err != nil {
+			hLog.WithError(err).Error("error establishing secret watch")
+			return err
+		}
+		r.servingCertSecretWatchEstablished = true
+	} else {
+		hLog.Debug("secret watch already established")
+	}
+	return nil
+}
+
 func (r *ReconcileHiveConfig) cleanupLegacyObjects(hLog log.FieldLogger) error {
-	clusterRoleGVR := schema.GroupVersionResource{
-		Group:    "rbac.authorization.k8s.io",
-		Version:  "v1",
-		Resource: "clusterroles",
+	gvrNSNames := []gvrNSName{
+		{group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterroles", name: "manager-role"},
+		{group: "rbac.authorization.k8s.io", version: "v1", resource: "clusterrolebindings", name: "manager-rolebinding"},
 	}
-	clusterRoleBindingGVR := schema.GroupVersionResource{
-		Group:    "rbac.authorization.k8s.io",
-		Version:  "v1",
-		Resource: "clusterrolebindings",
-	}
-	if err := dynamicDelete(r.dynamicClient, clusterRoleGVR, "manager-role", hLog); err != nil {
-		return err
-	}
-	if err := dynamicDelete(r.dynamicClient, clusterRoleBindingGVR, "manager-rolebinding", hLog); err != nil {
-		return err
+
+	for _, gvrnsn := range gvrNSNames {
+		if err := dynamicDelete(r.dynamicClient, gvrnsn, hLog); err != nil {
+			return err
+		}
 	}
 	return nil
 }

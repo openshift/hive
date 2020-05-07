@@ -36,6 +36,7 @@ type ClusterOperatorState struct {
 // ClusterState is the Schema for the clusterstates API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Namespaced
 type ClusterState struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

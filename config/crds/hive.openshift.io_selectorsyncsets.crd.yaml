@@ -2,20 +2,20 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: syncsets.hive.openshift.io
+  name: selectorsyncsets.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
-    kind: SyncSet
-    plural: syncsets
+    kind: SelectorSyncSet
+    listKind: SelectorSyncSetList
+    plural: selectorsyncsets
     shortNames:
-    - ss
-  scope: Namespaced
+    - sss
+    singular: selectorsyncset
+  scope: Cluster
   validation:
     openAPIV3Schema:
-      description: SyncSet is the Schema for the SyncSet API
+      description: SelectorSyncSet is the Schema for the SelectorSyncSet API
       type: object
       properties:
         apiVersion:
@@ -31,26 +31,54 @@ spec:
         metadata:
           type: object
         spec:
-          description: SyncSetSpec defines the SyncSetCommonSpec resources and patches
-            to sync along with ClusterDeploymentRefs indicating which clusters the
-            SyncSet applies to in the SyncSet's namespace.
+          description: SelectorSyncSetSpec defines the SyncSetCommonSpec resources
+            and patches to sync along with a ClusterDeploymentSelector indicating
+            which clusters the SelectorSyncSet applies to in any namespace.
           type: object
-          required:
-          - clusterDeploymentRefs
           properties:
-            clusterDeploymentRefs:
-              description: ClusterDeploymentRefs is the list of LocalObjectReference
-                indicating which clusters the SyncSet applies to in the SyncSet's
-                namespace.
-              type: array
-              items:
-                description: LocalObjectReference contains enough information to let
-                  you locate the referenced object inside the same namespace.
-                type: object
-                properties:
-                  name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+            clusterDeploymentSelector:
+              description: ClusterDeploymentSelector is a LabelSelector indicating
+                which clusters the SelectorSyncSet applies to in any namespace.
+              type: object
+              properties:
+                matchExpressions:
+                  description: matchExpressions is a list of label selector requirements.
+                    The requirements are ANDed.
+                  type: array
+                  items:
+                    description: A label selector requirement is a selector that contains
+                      values, a key, and an operator that relates the key and values.
+                    type: object
+                    required:
+                    - key
+                    - operator
+                    properties:
+                      key:
+                        description: key is the label key that the selector applies
+                          to.
+                        type: string
+                      operator:
+                        description: operator represents a key's relationship to a
+                          set of values. Valid operators are In, NotIn, Exists and
+                          DoesNotExist.
+                        type: string
+                      values:
+                        description: values is an array of string values. If the operator
+                          is In or NotIn, the values array must be non-empty. If the
+                          operator is Exists or DoesNotExist, the values array must
+                          be empty. This array is replaced during a strategic merge
+                          patch.
+                        type: array
+                        items:
+                          type: string
+                matchLabels:
+                  description: matchLabels is a map of {key,value} pairs. A single
+                    {key,value} in the matchLabels map is equivalent to an element
+                    of matchExpressions, whose key field is "key", the operator is
+                    "In", and the values array contains only "value". The requirements
+                    are ANDed.
+                  type: object
+                  additionalProperties:
                     type: string
             patches:
               description: Patches is the list of patches to apply.
@@ -140,9 +168,13 @@ spec:
                           to be the same namespace as the syncset with the reference.
                         type: string
         status:
-          description: SyncSetStatus defines the observed state of a SyncSet
+          description: SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

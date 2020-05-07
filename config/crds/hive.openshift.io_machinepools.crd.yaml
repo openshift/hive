@@ -2,8 +2,6 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: machinepools.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -19,7 +17,9 @@ spec:
   group: hive.openshift.io
   names:
     kind: MachinePool
+    listKind: MachinePoolList
     plural: machinepools
+    singular: machinepool
   scope: Namespaced
   subresources:
     scale:
@@ -313,6 +313,10 @@ spec:
               type: integer
               format: int32
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

@@ -95,7 +95,7 @@ type SyncSetInstanceStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
-// +kubebuilder:resource:path=syncsetinstances,shortName=ssi
+// +kubebuilder:resource:path=syncsetinstances,shortName=ssi,scope=Namespaced
 type SyncSetInstance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

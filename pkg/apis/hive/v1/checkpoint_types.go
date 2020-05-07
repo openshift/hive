@@ -32,6 +32,7 @@ type CheckpointStatus struct {
 // Checkpoint is the Schema for the backup of Hive objects.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Namespaced
 type Checkpoint struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

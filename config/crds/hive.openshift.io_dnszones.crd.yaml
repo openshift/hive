@@ -2,14 +2,14 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: dnszones.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: DNSZone
+    listKind: DNSZoneList
     plural: dnszones
+    singular: dnszone
   scope: Namespaced
   subresources:
     status: {}
@@ -170,6 +170,10 @@ spec:
               items:
                 type: string
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

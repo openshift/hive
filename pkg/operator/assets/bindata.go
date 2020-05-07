@@ -31,21 +31,21 @@
 // config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
-// config/crds/hive_v1_checkpoint.yaml
-// config/crds/hive_v1_clusterdeployment.yaml
-// config/crds/hive_v1_clusterdeprovision.yaml
-// config/crds/hive_v1_clusterimageset.yaml
-// config/crds/hive_v1_clusterprovision.yaml
-// config/crds/hive_v1_clusterstate.yaml
-// config/crds/hive_v1_dnszone.yaml
-// config/crds/hive_v1_hiveconfig.yaml
-// config/crds/hive_v1_machinepool.yaml
-// config/crds/hive_v1_machinepoolnamelease.yaml
-// config/crds/hive_v1_selectorsyncidentityprovider.yaml
-// config/crds/hive_v1_selectorsyncset.yaml
-// config/crds/hive_v1_syncidentityprovider.yaml
-// config/crds/hive_v1_syncset.yaml
-// config/crds/hive_v1_syncsetinstance.yaml
+// config/crds/hive.openshift.io_checkpoints.crd.yaml
+// config/crds/hive.openshift.io_clusterdeployments.crd.yaml
+// config/crds/hive.openshift.io_clusterdeprovisions.crd.yaml
+// config/crds/hive.openshift.io_clusterimagesets.crd.yaml
+// config/crds/hive.openshift.io_clusterprovisions.crd.yaml
+// config/crds/hive.openshift.io_clusterstates.crd.yaml
+// config/crds/hive.openshift.io_dnszones.crd.yaml
+// config/crds/hive.openshift.io_hiveconfigs.crd.yaml
+// config/crds/hive.openshift.io_machinepoolnameleases.crd.yaml
+// config/crds/hive.openshift.io_machinepools.crd.yaml
+// config/crds/hive.openshift.io_selectorsyncidentityproviders.crd.yaml
+// config/crds/hive.openshift.io_selectorsyncsets.crd.yaml
+// config/crds/hive.openshift.io_syncidentityproviders.crd.yaml
+// config/crds/hive.openshift.io_syncsetinstances.crd.yaml
+// config/crds/hive.openshift.io_syncsets.crd.yaml
 // config/configmaps/install-log-regexes-configmap.yaml
 package assets
 
@@ -1514,18 +1514,18 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHive_v1_checkpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_checkpointsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: checkpoints.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: Checkpoint
+    listKind: CheckpointList
     plural: checkpoints
+    singular: checkpoint
   scope: Namespaced
   subresources:
     status: {}
@@ -1579,6 +1579,10 @@ spec:
           description: CheckpointStatus defines the observed state of Checkpoint
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -1587,27 +1591,25 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_checkpointYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_checkpointYaml, nil
+func configCrdsHiveOpenshiftIo_checkpointsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_checkpointsCrdYaml, nil
 }
 
-func configCrdsHive_v1_checkpointYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_checkpointYamlBytes()
+func configCrdsHiveOpenshiftIo_checkpointsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_checkpointsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_checkpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_checkpoints.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterdeploymentYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -1632,9 +1634,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
+    listKind: ClusterDeploymentList
     plural: clusterdeployments
     shortNames:
     - cd
+    singular: clusterdeployment
   scope: Namespaced
   subresources:
     status: {}
@@ -2495,6 +2499,10 @@ spec:
                 UI.
               type: string
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -2503,27 +2511,25 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterdeploymentYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterdeploymentYaml, nil
+func configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYaml, nil
 }
 
-func configCrdsHive_v1_clusterdeploymentYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterdeploymentYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterdeployments.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterdeprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterdeprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -2542,9 +2548,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterDeprovision
+    listKind: ClusterDeprovisionList
     plural: clusterdeprovisions
     shortNames:
     - cdr
+    singular: clusterdeprovision
   scope: Namespaced
   subresources:
     status: {}
@@ -2660,6 +2668,10 @@ spec:
               description: Completed is true when the uninstall has completed successfully
               type: boolean
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -2668,27 +2680,25 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterdeprovisionYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterdeprovisionYaml, nil
+func configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYaml, nil
 }
 
-func configCrdsHive_v1_clusterdeprovisionYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterdeprovisionYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterdeprovisions.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterimagesetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterimagesetsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -2698,9 +2708,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterImageSet
+    listKind: ClusterImageSetList
     plural: clusterimagesets
     shortNames:
     - imgset
+    singular: clusterimageset
   scope: Cluster
   subresources:
     status: {}
@@ -2735,6 +2747,10 @@ spec:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -2743,27 +2759,25 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterimagesetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterimagesetYaml, nil
+func configCrdsHiveOpenshiftIo_clusterimagesetsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterimagesetsCrdYaml, nil
 }
 
-func configCrdsHive_v1_clusterimagesetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterimagesetYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterimagesetsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterimagesetsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterimagesets.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterprovisionsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -2779,7 +2793,9 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterProvision
+    listKind: ClusterProvisionList
     plural: clusterprovisions
+    singular: clusterprovision
   scope: Namespaced
   subresources:
     status: {}
@@ -8384,6 +8400,10 @@ spec:
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8392,33 +8412,33 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterprovisionYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterprovisionYaml, nil
+func configCrdsHiveOpenshiftIo_clusterprovisionsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterprovisionsCrdYaml, nil
 }
 
-func configCrdsHive_v1_clusterprovisionYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterprovisionYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterprovisionsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterprovisionsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterprovisions.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterstateYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterstatesCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterstates.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: ClusterState
+    listKind: ClusterStateList
     plural: clusterstates
+    singular: clusterstate
   scope: Namespaced
   subresources:
     status: {}
@@ -8500,6 +8520,10 @@ spec:
               type: string
               format: date-time
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8508,33 +8532,33 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterstateYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterstateYaml, nil
+func configCrdsHiveOpenshiftIo_clusterstatesCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterstatesCrdYaml, nil
 }
 
-func configCrdsHive_v1_clusterstateYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterstateYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterstatesCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterstatesCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterstate.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterstates.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_dnszoneYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_dnszonesCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: dnszones.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: DNSZone
+    listKind: DNSZoneList
     plural: dnszones
+    singular: dnszone
   scope: Namespaced
   subresources:
     status: {}
@@ -8695,6 +8719,10 @@ spec:
               items:
                 type: string
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8703,33 +8731,33 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_dnszoneYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_dnszoneYaml, nil
+func configCrdsHiveOpenshiftIo_dnszonesCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_dnszonesCrdYaml, nil
 }
 
-func configCrdsHive_v1_dnszoneYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_dnszoneYamlBytes()
+func configCrdsHiveOpenshiftIo_dnszonesCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_dnszonesCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_dnszone.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_dnszones.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_hiveconfigYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_hiveconfigsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: hiveconfigs.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: HiveConfig
+    listKind: HiveConfigList
     plural: hiveconfigs
+    singular: hiveconfig
   scope: Cluster
   subresources:
     status: {}
@@ -8923,6 +8951,10 @@ spec:
               type: integer
               format: int64
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8931,27 +8963,105 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_hiveconfigYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_hiveconfigYaml, nil
+func configCrdsHiveOpenshiftIo_hiveconfigsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_hiveconfigsCrdYaml, nil
 }
 
-func configCrdsHive_v1_hiveconfigYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_hiveconfigYamlBytes()
+func configCrdsHiveOpenshiftIo_hiveconfigsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_hiveconfigsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_hiveconfig.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_hiveconfigs.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_machinepoolYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
+  name: machinepoolnameleases.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
+    name: MachinePool
+    type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
+    name: Cluster
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
+  group: hive.openshift.io
+  names:
+    kind: MachinePoolNameLease
+    listKind: MachinePoolNameLeaseList
+    plural: machinepoolnameleases
+    singular: machinepoolnamelease
+  scope: Namespaced
+  subresources: {}
+  validation:
+    openAPIV3Schema:
+      description: MachinePoolNameLease is the Schema for the MachinePoolNameLeases
+        API. This resource is mostly empty as we're primarily relying on the name
+        to determine if a lease is available. Note that not all cloud providers require
+        the use of a lease for naming, at present this is only required for GCP where
+        we're extremely restricted on name lengths.
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: MachinePoolNameLeaseSpec is a minimal resource for obtaining
+            unique machine pool names of a limited length.
+          type: object
+        status:
+          description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
+          type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYaml, nil
+}
+
+func configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_machinepoolnameleases.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHiveOpenshiftIo_machinepoolsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
   name: machinepools.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -8967,7 +9077,9 @@ spec:
   group: hive.openshift.io
   names:
     kind: MachinePool
+    listKind: MachinePoolList
     plural: machinepools
+    singular: machinepool
   scope: Namespaced
   subresources:
     scale:
@@ -9261,6 +9373,10 @@ spec:
               type: integer
               format: int32
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -9269,108 +9385,33 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_machinepoolYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_machinepoolYaml, nil
+func configCrdsHiveOpenshiftIo_machinepoolsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_machinepoolsCrdYaml, nil
 }
 
-func configCrdsHive_v1_machinepoolYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_machinepoolYamlBytes()
+func configCrdsHiveOpenshiftIo_machinepoolsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_machinepoolsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_machinepool.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_machinepools.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_machinepoolnameleaseYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: machinepoolnameleases.hive.openshift.io
-spec:
-  additionalPrinterColumns:
-  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
-    name: MachinePool
-    type: string
-  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
-    name: Cluster
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
-  group: hive.openshift.io
-  names:
-    kind: MachinePoolNameLease
-    plural: machinepoolnameleases
-  scope: Namespaced
-  validation:
-    openAPIV3Schema:
-      description: MachinePoolNameLease is the Schema for the MachinePoolNameLeases
-        API. This resource is mostly empty as we're primarily relying on the name
-        to determine if a lease is available. Note that not all cloud providers require
-        the use of a lease for naming, at present this is only required for GCP where
-        we're extremely restricted on name lengths.
-      type: object
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: MachinePoolNameLeaseSpec is a minimal resource for obtaining
-            unique machine pool names of a limited length.
-          type: object
-        status:
-          description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
-          type: object
-  version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-`)
-
-func configCrdsHive_v1_machinepoolnameleaseYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_machinepoolnameleaseYaml, nil
-}
-
-func configCrdsHive_v1_machinepoolnameleaseYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_machinepoolnameleaseYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/crds/hive_v1_machinepoolnamelease.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configCrdsHive_v1_selectorsyncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: selectorsyncidentityproviders.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SelectorSyncIdentityProvider
+    listKind: SelectorSyncIdentityProviderList
     plural: selectorsyncidentityproviders
+    singular: selectorsyncidentityprovider
   scope: Cluster
   validation:
     openAPIV3Schema:
@@ -9983,6 +10024,10 @@ spec:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -9991,35 +10036,35 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_selectorsyncidentityproviderYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_selectorsyncidentityproviderYaml, nil
+func configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYaml, nil
 }
 
-func configCrdsHive_v1_selectorsyncidentityproviderYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_selectorsyncidentityproviderYamlBytes()
+func configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_selectorsyncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_selectorsyncidentityproviders.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_selectorsyncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: selectorsyncsets.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SelectorSyncSet
+    listKind: SelectorSyncSetList
     plural: selectorsyncsets
     shortNames:
     - sss
+    singular: selectorsyncset
   scope: Cluster
   validation:
     openAPIV3Schema:
@@ -10179,6 +10224,10 @@ spec:
           description: SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -10187,33 +10236,33 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_selectorsyncsetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_selectorsyncsetYaml, nil
+func configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYaml, nil
 }
 
-func configCrdsHive_v1_selectorsyncsetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_selectorsyncsetYamlBytes()
+func configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_selectorsyncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_selectorsyncsets.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_syncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: syncidentityproviders.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SyncIdentityProvider
+    listKind: SyncIdentityProviderList
     plural: syncidentityproviders
+    singular: syncidentityprovider
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -10798,6 +10847,10 @@ spec:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -10806,195 +10859,25 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_syncidentityproviderYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_syncidentityproviderYaml, nil
+func configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYaml, nil
 }
 
-func configCrdsHive_v1_syncidentityproviderYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_syncidentityproviderYamlBytes()
+func configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_syncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_syncidentityproviders.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_syncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncsetinstancesCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: syncsets.hive.openshift.io
-spec:
-  group: hive.openshift.io
-  names:
-    kind: SyncSet
-    plural: syncsets
-    shortNames:
-    - ss
-  scope: Namespaced
-  validation:
-    openAPIV3Schema:
-      description: SyncSet is the Schema for the SyncSet API
-      type: object
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: SyncSetSpec defines the SyncSetCommonSpec resources and patches
-            to sync along with ClusterDeploymentRefs indicating which clusters the
-            SyncSet applies to in the SyncSet's namespace.
-          type: object
-          required:
-          - clusterDeploymentRefs
-          properties:
-            clusterDeploymentRefs:
-              description: ClusterDeploymentRefs is the list of LocalObjectReference
-                indicating which clusters the SyncSet applies to in the SyncSet's
-                namespace.
-              type: array
-              items:
-                description: LocalObjectReference contains enough information to let
-                  you locate the referenced object inside the same namespace.
-                type: object
-                properties:
-                  name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
-                    type: string
-            patches:
-              description: Patches is the list of patches to apply.
-              type: array
-              items:
-                description: SyncObjectPatch represents a patch to be applied to a
-                  specific object
-                type: object
-                required:
-                - apiVersion
-                - kind
-                - name
-                - patch
-                properties:
-                  apiVersion:
-                    description: APIVersion is the Group and Version of the object
-                      to be patched.
-                    type: string
-                  kind:
-                    description: Kind is the Kind of the object to be patched.
-                    type: string
-                  name:
-                    description: Name is the name of the object to be patched.
-                    type: string
-                  namespace:
-                    description: Namespace is the Namespace in which the object to
-                      patch exists. Defaults to the SyncSet's Namespace.
-                    type: string
-                  patch:
-                    description: Patch is the patch to apply.
-                    type: string
-                  patchType:
-                    description: PatchType indicates the PatchType as "strategic"
-                      (default), "json", or "merge".
-                    type: string
-            resourceApplyMode:
-              description: ResourceApplyMode indicates if the Resource apply mode
-                is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
-                and update. ApplyMode "Sync" indicates create, update and delete.
-              type: string
-            resources:
-              description: Resources is the list of objects to sync from RawExtension
-                definitions.
-              type: array
-              items:
-                type: object
-            secretMappings:
-              description: Secrets is the list of secrets to sync along with their
-                respective destinations.
-              type: array
-              items:
-                description: SecretMapping defines a source and destination for a
-                  secret to be synced by a SyncSet
-                type: object
-                required:
-                - sourceRef
-                - targetRef
-                properties:
-                  sourceRef:
-                    description: SourceRef specifies the name and namespace of a secret
-                      on the management cluster
-                    type: object
-                    required:
-                    - name
-                    properties:
-                      name:
-                        description: Name is the name of the secret
-                        type: string
-                      namespace:
-                        description: Namespace is the namespace where the secret lives.
-                          If not present for the source secret reference, it is assumed
-                          to be the same namespace as the syncset with the reference.
-                        type: string
-                  targetRef:
-                    description: TargetRef specifies the target name and namespace
-                      of the secret on the target cluster
-                    type: object
-                    required:
-                    - name
-                    properties:
-                      name:
-                        description: Name is the name of the secret
-                        type: string
-                      namespace:
-                        description: Namespace is the namespace where the secret lives.
-                          If not present for the source secret reference, it is assumed
-                          to be the same namespace as the syncset with the reference.
-                        type: string
-        status:
-          description: SyncSetStatus defines the observed state of a SyncSet
-          type: object
-  version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-`)
-
-func configCrdsHive_v1_syncsetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_syncsetYaml, nil
-}
-
-func configCrdsHive_v1_syncsetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_syncsetYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/crds/hive_v1_syncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configCrdsHive_v1_syncsetinstanceYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: syncsetinstances.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -11004,9 +10887,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: SyncSetInstance
+    listKind: SyncSetInstanceList
     plural: syncsetinstances
     shortNames:
     - ssi
+    singular: syncsetinstance
   scope: Namespaced
   subresources:
     status: {}
@@ -11342,6 +11227,10 @@ spec:
                       was synced. This will be populated for resources, but not patches
                     type: string
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -11350,17 +11239,189 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_syncsetinstanceYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_syncsetinstanceYaml, nil
+func configCrdsHiveOpenshiftIo_syncsetinstancesCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_syncsetinstancesCrdYaml, nil
 }
 
-func configCrdsHive_v1_syncsetinstanceYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_syncsetinstanceYamlBytes()
+func configCrdsHiveOpenshiftIo_syncsetinstancesCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_syncsetinstancesCrdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_syncsetinstance.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_syncsetinstances.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHiveOpenshiftIo_syncsetsCrdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: syncsets.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: SyncSet
+    listKind: SyncSetList
+    plural: syncsets
+    shortNames:
+    - ss
+    singular: syncset
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      description: SyncSet is the Schema for the SyncSet API
+      type: object
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: SyncSetSpec defines the SyncSetCommonSpec resources and patches
+            to sync along with ClusterDeploymentRefs indicating which clusters the
+            SyncSet applies to in the SyncSet's namespace.
+          type: object
+          required:
+          - clusterDeploymentRefs
+          properties:
+            clusterDeploymentRefs:
+              description: ClusterDeploymentRefs is the list of LocalObjectReference
+                indicating which clusters the SyncSet applies to in the SyncSet's
+                namespace.
+              type: array
+              items:
+                description: LocalObjectReference contains enough information to let
+                  you locate the referenced object inside the same namespace.
+                type: object
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+            patches:
+              description: Patches is the list of patches to apply.
+              type: array
+              items:
+                description: SyncObjectPatch represents a patch to be applied to a
+                  specific object
+                type: object
+                required:
+                - apiVersion
+                - kind
+                - name
+                - patch
+                properties:
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the object
+                      to be patched.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the object to be patched.
+                    type: string
+                  name:
+                    description: Name is the name of the object to be patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace in which the object to
+                      patch exists. Defaults to the SyncSet's Namespace.
+                    type: string
+                  patch:
+                    description: Patch is the patch to apply.
+                    type: string
+                  patchType:
+                    description: PatchType indicates the PatchType as "strategic"
+                      (default), "json", or "merge".
+                    type: string
+            resourceApplyMode:
+              description: ResourceApplyMode indicates if the Resource apply mode
+                is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
+                and update. ApplyMode "Sync" indicates create, update and delete.
+              type: string
+            resources:
+              description: Resources is the list of objects to sync from RawExtension
+                definitions.
+              type: array
+              items:
+                type: object
+            secretMappings:
+              description: Secrets is the list of secrets to sync along with their
+                respective destinations.
+              type: array
+              items:
+                description: SecretMapping defines a source and destination for a
+                  secret to be synced by a SyncSet
+                type: object
+                required:
+                - sourceRef
+                - targetRef
+                properties:
+                  sourceRef:
+                    description: SourceRef specifies the name and namespace of a secret
+                      on the management cluster
+                    type: object
+                    required:
+                    - name
+                    properties:
+                      name:
+                        description: Name is the name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace where the secret lives.
+                          If not present for the source secret reference, it is assumed
+                          to be the same namespace as the syncset with the reference.
+                        type: string
+                  targetRef:
+                    description: TargetRef specifies the target name and namespace
+                      of the secret on the target cluster
+                    type: object
+                    required:
+                    - name
+                    properties:
+                      name:
+                        description: Name is the name of the secret
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace where the secret lives.
+                          If not present for the source secret reference, it is assumed
+                          to be the same namespace as the syncset with the reference.
+                        type: string
+        status:
+          description: SyncSetStatus defines the observed state of a SyncSet
+          type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHiveOpenshiftIo_syncsetsCrdYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_syncsetsCrdYaml, nil
+}
+
+func configCrdsHiveOpenshiftIo_syncsetsCrdYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_syncsetsCrdYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_syncsets.crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -11496,53 +11557,53 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"config/apiserver/apiservice.yaml":                          configApiserverApiserviceYaml,
-	"config/apiserver/deployment.yaml":                          configApiserverDeploymentYaml,
-	"config/apiserver/hiveapi_rbac_role.yaml":                   configApiserverHiveapi_rbac_roleYaml,
-	"config/apiserver/hiveapi_rbac_role_binding.yaml":           configApiserverHiveapi_rbac_role_bindingYaml,
-	"config/apiserver/service-account.yaml":                     configApiserverServiceAccountYaml,
-	"config/apiserver/service.yaml":                             configApiserverServiceYaml,
-	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
-	"config/hiveadmission/clusterdeployment-webhook.yaml":       configHiveadmissionClusterdeploymentWebhookYaml,
-	"config/hiveadmission/clusterimageset-webhook.yaml":         configHiveadmissionClusterimagesetWebhookYaml,
-	"config/hiveadmission/clusterprovision-webhook.yaml":        configHiveadmissionClusterprovisionWebhookYaml,
-	"config/hiveadmission/deployment.yaml":                      configHiveadmissionDeploymentYaml,
-	"config/hiveadmission/dnszones-webhook.yaml":                configHiveadmissionDnszonesWebhookYaml,
-	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
-	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
-	"config/hiveadmission/machinepool-webhook.yaml":             configHiveadmissionMachinepoolWebhookYaml,
-	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
-	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
-	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
-	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
-	"config/controllers/deployment.yaml":                        configControllersDeploymentYaml,
-	"config/controllers/hive_controllers_role.yaml":             configControllersHive_controllers_roleYaml,
-	"config/controllers/hive_controllers_role_binding.yaml":     configControllersHive_controllers_role_bindingYaml,
-	"config/controllers/hive_controllers_serviceaccount.yaml":   configControllersHive_controllers_serviceaccountYaml,
-	"config/controllers/service.yaml":                           configControllersServiceYaml,
-	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
-	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
-	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
-	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
-	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
-	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
-	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
-	"config/crds/hive_v1_checkpoint.yaml":                       configCrdsHive_v1_checkpointYaml,
-	"config/crds/hive_v1_clusterdeployment.yaml":                configCrdsHive_v1_clusterdeploymentYaml,
-	"config/crds/hive_v1_clusterdeprovision.yaml":               configCrdsHive_v1_clusterdeprovisionYaml,
-	"config/crds/hive_v1_clusterimageset.yaml":                  configCrdsHive_v1_clusterimagesetYaml,
-	"config/crds/hive_v1_clusterprovision.yaml":                 configCrdsHive_v1_clusterprovisionYaml,
-	"config/crds/hive_v1_clusterstate.yaml":                     configCrdsHive_v1_clusterstateYaml,
-	"config/crds/hive_v1_dnszone.yaml":                          configCrdsHive_v1_dnszoneYaml,
-	"config/crds/hive_v1_hiveconfig.yaml":                       configCrdsHive_v1_hiveconfigYaml,
-	"config/crds/hive_v1_machinepool.yaml":                      configCrdsHive_v1_machinepoolYaml,
-	"config/crds/hive_v1_machinepoolnamelease.yaml":             configCrdsHive_v1_machinepoolnameleaseYaml,
-	"config/crds/hive_v1_selectorsyncidentityprovider.yaml":     configCrdsHive_v1_selectorsyncidentityproviderYaml,
-	"config/crds/hive_v1_selectorsyncset.yaml":                  configCrdsHive_v1_selectorsyncsetYaml,
-	"config/crds/hive_v1_syncidentityprovider.yaml":             configCrdsHive_v1_syncidentityproviderYaml,
-	"config/crds/hive_v1_syncset.yaml":                          configCrdsHive_v1_syncsetYaml,
-	"config/crds/hive_v1_syncsetinstance.yaml":                  configCrdsHive_v1_syncsetinstanceYaml,
-	"config/configmaps/install-log-regexes-configmap.yaml":      configConfigmapsInstallLogRegexesConfigmapYaml,
+	"config/apiserver/apiservice.yaml":                                     configApiserverApiserviceYaml,
+	"config/apiserver/deployment.yaml":                                     configApiserverDeploymentYaml,
+	"config/apiserver/hiveapi_rbac_role.yaml":                              configApiserverHiveapi_rbac_roleYaml,
+	"config/apiserver/hiveapi_rbac_role_binding.yaml":                      configApiserverHiveapi_rbac_role_bindingYaml,
+	"config/apiserver/service-account.yaml":                                configApiserverServiceAccountYaml,
+	"config/apiserver/service.yaml":                                        configApiserverServiceYaml,
+	"config/hiveadmission/apiservice.yaml":                                 configHiveadmissionApiserviceYaml,
+	"config/hiveadmission/clusterdeployment-webhook.yaml":                  configHiveadmissionClusterdeploymentWebhookYaml,
+	"config/hiveadmission/clusterimageset-webhook.yaml":                    configHiveadmissionClusterimagesetWebhookYaml,
+	"config/hiveadmission/clusterprovision-webhook.yaml":                   configHiveadmissionClusterprovisionWebhookYaml,
+	"config/hiveadmission/deployment.yaml":                                 configHiveadmissionDeploymentYaml,
+	"config/hiveadmission/dnszones-webhook.yaml":                           configHiveadmissionDnszonesWebhookYaml,
+	"config/hiveadmission/hiveadmission_rbac_role.yaml":                    configHiveadmissionHiveadmission_rbac_roleYaml,
+	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml":            configHiveadmissionHiveadmission_rbac_role_bindingYaml,
+	"config/hiveadmission/machinepool-webhook.yaml":                        configHiveadmissionMachinepoolWebhookYaml,
+	"config/hiveadmission/selectorsyncset-webhook.yaml":                    configHiveadmissionSelectorsyncsetWebhookYaml,
+	"config/hiveadmission/service-account.yaml":                            configHiveadmissionServiceAccountYaml,
+	"config/hiveadmission/service.yaml":                                    configHiveadmissionServiceYaml,
+	"config/hiveadmission/syncset-webhook.yaml":                            configHiveadmissionSyncsetWebhookYaml,
+	"config/controllers/deployment.yaml":                                   configControllersDeploymentYaml,
+	"config/controllers/hive_controllers_role.yaml":                        configControllersHive_controllers_roleYaml,
+	"config/controllers/hive_controllers_role_binding.yaml":                configControllersHive_controllers_role_bindingYaml,
+	"config/controllers/hive_controllers_serviceaccount.yaml":              configControllersHive_controllers_serviceaccountYaml,
+	"config/controllers/service.yaml":                                      configControllersServiceYaml,
+	"config/rbac/hive_admin_role.yaml":                                     configRbacHive_admin_roleYaml,
+	"config/rbac/hive_admin_role_binding.yaml":                             configRbacHive_admin_role_bindingYaml,
+	"config/rbac/hive_frontend_role.yaml":                                  configRbacHive_frontend_roleYaml,
+	"config/rbac/hive_frontend_role_binding.yaml":                          configRbacHive_frontend_role_bindingYaml,
+	"config/rbac/hive_frontend_serviceaccount.yaml":                        configRbacHive_frontend_serviceaccountYaml,
+	"config/rbac/hive_reader_role.yaml":                                    configRbacHive_reader_roleYaml,
+	"config/rbac/hive_reader_role_binding.yaml":                            configRbacHive_reader_role_bindingYaml,
+	"config/crds/hive.openshift.io_checkpoints.crd.yaml":                   configCrdsHiveOpenshiftIo_checkpointsCrdYaml,
+	"config/crds/hive.openshift.io_clusterdeployments.crd.yaml":            configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYaml,
+	"config/crds/hive.openshift.io_clusterdeprovisions.crd.yaml":           configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYaml,
+	"config/crds/hive.openshift.io_clusterimagesets.crd.yaml":              configCrdsHiveOpenshiftIo_clusterimagesetsCrdYaml,
+	"config/crds/hive.openshift.io_clusterprovisions.crd.yaml":             configCrdsHiveOpenshiftIo_clusterprovisionsCrdYaml,
+	"config/crds/hive.openshift.io_clusterstates.crd.yaml":                 configCrdsHiveOpenshiftIo_clusterstatesCrdYaml,
+	"config/crds/hive.openshift.io_dnszones.crd.yaml":                      configCrdsHiveOpenshiftIo_dnszonesCrdYaml,
+	"config/crds/hive.openshift.io_hiveconfigs.crd.yaml":                   configCrdsHiveOpenshiftIo_hiveconfigsCrdYaml,
+	"config/crds/hive.openshift.io_machinepoolnameleases.crd.yaml":         configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYaml,
+	"config/crds/hive.openshift.io_machinepools.crd.yaml":                  configCrdsHiveOpenshiftIo_machinepoolsCrdYaml,
+	"config/crds/hive.openshift.io_selectorsyncidentityproviders.crd.yaml": configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYaml,
+	"config/crds/hive.openshift.io_selectorsyncsets.crd.yaml":              configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYaml,
+	"config/crds/hive.openshift.io_syncidentityproviders.crd.yaml":         configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYaml,
+	"config/crds/hive.openshift.io_syncsetinstances.crd.yaml":              configCrdsHiveOpenshiftIo_syncsetinstancesCrdYaml,
+	"config/crds/hive.openshift.io_syncsets.crd.yaml":                      configCrdsHiveOpenshiftIo_syncsetsCrdYaml,
+	"config/configmaps/install-log-regexes-configmap.yaml":                 configConfigmapsInstallLogRegexesConfigmapYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -11606,21 +11667,21 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service.yaml":                         {configControllersServiceYaml, map[string]*bintree{}},
 		}},
 		"crds": {nil, map[string]*bintree{
-			"hive_v1_checkpoint.yaml":                   {configCrdsHive_v1_checkpointYaml, map[string]*bintree{}},
-			"hive_v1_clusterdeployment.yaml":            {configCrdsHive_v1_clusterdeploymentYaml, map[string]*bintree{}},
-			"hive_v1_clusterdeprovision.yaml":           {configCrdsHive_v1_clusterdeprovisionYaml, map[string]*bintree{}},
-			"hive_v1_clusterimageset.yaml":              {configCrdsHive_v1_clusterimagesetYaml, map[string]*bintree{}},
-			"hive_v1_clusterprovision.yaml":             {configCrdsHive_v1_clusterprovisionYaml, map[string]*bintree{}},
-			"hive_v1_clusterstate.yaml":                 {configCrdsHive_v1_clusterstateYaml, map[string]*bintree{}},
-			"hive_v1_dnszone.yaml":                      {configCrdsHive_v1_dnszoneYaml, map[string]*bintree{}},
-			"hive_v1_hiveconfig.yaml":                   {configCrdsHive_v1_hiveconfigYaml, map[string]*bintree{}},
-			"hive_v1_machinepool.yaml":                  {configCrdsHive_v1_machinepoolYaml, map[string]*bintree{}},
-			"hive_v1_machinepoolnamelease.yaml":         {configCrdsHive_v1_machinepoolnameleaseYaml, map[string]*bintree{}},
-			"hive_v1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1_selectorsyncidentityproviderYaml, map[string]*bintree{}},
-			"hive_v1_selectorsyncset.yaml":              {configCrdsHive_v1_selectorsyncsetYaml, map[string]*bintree{}},
-			"hive_v1_syncidentityprovider.yaml":         {configCrdsHive_v1_syncidentityproviderYaml, map[string]*bintree{}},
-			"hive_v1_syncset.yaml":                      {configCrdsHive_v1_syncsetYaml, map[string]*bintree{}},
-			"hive_v1_syncsetinstance.yaml":              {configCrdsHive_v1_syncsetinstanceYaml, map[string]*bintree{}},
+			"hive.openshift.io_checkpoints.crd.yaml":                   {configCrdsHiveOpenshiftIo_checkpointsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterdeployments.crd.yaml":            {configCrdsHiveOpenshiftIo_clusterdeploymentsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterdeprovisions.crd.yaml":           {configCrdsHiveOpenshiftIo_clusterdeprovisionsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterimagesets.crd.yaml":              {configCrdsHiveOpenshiftIo_clusterimagesetsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterprovisions.crd.yaml":             {configCrdsHiveOpenshiftIo_clusterprovisionsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterstates.crd.yaml":                 {configCrdsHiveOpenshiftIo_clusterstatesCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_dnszones.crd.yaml":                      {configCrdsHiveOpenshiftIo_dnszonesCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_hiveconfigs.crd.yaml":                   {configCrdsHiveOpenshiftIo_hiveconfigsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_machinepoolnameleases.crd.yaml":         {configCrdsHiveOpenshiftIo_machinepoolnameleasesCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_machinepools.crd.yaml":                  {configCrdsHiveOpenshiftIo_machinepoolsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_selectorsyncidentityproviders.crd.yaml": {configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_selectorsyncsets.crd.yaml":              {configCrdsHiveOpenshiftIo_selectorsyncsetsCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_syncidentityproviders.crd.yaml":         {configCrdsHiveOpenshiftIo_syncidentityprovidersCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_syncsetinstances.crd.yaml":              {configCrdsHiveOpenshiftIo_syncsetinstancesCrdYaml, map[string]*bintree{}},
+			"hive.openshift.io_syncsets.crd.yaml":                      {configCrdsHiveOpenshiftIo_syncsetsCrdYaml, map[string]*bintree{}},
 		}},
 		"hiveadmission": {nil, map[string]*bintree{
 			"apiservice.yaml":                      {configHiveadmissionApiserviceYaml, map[string]*bintree{}},

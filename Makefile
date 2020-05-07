@@ -4,9 +4,9 @@ all: vendor update test build
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
-	targets/openshift/bindata.mk \
-	targets/openshift/crd-schema-gen.mk \
 	targets/openshift/deps.mk \
+	targets/openshift/crd-schema-gen.mk \
+	targets/openshift/bindata.mk \
 	targets/openshift/images.mk \
 )
 
@@ -51,15 +51,15 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
+CRD_APIS :=$(addprefix ./pkg/apis/hive/,v1)
+$(call add-crd-gen,hive,$(CRD_APIS),$(PERMANENT_TMP)/crds,./config/crds)
+
 BINDATA_INPUTS :=./config/apiserver/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/crds/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
 $(call build-image,hive,$(IMG),./Dockerfile,.)
 $(call build-image,hive-dev,$(IMG),./Dockerfile.dev,.)
 $(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
-
-CRD_APIS :=$(addprefix ./pkg/apis/hive/,v1)
-$(call add-crd-gen,hive,$(CRD_APIS),./config/crds,./config/crds)
 
 clean:
 	rm -rf $(GO_BUILD_BINDIR)
@@ -69,6 +69,26 @@ vendor:
 	go mod tidy
 	go mod vendor
 	$(MAKE) -C v1alpha1apiserver vendor
+
+define create-crd-gen
+	rm -rf "$(2)"
+	'$(CONTROLLER_GEN)' \
+		crd \
+		paths="$(subst $(empty) ,;,$(1))" \
+		output:dir="$(2)"
+endef
+
+clear-crds-hive:
+	rm -rf ./config/crds
+
+create-crds-hive: ensure-controller-gen ensure-yq
+	$(call create-crd-gen,./pkg/apis/hive/v1,$(PERMANENT_TMP)/crds)
+	@# targets/openshift/crd-schema-gen.mk is expecting CRDs to have the suffix .crd.yaml
+	rename .yaml .crd.yaml _output/crds/*.yaml
+.PHONY: create-crds-hive
+update-codegen-crds-hive: clear-crds-hive create-crds-hive
+
+verify-codegen-crds-hive: create-crds-hive
 
 .PHONY: test-integration
 test-integration: generate

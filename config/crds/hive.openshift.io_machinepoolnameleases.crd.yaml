@@ -2,8 +2,6 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -19,8 +17,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: MachinePoolNameLease
+    listKind: MachinePoolNameLeaseList
     plural: machinepoolnameleases
+    singular: machinepoolnamelease
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: MachinePoolNameLease is the Schema for the MachinePoolNameLeases
@@ -50,6 +51,10 @@ spec:
           description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
           type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

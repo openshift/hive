@@ -1,18 +1,20 @@
-package secret
+package syncidentityprovider
 
 import (
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/test/generic"
 )
 
 // Option defines a function signature for any function that wants to be passed into Build
-type Option func(*corev1.Secret)
+type Option func(*hivev1.SyncIdentityProvider)
 
 // Build runs each of the functions passed in to generate the object.
-func Build(opts ...Option) *corev1.Secret {
-	retval := &corev1.Secret{}
+func Build(opts ...Option) *hivev1.SyncIdentityProvider {
+	retval := &hivev1.SyncIdentityProvider{}
 	for _, o := range opts {
 		o(retval)
 	}
@@ -21,7 +23,7 @@ func Build(opts ...Option) *corev1.Secret {
 }
 
 type Builder interface {
-	Build(opts ...Option) *corev1.Secret
+	Build(opts ...Option) *hivev1.SyncIdentityProvider
 
 	Options(opts ...Option) Builder
 
@@ -46,7 +48,7 @@ type builder struct {
 	options []Option
 }
 
-func (b *builder) Build(opts ...Option) *corev1.Secret {
+func (b *builder) Build(opts ...Option) *hivev1.SyncIdentityProvider {
 	return Build(append(b.options, opts...)...)
 }
 
@@ -66,8 +68,8 @@ func (b *builder) GenericOptions(opts ...generic.Option) Builder {
 
 // Generic allows common functions applicable to all objects to be used as Options to Build
 func Generic(opt generic.Option) Option {
-	return func(obj *corev1.Secret) {
-		opt(obj)
+	return func(syncIdentityProvider *hivev1.SyncIdentityProvider) {
+		opt(syncIdentityProvider)
 	}
 }
 
@@ -81,19 +83,20 @@ func WithNamespace(namespace string) Option {
 	return Generic(generic.WithNamespace(namespace))
 }
 
-// WithDataKeyValue adds the key and value to the secret's data section.
-func WithDataKeyValue(key string, value []byte) Option {
-	return func(obj *corev1.Secret) {
-		if obj.Data == nil {
-			obj.Data = map[string][]byte{}
+func ForClusterDeployments(clusterDeploymentNames ...string) Option {
+	return func(syncIdentityProvider *hivev1.SyncIdentityProvider) {
+		syncIdentityProvider.Spec.ClusterDeploymentRefs = make([]corev1.LocalObjectReference, len(clusterDeploymentNames))
+		for i, name := range clusterDeploymentNames {
+			syncIdentityProvider.Spec.ClusterDeploymentRefs[i] = corev1.LocalObjectReference{Name: name}
 		}
-		obj.Data[key] = value
 	}
 }
 
-// WithType sets the secret's type value.
-func WithType(t corev1.SecretType) Option {
-	return func(obj *corev1.Secret) {
-		obj.Type = t
+func ForIdentities(names ...string) Option {
+	return func(syncIdentityProvider *hivev1.SyncIdentityProvider) {
+		syncIdentityProvider.Spec.IdentityProviders = make([]openshiftapiv1.IdentityProvider, len(names))
+		for i, name := range names {
+			syncIdentityProvider.Spec.IdentityProviders[i] = openshiftapiv1.IdentityProvider{Name: name}
+		}
 	}
 }

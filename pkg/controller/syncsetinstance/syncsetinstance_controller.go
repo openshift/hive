@@ -232,8 +232,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	if cd.Annotations[constants.SyncsetPauseAnnotation] == "true" {
-		log.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
+	if !controllerutils.ShouldSyncCluster(cd, ssiLog) {
 		return reconcile.Result{}, nil
 	}
 

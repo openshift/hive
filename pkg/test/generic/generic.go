@@ -141,3 +141,11 @@ func WithoutFinalizer(finalizer string) Option {
 		meta.SetFinalizers(finalizers.List())
 	}
 }
+
+// Deleted sets a deletion timestamp on the object.
+func Deleted() Option {
+	return func(meta hivev1.MetaRuntimeObject) {
+		now := metav1.Now()
+		meta.SetDeletionTimestamp(&now)
+	}
+}

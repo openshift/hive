@@ -431,6 +431,19 @@ type CertificateBundleStatus struct {
 	Generated bool `json:"generated"`
 }
 
+// RelocateStatus is the status of a cluster relocate.
+// This is used in the value of the "hive.openshift.io/relocate" annotation.
+type RelocateStatus string
+
+const (
+	// RelocateOutgoing indicates that a resource is on the source side of an in-progress relocate
+	RelocateOutgoing RelocateStatus = "outgoing"
+	// RelocateComplete indicates that a resource is on the source side of a completed relocate
+	RelocateComplete RelocateStatus = "complete"
+	// RelocateIncoming indicates that a resource is on the destination side of an in-progress relocate
+	RelocateIncoming RelocateStatus = "incoming"
+)
+
 func init() {
 	SchemeBuilder.Register(&ClusterDeployment{}, &ClusterDeploymentList{})
 }

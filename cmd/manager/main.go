@@ -32,6 +32,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
 	"github.com/openshift/hive/pkg/controller/clusterdeprovision"
 	"github.com/openshift/hive/pkg/controller/clusterprovision"
+	"github.com/openshift/hive/pkg/controller/clusterrelocate"
 	"github.com/openshift/hive/pkg/controller/clusterstate"
 	"github.com/openshift/hive/pkg/controller/clusterversion"
 	"github.com/openshift/hive/pkg/controller/controlplanecerts"
@@ -63,6 +64,7 @@ var controllerFuncs = map[string]controllerSetupFunc{
 	clusterdeployment.ControllerName:    clusterdeployment.Add,
 	clusterdeprovision.ControllerName:   clusterdeprovision.Add,
 	clusterprovision.ControllerName:     clusterprovision.Add,
+	clusterrelocate.ControllerName:      clusterrelocate.Add,
 	clusterstate.ControllerName:         clusterstate.Add,
 	clusterversion.ControllerName:       clusterversion.Add,
 	controlplanecerts.ControllerName:    controlplanecerts.Add,

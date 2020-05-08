@@ -18,6 +18,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -185,56 +186,68 @@ func min(a, b int) int {
 // Refresh gets the AWS object for the zone.
 // If a zone cannot be found or no longer exists, actuator.zoneID remains unset.
 func (a *AWSActuator) Refresh() error {
-	var zoneID string
+	var zoneIDs []string
 	var err error
 	if a.dnsZone.Status.AWS != nil && a.dnsZone.Status.AWS.ZoneID != nil {
 		a.logger.Debug("Zone ID is set in status, will retrieve by ID")
-		zoneID = *a.dnsZone.Status.AWS.ZoneID
+		zoneIDs = []string{*a.dnsZone.Status.AWS.ZoneID}
 	}
-	if len(zoneID) == 0 {
+	if len(zoneIDs) == 0 {
 		a.logger.Debug("Zone ID is not set in status, looking up by tag")
-		zoneID, err = a.findZoneIDByTag()
+		zoneIDs, err = a.findZoneIDsByTag()
 		if err != nil {
 			a.logger.WithError(err).Error("Failed to lookup zone by tag")
 			return err
 		}
 	}
-	if len(zoneID) == 0 {
+	if len(zoneIDs) == 0 {
 		a.logger.Debug("No matching existing zone found")
 		return nil
 	}
 
 	// Fetch the hosted zone
-	logger := a.logger.WithField("id", zoneID)
-	logger.Debug("Fetching hosted zone by ID")
-	resp, err := a.awsClient.GetHostedZone(&route53.GetHostedZoneInput{Id: aws.String(zoneID)})
-	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == route53.ErrCodeNoSuchHostedZone {
-				logger.Debug("Zone no longer exists")
-				a.zoneID = nil
-				return nil
+	a.zoneID = nil
+	for _, zoneID := range zoneIDs {
+		logger := a.logger.WithField("id", zoneID)
+		logger.Debug("Fetching hosted zone by ID")
+		resp, err := a.awsClient.GetHostedZone(&route53.GetHostedZoneInput{Id: aws.String(zoneID)})
+		if err != nil {
+			if awsErr, ok := err.(awserr.Error); ok {
+				if awsErr.Code() == route53.ErrCodeNoSuchHostedZone {
+					logger.Debug("Zone no longer exists")
+					continue
+				}
 			}
+			logger.WithError(err).Error("Cannot get hosted zone")
+			return err
 		}
-		logger.WithError(err).Error("Cannot get hosted zone")
-		return err
+		if name := *resp.HostedZone.Name; name != controllerutils.Dotted(a.dnsZone.Spec.Zone) {
+			logger.WithField("zoneName", name).Debug("Zone name does not match expected name")
+			continue
+		}
+		logger.Debug("Found hosted zone")
+		a.zoneID = &zoneID
 	}
-	logger.Debug("Found hosted zone")
 
+	if a.zoneID == nil {
+		a.logger.Debug("No existing zone found")
+		return nil
+	}
+
+	logger := a.logger.WithField("id", a.zoneID)
 	logger.Debug("Fetching hosted zone tags")
-	tags, err := a.existingTags(resp.HostedZone.Id)
+	tags, err := a.existingTags(a.zoneID)
 	if err != nil {
 		logger.WithError(err).Error("Cannot get hosted zone tags")
 		return err
 	}
-
-	a.zoneID = resp.HostedZone.Id
 	a.currentHostedZoneTags = tags
 
 	return nil
 }
 
-func (a *AWSActuator) findZoneIDByTag() (string, error) {
+func (a *AWSActuator) findZoneIDsByTag() ([]string, error) {
+	var ids []string
 	tagFilter := &resourcegroupstaggingapi.TagFilter{
 		Key:    aws.String(hiveDNSZoneAWSTag),
 		Values: []*string{aws.String(fmt.Sprintf("%s/%s", a.dnsZone.Namespace, a.dnsZone.Name))},
@@ -261,11 +274,11 @@ func (a *AWSActuator) findZoneIDByTag() (string, error) {
 			}
 			id = elems[1]
 			logger.WithField("id", id).Debug("Found hosted zone")
-			return false
+			ids = append(ids, id)
 		}
 		return true
 	})
-	return id, err
+	return ids, err
 }
 
 func (a *AWSActuator) expectedTags() []*route53.Tag {

@@ -195,8 +195,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	if cd.Annotations[constants.SyncsetPauseAnnotation] == "true" {
-		logger.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
+	if !controllerutils.ShouldSyncCluster(cd, logger) {
 		return reconcile.Result{}, nil
 	}
 

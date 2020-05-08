@@ -38,6 +38,10 @@ type ClusterProvisionListerExpansion interface{}
 // ClusterProvisionNamespaceLister.
 type ClusterProvisionNamespaceListerExpansion interface{}
 
+// ClusterRelocateListerExpansion allows custom methods to be added to
+// ClusterRelocateLister.
+type ClusterRelocateListerExpansion interface{}
+
 // ClusterStateListerExpansion allows custom methods to be added to
 // ClusterStateLister.
 type ClusterStateListerExpansion interface{}

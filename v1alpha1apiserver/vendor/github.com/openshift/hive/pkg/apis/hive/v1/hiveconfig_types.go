@@ -15,7 +15,7 @@ type HiveConfigSpec struct {
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 
 	// ManagedDomains is the list of DNS domains that are managed by the Hive cluster
-	// When specifying 'managedDNS: true' in a ClusterDeployment, the ClusterDeployment's
+	// When specifying 'manageDNS: true' in a ClusterDeployment, the ClusterDeployment's
 	// baseDomain should be a direct child of one of these domains, otherwise the
 	// ClusterDeployment creation will result in a validation error.
 	// +optional

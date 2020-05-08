@@ -520,7 +520,7 @@ To use this feature:
            domains:
            - hive.example.com
 
-  1. Specify which domains Hive is allowed to manage by adding them to the `.spec.managedDomains[].domains` list. When specifying `managedDNS: true` in a ClusterDeployment, the ClusterDeployment's baseDomain must be a direct child of one of these domains, otherwise the ClusterDeployment creation will result in a validation error. The baseDomain must also be unique to that cluster and must not be used in any other ClusterDeployment, including on separate Hive instances.
+  1. Specify which domains Hive is allowed to manage by adding them to the `.spec.managedDomains[].domains` list. When specifying `manageDNS: true` in a ClusterDeployment, the ClusterDeployment's baseDomain must be a direct child of one of these domains, otherwise the ClusterDeployment creation will result in a validation error. The baseDomain must also be unique to that cluster and must not be used in any other ClusterDeployment, including on separate Hive instances.
 
      As such, a domain may exist in the `.spec.managedDomains[].domains` list in multiple Hive instances. Note that the specified credentials must be valid to add and remove NS record entries for all domains listed in `.spec.managedDomains[].domains`.
 

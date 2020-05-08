@@ -260,6 +260,9 @@ const (
 
 	// SyncSetFailedCondition indicates if any syncset for a cluster deployment failed
 	SyncSetFailedCondition ClusterDeploymentConditionType = "SyncSetFailed"
+
+	// RelocationFailedCondition indicates if a relocation to another Hive instance has failed
+	RelocationFailedCondition ClusterDeploymentConditionType = "RelocationFailed"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -275,6 +278,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	DNSNotReadyCondition,
 	ProvisionFailedCondition,
 	SyncSetFailedCondition,
+	RelocationFailedCondition,
 }
 
 // +genclient

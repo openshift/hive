@@ -513,6 +513,16 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
+	// If the ClusterDeployment is being relocated to another Hive instance, stop any current provisioning and do not
+	// do any more reconciling.
+	if _, relocating := cd.Annotations[constants.RelocatingAnnotation]; relocating {
+		result, err := r.stopProvisioning(cd, cdLog)
+		if result == nil {
+			result = &reconcile.Result{}
+		}
+		return *result, err
+	}
+
 	// Indicate that the cluster is still installing:
 	hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
 		cd.Name,
@@ -1145,34 +1155,28 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 
-	result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
-	if result != nil {
-		return *result, err
+	if _, relocated := cd.Annotations[constants.RelocatedAnnotation]; relocated {
+		cdLog.Infof("clusterdeployment relocated, removing finalizer")
+		err := r.removeClusterDeploymentFinalizer(cd, cdLog)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
+		}
+		return reconcile.Result{}, err
 	}
-	if err != nil {
+
+	switch result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog); {
+	case result != nil:
+		return *result, err
+	case err != nil:
 		return reconcile.Result{}, err
 	}
 
 	// Wait for outstanding provision to be removed before creating deprovision request
-	if cd.Status.ProvisionRef != nil {
-		provision := &hivev1.ClusterProvision{}
-		switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.ProvisionRef.Name, Namespace: cd.Namespace}, provision); {
-		case apierrors.IsNotFound(err):
-			cdLog.Debug("linked provision removed")
-		case err != nil:
-			cdLog.WithError(err).Error("could not get provision")
-			return reconcile.Result{}, err
-		case provision.DeletionTimestamp == nil:
-			if err := r.Delete(context.TODO(), provision); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not delete provision")
-				return reconcile.Result{}, err
-			}
-			cdLog.Info("deleted outstanding provision")
-			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-		default:
-			cdLog.Debug("still waiting for outstanding provision to be removed")
-			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-		}
+	switch result, err := r.stopProvisioning(cd, cdLog); {
+	case result != nil:
+		return *result, err
+	case err != nil:
+		return reconcile.Result{}, err
 	}
 
 	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed
@@ -1180,7 +1184,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		if cd.Spec.Installed {
 			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
 			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-				err = r.removeClusterDeploymentFinalizer(cd, cdLog)
+				err := r.removeClusterDeploymentFinalizer(cd, cdLog)
 				if err != nil {
 					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 				}
@@ -1195,7 +1199,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 
 	if cd.Spec.ClusterMetadata == nil {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
-		err = r.removeClusterDeploymentFinalizer(cd, cdLog)
+		err := r.removeClusterDeploymentFinalizer(cd, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
@@ -1276,6 +1280,31 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	cdLog.Debug("deprovision request not yet completed")
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeployment) stopProvisioning(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {
+	if cd.Status.ProvisionRef == nil {
+		return nil, nil
+	}
+	provision := &hivev1.ClusterProvision{}
+	switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.ProvisionRef.Name, Namespace: cd.Namespace}, provision); {
+	case apierrors.IsNotFound(err):
+		cdLog.Debug("linked provision removed")
+		return nil, nil
+	case err != nil:
+		cdLog.WithError(err).Error("could not get provision")
+		return nil, err
+	case provision.DeletionTimestamp == nil:
+		if err := r.Delete(context.TODO(), provision); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not delete provision")
+			return nil, err
+		}
+		cdLog.Info("deleted outstanding provision")
+		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	default:
+		cdLog.Debug("still waiting for outstanding provision to be removed")
+		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	}
 }
 
 func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {

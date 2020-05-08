@@ -135,7 +135,7 @@ func connectToRemoteCluster(
 
 // InitialURL returns the initial API URL for the ClusterDeployment.
 func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
-	cfg, err := restConfig(c, cd)
+	cfg, err := unadulteratedRESTConfig(c, cd)
 	if err != nil {
 		return "", err
 	}
@@ -254,25 +254,7 @@ func (b *builder) UseSecondaryAPIURL() Builder {
 }
 
 func (b *builder) RESTConfig() (*rest.Config, error) {
-	kubeconfigSecret := &corev1.Secret{}
-	if err := b.c.Get(
-		context.Background(),
-		client.ObjectKey{Namespace: b.cd.Namespace, Name: b.cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name},
-		kubeconfigSecret,
-	); err != nil {
-		return nil, errors.Wrap(err, "could not get admin kubeconfig secret")
-	}
-	kubeconfigData, ok := kubeconfigSecret.Data[constants.KubeconfigSecretKey]
-	if !ok {
-		return nil, errors.Errorf("admin kubeconfig secret does not contain %q data", constants.KubeconfigSecretKey)
-	}
-
-	config, err := clientcmd.Load(kubeconfigData)
-	if err != nil {
-		return nil, err
-	}
-	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
-	cfg, err := kubeConfig.ClientConfig()
+	cfg, err := unadulteratedRESTConfig(b.c, b.cd)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +271,7 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 	return cfg, nil
 }
 
-func restConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, error) {
+func unadulteratedRESTConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, error) {
 	kubeconfigSecret := &corev1.Secret{}
 	if err := c.Get(
 		context.Background(),
@@ -298,11 +280,14 @@ func restConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, er
 	); err != nil {
 		return nil, errors.Wrap(err, "could not get admin kubeconfig secret")
 	}
+	return restConfigFromSecret(kubeconfigSecret)
+}
+
+func restConfigFromSecret(kubeconfigSecret *corev1.Secret) (*rest.Config, error) {
 	kubeconfigData, ok := kubeconfigSecret.Data[constants.KubeconfigSecretKey]
 	if !ok {
-		return nil, errors.Errorf("admin kubeconfig secret does not contain %q data", constants.KubeconfigSecretKey)
+		return nil, errors.Errorf("kubeconfig secret does not contain %q data", constants.KubeconfigSecretKey)
 	}
-
 	config, err := clientcmd.Load(kubeconfigData)
 	if err != nil {
 		return nil, err

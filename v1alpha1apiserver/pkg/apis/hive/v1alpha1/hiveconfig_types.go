@@ -7,8 +7,8 @@ import (
 
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
-	// ManagedDomains is the list of DNS domains that are allowed to be used by the 'managedDNS' feature.
-	// When specifying 'managedDNS: true' in a ClusterDeployment, the ClusterDeployment's
+	// ManagedDomains is the list of DNS domains that are allowed to be used by the 'manageDNS' feature.
+	// When specifying 'manageDNS: true' in a ClusterDeployment, the ClusterDeployment's
 	// baseDomain must be a direct child of one of these domains, otherwise the
 	// ClusterDeployment creation will result in a validation error.
 	// +optional

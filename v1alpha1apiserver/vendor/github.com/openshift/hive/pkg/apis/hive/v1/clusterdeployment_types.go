@@ -251,7 +251,7 @@ const (
 	InstallFailingCondition ClusterDeploymentConditionType = "InstallFailing"
 
 	// DNSNotReadyCondition indicates that the the DNSZone object created for the clusterDeployment
-	// (ie managedDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
+	// (ie manageDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
 	DNSNotReadyCondition ClusterDeploymentConditionType = "DNSNotReady"
 
 	// ProvisionFailedCondition indicates that a provision failed

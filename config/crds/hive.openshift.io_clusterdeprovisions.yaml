@@ -1,9 +1,9 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterdeprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -22,16 +22,17 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterDeprovision
+    listKind: ClusterDeprovisionList
     plural: clusterdeprovisions
     shortNames:
     - cdr
+    singular: clusterdeprovision
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterDeprovision is the Schema for the clusterdeprovisions API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -47,9 +48,6 @@ spec:
           type: object
         spec:
           description: ClusterDeprovisionSpec defines the desired state of ClusterDeprovision
-          type: object
-          required:
-          - infraID
           properties:
             clusterID:
               description: ClusterID is a globally unique identifier for the cluster
@@ -62,62 +60,58 @@ spec:
             platform:
               description: Platform contains platform-specific configuration for a
                 ClusterDeprovision
-              type: object
               properties:
                 aws:
                   description: AWS contains AWS-specific deprovision settings
-                  type: object
-                  required:
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the AWS account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region is the AWS region for this deprovisioning
                       type: string
+                  required:
+                  - region
+                  type: object
                 azure:
                   description: Azure contains Azure-specific deprovision settings
-                  type: object
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the Azure account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
+                  type: object
                 gcp:
                   description: GCP contains GCP-specific deprovision settings
-                  type: object
-                  required:
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the GCP account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region is the GCP region for this deprovision
                       type: string
+                  required:
+                  - region
+                  type: object
                 openstack:
                   description: OpenStack contains OpenStack-specific deprovision settings
-                  type: object
-                  required:
-                  - cloud
                   properties:
                     cloud:
                       description: Cloud is the secion in the clouds.yaml secret below
@@ -126,20 +120,32 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the OpenStack account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
+                  required:
+                  - cloud
+                  type: object
+              type: object
+          required:
+          - infraID
+          type: object
         status:
           description: ClusterDeprovisionStatus defines the observed state of ClusterDeprovision
-          type: object
           properties:
             completed:
               description: Completed is true when the uninstall has completed successfully
               type: boolean
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

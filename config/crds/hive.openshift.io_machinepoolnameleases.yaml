@@ -1,16 +1,16 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
+  - JSONPath: .metadata.labels[hive.openshift.io/machine-pool-name]
     name: MachinePool
     type: string
-  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
+  - JSONPath: .metadata.labels.[hive.openshift.io/cluster-deployment-name]
     name: Cluster
     type: string
   - JSONPath: .metadata.creationTimestamp
@@ -19,8 +19,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: MachinePoolNameLease
+    listKind: MachinePoolNameLeaseList
     plural: machinepoolnameleases
-  scope: Namespaced
+    singular: machinepoolnamelease
+  scope: ""
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: MachinePoolNameLease is the Schema for the MachinePoolNameLeases
@@ -28,7 +31,6 @@ spec:
         to determine if a lease is available. Note that not all cloud providers require
         the use of a lease for naming, at present this is only required for GCP where
         we're extremely restricted on name lengths.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -49,7 +51,12 @@ spec:
         status:
           description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

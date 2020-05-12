@@ -1,9 +1,9 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -13,16 +13,17 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterImageSet
+    listKind: ClusterImageSetList
     plural: clusterimagesets
     shortNames:
     - imgset
-  scope: Cluster
+    singular: clusterimageset
+  scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterImageSet is the Schema for the clusterimagesets API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -38,18 +39,23 @@ spec:
           type: object
         spec:
           description: ClusterImageSetSpec defines the desired state of ClusterImageSet
-          type: object
-          required:
-          - releaseImage
           properties:
             releaseImage:
               description: ReleaseImage is the image that contains the payload to
                 use when installing a cluster.
               type: string
+          required:
+          - releaseImage
+          type: object
         status:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

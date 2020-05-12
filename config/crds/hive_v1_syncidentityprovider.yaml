@@ -15,7 +15,6 @@ spec:
     openAPIV3Schema:
       description: SyncIdentityProvider is the Schema for the SyncIdentityProvider
         API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

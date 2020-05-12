@@ -16,7 +16,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: Checkpoint is the Schema for the backup of Hive objects.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

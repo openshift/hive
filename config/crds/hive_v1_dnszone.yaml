@@ -16,7 +16,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: DNSZone is the Schema for the dnszones API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

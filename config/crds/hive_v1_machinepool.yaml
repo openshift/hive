@@ -29,7 +29,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: MachinePool is the Schema for the machinepools API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

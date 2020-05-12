@@ -1532,7 +1532,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: Checkpoint is the Schema for the backup of Hive objects.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -1641,7 +1640,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: ClusterDeployment is the Schema for the clusterdeployments API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -2551,7 +2549,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: ClusterDeprovision is the Schema for the clusterdeprovisions API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -2707,7 +2704,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: ClusterImageSet is the Schema for the clusterimagesets API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -2786,7 +2782,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: ClusterProvision is the Schema for the clusterprovisions API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8425,7 +8420,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: ClusterState is the Schema for the clusterstates API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8541,7 +8535,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: DNSZone is the Schema for the dnszones API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8736,7 +8729,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: HiveConfig is the Schema for the hives API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8977,7 +8969,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: MachinePool is the Schema for the machinepools API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -9314,7 +9305,6 @@ spec:
         to determine if a lease is available. Note that not all cloud providers require
         the use of a lease for naming, at present this is only required for GCP where
         we're extremely restricted on name lengths.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -9376,7 +9366,6 @@ spec:
     openAPIV3Schema:
       description: SelectorSyncIdentityProvider is the Schema for the SelectorSyncSet
         API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -10024,7 +10013,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: SelectorSyncSet is the Schema for the SelectorSyncSet API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -10219,7 +10207,6 @@ spec:
     openAPIV3Schema:
       description: SyncIdentityProvider is the Schema for the SyncIdentityProvider
         API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -10839,7 +10826,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: SyncSet is the Schema for the SyncSet API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -11013,7 +10999,6 @@ spec:
   validation:
     openAPIV3Schema:
       description: SyncSetInstance is the Schema for the syncsetinstances API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

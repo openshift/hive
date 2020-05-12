@@ -28,7 +28,6 @@ spec:
         to determine if a lease is available. Note that not all cloud providers require
         the use of a lease for naming, at present this is only required for GCP where
         we're extremely restricted on name lengths.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

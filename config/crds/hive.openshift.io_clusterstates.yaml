@@ -1,22 +1,23 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterstates.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: ClusterState
+    listKind: ClusterStateList
     plural: clusterstates
+    singular: clusterstate
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterState is the Schema for the clusterstates API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -35,37 +36,26 @@ spec:
           type: object
         status:
           description: ClusterStateStatus defines the observed state of ClusterState
-          type: object
           properties:
             clusterOperators:
               description: ClusterOperators contains the state for every cluster operator
                 in the target cluster
-              type: array
               items:
                 description: ClusterOperatorState summarizes the status of a single
                   cluster operator
-                type: object
-                required:
-                - name
                 properties:
                   conditions:
                     description: Conditions is the set of conditions in the status
                       of the cluster operator on the target cluster
-                    type: array
                     items:
                       description: ClusterOperatorStatusCondition represents the state
                         of the operator's managed and monitored components.
-                      type: object
-                      required:
-                      - lastTransitionTime
-                      - status
-                      - type
                       properties:
                         lastTransitionTime:
                           description: lastTransitionTime is the time of the last
                             update to the current status property.
-                          type: string
                           format: date-time
+                          type: string
                         message:
                           description: message provides additional information about
                             the current condition. This is only to be consumed by
@@ -83,14 +73,30 @@ spec:
                           description: type specifies the aspect reported by this
                             condition.
                           type: string
+                      required:
+                      - lastTransitionTime
+                      - status
+                      - type
+                      type: object
+                    type: array
                   name:
                     description: Name is the name of the cluster operator
                     type: string
+                required:
+                - name
+                type: object
+              type: array
             lastUpdated:
               description: LastUpdated is the last time that operator state was updated
-              type: string
               format: date-time
+              type: string
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

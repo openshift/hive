@@ -20,9 +20,10 @@ type ClusterImageSetStatus struct{}
 
 // ClusterImageSet is the Schema for the clusterimagesets API
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Release",type="string",JSONPath=".spec.releaseImage"
-// +kubebuilder:resource:path=clusterimagesets,shortName=imgset
+// +kubebuilder:resource:path=clusterimagesets,shortName=imgset,scope=Cluster
 type ClusterImageSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

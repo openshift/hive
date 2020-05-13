@@ -1,28 +1,36 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: clusterimagesets.hive.openshift.io
+  name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.releaseImage
-    name: Release
+  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
+    name: MachinePool
     type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
+    name: Cluster
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: hive.openshift.io
   names:
-    kind: ClusterImageSet
-    plural: clusterimagesets
-    shortNames:
-    - imgset
-  scope: Cluster
-  subresources:
-    status: {}
+    kind: MachinePoolNameLease
+    listKind: MachinePoolNameLeaseList
+    plural: machinepoolnameleases
+    singular: machinepoolnamelease
+  scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
-      description: ClusterImageSet is the Schema for the clusterimagesets API
-      type: object
+      description: MachinePoolNameLease is the Schema for the MachinePoolNameLeases
+        API. This resource is mostly empty as we're primarily relying on the name
+        to determine if a lease is available. Note that not all cloud providers require
+        the use of a lease for naming, at present this is only required for GCP where
+        we're extremely restricted on name lengths.
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -37,19 +45,18 @@ spec:
         metadata:
           type: object
         spec:
-          description: ClusterImageSetSpec defines the desired state of ClusterImageSet
+          description: MachinePoolNameLeaseSpec is a minimal resource for obtaining
+            unique machine pool names of a limited length.
           type: object
-          required:
-          - releaseImage
-          properties:
-            releaseImage:
-              description: ReleaseImage is the image that contains the payload to
-                use when installing a cluster.
-              type: string
         status:
-          description: ClusterImageSetStatus defines the observed state of ClusterImageSet
+          description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

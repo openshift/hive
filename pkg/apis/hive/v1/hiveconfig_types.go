@@ -168,6 +168,7 @@ type ManageDNSGCPConfig struct {
 // HiveConfig is the Schema for the hives API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 type HiveConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

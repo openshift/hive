@@ -148,7 +148,7 @@ const (
 // +kubebuilder:printcolumn:name="PoolName",type="string",JSONPath=".spec.name"
 // +kubebuilder:printcolumn:name="ClusterDeployment",type="string",JSONPath=".spec.clusterDeploymentRef.name"
 // +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas"
-// +kubebuilder:resource:path=machinepools
+// +kubebuilder:resource:path=machinepools,scope=Namespaced
 type MachinePool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

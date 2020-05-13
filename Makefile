@@ -4,8 +4,9 @@ all: vendor update test build
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
+	lib/tmp.mk \
+	targets/openshift/controller-gen.mk \
 	targets/openshift/bindata.mk \
-	targets/openshift/crd-schema-gen.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
 )
@@ -58,9 +59,6 @@ $(call build-image,hive,$(IMG),./Dockerfile,.)
 $(call build-image,hive-dev,$(IMG),./Dockerfile.dev,.)
 $(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
-CRD_APIS :=$(addprefix ./pkg/apis/hive/,v1)
-$(call add-crd-gen,hive,$(CRD_APIS),./config/crds,./config/crds)
-
 clean:
 	rm -rf $(GO_BUILD_BINDIR)
 
@@ -69,6 +67,23 @@ vendor:
 	go mod tidy
 	go mod vendor
 	$(MAKE) -C v1alpha1apiserver vendor
+
+# Update the manifest directory of artifacts OLM will deploy. Copies files in from
+# the locations kubebuilder generates them.
+.PHONY: manifests
+manifests: crd
+
+# Generate CRD yaml from our api types:
+.PHONY: crd
+crd: ensure-controller-gen
+	rm -rf ./config/crds
+	'$(CONTROLLER_GEN)' crd paths=./pkg/apis/hive/v1 output:dir=./config/crds
+update: crd
+
+.PHONY: verify-crd
+verify-crd: ensure-controller-gen
+	./hack/verify-crd.sh
+verify: verify-crd
 
 .PHONY: test-integration
 test-integration: generate
@@ -104,7 +119,7 @@ run-operator: build
 	./bin/operator --log-level=${LOG_LEVEL}
 
 # Install CRDs into a cluster
-install: update-codegen-crds
+install: crd
 	oc apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config

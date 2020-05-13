@@ -31,21 +31,21 @@
 // config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
-// config/crds/hive_v1_checkpoint.yaml
-// config/crds/hive_v1_clusterdeployment.yaml
-// config/crds/hive_v1_clusterdeprovision.yaml
-// config/crds/hive_v1_clusterimageset.yaml
-// config/crds/hive_v1_clusterprovision.yaml
-// config/crds/hive_v1_clusterstate.yaml
-// config/crds/hive_v1_dnszone.yaml
-// config/crds/hive_v1_hiveconfig.yaml
-// config/crds/hive_v1_machinepool.yaml
-// config/crds/hive_v1_machinepoolnamelease.yaml
-// config/crds/hive_v1_selectorsyncidentityprovider.yaml
-// config/crds/hive_v1_selectorsyncset.yaml
-// config/crds/hive_v1_syncidentityprovider.yaml
-// config/crds/hive_v1_syncset.yaml
-// config/crds/hive_v1_syncsetinstance.yaml
+// config/crds/hive.openshift.io_checkpoints.yaml
+// config/crds/hive.openshift.io_clusterdeployments.yaml
+// config/crds/hive.openshift.io_clusterdeprovisions.yaml
+// config/crds/hive.openshift.io_clusterimagesets.yaml
+// config/crds/hive.openshift.io_clusterprovisions.yaml
+// config/crds/hive.openshift.io_clusterstates.yaml
+// config/crds/hive.openshift.io_dnszones.yaml
+// config/crds/hive.openshift.io_hiveconfigs.yaml
+// config/crds/hive.openshift.io_machinepoolnameleases.yaml
+// config/crds/hive.openshift.io_machinepools.yaml
+// config/crds/hive.openshift.io_selectorsyncidentityproviders.yaml
+// config/crds/hive.openshift.io_selectorsyncsets.yaml
+// config/crds/hive.openshift.io_syncidentityproviders.yaml
+// config/crds/hive.openshift.io_syncsetinstances.yaml
+// config/crds/hive.openshift.io_syncsets.yaml
 // config/configmaps/install-log-regexes-configmap.yaml
 package assets
 
@@ -1514,25 +1514,26 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHive_v1_checkpointYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_checkpointsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: checkpoints.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: Checkpoint
+    listKind: CheckpointList
     plural: checkpoints
+    singular: checkpoint
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: Checkpoint is the Schema for the backup of Hive objects.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -1549,11 +1550,6 @@ spec:
         spec:
           description: CheckpointSpec defines the metadata around the Hive objects
             state in the namespace at the time of the last backup.
-          type: object
-          required:
-          - lastBackupChecksum
-          - lastBackupRef
-          - lastBackupTime
           properties:
             lastBackupChecksum:
               description: LastBackupChecksum is the checksum of all Hive objects
@@ -1561,24 +1557,34 @@ spec:
               type: string
             lastBackupRef:
               description: LastBackupRef is a reference to last backup object created
-              type: object
-              required:
-              - name
-              - namespace
               properties:
                 name:
                   type: string
                 namespace:
                   type: string
+              required:
+              - name
+              - namespace
+              type: object
             lastBackupTime:
               description: LastBackupTime is the last time we performed a backup of
                 the namespace
-              type: string
               format: date-time
+              type: string
+          required:
+          - lastBackupChecksum
+          - lastBackupRef
+          - lastBackupTime
+          type: object
         status:
           description: CheckpointStatus defines the observed state of Checkpoint
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -1587,27 +1593,27 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_checkpointYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_checkpointYaml, nil
+func configCrdsHiveOpenshiftIo_checkpointsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_checkpointsYaml, nil
 }
 
-func configCrdsHive_v1_checkpointYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_checkpointYamlBytes()
+func configCrdsHiveOpenshiftIo_checkpointsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_checkpointsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_checkpoint.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_checkpoints.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterdeploymentYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeploymentsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -1632,16 +1638,17 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
+    listKind: ClusterDeploymentList
     plural: clusterdeployments
     shortNames:
     - cd
+    singular: clusterdeployment
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterDeployment is the Schema for the clusterdeployments API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -1657,11 +1664,6 @@ spec:
           type: object
         spec:
           description: ClusterDeploymentSpec defines the desired state of ClusterDeployment
-          type: object
-          required:
-          - baseDomain
-          - clusterName
-          - platform
           properties:
             baseDomain:
               description: BaseDomain is the base domain to which the cluster should
@@ -1670,14 +1672,9 @@ spec:
             certificateBundles:
               description: CertificateBundles is a list of certificate bundles associated
                 with this cluster
-              type: array
               items:
                 description: CertificateBundleSpec specifies a certificate bundle
                   associated with a cluster deployment
-                type: object
-                required:
-                - certificateSecretRef
-                - name
                 properties:
                   certificateSecretRef:
                     description: CertificateSecretRef is the reference to the secret
@@ -1685,12 +1682,12 @@ spec:
                       is to be generated, it will be generated with the name in this
                       reference. Otherwise, it is expected that the secret should
                       exist in the same namespace as the ClusterDeployment
-                    type: object
                     properties:
                       name:
                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
+                    type: object
                   generate:
                     description: Generate indicates whether this bundle should have
                       real certificates generated for it.
@@ -1700,35 +1697,34 @@ spec:
                       the bundle and must be referenced by an ingress or by the control
                       plane serving certs
                     type: string
+                required:
+                - certificateSecretRef
+                - name
+                type: object
+              type: array
             clusterMetadata:
               description: ClusterMetadata contains metadata information about the
                 installed cluster.
-              type: object
-              required:
-              - adminKubeconfigSecretRef
-              - adminPasswordSecretRef
-              - clusterID
-              - infraID
               properties:
                 adminKubeconfigSecretRef:
                   description: AdminKubeconfigSecretRef references the secret containing
                     the admin kubeconfig for this cluster.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 adminPasswordSecretRef:
                   description: AdminPasswordSecretRef references the secret containing
                     the admin username/password which can be used to login to this
                     cluster.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 clusterID:
                   description: ClusterID is a globally unique identifier for this
                     cluster generated during installation. Used for reporting metrics
@@ -1739,6 +1735,12 @@ spec:
                     during installation and used for tagging/naming resources in cloud
                     providers.
                   type: string
+              required:
+              - adminKubeconfigSecretRef
+              - adminPasswordSecretRef
+              - clusterID
+              - infraID
+              type: object
             clusterName:
               description: ClusterName is the friendly name of the cluster. It is
                 used for subdomains, some resource tagging, and other instances where
@@ -1747,7 +1749,6 @@ spec:
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
                 the target cluster's control plane
-              type: object
               properties:
                 apiURLOverride:
                   description: APIURLOverride is the optional URL override to which
@@ -1763,20 +1764,14 @@ spec:
                 servingCertificates:
                   description: ServingCertificates specifies serving certificates
                     for the control plane
-                  type: object
                   properties:
                     additional:
                       description: Additional is a list of additional domains and
                         certificates that are also associated with the control plane's
                         api endpoint.
-                      type: array
                       items:
                         description: ControlPlaneAdditionalCertificate defines an
                           additional serving certificate for a control plane
-                        type: object
-                        required:
-                        - domain
-                        - name
                         properties:
                           domain:
                             description: Domain is the domain of the additional control
@@ -1787,22 +1782,24 @@ spec:
                               ClusterDeployment.Spec that should be used for this
                               additional certificate.
                             type: string
+                        required:
+                        - domain
+                        - name
+                        type: object
+                      type: array
                     default:
                       description: Default references the name of a CertificateBundle
                         in the ClusterDeployment that should be used for the control
                         plane's default endpoint.
                       type: string
+                  type: object
+              type: object
             ingress:
               description: Ingress allows defining desired clusteringress/shards to
                 be configured on the cluster.
-              type: array
               items:
                 description: ClusterIngress contains the configurable pieces for any
                   ClusterIngress objects that should exist on the cluster.
-                type: object
-                required:
-                - domain
-                - name
                 properties:
                   domain:
                     description: Domain (sometimes referred to as shard) is the full
@@ -1815,20 +1812,14 @@ spec:
                   namespaceSelector:
                     description: NamespaceSelector allows filtering the list of namespaces
                       serviced by the ingress controller.
-                    type: object
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
                           requirements. The requirements are ANDed.
-                        type: array
                         items:
                           description: A label selector requirement is a selector
                             that contains values, a key, and an operator that relates
                             the key and values.
-                          type: object
-                          required:
-                          - key
-                          - operator
                           properties:
                             key:
                               description: key is the label key that the selector
@@ -1845,35 +1836,35 @@ spec:
                                 be non-empty. If the operator is Exists or DoesNotExist,
                                 the values array must be empty. This array is replaced
                                 during a strategic merge patch.
-                              type: array
                               items:
                                 type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
                       matchLabels:
+                        additionalProperties:
+                          type: string
                         description: matchLabels is a map of {key,value} pairs. A
                           single {key,value} in the matchLabels map is equivalent
                           to an element of matchExpressions, whose key field is "key",
                           the operator is "In", and the values array contains only
                           "value". The requirements are ANDed.
                         type: object
-                        additionalProperties:
-                          type: string
+                    type: object
                   routeSelector:
                     description: RouteSelector allows filtering the set of Routes
                       serviced by the ingress controller
-                    type: object
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
                           requirements. The requirements are ANDed.
-                        type: array
                         items:
                           description: A label selector requirement is a selector
                             that contains values, a key, and an operator that relates
                             the key and values.
-                          type: object
-                          required:
-                          - key
-                          - operator
                           properties:
                             key:
                               description: key is the label key that the selector
@@ -1890,22 +1881,33 @@ spec:
                                 be non-empty. If the operator is Exists or DoesNotExist,
                                 the values array must be empty. This array is replaced
                                 during a strategic merge patch.
-                              type: array
                               items:
                                 type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
                       matchLabels:
+                        additionalProperties:
+                          type: string
                         description: matchLabels is a map of {key,value} pairs. A
                           single {key,value} in the matchLabels map is equivalent
                           to an element of matchExpressions, whose key field is "key",
                           the operator is "In", and the values array contains only
                           "value". The requirements are ANDed.
                         type: object
-                        additionalProperties:
-                          type: string
+                    type: object
                   servingCertificate:
                     description: ServingCertificate references a CertificateBundle
                       in the ClusterDeployment.Spec that should be used for this Ingress
                     type: string
+                required:
+                - domain
+                - name
+                type: object
+              type: array
             installed:
               description: Installed is true if the cluster has been installed
               type: boolean
@@ -1916,41 +1918,36 @@ spec:
             platform:
               description: Platform is the configuration for the specific platform
                 upon which to perform the installation.
-              type: object
               properties:
                 aws:
                   description: AWS is the configuration used when installing on AWS.
-                  type: object
-                  required:
-                  - credentialsSecretRef
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the AWS account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region specifies the AWS region where the cluster
                         will be created.
                       type: string
                     userTags:
+                      additionalProperties:
+                        type: string
                       description: UserTags specifies additional tags for AWS resources
                         created for the cluster.
                       type: object
-                      additionalProperties:
-                        type: string
-                azure:
-                  description: Azure is the configuration used when installing on
-                    Azure.
-                  type: object
                   required:
                   - credentialsSecretRef
                   - region
+                  type: object
+                azure:
+                  description: Azure is the configuration used when installing on
+                    Azure.
                   properties:
                     baseDomainResourceGroupName:
                       description: BaseDomainResourceGroupName specifies the resource
@@ -1959,22 +1956,23 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the Azure account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region specifies the Azure region where the cluster
                         will be created.
                       type: string
+                  required:
+                  - credentialsSecretRef
+                  - region
+                  type: object
                 baremetal:
                   description: BareMetal is the configuration used when installing
                     on bare metal.
-                  type: object
-                  required:
-                  - libvirtSSHPrivateKeySecretRef
                   properties:
                     libvirtSSHPrivateKeySecretRef:
                       description: LibvirtSSHPrivateKeySecretRef is the reference
@@ -1982,40 +1980,39 @@ spec:
                         access to the libvirt provisioning host. The SSH private key
                         is expected to be in the secret data under the "ssh-privatekey"
                         key.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
+                  required:
+                  - libvirtSSHPrivateKeySecretRef
+                  type: object
                 gcp:
                   description: GCP is the configuration used when installing on Google
                     Cloud Platform.
-                  type: object
-                  required:
-                  - credentialsSecretRef
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the GCP account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region specifies the GCP region where the cluster
                         will be created.
                       type: string
+                  required:
+                  - credentialsSecretRef
+                  - region
+                  type: object
                 openstack:
                   description: OpenStack is the configuration used when installing
                     on OpenStack
-                  type: object
-                  required:
-                  - cloud
-                  - credentialsSecretRef
                   properties:
                     cloud:
                       description: Cloud will be used to indicate the OS_CLOUD value
@@ -2024,16 +2021,21 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the OpenStack account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     trunkSupport:
                       description: TrunkSupport indicates whether or not to use trunk
                         ports in your OpenShift cluster.
                       type: boolean
+                  required:
+                  - cloud
+                  - credentialsSecretRef
+                  type: object
+              type: object
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
                 from Hive without deprovisioning it
@@ -2041,45 +2043,38 @@ spec:
             provisioning:
               description: Provisioning contains settings used only for initial cluster
                 provisioning. May be unset in the case of adopted clusters.
-              type: object
-              required:
-              - installConfigSecretRef
               properties:
                 imageSetRef:
                   description: ImageSetRef is a reference to a ClusterImageSet. If
                     a value is specified for ReleaseImage, that will take precedence
                     over the one from the ClusterImageSet.
-                  type: object
-                  required:
-                  - name
                   properties:
                     name:
                       description: Name is the name of the ClusterImageSet that this
                         refers to
                       type: string
+                  required:
+                  - name
+                  type: object
                 installConfigSecretRef:
                   description: InstallConfigSecretRef is the reference to a secret
                     that contains an openshift-install InstallConfig. This file will
                     be passed through directly to the installer. Any version of InstallConfig
                     can be used, provided it can be parsed by the openshift-install
                     version for the release you are provisioning.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 installerEnv:
                   description: InstallerEnv are extra environment variables to pass
                     through to the installer. This may be used to enable additional
                     features of the installer.
-                  type: array
                   items:
                     description: EnvVar represents an environment variable present
                       in a Container.
-                    type: object
-                    required:
-                    - name
                     properties:
                       name:
                         description: Name of the environment variable. Must be a C_IDENTIFIER.
@@ -2097,13 +2092,9 @@ spec:
                       valueFrom:
                         description: Source for the environment variable's value.
                           Cannot be used if value is not empty.
-                        type: object
                         properties:
                           configMapKeyRef:
                             description: Selects a key of a ConfigMap.
-                            type: object
-                            required:
-                            - key
                             properties:
                               key:
                                 description: The key to select.
@@ -2117,14 +2108,14 @@ spec:
                                 description: Specify whether the ConfigMap or its
                                   key must be defined
                                 type: boolean
+                            required:
+                            - key
+                            type: object
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, metadata.labels, metadata.annotations,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
                               status.podIP, status.podIPs.'
-                            type: object
-                            required:
-                            - fieldPath
                             properties:
                               apiVersion:
                                 description: Version of the schema the FieldPath is
@@ -2134,14 +2125,14 @@ spec:
                                 description: Path of the field to select in the specified
                                   API version.
                                 type: string
+                            required:
+                            - fieldPath
+                            type: object
                           resourceFieldRef:
                             description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
                               limits.ephemeral-storage, requests.cpu, requests.memory
                               and requests.ephemeral-storage) are currently supported.'
-                            type: object
-                            required:
-                            - resource
                             properties:
                               containerName:
                                 description: 'Container name: required for volumes,
@@ -2154,11 +2145,11 @@ spec:
                               resource:
                                 description: 'Required: resource to select'
                                 type: string
+                            required:
+                            - resource
+                            type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
-                            type: object
-                            required:
-                            - key
                             properties:
                               key:
                                 description: The key of the secret to select from.  Must
@@ -2173,16 +2164,24 @@ spec:
                                 description: Specify whether the Secret or its key
                                   must be defined
                                 type: boolean
+                            required:
+                            - key
+                            type: object
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  type: array
                 manifestsConfigMapRef:
                   description: ManifestsConfigMapRef is a reference to user-provided
                     manifests to add to or replace manifests that are generated by
                     the installer.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 releaseImage:
                   description: ReleaseImage is the image containing metadata for all
                     components that run in the cluster, and is the primary and best
@@ -2195,9 +2194,9 @@ spec:
                     install pod is somewhat limited today (failure log gathering from
                     cluster, some bare metal provisioning scenarios), so this setting
                     is often not needed.
-                  type: array
                   items:
                     type: string
+                  type: array
                 sshPrivateKeySecretRef:
                   description: SSHPrivateKeySecretRef is the reference to the secret
                     that contains the private SSH key to use for access to compute
@@ -2206,24 +2205,31 @@ spec:
                     to gather logs on the target cluster if there are install failures.
                     The SSH private key is expected to be in the secret data under
                     the "ssh-privatekey" key.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
+              required:
+              - installConfigSecretRef
+              type: object
             pullSecretRef:
               description: PullSecretRef is the reference to the secret to use when
                 pulling images.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
+          required:
+          - baseDomain
+          - clusterName
+          - platform
+          type: object
         status:
           description: ClusterDeploymentStatus defines the observed state of ClusterDeployment
-          type: object
           properties:
             apiURL:
               description: APIURL is the URL where the cluster's API can be accessed.
@@ -2231,14 +2237,9 @@ spec:
             certificateBundles:
               description: CertificateBundles contains of the status of the certificate
                 bundles associated with this cluster deployment.
-              type: array
               items:
                 description: CertificateBundleStatus specifies whether a certificate
                   bundle was generated for this cluster deployment.
-                type: object
-                required:
-                - generated
-                - name
                 properties:
                   generated:
                     description: Generated indicates whether the certificate bundle
@@ -2247,6 +2248,11 @@ spec:
                   name:
                     description: Name of the certificate bundle
                     type: string
+                required:
+                - generated
+                - name
+                type: object
+              type: array
             cliImage:
               description: CLIImage is the name of the oc cli image to use when installing
                 the target cluster
@@ -2254,23 +2260,15 @@ spec:
             clusterVersionStatus:
               description: ClusterVersionStatus will hold a copy of the remote cluster's
                 ClusterVersion.Status
-              type: object
-              required:
-              - availableUpdates
-              - desired
-              - observedGeneration
-              - versionHash
               properties:
                 availableUpdates:
                   description: availableUpdates contains the list of updates that
                     are appropriate for this cluster. This list may be empty if no
                     updates are recommended, if the update service is unavailable,
                     or if an invalid channel has been specified.
-                  type: array
                   items:
                     description: Update represents a release of the ClusterVersionOperator,
                       referenced by the Image member.
-                    type: object
                     properties:
                       force:
                         description: "force allows an administrator to update to an
@@ -2296,7 +2294,9 @@ spec:
                           the update version. When this field is part of spec, version
                           is optional if image is specified.
                         type: string
+                    type: object
                   nullable: true
+                  type: array
                 conditions:
                   description: conditions provides information about the cluster version.
                     The condition "Available" is set to true if the desiredUpdate
@@ -2305,21 +2305,15 @@ spec:
                     true if an update is currently blocked by a temporary or permanent
                     error. Conditions are only valid for the current desiredUpdate
                     when metadata.generation is equal to status.generation.
-                  type: array
                   items:
                     description: ClusterOperatorStatusCondition represents the state
                       of the operator's managed and monitored components.
-                    type: object
-                    required:
-                    - lastTransitionTime
-                    - status
-                    - type
                     properties:
                       lastTransitionTime:
                         description: lastTransitionTime is the time of the last update
                           to the current status property.
-                        type: string
                         format: date-time
+                        type: string
                       message:
                         description: message provides additional information about
                           the current condition. This is only to be consumed by humans.
@@ -2335,12 +2329,17 @@ spec:
                       type:
                         description: type specifies the aspect reported by this condition.
                         type: string
+                    required:
+                    - lastTransitionTime
+                    - status
+                    - type
+                    type: object
+                  type: array
                 desired:
                   description: desired is the version that the cluster is reconciling
                     towards. If the cluster is not yet fully initialized desired will
                     be set with the information available, which may be an image or
                     a tag.
-                  type: object
                   properties:
                     force:
                       description: "force allows an administrator to update to an
@@ -2365,6 +2364,7 @@ spec:
                         update version. When this field is part of spec, version is
                         optional if image is specified.
                       type: string
+                  type: object
                 history:
                   description: history contains a list of the most recent versions
                     applied to the cluster. This value may be empty during cluster
@@ -2373,17 +2373,9 @@ spec:
                     Updates in the history have state Completed if the rollout completed
                     - if an update was failing or halfway applied the state will be
                     Partial. Only a limited amount of update history is preserved.
-                  type: array
                   items:
                     description: UpdateHistory is a single attempted update to the
                       cluster.
-                    type: object
-                    required:
-                    - completionTime
-                    - image
-                    - startedTime
-                    - state
-                    - verified
                     properties:
                       completionTime:
                         description: completionTime, if set, is when the update was
@@ -2391,9 +2383,9 @@ spec:
                           will have a null completion time. Completion time will always
                           be set for entries that are not the current update (usually
                           to the started time of the next update).
-                        type: string
                         format: date-time
                         nullable: true
+                        type: string
                       image:
                         description: image is a container image location that contains
                           the update. This value is always populated.
@@ -2401,8 +2393,8 @@ spec:
                       startedTime:
                         description: startedTime is the time at which the update was
                           started.
-                        type: string
                         format: date-time
+                        type: string
                       state:
                         description: state reflects whether the update was fully applied.
                           The Partial state indicates the update is not fully applied,
@@ -2421,39 +2413,48 @@ spec:
                           a version, or if a failure occurs retrieving the image,
                           this value may be empty.
                         type: string
+                    required:
+                    - completionTime
+                    - image
+                    - startedTime
+                    - state
+                    - verified
+                    type: object
+                  type: array
                 observedGeneration:
                   description: observedGeneration reports which version of the spec
                     is being synced. If this value is not equal to metadata.generation,
                     then the desired and conditions fields may represent a previous
                     version.
-                  type: integer
                   format: int64
+                  type: integer
                 versionHash:
                   description: versionHash is a fingerprint of the content that the
                     cluster will be updated with. It is used by the operator to avoid
                     unnecessary work and is for internal use only.
                   type: string
+              required:
+              - availableUpdates
+              - desired
+              - observedGeneration
+              - versionHash
+              type: object
             conditions:
               description: Conditions includes more detailed status for the cluster
                 deployment
-              type: array
               items:
                 description: ClusterDeploymentCondition contains details for the current
                   condition of a cluster deployment
-                type: object
-                required:
-                - status
-                - type
                 properties:
                   lastProbeTime:
                     description: LastProbeTime is the last time we probed the condition.
-                    type: string
                     format: date-time
+                    type: string
                   lastTransitionTime:
                     description: LastTransitionTime is the last time the condition
                       transitioned from one status to another.
-                    type: string
                     format: date-time
+                    type: string
                   message:
                     description: Message is a human-readable message indicating details
                       about last transition.
@@ -2468,6 +2469,11 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
             installRestarts:
               description: InstallRestarts is the total count of container restarts
                 on the clusters install job.
@@ -2475,8 +2481,8 @@ spec:
             installedTimestamp:
               description: InstalledTimestamp is the time we first detected that the
                 cluster has been successfully installed.
-              type: string
               format: date-time
+              type: string
             installerImage:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
@@ -2484,17 +2490,23 @@ spec:
             provisionRef:
               description: ProvisionRef is a reference to the last ClusterProvision
                 created for the deployment
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.
               type: string
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -2503,27 +2515,27 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterdeploymentYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterdeploymentYaml, nil
+func configCrdsHiveOpenshiftIo_clusterdeploymentsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterdeploymentsYaml, nil
 }
 
-func configCrdsHive_v1_clusterdeploymentYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterdeploymentYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterdeploymentsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterdeploymentsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterdeployments.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterdeprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterdeprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -2542,16 +2554,17 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterDeprovision
+    listKind: ClusterDeprovisionList
     plural: clusterdeprovisions
     shortNames:
     - cdr
+    singular: clusterdeprovision
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterDeprovision is the Schema for the clusterdeprovisions API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -2567,9 +2580,6 @@ spec:
           type: object
         spec:
           description: ClusterDeprovisionSpec defines the desired state of ClusterDeprovision
-          type: object
-          required:
-          - infraID
           properties:
             clusterID:
               description: ClusterID is a globally unique identifier for the cluster
@@ -2582,62 +2592,58 @@ spec:
             platform:
               description: Platform contains platform-specific configuration for a
                 ClusterDeprovision
-              type: object
               properties:
                 aws:
                   description: AWS contains AWS-specific deprovision settings
-                  type: object
-                  required:
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the AWS account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region is the AWS region for this deprovisioning
                       type: string
+                  required:
+                  - region
+                  type: object
                 azure:
                   description: Azure contains Azure-specific deprovision settings
-                  type: object
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the Azure account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
+                  type: object
                 gcp:
                   description: GCP contains GCP-specific deprovision settings
-                  type: object
-                  required:
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the GCP account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region is the GCP region for this deprovision
                       type: string
+                  required:
+                  - region
+                  type: object
                 openstack:
                   description: OpenStack contains OpenStack-specific deprovision settings
-                  type: object
-                  required:
-                  - cloud
                   properties:
                     cloud:
                       description: Cloud is the secion in the clouds.yaml secret below
@@ -2646,20 +2652,32 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the OpenStack account credentials
                         to use for deprovisioning the cluster
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
+                  required:
+                  - cloud
+                  type: object
+              type: object
+          required:
+          - infraID
+          type: object
         status:
           description: ClusterDeprovisionStatus defines the observed state of ClusterDeprovision
-          type: object
           properties:
             completed:
               description: Completed is true when the uninstall has completed successfully
               type: boolean
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -2668,27 +2686,27 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterdeprovisionYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterdeprovisionYaml, nil
+func configCrdsHiveOpenshiftIo_clusterdeprovisionsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml, nil
 }
 
-func configCrdsHive_v1_clusterdeprovisionYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterdeprovisionYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterdeprovisionsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterdeprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterdeprovisions.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterimagesetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterimagesetsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -2698,16 +2716,17 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterImageSet
+    listKind: ClusterImageSetList
     plural: clusterimagesets
     shortNames:
     - imgset
+    singular: clusterimageset
   scope: Cluster
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterImageSet is the Schema for the clusterimagesets API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -2723,18 +2742,23 @@ spec:
           type: object
         spec:
           description: ClusterImageSetSpec defines the desired state of ClusterImageSet
-          type: object
-          required:
-          - releaseImage
           properties:
             releaseImage:
               description: ReleaseImage is the image that contains the payload to
                 use when installing a cluster.
               type: string
+          required:
+          - releaseImage
+          type: object
         status:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -2743,27 +2767,27 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterimagesetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterimagesetYaml, nil
+func configCrdsHiveOpenshiftIo_clusterimagesetsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterimagesetsYaml, nil
 }
 
-func configCrdsHive_v1_clusterimagesetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterimagesetYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterimagesetsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterimagesetsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterimageset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterimagesets.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterprovisionYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterprovisionsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -2779,14 +2803,15 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterProvision
+    listKind: ClusterProvisionList
     plural: clusterprovisions
+    singular: clusterprovision
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterProvision is the Schema for the clusterprovisions API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -2803,31 +2828,25 @@ spec:
         spec:
           description: ClusterProvisionSpec defines the results of provisioning a
             cluster.
-          type: object
-          required:
-          - attempt
-          - clusterDeploymentRef
-          - podSpec
-          - stage
           properties:
             adminKubeconfigSecretRef:
               description: AdminKubeconfigSecretRef references the secret containing
                 the admin kubeconfig for this cluster.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
             adminPasswordSecretRef:
               description: AdminPasswordSecretRef references the secret containing
                 the admin username/password which can be used to login to this cluster.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
             attempt:
               description: Attempt is which attempt number of the cluster deployment
                 that this ClusterProvision is
@@ -2835,12 +2854,12 @@ spec:
             clusterDeploymentRef:
               description: ClusterDeploymentRef references the cluster deployment
                 provisioned.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
             clusterID:
               description: ClusterID is a globally unique identifier for this cluster
                 generated during installation. Used for reporting metrics among other
@@ -2859,25 +2878,20 @@ spec:
               type: object
             podSpec:
               description: PodSpec is the spec to use for the installer pod.
-              type: object
-              required:
-              - containers
               properties:
                 activeDeadlineSeconds:
                   description: Optional duration in seconds the pod may be active
                     on the node relative to StartTime before the system will actively
                     try to mark it failed and kill associated containers. Value must
                     be a positive integer.
-                  type: integer
                   format: int64
+                  type: integer
                 affinity:
                   description: If specified, the pod's scheduling constraints
-                  type: object
                   properties:
                     nodeAffinity:
                       description: Describes node affinity scheduling rules for the
                         pod.
-                      type: object
                       properties:
                         preferredDuringSchedulingIgnoredDuringExecution:
                           description: The scheduler will prefer to schedule pods
@@ -2891,34 +2905,23 @@ spec:
                             of this field and adding "weight" to the sum if the node
                             matches the corresponding matchExpressions; the node(s)
                             with the highest sum are the most preferred.
-                          type: array
                           items:
                             description: An empty preferred scheduling term matches
                               all objects with implicit weight 0 (i.e. it's a no-op).
                               A null preferred scheduling term matches no objects
                               (i.e. is also a no-op).
-                            type: object
-                            required:
-                            - preference
-                            - weight
                             properties:
                               preference:
                                 description: A node selector term, associated with
                                   the corresponding weight.
-                                type: object
                                 properties:
                                   matchExpressions:
                                     description: A list of node selector requirements
                                       by node's labels.
-                                    type: array
                                     items:
                                       description: A node selector requirement is
                                         a selector that contains values, a key, and
                                         an operator that relates the key and values.
-                                      type: object
-                                      required:
-                                      - key
-                                      - operator
                                       properties:
                                         key:
                                           description: The label key that the selector
@@ -2940,21 +2943,21 @@ spec:
                                             single element, which will be interpreted
                                             as an integer. This array is replaced
                                             during a strategic merge patch.
-                                          type: array
                                           items:
                                             type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
                                   matchFields:
                                     description: A list of node selector requirements
                                       by node's fields.
-                                    type: array
                                     items:
                                       description: A node selector requirement is
                                         a selector that contains values, a key, and
                                         an operator that relates the key and values.
-                                      type: object
-                                      required:
-                                      - key
-                                      - operator
                                       properties:
                                         key:
                                           description: The label key that the selector
@@ -2976,14 +2979,25 @@ spec:
                                             single element, which will be interpreted
                                             as an integer. This array is replaced
                                             during a strategic merge patch.
-                                          type: array
                                           items:
                                             type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                type: object
                               weight:
                                 description: Weight associated with matching the corresponding
                                   nodeSelectorTerm, in the range 1-100.
-                                type: integer
                                 format: int32
+                                type: integer
+                            required:
+                            - preference
+                            - weight
+                            type: object
+                          type: array
                         requiredDuringSchedulingIgnoredDuringExecution:
                           description: If the affinity requirements specified by this
                             field are not met at scheduling time, the pod will not
@@ -2992,33 +3006,23 @@ spec:
                             during pod execution (e.g. due to an update), the system
                             may or may not try to eventually evict the pod from its
                             node.
-                          type: object
-                          required:
-                          - nodeSelectorTerms
                           properties:
                             nodeSelectorTerms:
                               description: Required. A list of node selector terms.
                                 The terms are ORed.
-                              type: array
                               items:
                                 description: A null or empty node selector term matches
                                   no objects. The requirements of them are ANDed.
                                   The TopologySelectorTerm type implements a subset
                                   of the NodeSelectorTerm.
-                                type: object
                                 properties:
                                   matchExpressions:
                                     description: A list of node selector requirements
                                       by node's labels.
-                                    type: array
                                     items:
                                       description: A node selector requirement is
                                         a selector that contains values, a key, and
                                         an operator that relates the key and values.
-                                      type: object
-                                      required:
-                                      - key
-                                      - operator
                                       properties:
                                         key:
                                           description: The label key that the selector
@@ -3040,21 +3044,21 @@ spec:
                                             single element, which will be interpreted
                                             as an integer. This array is replaced
                                             during a strategic merge patch.
-                                          type: array
                                           items:
                                             type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
                                   matchFields:
                                     description: A list of node selector requirements
                                       by node's fields.
-                                    type: array
                                     items:
                                       description: A node selector requirement is
                                         a selector that contains values, a key, and
                                         an operator that relates the key and values.
-                                      type: object
-                                      required:
-                                      - key
-                                      - operator
                                       properties:
                                         key:
                                           description: The label key that the selector
@@ -3076,13 +3080,23 @@ spec:
                                             single element, which will be interpreted
                                             as an integer. This array is replaced
                                             during a strategic merge patch.
-                                          type: array
                                           items:
                                             type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                type: object
+                              type: array
+                          required:
+                          - nodeSelectorTerms
+                          type: object
+                      type: object
                     podAffinity:
                       description: Describes pod affinity scheduling rules (e.g. co-locate
                         this pod in the same node, zone, etc. as some other pod(s)).
-                      type: object
                       properties:
                         preferredDuringSchedulingIgnoredDuringExecution:
                           description: The scheduler will prefer to schedule pods
@@ -3096,42 +3110,28 @@ spec:
                             of this field and adding "weight" to the sum if the node
                             has pods which matches the corresponding podAffinityTerm;
                             the node(s) with the highest sum are the most preferred.
-                          type: array
                           items:
                             description: The weights of all of the matched WeightedPodAffinityTerm
                               fields are added per-node to find the most preferred
                               node(s)
-                            type: object
-                            required:
-                            - podAffinityTerm
-                            - weight
                             properties:
                               podAffinityTerm:
                                 description: Required. A pod affinity term, associated
                                   with the corresponding weight.
-                                type: object
-                                required:
-                                - topologyKey
                                 properties:
                                   labelSelector:
                                     description: A label query over a set of resources,
                                       in this case pods.
-                                    type: object
                                     properties:
                                       matchExpressions:
                                         description: matchExpressions is a list of
                                           label selector requirements. The requirements
                                           are ANDed.
-                                        type: array
                                         items:
                                           description: A label selector requirement
                                             is a selector that contains values, a
                                             key, and an operator that relates the
                                             key and values.
-                                          type: object
-                                          required:
-                                          - key
-                                          - operator
                                           properties:
                                             key:
                                               description: key is the label key that
@@ -3151,10 +3151,17 @@ spec:
                                                 the values array must be empty. This
                                                 array is replaced during a strategic
                                                 merge patch.
-                                              type: array
                                               items:
                                                 type: string
+                                              type: array
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
                                       matchLabels:
+                                        additionalProperties:
+                                          type: string
                                         description: matchLabels is a map of {key,value}
                                           pairs. A single {key,value} in the matchLabels
                                           map is equivalent to an element of matchExpressions,
@@ -3162,15 +3169,14 @@ spec:
                                           "In", and the values array contains only
                                           "value". The requirements are ANDed.
                                         type: object
-                                        additionalProperties:
-                                          type: string
+                                    type: object
                                   namespaces:
                                     description: namespaces specifies which namespaces
                                       the labelSelector applies to (matches against);
                                       null or empty list means "this pod's namespace"
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
                                   topologyKey:
                                     description: This pod should be co-located (affinity)
                                       or not co-located (anti-affinity) with the pods
@@ -3181,11 +3187,19 @@ spec:
                                       any of the selected pods is running. Empty topologyKey
                                       is not allowed.
                                     type: string
+                                required:
+                                - topologyKey
+                                type: object
                               weight:
                                 description: weight associated with matching the corresponding
                                   podAffinityTerm, in the range 1-100.
-                                type: integer
                                 format: int32
+                                type: integer
+                            required:
+                            - podAffinityTerm
+                            - weight
+                            type: object
+                          type: array
                         requiredDuringSchedulingIgnoredDuringExecution:
                           description: If the affinity requirements specified by this
                             field are not met at scheduling time, the pod will not
@@ -3196,7 +3210,6 @@ spec:
                             pod from its node. When there are multiple elements, the
                             lists of nodes corresponding to each podAffinityTerm are
                             intersected, i.e. all terms must be satisfied.
-                          type: array
                           items:
                             description: Defines a set of pods (namely those matching
                               the labelSelector relative to the given namespace(s))
@@ -3205,28 +3218,19 @@ spec:
                               defined as running on a node whose value of the label
                               with key <topologyKey> matches that of any node on which
                               a pod of the set of pods is running
-                            type: object
-                            required:
-                            - topologyKey
                             properties:
                               labelSelector:
                                 description: A label query over a set of resources,
                                   in this case pods.
-                                type: object
                                 properties:
                                   matchExpressions:
                                     description: matchExpressions is a list of label
                                       selector requirements. The requirements are
                                       ANDed.
-                                    type: array
                                     items:
                                       description: A label selector requirement is
                                         a selector that contains values, a key, and
                                         an operator that relates the key and values.
-                                      type: object
-                                      required:
-                                      - key
-                                      - operator
                                       properties:
                                         key:
                                           description: key is the label key that the
@@ -3244,10 +3248,17 @@ spec:
                                             the operator is Exists or DoesNotExist,
                                             the values array must be empty. This array
                                             is replaced during a strategic merge patch.
-                                          type: array
                                           items:
                                             type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
                                   matchLabels:
+                                    additionalProperties:
+                                      type: string
                                     description: matchLabels is a map of {key,value}
                                       pairs. A single {key,value} in the matchLabels
                                       map is equivalent to an element of matchExpressions,
@@ -3255,15 +3266,14 @@ spec:
                                       and the values array contains only "value".
                                       The requirements are ANDed.
                                     type: object
-                                    additionalProperties:
-                                      type: string
+                                type: object
                               namespaces:
                                 description: namespaces specifies which namespaces
                                   the labelSelector applies to (matches against);
                                   null or empty list means "this pod's namespace"
-                                type: array
                                 items:
                                   type: string
+                                type: array
                               topologyKey:
                                 description: This pod should be co-located (affinity)
                                   or not co-located (anti-affinity) with the pods
@@ -3273,11 +3283,15 @@ spec:
                                   that of any node on which any of the selected pods
                                   is running. Empty topologyKey is not allowed.
                                 type: string
+                            required:
+                            - topologyKey
+                            type: object
+                          type: array
+                      type: object
                     podAntiAffinity:
                       description: Describes pod anti-affinity scheduling rules (e.g.
                         avoid putting this pod in the same node, zone, etc. as some
                         other pod(s)).
-                      type: object
                       properties:
                         preferredDuringSchedulingIgnoredDuringExecution:
                           description: The scheduler will prefer to schedule pods
@@ -3292,42 +3306,28 @@ spec:
                             sum if the node has pods which matches the corresponding
                             podAffinityTerm; the node(s) with the highest sum are
                             the most preferred.
-                          type: array
                           items:
                             description: The weights of all of the matched WeightedPodAffinityTerm
                               fields are added per-node to find the most preferred
                               node(s)
-                            type: object
-                            required:
-                            - podAffinityTerm
-                            - weight
                             properties:
                               podAffinityTerm:
                                 description: Required. A pod affinity term, associated
                                   with the corresponding weight.
-                                type: object
-                                required:
-                                - topologyKey
                                 properties:
                                   labelSelector:
                                     description: A label query over a set of resources,
                                       in this case pods.
-                                    type: object
                                     properties:
                                       matchExpressions:
                                         description: matchExpressions is a list of
                                           label selector requirements. The requirements
                                           are ANDed.
-                                        type: array
                                         items:
                                           description: A label selector requirement
                                             is a selector that contains values, a
                                             key, and an operator that relates the
                                             key and values.
-                                          type: object
-                                          required:
-                                          - key
-                                          - operator
                                           properties:
                                             key:
                                               description: key is the label key that
@@ -3347,10 +3347,17 @@ spec:
                                                 the values array must be empty. This
                                                 array is replaced during a strategic
                                                 merge patch.
-                                              type: array
                                               items:
                                                 type: string
+                                              type: array
+                                          required:
+                                          - key
+                                          - operator
+                                          type: object
+                                        type: array
                                       matchLabels:
+                                        additionalProperties:
+                                          type: string
                                         description: matchLabels is a map of {key,value}
                                           pairs. A single {key,value} in the matchLabels
                                           map is equivalent to an element of matchExpressions,
@@ -3358,15 +3365,14 @@ spec:
                                           "In", and the values array contains only
                                           "value". The requirements are ANDed.
                                         type: object
-                                        additionalProperties:
-                                          type: string
+                                    type: object
                                   namespaces:
                                     description: namespaces specifies which namespaces
                                       the labelSelector applies to (matches against);
                                       null or empty list means "this pod's namespace"
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
                                   topologyKey:
                                     description: This pod should be co-located (affinity)
                                       or not co-located (anti-affinity) with the pods
@@ -3377,11 +3383,19 @@ spec:
                                       any of the selected pods is running. Empty topologyKey
                                       is not allowed.
                                     type: string
+                                required:
+                                - topologyKey
+                                type: object
                               weight:
                                 description: weight associated with matching the corresponding
                                   podAffinityTerm, in the range 1-100.
-                                type: integer
                                 format: int32
+                                type: integer
+                            required:
+                            - podAffinityTerm
+                            - weight
+                            type: object
+                          type: array
                         requiredDuringSchedulingIgnoredDuringExecution:
                           description: If the anti-affinity requirements specified
                             by this field are not met at scheduling time, the pod
@@ -3392,7 +3406,6 @@ spec:
                             the pod from its node. When there are multiple elements,
                             the lists of nodes corresponding to each podAffinityTerm
                             are intersected, i.e. all terms must be satisfied.
-                          type: array
                           items:
                             description: Defines a set of pods (namely those matching
                               the labelSelector relative to the given namespace(s))
@@ -3401,28 +3414,19 @@ spec:
                               defined as running on a node whose value of the label
                               with key <topologyKey> matches that of any node on which
                               a pod of the set of pods is running
-                            type: object
-                            required:
-                            - topologyKey
                             properties:
                               labelSelector:
                                 description: A label query over a set of resources,
                                   in this case pods.
-                                type: object
                                 properties:
                                   matchExpressions:
                                     description: matchExpressions is a list of label
                                       selector requirements. The requirements are
                                       ANDed.
-                                    type: array
                                     items:
                                       description: A label selector requirement is
                                         a selector that contains values, a key, and
                                         an operator that relates the key and values.
-                                      type: object
-                                      required:
-                                      - key
-                                      - operator
                                       properties:
                                         key:
                                           description: key is the label key that the
@@ -3440,10 +3444,17 @@ spec:
                                             the operator is Exists or DoesNotExist,
                                             the values array must be empty. This array
                                             is replaced during a strategic merge patch.
-                                          type: array
                                           items:
                                             type: string
+                                          type: array
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
                                   matchLabels:
+                                    additionalProperties:
+                                      type: string
                                     description: matchLabels is a map of {key,value}
                                       pairs. A single {key,value} in the matchLabels
                                       map is equivalent to an element of matchExpressions,
@@ -3451,15 +3462,14 @@ spec:
                                       and the values array contains only "value".
                                       The requirements are ANDed.
                                     type: object
-                                    additionalProperties:
-                                      type: string
+                                type: object
                               namespaces:
                                 description: namespaces specifies which namespaces
                                   the labelSelector applies to (matches against);
                                   null or empty list means "this pod's namespace"
-                                type: array
                                 items:
                                   type: string
+                                type: array
                               topologyKey:
                                 description: This pod should be co-located (affinity)
                                   or not co-located (anti-affinity) with the pods
@@ -3469,6 +3479,12 @@ spec:
                                   that of any node on which any of the selected pods
                                   is running. Empty topologyKey is not allowed.
                                 type: string
+                            required:
+                            - topologyKey
+                            type: object
+                          type: array
+                      type: object
+                  type: object
                 automountServiceAccountToken:
                   description: AutomountServiceAccountToken indicates whether a service
                     account token should be automatically mounted.
@@ -3477,13 +3493,9 @@ spec:
                   description: List of containers belonging to the pod. Containers
                     cannot currently be added or removed. There must be at least one
                     container in a Pod. Cannot be updated.
-                  type: array
                   items:
                     description: A single application container that you want to run
                       within a pod.
-                    type: object
-                    required:
-                    - name
                     properties:
                       args:
                         description: 'Arguments to the entrypoint. The docker image''s
@@ -3494,9 +3506,9 @@ spec:
                           escaped with a double $$, ie: $$(VAR_NAME). Escaped references
                           will never be expanded, regardless of whether the variable
                           exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        type: array
                         items:
                           type: string
+                        type: array
                       command:
                         description: 'Entrypoint array. Not executed within a shell.
                           The docker image''s ENTRYPOINT is used if this is not provided.
@@ -3507,19 +3519,15 @@ spec:
                           references will never be expanded, regardless of whether
                           the variable exists or not. Cannot be updated. More info:
                           https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        type: array
                         items:
                           type: string
+                        type: array
                       env:
                         description: List of environment variables to set in the container.
                           Cannot be updated.
-                        type: array
                         items:
                           description: EnvVar represents an environment variable present
                             in a Container.
-                          type: object
-                          required:
-                          - name
                           properties:
                             name:
                               description: Name of the environment variable. Must
@@ -3539,13 +3547,9 @@ spec:
                             valueFrom:
                               description: Source for the environment variable's value.
                                 Cannot be used if value is not empty.
-                              type: object
                               properties:
                                 configMapKeyRef:
                                   description: Selects a key of a ConfigMap.
-                                  type: object
-                                  required:
-                                  - key
                                   properties:
                                     key:
                                       description: The key to select.
@@ -3560,14 +3564,14 @@ spec:
                                       description: Specify whether the ConfigMap or
                                         its key must be defined
                                       type: boolean
+                                  required:
+                                  - key
+                                  type: object
                                 fieldRef:
                                   description: 'Selects a field of the pod: supports
                                     metadata.name, metadata.namespace, metadata.labels,
                                     metadata.annotations, spec.nodeName, spec.serviceAccountName,
                                     status.hostIP, status.podIP, status.podIPs.'
-                                  type: object
-                                  required:
-                                  - fieldPath
                                   properties:
                                     apiVersion:
                                       description: Version of the schema the FieldPath
@@ -3577,15 +3581,15 @@ spec:
                                       description: Path of the field to select in
                                         the specified API version.
                                       type: string
+                                  required:
+                                  - fieldPath
+                                  type: object
                                 resourceFieldRef:
                                   description: 'Selects a resource of the container:
                                     only resources limits and requests (limits.cpu,
                                     limits.memory, limits.ephemeral-storage, requests.cpu,
                                     requests.memory and requests.ephemeral-storage)
                                     are currently supported.'
-                                  type: object
-                                  required:
-                                  - resource
                                   properties:
                                     containerName:
                                       description: 'Container name: required for volumes,
@@ -3598,12 +3602,12 @@ spec:
                                     resource:
                                       description: 'Required: resource to select'
                                       type: string
+                                  required:
+                                  - resource
+                                  type: object
                                 secretKeyRef:
                                   description: Selects a key of a secret in the pod's
                                     namespace
-                                  type: object
-                                  required:
-                                  - key
                                   properties:
                                     key:
                                       description: The key of the secret to select
@@ -3619,6 +3623,14 @@ spec:
                                       description: Specify whether the Secret or its
                                         key must be defined
                                       type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                              type: object
+                          required:
+                          - name
+                          type: object
+                        type: array
                       envFrom:
                         description: List of sources to populate environment variables
                           in the container. The keys defined within a source must
@@ -3627,15 +3639,12 @@ spec:
                           in multiple sources, the value associated with the last
                           source will take precedence. Values defined by an Env with
                           a duplicate key will take precedence. Cannot be updated.
-                        type: array
                         items:
                           description: EnvFromSource represents the source of a set
                             of ConfigMaps
-                          type: object
                           properties:
                             configMapRef:
                               description: The ConfigMap to select from
-                              type: object
                               properties:
                                 name:
                                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -3646,13 +3655,13 @@ spec:
                                   description: Specify whether the ConfigMap must
                                     be defined
                                   type: boolean
+                              type: object
                             prefix:
                               description: An optional identifier to prepend to each
                                 key in the ConfigMap. Must be a C_IDENTIFIER.
                               type: string
                             secretRef:
                               description: The Secret to select from
-                              type: object
                               properties:
                                 name:
                                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -3663,6 +3672,9 @@ spec:
                                   description: Specify whether the Secret must be
                                     defined
                                   type: boolean
+                              type: object
+                          type: object
+                        type: array
                       image:
                         description: 'Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images
                           This field is optional to allow higher level config management
@@ -3677,7 +3689,6 @@ spec:
                       lifecycle:
                         description: Actions that the management system should take
                           in response to container lifecycle events. Cannot be updated.
-                        type: object
                         properties:
                           postStart:
                             description: 'PostStart is called immediately after a
@@ -3685,12 +3696,10 @@ spec:
                               is terminated and restarted according to its restart
                               policy. Other management of the container blocks until
                               the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
-                            type: object
                             properties:
                               exec:
                                 description: One and only one of the following should
                                   be specified. Exec specifies the action to take.
-                                type: object
                                 properties:
                                   command:
                                     description: Command is the command line to execute
@@ -3702,15 +3711,13 @@ spec:
                                       shell, you need to explicitly call out to that
                                       shell. Exit status of 0 is treated as live/healthy
                                       and non-zero is unhealthy.
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
+                                type: object
                               httpGet:
                                 description: HTTPGet specifies the http request to
                                   perform.
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: Host name to connect to, defaults
@@ -3720,14 +3727,9 @@ spec:
                                   httpHeaders:
                                     description: Custom headers to set in the request.
                                       HTTP allows repeated headers.
-                                    type: array
                                     items:
                                       description: HTTPHeader describes a custom header
                                         to be used in HTTP probes
-                                      type: object
-                                      required:
-                                      - name
-                                      - value
                                       properties:
                                         name:
                                           description: The header field name
@@ -3735,39 +3737,48 @@ spec:
                                         value:
                                           description: The header field value
                                           type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    type: array
                                   path:
                                     description: Path to access on the HTTP server.
                                     type: string
                                   port:
-                                    description: Name or number of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Name or number of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                   scheme:
                                     description: Scheme to use for connecting to the
                                       host. Defaults to HTTP.
                                     type: string
+                                required:
+                                - port
+                                type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
                                   a TCP port. TCP hooks not yet supported TODO: implement
                                   a realistic TCP lifecycle hook'
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: 'Optional: Host name to connect to,
                                       defaults to the pod IP.'
                                     type: string
                                   port:
-                                    description: Number or name of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Number or name of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
+                                required:
+                                - port
+                                type: object
+                            type: object
                           preStop:
                             description: 'PreStop is called immediately before a container
                               is terminated due to an API request or management event
@@ -3781,12 +3792,10 @@ spec:
                               termination grace period. Other management of the container
                               blocks until the hook completes or until the termination
                               grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
-                            type: object
                             properties:
                               exec:
                                 description: One and only one of the following should
                                   be specified. Exec specifies the action to take.
-                                type: object
                                 properties:
                                   command:
                                     description: Command is the command line to execute
@@ -3798,15 +3807,13 @@ spec:
                                       shell, you need to explicitly call out to that
                                       shell. Exit status of 0 is treated as live/healthy
                                       and non-zero is unhealthy.
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
+                                type: object
                               httpGet:
                                 description: HTTPGet specifies the http request to
                                   perform.
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: Host name to connect to, defaults
@@ -3816,14 +3823,9 @@ spec:
                                   httpHeaders:
                                     description: Custom headers to set in the request.
                                       HTTP allows repeated headers.
-                                    type: array
                                     items:
                                       description: HTTPHeader describes a custom header
                                         to be used in HTTP probes
-                                      type: object
-                                      required:
-                                      - name
-                                      - value
                                       properties:
                                         name:
                                           description: The header field name
@@ -3831,49 +3833,57 @@ spec:
                                         value:
                                           description: The header field value
                                           type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    type: array
                                   path:
                                     description: Path to access on the HTTP server.
                                     type: string
                                   port:
-                                    description: Name or number of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Name or number of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                   scheme:
                                     description: Scheme to use for connecting to the
                                       host. Defaults to HTTP.
                                     type: string
+                                required:
+                                - port
+                                type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
                                   a TCP port. TCP hooks not yet supported TODO: implement
                                   a realistic TCP lifecycle hook'
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: 'Optional: Host name to connect to,
                                       defaults to the pod IP.'
                                     type: string
                                   port:
-                                    description: Number or name of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Number or name of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
+                                required:
+                                - port
+                                type: object
+                            type: object
+                        type: object
                       livenessProbe:
                         description: 'Periodic probe of container liveness. Container
                           will be restarted if the probe fails. Cannot be updated.
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -3884,20 +3894,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -3907,14 +3915,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -3922,63 +3925,72 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       name:
                         description: Name of the container specified as a DNS_LABEL.
                           Each container in a pod must have a unique name (DNS_LABEL).
@@ -3992,20 +4004,16 @@ spec:
                           that port from being exposed. Any port which is listening
                           on the default "0.0.0.0" address inside a container will
                           be accessible from the network. Cannot be updated.
-                        type: array
                         items:
                           description: ContainerPort represents a network port in
                             a single container.
-                          type: object
-                          required:
-                          - containerPort
                           properties:
                             containerPort:
                               description: Number of port to expose on the pod's IP
                                 address. This must be a valid port number, 0 < x <
                                 65536.
-                              type: integer
                               format: int32
+                              type: integer
                             hostIP:
                               description: What host IP to bind the external port
                                 to.
@@ -4015,8 +4023,8 @@ spec:
                                 specified, this must be a valid port number, 0 < x
                                 < 65536. If HostNetwork is specified, this must match
                                 ContainerPort. Most containers do not need this.
-                              type: integer
                               format: int32
+                              type: integer
                             name:
                               description: If specified, this must be an IANA_SVC_NAME
                                 and unique within the pod. Each named port in a pod
@@ -4027,16 +4035,18 @@ spec:
                               description: Protocol for port. Must be UDP, TCP, or
                                 SCTP. Defaults to "TCP".
                               type: string
+                          required:
+                          - containerPort
+                          type: object
+                        type: array
                       readinessProbe:
                         description: 'Periodic probe of container service readiness.
                           Container will be removed from service endpoints if the
                           probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -4047,20 +4057,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -4070,14 +4078,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -4085,88 +4088,96 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       resources:
                         description: 'Compute Resources required by this container.
                           Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                        type: object
                         properties:
                           limits:
+                            additionalProperties:
+                              type: string
                             description: 'Limits describes the maximum amount of compute
                               resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                             type: object
+                          requests:
                             additionalProperties:
                               type: string
-                          requests:
                             description: 'Requests describes the minimum amount of
                               compute resources required. If Requests is omitted for
                               a container, it defaults to Limits if that is explicitly
                               specified, otherwise to an implementation-defined value.
                               More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                             type: object
-                            additionalProperties:
-                              type: string
+                        type: object
                       securityContext:
                         description: 'Security options the pod should run with. More
                           info: https://kubernetes.io/docs/concepts/policy/security-context/
                           More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/'
-                        type: object
                         properties:
                           allowPrivilegeEscalation:
                             description: 'AllowPrivilegeEscalation controls whether
@@ -4180,22 +4191,22 @@ spec:
                             description: The capabilities to add/drop when running
                               containers. Defaults to the default set of capabilities
                               granted by the container runtime.
-                            type: object
                             properties:
                               add:
                                 description: Added capabilities
-                                type: array
                                 items:
                                   description: Capability represent POSIX capabilities
                                     type
                                   type: string
+                                type: array
                               drop:
                                 description: Removed capabilities
-                                type: array
                                 items:
                                   description: Capability represent POSIX capabilities
                                     type
                                   type: string
+                                type: array
+                            type: object
                           privileged:
                             description: Run container in privileged mode. Processes
                               in privileged containers are essentially equivalent
@@ -4218,8 +4229,8 @@ spec:
                               set in PodSecurityContext.  If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: integer
                             format: int64
+                            type: integer
                           runAsNonRoot:
                             description: Indicates that the container must run as
                               a non-root user. If true, the Kubelet will validate
@@ -4236,8 +4247,8 @@ spec:
                               if unspecified. May also be set in PodSecurityContext.  If
                               set in both SecurityContext and PodSecurityContext,
                               the value specified in SecurityContext takes precedence.
-                            type: integer
                             format: int64
+                            type: integer
                           seLinuxOptions:
                             description: The SELinux context to be applied to the
                               container. If unspecified, the container runtime will
@@ -4245,7 +4256,6 @@ spec:
                               also be set in PodSecurityContext.  If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: object
                             properties:
                               level:
                                 description: Level is SELinux level label that applies
@@ -4263,13 +4273,13 @@ spec:
                                 description: User is a SELinux user label that applies
                                   to the container.
                                 type: string
+                            type: object
                           windowsOptions:
                             description: The Windows specific settings applied to
                               all containers. If unspecified, the options from the
                               PodSecurityContext will be used. If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: object
                             properties:
                               gmsaCredentialSpec:
                                 description: GMSACredentialSpec is where the GMSA
@@ -4289,6 +4299,8 @@ spec:
                                   and PodSecurityContext, the value specified in SecurityContext
                                   takes precedence.
                                 type: string
+                            type: object
+                        type: object
                       startupProbe:
                         description: 'StartupProbe indicates that the Pod has successfully
                           initialized. If specified, no other probes are executed
@@ -4299,12 +4311,10 @@ spec:
                           a long time to load data or warm a cache, than during steady-state
                           operation. This cannot be updated. This is a beta feature
                           enabled by the StartupProbe feature flag. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -4315,20 +4325,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -4338,14 +4346,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -4353,63 +4356,72 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       stdin:
                         description: Whether this container should allocate a buffer
                           for stdin in the container runtime. If this is not set,
@@ -4455,14 +4467,9 @@ spec:
                       volumeDevices:
                         description: volumeDevices is the list of block devices to
                           be used by the container.
-                        type: array
                         items:
                           description: volumeDevice describes a mapping of a raw block
                             device within a container.
-                          type: object
-                          required:
-                          - devicePath
-                          - name
                           properties:
                             devicePath:
                               description: devicePath is the path inside of the container
@@ -4472,17 +4479,17 @@ spec:
                               description: name must match the name of a persistentVolumeClaim
                                 in the pod
                               type: string
+                          required:
+                          - devicePath
+                          - name
+                          type: object
+                        type: array
                       volumeMounts:
                         description: Pod volumes to mount into the container's filesystem.
                           Cannot be updated.
-                        type: array
                         items:
                           description: VolumeMount describes a mounting of a Volume
                             within a container.
-                          type: object
-                          required:
-                          - mountPath
-                          - name
                           properties:
                             mountPath:
                               description: Path within the container at which the
@@ -4514,47 +4521,56 @@ spec:
                                 Defaults to "" (volume's root). SubPathExpr and SubPath
                                 are mutually exclusive.
                               type: string
+                          required:
+                          - mountPath
+                          - name
+                          type: object
+                        type: array
                       workingDir:
                         description: Container's working directory. If not specified,
                           the container runtime's default will be used, which might
                           be configured in the container image. Cannot be updated.
                         type: string
+                    required:
+                    - name
+                    type: object
+                  type: array
                 dnsConfig:
                   description: Specifies the DNS parameters of a pod. Parameters specified
                     here will be merged to the generated DNS configuration based on
                     DNSPolicy.
-                  type: object
                   properties:
                     nameservers:
                       description: A list of DNS name server IP addresses. This will
                         be appended to the base nameservers generated from DNSPolicy.
                         Duplicated nameservers will be removed.
-                      type: array
                       items:
                         type: string
+                      type: array
                     options:
                       description: A list of DNS resolver options. This will be merged
                         with the base options generated from DNSPolicy. Duplicated
                         entries will be removed. Resolution options given in Options
                         will override those that appear in the base DNSPolicy.
-                      type: array
                       items:
                         description: PodDNSConfigOption defines DNS resolver options
                           of a pod.
-                        type: object
                         properties:
                           name:
                             description: Required.
                             type: string
                           value:
                             type: string
+                        type: object
+                      type: array
                     searches:
                       description: A list of DNS search domains for host-name lookup.
                         This will be appended to the base search paths generated from
                         DNSPolicy. Duplicated search paths will be removed.
-                      type: array
                       items:
                         type: string
+                      type: array
+                  type: object
                 dnsPolicy:
                   description: Set DNS policy for the pod. Defaults to "ClusterFirst".
                     Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default'
@@ -4577,7 +4593,6 @@ spec:
                     use the pod's ephemeralcontainers subresource. This field is alpha-level
                     and is only honored by servers that enable the EphemeralContainers
                     feature.
-                  type: array
                   items:
                     description: An EphemeralContainer is a container that may be
                       added temporarily to an existing pod for user-initiated activities
@@ -4590,9 +4605,6 @@ spec:
                       ephemeralcontainers subresource, and they will appear in the
                       pod spec once added. This is an alpha feature enabled by the
                       EphemeralContainers feature flag.
-                    type: object
-                    required:
-                    - name
                     properties:
                       args:
                         description: 'Arguments to the entrypoint. The docker image''s
@@ -4603,9 +4615,9 @@ spec:
                           escaped with a double $$, ie: $$(VAR_NAME). Escaped references
                           will never be expanded, regardless of whether the variable
                           exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        type: array
                         items:
                           type: string
+                        type: array
                       command:
                         description: 'Entrypoint array. Not executed within a shell.
                           The docker image''s ENTRYPOINT is used if this is not provided.
@@ -4616,19 +4628,15 @@ spec:
                           references will never be expanded, regardless of whether
                           the variable exists or not. Cannot be updated. More info:
                           https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        type: array
                         items:
                           type: string
+                        type: array
                       env:
                         description: List of environment variables to set in the container.
                           Cannot be updated.
-                        type: array
                         items:
                           description: EnvVar represents an environment variable present
                             in a Container.
-                          type: object
-                          required:
-                          - name
                           properties:
                             name:
                               description: Name of the environment variable. Must
@@ -4648,13 +4656,9 @@ spec:
                             valueFrom:
                               description: Source for the environment variable's value.
                                 Cannot be used if value is not empty.
-                              type: object
                               properties:
                                 configMapKeyRef:
                                   description: Selects a key of a ConfigMap.
-                                  type: object
-                                  required:
-                                  - key
                                   properties:
                                     key:
                                       description: The key to select.
@@ -4669,14 +4673,14 @@ spec:
                                       description: Specify whether the ConfigMap or
                                         its key must be defined
                                       type: boolean
+                                  required:
+                                  - key
+                                  type: object
                                 fieldRef:
                                   description: 'Selects a field of the pod: supports
                                     metadata.name, metadata.namespace, metadata.labels,
                                     metadata.annotations, spec.nodeName, spec.serviceAccountName,
                                     status.hostIP, status.podIP, status.podIPs.'
-                                  type: object
-                                  required:
-                                  - fieldPath
                                   properties:
                                     apiVersion:
                                       description: Version of the schema the FieldPath
@@ -4686,15 +4690,15 @@ spec:
                                       description: Path of the field to select in
                                         the specified API version.
                                       type: string
+                                  required:
+                                  - fieldPath
+                                  type: object
                                 resourceFieldRef:
                                   description: 'Selects a resource of the container:
                                     only resources limits and requests (limits.cpu,
                                     limits.memory, limits.ephemeral-storage, requests.cpu,
                                     requests.memory and requests.ephemeral-storage)
                                     are currently supported.'
-                                  type: object
-                                  required:
-                                  - resource
                                   properties:
                                     containerName:
                                       description: 'Container name: required for volumes,
@@ -4707,12 +4711,12 @@ spec:
                                     resource:
                                       description: 'Required: resource to select'
                                       type: string
+                                  required:
+                                  - resource
+                                  type: object
                                 secretKeyRef:
                                   description: Selects a key of a secret in the pod's
                                     namespace
-                                  type: object
-                                  required:
-                                  - key
                                   properties:
                                     key:
                                       description: The key of the secret to select
@@ -4728,6 +4732,14 @@ spec:
                                       description: Specify whether the Secret or its
                                         key must be defined
                                       type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                              type: object
+                          required:
+                          - name
+                          type: object
+                        type: array
                       envFrom:
                         description: List of sources to populate environment variables
                           in the container. The keys defined within a source must
@@ -4736,15 +4748,12 @@ spec:
                           in multiple sources, the value associated with the last
                           source will take precedence. Values defined by an Env with
                           a duplicate key will take precedence. Cannot be updated.
-                        type: array
                         items:
                           description: EnvFromSource represents the source of a set
                             of ConfigMaps
-                          type: object
                           properties:
                             configMapRef:
                               description: The ConfigMap to select from
-                              type: object
                               properties:
                                 name:
                                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -4755,13 +4764,13 @@ spec:
                                   description: Specify whether the ConfigMap must
                                     be defined
                                   type: boolean
+                              type: object
                             prefix:
                               description: An optional identifier to prepend to each
                                 key in the ConfigMap. Must be a C_IDENTIFIER.
                               type: string
                             secretRef:
                               description: The Secret to select from
-                              type: object
                               properties:
                                 name:
                                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -4772,6 +4781,9 @@ spec:
                                   description: Specify whether the Secret must be
                                     defined
                                   type: boolean
+                              type: object
+                          type: object
+                        type: array
                       image:
                         description: 'Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images'
                         type: string
@@ -4782,7 +4794,6 @@ spec:
                         type: string
                       lifecycle:
                         description: Lifecycle is not allowed for ephemeral containers.
-                        type: object
                         properties:
                           postStart:
                             description: 'PostStart is called immediately after a
@@ -4790,12 +4801,10 @@ spec:
                               is terminated and restarted according to its restart
                               policy. Other management of the container blocks until
                               the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
-                            type: object
                             properties:
                               exec:
                                 description: One and only one of the following should
                                   be specified. Exec specifies the action to take.
-                                type: object
                                 properties:
                                   command:
                                     description: Command is the command line to execute
@@ -4807,15 +4816,13 @@ spec:
                                       shell, you need to explicitly call out to that
                                       shell. Exit status of 0 is treated as live/healthy
                                       and non-zero is unhealthy.
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
+                                type: object
                               httpGet:
                                 description: HTTPGet specifies the http request to
                                   perform.
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: Host name to connect to, defaults
@@ -4825,14 +4832,9 @@ spec:
                                   httpHeaders:
                                     description: Custom headers to set in the request.
                                       HTTP allows repeated headers.
-                                    type: array
                                     items:
                                       description: HTTPHeader describes a custom header
                                         to be used in HTTP probes
-                                      type: object
-                                      required:
-                                      - name
-                                      - value
                                       properties:
                                         name:
                                           description: The header field name
@@ -4840,39 +4842,48 @@ spec:
                                         value:
                                           description: The header field value
                                           type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    type: array
                                   path:
                                     description: Path to access on the HTTP server.
                                     type: string
                                   port:
-                                    description: Name or number of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Name or number of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                   scheme:
                                     description: Scheme to use for connecting to the
                                       host. Defaults to HTTP.
                                     type: string
+                                required:
+                                - port
+                                type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
                                   a TCP port. TCP hooks not yet supported TODO: implement
                                   a realistic TCP lifecycle hook'
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: 'Optional: Host name to connect to,
                                       defaults to the pod IP.'
                                     type: string
                                   port:
-                                    description: Number or name of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Number or name of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
+                                required:
+                                - port
+                                type: object
+                            type: object
                           preStop:
                             description: 'PreStop is called immediately before a container
                               is terminated due to an API request or management event
@@ -4886,12 +4897,10 @@ spec:
                               termination grace period. Other management of the container
                               blocks until the hook completes or until the termination
                               grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
-                            type: object
                             properties:
                               exec:
                                 description: One and only one of the following should
                                   be specified. Exec specifies the action to take.
-                                type: object
                                 properties:
                                   command:
                                     description: Command is the command line to execute
@@ -4903,15 +4912,13 @@ spec:
                                       shell, you need to explicitly call out to that
                                       shell. Exit status of 0 is treated as live/healthy
                                       and non-zero is unhealthy.
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
+                                type: object
                               httpGet:
                                 description: HTTPGet specifies the http request to
                                   perform.
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: Host name to connect to, defaults
@@ -4921,14 +4928,9 @@ spec:
                                   httpHeaders:
                                     description: Custom headers to set in the request.
                                       HTTP allows repeated headers.
-                                    type: array
                                     items:
                                       description: HTTPHeader describes a custom header
                                         to be used in HTTP probes
-                                      type: object
-                                      required:
-                                      - name
-                                      - value
                                       properties:
                                         name:
                                           description: The header field name
@@ -4936,47 +4938,55 @@ spec:
                                         value:
                                           description: The header field value
                                           type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    type: array
                                   path:
                                     description: Path to access on the HTTP server.
                                     type: string
                                   port:
-                                    description: Name or number of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Name or number of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                   scheme:
                                     description: Scheme to use for connecting to the
                                       host. Defaults to HTTP.
                                     type: string
+                                required:
+                                - port
+                                type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
                                   a TCP port. TCP hooks not yet supported TODO: implement
                                   a realistic TCP lifecycle hook'
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: 'Optional: Host name to connect to,
                                       defaults to the pod IP.'
                                     type: string
                                   port:
-                                    description: Number or name of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Number or name of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
+                                required:
+                                - port
+                                type: object
+                            type: object
+                        type: object
                       livenessProbe:
                         description: Probes are not allowed for ephemeral containers.
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -4987,20 +4997,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -5010,14 +5018,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -5025,63 +5028,72 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       name:
                         description: Name of the ephemeral container specified as
                           a DNS_LABEL. This name must be unique among all containers,
@@ -5089,20 +5101,16 @@ spec:
                         type: string
                       ports:
                         description: Ports are not allowed for ephemeral containers.
-                        type: array
                         items:
                           description: ContainerPort represents a network port in
                             a single container.
-                          type: object
-                          required:
-                          - containerPort
                           properties:
                             containerPort:
                               description: Number of port to expose on the pod's IP
                                 address. This must be a valid port number, 0 < x <
                                 65536.
-                              type: integer
                               format: int32
+                              type: integer
                             hostIP:
                               description: What host IP to bind the external port
                                 to.
@@ -5112,8 +5120,8 @@ spec:
                                 specified, this must be a valid port number, 0 < x
                                 < 65536. If HostNetwork is specified, this must match
                                 ContainerPort. Most containers do not need this.
-                              type: integer
                               format: int32
+                              type: integer
                             name:
                               description: If specified, this must be an IANA_SVC_NAME
                                 and unique within the pod. Each named port in a pod
@@ -5124,14 +5132,16 @@ spec:
                               description: Protocol for port. Must be UDP, TCP, or
                                 SCTP. Defaults to "TCP".
                               type: string
+                          required:
+                          - containerPort
+                          type: object
+                        type: array
                       readinessProbe:
                         description: Probes are not allowed for ephemeral containers.
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -5142,20 +5152,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -5165,14 +5173,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -5180,88 +5183,96 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       resources:
                         description: Resources are not allowed for ephemeral containers.
                           Ephemeral containers use spare resources already allocated
                           to the pod.
-                        type: object
                         properties:
                           limits:
+                            additionalProperties:
+                              type: string
                             description: 'Limits describes the maximum amount of compute
                               resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                             type: object
+                          requests:
                             additionalProperties:
                               type: string
-                          requests:
                             description: 'Requests describes the minimum amount of
                               compute resources required. If Requests is omitted for
                               a container, it defaults to Limits if that is explicitly
                               specified, otherwise to an implementation-defined value.
                               More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                             type: object
-                            additionalProperties:
-                              type: string
+                        type: object
                       securityContext:
                         description: SecurityContext is not allowed for ephemeral
                           containers.
-                        type: object
                         properties:
                           allowPrivilegeEscalation:
                             description: 'AllowPrivilegeEscalation controls whether
@@ -5275,22 +5286,22 @@ spec:
                             description: The capabilities to add/drop when running
                               containers. Defaults to the default set of capabilities
                               granted by the container runtime.
-                            type: object
                             properties:
                               add:
                                 description: Added capabilities
-                                type: array
                                 items:
                                   description: Capability represent POSIX capabilities
                                     type
                                   type: string
+                                type: array
                               drop:
                                 description: Removed capabilities
-                                type: array
                                 items:
                                   description: Capability represent POSIX capabilities
                                     type
                                   type: string
+                                type: array
+                            type: object
                           privileged:
                             description: Run container in privileged mode. Processes
                               in privileged containers are essentially equivalent
@@ -5313,8 +5324,8 @@ spec:
                               set in PodSecurityContext.  If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: integer
                             format: int64
+                            type: integer
                           runAsNonRoot:
                             description: Indicates that the container must run as
                               a non-root user. If true, the Kubelet will validate
@@ -5331,8 +5342,8 @@ spec:
                               if unspecified. May also be set in PodSecurityContext.  If
                               set in both SecurityContext and PodSecurityContext,
                               the value specified in SecurityContext takes precedence.
-                            type: integer
                             format: int64
+                            type: integer
                           seLinuxOptions:
                             description: The SELinux context to be applied to the
                               container. If unspecified, the container runtime will
@@ -5340,7 +5351,6 @@ spec:
                               also be set in PodSecurityContext.  If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: object
                             properties:
                               level:
                                 description: Level is SELinux level label that applies
@@ -5358,13 +5368,13 @@ spec:
                                 description: User is a SELinux user label that applies
                                   to the container.
                                 type: string
+                            type: object
                           windowsOptions:
                             description: The Windows specific settings applied to
                               all containers. If unspecified, the options from the
                               PodSecurityContext will be used. If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: object
                             properties:
                               gmsaCredentialSpec:
                                 description: GMSACredentialSpec is where the GMSA
@@ -5384,14 +5394,14 @@ spec:
                                   and PodSecurityContext, the value specified in SecurityContext
                                   takes precedence.
                                 type: string
+                            type: object
+                        type: object
                       startupProbe:
                         description: Probes are not allowed for ephemeral containers.
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -5402,20 +5412,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -5425,14 +5433,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -5440,63 +5443,72 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       stdin:
                         description: Whether this container should allocate a buffer
                           for stdin in the container runtime. If this is not set,
@@ -5550,14 +5562,9 @@ spec:
                       volumeDevices:
                         description: volumeDevices is the list of block devices to
                           be used by the container.
-                        type: array
                         items:
                           description: volumeDevice describes a mapping of a raw block
                             device within a container.
-                          type: object
-                          required:
-                          - devicePath
-                          - name
                           properties:
                             devicePath:
                               description: devicePath is the path inside of the container
@@ -5567,17 +5574,17 @@ spec:
                               description: name must match the name of a persistentVolumeClaim
                                 in the pod
                               type: string
+                          required:
+                          - devicePath
+                          - name
+                          type: object
+                        type: array
                       volumeMounts:
                         description: Pod volumes to mount into the container's filesystem.
                           Cannot be updated.
-                        type: array
                         items:
                           description: VolumeMount describes a mounting of a Volume
                             within a container.
-                          type: object
-                          required:
-                          - mountPath
-                          - name
                           properties:
                             mountPath:
                               description: Path within the container at which the
@@ -5609,29 +5616,38 @@ spec:
                                 Defaults to "" (volume's root). SubPathExpr and SubPath
                                 are mutually exclusive.
                               type: string
+                          required:
+                          - mountPath
+                          - name
+                          type: object
+                        type: array
                       workingDir:
                         description: Container's working directory. If not specified,
                           the container runtime's default will be used, which might
                           be configured in the container image. Cannot be updated.
                         type: string
+                    required:
+                    - name
+                    type: object
+                  type: array
                 hostAliases:
                   description: HostAliases is an optional list of hosts and IPs that
                     will be injected into the pod's hosts file if specified. This
                     is only valid for non-hostNetwork pods.
-                  type: array
                   items:
                     description: HostAlias holds the mapping between IP and hostnames
                       that will be injected as an entry in the pod's hosts file.
-                    type: object
                     properties:
                       hostnames:
                         description: Hostnames for the above IP address.
-                        type: array
                         items:
                           type: string
+                        type: array
                       ip:
                         description: IP address of the host file entry.
                         type: string
+                    type: object
+                  type: array
                 hostIPC:
                   description: 'Use the host''s ipc namespace. Optional: Default to
                     false.'
@@ -5656,16 +5672,16 @@ spec:
                     be passed to individual puller implementations for them to use.
                     For example, in the case of docker, only DockerConfig type secrets
                     are honored. More info: https://kubernetes.io/docs/concepts/containers/images#specifying-imagepullsecrets-on-a-pod'
-                  type: array
                   items:
                     description: LocalObjectReference contains enough information
                       to let you locate the referenced object inside the same namespace.
-                    type: object
                     properties:
                       name:
                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
+                    type: object
+                  type: array
                 initContainers:
                   description: 'List of initialization containers belonging to the
                     pod. Init containers are executed in order prior to containers
@@ -5680,13 +5696,9 @@ spec:
                     Limits are applied to init containers in a similar fashion. Init
                     containers cannot currently be added or removed. Cannot be updated.
                     More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/'
-                  type: array
                   items:
                     description: A single application container that you want to run
                       within a pod.
-                    type: object
-                    required:
-                    - name
                     properties:
                       args:
                         description: 'Arguments to the entrypoint. The docker image''s
@@ -5697,9 +5709,9 @@ spec:
                           escaped with a double $$, ie: $$(VAR_NAME). Escaped references
                           will never be expanded, regardless of whether the variable
                           exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        type: array
                         items:
                           type: string
+                        type: array
                       command:
                         description: 'Entrypoint array. Not executed within a shell.
                           The docker image''s ENTRYPOINT is used if this is not provided.
@@ -5710,19 +5722,15 @@ spec:
                           references will never be expanded, regardless of whether
                           the variable exists or not. Cannot be updated. More info:
                           https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
-                        type: array
                         items:
                           type: string
+                        type: array
                       env:
                         description: List of environment variables to set in the container.
                           Cannot be updated.
-                        type: array
                         items:
                           description: EnvVar represents an environment variable present
                             in a Container.
-                          type: object
-                          required:
-                          - name
                           properties:
                             name:
                               description: Name of the environment variable. Must
@@ -5742,13 +5750,9 @@ spec:
                             valueFrom:
                               description: Source for the environment variable's value.
                                 Cannot be used if value is not empty.
-                              type: object
                               properties:
                                 configMapKeyRef:
                                   description: Selects a key of a ConfigMap.
-                                  type: object
-                                  required:
-                                  - key
                                   properties:
                                     key:
                                       description: The key to select.
@@ -5763,14 +5767,14 @@ spec:
                                       description: Specify whether the ConfigMap or
                                         its key must be defined
                                       type: boolean
+                                  required:
+                                  - key
+                                  type: object
                                 fieldRef:
                                   description: 'Selects a field of the pod: supports
                                     metadata.name, metadata.namespace, metadata.labels,
                                     metadata.annotations, spec.nodeName, spec.serviceAccountName,
                                     status.hostIP, status.podIP, status.podIPs.'
-                                  type: object
-                                  required:
-                                  - fieldPath
                                   properties:
                                     apiVersion:
                                       description: Version of the schema the FieldPath
@@ -5780,15 +5784,15 @@ spec:
                                       description: Path of the field to select in
                                         the specified API version.
                                       type: string
+                                  required:
+                                  - fieldPath
+                                  type: object
                                 resourceFieldRef:
                                   description: 'Selects a resource of the container:
                                     only resources limits and requests (limits.cpu,
                                     limits.memory, limits.ephemeral-storage, requests.cpu,
                                     requests.memory and requests.ephemeral-storage)
                                     are currently supported.'
-                                  type: object
-                                  required:
-                                  - resource
                                   properties:
                                     containerName:
                                       description: 'Container name: required for volumes,
@@ -5801,12 +5805,12 @@ spec:
                                     resource:
                                       description: 'Required: resource to select'
                                       type: string
+                                  required:
+                                  - resource
+                                  type: object
                                 secretKeyRef:
                                   description: Selects a key of a secret in the pod's
                                     namespace
-                                  type: object
-                                  required:
-                                  - key
                                   properties:
                                     key:
                                       description: The key of the secret to select
@@ -5822,6 +5826,14 @@ spec:
                                       description: Specify whether the Secret or its
                                         key must be defined
                                       type: boolean
+                                  required:
+                                  - key
+                                  type: object
+                              type: object
+                          required:
+                          - name
+                          type: object
+                        type: array
                       envFrom:
                         description: List of sources to populate environment variables
                           in the container. The keys defined within a source must
@@ -5830,15 +5842,12 @@ spec:
                           in multiple sources, the value associated with the last
                           source will take precedence. Values defined by an Env with
                           a duplicate key will take precedence. Cannot be updated.
-                        type: array
                         items:
                           description: EnvFromSource represents the source of a set
                             of ConfigMaps
-                          type: object
                           properties:
                             configMapRef:
                               description: The ConfigMap to select from
-                              type: object
                               properties:
                                 name:
                                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -5849,13 +5858,13 @@ spec:
                                   description: Specify whether the ConfigMap must
                                     be defined
                                   type: boolean
+                              type: object
                             prefix:
                               description: An optional identifier to prepend to each
                                 key in the ConfigMap. Must be a C_IDENTIFIER.
                               type: string
                             secretRef:
                               description: The Secret to select from
-                              type: object
                               properties:
                                 name:
                                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -5866,6 +5875,9 @@ spec:
                                   description: Specify whether the Secret must be
                                     defined
                                   type: boolean
+                              type: object
+                          type: object
+                        type: array
                       image:
                         description: 'Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images
                           This field is optional to allow higher level config management
@@ -5880,7 +5892,6 @@ spec:
                       lifecycle:
                         description: Actions that the management system should take
                           in response to container lifecycle events. Cannot be updated.
-                        type: object
                         properties:
                           postStart:
                             description: 'PostStart is called immediately after a
@@ -5888,12 +5899,10 @@ spec:
                               is terminated and restarted according to its restart
                               policy. Other management of the container blocks until
                               the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
-                            type: object
                             properties:
                               exec:
                                 description: One and only one of the following should
                                   be specified. Exec specifies the action to take.
-                                type: object
                                 properties:
                                   command:
                                     description: Command is the command line to execute
@@ -5905,15 +5914,13 @@ spec:
                                       shell, you need to explicitly call out to that
                                       shell. Exit status of 0 is treated as live/healthy
                                       and non-zero is unhealthy.
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
+                                type: object
                               httpGet:
                                 description: HTTPGet specifies the http request to
                                   perform.
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: Host name to connect to, defaults
@@ -5923,14 +5930,9 @@ spec:
                                   httpHeaders:
                                     description: Custom headers to set in the request.
                                       HTTP allows repeated headers.
-                                    type: array
                                     items:
                                       description: HTTPHeader describes a custom header
                                         to be used in HTTP probes
-                                      type: object
-                                      required:
-                                      - name
-                                      - value
                                       properties:
                                         name:
                                           description: The header field name
@@ -5938,39 +5940,48 @@ spec:
                                         value:
                                           description: The header field value
                                           type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    type: array
                                   path:
                                     description: Path to access on the HTTP server.
                                     type: string
                                   port:
-                                    description: Name or number of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Name or number of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                   scheme:
                                     description: Scheme to use for connecting to the
                                       host. Defaults to HTTP.
                                     type: string
+                                required:
+                                - port
+                                type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
                                   a TCP port. TCP hooks not yet supported TODO: implement
                                   a realistic TCP lifecycle hook'
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: 'Optional: Host name to connect to,
                                       defaults to the pod IP.'
                                     type: string
                                   port:
-                                    description: Number or name of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Number or name of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
+                                required:
+                                - port
+                                type: object
+                            type: object
                           preStop:
                             description: 'PreStop is called immediately before a container
                               is terminated due to an API request or management event
@@ -5984,12 +5995,10 @@ spec:
                               termination grace period. Other management of the container
                               blocks until the hook completes or until the termination
                               grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
-                            type: object
                             properties:
                               exec:
                                 description: One and only one of the following should
                                   be specified. Exec specifies the action to take.
-                                type: object
                                 properties:
                                   command:
                                     description: Command is the command line to execute
@@ -6001,15 +6010,13 @@ spec:
                                       shell, you need to explicitly call out to that
                                       shell. Exit status of 0 is treated as live/healthy
                                       and non-zero is unhealthy.
-                                    type: array
                                     items:
                                       type: string
+                                    type: array
+                                type: object
                               httpGet:
                                 description: HTTPGet specifies the http request to
                                   perform.
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: Host name to connect to, defaults
@@ -6019,14 +6026,9 @@ spec:
                                   httpHeaders:
                                     description: Custom headers to set in the request.
                                       HTTP allows repeated headers.
-                                    type: array
                                     items:
                                       description: HTTPHeader describes a custom header
                                         to be used in HTTP probes
-                                      type: object
-                                      required:
-                                      - name
-                                      - value
                                       properties:
                                         name:
                                           description: The header field name
@@ -6034,49 +6036,57 @@ spec:
                                         value:
                                           description: The header field value
                                           type: string
+                                      required:
+                                      - name
+                                      - value
+                                      type: object
+                                    type: array
                                   path:
                                     description: Path to access on the HTTP server.
                                     type: string
                                   port:
-                                    description: Name or number of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Name or number of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                   scheme:
                                     description: Scheme to use for connecting to the
                                       host. Defaults to HTTP.
                                     type: string
+                                required:
+                                - port
+                                type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
                                   a TCP port. TCP hooks not yet supported TODO: implement
                                   a realistic TCP lifecycle hook'
-                                type: object
-                                required:
-                                - port
                                 properties:
                                   host:
                                     description: 'Optional: Host name to connect to,
                                       defaults to the pod IP.'
                                     type: string
                                   port:
-                                    description: Number or name of the port to access
-                                      on the container. Number must be in the range
-                                      1 to 65535. Name must be an IANA_SVC_NAME.
                                     anyOf:
                                     - type: string
                                     - type: integer
+                                    description: Number or name of the port to access
+                                      on the container. Number must be in the range
+                                      1 to 65535. Name must be an IANA_SVC_NAME.
+                                required:
+                                - port
+                                type: object
+                            type: object
+                        type: object
                       livenessProbe:
                         description: 'Periodic probe of container liveness. Container
                           will be restarted if the probe fails. Cannot be updated.
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -6087,20 +6097,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -6110,14 +6118,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -6125,63 +6128,72 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       name:
                         description: Name of the container specified as a DNS_LABEL.
                           Each container in a pod must have a unique name (DNS_LABEL).
@@ -6195,20 +6207,16 @@ spec:
                           that port from being exposed. Any port which is listening
                           on the default "0.0.0.0" address inside a container will
                           be accessible from the network. Cannot be updated.
-                        type: array
                         items:
                           description: ContainerPort represents a network port in
                             a single container.
-                          type: object
-                          required:
-                          - containerPort
                           properties:
                             containerPort:
                               description: Number of port to expose on the pod's IP
                                 address. This must be a valid port number, 0 < x <
                                 65536.
-                              type: integer
                               format: int32
+                              type: integer
                             hostIP:
                               description: What host IP to bind the external port
                                 to.
@@ -6218,8 +6226,8 @@ spec:
                                 specified, this must be a valid port number, 0 < x
                                 < 65536. If HostNetwork is specified, this must match
                                 ContainerPort. Most containers do not need this.
-                              type: integer
                               format: int32
+                              type: integer
                             name:
                               description: If specified, this must be an IANA_SVC_NAME
                                 and unique within the pod. Each named port in a pod
@@ -6230,16 +6238,18 @@ spec:
                               description: Protocol for port. Must be UDP, TCP, or
                                 SCTP. Defaults to "TCP".
                               type: string
+                          required:
+                          - containerPort
+                          type: object
+                        type: array
                       readinessProbe:
                         description: 'Periodic probe of container service readiness.
                           Container will be removed from service endpoints if the
                           probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -6250,20 +6260,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -6273,14 +6281,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -6288,88 +6291,96 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       resources:
                         description: 'Compute Resources required by this container.
                           Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
-                        type: object
                         properties:
                           limits:
+                            additionalProperties:
+                              type: string
                             description: 'Limits describes the maximum amount of compute
                               resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                             type: object
+                          requests:
                             additionalProperties:
                               type: string
-                          requests:
                             description: 'Requests describes the minimum amount of
                               compute resources required. If Requests is omitted for
                               a container, it defaults to Limits if that is explicitly
                               specified, otherwise to an implementation-defined value.
                               More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                             type: object
-                            additionalProperties:
-                              type: string
+                        type: object
                       securityContext:
                         description: 'Security options the pod should run with. More
                           info: https://kubernetes.io/docs/concepts/policy/security-context/
                           More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/'
-                        type: object
                         properties:
                           allowPrivilegeEscalation:
                             description: 'AllowPrivilegeEscalation controls whether
@@ -6383,22 +6394,22 @@ spec:
                             description: The capabilities to add/drop when running
                               containers. Defaults to the default set of capabilities
                               granted by the container runtime.
-                            type: object
                             properties:
                               add:
                                 description: Added capabilities
-                                type: array
                                 items:
                                   description: Capability represent POSIX capabilities
                                     type
                                   type: string
+                                type: array
                               drop:
                                 description: Removed capabilities
-                                type: array
                                 items:
                                   description: Capability represent POSIX capabilities
                                     type
                                   type: string
+                                type: array
+                            type: object
                           privileged:
                             description: Run container in privileged mode. Processes
                               in privileged containers are essentially equivalent
@@ -6421,8 +6432,8 @@ spec:
                               set in PodSecurityContext.  If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: integer
                             format: int64
+                            type: integer
                           runAsNonRoot:
                             description: Indicates that the container must run as
                               a non-root user. If true, the Kubelet will validate
@@ -6439,8 +6450,8 @@ spec:
                               if unspecified. May also be set in PodSecurityContext.  If
                               set in both SecurityContext and PodSecurityContext,
                               the value specified in SecurityContext takes precedence.
-                            type: integer
                             format: int64
+                            type: integer
                           seLinuxOptions:
                             description: The SELinux context to be applied to the
                               container. If unspecified, the container runtime will
@@ -6448,7 +6459,6 @@ spec:
                               also be set in PodSecurityContext.  If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: object
                             properties:
                               level:
                                 description: Level is SELinux level label that applies
@@ -6466,13 +6476,13 @@ spec:
                                 description: User is a SELinux user label that applies
                                   to the container.
                                 type: string
+                            type: object
                           windowsOptions:
                             description: The Windows specific settings applied to
                               all containers. If unspecified, the options from the
                               PodSecurityContext will be used. If set in both SecurityContext
                               and PodSecurityContext, the value specified in SecurityContext
                               takes precedence.
-                            type: object
                             properties:
                               gmsaCredentialSpec:
                                 description: GMSACredentialSpec is where the GMSA
@@ -6492,6 +6502,8 @@ spec:
                                   and PodSecurityContext, the value specified in SecurityContext
                                   takes precedence.
                                 type: string
+                            type: object
+                        type: object
                       startupProbe:
                         description: 'StartupProbe indicates that the Pod has successfully
                           initialized. If specified, no other probes are executed
@@ -6502,12 +6514,10 @@ spec:
                           a long time to load data or warm a cache, than during steady-state
                           operation. This cannot be updated. This is a beta feature
                           enabled by the StartupProbe feature flag. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                        type: object
                         properties:
                           exec:
                             description: One and only one of the following should
                               be specified. Exec specifies the action to take.
-                            type: object
                             properties:
                               command:
                                 description: Command is the command line to execute
@@ -6518,20 +6528,18 @@ spec:
                                   etc) won't work. To use a shell, you need to explicitly
                                   call out to that shell. Exit status of 0 is treated
                                   as live/healthy and non-zero is unhealthy.
-                                type: array
                                 items:
                                   type: string
+                                type: array
+                            type: object
                           failureThreshold:
                             description: Minimum consecutive failures for the probe
                               to be considered failed after having succeeded. Defaults
                               to 3. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           httpGet:
                             description: HTTPGet specifies the http request to perform.
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: Host name to connect to, defaults to
@@ -6541,14 +6549,9 @@ spec:
                               httpHeaders:
                                 description: Custom headers to set in the request.
                                   HTTP allows repeated headers.
-                                type: array
                                 items:
                                   description: HTTPHeader describes a custom header
                                     to be used in HTTP probes
-                                  type: object
-                                  required:
-                                  - name
-                                  - value
                                   properties:
                                     name:
                                       description: The header field name
@@ -6556,63 +6559,72 @@ spec:
                                     value:
                                       description: The header field value
                                       type: string
+                                  required:
+                                  - name
+                                  - value
+                                  type: object
+                                type: array
                               path:
                                 description: Path to access on the HTTP server.
                                 type: string
                               port:
-                                description: Name or number of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Name or number of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
                               scheme:
                                 description: Scheme to use for connecting to the host.
                                   Defaults to HTTP.
                                 type: string
+                            required:
+                            - port
+                            type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
                               started before liveness probes are initiated. More info:
                               https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
                           periodSeconds:
                             description: How often (in seconds) to perform the probe.
                               Default to 10 seconds. Minimum value is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           successThreshold:
                             description: Minimum consecutive successes for the probe
                               to be considered successful after having failed. Defaults
                               to 1. Must be 1 for liveness and startup. Minimum value
                               is 1.
-                            type: integer
                             format: int32
+                            type: integer
                           tcpSocket:
                             description: 'TCPSocket specifies an action involving
                               a TCP port. TCP hooks not yet supported TODO: implement
                               a realistic TCP lifecycle hook'
-                            type: object
-                            required:
-                            - port
                             properties:
                               host:
                                 description: 'Optional: Host name to connect to, defaults
                                   to the pod IP.'
                                 type: string
                               port:
-                                description: Number or name of the port to access
-                                  on the container. Number must be in the range 1
-                                  to 65535. Name must be an IANA_SVC_NAME.
                                 anyOf:
                                 - type: string
                                 - type: integer
+                                description: Number or name of the port to access
+                                  on the container. Number must be in the range 1
+                                  to 65535. Name must be an IANA_SVC_NAME.
+                            required:
+                            - port
+                            type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
                               times out. Defaults to 1 second. Minimum value is 1.
                               More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
-                            type: integer
                             format: int32
+                            type: integer
+                        type: object
                       stdin:
                         description: Whether this container should allocate a buffer
                           for stdin in the container runtime. If this is not set,
@@ -6658,14 +6670,9 @@ spec:
                       volumeDevices:
                         description: volumeDevices is the list of block devices to
                           be used by the container.
-                        type: array
                         items:
                           description: volumeDevice describes a mapping of a raw block
                             device within a container.
-                          type: object
-                          required:
-                          - devicePath
-                          - name
                           properties:
                             devicePath:
                               description: devicePath is the path inside of the container
@@ -6675,17 +6682,17 @@ spec:
                               description: name must match the name of a persistentVolumeClaim
                                 in the pod
                               type: string
+                          required:
+                          - devicePath
+                          - name
+                          type: object
+                        type: array
                       volumeMounts:
                         description: Pod volumes to mount into the container's filesystem.
                           Cannot be updated.
-                        type: array
                         items:
                           description: VolumeMount describes a mounting of a Volume
                             within a container.
-                          type: object
-                          required:
-                          - mountPath
-                          - name
                           properties:
                             mountPath:
                               description: Path within the container at which the
@@ -6717,24 +6724,35 @@ spec:
                                 Defaults to "" (volume's root). SubPathExpr and SubPath
                                 are mutually exclusive.
                               type: string
+                          required:
+                          - mountPath
+                          - name
+                          type: object
+                        type: array
                       workingDir:
                         description: Container's working directory. If not specified,
                           the container runtime's default will be used, which might
                           be configured in the container image. Cannot be updated.
                         type: string
+                    required:
+                    - name
+                    type: object
+                  type: array
                 nodeName:
                   description: NodeName is a request to schedule this pod onto a specific
                     node. If it is non-empty, the scheduler simply schedules this
                     pod onto that node, assuming that it fits resource requirements.
                   type: string
                 nodeSelector:
+                  additionalProperties:
+                    type: string
                   description: 'NodeSelector is a selector which must be true for
                     the pod to fit on a node. Selector which must match a node''s
                     labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                   type: object
+                overhead:
                   additionalProperties:
                     type: string
-                overhead:
                   description: 'Overhead represents the resource overhead associated
                     with running a pod for a given RuntimeClass. This field will be
                     autopopulated at admission time by the RuntimeClass admission
@@ -6748,8 +6766,6 @@ spec:
                     This field is alpha-level as of Kubernetes v1.16, and is only
                     honored by servers that enable the PodOverhead feature.'
                   type: object
-                  additionalProperties:
-                    type: string
                 preemptionPolicy:
                   description: PreemptionPolicy is the Policy for preempting pods
                     with lower priority. One of Never, PreemptLowerPriority. Defaults
@@ -6763,8 +6779,8 @@ spec:
                     Controller is enabled, it prevents users from setting this field.
                     The admission controller populates this field from PriorityClassName.
                     The higher the value, the higher the priority.
-                  type: integer
                   format: int32
+                  type: integer
                 priorityClassName:
                   description: If specified, indicates the pod's priority. "system-node-critical"
                     and "system-cluster-critical" are two special keywords which indicate
@@ -6778,18 +6794,18 @@ spec:
                     for pod readiness. A pod is ready when all its containers are
                     ready AND all conditions specified in the readiness gates have
                     status equal to "True" More info: https://git.k8s.io/enhancements/keps/sig-network/0007-pod-ready%2B%2B.md'
-                  type: array
                   items:
                     description: PodReadinessGate contains the reference to a pod
                       condition
-                    type: object
-                    required:
-                    - conditionType
                     properties:
                       conditionType:
                         description: ConditionType refers to a condition in the pod's
                           condition list with matching type.
                         type: string
+                    required:
+                    - conditionType
+                    type: object
+                  type: array
                 restartPolicy:
                   description: 'Restart policy for all containers within the pod.
                     One of Always, OnFailure, Never. Default to Always. More info:
@@ -6813,7 +6829,6 @@ spec:
                   description: 'SecurityContext holds pod-level security attributes
                     and common container settings. Optional: Defaults to empty.  See
                     type description for default values of each field.'
-                  type: object
                   properties:
                     fsGroup:
                       description: "A special supplemental group that applies to all
@@ -6824,8 +6839,8 @@ spec:
                         3. The permission bits are OR'd with rw-rw---- \n If unset,
                         the Kubelet will not modify the ownership and permissions
                         of any volume."
-                      type: integer
                       format: int64
+                      type: integer
                     fsGroupChangePolicy:
                       description: 'fsGroupChangePolicy defines behavior of changing
                         ownership and permission of the volume before being exposed
@@ -6841,8 +6856,8 @@ spec:
                         SecurityContext.  If set in both SecurityContext and PodSecurityContext,
                         the value specified in SecurityContext takes precedence for
                         that container.
-                      type: integer
                       format: int64
+                      type: integer
                     runAsNonRoot:
                       description: Indicates that the container must run as a non-root
                         user. If true, the Kubelet will validate the image at runtime
@@ -6858,15 +6873,14 @@ spec:
                         May also be set in SecurityContext.  If set in both SecurityContext
                         and PodSecurityContext, the value specified in SecurityContext
                         takes precedence for that container.
-                      type: integer
                       format: int64
+                      type: integer
                     seLinuxOptions:
                       description: The SELinux context to be applied to all containers.
                         If unspecified, the container runtime will allocate a random
                         SELinux context for each container.  May also be set in SecurityContext.  If
                         set in both SecurityContext and PodSecurityContext, the value
                         specified in SecurityContext takes precedence for that container.
-                      type: object
                       properties:
                         level:
                           description: Level is SELinux level label that applies to
@@ -6884,25 +6898,21 @@ spec:
                           description: User is a SELinux user label that applies to
                             the container.
                           type: string
+                      type: object
                     supplementalGroups:
                       description: A list of groups applied to the first process run
                         in each container, in addition to the container's primary
                         GID.  If unspecified, no groups will be added to any container.
-                      type: array
                       items:
-                        type: integer
                         format: int64
+                        type: integer
+                      type: array
                     sysctls:
                       description: Sysctls hold a list of namespaced sysctls used
                         for the pod. Pods with unsupported sysctls (by the container
                         runtime) might fail to launch.
-                      type: array
                       items:
                         description: Sysctl defines a kernel parameter to be set
-                        type: object
-                        required:
-                        - name
-                        - value
                         properties:
                           name:
                             description: Name of a property to set
@@ -6910,12 +6920,16 @@ spec:
                           value:
                             description: Value of a property to set
                             type: string
+                        required:
+                        - name
+                        - value
+                        type: object
+                      type: array
                     windowsOptions:
                       description: The Windows specific settings applied to all containers.
                         If unspecified, the options within a container's SecurityContext
                         will be used. If set in both SecurityContext and PodSecurityContext,
                         the value specified in SecurityContext takes precedence.
-                      type: object
                       properties:
                         gmsaCredentialSpec:
                           description: GMSACredentialSpec is where the GMSA admission
@@ -6934,6 +6948,8 @@ spec:
                             If set in both SecurityContext and PodSecurityContext,
                             the value specified in SecurityContext takes precedence.
                           type: string
+                      type: object
+                  type: object
                 serviceAccount:
                   description: 'DeprecatedServiceAccount is a depreciated alias for
                     ServiceAccountName. Deprecated: Use serviceAccountName instead.'
@@ -6965,16 +6981,14 @@ spec:
                     when the processes are forcibly halted with a kill signal. Set
                     this value longer than the expected cleanup time for your process.
                     Defaults to 30 seconds.
-                  type: integer
                   format: int64
+                  type: integer
                 tolerations:
                   description: If specified, the pod's tolerations.
-                  type: array
                   items:
                     description: The pod this Toleration is attached to tolerates
                       any taint that matches the triple <key,value,effect> using the
                       matching operator <operator>.
-                    type: object
                     properties:
                       effect:
                         description: Effect indicates the taint effect to match. Empty
@@ -7000,47 +7014,37 @@ spec:
                           it is not set, which means tolerate the taint forever (do
                           not evict). Zero and negative values will be treated as
                           0 (evict immediately) by the system.
-                        type: integer
                         format: int64
+                        type: integer
                       value:
                         description: Value is the taint value the toleration matches
                           to. If the operator is Exists, the value should be empty,
                           otherwise just a regular string.
                         type: string
+                    type: object
+                  type: array
                 topologySpreadConstraints:
                   description: TopologySpreadConstraints describes how a group of
                     pods ought to spread across topology domains. Scheduler will schedule
                     pods in a way which abides by the constraints. This field is only
                     honored by clusters that enable the EvenPodsSpread feature. All
                     topologySpreadConstraints are ANDed.
-                  type: array
                   items:
                     description: TopologySpreadConstraint specifies how to spread
                       matching pods among the given topology.
-                    type: object
-                    required:
-                    - maxSkew
-                    - topologyKey
-                    - whenUnsatisfiable
                     properties:
                       labelSelector:
                         description: LabelSelector is used to find matching pods.
                           Pods that match this label selector are counted to determine
                           the number of pods in their corresponding topology domain.
-                        type: object
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
                               requirements. The requirements are ANDed.
-                            type: array
                             items:
                               description: A label selector requirement is a selector
                                 that contains values, a key, and an operator that
                                 relates the key and values.
-                              type: object
-                              required:
-                              - key
-                              - operator
                               properties:
                                 key:
                                   description: key is the label key that the selector
@@ -7058,18 +7062,24 @@ spec:
                                     DoesNotExist, the values array must be empty.
                                     This array is replaced during a strategic merge
                                     patch.
-                                  type: array
                                   items:
                                     type: string
+                                  type: array
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
                           matchLabels:
+                            additionalProperties:
+                              type: string
                             description: matchLabels is a map of {key,value} pairs.
                               A single {key,value} in the matchLabels map is equivalent
                               to an element of matchExpressions, whose key field is
                               "key", the operator is "In", and the values array contains
                               only "value". The requirements are ANDed.
                             type: object
-                            additionalProperties:
-                              type: string
+                        type: object
                       maxSkew:
                         description: 'MaxSkew describes the degree to which pods may
                           be unevenly distributed. It''s the maximum permitted difference
@@ -7083,8 +7093,8 @@ spec:
                           - if MaxSkew is 2, incoming pod can be scheduled onto any
                           zone. It''s a required field. Default value is 1 and 0 is
                           not allowed.'
-                        type: integer
                         format: int32
+                        type: integer
                       topologyKey:
                         description: TopologyKey is the key of node labels. Nodes
                           that have a label with this key and identical values are
@@ -7108,24 +7118,23 @@ spec:
                           scheduler won''t make it *more* imbalanced. It''s a required
                           field.'
                         type: string
+                    required:
+                    - maxSkew
+                    - topologyKey
+                    - whenUnsatisfiable
+                    type: object
+                  type: array
                 volumes:
                   description: 'List of volumes that can be mounted by containers
                     belonging to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes'
-                  type: array
                   items:
                     description: Volume represents a named volume in a pod that may
                       be accessed by any container in the pod.
-                    type: object
-                    required:
-                    - name
                     properties:
                       awsElasticBlockStore:
                         description: 'AWSElasticBlockStore represents an AWS Disk
                           resource that is attached to a kubelet''s host machine and
                           then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore'
-                        type: object
-                        required:
-                        - volumeID
                         properties:
                           fsType:
                             description: 'Filesystem type of the volume that you want
@@ -7142,8 +7151,8 @@ spec:
                               name. Examples: For volume /dev/sda1, you specify the
                               partition as "1". Similarly, the volume partition for
                               /dev/sda is "0" (or you can leave the property empty).'
-                            type: integer
                             format: int32
+                            type: integer
                           readOnly:
                             description: 'Specify "true" to force and set the ReadOnly
                               property in VolumeMounts to "true". If omitted, the
@@ -7153,13 +7162,12 @@ spec:
                             description: 'Unique ID of the persistent disk resource
                               in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore'
                             type: string
+                        required:
+                        - volumeID
+                        type: object
                       azureDisk:
                         description: AzureDisk represents an Azure Data Disk mount
                           on the host and bind mount to the pod.
-                        type: object
-                        required:
-                        - diskName
-                        - diskURI
                         properties:
                           cachingMode:
                             description: 'Host Caching mode: None, Read Only, Read
@@ -7186,13 +7194,13 @@ spec:
                             description: Defaults to false (read/write). ReadOnly
                               here will force the ReadOnly setting in VolumeMounts.
                             type: boolean
+                        required:
+                        - diskName
+                        - diskURI
+                        type: object
                       azureFile:
                         description: AzureFile represents an Azure File Service mount
                           on the host and bind mount to the pod.
-                        type: object
-                        required:
-                        - secretName
-                        - shareName
                         properties:
                           readOnly:
                             description: Defaults to false (read/write). ReadOnly
@@ -7205,19 +7213,20 @@ spec:
                           shareName:
                             description: Share Name
                             type: string
+                        required:
+                        - secretName
+                        - shareName
+                        type: object
                       cephfs:
                         description: CephFS represents a Ceph FS mount on the host
                           that shares a pod's lifetime
-                        type: object
-                        required:
-                        - monitors
                         properties:
                           monitors:
                             description: 'Required: Monitors is a collection of Ceph
                               monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
-                            type: array
                             items:
                               type: string
+                            type: array
                           path:
                             description: 'Optional: Used as the mounted root, rather
                               than the full Ceph tree, default is /'
@@ -7236,23 +7245,23 @@ spec:
                             description: 'Optional: SecretRef is reference to the
                               authentication secret for User, default is empty. More
                               info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           user:
                             description: 'Optional: User is the rados user name, default
                               is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
                             type: string
+                        required:
+                        - monitors
+                        type: object
                       cinder:
                         description: 'Cinder represents a cinder volume attached and
                           mounted on kubelets host machine. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
-                        type: object
-                        required:
-                        - volumeID
                         properties:
                           fsType:
                             description: 'Filesystem type to mount. Must be a filesystem
@@ -7268,21 +7277,23 @@ spec:
                           secretRef:
                             description: 'Optional: points to a secret object containing
                               parameters used to connect to OpenStack.'
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           volumeID:
                             description: 'volume id used to identify the volume in
                               cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
                             type: string
+                        required:
+                        - volumeID
+                        type: object
                       configMap:
                         description: ConfigMap represents a configMap that should
                           populate this volume
-                        type: object
                         properties:
                           defaultMode:
                             description: 'Optional: mode bits to use on created files
@@ -7291,8 +7302,8 @@ spec:
                               by this setting. This might be in conflict with other
                               options that affect the file mode, like fsGroup, and
                               the result can be other mode bits set.'
-                            type: integer
                             format: int32
+                            type: integer
                           items:
                             description: If unspecified, each key-value pair in the
                               Data field of the referenced ConfigMap will be projected
@@ -7303,13 +7314,8 @@ spec:
                               is not present in the ConfigMap, the volume setup will
                               error unless it is marked optional. Paths must be relative
                               and may not contain the '..' path or start with '..'.
-                            type: array
                             items:
                               description: Maps a string key to a path within a volume.
-                              type: object
-                              required:
-                              - key
-                              - path
                               properties:
                                 key:
                                   description: The key to project.
@@ -7321,14 +7327,19 @@ spec:
                                     This might be in conflict with other options that
                                     affect the file mode, like fsGroup, and the result
                                     can be other mode bits set.'
-                                  type: integer
                                   format: int32
+                                  type: integer
                                 path:
                                   description: The relative path of the file to map
                                     the key to. May not be an absolute path. May not
                                     contain the path element '..'. May not start with
                                     the string '..'.
                                   type: string
+                              required:
+                              - key
+                              - path
+                              type: object
+                            type: array
                           name:
                             description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                               TODO: Add other useful fields. apiVersion, kind, uid?'
@@ -7337,13 +7348,11 @@ spec:
                             description: Specify whether the ConfigMap or its keys
                               must be defined
                             type: boolean
+                        type: object
                       csi:
                         description: CSI (Container Storage Interface) represents
                           storage that is handled by an external CSI driver (Alpha
                           feature).
-                        type: object
-                        required:
-                        - driver
                         properties:
                           driver:
                             description: Driver is the name of the CSI driver that
@@ -7364,28 +7373,30 @@ spec:
                               and  may be empty if no secret is required. If the secret
                               object contains more than one secret, all secret references
                               are passed.
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           readOnly:
                             description: Specifies a read-only configuration for the
                               volume. Defaults to false (read/write).
                             type: boolean
                           volumeAttributes:
+                            additionalProperties:
+                              type: string
                             description: VolumeAttributes stores driver-specific properties
                               that are passed to the CSI driver. Consult your driver's
                               documentation for supported values.
                             type: object
-                            additionalProperties:
-                              type: string
+                        required:
+                        - driver
+                        type: object
                       downwardAPI:
                         description: DownwardAPI represents downward API about the
                           pod that should populate this volume
-                        type: object
                         properties:
                           defaultMode:
                             description: 'Optional: mode bits to use on created files
@@ -7394,25 +7405,18 @@ spec:
                               by this setting. This might be in conflict with other
                               options that affect the file mode, like fsGroup, and
                               the result can be other mode bits set.'
-                            type: integer
                             format: int32
+                            type: integer
                           items:
                             description: Items is a list of downward API volume file
-                            type: array
                             items:
                               description: DownwardAPIVolumeFile represents information
                                 to create the file containing the pod field
-                              type: object
-                              required:
-                              - path
                               properties:
                                 fieldRef:
                                   description: 'Required: Selects a field of the pod:
                                     only annotations, labels, name and namespace are
                                     supported.'
-                                  type: object
-                                  required:
-                                  - fieldPath
                                   properties:
                                     apiVersion:
                                       description: Version of the schema the FieldPath
@@ -7422,6 +7426,9 @@ spec:
                                       description: Path of the field to select in
                                         the specified API version.
                                       type: string
+                                  required:
+                                  - fieldPath
+                                  type: object
                                 mode:
                                   description: 'Optional: mode bits to use on this
                                     file, must be a value between 0 and 0777. If not
@@ -7429,8 +7436,8 @@ spec:
                                     This might be in conflict with other options that
                                     affect the file mode, like fsGroup, and the result
                                     can be other mode bits set.'
-                                  type: integer
                                   format: int32
+                                  type: integer
                                 path:
                                   description: 'Required: Path is  the relative path
                                     name of the file to be created. Must not be absolute
@@ -7443,9 +7450,6 @@ spec:
                                     only resources limits and requests (limits.cpu,
                                     limits.memory, requests.cpu and requests.memory)
                                     are currently supported.'
-                                  type: object
-                                  required:
-                                  - resource
                                   properties:
                                     containerName:
                                       description: 'Container name: required for volumes,
@@ -7458,10 +7462,17 @@ spec:
                                     resource:
                                       description: 'Required: resource to select'
                                       type: string
+                                  required:
+                                  - resource
+                                  type: object
+                              required:
+                              - path
+                              type: object
+                            type: array
+                        type: object
                       emptyDir:
                         description: 'EmptyDir represents a temporary directory that
                           shares a pod''s lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir'
-                        type: object
                         properties:
                           medium:
                             description: 'What type of storage medium should back
@@ -7478,11 +7489,11 @@ spec:
                               in a pod. The default is nil which means that the limit
                               is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir'
                             type: string
+                        type: object
                       fc:
                         description: FC represents a Fibre Channel resource that is
                           attached to a kubelet's host machine and then exposed to
                           the pod.
-                        type: object
                         properties:
                           fsType:
                             description: 'Filesystem type to mount. Must be a filesystem
@@ -7493,30 +7504,28 @@ spec:
                             type: string
                           lun:
                             description: 'Optional: FC target lun number'
-                            type: integer
                             format: int32
+                            type: integer
                           readOnly:
                             description: 'Optional: Defaults to false (read/write).
                               ReadOnly here will force the ReadOnly setting in VolumeMounts.'
                             type: boolean
                           targetWWNs:
                             description: 'Optional: FC target worldwide names (WWNs)'
-                            type: array
                             items:
                               type: string
+                            type: array
                           wwids:
                             description: 'Optional: FC volume world wide identifiers
                               (wwids) Either wwids or combination of targetWWNs and
                               lun must be set, but not both simultaneously.'
-                            type: array
                             items:
                               type: string
+                            type: array
+                        type: object
                       flexVolume:
                         description: FlexVolume represents a generic volume resource
                           that is provisioned/attached using an exec based plugin.
-                        type: object
-                        required:
-                        - driver
                         properties:
                           driver:
                             description: Driver is the name of the driver to use for
@@ -7529,10 +7538,10 @@ spec:
                               script.
                             type: string
                           options:
-                            description: 'Optional: Extra command options if any.'
-                            type: object
                             additionalProperties:
                               type: string
+                            description: 'Optional: Extra command options if any.'
+                            type: object
                           readOnly:
                             description: 'Optional: Defaults to false (read/write).
                               ReadOnly here will force the ReadOnly setting in VolumeMounts.'
@@ -7544,18 +7553,20 @@ spec:
                               object is specified. If the secret object contains more
                               than one secret, all secrets are passed to the plugin
                               scripts.'
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
+                        required:
+                        - driver
+                        type: object
                       flocker:
                         description: Flocker represents a Flocker volume attached
                           to a kubelet's host machine. This depends on the Flocker
                           control service being running
-                        type: object
                         properties:
                           datasetName:
                             description: Name of the dataset stored as metadata ->
@@ -7566,13 +7577,11 @@ spec:
                             description: UUID of the dataset. This is unique identifier
                               of a Flocker dataset
                             type: string
+                        type: object
                       gcePersistentDisk:
                         description: 'GCEPersistentDisk represents a GCE Disk resource
                           that is attached to a kubelet''s host machine and then exposed
                           to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
-                        type: object
-                        required:
-                        - pdName
                         properties:
                           fsType:
                             description: 'Filesystem type of the volume that you want
@@ -7590,8 +7599,8 @@ spec:
                               partition as "1". Similarly, the volume partition for
                               /dev/sda is "0" (or you can leave the property empty).
                               More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
-                            type: integer
                             format: int32
+                            type: integer
                           pdName:
                             description: 'Unique name of the PD resource in GCE. Used
                               to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
@@ -7600,15 +7609,15 @@ spec:
                             description: 'ReadOnly here will force the ReadOnly setting
                               in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
                             type: boolean
+                        required:
+                        - pdName
+                        type: object
                       gitRepo:
                         description: 'GitRepo represents a git repository at a particular
                           revision. DEPRECATED: GitRepo is deprecated. To provision
                           a container with a git repo, mount an EmptyDir into an InitContainer
                           that clones the repo using git, then mount the EmptyDir
                           into the Pod''s container.'
-                        type: object
-                        required:
-                        - repository
                         properties:
                           directory:
                             description: Target directory name. Must not contain or
@@ -7623,13 +7632,12 @@ spec:
                           revision:
                             description: Commit hash for the specified revision.
                             type: string
+                        required:
+                        - repository
+                        type: object
                       glusterfs:
                         description: 'Glusterfs represents a Glusterfs mount on the
                           host that shares a pod''s lifetime. More info: https://examples.k8s.io/volumes/glusterfs/README.md'
-                        type: object
-                        required:
-                        - endpoints
-                        - path
                         properties:
                           endpoints:
                             description: 'EndpointsName is the endpoint name that
@@ -7644,6 +7652,10 @@ spec:
                               to be mounted with read-only permissions. Defaults to
                               false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod'
                             type: boolean
+                        required:
+                        - endpoints
+                        - path
+                        type: object
                       hostPath:
                         description: 'HostPath represents a pre-existing file or directory
                           on the host machine that is directly exposed to the container.
@@ -7652,9 +7664,6 @@ spec:
                           will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
                           --- TODO(jonesdl) We need to restrict who can use host directory
                           mounts and who can/can not mount host directories as read/write.'
-                        type: object
-                        required:
-                        - path
                         properties:
                           path:
                             description: 'Path of the directory on the host. If the
@@ -7665,15 +7674,13 @@ spec:
                             description: 'Type for HostPath Volume Defaults to ""
                               More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath'
                             type: string
+                        required:
+                        - path
+                        type: object
                       iscsi:
                         description: 'ISCSI represents an ISCSI Disk resource that
                           is attached to a kubelet''s host machine and then exposed
                           to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md'
-                        type: object
-                        required:
-                        - iqn
-                        - lun
-                        - targetPortal
                         properties:
                           chapAuthDiscovery:
                             description: whether support iSCSI Discovery CHAP authentication
@@ -7705,15 +7712,15 @@ spec:
                             type: string
                           lun:
                             description: iSCSI Target Lun number.
-                            type: integer
                             format: int32
+                            type: integer
                           portals:
                             description: iSCSI Target Portal List. The portal is either
                               an IP or ip_addr:port if the port is other than default
                               (typically TCP ports 860 and 3260).
-                            type: array
                             items:
                               type: string
+                            type: array
                           readOnly:
                             description: ReadOnly here will force the ReadOnly setting
                               in VolumeMounts. Defaults to false.
@@ -7721,18 +7728,23 @@ spec:
                           secretRef:
                             description: CHAP Secret for iSCSI target and initiator
                               authentication
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           targetPortal:
                             description: iSCSI Target Portal. The Portal is either
                               an IP or ip_addr:port if the port is other than default
                               (typically TCP ports 860 and 3260).
                             type: string
+                        required:
+                        - iqn
+                        - lun
+                        - targetPortal
+                        type: object
                       name:
                         description: 'Volume''s name. Must be a DNS_LABEL and unique
                           within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
@@ -7740,10 +7752,6 @@ spec:
                       nfs:
                         description: 'NFS represents an NFS mount on the host that
                           shares a pod''s lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
-                        type: object
-                        required:
-                        - path
-                        - server
                         properties:
                           path:
                             description: 'Path that is exported by the NFS server.
@@ -7758,13 +7766,14 @@ spec:
                             description: 'Server is the hostname or IP address of
                               the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
                             type: string
+                        required:
+                        - path
+                        - server
+                        type: object
                       persistentVolumeClaim:
                         description: 'PersistentVolumeClaimVolumeSource represents
                           a reference to a PersistentVolumeClaim in the same namespace.
                           More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims'
-                        type: object
-                        required:
-                        - claimName
                         properties:
                           claimName:
                             description: 'ClaimName is the name of a PersistentVolumeClaim
@@ -7775,12 +7784,12 @@ spec:
                             description: Will force the ReadOnly setting in VolumeMounts.
                               Default false.
                             type: boolean
+                        required:
+                        - claimName
+                        type: object
                       photonPersistentDisk:
                         description: PhotonPersistentDisk represents a PhotonController
                           persistent disk attached and mounted on kubelets host machine
-                        type: object
-                        required:
-                        - pdID
                         properties:
                           fsType:
                             description: Filesystem type to mount. Must be a filesystem
@@ -7791,12 +7800,12 @@ spec:
                             description: ID that identifies Photon Controller persistent
                               disk
                             type: string
+                        required:
+                        - pdID
+                        type: object
                       portworxVolume:
                         description: PortworxVolume represents a portworx volume attached
                           and mounted on kubelets host machine
-                        type: object
-                        required:
-                        - volumeID
                         properties:
                           fsType:
                             description: FSType represents the filesystem type to
@@ -7811,12 +7820,12 @@ spec:
                           volumeID:
                             description: VolumeID uniquely identifies a Portworx volume
                             type: string
+                        required:
+                        - volumeID
+                        type: object
                       projected:
                         description: Items for all in one resources secrets, configmaps,
                           and downward API
-                        type: object
-                        required:
-                        - sources
                         properties:
                           defaultMode:
                             description: Mode bits to use on created files by default.
@@ -7825,20 +7834,17 @@ spec:
                               be in conflict with other options that affect the file
                               mode, like fsGroup, and the result can be other mode
                               bits set.
-                            type: integer
                             format: int32
+                            type: integer
                           sources:
                             description: list of volume projections
-                            type: array
                             items:
                               description: Projection that may be projected along
                                 with other supported volume types
-                              type: object
                               properties:
                                 configMap:
                                   description: information about the configMap data
                                     to project
-                                  type: object
                                   properties:
                                     items:
                                       description: If unspecified, each key-value
@@ -7852,14 +7858,9 @@ spec:
                                         volume setup will error unless it is marked
                                         optional. Paths must be relative and may not
                                         contain the '..' path or start with '..'.
-                                      type: array
                                       items:
                                         description: Maps a string key to a path within
                                           a volume.
-                                        type: object
-                                        required:
-                                        - key
-                                        - path
                                         properties:
                                           key:
                                             description: The key to project.
@@ -7873,8 +7874,8 @@ spec:
                                               affect the file mode, like fsGroup,
                                               and the result can be other mode bits
                                               set.'
-                                            type: integer
                                             format: int32
+                                            type: integer
                                           path:
                                             description: The relative path of the
                                               file to map the key to. May not be an
@@ -7882,6 +7883,11 @@ spec:
                                               element '..'. May not start with the
                                               string '..'.
                                             type: string
+                                        required:
+                                        - key
+                                        - path
+                                        type: object
+                                      type: array
                                     name:
                                       description: 'Name of the referent. More info:
                                         https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -7892,30 +7898,23 @@ spec:
                                       description: Specify whether the ConfigMap or
                                         its keys must be defined
                                       type: boolean
+                                  type: object
                                 downwardAPI:
                                   description: information about the downwardAPI data
                                     to project
-                                  type: object
                                   properties:
                                     items:
                                       description: Items is a list of DownwardAPIVolume
                                         file
-                                      type: array
                                       items:
                                         description: DownwardAPIVolumeFile represents
                                           information to create the file containing
                                           the pod field
-                                        type: object
-                                        required:
-                                        - path
                                         properties:
                                           fieldRef:
                                             description: 'Required: Selects a field
                                               of the pod: only annotations, labels,
                                               name and namespace are supported.'
-                                            type: object
-                                            required:
-                                            - fieldPath
                                             properties:
                                               apiVersion:
                                                 description: Version of the schema
@@ -7926,6 +7925,9 @@ spec:
                                                 description: Path of the field to
                                                   select in the specified API version.
                                                 type: string
+                                            required:
+                                            - fieldPath
+                                            type: object
                                           mode:
                                             description: 'Optional: mode bits to use
                                               on this file, must be a value between
@@ -7935,8 +7937,8 @@ spec:
                                               affect the file mode, like fsGroup,
                                               and the result can be other mode bits
                                               set.'
-                                            type: integer
                                             format: int32
+                                            type: integer
                                           path:
                                             description: 'Required: Path is  the relative
                                               path name of the file to be created.
@@ -7951,9 +7953,6 @@ spec:
                                               requests (limits.cpu, limits.memory,
                                               requests.cpu and requests.memory) are
                                               currently supported.'
-                                            type: object
-                                            required:
-                                            - resource
                                             properties:
                                               containerName:
                                                 description: 'Container name: required
@@ -7968,10 +7967,17 @@ spec:
                                                 description: 'Required: resource to
                                                   select'
                                                 type: string
+                                            required:
+                                            - resource
+                                            type: object
+                                        required:
+                                        - path
+                                        type: object
+                                      type: array
+                                  type: object
                                 secret:
                                   description: information about the secret data to
                                     project
-                                  type: object
                                   properties:
                                     items:
                                       description: If unspecified, each key-value
@@ -7985,14 +7991,9 @@ spec:
                                         setup will error unless it is marked optional.
                                         Paths must be relative and may not contain
                                         the '..' path or start with '..'.
-                                      type: array
                                       items:
                                         description: Maps a string key to a path within
                                           a volume.
-                                        type: object
-                                        required:
-                                        - key
-                                        - path
                                         properties:
                                           key:
                                             description: The key to project.
@@ -8006,8 +8007,8 @@ spec:
                                               affect the file mode, like fsGroup,
                                               and the result can be other mode bits
                                               set.'
-                                            type: integer
                                             format: int32
+                                            type: integer
                                           path:
                                             description: The relative path of the
                                               file to map the key to. May not be an
@@ -8015,6 +8016,11 @@ spec:
                                               element '..'. May not start with the
                                               string '..'.
                                             type: string
+                                        required:
+                                        - key
+                                        - path
+                                        type: object
+                                      type: array
                                     name:
                                       description: 'Name of the referent. More info:
                                         https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -8025,12 +8031,10 @@ spec:
                                       description: Specify whether the Secret or its
                                         key must be defined
                                       type: boolean
+                                  type: object
                                 serviceAccountToken:
                                   description: information about the serviceAccountToken
                                     data to project
-                                  type: object
-                                  required:
-                                  - path
                                   properties:
                                     audience:
                                       description: Audience is the intended audience
@@ -8050,20 +8054,24 @@ spec:
                                         token is older than 80 percent of its time
                                         to live or if the token is older than 24 hours.Defaults
                                         to 1 hour and must be at least 10 minutes.
-                                      type: integer
                                       format: int64
+                                      type: integer
                                     path:
                                       description: Path is the path relative to the
                                         mount point of the file to project the token
                                         into.
                                       type: string
+                                  required:
+                                  - path
+                                  type: object
+                              type: object
+                            type: array
+                        required:
+                        - sources
+                        type: object
                       quobyte:
                         description: Quobyte represents a Quobyte mount on the host
                           that shares a pod's lifetime
-                        type: object
-                        required:
-                        - registry
-                        - volume
                         properties:
                           group:
                             description: Group to map volume access to Default is
@@ -8093,13 +8101,13 @@ spec:
                             description: Volume is a string that references an already
                               created Quobyte volume by name.
                             type: string
+                        required:
+                        - registry
+                        - volume
+                        type: object
                       rbd:
                         description: 'RBD represents a Rados Block Device mount on
                           the host that shares a pod''s lifetime. More info: https://examples.k8s.io/volumes/rbd/README.md'
-                        type: object
-                        required:
-                        - image
-                        - monitors
                         properties:
                           fsType:
                             description: 'Filesystem type of the volume that you want
@@ -8120,9 +8128,9 @@ spec:
                           monitors:
                             description: 'A collection of Ceph monitors. More info:
                               https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
-                            type: array
                             items:
                               type: string
+                            type: array
                           pool:
                             description: 'The rados pool name. Default is rbd. More
                               info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
@@ -8135,25 +8143,24 @@ spec:
                             description: 'SecretRef is name of the authentication
                               secret for RBDUser. If provided overrides keyring. Default
                               is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           user:
                             description: 'The rados user name. Default is admin. More
                               info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
                             type: string
+                        required:
+                        - image
+                        - monitors
+                        type: object
                       scaleIO:
                         description: ScaleIO represents a ScaleIO persistent volume
                           attached and mounted on Kubernetes nodes.
-                        type: object
-                        required:
-                        - gateway
-                        - secretRef
-                        - system
                         properties:
                           fsType:
                             description: Filesystem type to mount. Must be a filesystem
@@ -8175,13 +8182,13 @@ spec:
                             description: SecretRef references to the secret for ScaleIO
                               user and other sensitive information. If this is not
                               provided, Login operation will fail.
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           sslEnabled:
                             description: Flag to enable/disable SSL communication
                               with Gateway, default false
@@ -8203,10 +8210,14 @@ spec:
                             description: The name of a volume already created in the
                               ScaleIO system that is associated with this volume source.
                             type: string
+                        required:
+                        - gateway
+                        - secretRef
+                        - system
+                        type: object
                       secret:
                         description: 'Secret represents a secret that should populate
                           this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret'
-                        type: object
                         properties:
                           defaultMode:
                             description: 'Optional: mode bits to use on created files
@@ -8215,8 +8226,8 @@ spec:
                               by this setting. This might be in conflict with other
                               options that affect the file mode, like fsGroup, and
                               the result can be other mode bits set.'
-                            type: integer
                             format: int32
+                            type: integer
                           items:
                             description: If unspecified, each key-value pair in the
                               Data field of the referenced Secret will be projected
@@ -8227,13 +8238,8 @@ spec:
                               is not present in the Secret, the volume setup will
                               error unless it is marked optional. Paths must be relative
                               and may not contain the '..' path or start with '..'.
-                            type: array
                             items:
                               description: Maps a string key to a path within a volume.
-                              type: object
-                              required:
-                              - key
-                              - path
                               properties:
                                 key:
                                   description: The key to project.
@@ -8245,14 +8251,19 @@ spec:
                                     This might be in conflict with other options that
                                     affect the file mode, like fsGroup, and the result
                                     can be other mode bits set.'
-                                  type: integer
                                   format: int32
+                                  type: integer
                                 path:
                                   description: The relative path of the file to map
                                     the key to. May not be an absolute path. May not
                                     contain the path element '..'. May not start with
                                     the string '..'.
                                   type: string
+                              required:
+                              - key
+                              - path
+                              type: object
+                            type: array
                           optional:
                             description: Specify whether the Secret or its keys must
                               be defined
@@ -8261,10 +8272,10 @@ spec:
                             description: 'Name of the secret in the pod''s namespace
                               to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret'
                             type: string
+                        type: object
                       storageos:
                         description: StorageOS represents a StorageOS volume attached
                           and mounted on Kubernetes nodes.
-                        type: object
                         properties:
                           fsType:
                             description: Filesystem type to mount. Must be a filesystem
@@ -8279,13 +8290,13 @@ spec:
                             description: SecretRef specifies the secret to use for
                               obtaining the StorageOS API credentials.  If not specified,
                               default values will be attempted.
-                            type: object
                             properties:
                               name:
                                 description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
                                   uid?'
                                 type: string
+                            type: object
                           volumeName:
                             description: VolumeName is the human-readable name of
                               the StorageOS volume.  Volume names are only unique
@@ -8301,12 +8312,10 @@ spec:
                               if you are not using namespaces within StorageOS. Namespaces
                               that do not pre-exist within StorageOS will be created.
                             type: string
+                        type: object
                       vsphereVolume:
                         description: VsphereVolume represents a vSphere volume attached
                           and mounted on kubelets host machine
-                        type: object
-                        required:
-                        - volumePath
                         properties:
                           fsType:
                             description: Filesystem type to mount. Must be a filesystem
@@ -8324,6 +8333,16 @@ spec:
                           volumePath:
                             description: Path that identifies vSphere volume vmdk
                             type: string
+                        required:
+                        - volumePath
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  type: array
+              required:
+              - containers
+              type: object
             prevClusterID:
               description: PrevClusterID is the cluster ID of the previous failed
                 provision attempt.
@@ -8336,31 +8355,31 @@ spec:
               description: Stage is the stage of provisioning that the cluster deployment
                 has reached.
               type: string
+          required:
+          - attempt
+          - clusterDeploymentRef
+          - podSpec
+          - stage
+          type: object
         status:
           description: ClusterProvisionStatus defines the observed state of ClusterProvision.
-          type: object
           properties:
             conditions:
               description: Conditions includes more detailed status for the cluster
                 provision
-              type: array
               items:
                 description: ClusterProvisionCondition contains details for the current
                   condition of a cluster provision
-                type: object
-                required:
-                - status
-                - type
                 properties:
                   lastProbeTime:
                     description: LastProbeTime is the last time we probed the condition.
-                    type: string
                     format: date-time
+                    type: string
                   lastTransitionTime:
                     description: LastTransitionTime is the last time the condition
                       transitioned from one status to another.
-                    type: string
                     format: date-time
+                    type: string
                   message:
                     description: Message is a human-readable message indicating details
                       about last transition.
@@ -8375,15 +8394,26 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
             jobRef:
               description: JobRef is the reference to the job performing the provision.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8392,40 +8422,41 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterprovisionYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterprovisionYaml, nil
+func configCrdsHiveOpenshiftIo_clusterprovisionsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterprovisionsYaml, nil
 }
 
-func configCrdsHive_v1_clusterprovisionYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterprovisionYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterprovisionsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterprovisionsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterprovision.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterprovisions.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_clusterstateYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterstatesYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterstates.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: ClusterState
+    listKind: ClusterStateList
     plural: clusterstates
+    singular: clusterstate
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterState is the Schema for the clusterstates API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8444,37 +8475,26 @@ spec:
           type: object
         status:
           description: ClusterStateStatus defines the observed state of ClusterState
-          type: object
           properties:
             clusterOperators:
               description: ClusterOperators contains the state for every cluster operator
                 in the target cluster
-              type: array
               items:
                 description: ClusterOperatorState summarizes the status of a single
                   cluster operator
-                type: object
-                required:
-                - name
                 properties:
                   conditions:
                     description: Conditions is the set of conditions in the status
                       of the cluster operator on the target cluster
-                    type: array
                     items:
                       description: ClusterOperatorStatusCondition represents the state
                         of the operator's managed and monitored components.
-                      type: object
-                      required:
-                      - lastTransitionTime
-                      - status
-                      - type
                       properties:
                         lastTransitionTime:
                           description: lastTransitionTime is the time of the last
                             update to the current status property.
-                          type: string
                           format: date-time
+                          type: string
                         message:
                           description: message provides additional information about
                             the current condition. This is only to be consumed by
@@ -8492,14 +8512,30 @@ spec:
                           description: type specifies the aspect reported by this
                             condition.
                           type: string
+                      required:
+                      - lastTransitionTime
+                      - status
+                      - type
+                      type: object
+                    type: array
                   name:
                     description: Name is the name of the cluster operator
                     type: string
+                required:
+                - name
+                type: object
+              type: array
             lastUpdated:
               description: LastUpdated is the last time that operator state was updated
-              type: string
               format: date-time
+              type: string
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8508,40 +8544,41 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_clusterstateYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_clusterstateYaml, nil
+func configCrdsHiveOpenshiftIo_clusterstatesYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterstatesYaml, nil
 }
 
-func configCrdsHive_v1_clusterstateYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_clusterstateYamlBytes()
+func configCrdsHiveOpenshiftIo_clusterstatesYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterstatesYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_clusterstate.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterstates.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_dnszoneYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_dnszonesYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: dnszones.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: DNSZone
+    listKind: DNSZoneList
     plural: dnszones
+    singular: dnszone
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: DNSZone is the Schema for the dnszones API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8557,29 +8594,18 @@ spec:
           type: object
         spec:
           description: DNSZoneSpec defines the desired state of DNSZone
-          type: object
-          required:
-          - zone
           properties:
             aws:
               description: AWS specifies AWS-specific cloud configuration
-              type: object
-              required:
-              - credentialsSecretRef
               properties:
                 additionalTags:
                   description: AdditionalTags is a set of additional tags to set on
                     the DNS hosted zone. In addition to these tags,the DNS Zone controller
                     will set a hive.openhsift.io/hostedzone tag identifying the HostedZone
                     record that it belongs to.
-                  type: array
                   items:
                     description: AWSResourceTag represents a tag that is applied to
                       an AWS cloud resource
-                    type: object
-                    required:
-                    - key
-                    - value
                     properties:
                       key:
                         description: Key is the key for the tag
@@ -8587,24 +8613,29 @@ spec:
                       value:
                         description: Value is the value for the tag
                         type: string
+                    required:
+                    - key
+                    - value
+                    type: object
+                  type: array
                 credentialsSecretRef:
                   description: CredentialsSecretRef contains a reference to a secret
                     that contains AWS credentials for CRUD operations
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 region:
                   description: Region is the AWS region to use for route53 operations.
                     This defaults to us-east-1. For AWS China, use cn-northwest-1.
                   type: string
-            gcp:
-              description: GCP specifies GCP-specific cloud configuration
-              type: object
               required:
               - credentialsSecretRef
+              type: object
+            gcp:
+              description: GCP specifies GCP-specific cloud configuration
               properties:
                 credentialsSecretRef:
                   description: CredentialsSecretRef references a secret that will
@@ -8612,12 +8643,15 @@ spec:
                     to create and manage CloudDNS Hosted Zones. Secret should have
                     a key named 'osServiceAccount.json'. The credentials must specify
                     the project to use.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
+              required:
+              - credentialsSecretRef
+              type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
                 be automatically created to link this DNSZone with a parent domain.
@@ -8625,38 +8659,35 @@ spec:
             zone:
               description: Zone is the DNS zone to host
               type: string
+          required:
+          - zone
+          type: object
         status:
           description: DNSZoneStatus defines the observed state of DNSZone
-          type: object
           properties:
             aws:
               description: AWSDNSZoneStatus contains status information specific to
                 AWS
-              type: object
               properties:
                 zoneID:
                   description: ZoneID is the ID of the zone in AWS
                   type: string
+              type: object
             conditions:
               description: Conditions includes more detailed status for the DNSZone
-              type: array
               items:
                 description: DNSZoneCondition contains details for the current condition
                   of a DNSZone
-                type: object
-                required:
-                - status
-                - type
                 properties:
                   lastProbeTime:
                     description: LastProbeTime is the last time we probed the condition.
-                    type: string
                     format: date-time
+                    type: string
                   lastTransitionTime:
                     description: LastTransitionTime is the last time the condition
                       transitioned from one status to another.
-                    type: string
                     format: date-time
+                    type: string
                   message:
                     description: Message is a human-readable message indicating details
                       about last transition.
@@ -8671,30 +8702,41 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
             gcp:
               description: GCPDNSZoneStatus contains status information specific to
                 GCP
-              type: object
               properties:
                 zoneName:
                   description: ZoneName is the name of the zone in GCP Cloud DNS
                   type: string
+              type: object
             lastSyncGeneration:
               description: LastSyncGeneration is the generation of the zone resource
                 that was last sync'd. This is used to know if the Object has changed
                 and we should sync immediately.
-              type: integer
               format: int64
+              type: integer
             lastSyncTimestamp:
               description: LastSyncTimestamp is the time that the zone was last sync'd.
-              type: string
               format: date-time
+              type: string
             nameServers:
               description: NameServers is a list of nameservers for this DNS zone
-              type: array
               items:
                 type: string
+              type: array
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -8703,40 +8745,41 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_dnszoneYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_dnszoneYaml, nil
+func configCrdsHiveOpenshiftIo_dnszonesYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_dnszonesYaml, nil
 }
 
-func configCrdsHive_v1_dnszoneYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_dnszoneYamlBytes()
+func configCrdsHiveOpenshiftIo_dnszonesYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_dnszonesYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_dnszone.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_dnszones.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_hiveconfigYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_hiveconfigsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: hiveconfigs.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: HiveConfig
+    listKind: HiveConfigList
     plural: hiveconfigs
+    singular: hiveconfig
   scope: Cluster
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: HiveConfig is the Schema for the hives API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -8752,7 +8795,6 @@ spec:
           type: object
         spec:
           description: HiveConfigSpec defines the desired state of Hive
-          type: object
           properties:
             additionalCertificateAuthoritiesSecretRef:
               description: AdditionalCertificateAuthoritiesSecretRef is a list of
@@ -8760,20 +8802,19 @@ spec:
                 Certificate Authority to use when communicating with target clusters.
                 These certificate authorities will be used in addition to any self-signed
                 CA generated by each cluster on installation.
-              type: array
               items:
                 description: LocalObjectReference contains enough information to let
                   you locate the referenced object inside the same namespace.
-                type: object
                 properties:
                   name:
                     description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
+                type: object
+              type: array
             backup:
               description: Backup specifies configuration for backup integration.
                 If absent, backup integration will be disabled.
-              type: object
               properties:
                 minBackupPeriodSeconds:
                   description: MinBackupPeriodSeconds specifies that a minimum of
@@ -8786,12 +8827,13 @@ spec:
                 velero:
                   description: Velero specifies configuration for the Velero backup
                     integration.
-                  type: object
                   properties:
                     enabled:
                       description: Enabled dictates if Velero backup integration is
                         enabled. If not specified, the default is disabled.
                       type: boolean
+                  type: object
+              type: object
             deprovisionsDisabled:
               description: DeprovisionsDisabled can be set to true to block deprovision
                 jobs from running.
@@ -8799,7 +8841,6 @@ spec:
             failedProvisionConfig:
               description: FailedProvisionConfig is used to configure settings related
                 to handling provision failures.
-              type: object
               properties:
                 skipGatherLogs:
                   description: SkipGatherLogs disables functionality that attempts
@@ -8807,6 +8848,7 @@ spec:
                     for any reason. The logs will be stored in a persistent volume
                     for up to 7 days.
                   type: boolean
+              type: object
             globalPullSecretRef:
               description: GlobalPullSecretRef is used to specify a pull secret that
                 will be used globally by all of the cluster deployments. For each
@@ -8814,12 +8856,12 @@ spec:
                 with the specific pull secret for a cluster deployment(if specified),
                 with precedence given to the contents of the pull secret for the cluster
                 deployment. The global pull secret is assumed to be in the TargetNamespace.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
             hiveAPIEnabled:
               description: HiveAPIEnabled is a boolean controlling whether or not
                 the Hive operator will start up the v1alpha1 aggregated API server.
@@ -8842,17 +8884,12 @@ spec:
                 the ClusterDeployment''s baseDomain should be a direct child of one
                 of these domains, otherwise the ClusterDeployment creation will result
                 in a validation error.'
-              type: array
               items:
                 description: ManageDNSConfig contains the domain being managed, and
                   the cloud-specific details for accessing/managing the domain.
-                type: object
-                required:
-                - domains
                 properties:
                   aws:
                     description: AWS contains AWS-specific settings for external DNS
-                    type: object
                     properties:
                       credentialsSecretRef:
                         description: CredentialsSecretRef references a secret in the
@@ -8860,25 +8897,25 @@ spec:
                           Route53. It will need permission to manage entries for the
                           domain listed in the parent ManageDNSConfig object. Secret
                           should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
-                        type: object
                         properties:
                           name:
                             description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
+                        type: object
                       region:
                         description: Region is the AWS region to use for route53 operations.
                           This defaults to us-east-1. For AWS China, use cn-northwest-1.
                         type: string
+                    type: object
                   domains:
                     description: Domains is the list of domains that hive will be
                       managing entries for with the provided credentials.
-                    type: array
                     items:
                       type: string
+                    type: array
                   gcp:
                     description: GCP contains GCP-specific settings for external DNS
-                    type: object
                     properties:
                       credentialsSecretRef:
                         description: CredentialsSecretRef references a secret in the
@@ -8887,12 +8924,17 @@ spec:
                           the managed domains for this cluster. listed in the parent
                           ManageDNSConfig object. Secret should have a key named 'osServiceAccount.json'.
                           The credentials must specify the project to use.
-                        type: object
                         properties:
                           name:
                             description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
+                        type: object
+                    type: object
+                required:
+                - domains
+                type: object
+              type: array
             syncSetReapplyInterval:
               description: SyncSetReapplyInterval is a string duration indicating
                 how much time must pass before SyncSet resources will be reapplied.
@@ -8904,9 +8946,9 @@ spec:
                 already exist. All resource references in HiveConfig can be assumed
                 to be in the TargetNamespace.
               type: string
+          type: object
         status:
           description: HiveConfigStatus defines the observed state of Hive
-          type: object
           properties:
             aggregatorClientCAHash:
               description: AggregatorClientCAHash keeps an md5 hash of the aggregator
@@ -8920,347 +8962,15 @@ spec:
             observedGeneration:
               description: ObservedGeneration will record the most recently processed
                 HiveConfig object's generation.
-              type: integer
               format: int64
-  version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-`)
-
-func configCrdsHive_v1_hiveconfigYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_hiveconfigYaml, nil
-}
-
-func configCrdsHive_v1_hiveconfigYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_hiveconfigYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/crds/hive_v1_hiveconfig.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configCrdsHive_v1_machinepoolYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: machinepools.hive.openshift.io
-spec:
-  additionalPrinterColumns:
-  - JSONPath: .spec.name
-    name: PoolName
-    type: string
-  - JSONPath: .spec.clusterDeploymentRef.name
-    name: ClusterDeployment
-    type: string
-  - JSONPath: .spec.replicas
-    name: Replicas
-    type: integer
-  group: hive.openshift.io
-  names:
-    kind: MachinePool
-    plural: machinepools
-  scope: Namespaced
-  subresources:
-    scale:
-      specReplicasPath: .spec.replicas
-      statusReplicasPath: .status.replicas
-    status: {}
-  validation:
-    openAPIV3Schema:
-      description: MachinePool is the Schema for the machinepools API
+              type: integer
+          type: object
       type: object
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: MachinePoolSpec defines the desired state of MachinePool
-          type: object
-          required:
-          - clusterDeploymentRef
-          - name
-          - platform
-          properties:
-            autoscaling:
-              description: Autoscaling is the details for auto-scaling the machine
-                pool. Replicas and autoscaling cannot be used together.
-              type: object
-              required:
-              - maxReplicas
-              - minReplicas
-              properties:
-                maxReplicas:
-                  description: MaxReplicas is the maximum number of replicas for the
-                    machine pool.
-                  type: integer
-                  format: int32
-                minReplicas:
-                  description: MinReplicas is the minimum number of replicas for the
-                    machine pool.
-                  type: integer
-                  format: int32
-            clusterDeploymentRef:
-              description: ClusterDeploymentRef references the cluster deployment
-                to which this machine pool belongs.
-              type: object
-              properties:
-                name:
-                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    TODO: Add other useful fields. apiVersion, kind, uid?'
-                  type: string
-            labels:
-              description: Map of label string keys and values that will be applied
-                to the created MachineSet's MachineSpec. This list will overwrite
-                any modifications made to Node labels on an ongoing basis.
-              type: object
-              additionalProperties:
-                type: string
-            name:
-              description: Name is the name of the machine pool.
-              type: string
-            platform:
-              description: Platform is configuration for machine pool specific to
-                the platform.
-              type: object
-              properties:
-                aws:
-                  description: AWS is the configuration used when installing on AWS.
-                  type: object
-                  required:
-                  - rootVolume
-                  - type
-                  properties:
-                    rootVolume:
-                      description: EC2RootVolume defines the storage for ec2 instance.
-                      type: object
-                      required:
-                      - iops
-                      - size
-                      - type
-                      properties:
-                        iops:
-                          description: IOPS defines the iops for the storage.
-                          type: integer
-                        size:
-                          description: Size defines the size of the storage.
-                          type: integer
-                        type:
-                          description: Type defines the type of the storage.
-                          type: string
-                    type:
-                      description: InstanceType defines the ec2 instance type. eg.
-                        m4-large
-                      type: string
-                    zones:
-                      description: Zones is list of availability zones that can be
-                        used.
-                      type: array
-                      items:
-                        type: string
-                azure:
-                  description: Azure is the configuration used when installing on
-                    Azure.
-                  type: object
-                  required:
-                  - osDisk
-                  - type
-                  properties:
-                    osDisk:
-                      description: OSDisk defines the storage for instance.
-                      type: object
-                      required:
-                      - diskSizeGB
-                      properties:
-                        diskSizeGB:
-                          description: DiskSizeGB defines the size of disk in GB.
-                          type: integer
-                          format: int32
-                    type:
-                      description: InstanceType defines the azure instance type. eg.
-                        Standard_DS_V2
-                      type: string
-                    zones:
-                      description: Zones is list of availability zones that can be
-                        used. eg. ["1", "2", "3"]
-                      type: array
-                      items:
-                        type: string
-                gcp:
-                  description: GCP is the configuration used when installing on GCP.
-                  type: object
-                  required:
-                  - type
-                  properties:
-                    type:
-                      description: InstanceType defines the GCP instance type. eg.
-                        n1-standard-4
-                      type: string
-                    zones:
-                      description: Zones is list of availability zones that can be
-                        used.
-                      type: array
-                      items:
-                        type: string
-                openstack:
-                  description: OpenStack is the configuration used when installing
-                    on OpenStack.
-                  type: object
-                  required:
-                  - flavor
-                  properties:
-                    flavor:
-                      description: Flavor defines the OpenStack Nova flavor. eg. m1.large
-                        The json key here differs from the installer which uses both
-                        "computeFlavor" and type "type" depending on which type you're
-                        looking at, and the resulting field on the MachineSet is "flavor".
-                        We are opting to stay consistent with the end result.
-                      type: string
-                    rootVolume:
-                      description: RootVolume defines the root volume for instances
-                        in the machine pool. The instances use ephemeral disks if
-                        not set.
-                      type: object
-                      required:
-                      - size
-                      - type
-                      properties:
-                        size:
-                          description: Size defines the size of the volume in gibibytes
-                            (GiB). Required
-                          type: integer
-                        type:
-                          description: Type defines the type of the volume. Required
-                          type: string
-            replicas:
-              description: Replicas is the count of machines for this machine pool.
-                Replicas and autoscaling cannot be used together. Default is 1, if
-                autoscaling is not used.
-              type: integer
-              format: int64
-            taints:
-              description: List of taints that will be applied to the created MachineSet's
-                MachineSpec. This list will overwrite any modifications made to Node
-                taints on an ongoing basis.
-              type: array
-              items:
-                description: The node this Taint is attached to has the "effect" on
-                  any pod that does not tolerate the Taint.
-                type: object
-                required:
-                - effect
-                - key
-                properties:
-                  effect:
-                    description: Required. The effect of the taint on pods that do
-                      not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule
-                      and NoExecute.
-                    type: string
-                  key:
-                    description: Required. The taint key to be applied to a node.
-                    type: string
-                  timeAdded:
-                    description: TimeAdded represents the time at which the taint
-                      was added. It is only written for NoExecute taints.
-                    type: string
-                    format: date-time
-                  value:
-                    description: The taint value corresponding to the taint key.
-                    type: string
-        status:
-          description: MachinePoolStatus defines the observed state of MachinePool
-          type: object
-          properties:
-            conditions:
-              description: Conditions includes more detailed status for the cluster
-                deployment
-              type: array
-              items:
-                description: MachinePoolCondition contains details for the current
-                  condition of a machine pool
-                type: object
-                required:
-                - status
-                - type
-                properties:
-                  lastProbeTime:
-                    description: LastProbeTime is the last time we probed the condition.
-                    type: string
-                    format: date-time
-                  lastTransitionTime:
-                    description: LastTransitionTime is the last time the condition
-                      transitioned from one status to another.
-                    type: string
-                    format: date-time
-                  message:
-                    description: Message is a human-readable message indicating details
-                      about last transition.
-                    type: string
-                  reason:
-                    description: Reason is a unique, one-word, CamelCase reason for
-                      the condition's last transition.
-                    type: string
-                  status:
-                    description: Status is the status of the condition.
-                    type: string
-                  type:
-                    description: Type is the type of the condition.
-                    type: string
-            machineSets:
-              description: MachineSets is the status of the machine sets for the machine
-                pool on the remote cluster.
-              type: array
-              items:
-                description: MachineSetStatus is the status of a machineset in the
-                  remote cluster.
-                type: object
-                required:
-                - maxReplicas
-                - minReplicas
-                - name
-                - replicas
-                properties:
-                  maxReplicas:
-                    description: MaxReplicas is the maximum number of replicas for
-                      the machine set.
-                    type: integer
-                    format: int32
-                  minReplicas:
-                    description: MinReplicas is the minimum number of replicas for
-                      the machine set.
-                    type: integer
-                    format: int32
-                  name:
-                    description: Name is the name of the machine set.
-                    type: string
-                  replicas:
-                    description: Replicas is the current number of replicas for the
-                      machine set.
-                    type: integer
-                    format: int32
-            replicas:
-              description: Replicas is the current number of replicas for the machine
-                pool.
-              type: integer
-              format: int32
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -9269,27 +8979,27 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_machinepoolYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_machinepoolYaml, nil
+func configCrdsHiveOpenshiftIo_hiveconfigsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_hiveconfigsYaml, nil
 }
 
-func configCrdsHive_v1_machinepoolYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_machinepoolYamlBytes()
+func configCrdsHiveOpenshiftIo_hiveconfigsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_hiveconfigsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_machinepool.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_hiveconfigs.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_machinepoolnameleaseYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -9305,8 +9015,11 @@ spec:
   group: hive.openshift.io
   names:
     kind: MachinePoolNameLease
+    listKind: MachinePoolNameLeaseList
     plural: machinepoolnameleases
+    singular: machinepoolnamelease
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: MachinePoolNameLease is the Schema for the MachinePoolNameLeases
@@ -9314,7 +9027,6 @@ spec:
         to determine if a lease is available. Note that not all cloud providers require
         the use of a lease for naming, at present this is only required for GCP where
         we're extremely restricted on name lengths.
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -9335,7 +9047,12 @@ spec:
         status:
           description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -9344,39 +9061,384 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_machinepoolnameleaseYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_machinepoolnameleaseYaml, nil
+func configCrdsHiveOpenshiftIo_machinepoolnameleasesYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml, nil
 }
 
-func configCrdsHive_v1_machinepoolnameleaseYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_machinepoolnameleaseYamlBytes()
+func configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_machinepoolnameleasesYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_machinepoolnamelease.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_machinepoolnameleases.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_selectorsyncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
+  name: machinepools.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.name
+    name: PoolName
+    type: string
+  - JSONPath: .spec.clusterDeploymentRef.name
+    name: ClusterDeployment
+    type: string
+  - JSONPath: .spec.replicas
+    name: Replicas
+    type: integer
+  group: hive.openshift.io
+  names:
+    kind: MachinePool
+    listKind: MachinePoolList
+    plural: machinepools
+    singular: machinepool
+  scope: Namespaced
+  subresources:
+    scale:
+      specReplicasPath: .spec.replicas
+      statusReplicasPath: .status.replicas
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: MachinePool is the Schema for the machinepools API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: MachinePoolSpec defines the desired state of MachinePool
+          properties:
+            autoscaling:
+              description: Autoscaling is the details for auto-scaling the machine
+                pool. Replicas and autoscaling cannot be used together.
+              properties:
+                maxReplicas:
+                  description: MaxReplicas is the maximum number of replicas for the
+                    machine pool.
+                  format: int32
+                  type: integer
+                minReplicas:
+                  description: MinReplicas is the minimum number of replicas for the
+                    machine pool.
+                  format: int32
+                  type: integer
+              required:
+              - maxReplicas
+              - minReplicas
+              type: object
+            clusterDeploymentRef:
+              description: ClusterDeploymentRef references the cluster deployment
+                to which this machine pool belongs.
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
+              type: object
+            labels:
+              additionalProperties:
+                type: string
+              description: Map of label string keys and values that will be applied
+                to the created MachineSet's MachineSpec. This list will overwrite
+                any modifications made to Node labels on an ongoing basis.
+              type: object
+            name:
+              description: Name is the name of the machine pool.
+              type: string
+            platform:
+              description: Platform is configuration for machine pool specific to
+                the platform.
+              properties:
+                aws:
+                  description: AWS is the configuration used when installing on AWS.
+                  properties:
+                    rootVolume:
+                      description: EC2RootVolume defines the storage for ec2 instance.
+                      properties:
+                        iops:
+                          description: IOPS defines the iops for the storage.
+                          type: integer
+                        size:
+                          description: Size defines the size of the storage.
+                          type: integer
+                        type:
+                          description: Type defines the type of the storage.
+                          type: string
+                      required:
+                      - iops
+                      - size
+                      - type
+                      type: object
+                    type:
+                      description: InstanceType defines the ec2 instance type. eg.
+                        m4-large
+                      type: string
+                    zones:
+                      description: Zones is list of availability zones that can be
+                        used.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - rootVolume
+                  - type
+                  type: object
+                azure:
+                  description: Azure is the configuration used when installing on
+                    Azure.
+                  properties:
+                    osDisk:
+                      description: OSDisk defines the storage for instance.
+                      properties:
+                        diskSizeGB:
+                          description: DiskSizeGB defines the size of disk in GB.
+                          format: int32
+                          type: integer
+                      required:
+                      - diskSizeGB
+                      type: object
+                    type:
+                      description: InstanceType defines the azure instance type. eg.
+                        Standard_DS_V2
+                      type: string
+                    zones:
+                      description: Zones is list of availability zones that can be
+                        used. eg. ["1", "2", "3"]
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - osDisk
+                  - type
+                  type: object
+                gcp:
+                  description: GCP is the configuration used when installing on GCP.
+                  properties:
+                    type:
+                      description: InstanceType defines the GCP instance type. eg.
+                        n1-standard-4
+                      type: string
+                    zones:
+                      description: Zones is list of availability zones that can be
+                        used.
+                      items:
+                        type: string
+                      type: array
+                  required:
+                  - type
+                  type: object
+                openstack:
+                  description: OpenStack is the configuration used when installing
+                    on OpenStack.
+                  properties:
+                    flavor:
+                      description: Flavor defines the OpenStack Nova flavor. eg. m1.large
+                        The json key here differs from the installer which uses both
+                        "computeFlavor" and type "type" depending on which type you're
+                        looking at, and the resulting field on the MachineSet is "flavor".
+                        We are opting to stay consistent with the end result.
+                      type: string
+                    rootVolume:
+                      description: RootVolume defines the root volume for instances
+                        in the machine pool. The instances use ephemeral disks if
+                        not set.
+                      properties:
+                        size:
+                          description: Size defines the size of the volume in gibibytes
+                            (GiB). Required
+                          type: integer
+                        type:
+                          description: Type defines the type of the volume. Required
+                          type: string
+                      required:
+                      - size
+                      - type
+                      type: object
+                  required:
+                  - flavor
+                  type: object
+              type: object
+            replicas:
+              description: Replicas is the count of machines for this machine pool.
+                Replicas and autoscaling cannot be used together. Default is 1, if
+                autoscaling is not used.
+              format: int64
+              type: integer
+            taints:
+              description: List of taints that will be applied to the created MachineSet's
+                MachineSpec. This list will overwrite any modifications made to Node
+                taints on an ongoing basis.
+              items:
+                description: The node this Taint is attached to has the "effect" on
+                  any pod that does not tolerate the Taint.
+                properties:
+                  effect:
+                    description: Required. The effect of the taint on pods that do
+                      not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule
+                      and NoExecute.
+                    type: string
+                  key:
+                    description: Required. The taint key to be applied to a node.
+                    type: string
+                  timeAdded:
+                    description: TimeAdded represents the time at which the taint
+                      was added. It is only written for NoExecute taints.
+                    format: date-time
+                    type: string
+                  value:
+                    description: The taint value corresponding to the taint key.
+                    type: string
+                required:
+                - effect
+                - key
+                type: object
+              type: array
+          required:
+          - clusterDeploymentRef
+          - name
+          - platform
+          type: object
+        status:
+          description: MachinePoolStatus defines the observed state of MachinePool
+          properties:
+            conditions:
+              description: Conditions includes more detailed status for the cluster
+                deployment
+              items:
+                description: MachinePoolCondition contains details for the current
+                  condition of a machine pool
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
+            machineSets:
+              description: MachineSets is the status of the machine sets for the machine
+                pool on the remote cluster.
+              items:
+                description: MachineSetStatus is the status of a machineset in the
+                  remote cluster.
+                properties:
+                  maxReplicas:
+                    description: MaxReplicas is the maximum number of replicas for
+                      the machine set.
+                    format: int32
+                    type: integer
+                  minReplicas:
+                    description: MinReplicas is the minimum number of replicas for
+                      the machine set.
+                    format: int32
+                    type: integer
+                  name:
+                    description: Name is the name of the machine set.
+                    type: string
+                  replicas:
+                    description: Replicas is the current number of replicas for the
+                      machine set.
+                    format: int32
+                    type: integer
+                required:
+                - maxReplicas
+                - minReplicas
+                - name
+                - replicas
+                type: object
+              type: array
+            replicas:
+              description: Replicas is the current number of replicas for the machine
+                pool.
+              format: int32
+              type: integer
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHiveOpenshiftIo_machinepoolsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_machinepoolsYaml, nil
+}
+
+func configCrdsHiveOpenshiftIo_machinepoolsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_machinepoolsYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_machinepools.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
   name: selectorsyncidentityproviders.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SelectorSyncIdentityProvider
+    listKind: SelectorSyncIdentityProviderList
     plural: selectorsyncidentityproviders
+    singular: selectorsyncidentityprovider
   scope: Cluster
   validation:
     openAPIV3Schema:
       description: SelectorSyncIdentityProvider is the Schema for the SelectorSyncSet
         API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -9394,26 +9456,17 @@ spec:
           description: SelectorSyncIdentityProviderSpec defines the SyncIdentityProviderCommonSpec
             to sync to ClusterDeploymentSelector indicating which clusters the SelectorSyncIdentityProvider
             applies to in any namespace.
-          type: object
-          required:
-          - identityProviders
           properties:
             clusterDeploymentSelector:
               description: ClusterDeploymentSelector is a LabelSelector indicating
                 which clusters the SelectorIdentityProvider applies to in any namespace.
-              type: object
               properties:
                 matchExpressions:
                   description: matchExpressions is a list of label selector requirements.
                     The requirements are ANDed.
-                  type: array
                   items:
                     description: A label selector requirement is a selector that contains
                       values, a key, and an operator that relates the key and values.
-                    type: object
-                    required:
-                    - key
-                    - operator
                     properties:
                       key:
                         description: key is the label key that the selector applies
@@ -9430,31 +9483,34 @@ spec:
                           operator is Exists or DoesNotExist, the values array must
                           be empty. This array is replaced during a strategic merge
                           patch.
-                        type: array
                         items:
                           type: string
+                        type: array
+                    required:
+                    - key
+                    - operator
+                    type: object
+                  type: array
                 matchLabels:
+                  additionalProperties:
+                    type: string
                   description: matchLabels is a map of {key,value} pairs. A single
                     {key,value} in the matchLabels map is equivalent to an element
                     of matchExpressions, whose key field is "key", the operator is
                     "In", and the values array contains only "value". The requirements
                     are ANDed.
                   type: object
-                  additionalProperties:
-                    type: string
+              type: object
             identityProviders:
               description: IdentityProviders is an ordered list of ways for a user
                 to identify themselves
-              type: array
               items:
                 description: IdentityProvider provides identities for users authenticating
                   using credentials
-                type: object
                 properties:
                   basicAuth:
                     description: basicAuth contains configuration options for the
                       BasicAuth IdP
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -9466,14 +9522,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
                           by name that contains the PEM-encoded TLS client certificate
@@ -9483,14 +9539,14 @@ spec:
                           honored. If the specified certificate data is not valid,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
                           by name that contains the PEM-encoded TLS private key for
@@ -9500,20 +9556,20 @@ spec:
                           is not honored. If the specified certificate data is not
                           valid, the identity provider is not honored. The namespace
                           for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
+                    type: object
                   github:
                     description: github enables user authentication using GitHub credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -9526,14 +9582,14 @@ spec:
                           not honored. If empty, the default system roots are used.
                           This can only be configured when hostname is set to a non-empty
                           value. The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -9543,14 +9599,14 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
                           for use with a hosted instance of GitHub Enterprise. It
@@ -9560,18 +9616,18 @@ spec:
                       organizations:
                         description: organizations optionally restricts which organizations
                           are allowed to log in
-                        type: array
                         items:
                           type: string
+                        type: array
                       teams:
                         description: teams optionally restricts which teams are allowed
                           to log in. Format is <org>/<team>.
-                        type: array
                         items:
                           type: string
+                        type: array
+                    type: object
                   gitlab:
                     description: gitlab enables user authentication using GitLab credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -9583,14 +9639,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -9600,20 +9656,20 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       url:
                         description: url is the oauth server base URL
                         type: string
+                    type: object
                   google:
                     description: google enables user authentication using Google credentials
-                    type: object
                     properties:
                       clientID:
                         description: clientID is the oauth client ID
@@ -9624,22 +9680,22 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
                           (e.g. "mycompany.com") to restrict logins to
                         type: string
+                    type: object
                   htpasswd:
                     description: htpasswd enables user authentication using an HTPasswd
                       file to validate credentials
-                    type: object
                     properties:
                       fileData:
                         description: fileData is a required reference to a secret
@@ -9649,18 +9705,18 @@ spec:
                           honored. If the specified htpasswd data is not valid, the
                           identity provider is not honored. The namespace for this
                           secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
+                    type: object
                   keystone:
                     description: keystone enables user authentication using keystone
                       password credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -9672,14 +9728,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       domainName:
                         description: domainName is required for keystone v3
                         type: string
@@ -9692,14 +9748,14 @@ spec:
                           honored. If the specified certificate data is not valid,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
                           by name that contains the PEM-encoded TLS private key for
@@ -9709,56 +9765,56 @@ spec:
                           is not honored. If the specified certificate data is not
                           valid, the identity provider is not honored. The namespace
                           for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
+                    type: object
                   ldap:
                     description: ldap enables user authentication using LDAP credentials
-                    type: object
                     properties:
                       attributes:
                         description: attributes maps LDAP attributes to identities
-                        type: object
                         properties:
                           email:
                             description: email is the list of attributes whose values
                               should be used as the email address. Optional. If unspecified,
                               no email is set for the identity
-                            type: array
                             items:
                               type: string
+                            type: array
                           id:
                             description: id is the list of attributes whose values
                               should be used as the user ID. Required. First non-empty
                               attribute is used. At least one attribute is required.
                               If none of the listed attribute have a value, authentication
                               fails. LDAP standard identity attribute is "dn"
-                            type: array
                             items:
                               type: string
+                            type: array
                           name:
                             description: name is the list of attributes whose values
                               should be used as the display name. Optional. If unspecified,
                               no display name is set for the identity LDAP standard
                               display name attribute is "cn"
-                            type: array
                             items:
                               type: string
+                            type: array
                           preferredUsername:
                             description: preferredUsername is the list of attributes
                               whose values should be used as the preferred username.
                               LDAP standard login attribute is "uid"
-                            type: array
                             items:
                               type: string
+                            type: array
+                        type: object
                       bindDN:
                         description: bindDN is an optional DN to bind with during
                           the search phase.
@@ -9770,14 +9826,14 @@ spec:
                           If specified and the secret or expected key is not found,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       ca:
                         description: ca is an optional reference to a config map by
                           name containing the PEM-encoded CA bundle. It is used as
@@ -9788,14 +9844,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
                           should not use TLS WARNING: Should not be set to ` + "`" + `true` + "`" + `
@@ -9809,6 +9865,7 @@ spec:
                         description: 'url is an RFC 2255 URL which specifies the LDAP
                           search parameters to use. The syntax of the URL is: ldap://host:port/basedn?attribute?scope?filter'
                         type: string
+                    type: object
                   mappingMethod:
                     description: mappingMethod determines how identities from this
                       provider are mapped to users Defaults to "claim"
@@ -9822,7 +9879,6 @@ spec:
                     type: string
                   openID:
                     description: openID enables user authentication using OpenID credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -9834,40 +9890,40 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       claims:
                         description: claims mappings
-                        type: object
                         properties:
                           email:
                             description: email is the list of claims whose values
                               should be used as the email address. Optional. If unspecified,
                               no email is set for the identity
-                            type: array
                             items:
                               type: string
+                            type: array
                           name:
                             description: name is the list of claims whose values should
                               be used as the display name. Optional. If unspecified,
                               no display name is set for the identity
-                            type: array
                             items:
                               type: string
+                            type: array
                           preferredUsername:
                             description: preferredUsername is the list of claims whose
                               values should be used as the preferred username. If
                               unspecified, the preferred username is determined from
                               the value of the sub claim
-                            type: array
                             items:
                               type: string
+                            type: array
+                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -9877,35 +9933,35 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       extraAuthorizeParameters:
+                        additionalProperties:
+                          type: string
                         description: extraAuthorizeParameters are any custom parameters
                           to add to the authorize request.
                         type: object
-                        additionalProperties:
-                          type: string
                       extraScopes:
                         description: extraScopes are any scopes to request in addition
                           to the standard "openid" scope.
-                        type: array
                         items:
                           type: string
+                        type: array
                       issuer:
                         description: issuer is the URL that the OpenID Provider asserts
                           as its Issuer Identifier. It must use the https scheme with
                           no query or fragment component.
                         type: string
+                    type: object
                   requestHeader:
                     description: requestHeader enables user authentication using request
                       header credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is a required reference to a config map by
@@ -9918,14 +9974,14 @@ spec:
                           honored. If the specified ca data is not valid, the identity
                           provider is not honored. The namespace for this config map
                           is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
                           /authorize requests to Unauthenticated requests from OAuth
@@ -9939,21 +9995,21 @@ spec:
                         description: clientCommonNames is an optional list of common
                           names to require a match from. If empty, any client certificate
                           validated against the clientCA bundle is considered authoritative.
-                        type: array
                         items:
                           type: string
+                        type: array
                       emailHeaders:
                         description: emailHeaders is the set of headers to check for
                           the email address
-                        type: array
                         items:
                           type: string
+                        type: array
                       headers:
                         description: headers is the set of headers to check for identity
                           information
-                        type: array
                         items:
                           type: string
+                        type: array
                       loginURL:
                         description: loginURL is a URL to redirect unauthenticated
                           /authorize requests to Unauthenticated requests from OAuth
@@ -9966,23 +10022,34 @@ spec:
                       nameHeaders:
                         description: nameHeaders is the set of headers to check for
                           the display name
-                        type: array
                         items:
                           type: string
+                        type: array
                       preferredUsernameHeaders:
                         description: preferredUsernameHeaders is the set of headers
                           to check for the preferred username
-                        type: array
                         items:
                           type: string
+                        type: array
+                    type: object
                   type:
                     description: type identifies the identity provider type for this
                       entry.
                     type: string
+                type: object
+              type: array
+          required:
+          - identityProviders
+          type: object
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -9991,40 +10058,41 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_selectorsyncidentityproviderYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_selectorsyncidentityproviderYaml, nil
+func configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml, nil
 }
 
-func configCrdsHive_v1_selectorsyncidentityproviderYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_selectorsyncidentityproviderYamlBytes()
+func configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_selectorsyncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_selectorsyncidentityproviders.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_selectorsyncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncsetsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: selectorsyncsets.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SelectorSyncSet
+    listKind: SelectorSyncSetList
     plural: selectorsyncsets
     shortNames:
     - sss
+    singular: selectorsyncset
   scope: Cluster
   validation:
     openAPIV3Schema:
       description: SelectorSyncSet is the Schema for the SelectorSyncSet API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -10042,24 +10110,17 @@ spec:
           description: SelectorSyncSetSpec defines the SyncSetCommonSpec resources
             and patches to sync along with a ClusterDeploymentSelector indicating
             which clusters the SelectorSyncSet applies to in any namespace.
-          type: object
           properties:
             clusterDeploymentSelector:
               description: ClusterDeploymentSelector is a LabelSelector indicating
                 which clusters the SelectorSyncSet applies to in any namespace.
-              type: object
               properties:
                 matchExpressions:
                   description: matchExpressions is a list of label selector requirements.
                     The requirements are ANDed.
-                  type: array
                   items:
                     description: A label selector requirement is a selector that contains
                       values, a key, and an operator that relates the key and values.
-                    type: object
-                    required:
-                    - key
-                    - operator
                     properties:
                       key:
                         description: key is the label key that the selector applies
@@ -10076,30 +10137,29 @@ spec:
                           operator is Exists or DoesNotExist, the values array must
                           be empty. This array is replaced during a strategic merge
                           patch.
-                        type: array
                         items:
                           type: string
+                        type: array
+                    required:
+                    - key
+                    - operator
+                    type: object
+                  type: array
                 matchLabels:
+                  additionalProperties:
+                    type: string
                   description: matchLabels is a map of {key,value} pairs. A single
                     {key,value} in the matchLabels map is equivalent to an element
                     of matchExpressions, whose key field is "key", the operator is
                     "In", and the values array contains only "value". The requirements
                     are ANDed.
                   type: object
-                  additionalProperties:
-                    type: string
+              type: object
             patches:
               description: Patches is the list of patches to apply.
-              type: array
               items:
                 description: SyncObjectPatch represents a patch to be applied to a
                   specific object
-                type: object
-                required:
-                - apiVersion
-                - kind
-                - name
-                - patch
                 properties:
                   apiVersion:
                     description: APIVersion is the Group and Version of the object
@@ -10122,6 +10182,13 @@ spec:
                     description: PatchType indicates the PatchType as "strategic"
                       (default), "json", or "merge".
                     type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - patch
+                type: object
+              type: array
             resourceApplyMode:
               description: ResourceApplyMode indicates if the Resource apply mode
                 is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
@@ -10130,27 +10197,19 @@ spec:
             resources:
               description: Resources is the list of objects to sync from RawExtension
                 definitions.
-              type: array
               items:
                 type: object
+              type: array
             secretMappings:
               description: Secrets is the list of secrets to sync along with their
                 respective destinations.
-              type: array
               items:
                 description: SecretMapping defines a source and destination for a
                   secret to be synced by a SyncSet
-                type: object
-                required:
-                - sourceRef
-                - targetRef
                 properties:
                   sourceRef:
                     description: SourceRef specifies the name and namespace of a secret
                       on the management cluster
-                    type: object
-                    required:
-                    - name
                     properties:
                       name:
                         description: Name is the name of the secret
@@ -10160,12 +10219,12 @@ spec:
                           If not present for the source secret reference, it is assumed
                           to be the same namespace as the syncset with the reference.
                         type: string
+                    required:
+                    - name
+                    type: object
                   targetRef:
                     description: TargetRef specifies the target name and namespace
                       of the secret on the target cluster
-                    type: object
-                    required:
-                    - name
                     properties:
                       name:
                         description: Name is the name of the secret
@@ -10175,10 +10234,24 @@ spec:
                           If not present for the source secret reference, it is assumed
                           to be the same namespace as the syncset with the reference.
                         type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - sourceRef
+                - targetRef
+                type: object
+              type: array
+          type: object
         status:
           description: SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -10187,39 +10260,40 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_selectorsyncsetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_selectorsyncsetYaml, nil
+func configCrdsHiveOpenshiftIo_selectorsyncsetsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_selectorsyncsetsYaml, nil
 }
 
-func configCrdsHive_v1_selectorsyncsetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_selectorsyncsetYamlBytes()
+func configCrdsHiveOpenshiftIo_selectorsyncsetsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_selectorsyncsetsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_selectorsyncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_selectorsyncsets.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_syncidentityproviderYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncidentityprovidersYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: syncidentityproviders.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SyncIdentityProvider
+    listKind: SyncIdentityProviderList
     plural: syncidentityproviders
+    singular: syncidentityprovider
   scope: Namespaced
   validation:
     openAPIV3Schema:
       description: SyncIdentityProvider is the Schema for the SyncIdentityProvider
         API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -10238,38 +10312,31 @@ spec:
             identity providers to sync along with ClusterDeploymentRefs indicating
             which clusters the SyncIdentityProvider applies to in the SyncIdentityProvider's
             namespace.
-          type: object
-          required:
-          - clusterDeploymentRefs
-          - identityProviders
           properties:
             clusterDeploymentRefs:
               description: ClusterDeploymentRefs is the list of LocalObjectReference
                 indicating which clusters the SyncSet applies to in the SyncSet's
                 namespace.
-              type: array
               items:
                 description: LocalObjectReference contains enough information to let
                   you locate the referenced object inside the same namespace.
-                type: object
                 properties:
                   name:
                     description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
+                type: object
+              type: array
             identityProviders:
               description: IdentityProviders is an ordered list of ways for a user
                 to identify themselves
-              type: array
               items:
                 description: IdentityProvider provides identities for users authenticating
                   using credentials
-                type: object
                 properties:
                   basicAuth:
                     description: basicAuth contains configuration options for the
                       BasicAuth IdP
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -10281,14 +10348,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
                           by name that contains the PEM-encoded TLS client certificate
@@ -10298,14 +10365,14 @@ spec:
                           honored. If the specified certificate data is not valid,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
                           by name that contains the PEM-encoded TLS private key for
@@ -10315,20 +10382,20 @@ spec:
                           is not honored. If the specified certificate data is not
                           valid, the identity provider is not honored. The namespace
                           for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
+                    type: object
                   github:
                     description: github enables user authentication using GitHub credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -10341,14 +10408,14 @@ spec:
                           not honored. If empty, the default system roots are used.
                           This can only be configured when hostname is set to a non-empty
                           value. The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -10358,14 +10425,14 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
                           for use with a hosted instance of GitHub Enterprise. It
@@ -10375,18 +10442,18 @@ spec:
                       organizations:
                         description: organizations optionally restricts which organizations
                           are allowed to log in
-                        type: array
                         items:
                           type: string
+                        type: array
                       teams:
                         description: teams optionally restricts which teams are allowed
                           to log in. Format is <org>/<team>.
-                        type: array
                         items:
                           type: string
+                        type: array
+                    type: object
                   gitlab:
                     description: gitlab enables user authentication using GitLab credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -10398,14 +10465,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -10415,20 +10482,20 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       url:
                         description: url is the oauth server base URL
                         type: string
+                    type: object
                   google:
                     description: google enables user authentication using Google credentials
-                    type: object
                     properties:
                       clientID:
                         description: clientID is the oauth client ID
@@ -10439,22 +10506,22 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
                           (e.g. "mycompany.com") to restrict logins to
                         type: string
+                    type: object
                   htpasswd:
                     description: htpasswd enables user authentication using an HTPasswd
                       file to validate credentials
-                    type: object
                     properties:
                       fileData:
                         description: fileData is a required reference to a secret
@@ -10464,18 +10531,18 @@ spec:
                           honored. If the specified htpasswd data is not valid, the
                           identity provider is not honored. The namespace for this
                           secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
+                    type: object
                   keystone:
                     description: keystone enables user authentication using keystone
                       password credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -10487,14 +10554,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       domainName:
                         description: domainName is required for keystone v3
                         type: string
@@ -10507,14 +10574,14 @@ spec:
                           honored. If the specified certificate data is not valid,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
                           by name that contains the PEM-encoded TLS private key for
@@ -10524,56 +10591,56 @@ spec:
                           is not honored. If the specified certificate data is not
                           valid, the identity provider is not honored. The namespace
                           for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       url:
                         description: url is the remote URL to connect to
                         type: string
+                    type: object
                   ldap:
                     description: ldap enables user authentication using LDAP credentials
-                    type: object
                     properties:
                       attributes:
                         description: attributes maps LDAP attributes to identities
-                        type: object
                         properties:
                           email:
                             description: email is the list of attributes whose values
                               should be used as the email address. Optional. If unspecified,
                               no email is set for the identity
-                            type: array
                             items:
                               type: string
+                            type: array
                           id:
                             description: id is the list of attributes whose values
                               should be used as the user ID. Required. First non-empty
                               attribute is used. At least one attribute is required.
                               If none of the listed attribute have a value, authentication
                               fails. LDAP standard identity attribute is "dn"
-                            type: array
                             items:
                               type: string
+                            type: array
                           name:
                             description: name is the list of attributes whose values
                               should be used as the display name. Optional. If unspecified,
                               no display name is set for the identity LDAP standard
                               display name attribute is "cn"
-                            type: array
                             items:
                               type: string
+                            type: array
                           preferredUsername:
                             description: preferredUsername is the list of attributes
                               whose values should be used as the preferred username.
                               LDAP standard login attribute is "uid"
-                            type: array
                             items:
                               type: string
+                            type: array
+                        type: object
                       bindDN:
                         description: bindDN is an optional DN to bind with during
                           the search phase.
@@ -10585,14 +10652,14 @@ spec:
                           If specified and the secret or expected key is not found,
                           the identity provider is not honored. The namespace for
                           this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       ca:
                         description: ca is an optional reference to a config map by
                           name containing the PEM-encoded CA bundle. It is used as
@@ -10603,14 +10670,14 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
                           should not use TLS WARNING: Should not be set to ` + "`" + `true` + "`" + `
@@ -10624,6 +10691,7 @@ spec:
                         description: 'url is an RFC 2255 URL which specifies the LDAP
                           search parameters to use. The syntax of the URL is: ldap://host:port/basedn?attribute?scope?filter'
                         type: string
+                    type: object
                   mappingMethod:
                     description: mappingMethod determines how identities from this
                       provider are mapped to users Defaults to "claim"
@@ -10637,7 +10705,6 @@ spec:
                     type: string
                   openID:
                     description: openID enables user authentication using OpenID credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is an optional reference to a config map by
@@ -10649,40 +10716,40 @@ spec:
                           specified ca data is not valid, the identity provider is
                           not honored. If empty, the default system roots are used.
                           The namespace for this config map is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       claims:
                         description: claims mappings
-                        type: object
                         properties:
                           email:
                             description: email is the list of claims whose values
                               should be used as the email address. Optional. If unspecified,
                               no email is set for the identity
-                            type: array
                             items:
                               type: string
+                            type: array
                           name:
                             description: name is the list of claims whose values should
                               be used as the display name. Optional. If unspecified,
                               no display name is set for the identity
-                            type: array
                             items:
                               type: string
+                            type: array
                           preferredUsername:
                             description: preferredUsername is the list of claims whose
                               values should be used as the preferred username. If
                               unspecified, the preferred username is determined from
                               the value of the sub claim
-                            type: array
                             items:
                               type: string
+                            type: array
+                        type: object
                       clientID:
                         description: clientID is the oauth client ID
                         type: string
@@ -10692,35 +10759,35 @@ spec:
                           is used to locate the data. If the secret or expected key
                           is not found, the identity provider is not honored. The
                           namespace for this secret is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               secret
                             type: string
+                        required:
+                        - name
+                        type: object
                       extraAuthorizeParameters:
+                        additionalProperties:
+                          type: string
                         description: extraAuthorizeParameters are any custom parameters
                           to add to the authorize request.
                         type: object
-                        additionalProperties:
-                          type: string
                       extraScopes:
                         description: extraScopes are any scopes to request in addition
                           to the standard "openid" scope.
-                        type: array
                         items:
                           type: string
+                        type: array
                       issuer:
                         description: issuer is the URL that the OpenID Provider asserts
                           as its Issuer Identifier. It must use the https scheme with
                           no query or fragment component.
                         type: string
+                    type: object
                   requestHeader:
                     description: requestHeader enables user authentication using request
                       header credentials
-                    type: object
                     properties:
                       ca:
                         description: ca is a required reference to a config map by
@@ -10733,14 +10800,14 @@ spec:
                           honored. If the specified ca data is not valid, the identity
                           provider is not honored. The namespace for this config map
                           is openshift-config.
-                        type: object
-                        required:
-                        - name
                         properties:
                           name:
                             description: name is the metadata.name of the referenced
                               config map
                             type: string
+                        required:
+                        - name
+                        type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
                           /authorize requests to Unauthenticated requests from OAuth
@@ -10754,21 +10821,21 @@ spec:
                         description: clientCommonNames is an optional list of common
                           names to require a match from. If empty, any client certificate
                           validated against the clientCA bundle is considered authoritative.
-                        type: array
                         items:
                           type: string
+                        type: array
                       emailHeaders:
                         description: emailHeaders is the set of headers to check for
                           the email address
-                        type: array
                         items:
                           type: string
+                        type: array
                       headers:
                         description: headers is the set of headers to check for identity
                           information
-                        type: array
                         items:
                           type: string
+                        type: array
                       loginURL:
                         description: loginURL is a URL to redirect unauthenticated
                           /authorize requests to Unauthenticated requests from OAuth
@@ -10781,23 +10848,35 @@ spec:
                       nameHeaders:
                         description: nameHeaders is the set of headers to check for
                           the display name
-                        type: array
                         items:
                           type: string
+                        type: array
                       preferredUsernameHeaders:
                         description: preferredUsernameHeaders is the set of headers
                           to check for the preferred username
-                        type: array
                         items:
                           type: string
+                        type: array
+                    type: object
                   type:
                     description: type identifies the identity provider type for this
                       entry.
                     type: string
+                type: object
+              type: array
+          required:
+          - clusterDeploymentRefs
+          - identityProviders
+          type: object
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -10806,40 +10885,423 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_syncidentityproviderYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_syncidentityproviderYaml, nil
+func configCrdsHiveOpenshiftIo_syncidentityprovidersYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_syncidentityprovidersYaml, nil
 }
 
-func configCrdsHive_v1_syncidentityproviderYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_syncidentityproviderYamlBytes()
+func configCrdsHiveOpenshiftIo_syncidentityprovidersYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_syncidentityprovidersYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_syncidentityprovider.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_syncidentityproviders.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configCrdsHive_v1_syncsetYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncsetinstancesYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
+  name: syncsetinstances.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.applied
+    name: Applied
+    type: boolean
+  group: hive.openshift.io
+  names:
+    kind: SyncSetInstance
+    listKind: SyncSetInstanceList
+    plural: syncsetinstances
+    shortNames:
+    - ssi
+    singular: syncsetinstance
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: SyncSetInstance is the Schema for the syncsetinstances API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: SyncSetInstanceSpec defines the desired state of SyncSetInstance
+          properties:
+            clusterDeploymentRef:
+              description: ClusterDeployment is a reference to to the clusterdeployment
+                for this syncsetinstance.
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
+              type: object
+            resourceApplyMode:
+              description: ResourceApplyMode indicates if the resource apply mode
+                is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
+                and update. ApplyMode "Sync" indicates create, update and delete.
+              type: string
+            selectorSyncSetRef:
+              description: SelectorSyncSetRef is a reference to the selectorsyncset
+                for this syncsetinstance.
+              properties:
+                name:
+                  description: Name is the name of the SelectorSyncSet
+                  type: string
+              required:
+              - name
+              type: object
+            syncSetHash:
+              description: SyncSetHash is a hash of the contents of the syncset or
+                selectorsyncset spec. Its purpose is to cause a syncset instance update
+                whenever there's a change in its source.
+              type: string
+            syncSetRef:
+              description: SyncSet is a reference to the syncset for this syncsetinstance.
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
+              type: object
+          required:
+          - clusterDeploymentRef
+          type: object
+        status:
+          description: SyncSetInstanceStatus defines the observed state of SyncSetInstance
+          properties:
+            applied:
+              description: Applied will be true if all resources, patches, or secrets
+                have successfully been applied on last attempt.
+              type: boolean
+            conditions:
+              description: Conditions is the list of SyncConditions used to indicate
+                UnknownObject when a resource type cannot be determined from a SyncSet
+                resource.
+              items:
+                description: SyncCondition is a condition in a SyncStatus
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
+            patches:
+              description: Patches is the list of SyncStatus for patches that have
+                been applied.
+              items:
+                description: SyncStatus describes objects that have been created or
+                  patches that have been applied using the unique md5 sum of the object
+                  or patch.
+                properties:
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the object
+                      that was synced or patched.
+                    type: string
+                  conditions:
+                    description: Conditions is the list of conditions indicating success
+                      or failure of object create, update and delete as well as patch
+                      application.
+                    items:
+                      description: SyncCondition is a condition in a SyncStatus
+                      properties:
+                        lastProbeTime:
+                          description: LastProbeTime is the last time we probed the
+                            condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: LastTransitionTime is the last time the condition
+                            transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is a human-readable message indicating
+                            details about last transition.
+                          type: string
+                        reason:
+                          description: Reason is a unique, one-word, CamelCase reason
+                            for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status is the status of the condition.
+                          type: string
+                        type:
+                          description: Type is the type of the condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
+                  hash:
+                    description: Hash is the unique md5 hash of the resource or patch.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the object that was synced or
+                      patched.
+                    type: string
+                  name:
+                    description: Name is the name of the object that was synced or
+                      patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace of the object that was
+                      synced or patched.
+                    type: string
+                  resource:
+                    description: Resource is the resource name for the object that
+                      was synced. This will be populated for resources, but not patches
+                    type: string
+                required:
+                - apiVersion
+                - conditions
+                - hash
+                - kind
+                - name
+                - namespace
+                type: object
+              type: array
+            resources:
+              description: Resources is the list of SyncStatus for objects that have
+                been synced.
+              items:
+                description: SyncStatus describes objects that have been created or
+                  patches that have been applied using the unique md5 sum of the object
+                  or patch.
+                properties:
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the object
+                      that was synced or patched.
+                    type: string
+                  conditions:
+                    description: Conditions is the list of conditions indicating success
+                      or failure of object create, update and delete as well as patch
+                      application.
+                    items:
+                      description: SyncCondition is a condition in a SyncStatus
+                      properties:
+                        lastProbeTime:
+                          description: LastProbeTime is the last time we probed the
+                            condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: LastTransitionTime is the last time the condition
+                            transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is a human-readable message indicating
+                            details about last transition.
+                          type: string
+                        reason:
+                          description: Reason is a unique, one-word, CamelCase reason
+                            for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status is the status of the condition.
+                          type: string
+                        type:
+                          description: Type is the type of the condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
+                  hash:
+                    description: Hash is the unique md5 hash of the resource or patch.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the object that was synced or
+                      patched.
+                    type: string
+                  name:
+                    description: Name is the name of the object that was synced or
+                      patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace of the object that was
+                      synced or patched.
+                    type: string
+                  resource:
+                    description: Resource is the resource name for the object that
+                      was synced. This will be populated for resources, but not patches
+                    type: string
+                required:
+                - apiVersion
+                - conditions
+                - hash
+                - kind
+                - name
+                - namespace
+                type: object
+              type: array
+            secretReferences:
+              description: Secrets is the list of SyncStatus for secrets that have
+                been synced.
+              items:
+                description: SyncStatus describes objects that have been created or
+                  patches that have been applied using the unique md5 sum of the object
+                  or patch.
+                properties:
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the object
+                      that was synced or patched.
+                    type: string
+                  conditions:
+                    description: Conditions is the list of conditions indicating success
+                      or failure of object create, update and delete as well as patch
+                      application.
+                    items:
+                      description: SyncCondition is a condition in a SyncStatus
+                      properties:
+                        lastProbeTime:
+                          description: LastProbeTime is the last time we probed the
+                            condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: LastTransitionTime is the last time the condition
+                            transitioned from one status to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Message is a human-readable message indicating
+                            details about last transition.
+                          type: string
+                        reason:
+                          description: Reason is a unique, one-word, CamelCase reason
+                            for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status is the status of the condition.
+                          type: string
+                        type:
+                          description: Type is the type of the condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
+                  hash:
+                    description: Hash is the unique md5 hash of the resource or patch.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the object that was synced or
+                      patched.
+                    type: string
+                  name:
+                    description: Name is the name of the object that was synced or
+                      patched.
+                    type: string
+                  namespace:
+                    description: Namespace is the Namespace of the object that was
+                      synced or patched.
+                    type: string
+                  resource:
+                    description: Resource is the resource name for the object that
+                      was synced. This will be populated for resources, but not patches
+                    type: string
+                required:
+                - apiVersion
+                - conditions
+                - hash
+                - kind
+                - name
+                - namespace
+                type: object
+              type: array
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHiveOpenshiftIo_syncsetinstancesYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_syncsetinstancesYaml, nil
+}
+
+func configCrdsHiveOpenshiftIo_syncsetinstancesYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_syncsetinstancesYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_syncsetinstances.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configCrdsHiveOpenshiftIo_syncsetsYaml = []byte(`
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
   name: syncsets.hive.openshift.io
 spec:
   group: hive.openshift.io
   names:
     kind: SyncSet
+    listKind: SyncSetList
     plural: syncsets
     shortNames:
     - ss
+    singular: syncset
   scope: Namespaced
   validation:
     openAPIV3Schema:
       description: SyncSet is the Schema for the SyncSet API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -10857,36 +11319,26 @@ spec:
           description: SyncSetSpec defines the SyncSetCommonSpec resources and patches
             to sync along with ClusterDeploymentRefs indicating which clusters the
             SyncSet applies to in the SyncSet's namespace.
-          type: object
-          required:
-          - clusterDeploymentRefs
           properties:
             clusterDeploymentRefs:
               description: ClusterDeploymentRefs is the list of LocalObjectReference
                 indicating which clusters the SyncSet applies to in the SyncSet's
                 namespace.
-              type: array
               items:
                 description: LocalObjectReference contains enough information to let
                   you locate the referenced object inside the same namespace.
-                type: object
                 properties:
                   name:
                     description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
+                type: object
+              type: array
             patches:
               description: Patches is the list of patches to apply.
-              type: array
               items:
                 description: SyncObjectPatch represents a patch to be applied to a
                   specific object
-                type: object
-                required:
-                - apiVersion
-                - kind
-                - name
-                - patch
                 properties:
                   apiVersion:
                     description: APIVersion is the Group and Version of the object
@@ -10909,6 +11361,13 @@ spec:
                     description: PatchType indicates the PatchType as "strategic"
                       (default), "json", or "merge".
                     type: string
+                required:
+                - apiVersion
+                - kind
+                - name
+                - patch
+                type: object
+              type: array
             resourceApplyMode:
               description: ResourceApplyMode indicates if the Resource apply mode
                 is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
@@ -10917,27 +11376,19 @@ spec:
             resources:
               description: Resources is the list of objects to sync from RawExtension
                 definitions.
-              type: array
               items:
                 type: object
+              type: array
             secretMappings:
               description: Secrets is the list of secrets to sync along with their
                 respective destinations.
-              type: array
               items:
                 description: SecretMapping defines a source and destination for a
                   secret to be synced by a SyncSet
-                type: object
-                required:
-                - sourceRef
-                - targetRef
                 properties:
                   sourceRef:
                     description: SourceRef specifies the name and namespace of a secret
                       on the management cluster
-                    type: object
-                    required:
-                    - name
                     properties:
                       name:
                         description: Name is the name of the secret
@@ -10947,12 +11398,12 @@ spec:
                           If not present for the source secret reference, it is assumed
                           to be the same namespace as the syncset with the reference.
                         type: string
+                    required:
+                    - name
+                    type: object
                   targetRef:
                     description: TargetRef specifies the target name and namespace
                       of the secret on the target cluster
-                    type: object
-                    required:
-                    - name
                     properties:
                       name:
                         description: Name is the name of the secret
@@ -10962,386 +11413,26 @@ spec:
                           If not present for the source secret reference, it is assumed
                           to be the same namespace as the syncset with the reference.
                         type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - sourceRef
+                - targetRef
+                type: object
+              type: array
+          required:
+          - clusterDeploymentRefs
+          type: object
         status:
           description: SyncSetStatus defines the observed state of a SyncSet
           type: object
-  version: v1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-`)
-
-func configCrdsHive_v1_syncsetYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_syncsetYaml, nil
-}
-
-func configCrdsHive_v1_syncsetYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_syncsetYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/crds/hive_v1_syncset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _configCrdsHive_v1_syncsetinstanceYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: syncsetinstances.hive.openshift.io
-spec:
-  additionalPrinterColumns:
-  - JSONPath: .status.applied
-    name: Applied
-    type: boolean
-  group: hive.openshift.io
-  names:
-    kind: SyncSetInstance
-    plural: syncsetinstances
-    shortNames:
-    - ssi
-  scope: Namespaced
-  subresources:
-    status: {}
-  validation:
-    openAPIV3Schema:
-      description: SyncSetInstance is the Schema for the syncsetinstances API
       type: object
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: SyncSetInstanceSpec defines the desired state of SyncSetInstance
-          type: object
-          required:
-          - clusterDeploymentRef
-          properties:
-            clusterDeploymentRef:
-              description: ClusterDeployment is a reference to to the clusterdeployment
-                for this syncsetinstance.
-              type: object
-              properties:
-                name:
-                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    TODO: Add other useful fields. apiVersion, kind, uid?'
-                  type: string
-            resourceApplyMode:
-              description: ResourceApplyMode indicates if the resource apply mode
-                is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
-                and update. ApplyMode "Sync" indicates create, update and delete.
-              type: string
-            selectorSyncSetRef:
-              description: SelectorSyncSetRef is a reference to the selectorsyncset
-                for this syncsetinstance.
-              type: object
-              required:
-              - name
-              properties:
-                name:
-                  description: Name is the name of the SelectorSyncSet
-                  type: string
-            syncSetHash:
-              description: SyncSetHash is a hash of the contents of the syncset or
-                selectorsyncset spec. Its purpose is to cause a syncset instance update
-                whenever there's a change in its source.
-              type: string
-            syncSetRef:
-              description: SyncSet is a reference to the syncset for this syncsetinstance.
-              type: object
-              properties:
-                name:
-                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    TODO: Add other useful fields. apiVersion, kind, uid?'
-                  type: string
-        status:
-          description: SyncSetInstanceStatus defines the observed state of SyncSetInstance
-          type: object
-          properties:
-            applied:
-              description: Applied will be true if all resources, patches, or secrets
-                have successfully been applied on last attempt.
-              type: boolean
-            conditions:
-              description: Conditions is the list of SyncConditions used to indicate
-                UnknownObject when a resource type cannot be determined from a SyncSet
-                resource.
-              type: array
-              items:
-                description: SyncCondition is a condition in a SyncStatus
-                type: object
-                required:
-                - status
-                - type
-                properties:
-                  lastProbeTime:
-                    description: LastProbeTime is the last time we probed the condition.
-                    type: string
-                    format: date-time
-                  lastTransitionTime:
-                    description: LastTransitionTime is the last time the condition
-                      transitioned from one status to another.
-                    type: string
-                    format: date-time
-                  message:
-                    description: Message is a human-readable message indicating details
-                      about last transition.
-                    type: string
-                  reason:
-                    description: Reason is a unique, one-word, CamelCase reason for
-                      the condition's last transition.
-                    type: string
-                  status:
-                    description: Status is the status of the condition.
-                    type: string
-                  type:
-                    description: Type is the type of the condition.
-                    type: string
-            patches:
-              description: Patches is the list of SyncStatus for patches that have
-                been applied.
-              type: array
-              items:
-                description: SyncStatus describes objects that have been created or
-                  patches that have been applied using the unique md5 sum of the object
-                  or patch.
-                type: object
-                required:
-                - apiVersion
-                - conditions
-                - hash
-                - kind
-                - name
-                - namespace
-                properties:
-                  apiVersion:
-                    description: APIVersion is the Group and Version of the object
-                      that was synced or patched.
-                    type: string
-                  conditions:
-                    description: Conditions is the list of conditions indicating success
-                      or failure of object create, update and delete as well as patch
-                      application.
-                    type: array
-                    items:
-                      description: SyncCondition is a condition in a SyncStatus
-                      type: object
-                      required:
-                      - status
-                      - type
-                      properties:
-                        lastProbeTime:
-                          description: LastProbeTime is the last time we probed the
-                            condition.
-                          type: string
-                          format: date-time
-                        lastTransitionTime:
-                          description: LastTransitionTime is the last time the condition
-                            transitioned from one status to another.
-                          type: string
-                          format: date-time
-                        message:
-                          description: Message is a human-readable message indicating
-                            details about last transition.
-                          type: string
-                        reason:
-                          description: Reason is a unique, one-word, CamelCase reason
-                            for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status is the status of the condition.
-                          type: string
-                        type:
-                          description: Type is the type of the condition.
-                          type: string
-                  hash:
-                    description: Hash is the unique md5 hash of the resource or patch.
-                    type: string
-                  kind:
-                    description: Kind is the Kind of the object that was synced or
-                      patched.
-                    type: string
-                  name:
-                    description: Name is the name of the object that was synced or
-                      patched.
-                    type: string
-                  namespace:
-                    description: Namespace is the Namespace of the object that was
-                      synced or patched.
-                    type: string
-                  resource:
-                    description: Resource is the resource name for the object that
-                      was synced. This will be populated for resources, but not patches
-                    type: string
-            resources:
-              description: Resources is the list of SyncStatus for objects that have
-                been synced.
-              type: array
-              items:
-                description: SyncStatus describes objects that have been created or
-                  patches that have been applied using the unique md5 sum of the object
-                  or patch.
-                type: object
-                required:
-                - apiVersion
-                - conditions
-                - hash
-                - kind
-                - name
-                - namespace
-                properties:
-                  apiVersion:
-                    description: APIVersion is the Group and Version of the object
-                      that was synced or patched.
-                    type: string
-                  conditions:
-                    description: Conditions is the list of conditions indicating success
-                      or failure of object create, update and delete as well as patch
-                      application.
-                    type: array
-                    items:
-                      description: SyncCondition is a condition in a SyncStatus
-                      type: object
-                      required:
-                      - status
-                      - type
-                      properties:
-                        lastProbeTime:
-                          description: LastProbeTime is the last time we probed the
-                            condition.
-                          type: string
-                          format: date-time
-                        lastTransitionTime:
-                          description: LastTransitionTime is the last time the condition
-                            transitioned from one status to another.
-                          type: string
-                          format: date-time
-                        message:
-                          description: Message is a human-readable message indicating
-                            details about last transition.
-                          type: string
-                        reason:
-                          description: Reason is a unique, one-word, CamelCase reason
-                            for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status is the status of the condition.
-                          type: string
-                        type:
-                          description: Type is the type of the condition.
-                          type: string
-                  hash:
-                    description: Hash is the unique md5 hash of the resource or patch.
-                    type: string
-                  kind:
-                    description: Kind is the Kind of the object that was synced or
-                      patched.
-                    type: string
-                  name:
-                    description: Name is the name of the object that was synced or
-                      patched.
-                    type: string
-                  namespace:
-                    description: Namespace is the Namespace of the object that was
-                      synced or patched.
-                    type: string
-                  resource:
-                    description: Resource is the resource name for the object that
-                      was synced. This will be populated for resources, but not patches
-                    type: string
-            secretReferences:
-              description: Secrets is the list of SyncStatus for secrets that have
-                been synced.
-              type: array
-              items:
-                description: SyncStatus describes objects that have been created or
-                  patches that have been applied using the unique md5 sum of the object
-                  or patch.
-                type: object
-                required:
-                - apiVersion
-                - conditions
-                - hash
-                - kind
-                - name
-                - namespace
-                properties:
-                  apiVersion:
-                    description: APIVersion is the Group and Version of the object
-                      that was synced or patched.
-                    type: string
-                  conditions:
-                    description: Conditions is the list of conditions indicating success
-                      or failure of object create, update and delete as well as patch
-                      application.
-                    type: array
-                    items:
-                      description: SyncCondition is a condition in a SyncStatus
-                      type: object
-                      required:
-                      - status
-                      - type
-                      properties:
-                        lastProbeTime:
-                          description: LastProbeTime is the last time we probed the
-                            condition.
-                          type: string
-                          format: date-time
-                        lastTransitionTime:
-                          description: LastTransitionTime is the last time the condition
-                            transitioned from one status to another.
-                          type: string
-                          format: date-time
-                        message:
-                          description: Message is a human-readable message indicating
-                            details about last transition.
-                          type: string
-                        reason:
-                          description: Reason is a unique, one-word, CamelCase reason
-                            for the condition's last transition.
-                          type: string
-                        status:
-                          description: Status is the status of the condition.
-                          type: string
-                        type:
-                          description: Type is the type of the condition.
-                          type: string
-                  hash:
-                    description: Hash is the unique md5 hash of the resource or patch.
-                    type: string
-                  kind:
-                    description: Kind is the Kind of the object that was synced or
-                      patched.
-                    type: string
-                  name:
-                    description: Name is the name of the object that was synced or
-                      patched.
-                    type: string
-                  namespace:
-                    description: Namespace is the Namespace of the object that was
-                      synced or patched.
-                    type: string
-                  resource:
-                    description: Resource is the resource name for the object that
-                      was synced. This will be populated for resources, but not patches
-                    type: string
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""
@@ -11350,17 +11441,17 @@ status:
   storedVersions: []
 `)
 
-func configCrdsHive_v1_syncsetinstanceYamlBytes() ([]byte, error) {
-	return _configCrdsHive_v1_syncsetinstanceYaml, nil
+func configCrdsHiveOpenshiftIo_syncsetsYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_syncsetsYaml, nil
 }
 
-func configCrdsHive_v1_syncsetinstanceYaml() (*asset, error) {
-	bytes, err := configCrdsHive_v1_syncsetinstanceYamlBytes()
+func configCrdsHiveOpenshiftIo_syncsetsYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_syncsetsYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/crds/hive_v1_syncsetinstance.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_syncsets.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -11496,53 +11587,53 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"config/apiserver/apiservice.yaml":                          configApiserverApiserviceYaml,
-	"config/apiserver/deployment.yaml":                          configApiserverDeploymentYaml,
-	"config/apiserver/hiveapi_rbac_role.yaml":                   configApiserverHiveapi_rbac_roleYaml,
-	"config/apiserver/hiveapi_rbac_role_binding.yaml":           configApiserverHiveapi_rbac_role_bindingYaml,
-	"config/apiserver/service-account.yaml":                     configApiserverServiceAccountYaml,
-	"config/apiserver/service.yaml":                             configApiserverServiceYaml,
-	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
-	"config/hiveadmission/clusterdeployment-webhook.yaml":       configHiveadmissionClusterdeploymentWebhookYaml,
-	"config/hiveadmission/clusterimageset-webhook.yaml":         configHiveadmissionClusterimagesetWebhookYaml,
-	"config/hiveadmission/clusterprovision-webhook.yaml":        configHiveadmissionClusterprovisionWebhookYaml,
-	"config/hiveadmission/deployment.yaml":                      configHiveadmissionDeploymentYaml,
-	"config/hiveadmission/dnszones-webhook.yaml":                configHiveadmissionDnszonesWebhookYaml,
-	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
-	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
-	"config/hiveadmission/machinepool-webhook.yaml":             configHiveadmissionMachinepoolWebhookYaml,
-	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
-	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
-	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
-	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
-	"config/controllers/deployment.yaml":                        configControllersDeploymentYaml,
-	"config/controllers/hive_controllers_role.yaml":             configControllersHive_controllers_roleYaml,
-	"config/controllers/hive_controllers_role_binding.yaml":     configControllersHive_controllers_role_bindingYaml,
-	"config/controllers/hive_controllers_serviceaccount.yaml":   configControllersHive_controllers_serviceaccountYaml,
-	"config/controllers/service.yaml":                           configControllersServiceYaml,
-	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
-	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
-	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
-	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
-	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
-	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
-	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
-	"config/crds/hive_v1_checkpoint.yaml":                       configCrdsHive_v1_checkpointYaml,
-	"config/crds/hive_v1_clusterdeployment.yaml":                configCrdsHive_v1_clusterdeploymentYaml,
-	"config/crds/hive_v1_clusterdeprovision.yaml":               configCrdsHive_v1_clusterdeprovisionYaml,
-	"config/crds/hive_v1_clusterimageset.yaml":                  configCrdsHive_v1_clusterimagesetYaml,
-	"config/crds/hive_v1_clusterprovision.yaml":                 configCrdsHive_v1_clusterprovisionYaml,
-	"config/crds/hive_v1_clusterstate.yaml":                     configCrdsHive_v1_clusterstateYaml,
-	"config/crds/hive_v1_dnszone.yaml":                          configCrdsHive_v1_dnszoneYaml,
-	"config/crds/hive_v1_hiveconfig.yaml":                       configCrdsHive_v1_hiveconfigYaml,
-	"config/crds/hive_v1_machinepool.yaml":                      configCrdsHive_v1_machinepoolYaml,
-	"config/crds/hive_v1_machinepoolnamelease.yaml":             configCrdsHive_v1_machinepoolnameleaseYaml,
-	"config/crds/hive_v1_selectorsyncidentityprovider.yaml":     configCrdsHive_v1_selectorsyncidentityproviderYaml,
-	"config/crds/hive_v1_selectorsyncset.yaml":                  configCrdsHive_v1_selectorsyncsetYaml,
-	"config/crds/hive_v1_syncidentityprovider.yaml":             configCrdsHive_v1_syncidentityproviderYaml,
-	"config/crds/hive_v1_syncset.yaml":                          configCrdsHive_v1_syncsetYaml,
-	"config/crds/hive_v1_syncsetinstance.yaml":                  configCrdsHive_v1_syncsetinstanceYaml,
-	"config/configmaps/install-log-regexes-configmap.yaml":      configConfigmapsInstallLogRegexesConfigmapYaml,
+	"config/apiserver/apiservice.yaml":                                 configApiserverApiserviceYaml,
+	"config/apiserver/deployment.yaml":                                 configApiserverDeploymentYaml,
+	"config/apiserver/hiveapi_rbac_role.yaml":                          configApiserverHiveapi_rbac_roleYaml,
+	"config/apiserver/hiveapi_rbac_role_binding.yaml":                  configApiserverHiveapi_rbac_role_bindingYaml,
+	"config/apiserver/service-account.yaml":                            configApiserverServiceAccountYaml,
+	"config/apiserver/service.yaml":                                    configApiserverServiceYaml,
+	"config/hiveadmission/apiservice.yaml":                             configHiveadmissionApiserviceYaml,
+	"config/hiveadmission/clusterdeployment-webhook.yaml":              configHiveadmissionClusterdeploymentWebhookYaml,
+	"config/hiveadmission/clusterimageset-webhook.yaml":                configHiveadmissionClusterimagesetWebhookYaml,
+	"config/hiveadmission/clusterprovision-webhook.yaml":               configHiveadmissionClusterprovisionWebhookYaml,
+	"config/hiveadmission/deployment.yaml":                             configHiveadmissionDeploymentYaml,
+	"config/hiveadmission/dnszones-webhook.yaml":                       configHiveadmissionDnszonesWebhookYaml,
+	"config/hiveadmission/hiveadmission_rbac_role.yaml":                configHiveadmissionHiveadmission_rbac_roleYaml,
+	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml":        configHiveadmissionHiveadmission_rbac_role_bindingYaml,
+	"config/hiveadmission/machinepool-webhook.yaml":                    configHiveadmissionMachinepoolWebhookYaml,
+	"config/hiveadmission/selectorsyncset-webhook.yaml":                configHiveadmissionSelectorsyncsetWebhookYaml,
+	"config/hiveadmission/service-account.yaml":                        configHiveadmissionServiceAccountYaml,
+	"config/hiveadmission/service.yaml":                                configHiveadmissionServiceYaml,
+	"config/hiveadmission/syncset-webhook.yaml":                        configHiveadmissionSyncsetWebhookYaml,
+	"config/controllers/deployment.yaml":                               configControllersDeploymentYaml,
+	"config/controllers/hive_controllers_role.yaml":                    configControllersHive_controllers_roleYaml,
+	"config/controllers/hive_controllers_role_binding.yaml":            configControllersHive_controllers_role_bindingYaml,
+	"config/controllers/hive_controllers_serviceaccount.yaml":          configControllersHive_controllers_serviceaccountYaml,
+	"config/controllers/service.yaml":                                  configControllersServiceYaml,
+	"config/rbac/hive_admin_role.yaml":                                 configRbacHive_admin_roleYaml,
+	"config/rbac/hive_admin_role_binding.yaml":                         configRbacHive_admin_role_bindingYaml,
+	"config/rbac/hive_frontend_role.yaml":                              configRbacHive_frontend_roleYaml,
+	"config/rbac/hive_frontend_role_binding.yaml":                      configRbacHive_frontend_role_bindingYaml,
+	"config/rbac/hive_frontend_serviceaccount.yaml":                    configRbacHive_frontend_serviceaccountYaml,
+	"config/rbac/hive_reader_role.yaml":                                configRbacHive_reader_roleYaml,
+	"config/rbac/hive_reader_role_binding.yaml":                        configRbacHive_reader_role_bindingYaml,
+	"config/crds/hive.openshift.io_checkpoints.yaml":                   configCrdsHiveOpenshiftIo_checkpointsYaml,
+	"config/crds/hive.openshift.io_clusterdeployments.yaml":            configCrdsHiveOpenshiftIo_clusterdeploymentsYaml,
+	"config/crds/hive.openshift.io_clusterdeprovisions.yaml":           configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml,
+	"config/crds/hive.openshift.io_clusterimagesets.yaml":              configCrdsHiveOpenshiftIo_clusterimagesetsYaml,
+	"config/crds/hive.openshift.io_clusterprovisions.yaml":             configCrdsHiveOpenshiftIo_clusterprovisionsYaml,
+	"config/crds/hive.openshift.io_clusterstates.yaml":                 configCrdsHiveOpenshiftIo_clusterstatesYaml,
+	"config/crds/hive.openshift.io_dnszones.yaml":                      configCrdsHiveOpenshiftIo_dnszonesYaml,
+	"config/crds/hive.openshift.io_hiveconfigs.yaml":                   configCrdsHiveOpenshiftIo_hiveconfigsYaml,
+	"config/crds/hive.openshift.io_machinepoolnameleases.yaml":         configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml,
+	"config/crds/hive.openshift.io_machinepools.yaml":                  configCrdsHiveOpenshiftIo_machinepoolsYaml,
+	"config/crds/hive.openshift.io_selectorsyncidentityproviders.yaml": configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml,
+	"config/crds/hive.openshift.io_selectorsyncsets.yaml":              configCrdsHiveOpenshiftIo_selectorsyncsetsYaml,
+	"config/crds/hive.openshift.io_syncidentityproviders.yaml":         configCrdsHiveOpenshiftIo_syncidentityprovidersYaml,
+	"config/crds/hive.openshift.io_syncsetinstances.yaml":              configCrdsHiveOpenshiftIo_syncsetinstancesYaml,
+	"config/crds/hive.openshift.io_syncsets.yaml":                      configCrdsHiveOpenshiftIo_syncsetsYaml,
+	"config/configmaps/install-log-regexes-configmap.yaml":             configConfigmapsInstallLogRegexesConfigmapYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -11606,21 +11697,21 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service.yaml":                         {configControllersServiceYaml, map[string]*bintree{}},
 		}},
 		"crds": {nil, map[string]*bintree{
-			"hive_v1_checkpoint.yaml":                   {configCrdsHive_v1_checkpointYaml, map[string]*bintree{}},
-			"hive_v1_clusterdeployment.yaml":            {configCrdsHive_v1_clusterdeploymentYaml, map[string]*bintree{}},
-			"hive_v1_clusterdeprovision.yaml":           {configCrdsHive_v1_clusterdeprovisionYaml, map[string]*bintree{}},
-			"hive_v1_clusterimageset.yaml":              {configCrdsHive_v1_clusterimagesetYaml, map[string]*bintree{}},
-			"hive_v1_clusterprovision.yaml":             {configCrdsHive_v1_clusterprovisionYaml, map[string]*bintree{}},
-			"hive_v1_clusterstate.yaml":                 {configCrdsHive_v1_clusterstateYaml, map[string]*bintree{}},
-			"hive_v1_dnszone.yaml":                      {configCrdsHive_v1_dnszoneYaml, map[string]*bintree{}},
-			"hive_v1_hiveconfig.yaml":                   {configCrdsHive_v1_hiveconfigYaml, map[string]*bintree{}},
-			"hive_v1_machinepool.yaml":                  {configCrdsHive_v1_machinepoolYaml, map[string]*bintree{}},
-			"hive_v1_machinepoolnamelease.yaml":         {configCrdsHive_v1_machinepoolnameleaseYaml, map[string]*bintree{}},
-			"hive_v1_selectorsyncidentityprovider.yaml": {configCrdsHive_v1_selectorsyncidentityproviderYaml, map[string]*bintree{}},
-			"hive_v1_selectorsyncset.yaml":              {configCrdsHive_v1_selectorsyncsetYaml, map[string]*bintree{}},
-			"hive_v1_syncidentityprovider.yaml":         {configCrdsHive_v1_syncidentityproviderYaml, map[string]*bintree{}},
-			"hive_v1_syncset.yaml":                      {configCrdsHive_v1_syncsetYaml, map[string]*bintree{}},
-			"hive_v1_syncsetinstance.yaml":              {configCrdsHive_v1_syncsetinstanceYaml, map[string]*bintree{}},
+			"hive.openshift.io_checkpoints.yaml":                   {configCrdsHiveOpenshiftIo_checkpointsYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterdeployments.yaml":            {configCrdsHiveOpenshiftIo_clusterdeploymentsYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterdeprovisions.yaml":           {configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterimagesets.yaml":              {configCrdsHiveOpenshiftIo_clusterimagesetsYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterprovisions.yaml":             {configCrdsHiveOpenshiftIo_clusterprovisionsYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterstates.yaml":                 {configCrdsHiveOpenshiftIo_clusterstatesYaml, map[string]*bintree{}},
+			"hive.openshift.io_dnszones.yaml":                      {configCrdsHiveOpenshiftIo_dnszonesYaml, map[string]*bintree{}},
+			"hive.openshift.io_hiveconfigs.yaml":                   {configCrdsHiveOpenshiftIo_hiveconfigsYaml, map[string]*bintree{}},
+			"hive.openshift.io_machinepoolnameleases.yaml":         {configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml, map[string]*bintree{}},
+			"hive.openshift.io_machinepools.yaml":                  {configCrdsHiveOpenshiftIo_machinepoolsYaml, map[string]*bintree{}},
+			"hive.openshift.io_selectorsyncidentityproviders.yaml": {configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml, map[string]*bintree{}},
+			"hive.openshift.io_selectorsyncsets.yaml":              {configCrdsHiveOpenshiftIo_selectorsyncsetsYaml, map[string]*bintree{}},
+			"hive.openshift.io_syncidentityproviders.yaml":         {configCrdsHiveOpenshiftIo_syncidentityprovidersYaml, map[string]*bintree{}},
+			"hive.openshift.io_syncsetinstances.yaml":              {configCrdsHiveOpenshiftIo_syncsetinstancesYaml, map[string]*bintree{}},
+			"hive.openshift.io_syncsets.yaml":                      {configCrdsHiveOpenshiftIo_syncsetsYaml, map[string]*bintree{}},
 		}},
 		"hiveadmission": {nil, map[string]*bintree{
 			"apiservice.yaml":                      {configHiveadmissionApiserviceYaml, map[string]*bintree{}},

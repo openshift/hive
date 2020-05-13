@@ -1,9 +1,9 @@
+
+---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
-  labels:
-    controller-tools.k8s.io: "1.0"
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
@@ -28,16 +28,17 @@ spec:
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
+    listKind: ClusterDeploymentList
     plural: clusterdeployments
     shortNames:
     - cd
+    singular: clusterdeployment
   scope: Namespaced
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
       description: ClusterDeployment is the Schema for the clusterdeployments API
-      type: object
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -53,11 +54,6 @@ spec:
           type: object
         spec:
           description: ClusterDeploymentSpec defines the desired state of ClusterDeployment
-          type: object
-          required:
-          - baseDomain
-          - clusterName
-          - platform
           properties:
             baseDomain:
               description: BaseDomain is the base domain to which the cluster should
@@ -66,14 +62,9 @@ spec:
             certificateBundles:
               description: CertificateBundles is a list of certificate bundles associated
                 with this cluster
-              type: array
               items:
                 description: CertificateBundleSpec specifies a certificate bundle
                   associated with a cluster deployment
-                type: object
-                required:
-                - certificateSecretRef
-                - name
                 properties:
                   certificateSecretRef:
                     description: CertificateSecretRef is the reference to the secret
@@ -81,12 +72,12 @@ spec:
                       is to be generated, it will be generated with the name in this
                       reference. Otherwise, it is expected that the secret should
                       exist in the same namespace as the ClusterDeployment
-                    type: object
                     properties:
                       name:
                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
+                    type: object
                   generate:
                     description: Generate indicates whether this bundle should have
                       real certificates generated for it.
@@ -96,35 +87,34 @@ spec:
                       the bundle and must be referenced by an ingress or by the control
                       plane serving certs
                     type: string
+                required:
+                - certificateSecretRef
+                - name
+                type: object
+              type: array
             clusterMetadata:
               description: ClusterMetadata contains metadata information about the
                 installed cluster.
-              type: object
-              required:
-              - adminKubeconfigSecretRef
-              - adminPasswordSecretRef
-              - clusterID
-              - infraID
               properties:
                 adminKubeconfigSecretRef:
                   description: AdminKubeconfigSecretRef references the secret containing
                     the admin kubeconfig for this cluster.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 adminPasswordSecretRef:
                   description: AdminPasswordSecretRef references the secret containing
                     the admin username/password which can be used to login to this
                     cluster.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 clusterID:
                   description: ClusterID is a globally unique identifier for this
                     cluster generated during installation. Used for reporting metrics
@@ -135,6 +125,12 @@ spec:
                     during installation and used for tagging/naming resources in cloud
                     providers.
                   type: string
+              required:
+              - adminKubeconfigSecretRef
+              - adminPasswordSecretRef
+              - clusterID
+              - infraID
+              type: object
             clusterName:
               description: ClusterName is the friendly name of the cluster. It is
                 used for subdomains, some resource tagging, and other instances where
@@ -143,7 +139,6 @@ spec:
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
                 the target cluster's control plane
-              type: object
               properties:
                 apiURLOverride:
                   description: APIURLOverride is the optional URL override to which
@@ -159,20 +154,14 @@ spec:
                 servingCertificates:
                   description: ServingCertificates specifies serving certificates
                     for the control plane
-                  type: object
                   properties:
                     additional:
                       description: Additional is a list of additional domains and
                         certificates that are also associated with the control plane's
                         api endpoint.
-                      type: array
                       items:
                         description: ControlPlaneAdditionalCertificate defines an
                           additional serving certificate for a control plane
-                        type: object
-                        required:
-                        - domain
-                        - name
                         properties:
                           domain:
                             description: Domain is the domain of the additional control
@@ -183,22 +172,24 @@ spec:
                               ClusterDeployment.Spec that should be used for this
                               additional certificate.
                             type: string
+                        required:
+                        - domain
+                        - name
+                        type: object
+                      type: array
                     default:
                       description: Default references the name of a CertificateBundle
                         in the ClusterDeployment that should be used for the control
                         plane's default endpoint.
                       type: string
+                  type: object
+              type: object
             ingress:
               description: Ingress allows defining desired clusteringress/shards to
                 be configured on the cluster.
-              type: array
               items:
                 description: ClusterIngress contains the configurable pieces for any
                   ClusterIngress objects that should exist on the cluster.
-                type: object
-                required:
-                - domain
-                - name
                 properties:
                   domain:
                     description: Domain (sometimes referred to as shard) is the full
@@ -211,20 +202,14 @@ spec:
                   namespaceSelector:
                     description: NamespaceSelector allows filtering the list of namespaces
                       serviced by the ingress controller.
-                    type: object
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
                           requirements. The requirements are ANDed.
-                        type: array
                         items:
                           description: A label selector requirement is a selector
                             that contains values, a key, and an operator that relates
                             the key and values.
-                          type: object
-                          required:
-                          - key
-                          - operator
                           properties:
                             key:
                               description: key is the label key that the selector
@@ -241,35 +226,35 @@ spec:
                                 be non-empty. If the operator is Exists or DoesNotExist,
                                 the values array must be empty. This array is replaced
                                 during a strategic merge patch.
-                              type: array
                               items:
                                 type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
                       matchLabels:
+                        additionalProperties:
+                          type: string
                         description: matchLabels is a map of {key,value} pairs. A
                           single {key,value} in the matchLabels map is equivalent
                           to an element of matchExpressions, whose key field is "key",
                           the operator is "In", and the values array contains only
                           "value". The requirements are ANDed.
                         type: object
-                        additionalProperties:
-                          type: string
+                    type: object
                   routeSelector:
                     description: RouteSelector allows filtering the set of Routes
                       serviced by the ingress controller
-                    type: object
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
                           requirements. The requirements are ANDed.
-                        type: array
                         items:
                           description: A label selector requirement is a selector
                             that contains values, a key, and an operator that relates
                             the key and values.
-                          type: object
-                          required:
-                          - key
-                          - operator
                           properties:
                             key:
                               description: key is the label key that the selector
@@ -286,22 +271,33 @@ spec:
                                 be non-empty. If the operator is Exists or DoesNotExist,
                                 the values array must be empty. This array is replaced
                                 during a strategic merge patch.
-                              type: array
                               items:
                                 type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
                       matchLabels:
+                        additionalProperties:
+                          type: string
                         description: matchLabels is a map of {key,value} pairs. A
                           single {key,value} in the matchLabels map is equivalent
                           to an element of matchExpressions, whose key field is "key",
                           the operator is "In", and the values array contains only
                           "value". The requirements are ANDed.
                         type: object
-                        additionalProperties:
-                          type: string
+                    type: object
                   servingCertificate:
                     description: ServingCertificate references a CertificateBundle
                       in the ClusterDeployment.Spec that should be used for this Ingress
                     type: string
+                required:
+                - domain
+                - name
+                type: object
+              type: array
             installed:
               description: Installed is true if the cluster has been installed
               type: boolean
@@ -312,41 +308,36 @@ spec:
             platform:
               description: Platform is the configuration for the specific platform
                 upon which to perform the installation.
-              type: object
               properties:
                 aws:
                   description: AWS is the configuration used when installing on AWS.
-                  type: object
-                  required:
-                  - credentialsSecretRef
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the AWS account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region specifies the AWS region where the cluster
                         will be created.
                       type: string
                     userTags:
+                      additionalProperties:
+                        type: string
                       description: UserTags specifies additional tags for AWS resources
                         created for the cluster.
                       type: object
-                      additionalProperties:
-                        type: string
-                azure:
-                  description: Azure is the configuration used when installing on
-                    Azure.
-                  type: object
                   required:
                   - credentialsSecretRef
                   - region
+                  type: object
+                azure:
+                  description: Azure is the configuration used when installing on
+                    Azure.
                   properties:
                     baseDomainResourceGroupName:
                       description: BaseDomainResourceGroupName specifies the resource
@@ -355,22 +346,23 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the Azure account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region specifies the Azure region where the cluster
                         will be created.
                       type: string
+                  required:
+                  - credentialsSecretRef
+                  - region
+                  type: object
                 baremetal:
                   description: BareMetal is the configuration used when installing
                     on bare metal.
-                  type: object
-                  required:
-                  - libvirtSSHPrivateKeySecretRef
                   properties:
                     libvirtSSHPrivateKeySecretRef:
                       description: LibvirtSSHPrivateKeySecretRef is the reference
@@ -378,40 +370,39 @@ spec:
                         access to the libvirt provisioning host. The SSH private key
                         is expected to be in the secret data under the "ssh-privatekey"
                         key.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
+                  required:
+                  - libvirtSSHPrivateKeySecretRef
+                  type: object
                 gcp:
                   description: GCP is the configuration used when installing on Google
                     Cloud Platform.
-                  type: object
-                  required:
-                  - credentialsSecretRef
-                  - region
                   properties:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the GCP account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     region:
                       description: Region specifies the GCP region where the cluster
                         will be created.
                       type: string
+                  required:
+                  - credentialsSecretRef
+                  - region
+                  type: object
                 openstack:
                   description: OpenStack is the configuration used when installing
                     on OpenStack
-                  type: object
-                  required:
-                  - cloud
-                  - credentialsSecretRef
                   properties:
                     cloud:
                       description: Cloud will be used to indicate the OS_CLOUD value
@@ -420,16 +411,21 @@ spec:
                     credentialsSecretRef:
                       description: CredentialsSecretRef refers to a secret that contains
                         the OpenStack account access credentials.
-                      type: object
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
+                      type: object
                     trunkSupport:
                       description: TrunkSupport indicates whether or not to use trunk
                         ports in your OpenShift cluster.
                       type: boolean
+                  required:
+                  - cloud
+                  - credentialsSecretRef
+                  type: object
+              type: object
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
                 from Hive without deprovisioning it
@@ -437,45 +433,38 @@ spec:
             provisioning:
               description: Provisioning contains settings used only for initial cluster
                 provisioning. May be unset in the case of adopted clusters.
-              type: object
-              required:
-              - installConfigSecretRef
               properties:
                 imageSetRef:
                   description: ImageSetRef is a reference to a ClusterImageSet. If
                     a value is specified for ReleaseImage, that will take precedence
                     over the one from the ClusterImageSet.
-                  type: object
-                  required:
-                  - name
                   properties:
                     name:
                       description: Name is the name of the ClusterImageSet that this
                         refers to
                       type: string
+                  required:
+                  - name
+                  type: object
                 installConfigSecretRef:
                   description: InstallConfigSecretRef is the reference to a secret
                     that contains an openshift-install InstallConfig. This file will
                     be passed through directly to the installer. Any version of InstallConfig
                     can be used, provided it can be parsed by the openshift-install
                     version for the release you are provisioning.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 installerEnv:
                   description: InstallerEnv are extra environment variables to pass
                     through to the installer. This may be used to enable additional
                     features of the installer.
-                  type: array
                   items:
                     description: EnvVar represents an environment variable present
                       in a Container.
-                    type: object
-                    required:
-                    - name
                     properties:
                       name:
                         description: Name of the environment variable. Must be a C_IDENTIFIER.
@@ -493,13 +482,9 @@ spec:
                       valueFrom:
                         description: Source for the environment variable's value.
                           Cannot be used if value is not empty.
-                        type: object
                         properties:
                           configMapKeyRef:
                             description: Selects a key of a ConfigMap.
-                            type: object
-                            required:
-                            - key
                             properties:
                               key:
                                 description: The key to select.
@@ -513,14 +498,14 @@ spec:
                                 description: Specify whether the ConfigMap or its
                                   key must be defined
                                 type: boolean
+                            required:
+                            - key
+                            type: object
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, metadata.labels, metadata.annotations,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
                               status.podIP, status.podIPs.'
-                            type: object
-                            required:
-                            - fieldPath
                             properties:
                               apiVersion:
                                 description: Version of the schema the FieldPath is
@@ -530,14 +515,14 @@ spec:
                                 description: Path of the field to select in the specified
                                   API version.
                                 type: string
+                            required:
+                            - fieldPath
+                            type: object
                           resourceFieldRef:
                             description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
                               limits.ephemeral-storage, requests.cpu, requests.memory
                               and requests.ephemeral-storage) are currently supported.'
-                            type: object
-                            required:
-                            - resource
                             properties:
                               containerName:
                                 description: 'Container name: required for volumes,
@@ -550,11 +535,11 @@ spec:
                               resource:
                                 description: 'Required: resource to select'
                                 type: string
+                            required:
+                            - resource
+                            type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
-                            type: object
-                            required:
-                            - key
                             properties:
                               key:
                                 description: The key of the secret to select from.  Must
@@ -569,16 +554,24 @@ spec:
                                 description: Specify whether the Secret or its key
                                   must be defined
                                 type: boolean
+                            required:
+                            - key
+                            type: object
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  type: array
                 manifestsConfigMapRef:
                   description: ManifestsConfigMapRef is a reference to user-provided
                     manifests to add to or replace manifests that are generated by
                     the installer.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
                 releaseImage:
                   description: ReleaseImage is the image containing metadata for all
                     components that run in the cluster, and is the primary and best
@@ -591,9 +584,9 @@ spec:
                     install pod is somewhat limited today (failure log gathering from
                     cluster, some bare metal provisioning scenarios), so this setting
                     is often not needed.
-                  type: array
                   items:
                     type: string
+                  type: array
                 sshPrivateKeySecretRef:
                   description: SSHPrivateKeySecretRef is the reference to the secret
                     that contains the private SSH key to use for access to compute
@@ -602,24 +595,31 @@ spec:
                     to gather logs on the target cluster if there are install failures.
                     The SSH private key is expected to be in the secret data under
                     the "ssh-privatekey" key.
-                  type: object
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
+                  type: object
+              required:
+              - installConfigSecretRef
+              type: object
             pullSecretRef:
               description: PullSecretRef is the reference to the secret to use when
                 pulling images.
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
+          required:
+          - baseDomain
+          - clusterName
+          - platform
+          type: object
         status:
           description: ClusterDeploymentStatus defines the observed state of ClusterDeployment
-          type: object
           properties:
             apiURL:
               description: APIURL is the URL where the cluster's API can be accessed.
@@ -627,14 +627,9 @@ spec:
             certificateBundles:
               description: CertificateBundles contains of the status of the certificate
                 bundles associated with this cluster deployment.
-              type: array
               items:
                 description: CertificateBundleStatus specifies whether a certificate
                   bundle was generated for this cluster deployment.
-                type: object
-                required:
-                - generated
-                - name
                 properties:
                   generated:
                     description: Generated indicates whether the certificate bundle
@@ -643,6 +638,11 @@ spec:
                   name:
                     description: Name of the certificate bundle
                     type: string
+                required:
+                - generated
+                - name
+                type: object
+              type: array
             cliImage:
               description: CLIImage is the name of the oc cli image to use when installing
                 the target cluster
@@ -650,23 +650,15 @@ spec:
             clusterVersionStatus:
               description: ClusterVersionStatus will hold a copy of the remote cluster's
                 ClusterVersion.Status
-              type: object
-              required:
-              - availableUpdates
-              - desired
-              - observedGeneration
-              - versionHash
               properties:
                 availableUpdates:
                   description: availableUpdates contains the list of updates that
                     are appropriate for this cluster. This list may be empty if no
                     updates are recommended, if the update service is unavailable,
                     or if an invalid channel has been specified.
-                  type: array
                   items:
                     description: Update represents a release of the ClusterVersionOperator,
                       referenced by the Image member.
-                    type: object
                     properties:
                       force:
                         description: "force allows an administrator to update to an
@@ -692,7 +684,9 @@ spec:
                           the update version. When this field is part of spec, version
                           is optional if image is specified.
                         type: string
+                    type: object
                   nullable: true
+                  type: array
                 conditions:
                   description: conditions provides information about the cluster version.
                     The condition "Available" is set to true if the desiredUpdate
@@ -701,21 +695,15 @@ spec:
                     true if an update is currently blocked by a temporary or permanent
                     error. Conditions are only valid for the current desiredUpdate
                     when metadata.generation is equal to status.generation.
-                  type: array
                   items:
                     description: ClusterOperatorStatusCondition represents the state
                       of the operator's managed and monitored components.
-                    type: object
-                    required:
-                    - lastTransitionTime
-                    - status
-                    - type
                     properties:
                       lastTransitionTime:
                         description: lastTransitionTime is the time of the last update
                           to the current status property.
-                        type: string
                         format: date-time
+                        type: string
                       message:
                         description: message provides additional information about
                           the current condition. This is only to be consumed by humans.
@@ -731,12 +719,17 @@ spec:
                       type:
                         description: type specifies the aspect reported by this condition.
                         type: string
+                    required:
+                    - lastTransitionTime
+                    - status
+                    - type
+                    type: object
+                  type: array
                 desired:
                   description: desired is the version that the cluster is reconciling
                     towards. If the cluster is not yet fully initialized desired will
                     be set with the information available, which may be an image or
                     a tag.
-                  type: object
                   properties:
                     force:
                       description: "force allows an administrator to update to an
@@ -761,6 +754,7 @@ spec:
                         update version. When this field is part of spec, version is
                         optional if image is specified.
                       type: string
+                  type: object
                 history:
                   description: history contains a list of the most recent versions
                     applied to the cluster. This value may be empty during cluster
@@ -769,17 +763,9 @@ spec:
                     Updates in the history have state Completed if the rollout completed
                     - if an update was failing or halfway applied the state will be
                     Partial. Only a limited amount of update history is preserved.
-                  type: array
                   items:
                     description: UpdateHistory is a single attempted update to the
                       cluster.
-                    type: object
-                    required:
-                    - completionTime
-                    - image
-                    - startedTime
-                    - state
-                    - verified
                     properties:
                       completionTime:
                         description: completionTime, if set, is when the update was
@@ -787,9 +773,9 @@ spec:
                           will have a null completion time. Completion time will always
                           be set for entries that are not the current update (usually
                           to the started time of the next update).
-                        type: string
                         format: date-time
                         nullable: true
+                        type: string
                       image:
                         description: image is a container image location that contains
                           the update. This value is always populated.
@@ -797,8 +783,8 @@ spec:
                       startedTime:
                         description: startedTime is the time at which the update was
                           started.
-                        type: string
                         format: date-time
+                        type: string
                       state:
                         description: state reflects whether the update was fully applied.
                           The Partial state indicates the update is not fully applied,
@@ -817,39 +803,48 @@ spec:
                           a version, or if a failure occurs retrieving the image,
                           this value may be empty.
                         type: string
+                    required:
+                    - completionTime
+                    - image
+                    - startedTime
+                    - state
+                    - verified
+                    type: object
+                  type: array
                 observedGeneration:
                   description: observedGeneration reports which version of the spec
                     is being synced. If this value is not equal to metadata.generation,
                     then the desired and conditions fields may represent a previous
                     version.
-                  type: integer
                   format: int64
+                  type: integer
                 versionHash:
                   description: versionHash is a fingerprint of the content that the
                     cluster will be updated with. It is used by the operator to avoid
                     unnecessary work and is for internal use only.
                   type: string
+              required:
+              - availableUpdates
+              - desired
+              - observedGeneration
+              - versionHash
+              type: object
             conditions:
               description: Conditions includes more detailed status for the cluster
                 deployment
-              type: array
               items:
                 description: ClusterDeploymentCondition contains details for the current
                   condition of a cluster deployment
-                type: object
-                required:
-                - status
-                - type
                 properties:
                   lastProbeTime:
                     description: LastProbeTime is the last time we probed the condition.
-                    type: string
                     format: date-time
+                    type: string
                   lastTransitionTime:
                     description: LastTransitionTime is the last time the condition
                       transitioned from one status to another.
-                    type: string
                     format: date-time
+                    type: string
                   message:
                     description: Message is a human-readable message indicating details
                       about last transition.
@@ -864,6 +859,11 @@ spec:
                   type:
                     description: Type is the type of the condition.
                     type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
             installRestarts:
               description: InstallRestarts is the total count of container restarts
                 on the clusters install job.
@@ -871,8 +871,8 @@ spec:
             installedTimestamp:
               description: InstalledTimestamp is the time we first detected that the
                 cluster has been successfully installed.
-              type: string
               format: date-time
+              type: string
             installerImage:
               description: InstallerImage is the name of the installer image to use
                 when installing the target cluster
@@ -880,17 +880,23 @@ spec:
             provisionRef:
               description: ProvisionRef is a reference to the last ClusterProvision
                 created for the deployment
-              type: object
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
+              type: object
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.
               type: string
+          type: object
+      type: object
   version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
 status:
   acceptedNames:
     kind: ""

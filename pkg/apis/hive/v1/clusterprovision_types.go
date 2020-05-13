@@ -116,7 +116,7 @@ const (
 // +kubebuilder:printcolumn:name="ClusterDeployment",type="string",JSONPath=".spec.clusterDeploymentRef.name"
 // +kubebuilder:printcolumn:name="Stage",type="string",JSONPath=".spec.stage"
 // +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".spec.infraID"
-// +kubebuilder:resource:path=clusterprovisions
+// +kubebuilder:resource:path=clusterprovisions,scope=Namespaced
 type ClusterProvision struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

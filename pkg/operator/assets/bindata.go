@@ -1514,9 +1514,7 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_checkpointsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_checkpointsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -1563,8 +1561,8 @@ spec:
                 namespace:
                   type: string
               required:
-              - name
-              - namespace
+                - name
+                - namespace
               type: object
             lastBackupTime:
               description: LastBackupTime is the last time we performed a backup of
@@ -1572,9 +1570,9 @@ spec:
               format: date-time
               type: string
           required:
-          - lastBackupChecksum
-          - lastBackupRef
-          - lastBackupTime
+            - lastBackupChecksum
+            - lastBackupRef
+            - lastBackupTime
           type: object
         status:
           description: CheckpointStatus defines the observed state of Checkpoint
@@ -1582,13 +1580,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -1608,40 +1606,38 @@ func configCrdsHiveOpenshiftIo_checkpointsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterdeploymentsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeploymentsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.clusterName
-    name: ClusterName
-    type: string
-  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
-    name: ClusterType
-    type: string
-  - JSONPath: .spec.baseDomain
-    name: BaseDomain
-    type: string
-  - JSONPath: .spec.installed
-    name: Installed
-    type: boolean
-  - JSONPath: .spec.clusterMetadata.infraID
-    name: InfraID
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
+    - JSONPath: .spec.clusterName
+      name: ClusterName
+      type: string
+    - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
+      name: ClusterType
+      type: string
+    - JSONPath: .spec.baseDomain
+      name: BaseDomain
+      type: string
+    - JSONPath: .spec.installed
+      name: Installed
+      type: boolean
+    - JSONPath: .spec.clusterMetadata.infraID
+      name: InfraID
+      type: string
+    - JSONPath: .metadata.creationTimestamp
+      name: Age
+      type: date
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
     listKind: ClusterDeploymentList
     plural: clusterdeployments
     shortNames:
-    - cd
+      - cd
     singular: clusterdeployment
   scope: Namespaced
   subresources:
@@ -1698,8 +1694,8 @@ spec:
                       plane serving certs
                     type: string
                 required:
-                - certificateSecretRef
-                - name
+                  - certificateSecretRef
+                  - name
                 type: object
               type: array
             clusterMetadata:
@@ -1736,10 +1732,10 @@ spec:
                     providers.
                   type: string
               required:
-              - adminKubeconfigSecretRef
-              - adminPasswordSecretRef
-              - clusterID
-              - infraID
+                - adminKubeconfigSecretRef
+                - adminPasswordSecretRef
+                - clusterID
+                - infraID
               type: object
             clusterName:
               description: ClusterName is the friendly name of the cluster. It is
@@ -1783,8 +1779,8 @@ spec:
                               additional certificate.
                             type: string
                         required:
-                        - domain
-                        - name
+                          - domain
+                          - name
                         type: object
                       type: array
                     default:
@@ -1840,8 +1836,8 @@ spec:
                                 type: string
                               type: array
                           required:
-                          - key
-                          - operator
+                            - key
+                            - operator
                           type: object
                         type: array
                       matchLabels:
@@ -1885,8 +1881,8 @@ spec:
                                 type: string
                               type: array
                           required:
-                          - key
-                          - operator
+                            - key
+                            - operator
                           type: object
                         type: array
                       matchLabels:
@@ -1904,8 +1900,8 @@ spec:
                       in the ClusterDeployment.Spec that should be used for this Ingress
                     type: string
                 required:
-                - domain
-                - name
+                  - domain
+                  - name
                 type: object
               type: array
             installed:
@@ -1942,8 +1938,8 @@ spec:
                         created for the cluster.
                       type: object
                   required:
-                  - credentialsSecretRef
-                  - region
+                    - credentialsSecretRef
+                    - region
                   type: object
                 azure:
                   description: Azure is the configuration used when installing on
@@ -1967,8 +1963,8 @@ spec:
                         will be created.
                       type: string
                   required:
-                  - credentialsSecretRef
-                  - region
+                    - credentialsSecretRef
+                    - region
                   type: object
                 baremetal:
                   description: BareMetal is the configuration used when installing
@@ -1987,7 +1983,7 @@ spec:
                           type: string
                       type: object
                   required:
-                  - libvirtSSHPrivateKeySecretRef
+                    - libvirtSSHPrivateKeySecretRef
                   type: object
                 gcp:
                   description: GCP is the configuration used when installing on Google
@@ -2007,8 +2003,8 @@ spec:
                         will be created.
                       type: string
                   required:
-                  - credentialsSecretRef
-                  - region
+                    - credentialsSecretRef
+                    - region
                   type: object
                 openstack:
                   description: OpenStack is the configuration used when installing
@@ -2032,8 +2028,8 @@ spec:
                         ports in your OpenShift cluster.
                       type: boolean
                   required:
-                  - cloud
-                  - credentialsSecretRef
+                    - cloud
+                    - credentialsSecretRef
                   type: object
               type: object
             preserveOnDelete:
@@ -2054,7 +2050,7 @@ spec:
                         refers to
                       type: string
                   required:
-                  - name
+                    - name
                   type: object
                 installConfigSecretRef:
                   description: InstallConfigSecretRef is the reference to a secret
@@ -2109,7 +2105,7 @@ spec:
                                   key must be defined
                                 type: boolean
                             required:
-                            - key
+                              - key
                             type: object
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
@@ -2126,7 +2122,7 @@ spec:
                                   API version.
                                 type: string
                             required:
-                            - fieldPath
+                              - fieldPath
                             type: object
                           resourceFieldRef:
                             description: 'Selects a resource of the container: only
@@ -2146,7 +2142,7 @@ spec:
                                 description: 'Required: resource to select'
                                 type: string
                             required:
-                            - resource
+                              - resource
                             type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
@@ -2165,11 +2161,11 @@ spec:
                                   must be defined
                                 type: boolean
                             required:
-                            - key
+                              - key
                             type: object
                         type: object
                     required:
-                    - name
+                      - name
                     type: object
                   type: array
                 manifestsConfigMapRef:
@@ -2212,7 +2208,7 @@ spec:
                       type: string
                   type: object
               required:
-              - installConfigSecretRef
+                - installConfigSecretRef
               type: object
             pullSecretRef:
               description: PullSecretRef is the reference to the secret to use when
@@ -2224,9 +2220,9 @@ spec:
                   type: string
               type: object
           required:
-          - baseDomain
-          - clusterName
-          - platform
+            - baseDomain
+            - clusterName
+            - platform
           type: object
         status:
           description: ClusterDeploymentStatus defines the observed state of ClusterDeployment
@@ -2249,8 +2245,8 @@ spec:
                     description: Name of the certificate bundle
                     type: string
                 required:
-                - generated
-                - name
+                  - generated
+                  - name
                 type: object
               type: array
             cliImage:
@@ -2271,17 +2267,17 @@ spec:
                       referenced by the Image member.
                     properties:
                       force:
-                        description: "force allows an administrator to update to an
-                          image that has failed verification, does not appear in the
-                          availableUpdates list, or otherwise would be blocked by
-                          normal protections on update. This option should only be
-                          used when the authenticity of the provided image has been
-                          verified out of band because the provided image will run
-                          with full administrative access to the cluster. Do not use
-                          this flag with images that comes from unknown or potentially
-                          malicious sources. \n This flag does not override other
-                          forms of consistency checking that are required before a
-                          new update is deployed."
+                        description: "force allows an administrator to update to an\
+                          \ image that has failed verification, does not appear in\
+                          \ the availableUpdates list, or otherwise would be blocked\
+                          \ by normal protections on update. This option should only\
+                          \ be used when the authenticity of the provided image has\
+                          \ been verified out of band because the provided image will\
+                          \ run with full administrative access to the cluster. Do\
+                          \ not use this flag with images that comes from unknown\
+                          \ or potentially malicious sources. \n This flag does not\
+                          \ override other forms of consistency checking that are\
+                          \ required before a new update is deployed."
                         type: boolean
                       image:
                         description: image is a container image location that contains
@@ -2330,9 +2326,9 @@ spec:
                         description: type specifies the aspect reported by this condition.
                         type: string
                     required:
-                    - lastTransitionTime
-                    - status
-                    - type
+                      - lastTransitionTime
+                      - status
+                      - type
                     type: object
                   type: array
                 desired:
@@ -2342,16 +2338,17 @@ spec:
                     a tag.
                   properties:
                     force:
-                      description: "force allows an administrator to update to an
-                        image that has failed verification, does not appear in the
-                        availableUpdates list, or otherwise would be blocked by normal
-                        protections on update. This option should only be used when
-                        the authenticity of the provided image has been verified out
-                        of band because the provided image will run with full administrative
-                        access to the cluster. Do not use this flag with images that
-                        comes from unknown or potentially malicious sources. \n This
-                        flag does not override other forms of consistency checking
-                        that are required before a new update is deployed."
+                      description: "force allows an administrator to update to an\
+                        \ image that has failed verification, does not appear in the\
+                        \ availableUpdates list, or otherwise would be blocked by\
+                        \ normal protections on update. This option should only be\
+                        \ used when the authenticity of the provided image has been\
+                        \ verified out of band because the provided image will run\
+                        \ with full administrative access to the cluster. Do not use\
+                        \ this flag with images that comes from unknown or potentially\
+                        \ malicious sources. \n This flag does not override other\
+                        \ forms of consistency checking that are required before a\
+                        \ new update is deployed."
                       type: boolean
                     image:
                       description: image is a container image location that contains
@@ -2414,11 +2411,11 @@ spec:
                           this value may be empty.
                         type: string
                     required:
-                    - completionTime
-                    - image
-                    - startedTime
-                    - state
-                    - verified
+                      - completionTime
+                      - image
+                      - startedTime
+                      - state
+                      - verified
                     type: object
                   type: array
                 observedGeneration:
@@ -2434,10 +2431,10 @@ spec:
                     unnecessary work and is for internal use only.
                   type: string
               required:
-              - availableUpdates
-              - desired
-              - observedGeneration
-              - versionHash
+                - availableUpdates
+                - desired
+                - observedGeneration
+                - versionHash
               type: object
             conditions:
               description: Conditions includes more detailed status for the cluster
@@ -2470,8 +2467,8 @@ spec:
                     description: Type is the type of the condition.
                     type: string
                 required:
-                - status
-                - type
+                  - status
+                  - type
                 type: object
               type: array
             installRestarts:
@@ -2504,13 +2501,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -2530,34 +2527,32 @@ func configCrdsHiveOpenshiftIo_clusterdeploymentsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: clusterdeprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.infraID
-    name: InfraID
-    type: string
-  - JSONPath: .spec.clusterID
-    name: ClusterID
-    type: string
-  - JSONPath: .status.completed
-    name: Completed
-    type: boolean
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
+    - JSONPath: .spec.infraID
+      name: InfraID
+      type: string
+    - JSONPath: .spec.clusterID
+      name: ClusterID
+      type: string
+    - JSONPath: .status.completed
+      name: Completed
+      type: boolean
+    - JSONPath: .metadata.creationTimestamp
+      name: Age
+      type: date
   group: hive.openshift.io
   names:
     kind: ClusterDeprovision
     listKind: ClusterDeprovisionList
     plural: clusterdeprovisions
     shortNames:
-    - cdr
+      - cdr
     singular: clusterdeprovision
   scope: Namespaced
   subresources:
@@ -2609,7 +2604,7 @@ spec:
                       description: Region is the AWS region for this deprovisioning
                       type: string
                   required:
-                  - region
+                    - region
                   type: object
                 azure:
                   description: Azure contains Azure-specific deprovision settings
@@ -2640,7 +2635,7 @@ spec:
                       description: Region is the GCP region for this deprovision
                       type: string
                   required:
-                  - region
+                    - region
                   type: object
                 openstack:
                   description: OpenStack contains OpenStack-specific deprovision settings
@@ -2659,11 +2654,11 @@ spec:
                           type: string
                       type: object
                   required:
-                  - cloud
+                    - cloud
                   type: object
               type: object
           required:
-          - infraID
+            - infraID
           type: object
         status:
           description: ClusterDeprovisionStatus defines the observed state of ClusterDeprovision
@@ -2675,13 +2670,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -2701,25 +2696,23 @@ func configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterimagesetsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterimagesetsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.releaseImage
-    name: Release
-    type: string
+    - JSONPath: .spec.releaseImage
+      name: Release
+      type: string
   group: hive.openshift.io
   names:
     kind: ClusterImageSet
     listKind: ClusterImageSetList
     plural: clusterimagesets
     shortNames:
-    - imgset
+      - imgset
     singular: clusterimageset
   scope: Cluster
   subresources:
@@ -2748,7 +2741,7 @@ spec:
                 use when installing a cluster.
               type: string
           required:
-          - releaseImage
+            - releaseImage
           type: object
         status:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
@@ -2756,13 +2749,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -2782,24 +2775,22 @@ func configCrdsHiveOpenshiftIo_clusterimagesetsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterprovisionsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterprovisionsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: clusterprovisions.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.clusterDeploymentRef.name
-    name: ClusterDeployment
-    type: string
-  - JSONPath: .spec.stage
-    name: Stage
-    type: string
-  - JSONPath: .spec.infraID
-    name: InfraID
-    type: string
+    - JSONPath: .spec.clusterDeploymentRef.name
+      name: ClusterDeployment
+      type: string
+    - JSONPath: .spec.stage
+      name: Stage
+      type: string
+    - JSONPath: .spec.infraID
+      name: InfraID
+      type: string
   group: hive.openshift.io
   names:
     kind: ClusterProvision
@@ -2947,8 +2938,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchFields:
@@ -2983,8 +2974,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                 type: object
@@ -2994,8 +2985,8 @@ spec:
                                 format: int32
                                 type: integer
                             required:
-                            - preference
-                            - weight
+                              - preference
+                              - weight
                             type: object
                           type: array
                         requiredDuringSchedulingIgnoredDuringExecution:
@@ -3048,8 +3039,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchFields:
@@ -3084,14 +3075,14 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                 type: object
                               type: array
                           required:
-                          - nodeSelectorTerms
+                            - nodeSelectorTerms
                           type: object
                       type: object
                     podAffinity:
@@ -3155,8 +3146,8 @@ spec:
                                                 type: string
                                               type: array
                                           required:
-                                          - key
-                                          - operator
+                                            - key
+                                            - operator
                                           type: object
                                         type: array
                                       matchLabels:
@@ -3188,7 +3179,7 @@ spec:
                                       is not allowed.
                                     type: string
                                 required:
-                                - topologyKey
+                                  - topologyKey
                                 type: object
                               weight:
                                 description: weight associated with matching the corresponding
@@ -3196,8 +3187,8 @@ spec:
                                 format: int32
                                 type: integer
                             required:
-                            - podAffinityTerm
-                            - weight
+                              - podAffinityTerm
+                              - weight
                             type: object
                           type: array
                         requiredDuringSchedulingIgnoredDuringExecution:
@@ -3252,8 +3243,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchLabels:
@@ -3284,7 +3275,7 @@ spec:
                                   is running. Empty topologyKey is not allowed.
                                 type: string
                             required:
-                            - topologyKey
+                              - topologyKey
                             type: object
                           type: array
                       type: object
@@ -3351,8 +3342,8 @@ spec:
                                                 type: string
                                               type: array
                                           required:
-                                          - key
-                                          - operator
+                                            - key
+                                            - operator
                                           type: object
                                         type: array
                                       matchLabels:
@@ -3384,7 +3375,7 @@ spec:
                                       is not allowed.
                                     type: string
                                 required:
-                                - topologyKey
+                                  - topologyKey
                                 type: object
                               weight:
                                 description: weight associated with matching the corresponding
@@ -3392,8 +3383,8 @@ spec:
                                 format: int32
                                 type: integer
                             required:
-                            - podAffinityTerm
-                            - weight
+                              - podAffinityTerm
+                              - weight
                             type: object
                           type: array
                         requiredDuringSchedulingIgnoredDuringExecution:
@@ -3448,8 +3439,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchLabels:
@@ -3480,7 +3471,7 @@ spec:
                                   is running. Empty topologyKey is not allowed.
                                 type: string
                             required:
-                            - topologyKey
+                              - topologyKey
                             type: object
                           type: array
                       type: object
@@ -3565,7 +3556,7 @@ spec:
                                         its key must be defined
                                       type: boolean
                                   required:
-                                  - key
+                                    - key
                                   type: object
                                 fieldRef:
                                   description: 'Selects a field of the pod: supports
@@ -3582,7 +3573,7 @@ spec:
                                         the specified API version.
                                       type: string
                                   required:
-                                  - fieldPath
+                                    - fieldPath
                                   type: object
                                 resourceFieldRef:
                                   description: 'Selects a resource of the container:
@@ -3603,7 +3594,7 @@ spec:
                                       description: 'Required: resource to select'
                                       type: string
                                   required:
-                                  - resource
+                                    - resource
                                   type: object
                                 secretKeyRef:
                                   description: Selects a key of a secret in the pod's
@@ -3624,11 +3615,11 @@ spec:
                                         key must be defined
                                       type: boolean
                                   required:
-                                  - key
+                                    - key
                                   type: object
                               type: object
                           required:
-                          - name
+                            - name
                           type: object
                         type: array
                       envFrom:
@@ -3738,8 +3729,8 @@ spec:
                                           description: The header field value
                                           type: string
                                       required:
-                                      - name
-                                      - value
+                                        - name
+                                        - value
                                       type: object
                                     type: array
                                   path:
@@ -3747,8 +3738,8 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Name or number of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
@@ -3757,7 +3748,7 @@ spec:
                                       host. Defaults to HTTP.
                                     type: string
                                 required:
-                                - port
+                                  - port
                                 type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
@@ -3770,13 +3761,13 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Number or name of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
                                 required:
-                                - port
+                                  - port
                                 type: object
                             type: object
                           preStop:
@@ -3834,8 +3825,8 @@ spec:
                                           description: The header field value
                                           type: string
                                       required:
-                                      - name
-                                      - value
+                                        - name
+                                        - value
                                       type: object
                                     type: array
                                   path:
@@ -3843,8 +3834,8 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Name or number of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
@@ -3853,7 +3844,7 @@ spec:
                                       host. Defaults to HTTP.
                                     type: string
                                 required:
-                                - port
+                                  - port
                                 type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
@@ -3866,13 +3857,13 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Number or name of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
                                 required:
-                                - port
+                                  - port
                                 type: object
                             type: object
                         type: object
@@ -3926,8 +3917,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -3935,8 +3926,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -3945,7 +3936,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -3976,13 +3967,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -4036,7 +4027,7 @@ spec:
                                 SCTP. Defaults to "TCP".
                               type: string
                           required:
-                          - containerPort
+                            - containerPort
                           type: object
                         type: array
                       readinessProbe:
@@ -4089,8 +4080,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -4098,8 +4089,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -4108,7 +4099,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -4139,13 +4130,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -4357,8 +4348,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -4366,8 +4357,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -4376,7 +4367,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -4407,13 +4398,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -4480,8 +4471,8 @@ spec:
                                 in the pod
                               type: string
                           required:
-                          - devicePath
-                          - name
+                            - devicePath
+                            - name
                           type: object
                         type: array
                       volumeMounts:
@@ -4522,8 +4513,8 @@ spec:
                                 are mutually exclusive.
                               type: string
                           required:
-                          - mountPath
-                          - name
+                            - mountPath
+                            - name
                           type: object
                         type: array
                       workingDir:
@@ -4532,7 +4523,7 @@ spec:
                           be configured in the container image. Cannot be updated.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                   type: array
                 dnsConfig:
@@ -4674,7 +4665,7 @@ spec:
                                         its key must be defined
                                       type: boolean
                                   required:
-                                  - key
+                                    - key
                                   type: object
                                 fieldRef:
                                   description: 'Selects a field of the pod: supports
@@ -4691,7 +4682,7 @@ spec:
                                         the specified API version.
                                       type: string
                                   required:
-                                  - fieldPath
+                                    - fieldPath
                                   type: object
                                 resourceFieldRef:
                                   description: 'Selects a resource of the container:
@@ -4712,7 +4703,7 @@ spec:
                                       description: 'Required: resource to select'
                                       type: string
                                   required:
-                                  - resource
+                                    - resource
                                   type: object
                                 secretKeyRef:
                                   description: Selects a key of a secret in the pod's
@@ -4733,11 +4724,11 @@ spec:
                                         key must be defined
                                       type: boolean
                                   required:
-                                  - key
+                                    - key
                                   type: object
                               type: object
                           required:
-                          - name
+                            - name
                           type: object
                         type: array
                       envFrom:
@@ -4843,8 +4834,8 @@ spec:
                                           description: The header field value
                                           type: string
                                       required:
-                                      - name
-                                      - value
+                                        - name
+                                        - value
                                       type: object
                                     type: array
                                   path:
@@ -4852,8 +4843,8 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Name or number of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
@@ -4862,7 +4853,7 @@ spec:
                                       host. Defaults to HTTP.
                                     type: string
                                 required:
-                                - port
+                                  - port
                                 type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
@@ -4875,13 +4866,13 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Number or name of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
                                 required:
-                                - port
+                                  - port
                                 type: object
                             type: object
                           preStop:
@@ -4939,8 +4930,8 @@ spec:
                                           description: The header field value
                                           type: string
                                       required:
-                                      - name
-                                      - value
+                                        - name
+                                        - value
                                       type: object
                                     type: array
                                   path:
@@ -4948,8 +4939,8 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Name or number of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
@@ -4958,7 +4949,7 @@ spec:
                                       host. Defaults to HTTP.
                                     type: string
                                 required:
-                                - port
+                                  - port
                                 type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
@@ -4971,13 +4962,13 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Number or name of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
                                 required:
-                                - port
+                                  - port
                                 type: object
                             type: object
                         type: object
@@ -5029,8 +5020,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -5038,8 +5029,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -5048,7 +5039,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -5079,13 +5070,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -5133,7 +5124,7 @@ spec:
                                 SCTP. Defaults to "TCP".
                               type: string
                           required:
-                          - containerPort
+                            - containerPort
                           type: object
                         type: array
                       readinessProbe:
@@ -5184,8 +5175,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -5193,8 +5184,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -5203,7 +5194,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -5234,13 +5225,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -5444,8 +5435,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -5453,8 +5444,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -5463,7 +5454,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -5494,13 +5485,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -5575,8 +5566,8 @@ spec:
                                 in the pod
                               type: string
                           required:
-                          - devicePath
-                          - name
+                            - devicePath
+                            - name
                           type: object
                         type: array
                       volumeMounts:
@@ -5617,8 +5608,8 @@ spec:
                                 are mutually exclusive.
                               type: string
                           required:
-                          - mountPath
-                          - name
+                            - mountPath
+                            - name
                           type: object
                         type: array
                       workingDir:
@@ -5627,7 +5618,7 @@ spec:
                           be configured in the container image. Cannot be updated.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                   type: array
                 hostAliases:
@@ -5768,7 +5759,7 @@ spec:
                                         its key must be defined
                                       type: boolean
                                   required:
-                                  - key
+                                    - key
                                   type: object
                                 fieldRef:
                                   description: 'Selects a field of the pod: supports
@@ -5785,7 +5776,7 @@ spec:
                                         the specified API version.
                                       type: string
                                   required:
-                                  - fieldPath
+                                    - fieldPath
                                   type: object
                                 resourceFieldRef:
                                   description: 'Selects a resource of the container:
@@ -5806,7 +5797,7 @@ spec:
                                       description: 'Required: resource to select'
                                       type: string
                                   required:
-                                  - resource
+                                    - resource
                                   type: object
                                 secretKeyRef:
                                   description: Selects a key of a secret in the pod's
@@ -5827,11 +5818,11 @@ spec:
                                         key must be defined
                                       type: boolean
                                   required:
-                                  - key
+                                    - key
                                   type: object
                               type: object
                           required:
-                          - name
+                            - name
                           type: object
                         type: array
                       envFrom:
@@ -5941,8 +5932,8 @@ spec:
                                           description: The header field value
                                           type: string
                                       required:
-                                      - name
-                                      - value
+                                        - name
+                                        - value
                                       type: object
                                     type: array
                                   path:
@@ -5950,8 +5941,8 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Name or number of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
@@ -5960,7 +5951,7 @@ spec:
                                       host. Defaults to HTTP.
                                     type: string
                                 required:
-                                - port
+                                  - port
                                 type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
@@ -5973,13 +5964,13 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Number or name of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
                                 required:
-                                - port
+                                  - port
                                 type: object
                             type: object
                           preStop:
@@ -6037,8 +6028,8 @@ spec:
                                           description: The header field value
                                           type: string
                                       required:
-                                      - name
-                                      - value
+                                        - name
+                                        - value
                                       type: object
                                     type: array
                                   path:
@@ -6046,8 +6037,8 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Name or number of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
@@ -6056,7 +6047,7 @@ spec:
                                       host. Defaults to HTTP.
                                     type: string
                                 required:
-                                - port
+                                  - port
                                 type: object
                               tcpSocket:
                                 description: 'TCPSocket specifies an action involving
@@ -6069,13 +6060,13 @@ spec:
                                     type: string
                                   port:
                                     anyOf:
-                                    - type: string
-                                    - type: integer
+                                      - type: string
+                                      - type: integer
                                     description: Number or name of the port to access
                                       on the container. Number must be in the range
                                       1 to 65535. Name must be an IANA_SVC_NAME.
                                 required:
-                                - port
+                                  - port
                                 type: object
                             type: object
                         type: object
@@ -6129,8 +6120,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -6138,8 +6129,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -6148,7 +6139,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -6179,13 +6170,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -6239,7 +6230,7 @@ spec:
                                 SCTP. Defaults to "TCP".
                               type: string
                           required:
-                          - containerPort
+                            - containerPort
                           type: object
                         type: array
                       readinessProbe:
@@ -6292,8 +6283,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -6301,8 +6292,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -6311,7 +6302,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -6342,13 +6333,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -6560,8 +6551,8 @@ spec:
                                       description: The header field value
                                       type: string
                                   required:
-                                  - name
-                                  - value
+                                    - name
+                                    - value
                                   type: object
                                 type: array
                               path:
@@ -6569,8 +6560,8 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Name or number of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
@@ -6579,7 +6570,7 @@ spec:
                                   Defaults to HTTP.
                                 type: string
                             required:
-                            - port
+                              - port
                             type: object
                           initialDelaySeconds:
                             description: 'Number of seconds after the container has
@@ -6610,13 +6601,13 @@ spec:
                                 type: string
                               port:
                                 anyOf:
-                                - type: string
-                                - type: integer
+                                  - type: string
+                                  - type: integer
                                 description: Number or name of the port to access
                                   on the container. Number must be in the range 1
                                   to 65535. Name must be an IANA_SVC_NAME.
                             required:
-                            - port
+                              - port
                             type: object
                           timeoutSeconds:
                             description: 'Number of seconds after which the probe
@@ -6683,8 +6674,8 @@ spec:
                                 in the pod
                               type: string
                           required:
-                          - devicePath
-                          - name
+                            - devicePath
+                            - name
                           type: object
                         type: array
                       volumeMounts:
@@ -6725,8 +6716,8 @@ spec:
                                 are mutually exclusive.
                               type: string
                           required:
-                          - mountPath
-                          - name
+                            - mountPath
+                            - name
                           type: object
                         type: array
                       workingDir:
@@ -6735,7 +6726,7 @@ spec:
                           be configured in the container image. Cannot be updated.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                   type: array
                 nodeName:
@@ -6803,7 +6794,7 @@ spec:
                           condition list with matching type.
                         type: string
                     required:
-                    - conditionType
+                      - conditionType
                     type: object
                   type: array
                 restartPolicy:
@@ -6831,14 +6822,14 @@ spec:
                     type description for default values of each field.'
                   properties:
                     fsGroup:
-                      description: "A special supplemental group that applies to all
-                        containers in a pod. Some volume types allow the Kubelet to
-                        change the ownership of that volume to be owned by the pod:
-                        \n 1. The owning GID will be the FSGroup 2. The setgid bit
-                        is set (new files created in the volume will be owned by FSGroup)
-                        3. The permission bits are OR'd with rw-rw---- \n If unset,
-                        the Kubelet will not modify the ownership and permissions
-                        of any volume."
+                      description: "A special supplemental group that applies to all\
+                        \ containers in a pod. Some volume types allow the Kubelet\
+                        \ to change the ownership of that volume to be owned by the\
+                        \ pod: \n 1. The owning GID will be the FSGroup 2. The setgid\
+                        \ bit is set (new files created in the volume will be owned\
+                        \ by FSGroup) 3. The permission bits are OR'd with rw-rw----\
+                        \ \n If unset, the Kubelet will not modify the ownership and\
+                        \ permissions of any volume."
                       format: int64
                       type: integer
                     fsGroupChangePolicy:
@@ -6921,8 +6912,8 @@ spec:
                             description: Value of a property to set
                             type: string
                         required:
-                        - name
-                        - value
+                          - name
+                          - value
                         type: object
                       type: array
                     windowsOptions:
@@ -7066,8 +7057,8 @@ spec:
                                     type: string
                                   type: array
                               required:
-                              - key
-                              - operator
+                                - key
+                                - operator
                               type: object
                             type: array
                           matchLabels:
@@ -7119,9 +7110,9 @@ spec:
                           field.'
                         type: string
                     required:
-                    - maxSkew
-                    - topologyKey
-                    - whenUnsatisfiable
+                      - maxSkew
+                      - topologyKey
+                      - whenUnsatisfiable
                     type: object
                   type: array
                 volumes:
@@ -7163,7 +7154,7 @@ spec:
                               in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore'
                             type: string
                         required:
-                        - volumeID
+                          - volumeID
                         type: object
                       azureDisk:
                         description: AzureDisk represents an Azure Data Disk mount
@@ -7195,8 +7186,8 @@ spec:
                               here will force the ReadOnly setting in VolumeMounts.
                             type: boolean
                         required:
-                        - diskName
-                        - diskURI
+                          - diskName
+                          - diskURI
                         type: object
                       azureFile:
                         description: AzureFile represents an Azure File Service mount
@@ -7214,8 +7205,8 @@ spec:
                             description: Share Name
                             type: string
                         required:
-                        - secretName
-                        - shareName
+                          - secretName
+                          - shareName
                         type: object
                       cephfs:
                         description: CephFS represents a Ceph FS mount on the host
@@ -7257,7 +7248,7 @@ spec:
                               is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
                             type: string
                         required:
-                        - monitors
+                          - monitors
                         type: object
                       cinder:
                         description: 'Cinder represents a cinder volume attached and
@@ -7289,7 +7280,7 @@ spec:
                               cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
                             type: string
                         required:
-                        - volumeID
+                          - volumeID
                         type: object
                       configMap:
                         description: ConfigMap represents a configMap that should
@@ -7336,8 +7327,8 @@ spec:
                                     the string '..'.
                                   type: string
                               required:
-                              - key
-                              - path
+                                - key
+                                - path
                               type: object
                             type: array
                           name:
@@ -7392,7 +7383,7 @@ spec:
                               documentation for supported values.
                             type: object
                         required:
-                        - driver
+                          - driver
                         type: object
                       downwardAPI:
                         description: DownwardAPI represents downward API about the
@@ -7427,7 +7418,7 @@ spec:
                                         the specified API version.
                                       type: string
                                   required:
-                                  - fieldPath
+                                    - fieldPath
                                   type: object
                                 mode:
                                   description: 'Optional: mode bits to use on this
@@ -7463,10 +7454,10 @@ spec:
                                       description: 'Required: resource to select'
                                       type: string
                                   required:
-                                  - resource
+                                    - resource
                                   type: object
                               required:
-                              - path
+                                - path
                               type: object
                             type: array
                         type: object
@@ -7561,7 +7552,7 @@ spec:
                                 type: string
                             type: object
                         required:
-                        - driver
+                          - driver
                         type: object
                       flocker:
                         description: Flocker represents a Flocker volume attached
@@ -7610,7 +7601,7 @@ spec:
                               in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
                             type: boolean
                         required:
-                        - pdName
+                          - pdName
                         type: object
                       gitRepo:
                         description: 'GitRepo represents a git repository at a particular
@@ -7633,7 +7624,7 @@ spec:
                             description: Commit hash for the specified revision.
                             type: string
                         required:
-                        - repository
+                          - repository
                         type: object
                       glusterfs:
                         description: 'Glusterfs represents a Glusterfs mount on the
@@ -7653,8 +7644,8 @@ spec:
                               false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod'
                             type: boolean
                         required:
-                        - endpoints
-                        - path
+                          - endpoints
+                          - path
                         type: object
                       hostPath:
                         description: 'HostPath represents a pre-existing file or directory
@@ -7675,7 +7666,7 @@ spec:
                               More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath'
                             type: string
                         required:
-                        - path
+                          - path
                         type: object
                       iscsi:
                         description: 'ISCSI represents an ISCSI Disk resource that
@@ -7741,9 +7732,9 @@ spec:
                               (typically TCP ports 860 and 3260).
                             type: string
                         required:
-                        - iqn
-                        - lun
-                        - targetPortal
+                          - iqn
+                          - lun
+                          - targetPortal
                         type: object
                       name:
                         description: 'Volume''s name. Must be a DNS_LABEL and unique
@@ -7767,8 +7758,8 @@ spec:
                               the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
                             type: string
                         required:
-                        - path
-                        - server
+                          - path
+                          - server
                         type: object
                       persistentVolumeClaim:
                         description: 'PersistentVolumeClaimVolumeSource represents
@@ -7785,7 +7776,7 @@ spec:
                               Default false.
                             type: boolean
                         required:
-                        - claimName
+                          - claimName
                         type: object
                       photonPersistentDisk:
                         description: PhotonPersistentDisk represents a PhotonController
@@ -7801,7 +7792,7 @@ spec:
                               disk
                             type: string
                         required:
-                        - pdID
+                          - pdID
                         type: object
                       portworxVolume:
                         description: PortworxVolume represents a portworx volume attached
@@ -7821,7 +7812,7 @@ spec:
                             description: VolumeID uniquely identifies a Portworx volume
                             type: string
                         required:
-                        - volumeID
+                          - volumeID
                         type: object
                       projected:
                         description: Items for all in one resources secrets, configmaps,
@@ -7884,8 +7875,8 @@ spec:
                                               string '..'.
                                             type: string
                                         required:
-                                        - key
-                                        - path
+                                          - key
+                                          - path
                                         type: object
                                       type: array
                                     name:
@@ -7926,7 +7917,7 @@ spec:
                                                   select in the specified API version.
                                                 type: string
                                             required:
-                                            - fieldPath
+                                              - fieldPath
                                             type: object
                                           mode:
                                             description: 'Optional: mode bits to use
@@ -7968,10 +7959,10 @@ spec:
                                                   select'
                                                 type: string
                                             required:
-                                            - resource
+                                              - resource
                                             type: object
                                         required:
-                                        - path
+                                          - path
                                         type: object
                                       type: array
                                   type: object
@@ -8017,8 +8008,8 @@ spec:
                                               string '..'.
                                             type: string
                                         required:
-                                        - key
-                                        - path
+                                          - key
+                                          - path
                                         type: object
                                       type: array
                                     name:
@@ -8062,12 +8053,12 @@ spec:
                                         into.
                                       type: string
                                   required:
-                                  - path
+                                    - path
                                   type: object
                               type: object
                             type: array
                         required:
-                        - sources
+                          - sources
                         type: object
                       quobyte:
                         description: Quobyte represents a Quobyte mount on the host
@@ -8102,8 +8093,8 @@ spec:
                               created Quobyte volume by name.
                             type: string
                         required:
-                        - registry
-                        - volume
+                          - registry
+                          - volume
                         type: object
                       rbd:
                         description: 'RBD represents a Rados Block Device mount on
@@ -8155,8 +8146,8 @@ spec:
                               info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
                             type: string
                         required:
-                        - image
-                        - monitors
+                          - image
+                          - monitors
                         type: object
                       scaleIO:
                         description: ScaleIO represents a ScaleIO persistent volume
@@ -8211,9 +8202,9 @@ spec:
                               ScaleIO system that is associated with this volume source.
                             type: string
                         required:
-                        - gateway
-                        - secretRef
-                        - system
+                          - gateway
+                          - secretRef
+                          - system
                         type: object
                       secret:
                         description: 'Secret represents a secret that should populate
@@ -8260,8 +8251,8 @@ spec:
                                     the string '..'.
                                   type: string
                               required:
-                              - key
-                              - path
+                                - key
+                                - path
                               type: object
                             type: array
                           optional:
@@ -8334,14 +8325,14 @@ spec:
                             description: Path that identifies vSphere volume vmdk
                             type: string
                         required:
-                        - volumePath
+                          - volumePath
                         type: object
                     required:
-                    - name
+                      - name
                     type: object
                   type: array
               required:
-              - containers
+                - containers
               type: object
             prevClusterID:
               description: PrevClusterID is the cluster ID of the previous failed
@@ -8356,10 +8347,10 @@ spec:
                 has reached.
               type: string
           required:
-          - attempt
-          - clusterDeploymentRef
-          - podSpec
-          - stage
+            - attempt
+            - clusterDeploymentRef
+            - podSpec
+            - stage
           type: object
         status:
           description: ClusterProvisionStatus defines the observed state of ClusterProvision.
@@ -8395,8 +8386,8 @@ spec:
                     description: Type is the type of the condition.
                     type: string
                 required:
-                - status
-                - type
+                  - status
+                  - type
                 type: object
               type: array
             jobRef:
@@ -8411,13 +8402,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -8437,9 +8428,7 @@ func configCrdsHiveOpenshiftIo_clusterprovisionsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterstatesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterstatesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8513,16 +8502,16 @@ spec:
                             condition.
                           type: string
                       required:
-                      - lastTransitionTime
-                      - status
-                      - type
+                        - lastTransitionTime
+                        - status
+                        - type
                       type: object
                     type: array
                   name:
                     description: Name is the name of the cluster operator
                     type: string
                 required:
-                - name
+                  - name
                 type: object
               type: array
             lastUpdated:
@@ -8533,13 +8522,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -8559,9 +8548,7 @@ func configCrdsHiveOpenshiftIo_clusterstatesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_dnszonesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_dnszonesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8614,8 +8601,8 @@ spec:
                         description: Value is the value for the tag
                         type: string
                     required:
-                    - key
-                    - value
+                      - key
+                      - value
                     type: object
                   type: array
                 credentialsSecretRef:
@@ -8632,7 +8619,7 @@ spec:
                     This defaults to us-east-1. For AWS China, use cn-northwest-1.
                   type: string
               required:
-              - credentialsSecretRef
+                - credentialsSecretRef
               type: object
             gcp:
               description: GCP specifies GCP-specific cloud configuration
@@ -8650,7 +8637,7 @@ spec:
                       type: string
                   type: object
               required:
-              - credentialsSecretRef
+                - credentialsSecretRef
               type: object
             linkToParentDomain:
               description: LinkToParentDomain specifies whether DNS records should
@@ -8660,7 +8647,7 @@ spec:
               description: Zone is the DNS zone to host
               type: string
           required:
-          - zone
+            - zone
           type: object
         status:
           description: DNSZoneStatus defines the observed state of DNSZone
@@ -8703,8 +8690,8 @@ spec:
                     description: Type is the type of the condition.
                     type: string
                 required:
-                - status
-                - type
+                  - status
+                  - type
                 type: object
               type: array
             gcp:
@@ -8734,13 +8721,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -8760,9 +8747,7 @@ func configCrdsHiveOpenshiftIo_dnszonesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_hiveconfigsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_hiveconfigsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8932,7 +8917,7 @@ spec:
                         type: object
                     type: object
                 required:
-                - domains
+                  - domains
                 type: object
               type: array
             syncSetReapplyInterval:
@@ -8968,13 +8953,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -8994,24 +8979,22 @@ func configCrdsHiveOpenshiftIo_hiveconfigsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
-    name: MachinePool
-    type: string
-  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
-    name: Cluster
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
+    - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
+      name: MachinePool
+      type: string
+    - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
+      name: Cluster
+      type: string
+    - JSONPath: .metadata.creationTimestamp
+      name: Age
+      type: date
   group: hive.openshift.io
   names:
     kind: MachinePoolNameLease
@@ -9050,13 +9033,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -9076,24 +9059,22 @@ func configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_machinepoolsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: machinepools.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.name
-    name: PoolName
-    type: string
-  - JSONPath: .spec.clusterDeploymentRef.name
-    name: ClusterDeployment
-    type: string
-  - JSONPath: .spec.replicas
-    name: Replicas
-    type: integer
+    - JSONPath: .spec.name
+      name: PoolName
+      type: string
+    - JSONPath: .spec.clusterDeploymentRef.name
+      name: ClusterDeployment
+      type: string
+    - JSONPath: .spec.replicas
+      name: Replicas
+      type: integer
   group: hive.openshift.io
   names:
     kind: MachinePool
@@ -9140,8 +9121,8 @@ spec:
                   format: int32
                   type: integer
               required:
-              - maxReplicas
-              - minReplicas
+                - maxReplicas
+                - minReplicas
               type: object
             clusterDeploymentRef:
               description: ClusterDeploymentRef references the cluster deployment
@@ -9182,9 +9163,9 @@ spec:
                           description: Type defines the type of the storage.
                           type: string
                       required:
-                      - iops
-                      - size
-                      - type
+                        - iops
+                        - size
+                        - type
                       type: object
                     type:
                       description: InstanceType defines the ec2 instance type. eg.
@@ -9197,8 +9178,8 @@ spec:
                         type: string
                       type: array
                   required:
-                  - rootVolume
-                  - type
+                    - rootVolume
+                    - type
                   type: object
                 azure:
                   description: Azure is the configuration used when installing on
@@ -9212,7 +9193,7 @@ spec:
                           format: int32
                           type: integer
                       required:
-                      - diskSizeGB
+                        - diskSizeGB
                       type: object
                     type:
                       description: InstanceType defines the azure instance type. eg.
@@ -9225,8 +9206,8 @@ spec:
                         type: string
                       type: array
                   required:
-                  - osDisk
-                  - type
+                    - osDisk
+                    - type
                   type: object
                 gcp:
                   description: GCP is the configuration used when installing on GCP.
@@ -9242,7 +9223,7 @@ spec:
                         type: string
                       type: array
                   required:
-                  - type
+                    - type
                   type: object
                 openstack:
                   description: OpenStack is the configuration used when installing
@@ -9268,11 +9249,11 @@ spec:
                           description: Type defines the type of the volume. Required
                           type: string
                       required:
-                      - size
-                      - type
+                        - size
+                        - type
                       type: object
                   required:
-                  - flavor
+                    - flavor
                   type: object
               type: object
             replicas:
@@ -9306,14 +9287,14 @@ spec:
                     description: The taint value corresponding to the taint key.
                     type: string
                 required:
-                - effect
-                - key
+                  - effect
+                  - key
                 type: object
               type: array
           required:
-          - clusterDeploymentRef
-          - name
-          - platform
+            - clusterDeploymentRef
+            - name
+            - platform
           type: object
         status:
           description: MachinePoolStatus defines the observed state of MachinePool
@@ -9349,8 +9330,8 @@ spec:
                     description: Type is the type of the condition.
                     type: string
                 required:
-                - status
-                - type
+                  - status
+                  - type
                 type: object
               type: array
             machineSets:
@@ -9379,10 +9360,10 @@ spec:
                     format: int32
                     type: integer
                 required:
-                - maxReplicas
-                - minReplicas
-                - name
-                - replicas
+                  - maxReplicas
+                  - minReplicas
+                  - name
+                  - replicas
                 type: object
               type: array
             replicas:
@@ -9394,13 +9375,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -9420,9 +9401,7 @@ func configCrdsHiveOpenshiftIo_machinepoolsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -9487,8 +9466,8 @@ spec:
                           type: string
                         type: array
                     required:
-                    - key
-                    - operator
+                      - key
+                      - operator
                     type: object
                   type: array
                 matchLabels:
@@ -9528,7 +9507,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
@@ -9545,7 +9524,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -9562,7 +9541,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
@@ -9588,7 +9567,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -9605,7 +9584,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
@@ -9645,7 +9624,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -9662,7 +9641,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the oauth server base URL
@@ -9686,7 +9665,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
@@ -9711,7 +9690,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                     type: object
                   keystone:
@@ -9734,7 +9713,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       domainName:
                         description: domainName is required for keystone v3
@@ -9754,7 +9733,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -9771,7 +9750,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
@@ -9832,7 +9811,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       ca:
                         description: ca is an optional reference to a config map by
@@ -9850,7 +9829,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
@@ -9896,7 +9875,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       claims:
                         description: claims mappings
@@ -9939,7 +9918,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       extraAuthorizeParameters:
                         additionalProperties:
@@ -9980,7 +9959,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
@@ -10039,7 +10018,7 @@ spec:
                 type: object
               type: array
           required:
-          - identityProviders
+            - identityProviders
           type: object
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
@@ -10047,13 +10026,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -10073,9 +10052,7 @@ func configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml() (*asset, erro
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_selectorsyncsetsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncsetsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -10087,7 +10064,7 @@ spec:
     listKind: SelectorSyncSetList
     plural: selectorsyncsets
     shortNames:
-    - sss
+      - sss
     singular: selectorsyncset
   scope: Cluster
   validation:
@@ -10141,8 +10118,8 @@ spec:
                           type: string
                         type: array
                     required:
-                    - key
-                    - operator
+                      - key
+                      - operator
                     type: object
                   type: array
                 matchLabels:
@@ -10183,10 +10160,10 @@ spec:
                       (default), "json", or "merge".
                     type: string
                 required:
-                - apiVersion
-                - kind
-                - name
-                - patch
+                  - apiVersion
+                  - kind
+                  - name
+                  - patch
                 type: object
               type: array
             resourceApplyMode:
@@ -10220,7 +10197,7 @@ spec:
                           to be the same namespace as the syncset with the reference.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                   targetRef:
                     description: TargetRef specifies the target name and namespace
@@ -10235,11 +10212,11 @@ spec:
                           to be the same namespace as the syncset with the reference.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                 required:
-                - sourceRef
-                - targetRef
+                  - sourceRef
+                  - targetRef
                 type: object
               type: array
           type: object
@@ -10249,13 +10226,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -10275,9 +10252,7 @@ func configCrdsHiveOpenshiftIo_selectorsyncsetsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_syncidentityprovidersYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncidentityprovidersYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -10354,7 +10329,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
@@ -10371,7 +10346,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -10388,7 +10363,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
@@ -10414,7 +10389,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -10431,7 +10406,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
@@ -10471,7 +10446,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -10488,7 +10463,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the oauth server base URL
@@ -10512,7 +10487,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
@@ -10537,7 +10512,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                     type: object
                   keystone:
@@ -10560,7 +10535,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       domainName:
                         description: domainName is required for keystone v3
@@ -10580,7 +10555,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -10597,7 +10572,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
@@ -10658,7 +10633,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       ca:
                         description: ca is an optional reference to a config map by
@@ -10676,7 +10651,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
@@ -10722,7 +10697,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       claims:
                         description: claims mappings
@@ -10765,7 +10740,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       extraAuthorizeParameters:
                         additionalProperties:
@@ -10806,7 +10781,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
@@ -10865,8 +10840,8 @@ spec:
                 type: object
               type: array
           required:
-          - clusterDeploymentRefs
-          - identityProviders
+            - clusterDeploymentRefs
+            - identityProviders
           type: object
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
@@ -10874,13 +10849,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -10900,25 +10875,23 @@ func configCrdsHiveOpenshiftIo_syncidentityprovidersYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_syncsetinstancesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncsetinstancesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   name: syncsetinstances.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .status.applied
-    name: Applied
-    type: boolean
+    - JSONPath: .status.applied
+      name: Applied
+      type: boolean
   group: hive.openshift.io
   names:
     kind: SyncSetInstance
     listKind: SyncSetInstanceList
     plural: syncsetinstances
     shortNames:
-    - ssi
+      - ssi
     singular: syncsetinstance
   scope: Namespaced
   subresources:
@@ -10964,7 +10937,7 @@ spec:
                   description: Name is the name of the SelectorSyncSet
                   type: string
               required:
-              - name
+                - name
               type: object
             syncSetHash:
               description: SyncSetHash is a hash of the contents of the syncset or
@@ -10980,7 +10953,7 @@ spec:
                   type: string
               type: object
           required:
-          - clusterDeploymentRef
+            - clusterDeploymentRef
           type: object
         status:
           description: SyncSetInstanceStatus defines the observed state of SyncSetInstance
@@ -11020,8 +10993,8 @@ spec:
                     description: Type is the type of the condition.
                     type: string
                 required:
-                - status
-                - type
+                  - status
+                  - type
                 type: object
               type: array
             patches:
@@ -11068,8 +11041,8 @@ spec:
                           description: Type is the type of the condition.
                           type: string
                       required:
-                      - status
-                      - type
+                        - status
+                        - type
                       type: object
                     type: array
                   hash:
@@ -11092,12 +11065,12 @@ spec:
                       was synced. This will be populated for resources, but not patches
                     type: string
                 required:
-                - apiVersion
-                - conditions
-                - hash
-                - kind
-                - name
-                - namespace
+                  - apiVersion
+                  - conditions
+                  - hash
+                  - kind
+                  - name
+                  - namespace
                 type: object
               type: array
             resources:
@@ -11144,8 +11117,8 @@ spec:
                           description: Type is the type of the condition.
                           type: string
                       required:
-                      - status
-                      - type
+                        - status
+                        - type
                       type: object
                     type: array
                   hash:
@@ -11168,12 +11141,12 @@ spec:
                       was synced. This will be populated for resources, but not patches
                     type: string
                 required:
-                - apiVersion
-                - conditions
-                - hash
-                - kind
-                - name
-                - namespace
+                  - apiVersion
+                  - conditions
+                  - hash
+                  - kind
+                  - name
+                  - namespace
                 type: object
               type: array
             secretReferences:
@@ -11220,8 +11193,8 @@ spec:
                           description: Type is the type of the condition.
                           type: string
                       required:
-                      - status
-                      - type
+                        - status
+                        - type
                       type: object
                     type: array
                   hash:
@@ -11244,25 +11217,25 @@ spec:
                       was synced. This will be populated for resources, but not patches
                     type: string
                 required:
-                - apiVersion
-                - conditions
-                - hash
-                - kind
-                - name
-                - namespace
+                  - apiVersion
+                  - conditions
+                  - hash
+                  - kind
+                  - name
+                  - namespace
                 type: object
               type: array
           type: object
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)
@@ -11282,9 +11255,7 @@ func configCrdsHiveOpenshiftIo_syncsetinstancesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_syncsetsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncsetsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -11296,7 +11267,7 @@ spec:
     listKind: SyncSetList
     plural: syncsets
     shortNames:
-    - ss
+      - ss
     singular: syncset
   scope: Namespaced
   validation:
@@ -11362,10 +11333,10 @@ spec:
                       (default), "json", or "merge".
                     type: string
                 required:
-                - apiVersion
-                - kind
-                - name
-                - patch
+                  - apiVersion
+                  - kind
+                  - name
+                  - patch
                 type: object
               type: array
             resourceApplyMode:
@@ -11399,7 +11370,7 @@ spec:
                           to be the same namespace as the syncset with the reference.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                   targetRef:
                     description: TargetRef specifies the target name and namespace
@@ -11414,15 +11385,15 @@ spec:
                           to be the same namespace as the syncset with the reference.
                         type: string
                     required:
-                    - name
+                      - name
                     type: object
                 required:
-                - sourceRef
-                - targetRef
+                  - sourceRef
+                  - targetRef
                 type: object
               type: array
           required:
-          - clusterDeploymentRefs
+            - clusterDeploymentRefs
           type: object
         status:
           description: SyncSetStatus defines the observed state of a SyncSet
@@ -11430,13 +11401,13 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []
 `)

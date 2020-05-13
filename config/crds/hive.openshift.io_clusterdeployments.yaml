@@ -1,5 +1,3 @@
-
----
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -7,31 +5,31 @@ metadata:
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.clusterName
-    name: ClusterName
-    type: string
-  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
-    name: ClusterType
-    type: string
-  - JSONPath: .spec.baseDomain
-    name: BaseDomain
-    type: string
-  - JSONPath: .spec.installed
-    name: Installed
-    type: boolean
-  - JSONPath: .spec.clusterMetadata.infraID
-    name: InfraID
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
+    - JSONPath: .spec.clusterName
+      name: ClusterName
+      type: string
+    - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
+      name: ClusterType
+      type: string
+    - JSONPath: .spec.baseDomain
+      name: BaseDomain
+      type: string
+    - JSONPath: .spec.installed
+      name: Installed
+      type: boolean
+    - JSONPath: .spec.clusterMetadata.infraID
+      name: InfraID
+      type: string
+    - JSONPath: .metadata.creationTimestamp
+      name: Age
+      type: date
   group: hive.openshift.io
   names:
     kind: ClusterDeployment
     listKind: ClusterDeploymentList
     plural: clusterdeployments
     shortNames:
-    - cd
+      - cd
     singular: clusterdeployment
   scope: Namespaced
   subresources:
@@ -88,8 +86,8 @@ spec:
                       plane serving certs
                     type: string
                 required:
-                - certificateSecretRef
-                - name
+                  - certificateSecretRef
+                  - name
                 type: object
               type: array
             clusterMetadata:
@@ -126,10 +124,10 @@ spec:
                     providers.
                   type: string
               required:
-              - adminKubeconfigSecretRef
-              - adminPasswordSecretRef
-              - clusterID
-              - infraID
+                - adminKubeconfigSecretRef
+                - adminPasswordSecretRef
+                - clusterID
+                - infraID
               type: object
             clusterName:
               description: ClusterName is the friendly name of the cluster. It is
@@ -173,8 +171,8 @@ spec:
                               additional certificate.
                             type: string
                         required:
-                        - domain
-                        - name
+                          - domain
+                          - name
                         type: object
                       type: array
                     default:
@@ -230,8 +228,8 @@ spec:
                                 type: string
                               type: array
                           required:
-                          - key
-                          - operator
+                            - key
+                            - operator
                           type: object
                         type: array
                       matchLabels:
@@ -275,8 +273,8 @@ spec:
                                 type: string
                               type: array
                           required:
-                          - key
-                          - operator
+                            - key
+                            - operator
                           type: object
                         type: array
                       matchLabels:
@@ -294,8 +292,8 @@ spec:
                       in the ClusterDeployment.Spec that should be used for this Ingress
                     type: string
                 required:
-                - domain
-                - name
+                  - domain
+                  - name
                 type: object
               type: array
             installed:
@@ -332,8 +330,8 @@ spec:
                         created for the cluster.
                       type: object
                   required:
-                  - credentialsSecretRef
-                  - region
+                    - credentialsSecretRef
+                    - region
                   type: object
                 azure:
                   description: Azure is the configuration used when installing on
@@ -357,8 +355,8 @@ spec:
                         will be created.
                       type: string
                   required:
-                  - credentialsSecretRef
-                  - region
+                    - credentialsSecretRef
+                    - region
                   type: object
                 baremetal:
                   description: BareMetal is the configuration used when installing
@@ -377,7 +375,7 @@ spec:
                           type: string
                       type: object
                   required:
-                  - libvirtSSHPrivateKeySecretRef
+                    - libvirtSSHPrivateKeySecretRef
                   type: object
                 gcp:
                   description: GCP is the configuration used when installing on Google
@@ -397,8 +395,8 @@ spec:
                         will be created.
                       type: string
                   required:
-                  - credentialsSecretRef
-                  - region
+                    - credentialsSecretRef
+                    - region
                   type: object
                 openstack:
                   description: OpenStack is the configuration used when installing
@@ -422,8 +420,8 @@ spec:
                         ports in your OpenShift cluster.
                       type: boolean
                   required:
-                  - cloud
-                  - credentialsSecretRef
+                    - cloud
+                    - credentialsSecretRef
                   type: object
               type: object
             preserveOnDelete:
@@ -444,7 +442,7 @@ spec:
                         refers to
                       type: string
                   required:
-                  - name
+                    - name
                   type: object
                 installConfigSecretRef:
                   description: InstallConfigSecretRef is the reference to a secret
@@ -499,7 +497,7 @@ spec:
                                   key must be defined
                                 type: boolean
                             required:
-                            - key
+                              - key
                             type: object
                           fieldRef:
                             description: 'Selects a field of the pod: supports metadata.name,
@@ -516,7 +514,7 @@ spec:
                                   API version.
                                 type: string
                             required:
-                            - fieldPath
+                              - fieldPath
                             type: object
                           resourceFieldRef:
                             description: 'Selects a resource of the container: only
@@ -536,7 +534,7 @@ spec:
                                 description: 'Required: resource to select'
                                 type: string
                             required:
-                            - resource
+                              - resource
                             type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
@@ -555,11 +553,11 @@ spec:
                                   must be defined
                                 type: boolean
                             required:
-                            - key
+                              - key
                             type: object
                         type: object
                     required:
-                    - name
+                      - name
                     type: object
                   type: array
                 manifestsConfigMapRef:
@@ -602,7 +600,7 @@ spec:
                       type: string
                   type: object
               required:
-              - installConfigSecretRef
+                - installConfigSecretRef
               type: object
             pullSecretRef:
               description: PullSecretRef is the reference to the secret to use when
@@ -614,9 +612,9 @@ spec:
                   type: string
               type: object
           required:
-          - baseDomain
-          - clusterName
-          - platform
+            - baseDomain
+            - clusterName
+            - platform
           type: object
         status:
           description: ClusterDeploymentStatus defines the observed state of ClusterDeployment
@@ -639,8 +637,8 @@ spec:
                     description: Name of the certificate bundle
                     type: string
                 required:
-                - generated
-                - name
+                  - generated
+                  - name
                 type: object
               type: array
             cliImage:
@@ -661,17 +659,17 @@ spec:
                       referenced by the Image member.
                     properties:
                       force:
-                        description: "force allows an administrator to update to an
-                          image that has failed verification, does not appear in the
-                          availableUpdates list, or otherwise would be blocked by
-                          normal protections on update. This option should only be
-                          used when the authenticity of the provided image has been
-                          verified out of band because the provided image will run
-                          with full administrative access to the cluster. Do not use
-                          this flag with images that comes from unknown or potentially
-                          malicious sources. \n This flag does not override other
-                          forms of consistency checking that are required before a
-                          new update is deployed."
+                        description: "force allows an administrator to update to an\
+                          \ image that has failed verification, does not appear in\
+                          \ the availableUpdates list, or otherwise would be blocked\
+                          \ by normal protections on update. This option should only\
+                          \ be used when the authenticity of the provided image has\
+                          \ been verified out of band because the provided image will\
+                          \ run with full administrative access to the cluster. Do\
+                          \ not use this flag with images that comes from unknown\
+                          \ or potentially malicious sources. \n This flag does not\
+                          \ override other forms of consistency checking that are\
+                          \ required before a new update is deployed."
                         type: boolean
                       image:
                         description: image is a container image location that contains
@@ -720,9 +718,9 @@ spec:
                         description: type specifies the aspect reported by this condition.
                         type: string
                     required:
-                    - lastTransitionTime
-                    - status
-                    - type
+                      - lastTransitionTime
+                      - status
+                      - type
                     type: object
                   type: array
                 desired:
@@ -732,16 +730,17 @@ spec:
                     a tag.
                   properties:
                     force:
-                      description: "force allows an administrator to update to an
-                        image that has failed verification, does not appear in the
-                        availableUpdates list, or otherwise would be blocked by normal
-                        protections on update. This option should only be used when
-                        the authenticity of the provided image has been verified out
-                        of band because the provided image will run with full administrative
-                        access to the cluster. Do not use this flag with images that
-                        comes from unknown or potentially malicious sources. \n This
-                        flag does not override other forms of consistency checking
-                        that are required before a new update is deployed."
+                      description: "force allows an administrator to update to an\
+                        \ image that has failed verification, does not appear in the\
+                        \ availableUpdates list, or otherwise would be blocked by\
+                        \ normal protections on update. This option should only be\
+                        \ used when the authenticity of the provided image has been\
+                        \ verified out of band because the provided image will run\
+                        \ with full administrative access to the cluster. Do not use\
+                        \ this flag with images that comes from unknown or potentially\
+                        \ malicious sources. \n This flag does not override other\
+                        \ forms of consistency checking that are required before a\
+                        \ new update is deployed."
                       type: boolean
                     image:
                       description: image is a container image location that contains
@@ -804,11 +803,11 @@ spec:
                           this value may be empty.
                         type: string
                     required:
-                    - completionTime
-                    - image
-                    - startedTime
-                    - state
-                    - verified
+                      - completionTime
+                      - image
+                      - startedTime
+                      - state
+                      - verified
                     type: object
                   type: array
                 observedGeneration:
@@ -824,10 +823,10 @@ spec:
                     unnecessary work and is for internal use only.
                   type: string
               required:
-              - availableUpdates
-              - desired
-              - observedGeneration
-              - versionHash
+                - availableUpdates
+                - desired
+                - observedGeneration
+                - versionHash
               type: object
             conditions:
               description: Conditions includes more detailed status for the cluster
@@ -860,8 +859,8 @@ spec:
                     description: Type is the type of the condition.
                     type: string
                 required:
-                - status
-                - type
+                  - status
+                  - type
                 type: object
               type: array
             installRestarts:
@@ -894,12 +893,12 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []

@@ -1,5 +1,3 @@
-
----
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -77,7 +75,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientCert:
                         description: tlsClientCert is an optional reference to a secret
@@ -94,7 +92,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -111,7 +109,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
@@ -137,7 +135,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -154,7 +152,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       hostname:
                         description: hostname is the optional domain (e.g. "mycompany.com")
@@ -194,7 +192,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       clientID:
                         description: clientID is the oauth client ID
@@ -211,7 +209,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the oauth server base URL
@@ -235,7 +233,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       hostedDomain:
                         description: hostedDomain is the optional Google App domain
@@ -260,7 +258,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                     type: object
                   keystone:
@@ -283,7 +281,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       domainName:
                         description: domainName is required for keystone v3
@@ -303,7 +301,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       tlsClientKey:
                         description: tlsClientKey is an optional reference to a secret
@@ -320,7 +318,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       url:
                         description: url is the remote URL to connect to
@@ -381,7 +379,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       ca:
                         description: ca is an optional reference to a config map by
@@ -399,7 +397,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       insecure:
                         description: 'insecure, if true, indicates the connection
@@ -445,7 +443,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       claims:
                         description: claims mappings
@@ -488,7 +486,7 @@ spec:
                               secret
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       extraAuthorizeParameters:
                         additionalProperties:
@@ -529,7 +527,7 @@ spec:
                               config map
                             type: string
                         required:
-                        - name
+                          - name
                         type: object
                       challengeURL:
                         description: challengeURL is a URL to redirect unauthenticated
@@ -588,8 +586,8 @@ spec:
                 type: object
               type: array
           required:
-          - clusterDeploymentRefs
-          - identityProviders
+            - clusterDeploymentRefs
+            - identityProviders
           type: object
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
@@ -597,12 +595,12 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []

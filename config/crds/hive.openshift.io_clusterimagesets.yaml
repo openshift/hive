@@ -1,5 +1,3 @@
-
----
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -7,16 +5,16 @@ metadata:
   name: clusterimagesets.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.releaseImage
-    name: Release
-    type: string
+    - JSONPath: .spec.releaseImage
+      name: Release
+      type: string
   group: hive.openshift.io
   names:
     kind: ClusterImageSet
     listKind: ClusterImageSetList
     plural: clusterimagesets
     shortNames:
-    - imgset
+      - imgset
     singular: clusterimageset
   scope: Cluster
   subresources:
@@ -45,7 +43,7 @@ spec:
                 use when installing a cluster.
               type: string
           required:
-          - releaseImage
+            - releaseImage
           type: object
         status:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
@@ -53,12 +51,12 @@ spec:
       type: object
   version: v1
   versions:
-  - name: v1
-    served: true
-    storage: true
+    - name: v1
+      served: true
+      storage: true
 status:
   acceptedNames:
-    kind: ""
-    plural: ""
+    kind: ''
+    plural: ''
   conditions: []
   storedVersions: []

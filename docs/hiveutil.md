@@ -30,7 +30,7 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --a
 
 #### Create Cluster on GCP
 
-Credentials will be read from `~/.gcp/osServiceAccount.json`, which can be created by:
+Credentials will be read from either `~/.gcp/osServiceAccount.json`, the contents of the `GOOGLE_CREDENTIALS` environment variable, or the value provided with the `--creds-file` parameter (in increasing order of preference). GCP credentials can be created by:
 
  1. Login to GCP console at https://console.cloud.google.com/
  1. Create a service account with the owner role.
@@ -38,11 +38,11 @@ Credentials will be read from `~/.gcp/osServiceAccount.json`, which can be creat
  1. Select JSON for the key type.
  1. Download resulting JSON file and save to `~/.gcp/osServiceAccount.json`.
 
-Alternatively you can specify a GCP credentials file with `--creds-file` or the `GCP_SHARED_CREDENTIALS_FILE` environment variable.
-
 ```bash
 bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp mycluster
 ```
+
+NOTE: For deprovisioning a cluster, `hiveutil` will use creds from `~/.gcp/osServiceAccount.json` or the `GOOGLE_CREDENTIALS` environment variable (with the environment variable prefered).
 
 ### Other Commands
 

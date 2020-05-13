@@ -238,7 +238,7 @@ type SelectorSyncSetStatus struct {
 
 // SelectorSyncSet is the Schema for the SelectorSyncSet API
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:path=selectorsyncsets,shortName=sss
+// +kubebuilder:resource:path=selectorsyncsets,shortName=sss,scope=Cluster
 type SelectorSyncSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -252,7 +252,7 @@ type SelectorSyncSet struct {
 
 // SyncSet is the Schema for the SyncSet API
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:path=syncsets,shortName=ss
+// +kubebuilder:resource:path=syncsets,shortName=ss,scope=Namespaced
 type SyncSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

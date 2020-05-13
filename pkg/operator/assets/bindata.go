@@ -1528,7 +1528,7 @@ spec:
     listKind: CheckpointList
     plural: checkpoints
     singular: checkpoint
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:
@@ -1619,6 +1619,9 @@ spec:
   additionalPrinterColumns:
   - JSONPath: .spec.clusterName
     name: ClusterName
+    type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
+    name: ClusterType
     type: string
   - JSONPath: .spec.baseDomain
     name: BaseDomain
@@ -2718,7 +2721,7 @@ spec:
     shortNames:
     - imgset
     singular: clusterimageset
-  scope: Namespaced
+  scope: Cluster
   subresources:
     status: {}
   validation:
@@ -8448,7 +8451,7 @@ spec:
     listKind: ClusterStateList
     plural: clusterstates
     singular: clusterstate
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:
@@ -8570,7 +8573,7 @@ spec:
     listKind: DNSZoneList
     plural: dnszones
     singular: dnszone
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:
@@ -8771,7 +8774,7 @@ spec:
     listKind: HiveConfigList
     plural: hiveconfigs
     singular: hiveconfig
-  scope: ""
+  scope: Cluster
   subresources:
     status: {}
   validation:
@@ -9000,10 +9003,10 @@ metadata:
   name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .metadata.labels[hive.openshift.io/machine-pool-name]
+  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
     name: MachinePool
     type: string
-  - JSONPath: .metadata.labels.[hive.openshift.io/cluster-deployment-name]
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
     name: Cluster
     type: string
   - JSONPath: .metadata.creationTimestamp
@@ -9015,7 +9018,7 @@ spec:
     listKind: MachinePoolNameLeaseList
     plural: machinepoolnameleases
     singular: machinepoolnamelease
-  scope: ""
+  scope: Namespaced
   subresources: {}
   validation:
     openAPIV3Schema:
@@ -9431,7 +9434,7 @@ spec:
     listKind: SelectorSyncIdentityProviderList
     plural: selectorsyncidentityproviders
     singular: selectorsyncidentityprovider
-  scope: ""
+  scope: Cluster
   validation:
     openAPIV3Schema:
       description: SelectorSyncIdentityProvider is the Schema for the SelectorSyncSet
@@ -10086,7 +10089,7 @@ spec:
     shortNames:
     - sss
     singular: selectorsyncset
-  scope: Namespaced
+  scope: Cluster
   validation:
     openAPIV3Schema:
       description: SelectorSyncSet is the Schema for the SelectorSyncSet API
@@ -10286,7 +10289,7 @@ spec:
     listKind: SyncIdentityProviderList
     plural: syncidentityproviders
     singular: syncidentityprovider
-  scope: ""
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: SyncIdentityProvider is the Schema for the SyncIdentityProvider

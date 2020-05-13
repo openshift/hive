@@ -7,10 +7,10 @@ metadata:
   name: machinepoolnameleases.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .metadata.labels[hive.openshift.io/machine-pool-name]
+  - JSONPath: .metadata.labels.hive\.openshift\.io/machine-pool-name
     name: MachinePool
     type: string
-  - JSONPath: .metadata.labels.[hive.openshift.io/cluster-deployment-name]
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-deployment-name
     name: Cluster
     type: string
   - JSONPath: .metadata.creationTimestamp
@@ -22,7 +22,7 @@ spec:
     listKind: MachinePoolNameLeaseList
     plural: machinepoolnameleases
     singular: machinepoolnamelease
-  scope: ""
+  scope: Namespaced
   subresources: {}
   validation:
     openAPIV3Schema:

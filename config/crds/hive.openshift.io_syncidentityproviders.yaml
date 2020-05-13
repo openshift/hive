@@ -12,7 +12,7 @@ spec:
     listKind: SyncIdentityProviderList
     plural: syncidentityproviders
     singular: syncidentityprovider
-  scope: ""
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: SyncIdentityProvider is the Schema for the SyncIdentityProvider

@@ -12,7 +12,7 @@ spec:
     listKind: ClusterStateList
     plural: clusterstates
     singular: clusterstate
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:

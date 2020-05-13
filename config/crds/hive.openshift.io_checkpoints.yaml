@@ -12,7 +12,7 @@ spec:
     listKind: CheckpointList
     plural: checkpoints
     singular: checkpoint
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:

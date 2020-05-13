@@ -12,7 +12,7 @@ spec:
     listKind: SelectorSyncIdentityProviderList
     plural: selectorsyncidentityproviders
     singular: selectorsyncidentityprovider
-  scope: ""
+  scope: Cluster
   validation:
     openAPIV3Schema:
       description: SelectorSyncIdentityProvider is the Schema for the SelectorSyncSet

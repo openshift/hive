@@ -14,7 +14,7 @@ spec:
     shortNames:
     - sss
     singular: selectorsyncset
-  scope: Namespaced
+  scope: Cluster
   validation:
     openAPIV3Schema:
       description: SelectorSyncSet is the Schema for the SelectorSyncSet API

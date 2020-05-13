@@ -12,7 +12,7 @@ spec:
     listKind: HiveConfigList
     plural: hiveconfigs
     singular: hiveconfig
-  scope: ""
+  scope: Cluster
   subresources:
     status: {}
   validation:

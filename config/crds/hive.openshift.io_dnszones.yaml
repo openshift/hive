@@ -12,7 +12,7 @@ spec:
     listKind: DNSZoneList
     plural: dnszones
     singular: dnszone
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:

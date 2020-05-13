@@ -77,7 +77,7 @@ type OpenStackClusterDeprovision struct {
 // +kubebuilder:printcolumn:name="ClusterID",type="string",JSONPath=".spec.clusterID"
 // +kubebuilder:printcolumn:name="Completed",type="boolean",JSONPath=".status.completed"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
-// +kubebuilder:resource:path=clusterdeprovisions,shortName=cdr
+// +kubebuilder:resource:path=clusterdeprovisions,shortName=cdr,scope=Namespaced
 type ClusterDeprovision struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

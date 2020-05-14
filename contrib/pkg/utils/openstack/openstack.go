@@ -7,6 +7,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/client-go/util/homedir"
+
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -14,7 +16,7 @@ import (
 // ~/.config/openstack/clouds.yaml, or /etc/openstack/clouds.yaml
 func GetCreds(credsFile string) ([]byte, error) {
 	if credsFile == "" {
-		for _, filePath := range []string{filepath.Join(os.Getenv("HOME"), ".config", "openstack", constants.OpenStackCredentialsName),
+		for _, filePath := range []string{filepath.Join(homedir.HomeDir(), ".config", "openstack", constants.OpenStackCredentialsName),
 			"/etc/openstack"} {
 
 			_, err := os.Stat(filePath)
@@ -28,6 +30,6 @@ func GetCreds(credsFile string) ([]byte, error) {
 			break
 		}
 	}
-	log.Infof("Loading OpenStack creds from: %s", credsFile)
+	log.WithField("credsFile", credsFile).Info("Loading OpenStack creds")
 	return ioutil.ReadFile(credsFile)
 }

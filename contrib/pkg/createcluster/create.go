@@ -3,11 +3,6 @@ package createcluster
 import (
 	"encoding/json"
 	"fmt"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
-	"github.com/openshift/hive/pkg/clusterresource"
-	"github.com/openshift/hive/pkg/gcpclient"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -28,8 +23,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	azurecredutil "github.com/openshift/hive/contrib/pkg/utils/azure"
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -88,7 +89,6 @@ metadata:
   namespace: bar
 type: TestFailResource
 `
-	azureCredFile = "osServicePrincipal.json"
 )
 
 var (
@@ -431,16 +431,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
-		credsFilePath := filepath.Join(os.Getenv("HOME"), ".azure", azureCredFile)
-		if l := os.Getenv("AZURE_AUTH_LOCATION"); l != "" {
-			credsFilePath = l
-		}
-		if o.CredsFile != "" {
-			credsFilePath = o.CredsFile
-		}
-		log.Infof("Loading Azure service principal from: %s", credsFilePath)
-		spFileContents, err := ioutil.ReadFile(credsFilePath)
+		spFileContents, err := azurecredutil.GetCreds(o.CredsFile)
 		if err != nil {
+			log.WithError(err).Error("Failed to read in Azure credentials")
 			return nil, err
 		}
 

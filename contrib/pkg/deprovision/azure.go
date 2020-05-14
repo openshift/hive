@@ -1,11 +1,16 @@
 package deprovision
 
 import (
-	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
-	"github.com/openshift/installer/pkg/destroy/azure"
+	"os"
+
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
+
+	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
+	"github.com/openshift/installer/pkg/destroy/azure"
+
+	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 )
 
 // NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
@@ -17,6 +22,9 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 		Short: "Deprovision Azure assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			if err := validate(); err != nil {
+				log.WithError(err).Fatal("Failed validating Azure credentials")
+			}
 			if err := completeAzureUninstaller(opt, logLevel, args); err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
@@ -29,6 +37,15 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	return cmd
+}
+
+func validate() error {
+	_, err := azureutils.GetCreds("")
+	if err != nil {
+		return errors.Wrap(err, "failed to get Azure credentials")
+	}
+
+	return nil
 }
 
 func completeAzureUninstaller(o *azure.ClusterUninstaller, logLevel string, args []string) error {

@@ -49,7 +49,6 @@ spec:
         status:
           description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

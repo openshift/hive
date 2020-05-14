@@ -311,7 +311,6 @@ spec:
               format: int32
               type: integer
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

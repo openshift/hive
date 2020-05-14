@@ -141,7 +141,6 @@ spec:
         status:
           description: SyncSetStatus defines the observed state of a SyncSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

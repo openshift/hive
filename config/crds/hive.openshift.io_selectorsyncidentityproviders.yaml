@@ -620,7 +620,6 @@ spec:
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

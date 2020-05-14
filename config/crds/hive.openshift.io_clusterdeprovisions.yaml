@@ -138,7 +138,6 @@ spec:
               description: Completed is true when the uninstall has completed successfully
               type: boolean
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

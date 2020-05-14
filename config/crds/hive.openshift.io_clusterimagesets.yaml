@@ -48,7 +48,6 @@ spec:
         status:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

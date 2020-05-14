@@ -61,7 +61,6 @@ spec:
         status:
           description: CheckpointStatus defines the observed state of Checkpoint
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

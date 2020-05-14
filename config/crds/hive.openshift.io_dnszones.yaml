@@ -168,7 +168,6 @@ spec:
                 type: string
               type: array
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

@@ -1577,7 +1577,6 @@ spec:
         status:
           description: CheckpointStatus defines the observed state of Checkpoint
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -2497,7 +2496,6 @@ spec:
                 UI.
               type: string
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -2666,7 +2664,6 @@ spec:
               description: Completed is true when the uninstall has completed successfully
               type: boolean
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -2745,7 +2742,6 @@ spec:
         status:
           description: ClusterImageSetStatus defines the observed state of ClusterImageSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -8398,7 +8394,6 @@ spec:
                   type: string
               type: object
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -8518,7 +8513,6 @@ spec:
               format: date-time
               type: string
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -8717,7 +8711,6 @@ spec:
                 type: string
               type: array
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -8949,7 +8942,6 @@ spec:
               format: int64
               type: integer
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -9029,7 +9021,6 @@ spec:
         status:
           description: MachinePoolNameLeaseStatus defines the observed state of MachinePoolNameLease.
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -9371,7 +9362,6 @@ spec:
               format: int32
               type: integer
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -10022,7 +10012,6 @@ spec:
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -10222,7 +10211,6 @@ spec:
         status:
           description: SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -10845,7 +10833,6 @@ spec:
         status:
           description: IdentityProviderStatus defines the observed state of SyncSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -11225,7 +11212,6 @@ spec:
                 type: object
               type: array
           type: object
-      type: object
   version: v1
   versions:
   - name: v1
@@ -11397,7 +11383,6 @@ spec:
         status:
           description: SyncSetStatus defines the observed state of a SyncSet
           type: object
-      type: object
   version: v1
   versions:
   - name: v1

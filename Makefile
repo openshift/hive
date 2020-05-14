@@ -6,6 +6,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	lib/tmp.mk \
 	targets/openshift/controller-gen.mk \
+	targets/openshift/yq.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
@@ -73,15 +74,25 @@ vendor:
 .PHONY: manifests
 manifests: crd
 
+# controller-gen is adding a yaml break (---) at the beginning of each file. OLM does not like this break.
+# We use yq to strip out the yaml break by having yq replace each file with yq's formatting.
+# $1 - CRD file
+define strip-yaml-break
+	@$(YQ) m -i $(1) $(1)
+
+endef
+
 # Generate CRD yaml from our api types:
 .PHONY: crd
-crd: ensure-controller-gen
+crd: ensure-controller-gen ensure-yq
 	rm -rf ./config/crds
 	'$(CONTROLLER_GEN)' crd paths=./pkg/apis/hive/v1 output:dir=./config/crds
+	@echo Stripping yaml breaks from CRD files
+	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 update: crd
 
 .PHONY: verify-crd
-verify-crd: ensure-controller-gen
+verify-crd: ensure-controller-gen ensure-yq
 	./hack/verify-crd.sh
 verify: verify-crd
 

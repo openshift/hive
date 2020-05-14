@@ -1514,9 +1514,7 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_checkpointsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_checkpointsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -1608,9 +1606,7 @@ func configCrdsHiveOpenshiftIo_checkpointsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterdeploymentsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeploymentsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2530,9 +2526,7 @@ func configCrdsHiveOpenshiftIo_clusterdeploymentsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2701,9 +2695,7 @@ func configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterimagesetsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterimagesetsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -2782,9 +2774,7 @@ func configCrdsHiveOpenshiftIo_clusterimagesetsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterprovisionsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterprovisionsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8437,9 +8427,7 @@ func configCrdsHiveOpenshiftIo_clusterprovisionsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_clusterstatesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_clusterstatesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8559,9 +8547,7 @@ func configCrdsHiveOpenshiftIo_clusterstatesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_dnszonesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_dnszonesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8760,9 +8746,7 @@ func configCrdsHiveOpenshiftIo_dnszonesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_hiveconfigsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_hiveconfigsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -8994,9 +8978,7 @@ func configCrdsHiveOpenshiftIo_hiveconfigsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -9076,9 +9058,7 @@ func configCrdsHiveOpenshiftIo_machinepoolnameleasesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_machinepoolsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_machinepoolsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -9420,9 +9400,7 @@ func configCrdsHiveOpenshiftIo_machinepoolsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -10073,9 +10051,7 @@ func configCrdsHiveOpenshiftIo_selectorsyncidentityprovidersYaml() (*asset, erro
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_selectorsyncsetsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_selectorsyncsetsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -10275,9 +10251,7 @@ func configCrdsHiveOpenshiftIo_selectorsyncsetsYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_syncidentityprovidersYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncidentityprovidersYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -10900,9 +10874,7 @@ func configCrdsHiveOpenshiftIo_syncidentityprovidersYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_syncsetinstancesYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncsetinstancesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
@@ -11282,9 +11254,7 @@ func configCrdsHiveOpenshiftIo_syncsetinstancesYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configCrdsHiveOpenshiftIo_syncsetsYaml = []byte(`
----
-apiVersion: apiextensions.k8s.io/v1beta1
+var _configCrdsHiveOpenshiftIo_syncsetsYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null

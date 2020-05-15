@@ -153,6 +153,13 @@ func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterD
 	cdLog.WithField("clusterversion.status", clusterVersion.Status).Debug("remote cluster version status")
 	cd.Status.ClusterVersionStatus = clusterVersion.Status.DeepCopy()
 
+	// Force the AvailableUpdates field to an empty array instead of nil. When the field is nil, future reads will
+	// read it as an empty array. Then, when doing a deep equal to see if changes have been made, will consider that
+	// field changed, when it has not been.
+	if cd.Status.ClusterVersionStatus.AvailableUpdates == nil {
+		cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
+	}
+
 	if reflect.DeepEqual(cd.Status, origCD.Status) {
 		cdLog.Debug("status has not changed, nothing to update")
 		return nil

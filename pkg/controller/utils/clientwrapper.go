@@ -45,7 +45,15 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Cli
 	if err != nil {
 		log.WithError(err).Fatal("unable to initialize metrics wrapped client")
 	}
-	return c
+
+	return &client.DelegatingClient{
+		Reader: &client.DelegatingReader{
+			CacheReader:  mgr.GetCache(),
+			ClientReader: c,
+		},
+		Writer:       c,
+		StatusClient: c,
+	}
 }
 
 // AddControllerMetricsTransportWrapper adds a transport wrapper to the given rest config which

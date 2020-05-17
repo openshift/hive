@@ -136,6 +136,9 @@ const (
 	// NoMachinePoolNameLeasesAvailable is true when the cloud provider requires a name lease for the in-cluster MachineSet, but no
 	// leases are available.
 	NoMachinePoolNameLeasesAvailable MachinePoolConditionType = "NoMachinePoolNameLeasesAvailable"
+
+	// InvalidSubnetsMachinePoolCondition is true when there are missing or invalid entries in the subnet field
+	InvalidSubnetsMachinePoolCondition MachinePoolConditionType = "InvalidSubnets"
 )
 
 // +genclient

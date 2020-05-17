@@ -1,7 +1,10 @@
 package remotemachineset
 
 import (
+	"context"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -11,7 +14,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/sets"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
@@ -19,18 +24,25 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 // AWSActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type AWSActuator struct {
-	client awsclient.Client
-	logger log.FieldLogger
-	region string
-	amiID  string
+	client    client.Client
+	awsClient awsclient.Client
+	logger    log.FieldLogger
+	region    string
+	amiID     string
 }
 
-var _ Actuator = &AWSActuator{}
+var (
+	_ Actuator = &AWSActuator{}
+
+	// reg is a regex used to fetch condition message from error when subnets specified in the MachinePool are invalid
+	reg = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
+)
 
 // NewAWSActuator is the constructor for building a AWSActuator
 func NewAWSActuator(awsCreds *corev1.Secret, region string, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (*AWSActuator, error) {
@@ -50,10 +62,10 @@ func NewAWSActuator(awsCreds *corev1.Secret, region string, pool *hivev1.Machine
 		}
 	}
 	actuator := &AWSActuator{
-		client: awsClient,
-		logger: logger,
-		region: region,
-		amiID:  amiID,
+		awsClient: awsClient,
+		logger:    logger,
+		region:    region,
+		amiID:     amiID,
 	}
 	return actuator, nil
 }
@@ -94,16 +106,55 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		computePool.Platform.AWS.Zones = zones
 	}
 
-	// Private subnets && userTags are settings available in the installconfig
-	// that we are choosing to ignore for the timebeing. These empty settings
-	// should be updated to feed from the machinepool / installconfig in the
-	// future.
 	subnets := map[string]string{}
+	// Fetching private subnets from the machinepool and then mapping availability zones to subnets
+	if len(pool.Spec.Platform.AWS.Subnets) > 0 {
+		subnetsByAvailabilityZone, err := a.getSubnetsByAvailabilityZone(pool)
+		if err != nil {
+			return nil, false, errors.Wrap(err, "describing subnets")
+		}
+		subnets = subnetsByAvailabilityZone
+	}
+	// userTags are settings available in the installconfig that we are choosing
+	// to ignore for the timebeing. These empty settings should be updated to feed
+	// from the machinepool / installconfig in the future.
 	userTags := map[string]string{}
 
 	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, pool.Spec.Name, workerUserData, userTags)
 	if err != nil {
+		if strings.Contains(err.Error(), "no subnet for zone") {
+			conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+				pool.Status.Conditions,
+				hivev1.InvalidSubnetsMachinePoolCondition,
+				corev1.ConditionTrue,
+				"NoSubnetForAvailabilityZone",
+				err.Error(),
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+			if changed {
+				pool.Status.Conditions = conds
+				if err := a.client.Status().Update(context.Background(), pool); err != nil {
+					return nil, false, err
+				}
+			}
+		}
+
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
+	}
+
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.InvalidSubnetsMachinePoolCondition,
+		corev1.ConditionFalse,
+		"ValidSubnets",
+		"Subnets are valid",
+		controllerutils.UpdateConditionNever,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := a.client.Status().Update(context.Background(), pool); err != nil {
+			return nil, false, err
+		}
 	}
 
 	// Re-use existing AWS resources for generated MachineSets.
@@ -150,7 +201,7 @@ func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
 	req := &ec2.DescribeAvailabilityZonesInput{
 		Filters: []*ec2.Filter{zoneFilter},
 	}
-	resp, err := a.client.DescribeAvailabilityZones(req)
+	resp, err := a.awsClient.DescribeAvailabilityZones(req)
 	if err != nil {
 		return nil, err
 	}
@@ -188,11 +239,14 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	// broken on us once via renames in the installer. We need to start querying for what exists
 	// here.
 	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: aws.String(fmt.Sprintf("%s-worker-profile", infraID))}
-	providerConfig.Subnet = awsprovider.AWSResourceReference{
-		Filters: []awsprovider.Filter{{
-			Name:   "tag:Name",
-			Values: []string{fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone)},
-		}},
+	// Update the subnet filter only if subnet id is absent
+	if providerConfig.Subnet.ID == nil {
+		providerConfig.Subnet = awsprovider.AWSResourceReference{
+			Filters: []awsprovider.Filter{{
+				Name:   "tag:Name",
+				Values: []string{fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone)},
+			}},
+		}
 	}
 	providerConfig.SecurityGroups = []awsprovider.AWSResourceReference{{
 		Filters: []awsprovider.Filter{{
@@ -203,4 +257,72 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	machineSet.Spec.Template.Spec.ProviderSpec = machineapi.ProviderSpec{
 		Value: &runtime.RawExtension{Object: providerConfig},
 	}
+}
+
+// getSubnetsByAvailabilityZones maps availability zones to subnet
+func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (map[string]string, error) {
+	idPointers := make([]*string, len(pool.Spec.Platform.AWS.Subnets))
+	for i, id := range pool.Spec.Platform.AWS.Subnets {
+		idPointers[i] = aws.String(id)
+	}
+
+	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
+	if err != nil {
+		if strings.Contains(err.Error(), "InvalidSubnetID.NotFound") {
+			var conditionMessage string
+			if submatches := reg.FindStringSubmatch(err.Error()); submatches != nil {
+				// formatting error message before adding it to condition
+				// sample error message: InvalidSubnetID.NotFound: The subnet ID 'subnet-1,subnet-2' does not exist\tstatus code: 400, request id: ea8b3bb7-de56-405f-9345-e5690a3ea8b2
+				// message after formatting: The subnet ID 'subnet-1,subnet-2' does not exist
+				conditionMessage = submatches[1]
+			}
+			conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+				pool.Status.Conditions,
+				hivev1.InvalidSubnetsMachinePoolCondition,
+				corev1.ConditionTrue,
+				"SubnetsNotFound",
+				conditionMessage,
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+			if changed {
+				pool.Status.Conditions = conds
+				if err := a.client.Status().Update(context.Background(), pool); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return nil, err
+	}
+
+	conflictingSubnets := sets.NewString()
+	subnetsByAvailabilityZone := make(map[string]string, len(pool.Spec.Platform.AWS.Subnets))
+	for _, subnet := range results.Subnets {
+		if subnetID, ok := subnetsByAvailabilityZone[*subnet.AvailabilityZone]; ok {
+			conflictingSubnets.Insert(*subnet.SubnetId)
+			conflictingSubnets.Insert(subnetID)
+			continue
+		}
+		subnetsByAvailabilityZone[*subnet.AvailabilityZone] = *subnet.SubnetId
+	}
+
+	if len(conflictingSubnets) > 0 {
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.InvalidSubnetsMachinePoolCondition,
+			corev1.ConditionTrue,
+			"MoreThanOneSubnetForZone",
+			fmt.Sprintf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", ")),
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			if err := a.client.Status().Update(context.Background(), pool); err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, errors.Errorf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", "))
+	}
+
+	return subnetsByAvailabilityZone, nil
 }

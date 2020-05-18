@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -21,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/manageddns"
 )
 
@@ -113,18 +115,18 @@ func (a *ClusterDeploymentValidatingAdmissionHook) Validate(admissionSpec *admis
 
 	contextLogger.Info("Validating request")
 
-	if admissionSpec.Operation == admissionv1beta1.Create {
+	switch admissionSpec.Operation {
+	case admissionv1beta1.Create:
 		return a.validateCreate(admissionSpec)
-	}
-
-	if admissionSpec.Operation == admissionv1beta1.Update {
+	case admissionv1beta1.Update:
 		return a.validateUpdate(admissionSpec)
-	}
-
-	// We're only validating creates and updates at this time, so all other operations are explicitly allowed.
-	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
-		Allowed: true,
+	case admissionv1beta1.Delete:
+		return a.validateDelete(admissionSpec)
+	default:
+		contextLogger.Info("Successful validation")
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: true,
+		}
 	}
 }
 
@@ -433,6 +435,59 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
+	return &admissionv1beta1.AdmissionResponse{
+		Allowed: true,
+	}
+}
+
+// validateDelete specifically validates delete operations for ClusterDeployment objects.
+func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+	logger := log.WithFields(log.Fields{
+		"operation": request.Operation,
+		"group":     request.Resource.Group,
+		"version":   request.Resource.Version,
+		"resource":  request.Resource.Resource,
+		"method":    "validateDelete",
+	})
+
+	oldObject := &hivev1.ClusterDeployment{}
+	if err := a.decoder.DecodeRaw(request.OldObject, oldObject); err != nil {
+		logger.Errorf("Failed unmarshaling Object: %v", err.Error())
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: err.Error(),
+			},
+		}
+	}
+
+	logger.Data["object.Name"] = oldObject.Name
+
+	var allErrs field.ErrorList
+
+	if value, present := oldObject.Annotations[constants.ProtectedDeleteAnnotation]; present {
+		if enabled, err := strconv.ParseBool(value); enabled && err == nil {
+			allErrs = append(allErrs, field.Invalid(
+				field.NewPath("metadata", "annotations", constants.ProtectedDeleteAnnotation),
+				oldObject.Annotations[constants.ProtectedDeleteAnnotation],
+				"cannot delete while annotation is present",
+			))
+		} else {
+			logger.WithField(constants.ProtectedDeleteAnnotation, value).Info("Protected Delete annotation present but not set to true")
+		}
+	}
+
+	if len(allErrs) > 0 {
+		logger.WithError(allErrs.ToAggregate()).Info("failed validation")
+		status := errors.NewInvalid(schemaGVK(request.Kind).GroupKind(), request.Name, allErrs).Status()
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &status,
+		}
+	}
+
+	logger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}

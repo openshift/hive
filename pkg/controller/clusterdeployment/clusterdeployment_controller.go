@@ -829,6 +829,10 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	cd.Spec.Installed = true
 
 	if r.protectedDelete {
+		// Set protected delete on for the ClusterDeployment.
+		// If the ClusterDeployment already has the ProtectedDelete annotation, do not overwrite it. This allows the
+		// user an opportunity to explicitly exclude a ClusterDeployment from delete protection at the time of
+		// creation of the ClusterDeployment.
 		if _, annotationPresent := cd.Annotations[constants.ProtectedDeleteAnnotation]; !annotationPresent {
 			initializeAnnotations(cd)
 			cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
@@ -1171,6 +1175,10 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 }
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+	if controllerutils.IsDeleteProtected(cd) {
+		cdLog.Error("deprovision blocked for ClusterDeployment with protected delete on")
+		return reconcile.Result{}, nil
+	}
 
 	if _, relocated := cd.Annotations[constants.RelocatedAnnotation]; relocated {
 		cdLog.Infof("clusterdeployment relocated, removing finalizer")

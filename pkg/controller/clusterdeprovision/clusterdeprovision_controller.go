@@ -190,6 +190,10 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 		rLog.Error("ClusterDeprovision created for ClusterDeployment that has not been deleted")
 		return reconcile.Result{}, nil
 	}
+	if controllerutils.IsDeleteProtected(cd) {
+		rLog.Error("deprovision blocked for ClusterDeployment with protected delete on")
+		return reconcile.Result{}, nil
+	}
 
 	// Check if deprovisions are currently disabled: (originates in HiveConfig in real world)
 	if r.deprovisionsDisabled {

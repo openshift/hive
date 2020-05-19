@@ -406,6 +406,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Block deprovision when protected delete on",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					if cd.Annotations == nil {
+						cd.Annotations = make(map[string]string, 1)
+					}
+					cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				deprovision := getDeprovision(c)
+				assert.Nil(t, deprovision, "expected no deprovision request")
+				cd := getCD(c)
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer")
+			},
+		},
+		{
 			name: "Skip deprovision for deleted BareMetal cluster",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {

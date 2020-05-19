@@ -84,6 +84,22 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:        "no-op if cluster deployment has delete protection on",
+			deprovision: testClusterDeprovision(),
+			deployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				if cd.Annotations == nil {
+					cd.Annotations = make(map[string]string, 1)
+				}
+				cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
+				return cd
+			}(),
+			validate: func(t *testing.T, c client.Client) {
+				validateNoJobExists(t, c)
+			},
+			expectErr: true,
+		},
+		{
 			name:        "create uninstall job",
 			deprovision: testClusterDeprovision(),
 			deployment:  testDeletedClusterDeployment(),

@@ -16,7 +16,7 @@ import (
 // are not set.
 func GetCreds(credsFile string) ([]byte, error) {
 	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", constants.GCPCredentialsName)
-	if l := os.Getenv("GCP_SHARED_CREDENTIALS_FILE"); l != "" {
+	if l := os.Getenv("GOOGLE_CREDENTIALS"); l != "" {
 		credsFilePath = l
 	}
 	if credsFile != "" {

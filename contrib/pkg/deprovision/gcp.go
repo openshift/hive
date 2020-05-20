@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	typesgcp "github.com/openshift/installer/pkg/types/gcp"
 
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/gcpclient"
 )
 
@@ -61,8 +62,12 @@ func (o *gcpOptions) Validate(cmd *cobra.Command) error {
 		log.Info("Region is required")
 		return fmt.Errorf("missing region")
 	}
-	credsFile := os.Getenv("GOOGLE_CREDENTIALS")
-	projectID, err := gcpclient.ProjectIDFromFile(credsFile)
+
+	creds, err := gcputils.GetCreds("")
+	if err != nil {
+		return errors.Wrap(err, "failed to get GCP credentials")
+	}
+	projectID, err := gcpclient.ProjectID(creds)
 	if err != nil {
 		return errors.Wrap(err, "could not get GCP project ID")
 	}

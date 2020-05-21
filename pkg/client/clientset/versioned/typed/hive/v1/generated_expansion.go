@@ -12,6 +12,8 @@ type ClusterImageSetExpansion interface{}
 
 type ClusterProvisionExpansion interface{}
 
+type ClusterRelocateExpansion interface{}
+
 type ClusterStateExpansion interface{}
 
 type DNSZoneExpansion interface{}

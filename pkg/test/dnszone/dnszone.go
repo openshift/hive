@@ -2,6 +2,7 @@ package dnszone
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -19,6 +20,50 @@ func Build(opts ...Option) *hivev1.DNSZone {
 	}
 
 	return retval
+}
+
+type Builder interface {
+	Build(opts ...Option) *hivev1.DNSZone
+
+	Options(opts ...Option) Builder
+
+	GenericOptions(opts ...generic.Option) Builder
+}
+
+func BasicBuilder() Builder {
+	return &builder{}
+}
+
+func FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder {
+	b := &builder{}
+	return b.GenericOptions(
+		generic.WithTypeMeta(typer),
+		generic.WithResourceVersion("1"),
+		generic.WithNamespace(namespace),
+		generic.WithName(name),
+	)
+}
+
+type builder struct {
+	options []Option
+}
+
+func (b *builder) Build(opts ...Option) *hivev1.DNSZone {
+	return Build(append(b.options, opts...)...)
+}
+
+func (b *builder) Options(opts ...Option) Builder {
+	return &builder{
+		options: append(b.options, opts...),
+	}
+}
+
+func (b *builder) GenericOptions(opts ...generic.Option) Builder {
+	options := make([]Option, len(opts))
+	for i, o := range opts {
+		options[i] = Generic(o)
+	}
+	return b.Options(options...)
 }
 
 // Generic allows common functions applicable to all objects to be used as Options to Build
@@ -40,11 +85,8 @@ func WithIncrementedResourceVersion() Option {
 }
 
 // WithTypeMeta populates the type meta for the object.
-func WithTypeMeta() Option {
-	return func(dnsZone *hivev1.DNSZone) {
-		dnsZone.APIVersion = hivev1.SchemeGroupVersion.String()
-		dnsZone.Kind = "DNSZone"
-	}
+func WithTypeMeta(typers ...runtime.ObjectTyper) Option {
+	return Generic(generic.WithTypeMeta(typers...))
 }
 
 // WithControllerOwnerReference sets the owner reference to the supplied object.
@@ -60,5 +102,11 @@ func WithLabelOwner(owner *hivev1.ClusterDeployment) Option {
 		}
 		dnsZone.Labels[constants.ClusterDeploymentNameLabel] = owner.Name
 		dnsZone.Labels[constants.DNSZoneTypeLabel] = constants.DNSZoneTypeChild
+	}
+}
+
+func WithZone(zone string) Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		dnsZone.Spec.Zone = zone
 	}
 }

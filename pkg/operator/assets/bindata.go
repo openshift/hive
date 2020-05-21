@@ -36,6 +36,7 @@
 // config/crds/hive.openshift.io_clusterdeprovisions.yaml
 // config/crds/hive.openshift.io_clusterimagesets.yaml
 // config/crds/hive.openshift.io_clusterprovisions.yaml
+// config/crds/hive.openshift.io_clusterrelocates.yaml
 // config/crds/hive.openshift.io_clusterstates.yaml
 // config/crds/hive.openshift.io_dnszones.yaml
 // config/crds/hive.openshift.io_hiveconfigs.yaml
@@ -8422,6 +8423,139 @@ func configCrdsHiveOpenshiftIo_clusterprovisionsYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configCrdsHiveOpenshiftIo_clusterrelocatesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: clusterrelocates.hive.openshift.io
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.clusterDeploymentSelector
+    name: Selector
+    type: string
+  group: hive.openshift.io
+  names:
+    kind: ClusterRelocate
+    listKind: ClusterRelocateList
+    plural: clusterrelocates
+    singular: clusterrelocate
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ClusterRelocate is the Schema for the ClusterRelocates API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ClusterRelocateSpec defines the relocation of clusters from
+            one Hive instance to another.
+          properties:
+            clusterDeploymentSelector:
+              description: ClusterDeploymentSelector is a LabelSelector indicating
+                which clusters will be relocated.
+              properties:
+                matchExpressions:
+                  description: matchExpressions is a list of label selector requirements.
+                    The requirements are ANDed.
+                  items:
+                    description: A label selector requirement is a selector that contains
+                      values, a key, and an operator that relates the key and values.
+                    properties:
+                      key:
+                        description: key is the label key that the selector applies
+                          to.
+                        type: string
+                      operator:
+                        description: operator represents a key's relationship to a
+                          set of values. Valid operators are In, NotIn, Exists and
+                          DoesNotExist.
+                        type: string
+                      values:
+                        description: values is an array of string values. If the operator
+                          is In or NotIn, the values array must be non-empty. If the
+                          operator is Exists or DoesNotExist, the values array must
+                          be empty. This array is replaced during a strategic merge
+                          patch.
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - key
+                    - operator
+                    type: object
+                  type: array
+                matchLabels:
+                  additionalProperties:
+                    type: string
+                  description: matchLabels is a map of {key,value} pairs. A single
+                    {key,value} in the matchLabels map is equivalent to an element
+                    of matchExpressions, whose key field is "key", the operator is
+                    "In", and the values array contains only "value". The requirements
+                    are ANDed.
+                  type: object
+              type: object
+            kubeconfigSecretRef:
+              description: KubeconfigSecretRef is a reference to the secret containing
+                the kubeconfig for the destination Hive instance. The kubeconfig must
+                be in a data field where the key is "kubeconfig".
+              properties:
+                name:
+                  description: Name is the name of the secret.
+                  type: string
+                namespace:
+                  description: Namespace is the namespace where the secret lives.
+                  type: string
+              required:
+              - name
+              - namespace
+              type: object
+          required:
+          - clusterDeploymentSelector
+          - kubeconfigSecretRef
+          type: object
+        status:
+          description: ClusterRelocateStatus defines the observed state of ClusterRelocate.
+          type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+`)
+
+func configCrdsHiveOpenshiftIo_clusterrelocatesYamlBytes() ([]byte, error) {
+	return _configCrdsHiveOpenshiftIo_clusterrelocatesYaml, nil
+}
+
+func configCrdsHiveOpenshiftIo_clusterrelocatesYaml() (*asset, error) {
+	bytes, err := configCrdsHiveOpenshiftIo_clusterrelocatesYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/crds/hive.openshift.io_clusterrelocates.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configCrdsHiveOpenshiftIo_clusterstatesYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -11578,6 +11712,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/crds/hive.openshift.io_clusterdeprovisions.yaml":           configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml,
 	"config/crds/hive.openshift.io_clusterimagesets.yaml":              configCrdsHiveOpenshiftIo_clusterimagesetsYaml,
 	"config/crds/hive.openshift.io_clusterprovisions.yaml":             configCrdsHiveOpenshiftIo_clusterprovisionsYaml,
+	"config/crds/hive.openshift.io_clusterrelocates.yaml":              configCrdsHiveOpenshiftIo_clusterrelocatesYaml,
 	"config/crds/hive.openshift.io_clusterstates.yaml":                 configCrdsHiveOpenshiftIo_clusterstatesYaml,
 	"config/crds/hive.openshift.io_dnszones.yaml":                      configCrdsHiveOpenshiftIo_dnszonesYaml,
 	"config/crds/hive.openshift.io_hiveconfigs.yaml":                   configCrdsHiveOpenshiftIo_hiveconfigsYaml,
@@ -11657,6 +11792,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive.openshift.io_clusterdeprovisions.yaml":           {configCrdsHiveOpenshiftIo_clusterdeprovisionsYaml, map[string]*bintree{}},
 			"hive.openshift.io_clusterimagesets.yaml":              {configCrdsHiveOpenshiftIo_clusterimagesetsYaml, map[string]*bintree{}},
 			"hive.openshift.io_clusterprovisions.yaml":             {configCrdsHiveOpenshiftIo_clusterprovisionsYaml, map[string]*bintree{}},
+			"hive.openshift.io_clusterrelocates.yaml":              {configCrdsHiveOpenshiftIo_clusterrelocatesYaml, map[string]*bintree{}},
 			"hive.openshift.io_clusterstates.yaml":                 {configCrdsHiveOpenshiftIo_clusterstatesYaml, map[string]*bintree{}},
 			"hive.openshift.io_dnszones.yaml":                      {configCrdsHiveOpenshiftIo_dnszonesYaml, map[string]*bintree{}},
 			"hive.openshift.io_hiveconfigs.yaml":                   {configCrdsHiveOpenshiftIo_hiveconfigsYaml, map[string]*bintree{}},

@@ -18,6 +18,8 @@ type Interface interface {
 	ClusterImageSets() ClusterImageSetInformer
 	// ClusterProvisions returns a ClusterProvisionInformer.
 	ClusterProvisions() ClusterProvisionInformer
+	// ClusterRelocates returns a ClusterRelocateInformer.
+	ClusterRelocates() ClusterRelocateInformer
 	// ClusterStates returns a ClusterStateInformer.
 	ClusterStates() ClusterStateInformer
 	// DNSZones returns a DNSZoneInformer.
@@ -74,6 +76,11 @@ func (v *version) ClusterImageSets() ClusterImageSetInformer {
 // ClusterProvisions returns a ClusterProvisionInformer.
 func (v *version) ClusterProvisions() ClusterProvisionInformer {
 	return &clusterProvisionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterRelocates returns a ClusterRelocateInformer.
+func (v *version) ClusterRelocates() ClusterRelocateInformer {
+	return &clusterRelocateInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterStates returns a ClusterStateInformer.

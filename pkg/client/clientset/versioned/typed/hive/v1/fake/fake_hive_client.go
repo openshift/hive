@@ -32,6 +32,10 @@ func (c *FakeHiveV1) ClusterProvisions(namespace string) v1.ClusterProvisionInte
 	return &FakeClusterProvisions{c, namespace}
 }
 
+func (c *FakeHiveV1) ClusterRelocates() v1.ClusterRelocateInterface {
+	return &FakeClusterRelocates{c}
+}
+
 func (c *FakeHiveV1) ClusterStates(namespace string) v1.ClusterStateInterface {
 	return &FakeClusterStates{c, namespace}
 }

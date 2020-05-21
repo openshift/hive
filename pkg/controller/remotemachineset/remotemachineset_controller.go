@@ -29,7 +29,6 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -195,8 +194,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	if cd.Annotations[constants.SyncsetPauseAnnotation] == "true" {
-		logger.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
+	if !controllerutils.ShouldSyncCluster(cd, logger) {
 		return reconcile.Result{}, nil
 	}
 

@@ -660,13 +660,13 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:            "Test valid delete",
-			newObject:       validAWSClusterDeployment(),
+			oldObject:       validAWSClusterDeployment(),
 			operation:       admissionv1beta1.Delete,
 			expectedAllowed: true,
 		},
 		{
 			name: "Test protected delete",
-			newObject: func() *hivev1.ClusterDeployment {
+			oldObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
 				if cd.Annotations == nil {
 					cd.Annotations = make(map[string]string, 1)
@@ -679,7 +679,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name: "Test protected delete annotation false",
-			newObject: func() *hivev1.ClusterDeployment {
+			oldObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
 				if cd.Annotations == nil {
 					cd.Annotations = make(map[string]string, 1)

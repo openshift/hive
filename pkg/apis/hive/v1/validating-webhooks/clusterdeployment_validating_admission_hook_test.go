@@ -658,38 +658,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
-		{
-			name:            "Test valid delete",
-			newObject:       validAWSClusterDeployment(),
-			operation:       admissionv1beta1.Delete,
-			expectedAllowed: true,
-		},
-		{
-			name: "Test protected delete",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAWSClusterDeployment()
-				if cd.Annotations == nil {
-					cd.Annotations = make(map[string]string, 1)
-				}
-				cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
-				return cd
-			}(),
-			operation:       admissionv1beta1.Delete,
-			expectedAllowed: false,
-		},
-		{
-			name: "Test protected delete annotation false",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAWSClusterDeployment()
-				if cd.Annotations == nil {
-					cd.Annotations = make(map[string]string, 1)
-				}
-				cd.Annotations[constants.ProtectedDeleteAnnotation] = "false"
-				return cd
-			}(),
-			operation:       admissionv1beta1.Delete,
-			expectedAllowed: true,
-		},
 	}
 
 	for _, tc := range cases {

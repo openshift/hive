@@ -149,11 +149,12 @@ func TestInstallManager(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tempDir, err := ioutil.TempDir("", "installmanagertest")
-			if !assert.NoError(t, err) {
-				t.Fail()
-			}
+			require.NoError(t, err)
 			defer os.RemoveAll(tempDir)
 			defer os.Remove(installerConsoleLogFilePath)
+
+			binaryTempDir, err := ioutil.TempDir(tempDir, "bin")
+			require.NoError(t, err)
 
 			pullSecret := testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecretName, corev1.DockerConfigJsonKey, "{}")
 			existing := test.existing
@@ -181,6 +182,7 @@ func TestInstallManager(t *testing.T) {
 				DynamicClient:          fakeClient,
 				InstallConfigMountPath: mountedInstallConfigFile,
 				PullSecretMountPath:    mountedPullSecretFile,
+				binaryDir:              binaryTempDir,
 			}
 			im.Complete([]string{})
 
@@ -459,61 +461,6 @@ REDACTED LINE OF OUTPUT`,
 		})
 	}
 
-}
-
-func TestGatherLogs(t *testing.T) {
-	fakeBootstrapIP := "1.2.3.4"
-
-	tests := []struct {
-		name            string
-		scriptTemplate  string
-		expectedLogData string
-		expectedError   bool
-	}{
-		{
-			name:           "cannot execute script",
-			scriptTemplate: "not a bash script %s %s %s",
-			expectedError:  true,
-		},
-		{
-			name: "successfully run script file",
-			scriptTemplate: `#!/bin/bash
-		echo "fake log output %s %s" > %s`,
-			expectedLogData: fmt.Sprintf("fake log output %s %s\n", fakeBootstrapIP, fakeBootstrapIP),
-		},
-		{
-			name: "error running script",
-			scriptTemplate: `#!/bin/bash
-exit 2`,
-			expectedError: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			im := InstallManager{
-				LogLevel: "debug",
-				isGatherLogsEnabled: func() bool {
-					return true
-				},
-			}
-			assert.NoError(t, im.Complete([]string{}))
-			result, err := im.runGatherScript(fakeBootstrapIP, test.scriptTemplate, "/tmp")
-			if test.expectedError {
-				assert.Error(t, err, "expected error for test case %s", test.name)
-			} else {
-				t.Logf("result file: %s", result)
-				data, err := ioutil.ReadFile(result)
-				assert.NoError(t, err, "error reading returned log file data")
-				assert.Equal(t, test.expectedLogData, string(data))
-
-				// cleanup saved/copied logfile
-				if err := os.RemoveAll(result); err != nil {
-					t.Logf("couldn't delete saved log file: %v", err)
-				}
-			}
-		})
-	}
 }
 
 func TestInstallManagerSSH(t *testing.T) {

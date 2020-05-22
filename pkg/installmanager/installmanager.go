@@ -110,6 +110,7 @@ type InstallManager struct {
 	waitForProvisioningStage         func(*hivev1.ClusterProvision, *InstallManager) error
 	isGatherLogsEnabled              func() bool
 	waitForInstallCompleteExecutions int
+	binaryDir                        string
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
@@ -134,6 +135,7 @@ func NewInstallManagerCommand() *cobra.Command {
 			im.InstallConfigMountPath = defaultInstallConfigMountPath
 			im.PullSecretMountPath = defaultPullSecretMountPath
 			im.ManifestsMountPath = defaultManifestsMountPath
+			im.binaryDir = getHomeDir()
 
 			if err := im.Validate(); err != nil {
 				log.WithError(err).Error("invalid command options")
@@ -277,7 +279,10 @@ func (m *InstallManager) Run() error {
 
 	m.ClusterName = cd.Spec.ClusterName
 
-	m.waitForInstallerBinaries()
+	if err := m.waitForAndCopyInstallerBinaries(); err != nil {
+		m.log.WithError(err).Error("error waiting for/copying binaries")
+		return err
+	}
 
 	go m.tailFullInstallLog(scrubInstallLog)
 
@@ -466,12 +471,33 @@ func (m *InstallManager) waitForFiles(files []string) {
 	m.log.Infof("all files found, ready to proceed")
 }
 
-func (m *InstallManager) waitForInstallerBinaries() {
+func (m *InstallManager) waitForAndCopyInstallerBinaries() error {
 	fileList := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
 		filepath.Join(m.WorkDir, "oc"),
 	}
 	m.waitForFiles(fileList)
+
+	// copy each binary to our container user's home dir to avoid situations
+	// where the /output workdir may be mounted with noexec. (surfaced when using kind
+	// 0.8.x with podman but will likely be fixed in future versions)
+	for _, src := range fileList {
+		dest := filepath.Join(m.binaryDir, filepath.Base(src))
+		if err := m.copyFile(src, dest); err != nil {
+			return err
+		}
+		m.log.Infof("copied %s to %s", src, dest)
+	}
+	return nil
+}
+
+func (m *InstallManager) copyFile(src, dst string) error {
+	cmd := exec.Command("cp", "-p", src, dst)
+	if err := cmd.Run(); err != nil {
+		log.WithError(err).Errorf("error copying file %s to %s", src, dst)
+		return err
+	}
+	return nil
 }
 
 // cleanupFailedInstall allows recovering from an installation error and allows retries
@@ -652,7 +678,7 @@ func (m *InstallManager) provisionCluster() error {
 
 func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 	m.log.WithField("args", args).Info("running openshift-install binary")
-	cmd := exec.Command("./openshift-install", args...)
+	cmd := exec.Command(filepath.Join(m.binaryDir, "openshift-install"), args...)
 	cmd.Dir = m.WorkDir
 
 	// save the commands' stdout/stderr to a file
@@ -819,7 +845,7 @@ func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath
 func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
 	m.log.Info("attempting to gather logs with oc adm must-gather")
 	destDir := filepath.Join(m.LogsDir, fmt.Sprintf("%s-must-gather", time.Now().Format("20060102150405")))
-	cmd := exec.Command(filepath.Join(m.WorkDir, "oc"), "adm", "must-gather", "--dest-dir", destDir)
+	cmd := exec.Command(filepath.Join(m.binaryDir, "oc"), "adm", "must-gather", "--dest-dir", destDir)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", filepath.Join(m.WorkDir, "auth", "kubeconfig")))
 	stdout, err := cmd.Output()
@@ -992,49 +1018,6 @@ func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment, n
 	m.log.Info("bootstrap node log gathering complete")
 
 	return nil
-}
-
-func (m *InstallManager) runGatherScript(bootstrapIP, scriptTemplate, workDir string) (string, error) {
-
-	tmpFile, err := ioutil.TempFile(workDir, "gatherlog")
-	if err != nil {
-		m.log.WithError(err).Error("failed to create temp log gathering file")
-		return "", err
-	}
-	defer os.Remove(tmpFile.Name())
-
-	destTarball := filepath.Join(m.LogsDir, fmt.Sprintf("%s-log-bundle.tar.gz", time.Now().Format("20060102150405")))
-	script := fmt.Sprintf(scriptTemplate, bootstrapIP, bootstrapIP, destTarball)
-	m.log.Debugf("generated script: %s", script)
-
-	if _, err := tmpFile.Write([]byte(script)); err != nil {
-		m.log.WithError(err).Error("failed to write to log gathering file")
-		return "", err
-	}
-	if err := tmpFile.Chmod(0555); err != nil {
-		m.log.WithError(err).Error("failed to set script as executable")
-		return "", err
-	}
-	if err := tmpFile.Close(); err != nil {
-		m.log.WithError(err).Error("failed to close script")
-		return "", err
-	}
-
-	m.log.Info("Gathering logs from bootstrap node")
-	gatherCmd := exec.Command(tmpFile.Name())
-	if err := gatherCmd.Run(); err != nil {
-		m.log.WithError(err).Error("failed while running gather script")
-		return "", err
-	}
-
-	_, err = os.Stat(destTarball)
-	if err != nil {
-		m.log.WithError(err).Error("error while stat-ing log tarball")
-		return "", err
-	}
-	m.log.Infof("cluster logs gathered: %s", destTarball)
-
-	return destTarball, nil
 }
 
 func (m *InstallManager) isBootstrapComplete() bool {

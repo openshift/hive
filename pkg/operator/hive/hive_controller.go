@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"reflect"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -260,6 +261,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	origHiveConfig := instance.DeepCopy()
 	hiveNSName := getHiveNamespace(instance)
 
 	if err := r.establishSecretWatch(hLog, hiveNSName); err != nil {
@@ -308,7 +310,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 					Info("configmap has changed, admission pods will restart on the next sync")
 				instance.Status.AggregatorClientCAHash = caHash
 				cmLog.Debugf("updating status with new aggregator CA configmap hash")
-				err := r.updateHiveConfigStatus(instance, cmLog, true)
+				err := r.updateHiveConfigStatus(origHiveConfig, instance, cmLog, true)
 				if err != nil {
 					cmLog.WithError(err).Error("cannot update hash in config status")
 				}
@@ -323,14 +325,14 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error setting up managed domains")
-		r.updateHiveConfigStatus(instance, hLog, false)
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
 	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
-		r.updateHiveConfigStatus(instance, hLog, false)
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
@@ -342,18 +344,18 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
-		r.updateHiveConfigStatus(instance, hLog, false)
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
 	err = r.deployHiveAPI(hLog, h, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive v1alpha1 aggregated API")
-		r.updateHiveConfigStatus(instance, hLog, false)
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
-	r.updateHiveConfigStatus(instance, hLog, true)
+	r.updateHiveConfigStatus(origHiveConfig, instance, hLog, true)
 	return reconcile.Result{}, nil
 }
 
@@ -441,11 +443,18 @@ func computeHash(data map[string]string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func (r *ReconcileHiveConfig) updateHiveConfigStatus(hc *hivev1.HiveConfig, logger log.FieldLogger, succeeded bool) error {
-	hc.Status.ObservedGeneration = hc.Generation
-	hc.Status.ConfigApplied = succeeded
+func (r *ReconcileHiveConfig) updateHiveConfigStatus(origHiveConfig, newHiveConfig *hivev1.HiveConfig, logger log.FieldLogger, succeeded bool) error {
+	newHiveConfig.Status.ObservedGeneration = newHiveConfig.Generation
+	newHiveConfig.Status.ConfigApplied = succeeded
 
-	err := r.Status().Update(context.TODO(), hc)
+	if reflect.DeepEqual(origHiveConfig, newHiveConfig) {
+		logger.Debug("HiveConfig unchanged, no update required")
+		return nil
+	}
+
+	logger.Info("HiveConfig has changed, updating")
+
+	err := r.Status().Update(context.TODO(), newHiveConfig)
 	if err != nil {
 		logger.WithError(err).Error("failed to update HiveConfig status")
 	}

@@ -67,36 +67,35 @@ git clone https://github.com/openshift/hive.git
 
 ## Deploying with Kubernetes In Docker (kind)
 
-[Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. Currently, we support 0.5.1 version of Kind. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
+[Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. Currently, we support 0.8.1 version of Kind. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
 
 This approach requires [Docker](https://docs.docker.com/install). At present we do not have kind working with podman.
 
-Deploy a local insecure registry container, and configure your host docker daemon to be able to use it:
+If you encounter ImagePullErrors, and your kind container cannot reach your registry container, you may be experiencing problems with Fedora (at least 32, possibly earlier as well) and Docker. You can attempt to work around this by changing the FirewallBackend in the /etc/firewalld/firewalld.conf file from nftables to iptables and restarting docker. (see [this comment](https://github.com/kubernetes-sigs/kind/issues/1547#issuecomment-623756313)
 
-```bash
-./hack/create-insecure-registry.sh
-```
 
-Create a kind cluster named 'hive' to deploy to. You can create as many kind clusters as you need.:
+Create a local insecure registry (if one does not already exist) and then a kind cluster named 'hive' to deploy to. You can create additional clusters if desired by providing a different name argument to the script.
 
 ```bash
 ./hack/create-kind-cluster.sh hive
+```
+
+NOTE:  The following error will occur the first time you create your registry container, it is harmless and can be safely ignored.
+
+```
+Error response from daemon: container fcca36a26da5601d6453c0c53ab5909eb6ca8ffe42de0f8634dd7213f107cef0 is not connected to network kind
 ```
 
 `docker ps` should now show you a "registry" and a "hive" container running.
 
 ```bash
 $ docker ps
-CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                                  NAMES
-2756e565065a        kindest/node:v1.15.3   "/usr/local/bin/entr…"   29 hours ago        Up 29 hours         40393/tcp, 127.0.0.1:40393->6443/tcp   hive-control-plane
-1dc8a3c59d84        registry:2             "/entrypoint.sh /etc…"   2 weeks ago         Up 8 days           0.0.0.0:5000->5000/tcp                 registry
+CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                       NAMES
+ffddd07cd9e1        kindest/node:v1.18.2   "/usr/local/bin/entr…"   32 minutes ago      Up 32 minutes       127.0.0.1:36933->6443/tcp   hive-control-plane
+8060ab7c8116        registry:2             "/entrypoint.sh /etc…"   2 days ago          Up 2 days           0.0.0.0:5000->5000/tcp      kind-registry
 ```
 
-Configure kubectl/oc to talk to your new cluster:
-
-```bash
-export KUBECONFIG="$(kind get kubeconfig-path --name="hive")"
-```
+You should now have a `kind-hive` context in your kubeconfig and set to current.
 
 **NOTE:** If you do not have `cfssljson` and `cfssl` installed, run the following command to install, otherwise, ignore this.
 
@@ -108,8 +107,8 @@ go install github.com/cloudflare/cfssl/cmd/cfssl
 You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
 
 ```bash
-IMG=172.17.0.1:5000/hive:latest make docker-dev-push
-DEPLOY_IMAGE=172.17.0.1:5000/hive:latest make deploy
+IMG=localhost:5000/hive:latest make docker-dev-push
+DEPLOY_IMAGE=localhost:5000/hive:latest make deploy
 ./hack/hiveadmission-dev-cert.sh
 ```
 
@@ -130,7 +129,7 @@ To create a kind cluster and adopt:
 
 ```bash
 ./hack/create-kind-cluster.sh cluster1
-bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=$(kind get kubeconfig-path --name="cluster1") --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
+bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
 ```
 
 NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)

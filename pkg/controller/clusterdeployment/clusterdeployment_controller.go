@@ -47,7 +47,7 @@ import (
 var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
 
 const (
-	controllerName     = "clusterDeployment"
+	ControllerName     = "clusterDeployment"
 	defaultRequeueTime = 10 * time.Second
 	maxProvisions      = 3
 
@@ -145,15 +145,15 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	logger := log.WithField("controller", controllerName)
+	logger := log.WithField("controller", ControllerName)
 	r := &ReconcileClusterDeployment{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
 }
@@ -167,14 +167,14 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error getting new cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new cluster deployment")
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment")
 		return err
 	}
 
@@ -189,7 +189,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment job")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment job")
 		return err
 	}
 
@@ -198,7 +198,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		ToRequests: handler.ToRequestsFunc(selectorPodWatchHandler),
 	})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment pods")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment pods")
 		return err
 	}
 
@@ -208,7 +208,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching deprovision request created by cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching deprovision request created by cluster deployment")
 		return err
 	}
 
@@ -218,7 +218,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment dnszones")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment dnszones")
 		return err
 	}
 
@@ -258,7 +258,7 @@ type ReconcileClusterDeployment struct {
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
 	start := time.Now()
 	cdLog := r.logger.WithFields(log.Fields{
-		"controller":        controllerName,
+		"controller":        ControllerName,
 		"clusterDeployment": request.Name,
 		"namespace":         request.Namespace,
 	})
@@ -267,7 +267,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).WithField("result", result).Info("reconcile complete")
 	}()
 

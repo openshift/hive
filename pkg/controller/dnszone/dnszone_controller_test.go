@@ -147,7 +147,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			mocks := setupDefaultMocks(t)
 
 			zr, _ := NewAWSActuator(
-				log.WithField("controller", controllerName),
+				log.WithField("controller", ControllerName),
 				validAWSSecret(),
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
@@ -286,7 +286,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			mocks := setupDefaultMocks(t)
 
 			zr, _ := NewGCPActuator(
-				log.WithField("controller", controllerName),
+				log.WithField("controller", ControllerName),
 				validGCPSecret(),
 				tc.dnsZone,
 				fakeGCPClientBuilder(mocks.mockGCPClient),

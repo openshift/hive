@@ -30,13 +30,13 @@ import (
 )
 
 const (
-	controllerName = "dnsendpoint"
+	ControllerName = "dnsendpoint"
 )
 
 // Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	c := controllerutils.NewClientWithMetricsOrDie(mgr, controllerName)
+	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName)
 
 	reconciler, nameServerChangeNotifier, err := newReconciler(mgr, c)
 	if err != nil {
@@ -48,7 +48,7 @@ func Add(mgr manager.Manager) error {
 	}
 
 	ctrl, err := controller.New(
-		controllerName,
+		ControllerName,
 		mgr,
 		controller.Options{
 			Reconciler:              reconciler,
@@ -65,7 +65,7 @@ func Add(mgr manager.Manager) error {
 
 	if nameServerChangeNotifier != nil {
 		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, &handler.EnqueueRequestForObject{}); err != nil {
-			log.WithField("controller", controllerName).WithError(err).Error("unable to set up watch for name server changes")
+			log.WithField("controller", ControllerName).WithError(err).Error("unable to set up watch for name server changes")
 			return err
 		}
 	}
@@ -81,7 +81,7 @@ type nameServerTool struct {
 func newReconciler(mgr manager.Manager, kubeClient client.Client) (*ReconcileDNSEndpoint, chan event.GenericEvent, error) {
 	nsTools := []nameServerTool{}
 
-	logger := log.WithField("controller", controllerName)
+	logger := log.WithField("controller", ControllerName)
 
 	reconciler := &ReconcileDNSEndpoint{
 		Client:          kubeClient,
@@ -160,7 +160,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 	dnsLog.Info("reconciling dns endpoint")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

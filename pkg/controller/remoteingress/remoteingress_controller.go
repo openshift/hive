@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	controllerName = "remoteingress"
+	ControllerName = "remoteingress"
 
 	// namespace where the ingressController objects must be created
 	remoteIngressControllerNamespace = "openshift-ingress-operator"
@@ -67,12 +67,12 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	logger := log.WithField("controller", controllerName)
-	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), controllerName, logger)
+	logger := log.WithField("controller", ControllerName)
+	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
 	return &ReconcileRemoteClusterIngress{
-		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:  mgr.GetScheme(),
-		logger:  log.WithField("controller", controllerName),
+		logger:  log.WithField("controller", ControllerName),
 		kubeCLI: helper,
 	}
 }
@@ -123,7 +123,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (re
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

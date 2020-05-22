@@ -32,7 +32,7 @@ func TestNewGCPActuator(t *testing.T) {
 			// Arrange
 			mocks := setupDefaultMocks(t)
 			expectedGCPActuator := &GCPActuator{
-				logger:  log.WithField("controller", controllerName),
+				logger:  log.WithField("controller", ControllerName),
 				dnsZone: tc.dnsZone,
 			}
 

@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	controllerName = "syncset"
+	ControllerName = "syncset"
 )
 
 // Add creates a new SyncSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
@@ -41,9 +41,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileSyncSet{
-		Client:      controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:      controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:      mgr.GetScheme(),
-		logger:      log.WithField("controller", controllerName),
+		logger:      log.WithField("controller", ControllerName),
 		computeHash: controllerutils.GetChecksumOfObject,
 	}
 	return r

@@ -27,7 +27,7 @@ import (
 
 const (
 	clusterVersionObjectName = "version"
-	controllerName           = "clusterversion"
+	ControllerName           = "clusterversion"
 )
 
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -39,11 +39,11 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileClusterVersion{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme: mgr.GetScheme(),
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
 }
@@ -84,13 +84,13 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": request.Name,
 		"namespace":         request.Namespace,
-		"controller":        controllerName,
+		"controller":        ControllerName,
 	})
 
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

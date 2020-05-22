@@ -318,7 +318,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			rcd := &ReconcileRemoteClusterIngress{
 				Client:  fakeClient,
 				scheme:  scheme.Scheme,
-				logger:  log.WithField("controller", controllerName),
+				logger:  log.WithField("controller", ControllerName),
 				kubeCLI: helper,
 			}
 			_, err := rcd.Reconcile(reconcile.Request{
@@ -416,7 +416,7 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 			rcd := &ReconcileRemoteClusterIngress{
 				Client:  fakeClient,
 				scheme:  scheme.Scheme,
-				logger:  log.WithField("controller", controllerName),
+				logger:  log.WithField("controller", ControllerName),
 				kubeCLI: helper,
 			}
 			_, err := rcd.Reconcile(reconcile.Request{

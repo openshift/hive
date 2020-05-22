@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	controllerName = "syncidentityprovider"
+	ControllerName = "syncidentityprovider"
 
 	oauthAPIVersion = "config.openshift.io/v1"
 	oauthKind       = "OAuth"
@@ -48,16 +48,16 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileSyncIdentityProviders{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme: mgr.GetScheme(),
-		logger: log.WithField("controller", controllerName),
+		logger: log.WithField("controller", ControllerName),
 	}
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(controllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New(ControllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 	contextLogger.Info("reconciling syncidentityproviders and clusterdeployments")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		contextLogger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

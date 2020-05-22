@@ -15,6 +15,7 @@ webhooks:
   - operations:
     - CREATE
     - UPDATE
+    - DELETE
     apiGroups:
     - hive.openshift.io
     apiVersions:

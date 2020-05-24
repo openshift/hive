@@ -70,15 +70,6 @@ spec:
                       type: boolean
                   type: object
               type: object
-            deleteProtection:
-              description: DeleteProtection can be set to "enabled" to turn on automatic
-                delete protection for ClusterDeployments. When enabled, Hive will
-                add the "hive.openshift.io/protected-delete" annotation to new ClusterDeployments.
-                Once a ClusterDeployment has been installed, a user must remove the
-                annotation from a ClusterDeployment prior to deleting it.
-              enum:
-              - enabled
-              type: string
             deprovisionsDisabled:
               description: DeprovisionsDisabled can be set to true to block deprovision
                 jobs from running.

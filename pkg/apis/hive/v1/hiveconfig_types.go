@@ -66,14 +66,6 @@ type HiveConfigSpec struct {
 
 	// DeprovisionsDisabled can be set to true to block deprovision jobs from running.
 	DeprovisionsDisabled *bool `json:"deprovisionsDisabled,omitempty"`
-
-	// DeleteProtection can be set to "enabled" to turn on automatic delete protection for ClusterDeployments. When
-	// enabled, Hive will add the "hive.openshift.io/protected-delete" annotation to new ClusterDeployments. Once a
-	// ClusterDeployment has been installed, a user must remove the annotation from a ClusterDeployment prior to
-	// deleting it.
-	// +kubebuilder:validation:Enum=enabled
-	// +optional
-	DeleteProtection DeleteProtectionType `json:"deleteProtection,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
@@ -168,12 +160,6 @@ type ManageDNSGCPConfig struct {
 	// +optional
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 }
-
-type DeleteProtectionType string
-
-const (
-	DeleteProtectionEnabled DeleteProtectionType = "enabled"
-)
 
 // +genclient:nonNamespaced
 // +genclient

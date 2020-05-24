@@ -133,14 +133,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
 	}
 
-	if instance.Spec.DeleteProtection == hivev1.DeleteProtectionEnabled {
-		hLog.Info("Delete Protection enabled")
-		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
-			Name:  hiveconstants.ProtectedDeleteEnvVar,
-			Value: "true",
-		})
-	}
-
 	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {
 		return err
 	}

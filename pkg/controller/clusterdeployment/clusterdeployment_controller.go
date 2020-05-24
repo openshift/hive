@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -156,13 +155,6 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, controllerName)
 	}
-
-	protectedDeleteEnvVar := os.Getenv(constants.ProtectedDeleteEnvVar)
-	if protectedDelete, err := strconv.ParseBool(protectedDeleteEnvVar); protectedDelete && err == nil {
-		logger.Info("Protected Delete enabled")
-		r.protectedDelete = true
-	}
-
 	return r
 }
 
@@ -256,8 +248,6 @@ type ReconcileClusterDeployment struct {
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
-
-	protectedDelete bool
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -827,13 +817,6 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	}
 
 	cd.Spec.Installed = true
-
-	if r.protectedDelete {
-		if _, annotationPresent := cd.Annotations[constants.ProtectedDeleteAnnotation]; !annotationPresent {
-			initializeAnnotations(cd)
-			cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
-		}
-	}
 
 	if err := r.Update(context.TODO(), cd); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set the Installed flag")

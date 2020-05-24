@@ -24,8 +24,3 @@ func ShouldSyncCluster(cd *hivev1.ClusterDeployment, logger log.FieldLogger) boo
 	}
 	return true
 }
-
-func IsDeleteProtected(cd *hivev1.ClusterDeployment) bool {
-	protectedDelete, err := strconv.ParseBool(cd.Annotations[constants.ProtectedDeleteAnnotation])
-	return protectedDelete && err == nil
-}

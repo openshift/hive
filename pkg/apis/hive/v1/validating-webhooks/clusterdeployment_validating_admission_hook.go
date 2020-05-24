@@ -451,7 +451,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admis
 	})
 
 	oldObject := &hivev1.ClusterDeployment{}
-	if err := a.decoder.DecodeRaw(request.OldObject, oldObject); err != nil {
+	if err := a.decoder.DecodeRaw(request.Object, oldObject); err != nil {
 		logger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,

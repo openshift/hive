@@ -122,7 +122,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		expectPendingCreation   bool
 		expectConsoleRouteFetch bool
 		validate                func(client.Client, *testing.T)
-		reconcilerSetup         func(*ReconcileClusterDeployment)
 	}{
 		{
 			name: "Add finalizer",
@@ -285,28 +284,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
-					assert.NotContains(t, cd.Annotations, constants.ProtectedDeleteAnnotation, "unexpected protected delete annotation")
-				}
-			},
-		},
-		{
-			name: "Completed provision with protected delete",
-			existing: []runtime.Object{
-				testClusterDeploymentWithProvision(),
-				testSuccessfulProvision(),
-				testMetadataConfigMap(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-			},
-			reconcilerSetup: func(r *ReconcileClusterDeployment) {
-				r.protectedDelete = true
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
-					assert.Equal(t, "true", cd.Annotations[constants.ProtectedDeleteAnnotation], "unexpected protected delete annotation")
 				}
 			},
 		},
@@ -403,29 +380,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if deprovision != nil {
 					t.Errorf("got unexpected deprovision request")
 				}
-			},
-		},
-		{
-			name: "Block deprovision when protected delete on",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					if cd.Annotations == nil {
-						cd.Annotations = make(map[string]string, 1)
-					}
-					cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
-					now := metav1.Now()
-					cd.DeletionTimestamp = &now
-					return cd
-				}(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				deprovision := getDeprovision(c)
-				assert.Nil(t, deprovision, "expected no deprovision request")
-				cd := getCD(c)
-				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer")
 			},
 		},
 		{
@@ -1173,10 +1127,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				logger:                        logger,
 				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-			}
-
-			if test.reconcilerSetup != nil {
-				test.reconcilerSetup(rcd)
 			}
 
 			reconcileRequest := reconcile.Request{

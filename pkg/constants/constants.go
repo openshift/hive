@@ -138,14 +138,6 @@ const (
 	// that drove the relocation.
 	RelocatedAnnotation = "hive.openshift.io/relocated"
 
-	// ProtectedDeleteAnnotation is an annotation used on ClusterDeployments to indicate that the ClusterDeployment
-	// cannot be deleted. The annotation must be removed in order to delete the ClusterDeployment.
-	ProtectedDeleteAnnotation = "hive.openshift.io/protected-delete"
-
-	// ProtectedDeleteEnvVar is the name of the environment variable used to tell the controller manager whether
-	// protected delete is enabled.
-	ProtectedDeleteEnvVar = "PROTECTED_DELETE"
-
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

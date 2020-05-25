@@ -140,8 +140,6 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	/* DISABLED TEMPORARILY: SEE https://issues.redhat.com/browse/CO-963
-
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {
 		dnsLog.WithError(err).Error("error reconciling dnszone for relocation")
 		return reconcile.Result{}, err
@@ -149,7 +147,6 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		dnsLog.Info("got result from reconcile dns zone for relocation")
 		return *result, nil
 	}
-	*/
 
 	// See if we need to sync. This is what rate limits our dns provider API usage, but allows for immediate syncing
 	// on spec changes and deletes.

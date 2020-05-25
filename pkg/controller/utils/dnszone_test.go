@@ -73,7 +73,7 @@ func TestReconcileDNSZoneForRelocation(t *testing.T) {
 				).
 				Build(),
 			cd:           testcd.FullBuilder(testNamespace, testCDName, scheme).Build(),
-			expectResult: true,
+			expectResult: false,
 		},
 		{
 			name: "relocating clusterdeployment",

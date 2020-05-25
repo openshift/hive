@@ -38,12 +38,21 @@ const (
 	// clusterProvisionLabelKey is the label that is used to identify
 	// resources descendant from a cluster provision.
 	clusterProvisionLabelKey = "hive.openshift.io/cluster-provision"
+
+	resultSuccess = "success"
+	resultFailure = "failure"
 )
 
 var (
 	// controllerKind contains the schema.GroupVersionKind for this controller type.
 	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterProvision")
 
+	metricClusterProvisionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_cluster_provision_results_total",
+		Help: "Counter incremented every time we observe a completed cluster provision.",
+	},
+		[]string{"cluster_type", "result"},
+	)
 	metricInstallErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "hive_install_errors",
 		Help: "Counter incremented every time we observe certain errors strings in install logs.",
@@ -54,6 +63,7 @@ var (
 
 func init() {
 	metrics.Registry.MustRegister(metricInstallErrors)
+	metrics.Registry.MustRegister(metricClusterProvisionsTotal)
 }
 
 // Add creates a new ClusterProvision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -290,15 +300,23 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 
 func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
 	pLog.Info("install job succeeded")
-	return r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
+	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
+	if err == nil {
+		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), resultSuccess).Inc()
+	}
+	return result, err
 }
 
 func (r *ReconcileClusterProvision) reconcileFailedJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
 	pLog.Info("install job failed")
 	reason, message := r.parseInstallLog(instance.Spec.InstallLog, pLog)
-	// Increment a counter metric for this cluster type and error reason:
-	metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), reason).Inc()
-	return r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
+	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
+	if err == nil {
+		// Increment a counter metric for this cluster type and error reason:
+		metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), reason).Inc()
+		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), resultFailure).Inc()
+	}
+	return result, err
 }
 
 func (r *ReconcileClusterProvision) startProvisioning(instance *hivev1.ClusterProvision, pLog log.FieldLogger) (reconcile.Result, error) {

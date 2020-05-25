@@ -188,8 +188,10 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, instance, hivev1.FinalizerDNSEndpoint); err != nil {
+		dnsLog.WithError(err).Error("error reconciling dnszone for relocation")
 		return reconcile.Result{}, err
 	} else if result != nil {
+		dnsLog.Info("got result from reconcile dns zone for relocation")
 		return *result, nil
 	}
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -27,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -39,6 +41,19 @@ const (
 	resolverConfigFile              = "/etc/resolv.conf"
 	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
 )
+
+var (
+	metricDNSZonesDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_dnszones_deleted_total",
+		Help: "Counter incremented every time we observe a deleted dnszone. Force will be true if we were unable to properly cleanup the zone.",
+	},
+		[]string{"force"},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricDNSZonesDeleted)
+}
 
 // Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -125,6 +140,8 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
+	/* DISABLED TEMPORARILY: SEE https://issues.redhat.com/browse/CO-963
+
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {
 		dnsLog.WithError(err).Error("error reconciling dnszone for relocation")
 		return reconcile.Result{}, err
@@ -132,6 +149,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		dnsLog.Info("got result from reconcile dns zone for relocation")
 		return *result, nil
 	}
+	*/
 
 	// See if we need to sync. This is what rate limits our dns provider API usage, but allows for immediate syncing
 	// on spec changes and deletes.
@@ -168,6 +186,8 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 				err := r.Client.Update(context.TODO(), desiredState)
 				if err != nil {
 					dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
+				} else {
+					metricDNSZonesDeleted.WithLabelValues("true").Inc()
 				}
 
 				// This returns whether there was an error or not.
@@ -225,6 +245,7 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 			if err != nil {
 				r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
 			}
+			metricDNSZonesDeleted.WithLabelValues("false").Inc()
 		}
 		return reconcile.Result{}, err
 	}

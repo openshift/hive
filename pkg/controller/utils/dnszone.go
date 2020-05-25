@@ -66,7 +66,7 @@ func ReconcileDNSZoneForRelocation(c client.Client, logger log.FieldLogger, dnsZ
 	cd := &hivev1.ClusterDeployment{}
 	switch err := c.Get(context.TODO(), client.ObjectKey{Namespace: dnsZone.Namespace, Name: cdName}, cd); {
 	case apierrors.IsNotFound(err):
-		logger.Debug("owning ClusterDeployment not found")
+		logger.Info("owning ClusterDeployment not found")
 		return &reconcile.Result{}, nil
 	case err != nil:
 		logger.WithError(err).Log(LogLevel(err), "could not get owning ClusterDeployment")

@@ -17,6 +17,7 @@ import (
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 
 	hiveapis "github.com/openshift/hive/pkg/apis"
+	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 )
 
 func init() {
@@ -42,6 +43,14 @@ func MustGetKubernetesClient() kclient.Interface {
 	c, err := kclient.NewForConfig(MustGetConfig())
 	if err != nil {
 		log.Fatalf("Error obtaining kubernetes client: %v", err)
+	}
+	return c
+}
+
+func MustGetHiveClient() hiveclient.Interface {
+	c, err := hiveclient.NewForConfig(MustGetConfig())
+	if err != nil {
+		log.Fatalf("Error obtaining hive client: %v", err)
 	}
 	return c
 }

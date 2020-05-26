@@ -293,6 +293,24 @@ func (r *ReconcileClusterRelocate) reconcileNoSingleMatch(cd *hivev1.ClusterDepl
 func (r *ReconcileClusterRelocate) relocate(cd *hivev1.ClusterDeployment, relocator *hivev1.ClusterRelocate, logger log.FieldLogger) error {
 	logger = logger.WithField("clusterRelocate", relocator.Name)
 
+	if cd.Spec.ManageDNS {
+		if conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.RelocationFailedCondition,
+			corev1.ConditionTrue,
+			"ManagedDNSUnsupported",
+			"relocating a ClusterDeployment that used managed DNS is unsupported",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		); changed {
+			cd.Status.Conditions = conds
+			if err := r.Status().Update(context.Background(), cd); err != nil {
+				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update condition")
+				return errors.Wrap(err, "could not update condition")
+			}
+		}
+		return nil
+	}
+
 	if _, relocated := cd.Annotations[constants.RelocatedAnnotation]; !relocated {
 		if cd.Annotations[constants.RelocatingAnnotation] != relocator.Name {
 			if cd.Annotations == nil {

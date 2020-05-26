@@ -656,6 +656,17 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(testcr.WithClusterDeploymentSelector("other-key", "other-value")),
 			},
 		},
+		{
+			name: "managed DNS",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.ManageDNS = true
+				},
+			),
+			srcResources: []runtime.Object{
+				crBuilder.Build(testcr.WithClusterDeploymentSelector("other-key", "other-value")),
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

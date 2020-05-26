@@ -128,16 +128,6 @@ const (
 	// for the cluster provision to complete by running `openshift-install wait-for install-complete` command.
 	WaitForInstallCompleteExecutionsAnnotation = "hive.openshift.io/wait-for-install-complete-executions"
 
-	// RelocatingAnnotation is an annotation used on ClusterDeployments to indicate that the ClusterDeployment is
-	// being relocated to another Hive instance. The value of the annotation is the name of the ClusterRelocate
-	// that is driving the relocation.
-	RelocatingAnnotation = "hive.openshift.io/relocating"
-
-	// RelocatedAnnotation is an annotation used on ClusterDeployments to indicate that the ClusterDeployment has
-	// been relocated to another Hive instance. The value of the annotation is the name of the ClusterRelocate
-	// that drove the relocation.
-	RelocatedAnnotation = "hive.openshift.io/relocated"
-
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

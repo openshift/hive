@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -225,7 +226,8 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	if !controllerutils.ShouldSyncCluster(cd, ssiLog) {
+	if cd.Annotations[constants.SyncsetPauseAnnotation] == "true" {
+		log.Warn(constants.SyncsetPauseAnnotation, " is present, hence syncing to cluster is disabled")
 		return reconcile.Result{}, nil
 	}
 

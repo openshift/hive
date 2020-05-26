@@ -193,6 +193,7 @@ func (a *SyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec").Child("resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec").Child("patches"))...)
 	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec").Child("secretMappings"))...)
+	allErrs = append(allErrs, validateSourceSecretInSyncSetNamespace(newObject.Spec.Secrets, newObject.Namespace, field.NewPath("spec", "secretMappings"))...)
 	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {
@@ -240,6 +241,7 @@ func (a *SyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	allErrs = append(allErrs, validateResources(newObject.Spec.Resources, field.NewPath("spec", "resources"))...)
 	allErrs = append(allErrs, validatePatches(newObject.Spec.Patches, field.NewPath("spec", "patches"))...)
 	allErrs = append(allErrs, validateSecrets(newObject.Spec.Secrets, field.NewPath("spec", "secretMappings"))...)
+	allErrs = append(allErrs, validateSourceSecretInSyncSetNamespace(newObject.Spec.Secrets, newObject.Namespace, field.NewPath("spec", "secretMappings"))...)
 	allErrs = append(allErrs, validateResourceApplyMode(newObject.Spec.ResourceApplyMode, field.NewPath("spec", "resourceApplyMode"))...)
 
 	if len(allErrs) > 0 {
@@ -307,6 +309,19 @@ func validateSecrets(secrets []hivev1.SecretMapping, fldPath *field.Path) field.
 	for i, secret := range secrets {
 		allErrs = append(allErrs, validateSecretRef(secret.SourceRef, fldPath.Index(i).Child("sourceRef"))...)
 		allErrs = append(allErrs, validateSecretRef(secret.TargetRef, fldPath.Index(i).Child("targetRef"))...)
+	}
+	return allErrs
+}
+
+func validateSourceSecretInSyncSetNamespace(secrets []hivev1.SecretMapping, syncSetNS string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, secret := range secrets {
+		if secret.SourceRef.Namespace != syncSetNS && secret.SourceRef.Namespace != "" {
+			path := fldPath.Index(i).Child("sourceRef")
+
+			allErrs = append(allErrs, field.Invalid(path.Child("namespace"), secret.SourceRef.Namespace,
+				"source secret reference must be in same namespace as SyncSet"))
+		}
 	}
 	return allErrs
 }

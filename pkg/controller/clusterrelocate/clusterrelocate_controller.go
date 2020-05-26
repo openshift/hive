@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,22 +46,7 @@ var (
 			&hivev1.SyncIdentityProviderList{},
 		}
 	}
-
-	metricSuccessfulClusterRelocations = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_cluster_relocations",
-		Help: "Total number of successful cluster relocations.",
-	}, []string{"cluster_relocate"})
-
-	metricAbortedClusterRelocations = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_aborted_cluster_relocations",
-		Help: "Total number of aborted cluster relocations.",
-	}, []string{"cluster_relocate", "reason"})
 )
-
-func init() {
-	metrics.Registry.MustRegister(metricSuccessfulClusterRelocations)
-	metrics.Registry.MustRegister(metricAbortedClusterRelocations)
-}
 
 // Add creates a new ClusterRelocate controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
@@ -179,7 +162,49 @@ func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconci
 	desiredRelocators, err := r.findMatchingRelocators(cd, logger)
 
 	if len(desiredRelocators) != 1 {
-		return r.reconcileNoSingleMatch(cd, desiredRelocators, logger)
+		names := make([]string, len(desiredRelocators))
+		for i, cr := range desiredRelocators {
+			names[i] = cr.Name
+		}
+		logger := logger.WithField("matchingRelocators", names)
+		if err := r.stopRelocating(cd, true, logger); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to stop relocation")
+			return reconcile.Result{}, errors.Wrap(err, "failed to stop relocation")
+		}
+		if len(desiredRelocators) == 0 {
+			logger.Debug("no relocators match clusterdeployment")
+			if conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RelocationFailedCondition,
+				corev1.ConditionFalse,
+				"NoMatchingRelocators",
+				"no ClusterRelocates match",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			); changed {
+				cd.Status.Conditions = conds
+				if err := r.Status().Update(context.Background(), cd); err != nil {
+					logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update conditions")
+					return reconcile.Result{}, errors.Wrap(err, "could not update conditions")
+				}
+			}
+		} else {
+			logger.Warn("cannot relocate clusterdeployment since it matches multiple clusterrelocates")
+			if conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RelocationFailedCondition,
+				corev1.ConditionTrue,
+				"MultipleMatchingRelocators",
+				fmt.Sprintf("multiple ClusterRelocates match: %s", strings.Join(names, ", ")),
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			); changed {
+				cd.Status.Conditions = conds
+				if err := r.Status().Update(context.Background(), cd); err != nil {
+					logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update conditions")
+					return reconcile.Result{}, errors.Wrap(err, "could not update conditions")
+				}
+			}
+		}
+		return reconcile.Result{}, nil
 	}
 	desiredRelocator := desiredRelocators[0]
 
@@ -189,11 +214,9 @@ func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconci
 		logger.WithField("currentClusterRelocate", currentRelocatorName).
 			WithField("desiredClusterRelocate", desiredRelocator.Name).
 			Info("switching relocation")
-		abortedReconcile, err := r.stopRelocating(cd, false, logger)
-		if err != nil {
+		if err := r.stopRelocating(cd, false, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-		recordMetricForAbortedRelocate(abortedReconcile, "new_match")
 	}
 
 	return reconcile.Result{}, r.relocate(cd, desiredRelocator, logger)
@@ -220,74 +243,21 @@ func (r *ReconcileClusterRelocate) findMatchingRelocators(cd *hivev1.ClusterDepl
 	return matches, nil
 }
 
-func (r *ReconcileClusterRelocate) stopRelocating(cd *hivev1.ClusterDeployment, commitUpdates bool, logger log.FieldLogger) (abortedRelocate string, returnErr error) {
-	clusterRelocateName, relocating := cd.Annotations[constants.RelocatingAnnotation]
+func (r *ReconcileClusterRelocate) stopRelocating(cd *hivev1.ClusterDeployment, commitUpdates bool, logger log.FieldLogger) error {
+	controllerRelocatorName, relocating := cd.Annotations[constants.RelocatingAnnotation]
 	if !relocating {
-		return
+		return nil
 	}
-	abortedRelocate = clusterRelocateName
-	logger.WithField("clusterRelocate", clusterRelocateName).Info("stopping relocation")
+	logger.WithField("controllerRelocator", controllerRelocatorName).Info("stopping relocation")
 	// TODO: Attempt to clean up resources already relocated
 	delete(cd.Annotations, constants.RelocatingAnnotation)
 	if commitUpdates {
 		if err := r.Update(context.Background(), cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to clear relocating annotation")
-			returnErr = err
-			return
+			return err
 		}
 	}
-	return
-}
-
-func (r *ReconcileClusterRelocate) reconcileNoSingleMatch(cd *hivev1.ClusterDeployment, desiredRelocators []*hivev1.ClusterRelocate, logger log.FieldLogger) (reconcile.Result, error) {
-	names := make([]string, len(desiredRelocators))
-	for i, cr := range desiredRelocators {
-		names[i] = cr.Name
-	}
-	logger = logger.WithField("matchingRelocators", names)
-	abortedRelocate, err := r.stopRelocating(cd, true, logger)
-	if err != nil {
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to stop relocation")
-		return reconcile.Result{}, errors.Wrap(err, "failed to stop relocation")
-	}
-	var abortedReason string
-	if len(desiredRelocators) == 0 {
-		logger.Debug("no relocators match clusterdeployment")
-		abortedReason = "no_match"
-		if conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.RelocationFailedCondition,
-			corev1.ConditionFalse,
-			"NoMatchingRelocators",
-			"no ClusterRelocates match",
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		); changed {
-			cd.Status.Conditions = conds
-			if err := r.Status().Update(context.Background(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update conditions")
-				return reconcile.Result{}, errors.Wrap(err, "could not update conditions")
-			}
-		}
-	} else {
-		logger.Warn("cannot relocate clusterdeployment since it matches multiple clusterrelocates")
-		abortedReason = "multiple_matches"
-		if conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.RelocationFailedCondition,
-			corev1.ConditionTrue,
-			"MultipleMatchingRelocators",
-			fmt.Sprintf("multiple ClusterRelocates match: %s", strings.Join(names, ", ")),
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		); changed {
-			cd.Status.Conditions = conds
-			if err := r.Status().Update(context.Background(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update conditions")
-				return reconcile.Result{}, errors.Wrap(err, "could not update conditions")
-			}
-		}
-	}
-	recordMetricForAbortedRelocate(abortedRelocate, abortedReason)
-	return reconcile.Result{}, nil
+	return nil
 }
 
 func (r *ReconcileClusterRelocate) relocate(cd *hivev1.ClusterDeployment, relocator *hivev1.ClusterRelocate, logger log.FieldLogger) error {
@@ -487,8 +457,6 @@ func (r *ReconcileClusterRelocate) copy(cd *hivev1.ClusterDeployment, relocator 
 		return false, errors.Wrap(err, "failed to copy clusterdeployment")
 	}
 
-	metricSuccessfulClusterRelocations.WithLabelValues(relocator.Name).Inc()
-
 	return true, nil
 }
 
@@ -668,11 +636,4 @@ func (r *ReconcileClusterRelocate) ignoreSecret(secret *corev1.Secret, logger lo
 		}
 	}
 	return false, nil
-}
-
-func recordMetricForAbortedRelocate(abortedRelocate, abortedReason string) {
-	if abortedReason == "" {
-		return
-	}
-	metricAbortedClusterRelocations.WithLabelValues(abortedRelocate, abortedReason).Inc()
 }

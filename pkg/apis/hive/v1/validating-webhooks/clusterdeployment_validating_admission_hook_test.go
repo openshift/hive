@@ -690,6 +690,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Delete,
 			expectedAllowed: true,
 		},
+		{
+			name:            "Test delete on OpenShift 3.11",
+			oldObject:       nil,
+			operation:       admissionv1beta1.Delete,
+			expectedAllowed: true,
+		},
 	}
 
 	for _, tc := range cases {

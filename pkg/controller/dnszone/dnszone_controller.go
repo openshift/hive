@@ -62,7 +62,7 @@ func Add(mgr manager.Manager) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) *ReconcileDNSZone {
+func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDNSZone{
 		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
 		scheme:    mgr.GetScheme(),
@@ -72,7 +72,7 @@ func newReconciler(mgr manager.Manager) *ReconcileDNSZone {
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileDNSZone) error {
+func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
@@ -80,15 +80,8 @@ func add(mgr manager.Manager, r *ReconcileDNSZone) error {
 	}
 
 	// Watch for changes to DNSZone
-	if err := c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForObject{}); err != nil {
-		return err
-	}
-
-	// Watch for changes to ClusterDeployment
-	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(r, r.logger),
-	); err != nil {
+	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
 		return err
 	}
 
@@ -138,14 +131,6 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		// Error reading the object - requeue the request.
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
-	}
-
-	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {
-		dnsLog.WithError(err).Error("error reconciling dnszone for relocation")
-		return reconcile.Result{}, err
-	} else if result != nil {
-		dnsLog.Info("got result from reconcile dns zone for relocation")
-		return *result, nil
 	}
 
 	// See if we need to sync. This is what rate limits our dns provider API usage, but allows for immediate syncing

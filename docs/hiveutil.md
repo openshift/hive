@@ -22,11 +22,22 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=aws myclu
 
 #### Create Cluster on Azure
 
-Credentials will be read from `~/.azure/osServicePrincipal.json` typically created via the `az login` command. Alternatively you can specify an Azure credentials file with `--creds-file` or the `AZURE_AUTH_LOCATION` environment variable.
+Credentials will be read from either `~/.azure/osServicePrincipal.json`, the contents of the `AZURE_AUTH_LOCATION` environment variable, or the value provided with the `--creds-file` parameter (in increasing order of preference). The format for the credentials used for installation/uninstallation follows the same format used by the OpenShift installer:
+
+```
+{
+  "subscriptionId": "azure-subscription-uuid-here",
+  "clientId": "client-id-for-service-principal",
+  "clientSecret": "client-secret-for-service-principal",
+  "tenantId": "tenant-uuid-here"
+}
+```
 
 ```bash
 bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup mycluster
 ```
+
+NOTE: For deprovisioning a cluster `hiveutil` will use creds from `~/.azure/osServiceAccount.json` or the `AZURE_AUTH_LOCATION` environment variable (with the environment variable prefered).
 
 #### Create Cluster on GCP
 

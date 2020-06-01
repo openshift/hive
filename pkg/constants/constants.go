@@ -144,6 +144,10 @@ const (
 	// AzureCredentialsName is the name of the Azure credentials file or secret key.
 	AzureCredentialsName = "osServicePrincipal.json"
 
+	// AzureCredentialsEnvVar is the name of the environment variable pointing to the location
+	// where Azure credentials can be found.
+	AzureCredentialsEnvVar = "AZURE_AUTH_LOCATION"
+
 	// OpenStackCredentialsName is the name of the OpenStack credentials file.
 	OpenStackCredentialsName = "clouds.yaml"
 

@@ -7,6 +7,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/client-go/util/homedir"
+
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -15,13 +17,13 @@ import (
 // The defaultCredsFile will only be used if credsFile is empty and the environment variables
 // are not set.
 func GetCreds(credsFile string) ([]byte, error) {
-	credsFilePath := filepath.Join(os.Getenv("HOME"), ".gcp", constants.GCPCredentialsName)
+	credsFilePath := filepath.Join(homedir.HomeDir(), ".gcp", constants.GCPCredentialsName)
 	if l := os.Getenv("GOOGLE_CREDENTIALS"); l != "" {
 		credsFilePath = l
 	}
 	if credsFile != "" {
 		credsFilePath = credsFile
 	}
-	log.Infof("Loading gcp service account from: %s", credsFilePath)
+	log.WithField("credsFilePath", credsFilePath).Info("Loading gcp service account")
 	return ioutil.ReadFile(credsFilePath)
 }

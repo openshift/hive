@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	controllerName    = "clusterDeprovision"
+	ControllerName    = "clusterDeprovision"
 	jobHashAnnotation = "hive.openshift.io/jobhash"
 )
 
@@ -76,7 +76,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		}
 	}
 	return &ReconcileClusterDeprovision{
-		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:               mgr.GetScheme(),
 		deprovisionsDisabled: deprovisionsDisabled,
 	}, nil
@@ -87,14 +87,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("clusterdeprovision-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error getting new clusterdeprovision-controller")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new clusterdeprovision-controller")
 		return err
 	}
 
 	// Watch for changes to ClusterDeprovision
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching changes to clusterdeprovision")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching changes to clusterdeprovision")
 		return err
 	}
 
@@ -104,7 +104,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		OwnerType:    &hivev1.ClusterDeprovision{},
 	})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
 		return err
 	}
 
@@ -126,13 +126,13 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 	start := time.Now()
 	rLog := log.WithFields(log.Fields{
 		"name":       request.NamespacedName.String(),
-		"controller": controllerName,
+		"controller": ControllerName,
 	})
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	rLog.Info("reconciling cluster deprovision request")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		rLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 	// Fetch the ClusterDeprovision instance

@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	controllerName = "metrics"
+	ControllerName = "metrics"
 )
 
 var (
@@ -166,7 +166,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		mcLog := log.WithField("controller", "metrics")
 		defer func() {
 			dur := time.Since(start)
-			MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+			MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 			mcLog.WithField("elapsed", dur).Info("reconcile complete")
 		}()
 

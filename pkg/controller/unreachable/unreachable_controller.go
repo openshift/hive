@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	controllerName = "unreachable"
+	ControllerName = "unreachable"
 
 	maxUnreachableDuration = 2 * time.Hour
 )
@@ -58,12 +58,12 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileRemoteMachineSet{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme: mgr.GetScheme(),
-		logger: log.WithField("controller", controllerName),
+		logger: log.WithField("controller", ControllerName),
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
 }
@@ -105,14 +105,14 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	cdLog := log.WithFields(log.Fields{
 		"clusterDeployment": request.Name,
 		"namespace":         request.Namespace,
-		"controller":        controllerName,
+		"controller":        ControllerName,
 	})
 
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

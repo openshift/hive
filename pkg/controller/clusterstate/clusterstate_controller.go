@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	controllerName       = "clusterState"
+	ControllerName       = "clusterState"
 	statusUpdateInterval = 10 * time.Minute
 )
 
@@ -44,13 +44,13 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileClusterState{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:       mgr.GetScheme(),
-		logger:       log.WithField("controller", controllerName),
+		logger:       log.WithField("controller", ControllerName),
 		updateStatus: updateClusterStateStatus,
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
 }
@@ -59,14 +59,14 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("clusterstate-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error creating new clusterstate controller")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error creating new clusterstate controller")
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.WithField("controller", controllerName).WithError(err).Error("Error watching cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment")
 		return err
 	}
 	return nil
@@ -91,7 +91,7 @@ type ReconcileClusterState struct {
 func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	logger := r.logger.WithFields(log.Fields{
-		"controller":        controllerName,
+		"controller":        ControllerName,
 		"clusterDeployment": request.NamespacedName.String(),
 	})
 
@@ -99,7 +99,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 	logger.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

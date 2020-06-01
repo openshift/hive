@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	controllerName = "velerobackup"
+	ControllerName = "velerobackup"
 	errChecksum    = "HIVE_CHECKSUM_ERR_97A29D08"
 
 	// Default reconcile rate limiting to 1 backup every 3 minutes.
@@ -74,7 +74,7 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
-	logger := log.WithField("controller", controllerName)
+	logger := log.WithField("controller", ControllerName)
 	reconcileRateLimitDuration := defaultReconcileRateLimitDuration
 	minBackupPeriodSecondsStr := os.Getenv(hiveconstants.MinBackupPeriodSecondsEnvVar)
 	if minBackupPeriodSecondsStr != "" {
@@ -88,7 +88,7 @@ func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	}
 
 	return &ReconcileBackup{
-		Client:                     controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:                     controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:                     mgr.GetScheme(),
 		reconcileRateLimitDuration: reconcileRateLimitDuration,
 		logger:                     logger,
@@ -98,7 +98,7 @@ func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(controllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New(ControllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 	nsLogger.Info("reconciling backups and Hive object changes")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		nsLogger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

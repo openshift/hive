@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	controllerName = "clusterProvision"
+	ControllerName = "clusterProvision"
 
 	// clusterProvisionLabelKey is the label that is used to identify
 	// resources descendant from a cluster provision.
@@ -64,9 +64,9 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	logger := log.WithField("controller", controllerName)
+	logger := log.WithField("controller", ControllerName)
 	return &ReconcileClusterProvision{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
@@ -127,7 +127,7 @@ func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconc
 	pLog.Info("reconciling cluster provision")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		pLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

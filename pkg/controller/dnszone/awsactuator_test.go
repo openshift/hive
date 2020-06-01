@@ -43,7 +43,7 @@ func TestNewAWSActuator(t *testing.T) {
 			// Arrange
 			mocks := setupDefaultMocks(t)
 			expectedAWSActuator := &AWSActuator{
-				logger:  log.WithField("controller", controllerName),
+				logger:  log.WithField("controller", ControllerName),
 				dnsZone: tc.dnsZone,
 			}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/pflag"
 
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
@@ -28,8 +29,23 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller"
+	"github.com/openshift/hive/pkg/controller/clusterdeployment"
+	"github.com/openshift/hive/pkg/controller/clusterdeprovision"
+	"github.com/openshift/hive/pkg/controller/clusterprovision"
+	"github.com/openshift/hive/pkg/controller/clusterstate"
+	"github.com/openshift/hive/pkg/controller/clusterversion"
+	"github.com/openshift/hive/pkg/controller/controlplanecerts"
+	"github.com/openshift/hive/pkg/controller/dnsendpoint"
+	"github.com/openshift/hive/pkg/controller/dnszone"
+	"github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/remoteingress"
+	"github.com/openshift/hive/pkg/controller/remotemachineset"
+	"github.com/openshift/hive/pkg/controller/syncidentityprovider"
+	"github.com/openshift/hive/pkg/controller/syncset"
+	"github.com/openshift/hive/pkg/controller/syncsetinstance"
+	"github.com/openshift/hive/pkg/controller/unreachable"
 	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/controller/velerobackup"
 	"github.com/openshift/hive/pkg/version"
 )
 
@@ -41,12 +57,35 @@ const (
 	leaderElectionlRetryPeriod  = "4s"
 )
 
+type controllerSetupFunc func(manager.Manager) error
+
+var controllerFuncs = map[string]controllerSetupFunc{
+	clusterdeployment.ControllerName:    clusterdeployment.Add,
+	clusterdeprovision.ControllerName:   clusterdeprovision.Add,
+	clusterprovision.ControllerName:     clusterprovision.Add,
+	clusterstate.ControllerName:         clusterstate.Add,
+	clusterversion.ControllerName:       clusterversion.Add,
+	controlplanecerts.ControllerName:    controlplanecerts.Add,
+	dnsendpoint.ControllerName:          dnsendpoint.Add,
+	dnszone.ControllerName:              dnszone.Add,
+	metrics.ControllerName:              metrics.Add,
+	remoteingress.ControllerName:        remoteingress.Add,
+	remotemachineset.ControllerName:     remotemachineset.Add,
+	syncidentityprovider.ControllerName: syncidentityprovider.Add,
+	syncset.ControllerName:              syncset.Add,
+	syncsetinstance.ControllerName:      syncsetinstance.Add,
+	unreachable.ControllerName:          unreachable.Add,
+	velerobackup.ControllerName:         velerobackup.Add,
+}
+
 type controllerManagerOptions struct {
-	LogLevel string
+	LogLevel            string
+	Controllers         []string
+	DisabledControllers []string
 }
 
 func newRootCommand() *cobra.Command {
-	opts := &controllerManagerOptions{}
+	opts := newControllerManagerOptions()
 	cmd := &cobra.Command{
 		Use:   "manager",
 		Short: "OpenShift Hive controller manager.",
@@ -133,9 +172,20 @@ func newRootCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
+			disabledControllersSet := sets.NewString(opts.DisabledControllers...)
 			// Setup all Controllers
-			if err := controller.AddToManager(mgr); err != nil {
-				log.Fatal(err)
+			for _, name := range opts.Controllers {
+				fn, ok := controllerFuncs[name]
+				if !ok {
+					log.WithField("controller", name).Fatal("no entry for controller found")
+				}
+				if disabledControllersSet.Has(name) {
+					log.WithField("controller", name).Debugf("skipping disabled controller")
+					continue
+				}
+				if err := fn(mgr); err != nil {
+					log.WithError(err).WithField("controller", name).Fatal("failed to start controller")
+				}
 			}
 
 			mgr.AddReadyzCheck("ping", healthz.Ping)
@@ -150,10 +200,24 @@ func newRootCommand() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	cmd.PersistentFlags().StringSliceVar(&opts.Controllers, "controllers", opts.Controllers, "Comma-separated list of controllers to run")
+	cmd.PersistentFlags().StringSliceVar(&opts.DisabledControllers, "disabled-controllers", []string{},
+		"Comma-separated list of controllers to disable (overrides anything enabled with the --controllers param)")
 	initializeKlog(cmd.PersistentFlags())
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
+}
+
+func newControllerManagerOptions() *controllerManagerOptions {
+	// By default we have all of the controllers enabled
+	controllers := make([]string, 0, len(controllerFuncs))
+	for name := range controllerFuncs {
+		controllers = append(controllers, name)
+	}
+	return &controllerManagerOptions{
+		Controllers: controllers,
+	}
 }
 
 func initializeKlog(flags *pflag.FlagSet) {

@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	controllerName                  = "dnszone"
+	ControllerName                  = "dnszone"
 	zoneResyncDuration              = 2 * time.Hour
 	domainAvailabilityCheckInterval = 30 * time.Second
 	dnsClientTimeout                = 30 * time.Second
@@ -64,9 +64,9 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDNSZone{
-		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:    mgr.GetScheme(),
-		logger:    log.WithField("controller", controllerName),
+		logger:    log.WithField("controller", ControllerName),
 		soaLookup: lookupSOARecord,
 	}
 }
@@ -74,7 +74,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ type ReconcileDNSZone struct {
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 	dnsLog := r.logger.WithFields(log.Fields{
-		"controller": controllerName,
+		"controller": ControllerName,
 		"dnszone":    request.Name,
 		"namespace":  request.Namespace,
 	})
@@ -115,7 +115,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	dnsLog.Info("reconciling dns zone")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

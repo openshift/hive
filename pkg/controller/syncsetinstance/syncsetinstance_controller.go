@@ -55,7 +55,7 @@ import (
 )
 
 const (
-	controllerName           = "syncsetinstance"
+	ControllerName           = "syncsetinstance"
 	unknownObjectFoundReason = "UnknownObjectFound"
 	applySucceededReason     = "ApplySucceeded"
 	applyFailedReason        = "ApplyFailed"
@@ -82,7 +82,7 @@ type Applier interface {
 // Add creates a new SyncSetInstance controller and adds it to the manager with default RBAC. The manager will set fields on the
 // controller and start it when the manager starts.
 func Add(mgr manager.Manager) error {
-	logger := log.WithField("controller", controllerName)
+	logger := log.WithField("controller", ControllerName)
 	reapplyInterval := defaultReapplyInterval
 	if envReapplyInterval := os.Getenv(reapplyIntervalEnvKey); len(envReapplyInterval) > 0 {
 		var err error
@@ -99,7 +99,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, logger log.FieldLogger, reapplyInterval time.Duration) reconcile.Reconciler {
 	r := &ReconcileSyncSetInstance{
-		Client:          controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:          controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:          mgr.GetScheme(),
 		logger:          logger,
 		applierBuilder:  applierBuilderFunc,
@@ -107,7 +107,7 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, reapplyInterval 
 	}
 	r.hash = r.resourceHash
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
 }
@@ -191,7 +191,7 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 	ssiLog := r.logger.WithField("syncsetinstance", request.NamespacedName)
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		ssiLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

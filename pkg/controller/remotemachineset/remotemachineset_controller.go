@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	controllerName = "remotemachineset"
+	ControllerName = "remotemachineset"
 
 	machinePoolNameLabel = "hive.openshift.io/machine-pool"
 	finalizer            = "hive.openshift.io/remotemachineset"
@@ -48,9 +48,9 @@ var controllerKind = hivev1.SchemeGroupVersion.WithKind("MachinePool")
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	logger := log.WithField("controller", controllerName)
+	logger := log.WithField("controller", ControllerName)
 	r := &ReconcileRemoteMachineSet{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, controllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
@@ -59,7 +59,7 @@ func Add(mgr manager.Manager) error {
 		return r.createActuator(cd, pool, remoteMachineSets, logger)
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, controllerName)
+		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 
 	// Create a new controller
@@ -152,7 +152,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

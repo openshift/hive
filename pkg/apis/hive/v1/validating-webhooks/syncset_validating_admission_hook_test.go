@@ -4,12 +4,18 @@ import (
 	"encoding/json"
 	"testing"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
+
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+)
+
+const (
+	syncSetNS = "test-namespace"
 )
 
 func TestSyncSetValidatingResource(t *testing.T) {
@@ -105,6 +111,26 @@ func TestSyncSetValidate(t *testing.T) {
 				return ss
 			}(),
 			expectedAllowed: false,
+		},
+		{
+			name:      "Test invalid SecretReference source not in SyncSet namespace",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.Secrets[0].SourceRef.Namespace = "anotherns"
+				return ss
+			}(),
+			expectedAllowed: false,
+		},
+		{
+			name:      "Test valid SecretReference source has empty namespace",
+			operation: admissionv1beta1.Create,
+			syncSet: func() *hivev1.SyncSet {
+				ss := testSecretReferenceSyncSet()
+				ss.Spec.Secrets[0].SourceRef.Namespace = ""
+				return ss
+			}(),
+			expectedAllowed: true,
 		},
 		{
 			name:      "Test invalid SecretReference no target name create",
@@ -410,7 +436,7 @@ func testSecretReferenceSyncSet() *hivev1.SyncSet {
 				{
 					SourceRef: hivev1.SecretReference{
 						Name:      "foo",
-						Namespace: "foo",
+						Namespace: syncSetNS,
 					},
 					TargetRef: hivev1.SecretReference{
 						Name:      "foo",
@@ -427,7 +453,7 @@ func testSyncSet() *hivev1.SyncSet {
 	return &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-sync-set",
-			Namespace: "test-namespace",
+			Namespace: syncSetNS,
 		},
 	}
 }

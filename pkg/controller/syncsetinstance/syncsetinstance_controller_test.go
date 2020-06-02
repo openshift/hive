@@ -376,6 +376,22 @@ func TestSyncSetReconcile(t *testing.T) {
 			expectApplied: true,
 		},
 		{
+			name: "Skip syncset with secret references in another namespace",
+			existingObjs: []runtime.Object{
+				func() *corev1.Secret {
+					s := testSecret("foo", "bar")
+					s.Namespace = "anotherns"
+					return s
+				}(),
+			},
+			syncSet: func() *hivev1.SyncSet {
+				secretMapping := testSecretMapping("foo")
+				secretMapping.SourceRef.Namespace = "anotherns"
+				return testSyncSetWithSecretMappings("ss1", secretMapping)
+			}(),
+			expectApplied: false,
+		},
+		{
 			name:    "Local secret does not exist",
 			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {

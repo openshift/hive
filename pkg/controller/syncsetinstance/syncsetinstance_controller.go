@@ -266,6 +266,15 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
+	// Prevent users with permissions to create a SyncSet from referencing Secrets in another namespace
+	// and copying them into their clusters. This should be caught in admission, but just incase we have
+	// a check here to refuse to reconcile. Error is logged but not returned as there's no point re-reconciling
+	// this unless the SyncSet is edited. This check is not relevant for SelectorSyncSets which have no namespace.
+	if r.hasSourceSecretsInAnotherNamespace(ssi, spec) {
+		ssiLog.Warn("syncsetinstance has a source secret in another namespace")
+		return reconcile.Result{}, nil
+	}
+
 	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
 	dynamicClient, unreachable, requeue := remoteclient.ConnectToRemoteClusterWithDynamicClient(
 		cd,
@@ -303,6 +312,19 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 
 	reapplyDuration := r.ssiReapplyDuration(ssi)
 	return reconcile.Result{RequeueAfter: reapplyDuration}, nil
+}
+
+func (r *ReconcileSyncSetInstance) hasSourceSecretsInAnotherNamespace(ssi *hivev1.SyncSetInstance, spec *hivev1.SyncSetCommonSpec) bool {
+	// This check is not relevant for SelectorSyncSets
+	if ssi.Spec.SyncSetRef == nil {
+		return false
+	}
+	for _, secret := range spec.Secrets {
+		if secret.SourceRef.Namespace != ssi.Namespace && secret.SourceRef.Namespace != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // ssiReapplyDuration returns the shortest time.Duration to meet reapplyInterval from successfully applied

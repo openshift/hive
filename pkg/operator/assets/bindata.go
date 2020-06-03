@@ -9301,6 +9301,13 @@ spec:
                       - size
                       - type
                       type: object
+                    subnets:
+                      description: Subnets is the list of subnets to which to attach
+                        the machines. There must be exactly one subnet for each availability
+                        zone used.
+                      items:
+                        type: string
+                      type: array
                     type:
                       description: InstanceType defines the ec2 instance type. eg.
                         m4-large

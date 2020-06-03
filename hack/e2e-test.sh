@@ -86,16 +86,25 @@ DEPLOY_IMAGE="${HIVE_IMAGE}" make deploy
 function teardown() {
 	echo ""
 	echo ""
+        # Skip tear down if the clusterdeployment is no longer there
+        if ! oc get clusterdeployment ${CLUSTER_NAME}; then
+          return
+        fi
+
+        # This is here for backup. The test-e2e-destroycluster test
+        # should normally delete the clusterdeployemnt. Only if the 
+        # test fails before then, this will ensure we at least attempt
+        # to delete the cluster.
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
 	oc delete --wait=false clusterdeployment ${CLUSTER_NAME} || :
 
 	if ! go run "${SRC_ROOT}/contrib/cmd/waitforjob/main.go" --log-level=debug "${CLUSTER_NAME}" "uninstall"
 	then
 		echo "Waiting for uninstall job failed"
-		if oc logs job/${CLUSTER_NAME}-uninstall &> "${ARTIFACT_DIR}/hive_uninstall_job.log"
+		if oc logs job/${CLUSTER_NAME}-uninstall &> "${ARTIFACT_DIR}/hive_uninstall_job_onfailure.log"
 		then
 			echo "************* UNINSTALL JOB LOG *************"
-			cat "${ARTIFACT_DIR}/hive_uninstall_job.log"
+			cat "${ARTIFACT_DIR}/hive_uninstall_job_onfailure.log"
 			echo ""
 			echo ""
 		fi
@@ -103,6 +112,11 @@ function teardown() {
 	fi
 }
 trap 'teardown' EXIT
+
+function save_hive_logs() {
+  oc logs -n "${HIVE_NS}" deployment/hive-controllers > "${ARTIFACT_DIR}/hive-controllers.log"
+  oc logs -n "${HIVE_NS}" deployment/hiveadmission > "${ARTIFACT_DIR}/hiveadmission.log"
+}
 
 echo "Running post-deploy tests"
 make test-e2e-postdeploy
@@ -248,7 +262,11 @@ fi
 echo "Running post-install tests"
 make test-e2e-postinstall
 
+echo "Running destroy test"
+make test-e2e-destroycluster
+
+echo "Saving hive logs"
+save_hive_logs
+
 echo "Uninstalling hive and validating cleanup"
 make test-e2e-uninstallhive
-
-

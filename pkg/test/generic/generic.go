@@ -52,11 +52,13 @@ func WithAnnotationsPopulated() Option {
 	}
 }
 
+// WithAnnotation adds an annotation with the specified key and value to the supplied object.
+// If there is already an annotation with the specified key, it will be replaced.
 func WithAnnotation(key, value string) Option {
 	return func(meta hivev1.MetaRuntimeObject) {
 		annotations := meta.GetAnnotations()
 		if annotations == nil {
-			annotations = map[string]string{}
+			annotations = make(map[string]string, 1)
 		}
 		annotations[key] = value
 		meta.SetAnnotations(annotations)

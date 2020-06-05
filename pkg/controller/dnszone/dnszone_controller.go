@@ -15,6 +15,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/azureclient"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
@@ -347,6 +348,21 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 		}
 
 		return NewGCPActuator(dnsLog, secret, dnsZone, gcpclient.NewClientFromSecret)
+	}
+
+	if dnsZone.Spec.Azure != nil {
+		secret := &corev1.Secret{}
+		err := r.Get(context.TODO(),
+			types.NamespacedName{
+				Name:      dnsZone.Spec.Azure.CredentialsSecretRef.Name,
+				Namespace: dnsZone.Namespace,
+			},
+			secret)
+		if err != nil {
+			return nil, err
+		}
+
+		return NewAzureActuator(dnsLog, secret, dnsZone, azureclient.NewClientFromSecret)
 	}
 
 	return nil, errors.New("unable to determine which actuator to use")

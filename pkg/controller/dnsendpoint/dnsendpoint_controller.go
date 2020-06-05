@@ -289,6 +289,11 @@ func createNameServerQuery(c client.Client, logger log.FieldLogger, managedDomai
 		logger.Infof("using gcp creds for managed domain stored in %q secret", secretName)
 		return nameserver.NewGCPQuery(c, secretName)
 	}
+	if managedDomain.Azure != nil {
+		secretName := managedDomain.Azure.CredentialsSecretRef.Name
+		logger.Infof("using azure creds for managed domain stored in %q secret", secretName)
+		return nameserver.NewAzureQuery(c, secretName, managedDomain.Azure.ResourceGroupName)
+	}
 	logger.Error("unsupported cloud for managing DNS")
 	return nil
 }

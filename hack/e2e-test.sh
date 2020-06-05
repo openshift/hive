@@ -133,8 +133,6 @@ case "${CLOUD}" in
 "azure")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/osServicePrincipal.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
-	# NOTE: No plans to implement DNS management for Azure at this time
-	USE_MANAGED_DNS=false
 	;;
 "gcp")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/gce.json"

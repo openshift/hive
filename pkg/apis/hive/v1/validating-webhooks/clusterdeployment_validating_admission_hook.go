@@ -264,6 +264,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 	if newObject.Spec.Platform.Azure != nil {
 		numberOfPlatforms++
+		canManageDNS = true
 		azure := newObject.Spec.Platform.Azure
 		azurePath := platformPath.Child("azure")
 		if azure.CredentialsSecretRef.Name == "" {

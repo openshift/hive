@@ -2,11 +2,18 @@ package resource
 
 import (
 	"bytes"
+	"context"
 	"io"
 
+	"github.com/jonboulle/clockwork"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	kresource "k8s.io/cli-runtime/pkg/resource"
 	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -16,7 +23,7 @@ import (
 // by calling the Apply function
 type ApplyResult string
 
-var (
+const (
 	// ConfiguredApplyResult is returned when a patch was submitted
 	ConfiguredApplyResult ApplyResult = "configured"
 
@@ -29,6 +36,8 @@ var (
 	// UnknownApplyResult is returned when the resulting action could not be determined
 	UnknownApplyResult ApplyResult = "unknown"
 )
+
+const fieldTooLong metav1.CauseType = "FieldValueTooLong"
 
 // Apply applies the given resource bytes to the target cluster specified by kubeconfig
 func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
@@ -55,6 +64,9 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 	}
 	err = applyOptions.Run()
 	if err != nil {
+		if annotationTooLong(err) {
+			return r.createOrUpdateResource(factory, obj, ioStreams.ErrOut)
+		}
 		r.logger.WithError(err).
 			WithField("stdout", ioStreams.Out.(*bytes.Buffer).String()).
 			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Warn("running the apply command failed")
@@ -71,6 +83,50 @@ func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) 
 		return "", err
 	}
 	return r.Apply(data)
+}
+
+func (r *Helper) createOrUpdateResource(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
+	r.logger.Warn("attempting to create or update object directly because it's too large to be applied")
+	info, err := r.getResourceInternalInfo(f, obj)
+	if err != nil {
+		return "", err
+	}
+	c, err := f.DynamicClient()
+	if err != nil {
+		return "", err
+	}
+	sourceObj := info.Object.DeepCopyObject()
+	if err = info.Get(); err != nil {
+		if !errors.IsNotFound(err) {
+			return "", err
+		}
+		// Object doesn't exist yet, create it
+		gvr := info.ResourceMapping().Resource
+		_, err := c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured), metav1.CreateOptions{})
+		if err != nil {
+			return "", err
+		}
+		return CreatedApplyResult, nil
+	}
+	openAPISchema, _ := f.OpenAPISchema()
+	patcher := kcmdapply.Patcher{
+		Mapping:       info.Mapping,
+		Helper:        kresource.NewHelper(info.Client, info.Mapping),
+		DynamicClient: c,
+		Overwrite:     true,
+		BackOff:       clockwork.NewRealClock(),
+		OpenapiSchema: openAPISchema,
+	}
+	sourceBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, sourceObj)
+	patch, _, err := patcher.Patch(info.Object, sourceBytes, info.Source, info.Namespace, info.Name, errOut)
+	if err != nil {
+		return "", err
+	}
+	result := ConfiguredApplyResult
+	if string(patch) == "{}" {
+		result = UnchangedApplyResult
+	}
+	return result, nil
 }
 
 func (r *Helper) setupApplyCommand(f cmdutil.Factory, fileName string, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
@@ -151,4 +207,21 @@ func (t *changeTracker) ToPrinter(name string) (printers.ResourcePrinter, error)
 		internalPrinter: p,
 		setResult:       f,
 	}, nil
+}
+
+func annotationTooLong(err error) bool {
+	if !errors.IsInvalid(err) {
+		return false
+	}
+	apiStatusErr, ok := err.(errors.APIStatus)
+	if !ok {
+		return false
+	}
+	causes := apiStatusErr.Status().Details.Causes
+	for _, c := range causes {
+		if c.Type == fieldTooLong && c.Field == "metadata.annotations" {
+			return true
+		}
+	}
+	return false
 }

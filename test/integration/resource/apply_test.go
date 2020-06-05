@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"reflect"
 	"testing"
@@ -102,6 +103,68 @@ func TestApply(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:           "create large resource",
+			apply:          largeSecret(),
+			expectedResult: resource.CreatedApplyResult,
+			validate: func(t *testing.T, info *resource.Info, ns string) {
+				expected := largeSecret()
+				if info.Name != expected.Name {
+					t.Errorf("unexpected info name: %s", info.Name)
+				}
+				if info.Namespace != ns {
+					t.Errorf("unexpected info namespace: %s", info.Namespace)
+				}
+				if info.Kind != "Secret" {
+					t.Errorf("unexpected info kind: %s", info.Kind)
+				}
+
+				s := &corev1.Secret{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, s)
+				if err != nil {
+					t.Errorf("unexpected error retrieving secret: %v", err)
+					return
+				}
+				if !reflect.DeepEqual(expected.Data, s.Data) {
+					t.Errorf("unexpected secret data: %v", s.Data)
+				}
+			},
+		},
+		{
+			name:           "update large resource",
+			existing:       []runtime.Object{largeSecret()},
+			expectedResult: resource.ConfiguredApplyResult,
+			apply: func() runtime.Object {
+				secret := largeSecret()
+				secret.Data["foo"] = []byte("baz")
+				return secret
+			}(),
+			validate: func(t *testing.T, info *resource.Info, ns string) {
+				s := &corev1.Secret{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, s)
+				if err != nil {
+					t.Errorf("unexpected error retrieving secret: %v", err)
+					return
+				}
+				if string(s.Data["foo"]) != "baz" {
+					t.Errorf("unexpected data: %s", string(s.Data["foo"]))
+				}
+			},
+		},
+		{
+			name:           "unchanged large resource",
+			existing:       []runtime.Object{largeSecret()},
+			expectedResult: resource.UnchangedApplyResult,
+			apply:          largeSecret(),
+			validate: func(t *testing.T, info *resource.Info, ns string) {
+				s := &corev1.Secret{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, s)
+				if err != nil {
+					t.Errorf("unexpected error retrieving secret: %v", err)
+					return
+				}
+			},
+		},
 	}
 
 	configs := []string{"restconfig", "kubeconfig"}
@@ -169,4 +232,19 @@ func testDNSZone() *hivev1.DNSZone {
 	z.Name = "test-dns-zone"
 	z.Spec.Zone = "foo.example.com"
 	return z
+}
+
+func largeSecret() *corev1.Secret {
+	s := &corev1.Secret{}
+	s.Name = "large-secret"
+	s.Data = map[string][]byte{
+		"one":   largeData("1"),
+		"two":   largeData("2"),
+		"three": largeData("3"),
+	}
+	return s
+}
+
+func largeData(value string) []byte {
+	return bytes.Repeat([]byte(value), 90000)
 }

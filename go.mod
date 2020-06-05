@@ -15,6 +15,7 @@ require (
 	github.com/golangci/golangci-lint v1.23.8
 	github.com/google/uuid v1.1.1
 	github.com/heptio/velero v1.0.0
+	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.9
 	github.com/miekg/dns v1.1.15
 	github.com/modern-go/reflect2 v1.0.1

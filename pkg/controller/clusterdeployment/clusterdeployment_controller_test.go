@@ -1381,6 +1381,48 @@ func TestDeleteStaleProvisions(t *testing.T) {
 	}
 }
 
+func TestDeleteOldFailedProvisions(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+	cases := []struct {
+		name                                    string
+		totalProvisions                         int
+		failedProvisionsMoreThanSevenDaysOld    int
+		expectedNumberOfProvisionsAfterDeletion int
+	}{
+		{
+			name:                                    "One failed provision more than 7 days old",
+			totalProvisions:                         2,
+			failedProvisionsMoreThanSevenDaysOld:    1,
+			expectedNumberOfProvisionsAfterDeletion: 1,
+		},
+		{
+			name:                                    "No failed provision more than 7 days old",
+			totalProvisions:                         2,
+			failedProvisionsMoreThanSevenDaysOld:    0,
+			expectedNumberOfProvisionsAfterDeletion: 2,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			provisions := make([]runtime.Object, tc.totalProvisions)
+			for i := 0; i < tc.totalProvisions; i++ {
+				if i < tc.failedProvisionsMoreThanSevenDaysOld {
+					provisions[i] = testOldFailedProvision(time.Now().Add(-7*24*time.Hour), i)
+				} else {
+					provisions[i] = testOldFailedProvision(time.Now(), i)
+				}
+			}
+			fakeClient := fake.NewFakeClient(provisions...)
+			rcd := &ReconcileClusterDeployment{
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+			}
+			rcd.deleteOldFailedProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteOldFailedProvisions"))
+			assert.Len(t, getProvisions(fakeClient), tc.expectedNumberOfProvisionsAfterDeletion, "unexpected provisions kept")
+		})
+	}
+}
+
 func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 	cd := &hivev1.ClusterDeployment{
 		TypeMeta: metav1.TypeMeta{
@@ -1547,6 +1589,14 @@ func testFailedProvisionTime(time time.Time) *hivev1.ClusterProvision {
 			LastTransitionTime: metav1.NewTime(time),
 		},
 	}
+	return provision
+}
+
+func testOldFailedProvision(time time.Time, attempt int) *hivev1.ClusterProvision {
+	provision := testProvision()
+	provision.Name = fmt.Sprintf("%s-%02d", provision.Name, attempt)
+	provision.CreationTimestamp.Time = time
+	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
 	return provision
 }
 

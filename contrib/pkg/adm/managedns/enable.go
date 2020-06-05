@@ -29,6 +29,7 @@ import (
 
 	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -49,6 +50,7 @@ the ExternalDNS section of HiveConfig.
 const (
 	cloudAWS                = "aws"
 	cloudGCP                = "gcp"
+	cloudAzure              = "azure"
 	hiveAdmissionDeployment = "hiveadmission"
 	hiveConfigName          = "hive"
 	waitTime                = time.Minute * 2
@@ -59,6 +61,8 @@ type Options struct {
 	Cloud     string
 	CredsFile string
 	homeDir   string
+
+	AzureResourceGroup string
 
 	dynamicClient dynamic.Interface
 	hiveClient    *hiveclient.Clientset
@@ -94,8 +98,9 @@ func NewEnableManageDNSCommand() *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|gcp)")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|gcp|azure)")
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
+	flags.StringVar(&opt.AzureResourceGroup, "azure-resource-group-name", "os4-common", "Azure Resource Group (Only applicable if --cloud azure)")
 	return cmd
 }
 
@@ -155,6 +160,15 @@ func (o *Options) Run(args []string) error {
 		}
 		dnsConf.GCP = &hivev1.ManageDNSGCPConfig{
 			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret.Name},
+		}
+	case cloudAzure:
+		credsSecret, err = o.generateAzureCredentialsSecret()
+		if err != nil {
+			log.WithError(err).Fatal("error generating manageDNS credentials secret")
+		}
+		dnsConf.Azure = &hivev1.ManageDNSAzureConfig{
+			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret.Name},
+			ResourceGroupName:    o.AzureResourceGroup,
 		}
 	default:
 		log.WithField("cloud", o.Cloud).Fatal("unsupported cloud")
@@ -333,6 +347,27 @@ func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {
 		},
 	}, nil
 }
+
+func (o *Options) generateAzureCredentialsSecret() (*corev1.Secret, error) {
+	spFileContents, err := azureutils.GetCreds(o.CredsFile)
+	if err != nil {
+		return nil, err
+	}
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("azure-dns-creds-%s", uuid.New().String()[:5]),
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			constants.AzureCredentialsName: spFileContents,
+		},
+	}, nil
+}
+
 func (o *Options) getResourceHelper() (*resource.Helper, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {

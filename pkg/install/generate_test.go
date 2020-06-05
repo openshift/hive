@@ -22,7 +22,7 @@ func init() {
 
 func TestGenerateDeprovision(t *testing.T) {
 	dr := testClusterDeprovision()
-	job, err := GenerateUninstallerJobForDeprovision(dr)
+	job, err := GenerateUninstallerJobForDeprovision(dr, "test-service-account")
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 }

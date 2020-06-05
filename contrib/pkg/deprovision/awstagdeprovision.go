@@ -1,6 +1,7 @@
 package deprovision
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,24 +11,36 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/openshift/library-go/pkg/controller/fileobserver"
 
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 )
+
+type awsTagDeprovisionOpts struct {
+	logLevel           string
+	region             string
+	filters            []aws.Filter
+	clusterDeprovision string
+	logger             log.FieldLogger
+}
 
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
 // TODO: Port to a sub-command of deprovision.
 func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
-	opt := &aws.ClusterUninstaller{}
-	var logLevel string
+	opt := &awsTagDeprovisionOpts{}
 	cmd := &cobra.Command{
 		Use:   "aws-tag-deprovision KEY=VALUE ...",
 		Short: "Deprovision AWS assets (as created by openshift-installer) with the given tag(s)",
 		Long:  "Deprovision AWS assets (as created by openshift-installer) with the given tag(s).  A resource matches the filter if any of the key/value pairs are in its tags.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := completeAWSUninstaller(opt, logLevel, args); err != nil {
+			if err := opt.complete(args); err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
 			}
@@ -79,36 +92,36 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 				}()
 			}
 
-			if err := opt.Run(); err != nil {
+			if err := opt.run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
 			}
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
-	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
+	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	flags.StringVar(&opt.region, "region", "us-east-1", "AWS region to use")
+	flags.StringVar(&opt.clusterDeprovision, "clusterdeprovision", "", "name of the ClusterDeprovision in which to stored blocked resources")
 	return cmd
 }
 
-func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []string) error {
-
+func (o *awsTagDeprovisionOpts) complete(args []string) error {
 	for _, arg := range args {
 		filter := aws.Filter{}
 		err := parseFilter(filter, arg)
 		if err != nil {
 			return fmt.Errorf("cannot parse filter %s: %v", arg, err)
 		}
-		o.Filters = append(o.Filters, filter)
+		o.filters = append(o.filters, filter)
 	}
 
 	// Set log level
-	level, err := log.ParseLevel(logLevel)
+	level, err := log.ParseLevel(o.logLevel)
 	if err != nil {
 		log.WithError(err).Error("cannot parse log level")
 		return err
 	}
 
-	o.Logger = log.NewEntry(&log.Logger{
+	o.logger = log.NewEntry(&log.Logger{
 		Out: os.Stdout,
 		Formatter: &log.TextFormatter{
 			FullTimestamp: true,
@@ -118,6 +131,66 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 	})
 
 	return nil
+}
+
+func (o *awsTagDeprovisionOpts) run() error {
+	return wait.ExponentialBackoff(
+		// Start the backoff at 5 minutes, double it each time, to a cap of 24 hours.
+		wait.Backoff{
+			Duration: 5 * time.Minute,
+			Factor:   2,
+			Steps:    1 << 8, // large enough to make cap the effective bound
+			Cap:      24 * time.Hour,
+		},
+		func() (done bool, returnErr error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+			uninstaller := &aws.ClusterUninstaller{
+				Filters: o.filters,
+				Logger:  o.logger,
+				Region:  o.region,
+			}
+			blockedResources, err := uninstaller.RunWithContext(ctx)
+			if len(blockedResources) == 0 {
+				return true, err
+			}
+			if o.clusterDeprovision == "" {
+				return
+			}
+			kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+				clientcmd.NewDefaultClientConfigLoadingRules(),
+				&clientcmd.ConfigOverrides{},
+			)
+			namespace, _, err := kubeconfig.Namespace()
+			if err != nil {
+				o.logger.WithError(err).Error("could not get the namespace")
+				return
+			}
+			clientConfig, err := kubeconfig.ClientConfig()
+			if err != nil {
+				o.logger.WithError(err).Error("could not get the kube client config")
+				return
+			}
+			scheme := runtime.NewScheme()
+			hivev1.AddToScheme(scheme)
+			c, err := client.New(clientConfig, client.Options{Scheme: scheme})
+			if err != nil {
+				o.logger.WithError(err).Error("could not get kube client")
+				return
+			}
+			clusterDeprovision := &hivev1.ClusterDeprovision{}
+			if err := c.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: o.clusterDeprovision}, clusterDeprovision); err != nil {
+				o.logger.WithError(err).Error("could not get ClusterDeprovision")
+				return
+			}
+			clusterDeprovision.Status.BlockedResources = blockedResources
+			if err := c.Status().Update(context.Background(), clusterDeprovision); err != nil {
+				o.logger.WithError(err).Error("could not update ClusterDeprovision")
+				return
+			}
+			return
+		},
+	)
 }
 
 func parseFilter(filterMap aws.Filter, str string) error {

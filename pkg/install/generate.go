@@ -445,13 +445,16 @@ func GetUninstallJobName(name string) string {
 
 // GenerateUninstallerJobForDeprovision generates an uninstaller job for a given deprovision request
 func GenerateUninstallerJobForDeprovision(
-	req *hivev1.ClusterDeprovision) (*batchv1.Job, error) {
+	req *hivev1.ClusterDeprovision,
+	serviceAccountName string,
+) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
 
 	podSpec := corev1.PodSpec{
-		DNSPolicy:     corev1.DNSClusterFirst,
-		RestartPolicy: restartPolicy,
+		DNSPolicy:          corev1.DNSClusterFirst,
+		RestartPolicy:      restartPolicy,
+		ServiceAccountName: serviceAccountName,
 	}
 
 	completions := int32(1)
@@ -514,6 +517,8 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"debug",
 				"--region",
 				req.Spec.Platform.AWS.Region,
+				"--clusterdeprovision",
+				req.Name,
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
 			},
 		},

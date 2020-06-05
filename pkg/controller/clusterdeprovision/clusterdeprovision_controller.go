@@ -276,7 +276,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 
 	// Generate an uninstall job
 	rLog.Debug("generating uninstall job")
-	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance)
+	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance, controllerutils.ServiceAccountName)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

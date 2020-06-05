@@ -203,6 +203,12 @@ spec:
         status:
           description: ClusterDeprovisionStatus defines the observed state of ClusterDeprovision
           properties:
+            blockedResources:
+              description: BlockedResources is a list of cloud resources that the
+                deprovision has not been able to delete
+              items:
+                type: string
+              type: array
             completed:
               description: Completed is true when the uninstall has completed successfully
               type: boolean

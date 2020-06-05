@@ -158,6 +158,12 @@ const (
 	// An incoming status indicates that the resource is on the destination side of an in-progress relocate.
 	RelocateAnnotation = "hive.openshift.io/relocate"
 
+	// AbandonDeprovisionAnnotation is an annotation used on ClusterDeployments to indicate that attempts to deprovision
+	// the cluster should be abandoned. This is used when there are cloud resources that cannot be deleted without user
+	// intervention. Prior to abandoning, the user should collect the list of blocked resources from the
+	// ClusterDeprovision.
+	AbandonDeprovisionAnnotation = "hive.openshift.io/abandon-deprovision"
+
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

@@ -495,6 +495,52 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Test abandon deprovison annotation",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					if cd.Annotations == nil {
+						cd.Annotations = make(map[string]string, 1)
+					}
+					cd.Annotations[constants.AbandonDeprovisionAnnotation] = "true"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
+				}
+				deprovision := getDeprovision(c)
+				assert.Nil(t, deprovision, "expected no deprovision request")
+			},
+		},
+		{
+			name: "Test ignored abandon deprovison annotation",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					if cd.Annotations == nil {
+						cd.Annotations = make(map[string]string, 1)
+					}
+					cd.Annotations[constants.AbandonDeprovisionAnnotation] = "false"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected deprovision finalizer")
+				}
+				deprovision := getDeprovision(c)
+				assert.NotNil(t, deprovision, "expected deprovision request")
+			},
+		},
+		{
 			name: "Test creation of uninstall job when PreserveOnDelete is true but cluster deployment is not installed",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {

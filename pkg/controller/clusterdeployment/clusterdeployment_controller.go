@@ -1296,6 +1296,20 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 		cdLog.Info("PreserveOnDelete=true but creating deprovisioning request as cluster was never successfully provisioned")
 	}
 
+	// Stop waiting for deprovision if the abandon-deprovision annotation is true
+	if value, ok := cd.Annotations[constants.AbandonDeprovisionAnnotation]; ok {
+		logger := cdLog.WithField(constants.AbandonDeprovisionAnnotation, value)
+		if abandon, err := strconv.ParseBool(value); abandon && err == nil {
+			logger.Warn("adandoning deprovision")
+			err = r.removeClusterDeploymentFinalizer(cd, cdLog)
+			if err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
+			}
+			return true, err
+		}
+		logger.Debug("ignoring abandon-deprovision annotation")
+	}
+
 	if cd.Spec.ClusterMetadata == nil {
 		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
 		return true, nil

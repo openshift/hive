@@ -25,6 +25,9 @@ type ClusterDeprovisionStatus struct {
 	// Conditions includes more detailed status for the cluster deprovision
 	// +optional
 	Conditions []ClusterDeprovisionCondition `json:"conditions,omitempty"`
+
+	// BlockedResources is a list of cloud resources that the deprovision has not been able to delete
+	BlockedResources []string `json:"blockedResources,omitempty"`
 }
 
 // ClusterDeprovisionPlatform contains platform-specific configuration for the

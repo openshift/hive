@@ -780,6 +780,11 @@ func (in *ClusterDeprovisionStatus) DeepCopyInto(out *ClusterDeprovisionStatus) 
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.BlockedResources != nil {
+		in, out := &in.BlockedResources, &out.BlockedResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

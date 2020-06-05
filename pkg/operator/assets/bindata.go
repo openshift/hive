@@ -8749,6 +8749,29 @@ spec:
               required:
               - credentialsSecretRef
               type: object
+            azure:
+              description: Azure specifes Azure-specific cloud configuration
+              properties:
+                credentialsSecretRef:
+                  description: CredentialsSecretRef references a secret that will
+                    be used to authenticate with Azure CloudDNS. It will need permission
+                    to create and manage CloudDNS Hosted Zones. Secret should have
+                    a key named 'osServicePrincipal.json'. The credentials must specify
+                    the project to use.
+                  properties:
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                  type: object
+                resourceGroupName:
+                  description: ResourceGroupName specifies the Azure resource group
+                    in which the Hosted Zone should be created.
+                  type: string
+              required:
+              - credentialsSecretRef
+              - resourceGroupName
+              type: object
             gcp:
               description: GCP specifies GCP-specific cloud configuration
               properties:
@@ -8787,6 +8810,10 @@ spec:
                 zoneID:
                   description: ZoneID is the ID of the zone in AWS
                   type: string
+              type: object
+            azure:
+              description: AzureDNSZoneStatus contains status information specific
+                to Azure
               type: object
             conditions:
               description: Conditions includes more detailed status for the DNSZone
@@ -9028,6 +9055,32 @@ spec:
                         description: Region is the AWS region to use for route53 operations.
                           This defaults to us-east-1. For AWS China, use cn-northwest-1.
                         type: string
+                    required:
+                    - credentialsSecretRef
+                    type: object
+                  azure:
+                    description: Azure contains Azure-specific settings for external
+                      DNS
+                    properties:
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef references a secret in the
+                          TargetNamespace that will be used to authenticate with Azure
+                          DNS. It wil need permission to manage entries in each of
+                          the managed domains listed in the parent ManageDNSConfig
+                          object. Secret should have a key named 'osServicePrincipal.json'
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      resourceGroupName:
+                        description: ResourceGroupName specifies the Azure resource
+                          group containing the DNS zones for the domains being managed.
+                        type: string
+                    required:
+                    - credentialsSecretRef
+                    - resourceGroupName
                     type: object
                   domains:
                     description: Domains is the list of domains that hive will be
@@ -9051,6 +9104,8 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                    required:
+                    - credentialsSecretRef
                     type: object
                 required:
                 - domains

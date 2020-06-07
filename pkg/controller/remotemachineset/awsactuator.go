@@ -45,7 +45,7 @@ var (
 )
 
 // NewAWSActuator is the constructor for building a AWSActuator
-func NewAWSActuator(awsCreds *corev1.Secret, region string, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (*AWSActuator, error) {
+func NewAWSActuator(client client.Client, awsCreds *corev1.Secret, region string, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (*AWSActuator, error) {
 	awsClient, err := awsclient.NewClientFromSecret(awsCreds, region)
 	if err != nil {
 		logger.WithError(err).Warn("failed to create AWS client")
@@ -62,6 +62,7 @@ func NewAWSActuator(awsCreds *corev1.Secret, region string, pool *hivev1.Machine
 		}
 	}
 	actuator := &AWSActuator{
+		client:    client,
 		awsClient: awsClient,
 		logger:    logger,
 		region:    region,

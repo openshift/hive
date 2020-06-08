@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"reflect"
 	"testing"
@@ -13,11 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/resource"
 )
 
-func TestApply(t *testing.T) {
+func TestCreateOrUpdate(t *testing.T) {
 	tests := []struct {
 		name           string
 		existing       []runtime.Object
@@ -26,79 +26,64 @@ func TestApply(t *testing.T) {
 		validate       func(t *testing.T, info *resource.Info, ns string)
 	}{
 		{
-			name:           "create resource",
-			apply:          testConfigMap(),
+			name:           "create large resource",
+			apply:          largeSecret(),
 			expectedResult: resource.CreatedApplyResult,
 			validate: func(t *testing.T, info *resource.Info, ns string) {
-				if info.Name != testConfigMap().Name {
+				expected := largeSecret()
+				if info.Name != expected.Name {
 					t.Errorf("unexpected info name: %s", info.Name)
 				}
 				if info.Namespace != ns {
 					t.Errorf("unexpected info namespace: %s", info.Namespace)
 				}
-				if info.Kind != "ConfigMap" {
+				if info.Kind != "Secret" {
 					t.Errorf("unexpected info kind: %s", info.Kind)
 				}
 
-				cm := &corev1.ConfigMap{}
-				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, cm)
+				s := &corev1.Secret{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, s)
 				if err != nil {
-					t.Errorf("unexpected error retrieving configmap: %v", err)
+					t.Errorf("unexpected error retrieving secret: %v", err)
 					return
 				}
-				if !reflect.DeepEqual(testConfigMap().Data, cm.Data) {
-					t.Errorf("unexpected configmap data: %v", cm.Data)
+				if !reflect.DeepEqual(expected.Data, s.Data) {
+					t.Errorf("unexpected secret data: %v", s.Data)
 				}
 			},
 		},
 		{
-			name:           "update resource",
-			existing:       []runtime.Object{testConfigMap()},
+			name:           "update large resource",
+			existing:       []runtime.Object{largeSecret()},
 			expectedResult: resource.ConfiguredApplyResult,
 			apply: func() runtime.Object {
-				cm := testConfigMap()
-				cm.Data["foo"] = "baz"
-				return cm
+				secret := largeSecret()
+				secret.Data["foo"] = []byte("baz")
+				return secret
 			}(),
 			validate: func(t *testing.T, info *resource.Info, ns string) {
-				cm := &corev1.ConfigMap{}
-				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, cm)
+				s := &corev1.Secret{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, s)
 				if err != nil {
-					t.Errorf("unexpected error retrieving configmap: %v", err)
+					t.Errorf("unexpected error retrieving secret: %v", err)
 					return
 				}
-				if cm.Data["foo"] != "baz" {
-					t.Errorf("unexpected data: %v", cm.Data)
+				if string(s.Data["foo"]) != "baz" {
+					t.Errorf("unexpected data: %s", string(s.Data["foo"]))
 				}
 			},
 		},
 		{
-			name:           "unchanged resource",
-			existing:       []runtime.Object{testConfigMap()},
+			name:           "unchanged large resource",
+			existing:       []runtime.Object{largeSecret()},
 			expectedResult: resource.UnchangedApplyResult,
-			apply:          testConfigMap(),
+			apply:          largeSecret(),
 			validate: func(t *testing.T, info *resource.Info, ns string) {
-				cm := &corev1.ConfigMap{}
-				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, cm)
+				s := &corev1.Secret{}
+				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, s)
 				if err != nil {
-					t.Errorf("unexpected error retrieving configmap: %v", err)
+					t.Errorf("unexpected error retrieving secret: %v", err)
 					return
-				}
-			},
-		},
-		{
-			name:           "create crd instance",
-			apply:          testDNSZone(),
-			expectedResult: resource.CreatedApplyResult,
-			validate: func(t *testing.T, info *resource.Info, ns string) {
-				zone := &hivev1.DNSZone{}
-				err := c.Get(context.TODO(), types.NamespacedName{Name: info.Name, Namespace: info.Namespace}, zone)
-				if err != nil {
-					t.Errorf("unexpected error retrieving dns zone: %v", err)
-					return
-				}
-				if zone.Spec.Zone != "foo.example.com" {
-					t.Errorf("unexpected zone: %s", zone.Spec.Zone)
 				}
 			},
 		},
@@ -126,7 +111,7 @@ func TestApply(t *testing.T) {
 				for _, obj := range test.existing {
 					o := obj.DeepCopyObject()
 					accessor.SetNamespace(o, namespace.Name)
-					_, err := h.ApplyRuntimeObject(o, scheme.Scheme)
+					_, err := h.CreateOrUpdateRuntimeObject(o, scheme.Scheme)
 					if err != nil {
 						t.Fatalf("unexpected err: %v", err)
 					}
@@ -139,7 +124,7 @@ func TestApply(t *testing.T) {
 					t.Errorf("unexpected error calling info: %v", err)
 					return
 				}
-				applyResult, err := h.Apply(data)
+				applyResult, err := h.CreateOrUpdate(data)
 				if err != nil {
 					t.Errorf("unexpected error calling apply: %v", err)
 					return
@@ -153,20 +138,17 @@ func TestApply(t *testing.T) {
 	}
 }
 
-func testConfigMap() *corev1.ConfigMap {
-	cm := &corev1.ConfigMap{}
-	cm.Name = "test-config-map"
-	cm.Data = map[string]string{"foo": "bar"}
-	return cm
+func largeSecret() *corev1.Secret {
+	s := &corev1.Secret{}
+	s.Name = "large-secret"
+	s.Data = map[string][]byte{
+		"one":   largeData("1"),
+		"two":   largeData("2"),
+		"three": largeData("3"),
+	}
+	return s
 }
 
-func strptr(s string) *string {
-	return &s
-}
-
-func testDNSZone() *hivev1.DNSZone {
-	z := &hivev1.DNSZone{}
-	z.Name = "test-dns-zone"
-	z.Spec.Zone = "foo.example.com"
-	return z
+func largeData(value string) []byte {
+	return bytes.Repeat([]byte(value), 90000)
 }

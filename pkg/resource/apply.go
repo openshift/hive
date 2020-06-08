@@ -64,9 +64,6 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 	}
 	err = applyOptions.Run()
 	if err != nil {
-		if annotationTooLong(err) {
-			return r.createOrUpdateResource(factory, obj, ioStreams.ErrOut)
-		}
 		r.logger.WithError(err).
 			WithField("stdout", ioStreams.Out.(*bytes.Buffer).String()).
 			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Warn("running the apply command failed")
@@ -83,6 +80,32 @@ func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) 
 		return "", err
 	}
 	return r.Apply(data)
+}
+
+func (r *Helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
+	factory, err := r.getFactory("")
+	if err != nil {
+		r.logger.WithError(err).Error("failed to obtain factory for apply")
+		return "", err
+	}
+
+	errOut := &bytes.Buffer{}
+	result, err := r.createOrUpdateResource(factory, obj, errOut)
+	if err != nil {
+		r.logger.WithError(err).
+			WithField("stderr", errOut.String()).Warn("running the apply command failed")
+		return "", err
+	}
+	return result, nil
+}
+
+func (r *Helper) CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
+	data, err := r.Serialize(obj, scheme)
+	if err != nil {
+		r.logger.WithError(err).Warn("cannot serialize runtime object")
+		return "", err
+	}
+	return r.CreateOrUpdate(data)
 }
 
 func (r *Helper) createOrUpdateResource(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
@@ -207,21 +230,4 @@ func (t *changeTracker) ToPrinter(name string) (printers.ResourcePrinter, error)
 		internalPrinter: p,
 		setResult:       f,
 	}, nil
-}
-
-func annotationTooLong(err error) bool {
-	if !errors.IsInvalid(err) {
-		return false
-	}
-	apiStatusErr, ok := err.(errors.APIStatus)
-	if !ok {
-		return false
-	}
-	causes := apiStatusErr.Status().Details.Causes
-	for _, c := range causes {
-		if c.Type == fieldTooLong && c.Field == "metadata.annotations" {
-			return true
-		}
-	}
-	return false
 }

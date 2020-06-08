@@ -198,6 +198,13 @@ type SyncSetCommonSpec struct {
 	// Secrets is the list of secrets to sync along with their respective destinations.
 	// +optional
 	Secrets []SecretMapping `json:"secretMappings,omitempty"`
+
+	// OmitAnnotation if true indicates that the usual annotation used by the apply command
+	// will be omitted from the target resources. This results in some loss of functionality
+	// when syncing removal of map entries, but it makes it possible to sync large resources
+	// that otherwise could not be synced.
+	// +optional
+	OmitAnnotation bool `json:"omitAnnotation,omitempty"`
 }
 
 // SelectorSyncSetSpec defines the SyncSetCommonSpec resources and patches to sync along

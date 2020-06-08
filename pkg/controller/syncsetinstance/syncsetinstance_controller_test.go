@@ -1197,11 +1197,19 @@ func (f *fakeHelper) newHelper(*rest.Config, log.FieldLogger) Applier {
 	return f
 }
 
+func (f *fakeHelper) CreateOrUpdateRuntimeObject(object runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
+	return f.ApplyRuntimeObject(object, scheme)
+}
+
 func (f *fakeHelper) ApplyRuntimeObject(object runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
 	data, err := json.Marshal(object)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize runtime object: %s", err)
 	}
+	return f.Apply(data)
+}
+
+func (f *fakeHelper) CreateOrUpdate(data []byte) (resource.ApplyResult, error) {
 	return f.Apply(data)
 }
 

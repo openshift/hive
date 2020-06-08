@@ -141,6 +141,9 @@ func (r *Helper) createOrUpdateResource(f cmdutil.Factory, obj []byte, errOut io
 		OpenapiSchema: openAPISchema,
 	}
 	sourceBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, sourceObj)
+	if err != nil {
+		return "", err
+	}
 	patch, _, err := patcher.Patch(info.Object, sourceBytes, info.Source, info.Namespace, info.Name, errOut)
 	if err != nil {
 		return "", err

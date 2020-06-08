@@ -10254,6 +10254,13 @@ spec:
                     are ANDed.
                   type: object
               type: object
+            omitAnnotation:
+              description: OmitAnnotation if true indicates that the usual annotation
+                used by the apply command will be omitted from the target resources.
+                This results in some loss of functionality when syncing removal of
+                map entries, but it makes it possible to sync large resources that
+                otherwise could not be synced.
+              type: boolean
             patches:
               description: Patches is the list of patches to apply.
               items:
@@ -11424,6 +11431,13 @@ spec:
                     type: string
                 type: object
               type: array
+            omitAnnotation:
+              description: OmitAnnotation if true indicates that the usual annotation
+                used by the apply command will be omitted from the target resources.
+                This results in some loss of functionality when syncing removal of
+                map entries, but it makes it possible to sync large resources that
+                otherwise could not be synced.
+              type: boolean
             patches:
               description: Patches is the list of patches to apply.
               items:

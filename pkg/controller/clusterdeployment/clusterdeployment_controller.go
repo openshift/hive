@@ -313,6 +313,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 		{
 			TypeToList:    &hivev1.ClusterProvisionList{},
 			LabelSelector: map[string]string{constants.ClusterDeploymentNameLabel: owner.GetName()},
+			Controlled:    true,
 		},
 		{
 			TypeToList: &corev1.PersistentVolumeClaimList{},
@@ -320,6 +321,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 				constants.PVCTypeLabel:               constants.PVCTypeInstallLogs,
 			},
+			Controlled: true,
 		},
 		{
 			TypeToList: &batchv1.JobList{},
@@ -327,12 +329,14 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 				constants.JobTypeLabel:               constants.JobTypeImageSet,
 			},
+			Controlled: true,
 		},
 		{
 			TypeToList: &hivev1.ClusterDeprovisionList{},
 			LabelSelector: map[string]string{
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 			},
+			Controlled: true,
 		},
 		{
 			TypeToList: &hivev1.DNSZoneList{},
@@ -340,6 +344,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 				constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
 			},
+			Controlled: true,
 		},
 		{
 			TypeToList: &corev1.SecretList{},
@@ -347,6 +352,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 				constants.SecretTypeLabel:            constants.SecretTypeMergedPullSecret,
 			},
+			Controlled: true,
 		},
 	}
 }

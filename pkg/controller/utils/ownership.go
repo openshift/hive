@@ -23,6 +23,7 @@ import (
 type OwnershipUniqueKey struct {
 	LabelSelector map[string]string
 	TypeToList    runtime.Object
+	Controlled    bool
 }
 
 // ReconcileOwnerReferences ensures that given owner is in fact the actual owner for all types in typesToList given a specific labelSelector
@@ -44,21 +45,22 @@ func ReconcileOwnerReferences(owner hivev1.MetaRuntimeObject, ownershipKeys []*O
 				continue
 			}
 
-			err := SyncControllerReference(owner, mrObject, kubeclient, scheme, logger)
+			err := SyncOwnerReference(owner, mrObject, kubeclient, scheme, ownershipKey.Controlled, logger)
 			if err != nil {
 				errlist = append(errlist, err)
 			}
+
 		}
 	}
 
 	return utilerrors.NewAggregate(errlist)
 }
 
-// SyncControllerReference ensures that the object passed in has a controller owner reference of the owner passed in. It then updates the object in Kube.
-// If there is already a controller owner reference set and it's set to the passed in owner, it does nothing.
-// If there is already a controller owner reference, but it's set to a different owner than the one passed in, it will set the controller owner reference to the owner that is passed in.
-// If there isn't a controller owner reference, it will add one.
-func SyncControllerReference(owner hivev1.MetaRuntimeObject, object hivev1.MetaRuntimeObject, kubeclient client.Client, scheme *runtime.Scheme, logger log.FieldLogger) error {
+// SyncOwnerReference ensures that the object passed in has an owner reference of the owner passed in. It then updates the object in Kube.
+// If 'controlled' is set to true, the owner is set as the controller of the object.
+// BlockOwnerDeletion is set to true for all owner references
+func SyncOwnerReference(owner hivev1.MetaRuntimeObject, object hivev1.MetaRuntimeObject, kubeclient client.Client,
+	scheme *runtime.Scheme, controlled bool, logger log.FieldLogger) error {
 	objectNamespacedName := object.GetNamespace() + "/" + object.GetName()
 	ownerNamespacedName := owner.GetNamespace() + "/" + owner.GetName()
 
@@ -83,16 +85,20 @@ func SyncControllerReference(owner hivev1.MetaRuntimeObject, object hivev1.MetaR
 
 	ownerRef := metav1.NewControllerRef(owner, ownerGVK)
 
-	// Remove any other controller ref (librarygocontroller doesn't look at controller references, so it won't do this).
-	for i, ref := range object.GetOwnerReferences() {
-		if ref.Controller != nil && *ref.Controller {
-			if !equality.Semantic.DeepEqual(&ref, ownerRef) {
-				ownerRefs := object.GetOwnerReferences()
-				ownerRefs[i] = ownerRefs[len(ownerRefs)-1]              // Copy last element in the slice over the top of the controller owner reference.
-				object.SetOwnerReferences(ownerRefs[:len(ownerRefs)-1]) // Remove the last element (since it's now in the position pointed to i)
+	if controlled {
+		// Remove any other controller ref (librarygocontroller doesn't look at controller references, so it won't do this).
+		for i, ref := range object.GetOwnerReferences() {
+			if ref.Controller != nil && *ref.Controller {
+				if !equality.Semantic.DeepEqual(&ref, ownerRef) {
+					ownerRefs := object.GetOwnerReferences()
+					ownerRefs[i] = ownerRefs[len(ownerRefs)-1]              // Copy last element in the slice over the top of the controller owner reference.
+					object.SetOwnerReferences(ownerRefs[:len(ownerRefs)-1]) // Remove the last element (since it's now in the position pointed to i)
+				}
+				break // There can be only 1 controller owner ref, so we don't need to loop after we find it.
 			}
-			break // There can be only 1 controller owner ref, so we don't need to loop after we find it.
 		}
+	} else {
+		ownerRef.Controller = nil
 	}
 
 	// Add the controller reference if it doesn't already exist.

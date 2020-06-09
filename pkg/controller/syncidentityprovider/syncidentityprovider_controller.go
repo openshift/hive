@@ -392,6 +392,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 				constants.SyncSetTypeLabel:           constants.SyncSetTypeIdentityProvider,
 			},
+			Controlled: true,
 		},
 	}
 }

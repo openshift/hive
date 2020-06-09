@@ -89,9 +89,14 @@ func WithTypeMeta(typers ...runtime.ObjectTyper) Option {
 	return Generic(generic.WithTypeMeta(typers...))
 }
 
-// WithControllerOwnerReference sets the owner reference to the supplied object.
+// WithControllerOwnerReference sets the controller owner reference to the supplied object.
 func WithControllerOwnerReference(owner metav1.Object) Option {
 	return Generic(generic.WithControllerOwnerReference(owner))
+}
+
+// WithOwnerReference sets the owner reference to the supplied object.
+func WithOwnerReference(owner hivev1.MetaRuntimeObject) Option {
+	return Generic(generic.WithOwnerReference(owner))
 }
 
 // WithLabelOwner sets the labels so that the specific ClusterDeployment is the labeled as the owner.

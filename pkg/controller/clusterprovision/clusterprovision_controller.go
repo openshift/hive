@@ -473,7 +473,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterProvisionNameLabel: owner.GetName(),
 				constants.SecretTypeLabel:           constants.SecretTypeKubeConfig,
 			},
-			Controlled: true,
+			Controlled: false,
 		},
 		{
 			TypeToList: &corev1.SecretList{},
@@ -481,7 +481,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterProvisionNameLabel: owner.GetName(),
 				constants.SecretTypeLabel:           constants.SecretTypeKubeAdminCreds,
 			},
-			Controlled: true,
+			Controlled: false,
 		},
 	}
 }

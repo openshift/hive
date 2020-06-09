@@ -67,6 +67,7 @@ contexts:
 current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
+	adminPassword       = "foo"
 
 	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"
@@ -317,6 +318,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -339,6 +341,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -359,6 +362,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallLogPVC(),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -387,6 +391,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstalledClusterDeployment(time.Date(2019, 9, 6, 11, 58, 32, 45, time.UTC)),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -1155,6 +1160,49 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				require.Equal(t, 1, len(cd.Status.Conditions))
 				require.Equal(t, clusterImageSetNotFoundReason, cd.Status.Conditions[0].Reason)
+			},
+		},
+		{
+			name: "Add ownership to admin secrets",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						InfraID:                  "fakeinfra",
+						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+						AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: adminPasswordSecret},
+					}
+					cd.Status.WebConsoleURL = "https://example.com"
+					cd.Status.APIURL = "https://example.com"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(
+					testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testMetadataConfigMap(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				secretNames := []string{adminKubeconfigSecret, adminPasswordSecret}
+				for _, secretName := range secretNames {
+					secret := &corev1.Secret{}
+					err := c.Get(context.TODO(), client.ObjectKey{Name: secretName, Namespace: testNamespace},
+						secret)
+					require.NoErrorf(t, err, "not found secret %s", secretName)
+					require.NotNilf(t, secret, "expected secret %s", secretName)
+					assert.Equalf(t, testClusterDeployment().Name, secret.Labels[constants.ClusterDeploymentNameLabel],
+						"incorrect cluster deployment name label for %s", secretName)
+					refs := secret.GetOwnerReferences()
+					cdAsOwnerRef := false
+					for _, ref := range refs {
+						if ref.Name == testName {
+							cdAsOwnerRef = true
+						}
+					}
+					assert.Truef(t, cdAsOwnerRef, "cluster deployment not owner of %s", secretName)
+				}
 			},
 		},
 	}

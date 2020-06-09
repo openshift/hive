@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -33,6 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -354,6 +357,22 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			},
 			Controlled: true,
 		},
+		{
+			TypeToList: &corev1.SecretList{},
+			LabelSelector: map[string]string{
+				constants.ClusterDeploymentNameLabel: owner.GetName(),
+				constants.SecretTypeLabel:            constants.SecretTypeKubeConfig,
+			},
+			Controlled: false,
+		},
+		{
+			TypeToList: &corev1.SecretList{},
+			LabelSelector: map[string]string{
+				constants.ClusterDeploymentNameLabel: owner.GetName(),
+				constants.SecretTypeLabel:            constants.SecretTypeKubeAdminCreds,
+			},
+			Controlled: false,
+		},
 	}
 }
 
@@ -527,6 +546,16 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 			if err := r.addAdditionalKubeconfigCAs(cd, cdLog); err != nil {
 				return reconcile.Result{}, err
+			}
+
+			// Add cluster deployment as additional owner reference to admin secrets
+			if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name); err != nil {
+				return reconcile.Result{}, err
+			}
+			if cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name != "" {
+				if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name); err != nil {
+					return reconcile.Result{}, err
+				}
 			}
 
 			if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
@@ -1932,6 +1961,47 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 		return false, err
 	}
 	return true, nil
+}
+
+// addOwnershipToSecret adds cluster deployment as an additional non-controlling owner to secret
+func (r *ReconcileClusterDeployment) addOwnershipToSecret(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger, name string) error {
+	cdLog = cdLog.WithField("secret", name)
+
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: name}, secret); err != nil {
+		cdLog.WithError(err).Error("failed to get secret")
+		return err
+	}
+
+	labelAdded := false
+
+	// Add the label for cluster deployment for reconciling later, and add the owner reference
+	if secret.Labels[constants.ClusterDeploymentNameLabel] != cd.Name {
+		cdLog.Debug("Setting label on derived object")
+		secret.Labels = k8slabels.AddLabel(secret.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+		labelAdded = true
+	}
+
+	cdRef := metav1.OwnerReference{
+		APIVersion:         cd.APIVersion,
+		Kind:               cd.Kind,
+		Name:               cd.Name,
+		UID:                cd.UID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}
+
+	cdRefChanged := librarygocontroller.EnsureOwnerRef(secret, cdRef)
+	if cdRefChanged {
+		cdLog.Debug("ownership added for cluster deployment")
+	}
+	if cdRefChanged || labelAdded {
+		cdLog.Info("secret has been modified, updating")
+		if err := r.Update(context.TODO(), secret); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating secret")
+			return err
+		}
+	}
+	return nil
 }
 
 // getClusterPlatform returns the platform of a given ClusterDeployment

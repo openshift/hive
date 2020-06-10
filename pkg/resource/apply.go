@@ -90,7 +90,7 @@ func (r *Helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
 	}
 
 	errOut := &bytes.Buffer{}
-	result, err := r.createOrUpdateResource(factory, obj, errOut)
+	result, err := r.createOrUpdate(factory, obj, errOut)
 	if err != nil {
 		r.logger.WithError(err).
 			WithField("stderr", errOut.String()).Warn("running the apply command failed")
@@ -108,8 +108,54 @@ func (r *Helper) CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime
 	return r.CreateOrUpdate(data)
 }
 
-func (r *Helper) createOrUpdateResource(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
-	r.logger.Warn("attempting to create or update object directly because it's too large to be applied")
+func (r *Helper) Create(obj []byte) (ApplyResult, error) {
+	factory, err := r.getFactory("")
+	if err != nil {
+		r.logger.WithError(err).Error("failed to obtain factory for apply")
+		return "", err
+	}
+	result, err := r.createOnly(factory, obj)
+	if err != nil {
+		r.logger.WithError(err).Warn("running the create command failed")
+		return "", err
+	}
+	return result, nil
+}
+
+func (r *Helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
+	data, err := r.Serialize(obj, scheme)
+	if err != nil {
+		r.logger.WithError(err).Warn("cannot serialize runtime object")
+		return "", err
+	}
+	return r.Create(data)
+}
+
+func (r *Helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {
+	info, err := r.getResourceInternalInfo(f, obj)
+	if err != nil {
+		return "", err
+	}
+	c, err := f.DynamicClient()
+	if err != nil {
+		return "", err
+	}
+	if err = info.Get(); err != nil {
+		if !errors.IsNotFound(err) {
+			return "", err
+		}
+		// Object doesn't exist yet, create it
+		gvr := info.ResourceMapping().Resource
+		_, err := c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured), metav1.CreateOptions{})
+		if err != nil {
+			return "", err
+		}
+		return CreatedApplyResult, nil
+	}
+	return UnchangedApplyResult, nil
+}
+
+func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
 	info, err := r.getResourceInternalInfo(f, obj)
 	if err != nil {
 		return "", err

@@ -79,6 +79,8 @@ type Applier interface {
 	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
 	CreateOrUpdate(obj []byte) (hiveresource.ApplyResult, error)
 	CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
+	Create(obj []byte) (hiveresource.ApplyResult, error)
+	CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
 }
 
 // Add creates a new SyncSetInstance controller and adds it to the manager with default RBAC. The manager will set fields on the
@@ -413,13 +415,13 @@ func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spe
 		}
 	}()
 
-	if err := r.applySyncSetResources(ssi, spec.Resources, spec.OmitAnnotation, dynamicClient, h, ssiLog); err != nil {
+	if err := r.applySyncSetResources(ssi, spec.Resources, spec.ApplyBehavior, dynamicClient, h, ssiLog); err != nil {
 		return err
 	}
 	if err := r.applySyncSetPatches(ssi, spec.Patches, h, ssiLog); err != nil {
 		return err
 	}
-	return r.applySyncSetSecretMappings(ssi, spec.Secrets, spec.OmitAnnotation, dynamicClient, h, ssiLog)
+	return r.applySyncSetSecretMappings(ssi, spec.Secrets, spec.ApplyBehavior, dynamicClient, h, ssiLog)
 }
 
 func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetInstance, dynamicClient dynamic.Interface, ssiLog log.FieldLogger) error {
@@ -559,7 +561,7 @@ func (r *ReconcileSyncSetInstance) reapplyTime(status hivev1.SyncStatus) time.Ti
 }
 
 // applySyncSetResources evaluates resource objects from RawExtension and applies them to the cluster identified by kubeConfig
-func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInstance, resources []runtime.RawExtension, omitAnnotation bool, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
+func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInstance, resources []runtime.RawExtension, applyBehavior hivev1.SyncSetApplyBehavior, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
 	ssiLog = ssiLog.WithField("applyTerm", "resource")
 
 	// determine if we can gather info for all resources
@@ -578,8 +580,11 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	syncStatusList := []hivev1.SyncStatus{}
 
 	applyFn := h.Apply
-	if omitAnnotation {
+	switch applyBehavior {
+	case hivev1.CreateOrUpdateSyncSetApplyBehavior:
 		applyFn = h.CreateOrUpdate
+	case hivev1.CreateOnlySyncSetApplyBehavior:
+		applyFn = h.Create
 	}
 
 	var applyErr error
@@ -748,14 +753,17 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 }
 
 // applySyncSetSecretMappings evaluates secret mappings and applies them to the cluster identified by kubeConfig
-func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSetInstance, secretMappings []hivev1.SecretMapping, omitAnnotation bool, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
+func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSetInstance, secretMappings []hivev1.SecretMapping, applyBehavior hivev1.SyncSetApplyBehavior, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
 	ssiLog = ssiLog.WithField("applyTerm", "secret")
 
 	syncStatusList := []hivev1.SyncStatus{}
 
 	applyFn := h.ApplyRuntimeObject
-	if omitAnnotation {
+	switch applyBehavior {
+	case hivev1.CreateOrUpdateSyncSetApplyBehavior:
 		applyFn = h.CreateOrUpdateRuntimeObject
+	case hivev1.CreateOnlySyncSetApplyBehavior:
+		applyFn = h.CreateRuntimeObject
 	}
 
 	var applyErr error

@@ -1201,6 +1201,10 @@ func (f *fakeHelper) CreateOrUpdateRuntimeObject(object runtime.Object, scheme *
 	return f.ApplyRuntimeObject(object, scheme)
 }
 
+func (f *fakeHelper) CreateRuntimeObject(object runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
+	return f.ApplyRuntimeObject(object, scheme)
+}
+
 func (f *fakeHelper) ApplyRuntimeObject(object runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error) {
 	data, err := json.Marshal(object)
 	if err != nil {
@@ -1210,6 +1214,10 @@ func (f *fakeHelper) ApplyRuntimeObject(object runtime.Object, scheme *runtime.S
 }
 
 func (f *fakeHelper) CreateOrUpdate(data []byte) (resource.ApplyResult, error) {
+	return f.Apply(data)
+}
+
+func (f *fakeHelper) Create(data []byte) (resource.ApplyResult, error) {
 	return f.Apply(data)
 }
 

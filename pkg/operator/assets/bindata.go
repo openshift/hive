@@ -10210,6 +10210,19 @@ spec:
             and patches to sync along with a ClusterDeploymentSelector indicating
             which clusters the SelectorSyncSet applies to in any namespace.
           properties:
+            applyBehavior:
+              description: ApplyBehavior indicates how resources in this syncset will
+                be applied to the target cluster. The default value of "Apply" indicates
+                that resources should be applied using the 'oc apply' command. If
+                no value is set, "Apply" is assumed. A value of "CreateOnly" indicates
+                that the resource will only be created if it does not already exist
+                in the target cluster. Otherwise, it will be left alone. A value of
+                "CreateOrUpdate" indicates that the resource will be created/updated
+                without the use of the 'oc apply' command, allowing larger resources
+                to be synced, but losing some functionality of the 'oc apply' command
+                such as the ability to remove annotations, labels, and other map entries
+                in general.
+              type: string
             clusterDeploymentSelector:
               description: ClusterDeploymentSelector is a LabelSelector indicating
                 which clusters the SelectorSyncSet applies to in any namespace.
@@ -10254,13 +10267,6 @@ spec:
                     are ANDed.
                   type: object
               type: object
-            omitAnnotation:
-              description: OmitAnnotation if true indicates that the usual annotation
-                used by the apply command will be omitted from the target resources.
-                This results in some loss of functionality when syncing removal of
-                map entries, but it makes it possible to sync large resources that
-                otherwise could not be synced.
-              type: boolean
             patches:
               description: Patches is the list of patches to apply.
               items:
@@ -11417,6 +11423,19 @@ spec:
             to sync along with ClusterDeploymentRefs indicating which clusters the
             SyncSet applies to in the SyncSet's namespace.
           properties:
+            applyBehavior:
+              description: ApplyBehavior indicates how resources in this syncset will
+                be applied to the target cluster. The default value of "Apply" indicates
+                that resources should be applied using the 'oc apply' command. If
+                no value is set, "Apply" is assumed. A value of "CreateOnly" indicates
+                that the resource will only be created if it does not already exist
+                in the target cluster. Otherwise, it will be left alone. A value of
+                "CreateOrUpdate" indicates that the resource will be created/updated
+                without the use of the 'oc apply' command, allowing larger resources
+                to be synced, but losing some functionality of the 'oc apply' command
+                such as the ability to remove annotations, labels, and other map entries
+                in general.
+              type: string
             clusterDeploymentRefs:
               description: ClusterDeploymentRefs is the list of LocalObjectReference
                 indicating which clusters the SyncSet applies to in the SyncSet's
@@ -11431,13 +11450,6 @@ spec:
                     type: string
                 type: object
               type: array
-            omitAnnotation:
-              description: OmitAnnotation if true indicates that the usual annotation
-                used by the apply command will be omitted from the target resources.
-                This results in some loss of functionality when syncing removal of
-                map entries, but it makes it possible to sync large resources that
-                otherwise could not be synced.
-              type: boolean
             patches:
               description: Patches is the list of patches to apply.
               items:

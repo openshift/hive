@@ -1556,8 +1556,8 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 		}
 	case cd.Spec.Platform.VSphere != nil:
 		req.Spec.Platform.VSphere = &hivev1.VSphereClusterDeprovision{
-			CredentialsSecretRef:  &cd.Spec.Platform.VSphere.CredentialsSecretRef,
-			CertificatesSecretRef: &cd.Spec.Platform.VSphere.CertificatesSecretRef,
+			CredentialsSecretRef:  cd.Spec.Platform.VSphere.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.VSphere.CertificatesSecretRef,
 			VCenter:               cd.Spec.Platform.VSphere.VCenter,
 		}
 	default:

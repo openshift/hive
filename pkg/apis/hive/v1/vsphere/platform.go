@@ -10,7 +10,7 @@ type Platform struct {
 	VCenter string `json:"vCenter"`
 
 	// CredentialsSecretRef refers to a secret that contains the vSphere account access
-	// credentials: GOVC_HOST, GOVC_USERNAME, GOVC_PASSWORD fields.
+	// credentials: GOVC_USERNAME, GOVC_PASSWORD fields.
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
 	// CertificatesSecretRef refers to a secret that contains the vSphere CA certificates

@@ -72,10 +72,10 @@ type OpenStackClusterDeprovision struct {
 // VSphereClusterDeprovision contains VMware vSphere-specific configuration for a ClusterDeprovision
 type VSphereClusterDeprovision struct {
 	// CredentialsSecretRef is the vSphere account credentials to use for deprovisioning the cluster
-	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 	// CertificatesSecretRef refers to a secret that contains the vSphere CA certificates
 	// necessary for communicating with the VCenter.
-	CertificatesSecretRef *corev1.LocalObjectReference `json:"certificatesSecretRef"`
+	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 	// VCenter is the vSphere vCenter hostname.
 	VCenter string `json:"vCenter"`
 }

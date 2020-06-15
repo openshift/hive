@@ -7,10 +7,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	"github.com/openshift/installer/pkg/types"
 	typesvsphere "github.com/openshift/installer/pkg/types/vsphere"
+
+	"github.com/openshift/hive/pkg/constants"
 )
 
 // vSphereOptions is the set of options to deprovision an vSphere cluster
@@ -50,7 +51,11 @@ func NewDeprovisionvSphereCommand() *cobra.Command {
 // Complete finishes parsing arguments for the command
 func (o *vSphereOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
+	return nil
+}
 
+// Validate ensures that option values make sense
+func (o *vSphereOptions) Validate(cmd *cobra.Command) error {
 	if o.vCenter == "" {
 		o.vCenter = os.Getenv(constants.VSphereVCenterEnvVar)
 		if o.vCenter == "" {
@@ -65,12 +70,6 @@ func (o *vSphereOptions) Complete(cmd *cobra.Command, args []string) error {
 	if o.password == "" {
 		return fmt.Errorf("No %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
 	}
-
-	return nil
-}
-
-// Validate ensures that option values make sense
-func (o *vSphereOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 

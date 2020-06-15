@@ -443,8 +443,8 @@ spec:
                       type: string
                     credentialsSecretRef:
                       description: 'CredentialsSecretRef refers to a secret that contains
-                        the vSphere account access credentials: GOVC_HOST, GOVC_USERNAME,
-                        GOVC_PASSWORD fields.'
+                        the vSphere account access credentials: GOVC_USERNAME, GOVC_PASSWORD
+                        fields.'
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names

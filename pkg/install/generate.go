@@ -312,7 +312,7 @@ func InstallerPodSpec(
 	hiveArg := fmt.Sprintf("/usr/bin/hiveutil install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)
 	if cd.Spec.Platform.VSphere != nil {
 		// Add vsphere certificates to CA trust.
-		hiveArg = fmt.Sprintf("cp -v %s/.cacert /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", vsphereCloudsDir, hiveArg)
+		hiveArg = fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", vsphereCloudsDir, hiveArg)
 	}
 
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
@@ -660,7 +660,7 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
-			Args:            []string{fmt.Sprintf("cp -v /vsphere/.cacert /etc/pki/ca-trust/source/anchors/ && update-ca-trust && /usr/bin/hiveutil deprovision vsphere --vsphere-vcenter %s --loglevel debug %s", req.Spec.Platform.VSphere.VCenter, req.Spec.InfraID)},
+			Args:            []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && /usr/bin/hiveutil deprovision vsphere --vsphere-vcenter %s --loglevel debug %s", vsphereCloudsDir, req.Spec.Platform.VSphere.VCenter, req.Spec.InfraID)},
 			VolumeMounts:    volumeMounts,
 		},
 	}

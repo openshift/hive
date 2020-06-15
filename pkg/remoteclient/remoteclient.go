@@ -126,7 +126,7 @@ func connectToRemoteCluster(
 	unreachable = true
 	logger.WithError(err).Info("remote cluster is unreachable")
 	SetUnreachableCondition(cd, err)
-	if err := localClient.Update(context.Background(), cd); err != nil {
+	if err := localClient.Status().Update(context.Background(), cd); err != nil {
 		logger.WithError(err).Log(utils.LogLevel(err), "could not update clusterdeployment with unreachable condition")
 		requeue = true
 	}

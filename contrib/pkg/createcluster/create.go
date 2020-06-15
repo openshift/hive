@@ -431,14 +431,14 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
-		spFileContents, err := azurecredutil.GetCreds(o.CredsFile)
+		creds, err := azurecredutil.GetCreds(o.CredsFile)
 		if err != nil {
 			log.WithError(err).Error("Failed to read in Azure credentials")
 			return nil, err
 		}
 
 		azureProvider := &clusterresource.AzureCloudBuilder{
-			ServicePrincipal:            spFileContents,
+			ServicePrincipal:            creds,
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 		}
 		builder.CloudBuilder = azureProvider

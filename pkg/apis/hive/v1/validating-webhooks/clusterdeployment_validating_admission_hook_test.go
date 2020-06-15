@@ -377,7 +377,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name: "Test managed DNS is invalid on Azure",
+			name: "Test managed DNS is valid on Azure",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAzureClusterDeployment()
 				cd.Spec.ManageDNS = true
@@ -385,7 +385,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
-			expectedAllowed: false,
+			expectedAllowed: true,
 		},
 		{
 			name:      "Test allow modifying controlPlaneConfig",

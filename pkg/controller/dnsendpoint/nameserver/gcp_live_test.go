@@ -83,11 +83,6 @@ func (s *LiveGCPTestSuite) TestCreateAndDelete_UnknownDeleteValues() {
 	})
 }
 
-type testCreateThenUpdateCase struct {
-	createValues []string
-	updateValues []string
-}
-
 func (s *LiveGCPTestSuite) TestCreateThenUpdate_SameValuesOnUpdate() {
 	s.testCreateThenUpdate(&testCreateThenUpdateCase{
 		createValues: []string{"test-value"},
@@ -100,11 +95,6 @@ func (s *LiveGCPTestSuite) TestCreateThenUpdate_DifferentValuesOnUpdate() {
 		createValues: []string{"test-value"},
 		updateValues: []string{"test-value-2"},
 	})
-}
-
-type testCreateAndDeleteCase struct {
-	createValues []string
-	deleteValues []string
 }
 
 func (s *LiveGCPTestSuite) testCreateAndDelete(tc *testCreateAndDeleteCase) {

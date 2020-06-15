@@ -33,6 +33,10 @@ type DNSZoneSpec struct {
 	// GCP specifies GCP-specific cloud configuration
 	// +optional
 	GCP *GCPDNSZoneSpec `json:"gcp,omitempty"`
+
+	// Azure specifes Azure-specific cloud configuration
+	// +optional
+	Azure *AzureDNSZoneSpec `json:"azure,omitempty"`
 }
 
 // AWSDNSZoneSpec contains AWS-specific DNSZone specifications
@@ -70,6 +74,18 @@ type GCPDNSZoneSpec struct {
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }
 
+// AzureDNSZoneSpec contains Azure-specific DNSZone specifications
+type AzureDNSZoneSpec struct {
+	// CredentialsSecretRef references a secret that will be used to authenticate with
+	// Azure CloudDNS. It will need permission to create and manage CloudDNS Hosted Zones.
+	// Secret should have a key named 'osServicePrincipal.json'.
+	// The credentials must specify the project to use.
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// ResourceGroupName specifies the Azure resource group in which the Hosted Zone should be created.
+	ResourceGroupName string `json:"resourceGroupName"`
+}
+
 // DNSZoneStatus defines the observed state of DNSZone
 type DNSZoneStatus struct {
 	// LastSyncTimestamp is the time that the zone was last sync'd.
@@ -93,6 +109,9 @@ type DNSZoneStatus struct {
 	// +optional
 	GCP *GCPDNSZoneStatus `json:"gcp,omitempty"`
 
+	// AzureDNSZoneStatus contains status information specific to Azure
+	Azure *AzureDNSZoneStatus `json:"azure,omitempty"`
+
 	// Conditions includes more detailed status for the DNSZone
 	// +optional
 	Conditions []DNSZoneCondition `json:"conditions,omitempty"`
@@ -103,6 +122,10 @@ type AWSDNSZoneStatus struct {
 	// ZoneID is the ID of the zone in AWS
 	// +optional
 	ZoneID *string `json:"zoneID,omitempty"`
+}
+
+// AzureDNSZoneStatus contains status information specific to Azure DNS zones
+type AzureDNSZoneStatus struct {
 }
 
 // GCPDNSZoneStatus contains status information specific to GCP Cloud DNS zones

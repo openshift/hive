@@ -136,6 +136,10 @@ type ManageDNSConfig struct {
 	// +optional
 	GCP *ManageDNSGCPConfig `json:"gcp,omitempty"`
 
+	// Azure contains Azure-specific settings for external DNS
+	// +optional
+	Azure *ManageDNSAzureConfig `json:"azure,omitempty"`
+
 	// As other cloud providers are supported, additional fields will be
 	// added for each of those cloud providers. Only a single cloud provider
 	// may be configured at a time.
@@ -147,8 +151,7 @@ type ManageDNSAWSConfig struct {
 	// AWS Route53. It will need permission to manage entries for the domain
 	// listed in the parent ManageDNSConfig object.
 	// Secret should have AWS keys named 'aws_access_key_id' and 'aws_secret_access_key'.
-	// +optional
-	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
 	// Region is the AWS region to use for route53 operations.
 	// This defaults to us-east-1.
@@ -165,8 +168,7 @@ type ManageDNSGCPConfig struct {
 	// listed in the parent ManageDNSConfig object.
 	// Secret should have a key named 'osServiceAccount.json'.
 	// The credentials must specify the project to use.
-	// +optional
-	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }
 
 type DeleteProtectionType string
@@ -174,6 +176,19 @@ type DeleteProtectionType string
 const (
 	DeleteProtectionEnabled DeleteProtectionType = "enabled"
 )
+
+// ManageDNSAzureConfig contains Azure-specific info to manage a given domain
+type ManageDNSAzureConfig struct {
+	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
+	// Azure DNS. It wil need permission to manage entries in each of the
+	// managed domains listed in the parent ManageDNSConfig object.
+	// Secret should have a key named 'osServicePrincipal.json'
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// ResourceGroupName specifies the Azure resource group containing the DNS zones
+	// for the domains being managed.
+	ResourceGroupName string `json:"resourceGroupName"`
+}
 
 // +genclient:nonNamespaced
 // +genclient

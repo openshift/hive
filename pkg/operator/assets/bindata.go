@@ -10222,6 +10222,11 @@ spec:
                 to be synced, but losing some functionality of the 'oc apply' command
                 such as the ability to remove annotations, labels, and other map entries
                 in general.
+              enum:
+              - ""
+              - Apply
+              - CreateOnly
+              - CreateOrUpdate
               type: string
             clusterDeploymentSelector:
               description: ClusterDeploymentSelector is a LabelSelector indicating
@@ -11435,6 +11440,11 @@ spec:
                 to be synced, but losing some functionality of the 'oc apply' command
                 such as the ability to remove annotations, labels, and other map entries
                 in general.
+              enum:
+              - ""
+              - Apply
+              - CreateOnly
+              - CreateOrUpdate
               type: string
             clusterDeploymentRefs:
               description: ClusterDeploymentRefs is the list of LocalObjectReference

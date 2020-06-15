@@ -22,25 +22,26 @@ const (
 )
 
 // SyncSetApplyBehavior is a string representing the behavior to use when
-// aplying a syncset to t arget cluster.
+// aplying a syncset to target cluster.
+// +kubebuilder:validation:Enum="";Apply;CreateOnly;CreateOrUpdate
 type SyncSetApplyBehavior string
 
 const (
 	// ApplySyncSetApplyBehavior is the default apply behavior. It will result
 	// in resources getting applied using the 'oc apply' command to the target
 	// cluster.
-	ApplySyncSetApplyBehavior = "Apply"
+	ApplySyncSetApplyBehavior SyncSetApplyBehavior = "Apply"
 
 	// CreateOnlySyncSetApplyBehavior results in resources only getting created
 	// if they do not exist, otherwise they are left alone.
-	CreateOnlySyncSetApplyBehavior = "CreateOnly"
+	CreateOnlySyncSetApplyBehavior SyncSetApplyBehavior = "CreateOnly"
 
 	// CreateOrUpdateSyncSetApplyBehavior results in resources getting created if
 	// they do not exist, otherwise they are updated with the contents of the
 	// syncset resource. This is different from Apply behavior in that an annotation
 	// is not added to the target resource with the "lastApplied" value. It allows
 	// for syncing larger resources, but loses the ability to sync map entry deletes.
-	CreateOrUpdateSyncSetApplyBehavior = "CreateOrUpdate"
+	CreateOrUpdateSyncSetApplyBehavior SyncSetApplyBehavior = "CreateOrUpdate"
 )
 
 // SyncSetPatchApplyMode is a string representing the mode with which to apply

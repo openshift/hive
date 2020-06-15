@@ -779,7 +779,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewAWSActuator(creds, cd.Spec.Platform.AWS.Region, pool, remoteMachineSets, r.scheme, logger)
+		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, remoteMachineSets, r.scheme, logger)
 	case cd.Spec.Platform.GCP != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(

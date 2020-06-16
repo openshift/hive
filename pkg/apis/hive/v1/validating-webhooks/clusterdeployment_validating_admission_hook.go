@@ -300,6 +300,26 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
 		}
 	}
+	if newObject.Spec.Platform.VSphere != nil {
+		numberOfPlatforms++
+		vsphere := newObject.Spec.Platform.VSphere
+		vspherePath := platformPath.Child("vsphere")
+		if vsphere.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
+		}
+		if vsphere.CertificatesSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
+		}
+		if vsphere.VCenter == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
+		}
+		if vsphere.Datacenter == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
+		}
+		if vsphere.DefaultDatastore == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		}
+	}
 	if newObject.Spec.Platform.BareMetal != nil {
 		numberOfPlatforms++
 	}

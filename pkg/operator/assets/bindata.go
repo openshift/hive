@@ -2032,6 +2032,61 @@ spec:
                   - cloud
                   - credentialsSecretRef
                   type: object
+                vsphere:
+                  description: VSphere is the configuration used when installing on
+                    vSphere
+                  properties:
+                    certificatesSecretRef:
+                      description: CertificatesSecretRef refers to a secret that contains
+                        the vSphere CA certificates necessary for communicating with
+                        the VCenter.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    cluster:
+                      description: Cluster is the name of the cluster virtual machines
+                        will be cloned into.
+                      type: string
+                    credentialsSecretRef:
+                      description: 'CredentialsSecretRef refers to a secret that contains
+                        the vSphere account access credentials: GOVC_USERNAME, GOVC_PASSWORD
+                        fields.'
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    datacenter:
+                      description: Datacenter is the name of the datacenter to use
+                        in the vCenter.
+                      type: string
+                    defaultDatastore:
+                      description: DefaultDatastore is the default datastore to use
+                        for provisioning volumes.
+                      type: string
+                    folder:
+                      description: Folder is the name of the folder that will be used
+                        and/or created for virtual machines.
+                      type: string
+                    network:
+                      description: Network specifies the name of the network to be
+                        used by the cluster.
+                      type: string
+                    vCenter:
+                      description: VCenter is the domain name or IP address of the
+                        vCenter.
+                      type: string
+                  required:
+                  - certificatesSecretRef
+                  - credentialsSecretRef
+                  - datacenter
+                  - defaultDatastore
+                  - vCenter
+                  type: object
               type: object
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
@@ -2654,6 +2709,37 @@ spec:
                       type: object
                   required:
                   - cloud
+                  type: object
+                vsphere:
+                  description: VSphere contains VMWare vSphere-specific deprovision
+                    settings
+                  properties:
+                    certificatesSecretRef:
+                      description: CertificatesSecretRef refers to a secret that contains
+                        the vSphere CA certificates necessary for communicating with
+                        the VCenter.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the vSphere account credentials
+                        to use for deprovisioning the cluster
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    vCenter:
+                      description: VCenter is the vSphere vCenter hostname.
+                      type: string
+                  required:
+                  - certificatesSecretRef
+                  - credentialsSecretRef
+                  - vCenter
                   type: object
               type: object
           required:
@@ -9450,6 +9536,40 @@ spec:
                       type: object
                   required:
                   - flavor
+                  type: object
+                vsphere:
+                  description: VSphere is the configuration used when installing on
+                    vSphere
+                  properties:
+                    coresPerSocket:
+                      description: NumCoresPerSocket is the number of cores per socket
+                        in a vm. The number of vCPUs on the vm will be NumCPUs/NumCoresPerSocket.
+                      format: int32
+                      type: integer
+                    cpus:
+                      description: NumCPUs is the total number of virtual processor
+                        cores to assign a vm.
+                      format: int32
+                      type: integer
+                    memoryMB:
+                      description: Memory is the size of a VM's memory in MB.
+                      format: int64
+                      type: integer
+                    osDisk:
+                      description: OSDisk defines the storage for instance.
+                      properties:
+                        diskSizeGB:
+                          description: DiskSizeGB defines the size of disk in GB.
+                          format: int32
+                          type: integer
+                      required:
+                      - diskSizeGB
+                      type: object
+                  required:
+                  - coresPerSocket
+                  - cpus
+                  - memoryMB
+                  - osDisk
                   type: object
               type: object
             replicas:

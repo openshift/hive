@@ -19,6 +19,7 @@ import (
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -93,6 +94,21 @@ func validOpenStackClusterDeployment() *hivev1.ClusterDeployment {
 	cd.Spec.Platform.OpenStack = &hivev1openstack.Platform{
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		Cloud:                "somecloud",
+	}
+	return cd
+}
+
+func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.VSphere = &hivev1vsphere.Platform{
+		VCenter:               "somevcenter.com",
+		CredentialsSecretRef:  corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		CertificatesSecretRef: corev1.LocalObjectReference{Name: "fake-cert-secret"},
+		Datacenter:            "dc1",
+		DefaultDatastore:      "vmse-test",
+		Folder:                "/dc1/vm/test",
+		Cluster:               "test",
+		Network:               "Network",
 	}
 	return cd
 }
@@ -694,6 +710,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name:            "Test delete on OpenShift 3.11",
 			oldObject:       nil,
 			operation:       admissionv1beta1.Delete,
+			expectedAllowed: true,
+		},
+		{
+			name:            "vSphere create valid",
+			newObject:       validVSphereClusterDeployment(),
+			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
 	}

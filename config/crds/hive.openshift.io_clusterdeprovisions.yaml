@@ -127,6 +127,37 @@ spec:
                   required:
                   - cloud
                   type: object
+                vsphere:
+                  description: VSphere contains VMWare vSphere-specific deprovision
+                    settings
+                  properties:
+                    certificatesSecretRef:
+                      description: CertificatesSecretRef refers to a secret that contains
+                        the vSphere CA certificates necessary for communicating with
+                        the VCenter.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef is the vSphere account credentials
+                        to use for deprovisioning the cluster
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    vCenter:
+                      description: VCenter is the vSphere vCenter hostname.
+                      type: string
+                  required:
+                  - certificatesSecretRef
+                  - credentialsSecretRef
+                  - vCenter
+                  type: object
               type: object
           required:
           - infraID

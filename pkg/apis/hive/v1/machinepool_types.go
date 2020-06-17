@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	"github.com/openshift/hive/pkg/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 )
 
@@ -77,6 +78,8 @@ type MachinePoolPlatform struct {
 	OpenStack *openstack.MachinePool `json:"openstack,omitempty"`
 	// VSphere is the configuration used when installing on vSphere
 	VSphere *vsphere.MachinePool `json:"vsphere,omitempty"`
+	// Ovirt is the configuration used when installing on oVirt.
+	Ovirt *ovirt.MachinePool `json:"ovirt,omitempty"`
 }
 
 // MachinePoolStatus defines the observed state of MachinePool

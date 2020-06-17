@@ -201,6 +201,10 @@ spec:
                   required:
                   - flavor
                   type: object
+                ovirt:
+                  description: Ovirt is the configuration used when installing on
+                    oVirt.
+                  type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on
                     vSphere

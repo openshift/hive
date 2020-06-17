@@ -253,6 +253,11 @@ const (
 	// VersionMajorMinorPatchLabel is a label applied to ClusterDeployments to show the version of the cluster
 	// in the form "[MAJOR].[MINOR].[PATCH]".
 	VersionMajorMinorPatchLabel = "hive.openshift.io/version-major-minor-patch"
+	// OvirtCredentialsName is the name of the oVirt credentials file.
+	OvirtCredentialsName = "ovirt-config.yaml"
+
+	// OvirtConfigEnvVar is hte environment variable specifying the oVirt config path
+	OvirtConfigEnvVar = "OVIRT_CONFIG"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

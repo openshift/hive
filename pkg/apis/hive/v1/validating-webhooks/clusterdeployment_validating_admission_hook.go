@@ -320,6 +320,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
 		}
 	}
+	if newObject.Spec.Platform.Ovirt != nil {
+		numberOfPlatforms++
+	}
 	if newObject.Spec.Platform.BareMetal != nil {
 		numberOfPlatforms++
 	}

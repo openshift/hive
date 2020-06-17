@@ -423,6 +423,27 @@ spec:
                   - cloud
                   - credentialsSecretRef
                   type: object
+                ovirt:
+                  description: Ovirt is the configuration used when installing on
+                    oVirt
+                  properties:
+                    credentialsSecretRef:
+                      description: 'CredentialsSecretRef refers to a secret that contains
+                        the oVirt account access credentials with fields: ovirt_url,
+                        ovirt_username, ovirt_password, ovirt_ca_bundle'
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    ovirt_cluster_id:
+                      description: The target cluster under which all VMs will run
+                      type: string
+                  required:
+                  - credentialsSecretRef
+                  - ovirt_cluster_id
+                  type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on
                     vSphere

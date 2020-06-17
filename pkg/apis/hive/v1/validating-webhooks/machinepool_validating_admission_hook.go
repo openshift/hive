@@ -22,6 +22,7 @@ import (
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1ovirt "github.com/openshift/hive/pkg/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 )
 
@@ -288,6 +289,10 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		platforms = append(platforms, "vsphere")
 		allErrs = append(allErrs, validateVSphereMachinePoolPlatformInvariants(p, platformPath.Child("vsphere"))...)
 	}
+	if p := spec.Platform.Ovirt; p != nil {
+		platforms = append(platforms, "ovirt")
+		allErrs = append(allErrs, validateOvirtMachinePoolPlatformInvariants(p, platformPath.Child("ovirt"))...)
+	}
 
 	switch len(platforms) {
 	case 0:
@@ -397,5 +402,10 @@ func validateVSphereMachinePoolPlatformInvariants(platform *hivev1vsphere.Machin
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskSizeGB"), "disk size must be positive"))
 	}
 
+	return allErrs
+}
+
+func validateOvirtMachinePoolPlatformInvariants(platform *hivev1ovirt.MachinePool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
 	return allErrs
 }

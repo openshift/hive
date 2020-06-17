@@ -36,6 +36,8 @@ type ClusterDeprovisionPlatform struct {
 	OpenStack *OpenStackClusterDeprovision `json:"openstack,omitempty"`
 	// VSphere contains VMWare vSphere-specific deprovision settings
 	VSphere *VSphereClusterDeprovision `json:"vsphere,omitempty"`
+	// Ovirt contains oVirt-specific deprovision settings
+	Ovirt *OvirtClusterDeprovision `json:"ovirt,omitempty"`
 }
 
 // AWSClusterDeprovision contains AWS-specific configuration for a ClusterDeprovision
@@ -78,6 +80,14 @@ type VSphereClusterDeprovision struct {
 	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 	// VCenter is the vSphere vCenter hostname.
 	VCenter string `json:"vCenter"`
+}
+
+// OvirtClusterDeprovision contains oVirt-specific configuration for a ClusterDeprovision
+type OvirtClusterDeprovision struct {
+	// The oVirt cluster ID
+	ClusterID string `json:"ovirt_cluster_id"`
+	// CredentialsSecretRef is the oVirt account credentials to use for deprovisioning the cluster
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }
 
 // +genclient

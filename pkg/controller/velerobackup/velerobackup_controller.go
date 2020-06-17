@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -64,6 +65,12 @@ var (
 // Add creates a new Backup Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+
+	// Don't run the Velero controller unless explicitly enabled.
+	if !strings.EqualFold(os.Getenv(hiveconstants.VeleroBackupEnvVar), "true") {
+		return nil
+	}
+
 	reconciler, err := NewReconciler(mgr)
 	if err != nil {
 		return err

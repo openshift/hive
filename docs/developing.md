@@ -23,6 +23,7 @@
   - [Dependency management](#dependency-management)
     - [Updating Dependencies](#updating-dependencies)
     - [Re-creating vendor Directory](#re-creating-vendor-directory)
+    - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
   - [Running the e2e test locally](#running-the-e2e-test-locally)
   - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
 
@@ -265,6 +266,66 @@ To recreate *_vendor_* directory, you can run the following command:
 ```
 make vendor
 ```
+
+### Vendoring the OpenShift Installer
+
+For various reasons, Hive vendors the OpenShift Installer. The OpenShift installer brings in quite a few dependencies, so it is important to know the general flow of how to vendor the latest version of the OpenShift Installer.
+
+Things to note:
+* Hive vendors the installer from `@master`, NOT from `@latest`. For go modules, `@latest` means the latest git tag, which for the installer is not up to date.
+* The `go.mod` file contains a section called `replace`. The purpose of this section is to force go modules to use a specific version of that dependency.
+* `replace` directives may need to be copied from the OpenShift Installer or possibly other Hive dependencies. In other words, any dependency may need to be pinned to a specific version.
+* `go mod tidy` is used to add (download) missing dependencies and to remove unused modules.
+* `go mod vendor` is used to copy dependent modules to the vendor directory.
+
+
+The following is a basic flow for vendoring the latest OpenShift Installer. Updating Go modules can sometimes be complex, so it is likely that the flow below will not encompass everything needed to vendor the latest OpenShift Installer. If more steps are needed, please document them here so that the Hive team will know other possible things that need to be done.
+
+Basic flow for vendoring the latest OpenShift Installer:
+
+* Compare the `replace` section of the OpenShift Installer `go.mod` with the `replace` section of the Hive `go.mod`. If the Hive `replace` section has the same module listed as the OpenShift Installer `replace` section, ensure that the Hive version matches the installer version. If it doesn't, change the Hive version to match.
+
+* Edit `go.mod` and change the OpenShift Installer `require` to reference `master` (or a specific commit hash) instead of the last version. Go will change it to the version that master points to, so this is a temporary change.
+```
+github.com/openshift/installer master
+```
+
+* Run `make vendor`. This make target runs both `go mod tidy` and `go mod vendor` which get the latest modules, cleanup unused modules and copy the moduels into the Hive git tree.
+```
+make vendor
+```
+
+* If `go mod tidy` errors with a message like the following, then check Hive's usage of that package. In this case, the Hive import is importing an old version of the API. It needs to instead import v1beta1. Fix the hive code and re-run `go mod tidy`. This may need to be done multiple times.
+```
+github.com/openshift/hive/pkg/controller/remotemachineset imports
+	github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1alpha1: module github.com/openshift/machine-api-operator@latest found (v0.2.0), but does not contain package github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1alpha1
+```
+
+* If `go mod tidy` errors with a message like the following, then check the installer's replace directives for that go module so that Hive is pulling in the same version. Re-run the `go mod tidy` once the replace directive has been added or updated. This process may need to be followed several times to clean up all of the errors.
+```
+github.com/openshift/hive/pkg/controller/remotemachineset imports
+	github.com/openshift/installer/pkg/asset/machines/aws imports
+	sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1: module sigs.k8s.io/cluster-api-provider-aws@latest found (v0.5.3, replaced by github.com/openshift/cluster-api-provider-aws@v0.2.1-0.20200316201703-923caeb1d0d8), but does not contain package sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1
+```
+
+* If `go mod tidy` errors with a message like the following, then check the installer's replace directives for that go module so that Hive is pulling in the same version. Re-run the `go mod tidy` once the replace directive has been added or updated. This process may need to be followed several times to clean up all of the errors.
+```
+go: sigs.k8s.io/cluster-api-provider-azure@v0.0.0: reading sigs.k8s.io/cluster-api-provider-azure/go.mod at revision v0.0.0: unknown revision v0.0.0
+```
+
+* If `go mod tidy` errors with a message like the following, then check the installer's replace directives to see if the replace needs to be updated. In this specific case, the replace was correct, but Hive is referring to `awsproviderconfig/v1beta1`, and the module has renamed that directory to `awsprovider/v1beta1`. Fix the Hive code and re-run `go mod tidy`
+```
+github.com/openshift/hive/cmd/manager imports
+	sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1: module sigs.k8s.io/cluster-api-provider-aws@latest found (v0.5.3, replaced by github.com/openshift/cluster-api-provider-aws@v0.2.1-0.20200506073438-9d49428ff837), but does not contain package sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1
+
+```
+
+* Once `go mod vendor` succeeds, run `make` to ensure everything builds and test correctly:
+```
+make
+```
+* If `make` errors, that may mean that Hive code needs to be updated to be compatible with the latest vendored code. Fix the Hive code and re-run `make`
+
 
 ## Running the e2e test locally
 

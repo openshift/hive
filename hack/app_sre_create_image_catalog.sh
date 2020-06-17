@@ -23,8 +23,8 @@ git clone \
 REMOVED_VERSIONS=""
 if [[ "$REMOVE_UNDEPLOYED" == true ]]; then
     DEPLOYED_HASH=$(
-        curl -s 'https://gitlab.cee.redhat.com/service/saas-hive/raw/master/hive-services/hive.yaml' | \
-            docker run --rm -i evns/yq -r '.services[]|select(.name="hive").hash'
+        curl -s https://gitlab.cee.redhat.com/service/app-interface/-/raw/master/data/services/hive/cicd/ci-int/saas.yaml | \
+            docker run --rm -i evns/yq -r '.resourceTemplates[]|select(.name="hive").targets[]|select(.namespace."$ref"=="/services/hive/namespaces/hive-production.yml").ref'
     )
 
     delete=false

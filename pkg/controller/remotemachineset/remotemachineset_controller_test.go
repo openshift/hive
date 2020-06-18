@@ -20,7 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1"
+	awsproviderapis "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -57,7 +58,7 @@ func init() {
 func TestRemoteMachineSetReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
-	awsprovider.SchemeBuilder.AddToScheme(scheme.Scheme)
+	awsproviderapis.AddToScheme(scheme.Scheme)
 
 	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {
 		pool := &hivev1.MachinePool{}

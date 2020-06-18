@@ -17,8 +17,8 @@ type Platform struct {
 	// DefaultDatastore is the default datastore to use for provisioning volumes.
 	DefaultDatastore string `json:"defaultDatastore"`
 
-	// Folder is the name of the folder that will be used and/or created for
-	// virtual machines.
+	// Folder is the absolute path of the folder that will be used and/or created for
+	// virtual machines. The absolute path is of the form /<datacenter>/vm/<folder>/<subfolder>.
 	Folder string `json:"folder,omitempty"`
 
 	// Cluster is the name of the cluster virtual machines will be cloned into.
@@ -28,13 +28,16 @@ type Platform struct {
 	ClusterOSImage string `json:"clusterOSImage,omitempty"`
 
 	// APIVIP is the virtual IP address for the api endpoint
+	//
+	// +kubebuilder:validation:format=ip
+	// +optional
 	APIVIP string `json:"apiVIP,omitempty"`
 
 	// IngressVIP is the virtual IP address for ingress
+	//
+	// +kubebuilder:validation:format=ip
+	// +optional
 	IngressVIP string `json:"ingressVIP,omitempty"`
-
-	// DNSVIP is the virtual IP address for DNS
-	DNSVIP string `json:"dnsVIP,omitempty"`
 
 	// DefaultMachinePlatform is the default configuration used when
 	// installing on VSphere for machine pools which do not define their own

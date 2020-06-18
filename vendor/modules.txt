@@ -46,7 +46,7 @@ github.com/OpenPeeDeeP/depguard
 github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 github.com/PuerkitoBio/urlesc
-# github.com/aws/aws-sdk-go v1.29.24
+# github.com/aws/aws-sdk-go v1.30.16
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/arn
 github.com/aws/aws-sdk-go/aws/awserr
@@ -205,7 +205,7 @@ github.com/golang/groupcache/lru
 github.com/golang/mock/gomock
 github.com/golang/mock/mockgen
 github.com/golang/mock/mockgen/model
-# github.com/golang/protobuf v1.3.2
+# github.com/golang/protobuf v1.3.4
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
@@ -309,6 +309,7 @@ github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/listeners
 github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/loadbalancers
 github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/monitors
 github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/pools
+github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/attributestags
 github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips
 github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers
 github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups
@@ -363,7 +364,7 @@ github.com/inconshreveable/mousetrap
 github.com/jingyugao/rowserrcheck/passes/rowserr
 # github.com/jirfag/go-printf-func-name v0.0.0-20191110105641-45db9963cdd3
 github.com/jirfag/go-printf-func-name/pkg/analyzer
-# github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
+# github.com/jmespath/go-jmespath v0.3.0
 github.com/jmespath/go-jmespath
 # github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
@@ -418,7 +419,7 @@ github.com/nbutton23/zxcvbn-go/match
 github.com/nbutton23/zxcvbn-go/matching
 github.com/nbutton23/zxcvbn-go/scoring
 github.com/nbutton23/zxcvbn-go/utils/math
-# github.com/onsi/ginkgo v1.11.0
+# github.com/onsi/ginkgo v1.12.0
 github.com/onsi/ginkgo
 github.com/onsi/ginkgo/config
 github.com/onsi/ginkgo/internal/codelocation
@@ -476,8 +477,6 @@ github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 github.com/openshift/cloud-credential-operator/pkg/aws
 github.com/openshift/cloud-credential-operator/version
 # github.com/openshift/cluster-api v0.0.0-20191129101638-b09907ac6668
-github.com/openshift/cluster-api/pkg/apis/cluster/common
-github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1
 github.com/openshift/cluster-api/pkg/apis/machine/common
 github.com/openshift/cluster-api/pkg/apis/machine/v1beta1
 # github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156
@@ -490,7 +489,8 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
-# github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54
+# github.com/openshift/installer v0.9.0-master.0.20200603112517-20e472f69982
+github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure
 github.com/openshift/installer/pkg/asset/installconfig/gcp
@@ -498,6 +498,7 @@ github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp
 github.com/openshift/installer/pkg/asset/machines/openstack
+github.com/openshift/installer/pkg/asset/machines/vsphere
 github.com/openshift/installer/pkg/destroy/aws
 github.com/openshift/installer/pkg/destroy/azure
 github.com/openshift/installer/pkg/destroy/gcp
@@ -505,9 +506,9 @@ github.com/openshift/installer/pkg/destroy/openstack
 github.com/openshift/installer/pkg/destroy/providers
 github.com/openshift/installer/pkg/destroy/vsphere
 github.com/openshift/installer/pkg/ipnet
+github.com/openshift/installer/pkg/rhcos
 github.com/openshift/installer/pkg/types
 github.com/openshift/installer/pkg/types/aws
-github.com/openshift/installer/pkg/types/aws/validation
 github.com/openshift/installer/pkg/types/azure
 github.com/openshift/installer/pkg/types/baremetal
 github.com/openshift/installer/pkg/types/gcp
@@ -524,9 +525,10 @@ github.com/openshift/library-go/pkg/controller/fileobserver
 github.com/openshift/library-go/pkg/operator/events
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/resource/resourceread
-# github.com/openshift/machine-api-operator v0.2.1-0.20200310180732-c63fa2b143f0
+# github.com/openshift/machine-api-operator v0.2.1-0.20200429102619-d36974451290
 github.com/openshift/machine-api-operator/pkg/apis/machine
 github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1
+github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1
 # github.com/pborman/uuid v1.2.0
 github.com/pborman/uuid
 # github.com/pelletier/go-toml v1.2.0
@@ -557,6 +559,10 @@ github.com/russross/blackfriday
 # github.com/securego/gosec v0.0.0-20200103095621-79fbf3af8d83
 github.com/securego/gosec
 github.com/securego/gosec/rules
+# github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749
+github.com/shurcooL/httpfs/vfsutil
+# github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd
+github.com/shurcooL/vfsgen
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/sourcegraph/go-diff v0.5.1
@@ -576,7 +582,7 @@ github.com/spf13/pflag
 github.com/spf13/viper
 # github.com/stretchr/objx v0.2.0
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.4.0
+# github.com/stretchr/testify v1.5.1
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
@@ -675,7 +681,7 @@ golang.org/x/crypto/pkcs12/internal/rc2
 golang.org/x/crypto/poly1305
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
+# golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 golang.org/x/lint
 golang.org/x/lint/golint
 # golang.org/x/mod v0.2.0
@@ -801,16 +807,16 @@ golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # gomodules.xyz/jsonpatch/v2 v2.0.1
 gomodules.xyz/jsonpatch/v2
-# google.golang.org/api v0.14.0
+# google.golang.org/api v0.14.0 => google.golang.org/api v0.13.0
 google.golang.org/api/cloudresourcemanager/v1
 google.golang.org/api/compute/v1
 google.golang.org/api/dns/v1
 google.golang.org/api/googleapi
+google.golang.org/api/googleapi/internal/uritemplates
 google.golang.org/api/googleapi/transport
 google.golang.org/api/iam/v1
 google.golang.org/api/internal
 google.golang.org/api/internal/gensupport
-google.golang.org/api/internal/third_party/uritemplates
 google.golang.org/api/option
 google.golang.org/api/serviceusage/v1
 google.golang.org/api/storage/v1
@@ -827,12 +833,10 @@ google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20200122232147-0452cf42e150
+# google.golang.org/genproto v0.0.0-20200310143817-43be25429f5a
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.26.0
+# google.golang.org/grpc v1.27.1 => google.golang.org/grpc v1.23.1
 google.golang.org/grpc
-google.golang.org/grpc/attributes
-google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
 google.golang.org/grpc/balancer/roundrobin
@@ -848,13 +852,10 @@ google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
 google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
-google.golang.org/grpc/internal/buffer
 google.golang.org/grpc/internal/channelz
 google.golang.org/grpc/internal/envconfig
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
-google.golang.org/grpc/internal/resolver/dns
-google.golang.org/grpc/internal/resolver/passthrough
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/keepalive
@@ -1450,7 +1451,7 @@ k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 k8s.io/kubectl/pkg/validation
-# k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
+# k8s.io/utils v0.0.0-20200327001022-6496210b90e8
 k8s.io/utils/buffer
 k8s.io/utils/exec
 k8s.io/utils/integer
@@ -1467,11 +1468,12 @@ mvdan.cc/unparam/check
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.7
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/cluster-api-provider-aws v0.0.0 => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20200316201703-923caeb1d0d8
-sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsproviderconfig/v1beta1
+# sigs.k8s.io/cluster-api-provider-aws v0.0.0 => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20200506073438-9d49428ff837
+sigs.k8s.io/cluster-api-provider-aws/pkg/apis
+sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1
 # sigs.k8s.io/cluster-api-provider-azure v0.0.0 => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20200120114645-8a9592f1f87b
 sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1
-# sigs.k8s.io/cluster-api-provider-openstack v0.0.0 => github.com/openshift/cluster-api-provider-openstack v0.0.0-20200323110431-3311de91e078
+# sigs.k8s.io/cluster-api-provider-openstack v0.0.0 => github.com/openshift/cluster-api-provider-openstack v0.0.0-20200526112135-319a35b2e38e
 sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1
 # sigs.k8s.io/controller-runtime v0.6.0
 sigs.k8s.io/controller-runtime/pkg/cache

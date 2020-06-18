@@ -808,6 +808,8 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		return NewAzureActuator(creds, logger)
 	case cd.Spec.Platform.OpenStack != nil:
 		return NewOpenStackActuator(logger)
+	case cd.Spec.Platform.VSphere != nil:
+		return NewVSphereActuator(logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

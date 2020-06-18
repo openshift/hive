@@ -46,9 +46,6 @@ type VSphereCloudBuilder struct {
 	// IngressVIP is the virtual IP address for ingress
 	IngressVIP string
 
-	// DNSVIP is the virtual IP address for DNS
-	DNSVIP string
-
 	// Network specifies the name of the network to be used by the cluster.
 	Network string
 
@@ -111,7 +108,14 @@ func (p *VSphereCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev
 }
 
 func (p *VSphereCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
-	mp.Spec.Platform.VSphere = &hivev1vsphere.MachinePool{}
+	mp.Spec.Platform.VSphere = &hivev1vsphere.MachinePool{
+		NumCPUs:           2,
+		NumCoresPerSocket: 1,
+		MemoryMiB:         8192,
+		OSDisk: hivev1vsphere.OSDisk{
+			DiskSizeGB: 120,
+		},
+	}
 }
 
 func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
@@ -126,7 +130,6 @@ func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 			Cluster:          p.Cluster,
 			APIVIP:           p.APIVIP,
 			IngressVIP:       p.IngressVIP,
-			DNSVIP:           p.DNSVIP,
 			Network:          p.Network,
 		},
 	}

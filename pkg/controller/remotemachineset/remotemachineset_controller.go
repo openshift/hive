@@ -340,6 +340,12 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 
 		// Apply hive MachinePool taints to MachineSet MachineSpec.
 		ms.Spec.Template.Spec.Taints = pool.Spec.Taints
+
+		// Add the managed-by-Hive annotation:
+		if ms.Annotations == nil {
+			ms.Annotations = make(map[string]string, 1)
+		}
+		ms.Annotations[constants.HiveManagedAnnotation] = "true"
 	}
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))

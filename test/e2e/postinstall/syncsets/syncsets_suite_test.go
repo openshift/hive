@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -126,6 +127,9 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				err = targetClusterClient.Get(ctx, client.ObjectKey{Name: "foo", Namespace: "default"}, resultConfigMap)
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(resultConfigMap.Data).Should(Equal(map[string]string{"foo": "bar"}))
+
+				By("Verify the managed-by-Hive annotation was injected automatically")
+				Ω(resultConfigMap.Annotations[constants.HiveManagedAnnotation]).Should(Equal("true"))
 
 				By("Delete the syncset and verify syncset and syncsetinstance are deleted")
 				deleteSyncSets(hiveClient, clusterNamespace, "test-syncresource")

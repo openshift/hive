@@ -809,6 +809,9 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 				"machine.openshift.io/cluster-api-cluster": testInfraID,
 			},
 			Generation: int64(generation),
+			Annotations: map[string]string{
+				constants.HiveManagedAnnotation: "true",
+			},
 		},
 		Spec: machineapi.MachineSetSpec{
 			Replicas: &msReplicas,
@@ -838,9 +841,7 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 	}
 	// Add a pre-existing annotation which we will ensure remains in updated machinesets.
 	if unstompedAnnotation {
-		ms.Annotations = map[string]string{
-			"hive.openshift.io/unstomped": "true",
-		}
+		ms.Annotations["hive.openshift.io/unstomped"] = "true"
 	}
 	return &ms
 }

@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/yaml"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -588,7 +590,16 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 
 	// determine if we can gather info for all resources
 	infos := []hiveresource.Info{}
+	unstructureds := make([]*unstructured.Unstructured, len(resources))
 	for i, resource := range resources {
+		u := &unstructured.Unstructured{}
+		if err := yaml.Unmarshal(resource.Raw, u); err != nil {
+			ssiLog.WithError(err).Warn("error decoding unstructured object")
+			return err
+		}
+		unstructureds[i] = u
+
+		// TODO: read required info from unstructured
 		info, err := h.Info(resource.Raw)
 		if err != nil {
 			ssi.Status.Conditions = r.setUnknownObjectSyncCondition(ssi.Status.Conditions, err, i)
@@ -596,6 +607,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 			return err
 		}
 		infos = append(infos, *info)
+
 	}
 
 	ssi.Status.Conditions = r.clearUnknownObjectSyncCondition(ssi.Status.Conditions)
@@ -628,8 +640,8 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply(resourceSyncStatus, *rss, ssiLog) {
 			// Apply resource
 			ssiLog.Debug("applying resource")
-			var applyResult hiveresource.ApplyResult
-			applyResult, applyErr = applyFn(resource.Raw)
+
+			applyErr = applyResource(unstructureds[i], ssiLog, applyFn)
 
 			var resourceSyncConditions []hivev1.SyncCondition
 			if rss != nil {
@@ -637,11 +649,6 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 			}
 			resourceSyncStatus.Conditions = r.setApplySyncConditions(resourceSyncConditions, applyErr)
 
-			if applyErr != nil {
-				ssiLog.WithError(applyErr).Warn("error applying resource")
-			} else {
-				ssiLog.WithField("applyResult", applyResult).Debug("resource applied")
-			}
 		} else {
 			// Do not apply resource
 			ssiLog.Debug("resource has not changed, will not apply")
@@ -665,6 +672,30 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	}
 
 	return nil
+}
+
+func applyResource(u *unstructured.Unstructured, logger log.FieldLogger, applyFn func(obj []byte) (hiveresource.ApplyResult, error)) error {
+	annotations := u.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string, 1)
+	}
+	// Inject the hive managed annotation to help end-users see that a resource is managed by hive:
+	annotations[constants.HiveManagedAnnotation] = "true"
+	u.SetAnnotations(annotations)
+
+	bytes, err := json.Marshal(u)
+	if err != nil {
+		logger.WithError(err).Error("error marshalling unstructured object to json bytes")
+		return err
+	}
+
+	applyResult, err := applyFn(bytes)
+	if err != nil {
+		logger.WithError(err).Warn("error applying resource")
+	} else {
+		logger.WithField("applyResult", applyResult).Debug("resource applied")
+	}
+	return err
 }
 
 func (r *ReconcileSyncSetInstance) reconcileDeleted(applyMode hivev1.SyncSetResourceApplyMode, dynamicClient dynamic.Interface, existingStatusList, newStatusList []hivev1.SyncStatus, err error, ssiLog log.FieldLogger) []hivev1.SyncStatus {
@@ -829,6 +860,12 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 		secret.ResourceVersion = ""
 		secret.UID = ""
 		secret.OwnerReferences = nil
+
+		// Inject our managed-by-Hive annotation:
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string, 1)
+		}
+		secret.Annotations[constants.HiveManagedAnnotation] = "true"
 
 		var hash string
 		hash, applyErr = controllerutils.GetChecksumOfObject(secret)

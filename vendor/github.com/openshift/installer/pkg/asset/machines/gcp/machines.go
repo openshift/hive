@@ -31,6 +31,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 	if pool.Replicas != nil {
 		total = *pool.Replicas
 	}
+
 	var machines []machineapi.Machine
 	for idx := int64(0); idx < total; idx++ {
 		azIndex := int(idx) % len(azs)
@@ -45,7 +46,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "openshift-machine-api",
-				Name:      fmt.Sprintf("%s-%s-%d", clusterID, pool.Name[:1], idx),
+				Name:      fmt.Sprintf("%s-%s-%d", clusterID, pool.Name, idx),
 				Labels: map[string]string{
 					"machine.openshift.io/cluster-api-cluster":      clusterID,
 					"machine.openshift.io/cluster-api-machine-role": role,
@@ -84,8 +85,8 @@ func provider(clusterID string, platform *gcp.Platform, mpool *gcp.MachinePool, 
 		Disks: []*gcpprovider.GCPDisk{{
 			AutoDelete: true,
 			Boot:       true,
-			SizeGb:     128,
-			Type:       "pd-ssd",
+			SizeGb:     mpool.OSDisk.DiskSizeGB,
+			Type:       mpool.OSDisk.DiskType,
 			Image:      fmt.Sprintf("%s-rhcos-image", clusterID),
 		}},
 		NetworkInterfaces: []*gcpprovider.GCPNetworkInterface{{

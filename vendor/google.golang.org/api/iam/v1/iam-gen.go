@@ -520,38 +520,6 @@ type Binding struct {
 	// group.
 	//    For example, `admins@example.com`.
 	//
-	// * `deleted:user:{emailid}?uid={uniqueid}`: An email address (plus
-	// unique
-	//    identifier) representing a user that has been recently deleted.
-	// For
-	//    example,`alice@example.com?uid=123456789012345678901`. If the user
-	// is
-	//    recovered, this value reverts to `user:{emailid}` and the
-	// recovered user
-	//    retains the role in the binding.
-	//
-	// * `deleted:serviceAccount:{emailid}?uid={uniqueid}`: An email address
-	// (plus
-	//    unique identifier) representing a service account that has been
-	// recently
-	//    deleted. For example,
-	//
-	// `my-other-app@appspot.gserviceaccount.com?uid=123456789012345678901`.
-	//
-	//    If the service account is undeleted, this value reverts to
-	//    `serviceAccount:{emailid}` and the undeleted service account
-	// retains the
-	//    role in the binding.
-	//
-	// * `deleted:group:{emailid}?uid={uniqueid}`: An email address (plus
-	// unique
-	//    identifier) representing a Google group that has been recently
-	//    deleted. For example,
-	// `admins@example.com?uid=123456789012345678901`. If
-	//    the group is recovered, this value reverts to `group:{emailid}`
-	// and the
-	//    recovered group retains the role in the binding.
-	//
 	//
 	// * `domain:{domain}`: The G Suite domain (primary) that represents all
 	// the
@@ -1244,14 +1212,14 @@ type Permission struct {
 	//   "NOT_SUPPORTED" - Permission is not supported for custom role use.
 	CustomRolesSupportLevel string `json:"customRolesSupportLevel,omitempty"`
 
-	// Description: A brief description of what this Permission is used
-	// for.
-	// This permission can ONLY be used in predefined roles.
+	// Description: A brief description of what this Permission is used for.
 	Description string `json:"description,omitempty"`
 
 	// Name: The name of this Permission.
 	Name string `json:"name,omitempty"`
 
+	// OnlyInPredefinedRoles: This permission can ONLY be used in predefined
+	// roles.
 	OnlyInPredefinedRoles bool `json:"onlyInPredefinedRoles,omitempty"`
 
 	// PrimaryPermission: The preferred name for this permission. If
@@ -1983,18 +1951,6 @@ type ServiceAccountKey struct {
 	//   "GOOGLE_PROVIDED" - Key is provided by Google.
 	KeyOrigin string `json:"keyOrigin,omitempty"`
 
-	// KeyType: The key type.
-	//
-	// Possible values:
-	//   "KEY_TYPE_UNSPECIFIED" - Unspecified key type. The presence of this
-	// in the
-	// message will immediately result in an error.
-	//   "USER_MANAGED" - User-managed keys (managed and rotated by the
-	// user).
-	//   "SYSTEM_MANAGED" - System-managed keys (managed and rotated by
-	// Google).
-	KeyType string `json:"keyType,omitempty"`
-
 	// Name: The resource name of the service account key in the following
 	// format
 	// `projects/{PROJECT_ID}/serviceAccounts/{ACCOUNT}/keys/{key}`.
@@ -2483,7 +2439,7 @@ func (c *IamPoliciesLintPolicyCall) Header() http.Header {
 
 func (c *IamPoliciesLintPolicyCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -2610,7 +2566,7 @@ func (c *IamPoliciesQueryAuditableServicesCall) Header() http.Header {
 
 func (c *IamPoliciesQueryAuditableServicesCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -2737,7 +2693,7 @@ func (c *OrganizationsRolesCreateCall) Header() http.Header {
 
 func (c *OrganizationsRolesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -2893,7 +2849,7 @@ func (c *OrganizationsRolesDeleteCall) Header() http.Header {
 
 func (c *OrganizationsRolesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -3040,7 +2996,7 @@ func (c *OrganizationsRolesGetCall) Header() http.Header {
 
 func (c *OrganizationsRolesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -3221,7 +3177,7 @@ func (c *OrganizationsRolesListCall) Header() http.Header {
 
 func (c *OrganizationsRolesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -3409,7 +3365,7 @@ func (c *OrganizationsRolesPatchCall) Header() http.Header {
 
 func (c *OrganizationsRolesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -3555,7 +3511,7 @@ func (c *OrganizationsRolesUndeleteCall) Header() http.Header {
 
 func (c *OrganizationsRolesUndeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -3696,7 +3652,7 @@ func (c *PermissionsQueryTestablePermissionsCall) Header() http.Header {
 
 func (c *PermissionsQueryTestablePermissionsCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -3844,7 +3800,7 @@ func (c *ProjectsRolesCreateCall) Header() http.Header {
 
 func (c *ProjectsRolesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4000,7 +3956,7 @@ func (c *ProjectsRolesDeleteCall) Header() http.Header {
 
 func (c *ProjectsRolesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4147,7 +4103,7 @@ func (c *ProjectsRolesGetCall) Header() http.Header {
 
 func (c *ProjectsRolesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4328,7 +4284,7 @@ func (c *ProjectsRolesListCall) Header() http.Header {
 
 func (c *ProjectsRolesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4516,7 +4472,7 @@ func (c *ProjectsRolesPatchCall) Header() http.Header {
 
 func (c *ProjectsRolesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4662,7 +4618,7 @@ func (c *ProjectsRolesUndeleteCall) Header() http.Header {
 
 func (c *ProjectsRolesUndeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4803,7 +4759,7 @@ func (c *ProjectsServiceAccountsCreateCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -4941,7 +4897,7 @@ func (c *ProjectsServiceAccountsDeleteCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5099,7 +5055,7 @@ func (c *ProjectsServiceAccountsDisableCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsDisableCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5253,7 +5209,7 @@ func (c *ProjectsServiceAccountsEnableCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsEnableCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5402,7 +5358,7 @@ func (c *ProjectsServiceAccountsGetCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5577,7 +5533,7 @@ func (c *ProjectsServiceAccountsGetIamPolicyCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsGetIamPolicyCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5744,7 +5700,7 @@ func (c *ProjectsServiceAccountsListCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5920,7 +5876,7 @@ func (c *ProjectsServiceAccountsPatchCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6086,7 +6042,7 @@ func (c *ProjectsServiceAccountsSetIamPolicyCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsSetIamPolicyCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6234,7 +6190,7 @@ func (c *ProjectsServiceAccountsSignBlobCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsSignBlobCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6388,7 +6344,7 @@ func (c *ProjectsServiceAccountsSignJwtCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsSignJwtCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6530,7 +6486,7 @@ func (c *ProjectsServiceAccountsTestIamPermissionsCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsTestIamPermissionsCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6673,7 +6629,7 @@ func (c *ProjectsServiceAccountsUndeleteCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsUndeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6820,7 +6776,7 @@ func (c *ProjectsServiceAccountsUpdateCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6961,7 +6917,7 @@ func (c *ProjectsServiceAccountsKeysCreateCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsKeysCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7099,7 +7055,7 @@ func (c *ProjectsServiceAccountsKeysDeleteCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsKeysDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7254,7 +7210,7 @@ func (c *ProjectsServiceAccountsKeysGetCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsKeysGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7422,7 +7378,7 @@ func (c *ProjectsServiceAccountsKeysListCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsKeysListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7571,7 +7527,7 @@ func (c *ProjectsServiceAccountsKeysUploadCall) Header() http.Header {
 
 func (c *ProjectsServiceAccountsKeysUploadCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7720,7 +7676,7 @@ func (c *RolesGetCall) Header() http.Header {
 
 func (c *RolesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7946,7 +7902,7 @@ func (c *RolesListCall) Header() http.Header {
 
 func (c *RolesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8122,7 +8078,7 @@ func (c *RolesQueryGrantableRolesCall) Header() http.Header {
 
 func (c *RolesQueryGrantableRolesCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.4 gdcl/20191114")
+	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.0 gdcl/20191026")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}

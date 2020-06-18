@@ -46,9 +46,6 @@ type VSphereCloudBuilder struct {
 	// IngressVIP is the virtual IP address for ingress
 	IngressVIP string
 
-	// DNSVIP is the virtual IP address for DNS
-	DNSVIP string
-
 	// Network specifies the name of the network to be used by the cluster.
 	Network string
 
@@ -133,7 +130,6 @@ func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 			Cluster:          p.Cluster,
 			APIVIP:           p.APIVIP,
 			IngressVIP:       p.IngressVIP,
-			DNSVIP:           p.DNSVIP,
 			Network:          p.Network,
 		},
 	}

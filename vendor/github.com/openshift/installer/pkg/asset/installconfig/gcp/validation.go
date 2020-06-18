@@ -2,10 +2,14 @@ package gcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"strings"
 
 	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/types"
@@ -15,9 +19,61 @@ import (
 func Validate(client API, ic *types.InstallConfig) error {
 	allErrs := field.ErrorList{}
 
+	allErrs = append(allErrs, validateProject(client, ic, field.NewPath("platform").Child("gcp"))...)
 	allErrs = append(allErrs, validateNetworks(client, ic, field.NewPath("platform").Child("gcp"))...)
 
 	return allErrs.ToAggregate()
+}
+
+// ValidatePreExitingPublicDNS ensure no pre-existing DNS record exists in the public
+// DNS zone for cluster's Kubernetes API.
+func ValidatePreExitingPublicDNS(client API, ic *types.InstallConfig) error {
+	// If this is an internal cluster, this check is not necessary
+	if ic.Publish == types.InternalPublishingStrategy {
+		return nil
+	}
+
+	record := fmt.Sprintf("api.%s.", strings.TrimSuffix(ic.ClusterDomain(), "."))
+
+	zone, err := client.GetPublicDNSZone(context.TODO(), ic.Platform.GCP.ProjectID, ic.BaseDomain)
+	if err != nil {
+		var gErr *googleapi.Error
+		if errors.As(err, &gErr) {
+			if gErr.Code == http.StatusNotFound {
+				return field.NotFound(field.NewPath("baseDomain"), fmt.Sprintf("DNS Zone (%s/%s)", ic.Platform.GCP.ProjectID, ic.BaseDomain))
+			}
+		}
+		return field.InternalError(field.NewPath("baseDomain"), err)
+	}
+
+	rrSets, err := client.GetRecordSets(context.TODO(), ic.Platform.GCP.ProjectID, zone.Name)
+	if err != nil {
+		return field.InternalError(field.NewPath("baseDomain"), err)
+	}
+
+	for _, r := range rrSets {
+		if strings.EqualFold(r.Name, record) {
+			return field.Invalid(field.NewPath("metadata", "name"), ic.ObjectMeta.Name, fmt.Sprintf("record %s already exists in DNS Zone (%s/%s) and might be in use by another cluster, please remove it to continue", record, ic.Platform.GCP.ProjectID, zone.Name))
+		}
+	}
+
+	return nil
+}
+
+func validateProject(client API, ic *types.InstallConfig, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if ic.GCP.ProjectID != "" {
+		projects, err := client.GetProjects(context.TODO())
+		if err != nil {
+			return append(allErrs, field.InternalError(fieldPath.Child("project"), err))
+		}
+		if _, found := projects[ic.GCP.ProjectID]; !found {
+			return append(allErrs, field.Invalid(fieldPath.Child("project"), ic.GCP.ProjectID, "invalid project ID"))
+		}
+	}
+
+	return allErrs
 }
 
 // validateNetworks checks that the user-provided VPC is in the project and the provided subnets are valid.

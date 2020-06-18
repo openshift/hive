@@ -28,6 +28,7 @@ require (
 	github.com/openshift/generic-admission-server v1.14.0
 	github.com/openshift/installer v0.9.0-master.0.20200415072451-8ba1754a3f54
 	github.com/openshift/library-go v0.0.0-20200429122220-9e6c27e916a0
+	github.com/openshift/machine-api-operator v0.2.1-0.20200310180732-c63fa2b143f0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.2.1
 	github.com/sirupsen/logrus v1.4.2

@@ -1649,9 +1649,7 @@ func (r *ReconcileClusterDeployment) mergePullSecrets(cd *hivev1.ClusterDeployme
 	if cd.Spec.PullSecretRef != nil {
 		localPullSecret, err = controllerutils.LoadSecretData(r.Client, cd.Spec.PullSecretRef.Name, cd.Namespace, corev1.DockerConfigJsonKey)
 		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				return "", err
-			}
+			return "", errors.Wrap(err, "local pull secret could not be retrieved")
 		}
 	}
 

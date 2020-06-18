@@ -575,7 +575,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			Network:          vSphereNetwork,
 			CACert:           bytes.Join(caCerts, []byte("\n")),
 		}
-		builder.SkipMachinePoolGeneration = true
 		builder.CloudBuilder = vsphereProvider
 	}
 

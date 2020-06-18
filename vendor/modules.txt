@@ -498,6 +498,7 @@ github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp
 github.com/openshift/installer/pkg/asset/machines/openstack
+github.com/openshift/installer/pkg/asset/machines/vsphere
 github.com/openshift/installer/pkg/destroy/aws
 github.com/openshift/installer/pkg/destroy/azure
 github.com/openshift/installer/pkg/destroy/gcp
@@ -527,6 +528,7 @@ github.com/openshift/library-go/pkg/operator/resource/resourceread
 # github.com/openshift/machine-api-operator v0.2.1-0.20200310180732-c63fa2b143f0
 github.com/openshift/machine-api-operator/pkg/apis/machine
 github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1
+github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1alpha1
 # github.com/pborman/uuid v1.2.0
 github.com/pborman/uuid
 # github.com/pelletier/go-toml v1.2.0

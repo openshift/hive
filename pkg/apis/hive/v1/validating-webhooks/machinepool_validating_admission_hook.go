@@ -22,6 +22,7 @@ import (
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 )
 
 const (
@@ -282,7 +283,10 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	if p := spec.Platform.OpenStack; p != nil {
 		platforms = append(platforms, "openstack")
 		allErrs = append(allErrs, validateOpenStackMachinePoolPlatformInvariants(p, platformPath.Child("openstack"))...)
-		numberOfMachineSets = 1 // no zone support on OpenStack
+	}
+	if p := spec.Platform.VSphere; p != nil {
+		platforms = append(platforms, "vsphere")
+		allErrs = append(allErrs, validateVSphereMachinePoolPlatformInvariants(p, platformPath.Child("vsphere"))...)
 	}
 
 	switch len(platforms) {
@@ -372,5 +376,26 @@ func validateOpenStackMachinePoolPlatformInvariants(platform *hivev1openstack.Ma
 	if platform.Flavor == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "flavor name is required"))
 	}
+	return allErrs
+}
+
+func validateVSphereMachinePoolPlatformInvariants(platform *hivev1vsphere.MachinePool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if platform.NumCPUs <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("numCPUs"), "number of cpus must be positive"))
+	}
+
+	if platform.NumCoresPerSocket <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("numCoresPerSocket"), "number of cores per socket must be positive"))
+	}
+
+	if platform.MemoryMiB <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("memoryMiB"), "memory must be positive"))
+	}
+
+	if platform.OSDisk.DiskSizeGB <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("diskSizeGB"), "disk size must be positive"))
+	}
+
 	return allErrs
 }

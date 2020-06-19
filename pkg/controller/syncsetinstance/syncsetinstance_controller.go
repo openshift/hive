@@ -77,6 +77,10 @@ type Applier interface {
 	Info(obj []byte) (*hiveresource.Info, error)
 	Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error
 	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
+	CreateOrUpdate(obj []byte) (hiveresource.ApplyResult, error)
+	CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
+	Create(obj []byte) (hiveresource.ApplyResult, error)
+	CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (hiveresource.ApplyResult, error)
 }
 
 // Add creates a new SyncSetInstance controller and adds it to the manager with default RBAC. The manager will set fields on the
@@ -433,13 +437,13 @@ func (r *ReconcileSyncSetInstance) applySyncSet(ssi *hivev1.SyncSetInstance, spe
 		}
 	}()
 
-	if err := r.applySyncSetResources(ssi, spec.Resources, dynamicClient, h, ssiLog); err != nil {
+	if err := r.applySyncSetResources(ssi, spec.Resources, spec.ApplyBehavior, dynamicClient, h, ssiLog); err != nil {
 		return err
 	}
 	if err := r.applySyncSetPatches(ssi, spec.Patches, h, ssiLog); err != nil {
 		return err
 	}
-	return r.applySyncSetSecretMappings(ssi, spec.Secrets, dynamicClient, h, ssiLog)
+	return r.applySyncSetSecretMappings(ssi, spec.Secrets, spec.ApplyBehavior, dynamicClient, h, ssiLog)
 }
 
 func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetInstance, dynamicClient dynamic.Interface, ssiLog log.FieldLogger) error {
@@ -579,7 +583,7 @@ func (r *ReconcileSyncSetInstance) reapplyTime(status hivev1.SyncStatus) time.Ti
 }
 
 // applySyncSetResources evaluates resource objects from RawExtension and applies them to the cluster identified by kubeConfig
-func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInstance, resources []runtime.RawExtension, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
+func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInstance, resources []runtime.RawExtension, applyBehavior hivev1.SyncSetApplyBehavior, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
 	ssiLog = ssiLog.WithField("applyTerm", "resource")
 
 	// determine if we can gather info for all resources
@@ -596,6 +600,14 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 
 	ssi.Status.Conditions = r.clearUnknownObjectSyncCondition(ssi.Status.Conditions)
 	syncStatusList := []hivev1.SyncStatus{}
+
+	applyFn := h.Apply
+	switch applyBehavior {
+	case hivev1.CreateOrUpdateSyncSetApplyBehavior:
+		applyFn = h.CreateOrUpdate
+	case hivev1.CreateOnlySyncSetApplyBehavior:
+		applyFn = h.Create
+	}
 
 	var applyErr error
 	for i, resource := range resources {
@@ -617,7 +629,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 			// Apply resource
 			ssiLog.Debug("applying resource")
 			var applyResult hiveresource.ApplyResult
-			applyResult, applyErr = h.Apply(resource.Raw)
+			applyResult, applyErr = applyFn(resource.Raw)
 
 			var resourceSyncConditions []hivev1.SyncCondition
 			if rss != nil {
@@ -763,10 +775,18 @@ func (r *ReconcileSyncSetInstance) applySyncSetPatches(ssi *hivev1.SyncSetInstan
 }
 
 // applySyncSetSecretMappings evaluates secret mappings and applies them to the cluster identified by kubeConfig
-func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSetInstance, secretMappings []hivev1.SecretMapping, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
+func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSetInstance, secretMappings []hivev1.SecretMapping, applyBehavior hivev1.SyncSetApplyBehavior, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
 	ssiLog = ssiLog.WithField("applyTerm", "secret")
 
 	syncStatusList := []hivev1.SyncStatus{}
+
+	applyFn := h.ApplyRuntimeObject
+	switch applyBehavior {
+	case hivev1.CreateOrUpdateSyncSetApplyBehavior:
+		applyFn = h.CreateOrUpdateRuntimeObject
+	case hivev1.CreateOnlySyncSetApplyBehavior:
+		applyFn = h.CreateRuntimeObject
+	}
 
 	var applyErr error
 	for _, secretMapping := range secretMappings {
@@ -824,7 +844,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 			// Apply secret
 			ssiLog.Debug("applying secret")
 			var result hiveresource.ApplyResult
-			result, applyErr = h.ApplyRuntimeObject(secret, scheme.Scheme)
+			result, applyErr = applyFn(secret, scheme.Scheme)
 
 			var secretSyncConditions []hivev1.SyncCondition
 			if rss != nil {

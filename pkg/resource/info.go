@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -29,7 +30,7 @@ func (r *Helper) Info(obj []byte) (*Info, error) {
 	return resourceInfo, err
 }
 
-func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
+func (r *Helper) getResourceInternalInfo(f cmdutil.Factory, obj []byte) (*resource.Info, error) {
 	builder := f.NewBuilder()
 	infos, err := builder.Unstructured().Stream(bytes.NewBuffer(obj), "object").Flatten().Do().Infos()
 	if err != nil {
@@ -40,11 +41,19 @@ func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
 		r.logger.WithError(err).WithField("infos", infos).Errorf("Expected to get 1 resource info, got %d", len(infos))
 		return nil, fmt.Errorf("unexpected number of resources found: %d", len(infos))
 	}
+	return infos[0], nil
+}
+
+func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
+	info, err := r.getResourceInternalInfo(f, obj)
+	if err != nil {
+		return nil, err
+	}
 	return &Info{
-		Name:       infos[0].Name,
-		Namespace:  infos[0].Namespace,
-		Kind:       infos[0].ResourceMapping().GroupVersionKind.Kind,
-		APIVersion: infos[0].ResourceMapping().GroupVersionKind.GroupVersion().String(),
-		Resource:   infos[0].ResourceMapping().Resource.Resource,
+		Name:       info.Name,
+		Namespace:  info.Namespace,
+		Kind:       info.ResourceMapping().GroupVersionKind.Kind,
+		APIVersion: info.ResourceMapping().GroupVersionKind.GroupVersion().String(),
+		Resource:   info.ResourceMapping().Resource.Resource,
 	}, nil
 }

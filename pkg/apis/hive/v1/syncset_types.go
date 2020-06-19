@@ -21,6 +21,29 @@ const (
 	SyncResourceApplyMode SyncSetResourceApplyMode = "Sync"
 )
 
+// SyncSetApplyBehavior is a string representing the behavior to use when
+// aplying a syncset to target cluster.
+// +kubebuilder:validation:Enum="";Apply;CreateOnly;CreateOrUpdate
+type SyncSetApplyBehavior string
+
+const (
+	// ApplySyncSetApplyBehavior is the default apply behavior. It will result
+	// in resources getting applied using the 'oc apply' command to the target
+	// cluster.
+	ApplySyncSetApplyBehavior SyncSetApplyBehavior = "Apply"
+
+	// CreateOnlySyncSetApplyBehavior results in resources only getting created
+	// if they do not exist, otherwise they are left alone.
+	CreateOnlySyncSetApplyBehavior SyncSetApplyBehavior = "CreateOnly"
+
+	// CreateOrUpdateSyncSetApplyBehavior results in resources getting created if
+	// they do not exist, otherwise they are updated with the contents of the
+	// syncset resource. This is different from Apply behavior in that an annotation
+	// is not added to the target resource with the "lastApplied" value. It allows
+	// for syncing larger resources, but loses the ability to sync map entry deletes.
+	CreateOrUpdateSyncSetApplyBehavior SyncSetApplyBehavior = "CreateOrUpdate"
+)
+
 // SyncSetPatchApplyMode is a string representing the mode with which to apply
 // SyncSet Patches.
 type SyncSetPatchApplyMode string
@@ -198,6 +221,18 @@ type SyncSetCommonSpec struct {
 	// Secrets is the list of secrets to sync along with their respective destinations.
 	// +optional
 	Secrets []SecretMapping `json:"secretMappings,omitempty"`
+
+	// ApplyBehavior indicates how resources in this syncset will be applied to the target
+	// cluster. The default value of "Apply" indicates that resources should be applied
+	// using the 'oc apply' command. If no value is set, "Apply" is assumed.
+	// A value of "CreateOnly" indicates that the resource will only be created if it does
+	// not already exist in the target cluster. Otherwise, it will be left alone.
+	// A value of "CreateOrUpdate" indicates that the resource will be created/updated without
+	// the use of the 'oc apply' command, allowing larger resources to be synced, but losing
+	// some functionality of the 'oc apply' command such as the ability to remove annotations,
+	// labels, and other map entries in general.
+	// +optional
+	ApplyBehavior SyncSetApplyBehavior `json:"applyBehavior,omitempty"`
 }
 
 // SelectorSyncSetSpec defines the SyncSetCommonSpec resources and patches to sync along

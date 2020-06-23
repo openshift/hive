@@ -108,6 +108,10 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	computePool.Platform.GCP = &installertypesgcp.MachinePool{
 		Zones:        pool.Spec.Platform.GCP.Zones,
 		InstanceType: pool.Spec.Platform.GCP.InstanceType,
+		OSDisk: installertypesgcp.OSDisk{
+			DiskType:   "pd-ssd",
+			DiskSizeGB: 128,
+		},
 	}
 
 	// get image ID for the generated machine sets

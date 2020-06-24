@@ -192,7 +192,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	}).Info("Syncing DNS Zone")
 	result, err := r.reconcileDNSProvider(actuator, desiredState)
 	if err != nil {
-		dnsLog.WithError(err).Error("Encountered error while attempting to reconcile")
+		dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "Encountered error while attempting to reconcile")
 	}
 	return result, err
 }

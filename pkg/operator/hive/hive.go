@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -70,12 +71,12 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 		)
 	}
 
+	if dc := instance.Spec.DisabledControllers; len(dc) != 0 {
+		hiveContainer.Args = append(hiveContainer.Args, "--disabled-controllers", strings.Join(dc, ","))
+	}
+
 	if level := instance.Spec.LogLevel; level != "" {
-		hiveDeployment.Spec.Template.Spec.Containers[0].Command = append(
-			hiveDeployment.Spec.Template.Spec.Containers[0].Command,
-			"--log-level",
-			level,
-		)
+		hiveContainer.Args = append(hiveContainer.Args, "--log-level", level)
 	}
 
 	if syncSetReapplyInterval := instance.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {

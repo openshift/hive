@@ -1547,6 +1547,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DisabledControllers != nil {
+		in, out := &in.DisabledControllers, &out.DisabledControllers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

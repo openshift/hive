@@ -83,6 +83,13 @@ spec:
               description: DeprovisionsDisabled can be set to true to block deprovision
                 jobs from running.
               type: boolean
+            disabledControllers:
+              description: DisabledControllers allows selectively disabling Hive controllers
+                by name. The name of an individual controller matches the name of
+                the controller as seen in the Hive logging output.
+              items:
+                type: string
+              type: array
             failedProvisionConfig:
               description: FailedProvisionConfig is used to configure settings related
                 to handling provision failures.

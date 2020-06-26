@@ -74,6 +74,10 @@ type HiveConfigSpec struct {
 	// +kubebuilder:validation:Enum=enabled
 	// +optional
 	DeleteProtection DeleteProtectionType `json:"deleteProtection,omitempty"`
+
+	// DisabledControllers allows selectively disabling Hive controllers by name.
+	// The name of an individual controller matches the name of the controller as seen in the Hive logging output.
+	DisabledControllers []string `json:"disabledControllers,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive

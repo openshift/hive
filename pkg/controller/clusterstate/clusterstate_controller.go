@@ -336,6 +336,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			LabelSelector: map[string]string{
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 			},
+			Controlled: true,
 		},
 	}
 }

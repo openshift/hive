@@ -4,6 +4,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	librarygocontroller "github.com/openshift/library-go/pkg/controller"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 
@@ -65,10 +67,20 @@ func WithAnnotation(key, value string) Option {
 	}
 }
 
-// WithControllerOwnerReference sets the owner reference to the supplied object.
+// WithControllerOwnerReference sets the controller owner reference to the supplied object.
 func WithControllerOwnerReference(owner metav1.Object) Option {
 	return func(meta hivev1.MetaRuntimeObject) {
 		controllerutil.SetControllerReference(owner, meta, scheme.Scheme)
+	}
+}
+
+// WithOwnerReference sets the owner reference to the supplied object.
+// BlockOwnerDeletion is set to true
+func WithOwnerReference(owner hivev1.MetaRuntimeObject) Option {
+	return func(meta hivev1.MetaRuntimeObject) {
+		ownerRef := metav1.NewControllerRef(owner, owner.GetObjectKind().GroupVersionKind())
+		ownerRef.Controller = nil
+		librarygocontroller.EnsureOwnerRef(meta, *ownerRef)
 	}
 }
 

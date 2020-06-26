@@ -465,6 +465,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterProvisionNameLabel: owner.GetName(),
 				constants.JobTypeLabel:              constants.JobTypeProvision,
 			},
+			Controlled: true,
 		},
 		{
 			TypeToList: &corev1.SecretList{},
@@ -472,6 +473,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterProvisionNameLabel: owner.GetName(),
 				constants.SecretTypeLabel:           constants.SecretTypeKubeConfig,
 			},
+			Controlled: false,
 		},
 		{
 			TypeToList: &corev1.SecretList{},
@@ -479,6 +481,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterProvisionNameLabel: owner.GetName(),
 				constants.SecretTypeLabel:           constants.SecretTypeKubeAdminCreds,
 			},
+			Controlled: false,
 		},
 	}
 }

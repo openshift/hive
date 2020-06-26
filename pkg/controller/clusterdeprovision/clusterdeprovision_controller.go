@@ -297,6 +297,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 				constants.ClusterDeprovisionNameLabel: owner.GetName(),
 				constants.JobTypeLabel:                constants.JobTypeDeprovision,
 			},
+			Controlled: true,
 		},
 	}
 }

@@ -28,14 +28,24 @@ const (
 	differentNamespace = "differentns"
 )
 
-// withControllerOwnerReferenceAPIVersion sets the api version on the controller owner reference.
-func withControllerOwnerReferenceAPIVersion(apiVersion string) testdnszone.Option {
+// withOwnerReferenceAPIVersion sets the api version on the owner reference.
+func withOwnerReferenceAPIVersion(apiVersion string) testdnszone.Option {
 	return func(dnsZone *hivev1.DNSZone) {
-		for ix, ownerRef := range dnsZone.OwnerReferences {
-			if ownerRef.Controller != nil && *ownerRef.Controller {
-				dnsZone.OwnerReferences[ix].APIVersion = apiVersion
-			}
+		for ix := range dnsZone.OwnerReferences {
+			dnsZone.OwnerReferences[ix].APIVersion = apiVersion
 		}
+	}
+}
+
+func validControllingOwnershipUniqueKey(owner *hivev1.ClusterDeployment) *OwnershipUniqueKey {
+	key := validOwnershipUniqueKey(owner)
+	key.Controlled = true
+	return key
+}
+
+func validControllingOwnershipUniqueKeys(owner *hivev1.ClusterDeployment) []*OwnershipUniqueKey {
+	return []*OwnershipUniqueKey{
+		validControllingOwnershipUniqueKey(owner),
 	}
 }
 
@@ -46,6 +56,7 @@ func validOwnershipUniqueKey(owner *hivev1.ClusterDeployment) *OwnershipUniqueKe
 			constants.ClusterDeploymentNameLabel: owner.Name,
 			constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
 		},
+		Controlled: false,
 	}
 }
 
@@ -60,8 +71,6 @@ func buildClusterDeployment(options ...testclusterdeployment.Option) *hivev1.Clu
 		[]testclusterdeployment.Option{
 			func(clusterDeployment *hivev1.ClusterDeployment) {
 				clusterDeployment.ObjectMeta = metav1.ObjectMeta{
-					Name:        testName,
-					Namespace:   testNamespace,
 					UID:         types.UID("1234"),
 					Annotations: map[string]string{},
 					Labels:      map[string]string{},
@@ -71,7 +80,7 @@ func buildClusterDeployment(options ...testclusterdeployment.Option) *hivev1.Clu
 		options...,
 	)
 
-	return testclusterdeployment.Build(options...)
+	return testclusterdeployment.FullBuilder(testNamespace, testName, scheme.Scheme).Build(options...)
 }
 
 func buildDNSZone(options ...testdnszone.Option) *hivev1.DNSZone {
@@ -122,14 +131,14 @@ func TestReconcile(t *testing.T) {
 		{
 			name:                                 "no objects in kube (do nothing)",
 			owner:                                buildClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(buildClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(buildClusterDeployment()),
+			listRuntimeObjectsOwnershipUniqueKey: validControllingOwnershipUniqueKey(buildClusterDeployment()),
+			ownershipUniqueKeys:                  validControllingOwnershipUniqueKeys(buildClusterDeployment()),
 		},
 		{
-			name:                                 "ownership set correctly (do nothing)",
+			name:                                 "controlling ownership set correctly (do nothing)",
 			owner:                                buildClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(buildClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(buildClusterDeployment()),
+			listRuntimeObjectsOwnershipUniqueKey: validControllingOwnershipUniqueKey(buildClusterDeployment()),
+			ownershipUniqueKeys:                  validControllingOwnershipUniqueKeys(buildClusterDeployment()),
 			existingObjects: []runtime.Object{
 				buildDNSZone(
 					testdnszone.WithLabelOwner(buildClusterDeployment()),
@@ -154,15 +163,43 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                                 "ownership incorrect, wrong version (fix)",
+			name:                                 "non controlling ownership set correctly (do nothing)",
 			owner:                                buildClusterDeployment(),
 			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(buildClusterDeployment()),
 			ownershipUniqueKeys:                  validOwnershipUniqueKeys(buildClusterDeployment()),
 			existingObjects: []runtime.Object{
 				buildDNSZone(
 					testdnszone.WithLabelOwner(buildClusterDeployment()),
+					testdnszone.WithOwnerReference(buildClusterDeployment()),
+				),
+				buildDNSZone(
+					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
+					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+					testdnszone.WithOwnerReference(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+				),
+			},
+			expectedObjects: []runtime.Object{
+				buildDNSZone(
+					testdnszone.WithLabelOwner(buildClusterDeployment()),
+					testdnszone.WithOwnerReference(buildClusterDeployment()),
+				),
+				buildDNSZone(
+					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
+					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+					testdnszone.WithOwnerReference(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+				),
+			},
+		},
+		{
+			name:                                 "controller ownership incorrect, wrong version (fix)",
+			owner:                                buildClusterDeployment(),
+			listRuntimeObjectsOwnershipUniqueKey: validControllingOwnershipUniqueKey(buildClusterDeployment()),
+			ownershipUniqueKeys:                  validControllingOwnershipUniqueKeys(buildClusterDeployment()),
+			existingObjects: []runtime.Object{
+				buildDNSZone(
+					testdnszone.WithLabelOwner(buildClusterDeployment()),
 					testdnszone.WithControllerOwnerReference(buildClusterDeployment()),
-					withControllerOwnerReferenceAPIVersion("not/a/real/version"),
+					withOwnerReferenceAPIVersion("not/a/real/version"),
 				),
 				buildDNSZone(
 					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
@@ -184,10 +221,10 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                                 "ownership missing (add ownership back)",
+			name:                                 "controlling ownership missing (add ownership back)",
 			owner:                                buildClusterDeployment(),
-			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(buildClusterDeployment()),
-			ownershipUniqueKeys:                  validOwnershipUniqueKeys(buildClusterDeployment()),
+			listRuntimeObjectsOwnershipUniqueKey: validControllingOwnershipUniqueKey(buildClusterDeployment()),
+			ownershipUniqueKeys:                  validControllingOwnershipUniqueKeys(buildClusterDeployment()),
 			existingObjects: []runtime.Object{
 				buildDNSZone(
 					testdnszone.WithLabelOwner(buildClusterDeployment()),
@@ -212,10 +249,38 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:                                 "ownership incorrect, wrong object (fix it)",
+			name:                                 "non controlling ownership missing (add ownership back)",
 			owner:                                buildClusterDeployment(),
 			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(buildClusterDeployment()),
 			ownershipUniqueKeys:                  validOwnershipUniqueKeys(buildClusterDeployment()),
+			existingObjects: []runtime.Object{
+				buildDNSZone(
+					testdnszone.WithLabelOwner(buildClusterDeployment()),
+				),
+				buildDNSZone(
+					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
+					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+					testdnszone.WithOwnerReference(buildClusterDeployment()),
+				),
+			},
+			expectedObjects: []runtime.Object{
+				buildDNSZone(
+					testdnszone.WithLabelOwner(buildClusterDeployment()),
+					testdnszone.WithOwnerReference(buildClusterDeployment()),
+					testdnszone.WithIncrementedResourceVersion(),
+				),
+				buildDNSZone(
+					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
+					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+					testdnszone.WithOwnerReference(buildClusterDeployment()),
+				),
+			},
+		},
+		{
+			name:                                 "controlling ownership incorrect, wrong object (fix it)",
+			owner:                                buildClusterDeployment(),
+			listRuntimeObjectsOwnershipUniqueKey: validControllingOwnershipUniqueKey(buildClusterDeployment()),
+			ownershipUniqueKeys:                  validControllingOwnershipUniqueKeys(buildClusterDeployment()),
 			existingObjects: []runtime.Object{
 				buildDNSZone(
 					testdnszone.WithLabelOwner(buildClusterDeployment()),
@@ -241,6 +306,35 @@ func TestReconcile(t *testing.T) {
 					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
 					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
 					testdnszone.WithControllerOwnerReference(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+				),
+			},
+		},
+		{
+			name:                                 "non controlling ownership set to controlling, fix it",
+			owner:                                buildClusterDeployment(),
+			listRuntimeObjectsOwnershipUniqueKey: validOwnershipUniqueKey(buildClusterDeployment()),
+			ownershipUniqueKeys:                  validOwnershipUniqueKeys(buildClusterDeployment()),
+			existingObjects: []runtime.Object{
+				buildDNSZone(
+					testdnszone.WithLabelOwner(buildClusterDeployment()),
+					testdnszone.WithControllerOwnerReference(buildClusterDeployment()),
+				),
+				buildDNSZone(
+					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
+					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+					testdnszone.WithOwnerReference(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+				),
+			},
+			expectedObjects: []runtime.Object{
+				buildDNSZone(
+					testdnszone.WithLabelOwner(buildClusterDeployment()),
+					testdnszone.WithOwnerReference(buildClusterDeployment()),
+					testdnszone.WithIncrementedResourceVersion(),
+				),
+				buildDNSZone(
+					testdnszone.Generic(generic.WithNamespace(differentNamespace)),
+					testdnszone.WithLabelOwner(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
+					testdnszone.WithOwnerReference(buildClusterDeployment(testclusterdeployment.Generic(generic.WithNamespace(differentNamespace)))),
 				),
 			},
 		},

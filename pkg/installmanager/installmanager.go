@@ -49,7 +49,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/aws"
@@ -1082,10 +1081,20 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 	m.log.WithField("derivedObject", kubeconfigSecret.Name).Debug("Setting labels on derived object")
 	kubeconfigSecret.Labels = k8slabels.AddLabel(kubeconfigSecret.Labels, constants.ClusterProvisionNameLabel, provision.Name)
 	kubeconfigSecret.Labels = k8slabels.AddLabel(kubeconfigSecret.Labels, constants.SecretTypeLabel, constants.SecretTypeKubeConfig)
-	if err := controllerutil.SetControllerReference(provision, kubeconfigSecret, scheme.Scheme); err != nil {
-		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
+
+	provisionGVK, err := apiutil.GVKForObject(provision, scheme.Scheme)
+	if err != nil {
+		m.log.WithError(err).Errorf("error getting GVK for provision")
 		return nil, err
 	}
+
+	kubeconfigSecret.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion:         provisionGVK.GroupVersion().String(),
+		Kind:               provisionGVK.Kind,
+		Name:               provision.Name,
+		UID:                provision.UID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}}
 
 	if err := createWithRetries(kubeconfigSecret, m); err != nil {
 		return nil, err
@@ -1126,10 +1135,20 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) 
 	m.log.WithField("derivedObject", s.Name).Debug("Setting labels on derived object")
 	s.Labels = k8slabels.AddLabel(s.Labels, constants.ClusterProvisionNameLabel, provision.Name)
 	s.Labels = k8slabels.AddLabel(s.Labels, constants.SecretTypeLabel, constants.SecretTypeKubeAdminCreds)
-	if err := controllerutil.SetControllerReference(provision, s, scheme.Scheme); err != nil {
-		m.log.WithError(err).Error("error setting controller reference on kubeconfig secret")
+
+	provisionGVK, err := apiutil.GVKForObject(provision, scheme.Scheme)
+	if err != nil {
+		m.log.WithError(err).Errorf("error getting GVK for provision")
 		return nil, err
 	}
+
+	s.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion:         provisionGVK.GroupVersion().String(),
+		Kind:               provisionGVK.Kind,
+		Name:               provision.Name,
+		UID:                provision.UID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}}
 
 	if err := createWithRetries(s, m); err != nil {
 		return nil, err

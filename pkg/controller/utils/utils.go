@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/hive/pkg/constants"
 	"os"
 
 	"github.com/pkg/errors"
@@ -17,8 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 // HasFinalizer returns true if the given object has the given finalizer

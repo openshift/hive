@@ -371,7 +371,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulSecretStatus(testSecret("foo", "bar")))
+					successfulSecretStatus(testSecretWithManagedAnnotation("foo", "bar")))
 			},
 			expectApplied: true,
 		},
@@ -412,7 +412,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulSecretStatus(
-						testSecret("foo", "bar"),
+						testSecretWithManagedAnnotation("foo", "bar"),
 					))
 			},
 			expectApplied: true,
@@ -427,8 +427,8 @@ func TestSyncSetReconcile(t *testing.T) {
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
 					successfulSecretStatus(
-						testSecret("foo", "bar"),
-						testSecret("baz", "bar"),
+						testSecretWithManagedAnnotation("foo", "bar"),
+						testSecretWithManagedAnnotation("baz", "bar"),
 					))
 			},
 			expectApplied: true,
@@ -442,7 +442,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			syncSet: testSyncSetWithSecretMappings("ss1", testSecretMapping("foo")),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status,
-					successfulSecretStatus(testSecret("foo", "data_value***changed")))
+					successfulSecretStatus(testSecretWithManagedAnnotation("foo", "data_value***changed")))
 			},
 			expectApplied: true,
 		},
@@ -455,9 +455,9 @@ func TestSyncSetReconcile(t *testing.T) {
 			},
 			status: successfulSecretStatusWithTime(
 				[]runtime.Object{
-					testSecret("s1", "value1"),
-					testSecret("s2", "value2"),
-					testSecret("s3", "value3"),
+					testSecretWithManagedAnnotation("s1", "value1"),
+					testSecretWithManagedAnnotation("s2", "value2"),
+					testSecretWithManagedAnnotation("s3", "value3"),
 				},
 				metav1.NewTime(tenMinutesAgo)),
 			syncSet: testSyncSetWithSecretMappings("aaa",
@@ -467,9 +467,9 @@ func TestSyncSetReconcile(t *testing.T) {
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretStatus(
-					testSecret("s1", "value1"),
-					testSecret("s2", "value2***changed"),
-					testSecret("s3", "value3"),
+					testSecretWithManagedAnnotation("s1", "value1"),
+					testSecretWithManagedAnnotation("s2", "value2***changed"),
+					testSecretWithManagedAnnotation("s3", "value3"),
 				))
 				unchanged := []hivev1.SyncStatus{
 					ssi.Status.Secrets[0],
@@ -532,7 +532,7 @@ func TestSyncSetReconcile(t *testing.T) {
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
 				validateSyncSetInstanceStatus(t, ssi.Status, successfulSecretStatus(
-					testSecret("s1", "value1"),
+					testSecretWithManagedAnnotation("s1", "value1"),
 				))
 			},
 			expectApplied: true,
@@ -565,8 +565,8 @@ func TestSyncSetReconcile(t *testing.T) {
 				testSecret("foo", "bar"),
 			},
 			status: successfulSecretStatus(
-				testSecret("foo", "bar"),
-				testSecret("delete-error", "baz"),
+				testSecretWithManagedAnnotation("foo", "bar"),
+				testSecretWithManagedAnnotation("delete-error", "baz"),
 			),
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSetWithSecretMappings("aaa", testSecretMapping("foo"))
@@ -574,9 +574,9 @@ func TestSyncSetReconcile(t *testing.T) {
 				return ss
 			}(),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
-				status := successfulSecretStatus(testSecret("foo", "bar"))
+				status := successfulSecretStatus(testSecretWithManagedAnnotation("foo", "bar"))
 				status.Secrets = append(status.Secrets, deleteFailedSecretStatus("aaa",
-					testSecret("delete-error", "baz"),
+					testSecretWithManagedAnnotation("delete-error", "baz"),
 				).Secrets...)
 				validateSyncSetInstanceStatus(t, ssi.Status, status)
 			},
@@ -948,6 +948,14 @@ func testSecret(name, data string) *corev1.Secret {
 			testName: []byte(data),
 		},
 	}
+}
+
+func testSecretWithManagedAnnotation(name, data string) *corev1.Secret {
+	s := testSecret(name, data)
+	s.Annotations = map[string]string{
+		constants.HiveManagedAnnotation: "true",
+	}
+	return s
 }
 
 func testSecretWithOwner(name, data string) *corev1.Secret {

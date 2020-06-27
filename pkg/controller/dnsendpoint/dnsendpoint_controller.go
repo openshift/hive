@@ -63,6 +63,14 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
+	// Watch for changes to ClusterDeployment
+	if err := ctrl.Watch(
+		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(reconciler, reconciler.logger),
+	); err != nil {
+		return err
+	}
+
 	if nameServerChangeNotifier != nil {
 		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, &handler.EnqueueRequestForObject{}); err != nil {
 			log.WithField("controller", ControllerName).WithError(err).Error("unable to set up watch for name server changes")
@@ -177,6 +185,12 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 
 	if !instance.Spec.LinkToParentDomain {
 		return reconcile.Result{}, nil
+	}
+
+	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, instance, hivev1.FinalizerDNSEndpoint); err != nil {
+		return reconcile.Result{}, err
+	} else if result != nil {
+		return *result, nil
 	}
 
 	isDeleted := instance.DeletionTimestamp != nil

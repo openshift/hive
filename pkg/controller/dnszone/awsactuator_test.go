@@ -81,7 +81,7 @@ func mockAWSZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone
 	expect.GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
 		HostedZone: &route53.HostedZone{
 			Id:   aws.String("1234"),
-			Name: aws.String("blah.example.com"),
+			Name: aws.String("blah.example.com."),
 		},
 	}, nil).Times(1)
 }
@@ -99,7 +99,7 @@ func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).Return(&route53.CreateHostedZoneOutput{
 		HostedZone: &route53.HostedZone{
 			Id:   aws.String("1234"),
-			Name: aws.String("blah.example.com"),
+			Name: aws.String("blah.example.com."),
 		},
 	}, nil).Times(1)
 }
@@ -163,7 +163,7 @@ func mockListAWSZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hive
 		HostedZones: []*route53.HostedZone{
 			{
 				Id:              aws.String("1234"),
-				Name:            aws.String("blah.example.com"),
+				Name:            aws.String("blah.example.com."),
 				CallerReference: aws.String(string(zone.UID)),
 			},
 		},

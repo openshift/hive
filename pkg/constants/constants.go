@@ -140,6 +140,16 @@ const (
 	// protected delete is enabled.
 	ProtectedDeleteEnvVar = "PROTECTED_DELETE"
 
+	// RelocateAnnotation is an annotation used on ClusterDeployments and DNSZones to indicate that the resource
+	// is involved in a relocation between Hive instances.
+	// The value of the annotation has the format "{ClusterRelocate}/{Status}", where
+	// {ClusterRelocate} is the name of the ClusterRelocate that is driving the relocation and
+	// {Status} is the status of the relocate. The status is outgoing, completed, or incoming.
+	// An outgoing status indicates that the resource is on the source side of an in-progress relocate.
+	// A completed status indicates that the resource is on the source side of a completed relocate.
+	// An incoming status indicates that the resource is on the destination side of an in-progress relocate.
+	RelocateAnnotation = "hive.openshift.io/relocate"
+
 	// ManagedDomainsFileEnvVar if present, points to a simple text
 	// file that includes a valid managed domain per line. Cluster deployments
 	// requesting that their domains be managed must have a base domain

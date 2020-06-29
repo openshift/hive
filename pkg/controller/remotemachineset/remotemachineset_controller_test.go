@@ -682,7 +682,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, rMS.Labels)
 							}
 							if !reflect.DeepEqual(eMS.ObjectMeta.Annotations, rMS.ObjectMeta.Annotations) {
-								t.Errorf("machineset %v has unexpected annotations:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, rMS.Labels)
+								t.Errorf("machineset %v has unexpected annotations:\nexpected: %v\nactual: %v", eMS.Name, eMS.Annotations, rMS.Annotations)
 							}
 							if !reflect.DeepEqual(eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels) {
 								t.Errorf("machineset %v machinespec has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels)
@@ -807,11 +807,9 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 			Labels: map[string]string{
 				machinePoolNameLabel:                       machineType,
 				"machine.openshift.io/cluster-api-cluster": testInfraID,
+				constants.HiveManagedLabel:                 "true",
 			},
 			Generation: int64(generation),
-			Annotations: map[string]string{
-				constants.HiveManagedAnnotation: "true",
-			},
 		},
 		Spec: machineapi.MachineSetSpec{
 			Replicas: &msReplicas,
@@ -841,7 +839,9 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 	}
 	// Add a pre-existing annotation which we will ensure remains in updated machinesets.
 	if unstompedAnnotation {
-		ms.Annotations["hive.openshift.io/unstomped"] = "true"
+		ms.Annotations = map[string]string{
+			"hive.openshift.io/unstomped": "true",
+		}
 	}
 	return &ms
 }

@@ -11787,7 +11787,13 @@ metadata:
   namespace: hive
 data:
   regexes: |
-    # AWS Specific:
+    # AWS Specific
+    # https://bugzilla.redhat.com/show_bug.cgi?id=1844320
+    - name: AWSUnableToFindMatchingRouteTable
+      searchRegexStrings:
+      - "Error: Unable to find matching route for Route Table"
+      installFailingReason: AWSUnableToFindMatchingRouteTable
+      installFailingMessage: Unable to find matching route for route table
     - name: AWSNATGatewayLimitExceeded
       searchRegexStrings:
       - "NatGatewayLimitExceeded"

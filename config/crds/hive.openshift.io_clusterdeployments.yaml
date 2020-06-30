@@ -440,9 +440,19 @@ spec:
                     ovirt_cluster_id:
                       description: The target cluster under which all VMs will run
                       type: string
+                    ovirt_network_name:
+                      description: The target network of all the network interfaces
+                        of the nodes. Omitting defaults to ovirtmgmt network which
+                        is a default network for evert ovirt cluster.
+                      type: string
+                    ovirt_storage_domain_id:
+                      description: The target storage domain under which all VM disk
+                        would be created.
+                      type: string
                   required:
                   - credentialsSecretRef
                   - ovirt_cluster_id
+                  - ovirt_storage_domain_id
                   type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on

@@ -2033,9 +2033,19 @@ spec:
                     ovirt_cluster_id:
                       description: The target cluster under which all VMs will run
                       type: string
+                    ovirt_network_name:
+                      description: The target network of all the network interfaces
+                        of the nodes. Omitting defaults to ovirtmgmt network which
+                        is a default network for evert ovirt cluster.
+                      type: string
+                    ovirt_storage_domain_id:
+                      description: The target storage domain under which all VM disk
+                        would be created.
+                      type: string
                   required:
                   - credentialsSecretRef
                   - ovirt_cluster_id
+                  - ovirt_storage_domain_id
                   type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on
@@ -9571,6 +9581,46 @@ spec:
                 ovirt:
                   description: Ovirt is the configuration used when installing on
                     oVirt.
+                  properties:
+                    cpu:
+                      description: CPU defines the VM CPU.
+                      properties:
+                        cores:
+                          description: Cores is the number of cores per socket. Total
+                            CPUs is (Sockets * Cores)
+                          format: int32
+                          type: integer
+                        sockets:
+                          description: Sockets is the number of sockets for a VM.
+                            Total CPUs is (Sockets * Cores)
+                          format: int32
+                          type: integer
+                      required:
+                      - cores
+                      - sockets
+                      type: object
+                    memoryMB:
+                      description: MemoryMB is the size of a VM's memory in MiBs.
+                      format: int32
+                      type: integer
+                    osDisk:
+                      description: OSDisk is the the root disk of the node.
+                      properties:
+                        sizeGB:
+                          description: SizeGB size of the bootable disk in GiB.
+                          format: int64
+                          type: integer
+                      required:
+                      - sizeGB
+                      type: object
+                    vmType:
+                      description: VMType defines the workload type of the VM.
+                      enum:
+                      - ""
+                      - desktop
+                      - server
+                      - high_performance
+                      type: string
                   type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on

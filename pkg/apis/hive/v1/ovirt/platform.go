@@ -12,17 +12,15 @@ type Platform struct {
 	// CredentialsSecretRef refers to a secret that contains the oVirt account access
 	// credentials with fields: ovirt_url, ovirt_username, ovirt_password, ovirt_ca_bundle
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
 	// The target storage domain under which all VM disk would be created.
 	StorageDomainID string `json:"ovirt_storage_domain_id"`
+
 	// The target network of all the network interfaces of the nodes. Omitting defaults to ovirtmgmt
 	// network which is a default network for evert ovirt cluster.
 	NetworkName string `json:"ovirt_network_name,omitempty"`
+
 	/*
-		// The target storage domain under which all VM disk would be created.
-		StorageDomainID string `json:"ovirt_storage_domain_id"`
-		// The target network of all the network interfaces of the nodes. Omitting defaults to ovirtmgmt
-		// network which is a default network for evert ovirt cluster.
-		NetworkName string `json:"ovirt_network_name,omitempty"`
 		// APIVIP is an IP which will be served by bootstrap and then pivoted masters, using keepalived
 		APIVIP string `json:"api_vip"`
 		// DNSVIP is the IP of the internal DNS which will be operated by the cluster

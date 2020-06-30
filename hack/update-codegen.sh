@@ -12,3 +12,11 @@ GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "all" \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
   ${verify}
 
+# Generate deepcopy for platform-specific types.
+GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
+  github.com/openshift/hive/pkg/client \
+  github.com/openshift/hive/pkg/apis \
+  "hive:v1/aws hive:v1/azure hive:v1/baremetal hive:v1/gcp hive:v1/openstack hive:v1/vsphere" \
+  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
+  ${verify}
+

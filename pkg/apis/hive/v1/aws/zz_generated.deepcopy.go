@@ -28,6 +28,11 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Subnets != nil {
+		in, out := &in.Subnets, &out.Subnets
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.EC2RootVolume = in.EC2RootVolume
 	return
 }

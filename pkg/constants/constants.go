@@ -114,9 +114,9 @@ const (
 	// SyncsetPauseAnnotation is a annotation used by clusterDeployment, if it's true, then we will disable syncing to a specific cluster
 	SyncsetPauseAnnotation = "hive.openshift.io/syncset-pause"
 
-	// HiveManagedAnnotation is an annotation added to any resources we sync to the remote cluster to help identify that they are
+	// HiveManagedLabel is a label added to any resources we sync to the remote cluster to help identify that they are
 	// managed by Hive, and any manual changes may be undone the next time the resource is reconciled.
-	HiveManagedAnnotation = "hive.openshift.io/managed"
+	HiveManagedLabel = "hive.openshift.io/managed"
 
 	// DisableInstallLogPasswordRedactionAnnotation is an annotation used on ClusterDeployments to disable the installmanager
 	// functionality which refuses to print output if it appears to contain a password or sensitive info. This can be

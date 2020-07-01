@@ -674,13 +674,13 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 }
 
 func applyResource(u *unstructured.Unstructured, logger log.FieldLogger, applyFn func(obj []byte) (hiveresource.ApplyResult, error)) error {
-	annotations := u.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string, 1)
+	labels := u.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string, 1)
 	}
 	// Inject the hive managed annotation to help end-users see that a resource is managed by hive:
-	annotations[constants.HiveManagedAnnotation] = "true"
-	u.SetAnnotations(annotations)
+	labels[constants.HiveManagedLabel] = "true"
+	u.SetLabels(labels)
 
 	bytes, err := json.Marshal(u)
 	if err != nil {
@@ -861,10 +861,10 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 		secret.OwnerReferences = nil
 
 		// Inject our managed-by-Hive annotation:
-		if secret.Annotations == nil {
-			secret.Annotations = make(map[string]string, 1)
+		if secret.Labels == nil {
+			secret.Labels = make(map[string]string, 1)
 		}
-		secret.Annotations[constants.HiveManagedAnnotation] = "true"
+		secret.Labels[constants.HiveManagedLabel] = "true"
 
 		var hash string
 		hash, applyErr = controllerutils.GetChecksumOfObject(secret)

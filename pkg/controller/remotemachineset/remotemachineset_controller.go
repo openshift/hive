@@ -327,9 +327,11 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 		}
 
 		if ms.Labels == nil {
-			ms.Labels = map[string]string{}
+			ms.Labels = make(map[string]string, 2)
 		}
 		ms.Labels[machinePoolNameLabel] = pool.Spec.Name
+		// Add the managed-by-Hive label:
+		ms.Labels[constants.HiveManagedLabel] = "true"
 
 		// Apply hive MachinePool labels to MachineSet MachineSpec.
 		ms.Spec.Template.Spec.ObjectMeta.Labels = make(map[string]string, len(pool.Spec.Labels))
@@ -339,12 +341,6 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 
 		// Apply hive MachinePool taints to MachineSet MachineSpec.
 		ms.Spec.Template.Spec.Taints = pool.Spec.Taints
-
-		// Add the managed-by-Hive annotation:
-		if ms.Annotations == nil {
-			ms.Annotations = make(map[string]string, 1)
-		}
-		ms.Annotations[constants.HiveManagedAnnotation] = "true"
 	}
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))

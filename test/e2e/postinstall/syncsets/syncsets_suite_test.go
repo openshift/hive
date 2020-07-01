@@ -128,8 +128,8 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(resultConfigMap.Data).Should(Equal(map[string]string{"foo": "bar"}))
 
-				By("Verify the managed-by-Hive annotation was injected automatically")
-				Ω(resultConfigMap.Annotations[constants.HiveManagedAnnotation]).Should(Equal("true"))
+				By("Verify the managed-by-Hive label was injected automatically")
+				Ω(resultConfigMap.Labels[constants.HiveManagedLabel]).Should(Equal("true"))
 
 				By("Delete the syncset and verify syncset and syncsetinstance are deleted")
 				deleteSyncSets(hiveClient, clusterNamespace, "test-syncresource")

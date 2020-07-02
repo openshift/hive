@@ -95,6 +95,13 @@ func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DN
 	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 }
 
+func mockAccessDeniedException(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
+	accessDeniedErr := awserr.New("AccessDeniedException",
+		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+		fmt.Errorf("User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny"))
+	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(accessDeniedErr).Times(1)
+}
+
 func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).Return(&route53.CreateHostedZoneOutput{
 		HostedZone: &route53.HostedZone{

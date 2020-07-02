@@ -141,6 +141,20 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
 			},
 		},
+		{
+			name:    "Cannot create a hosted zone as credentials are missing permissions",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockAccessDeniedException(expect, validDNSZoneWithoutID())
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.InsufficientCredentialsCondition)
+				assert.NotNil(t, condition, "invalid credentials condition should be set on dnszone")
+				assert.Equalf(t, "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+					condition.Message, "condition has an unexpected message")
+			},
+			errorExpected: true,
+		},
 	}
 
 	for _, tc := range cases {

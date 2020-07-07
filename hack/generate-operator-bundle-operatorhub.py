@@ -87,15 +87,31 @@ def generate_csv_base(version, prev_version, hive_image):
     if not os.path.exists(version_dir):
         os.mkdir(version_dir)
 
+    owned_crds = []
+
     # Copy all CSV files over to the bundle output dir:
     crd_files = os.listdir(crds_dir)
     for file_name in crd_files:
         full_path = os.path.join(crds_dir, file_name)
         if os.path.isfile(os.path.join(crds_dir, file_name)):
             shutil.copy(full_path, os.path.join(version_dir, file_name))
+            # Read the CRD yaml to add to owned CRDs list
+            with open(dest_path, 'r') as stream:
+                crd_csv = yaml.load(stream, Loader=yaml.SafeLoader)
+                owned_crds.append(
+                        {
+                            "description": crd_csv["spec"]["validation"]["openAPIV3Schema"]["description"],
+                            "displayName": crd_csv["spec"]["names"]["kind"],
+                            "kind": crd_csv["spec"]["names"]["kind"],
+                            "name": crd_csv["metadata"]["name"],
+                            "version": crd_csv["spec"]["version"],
+                        })
+
 
     with open(csv_template, 'r') as stream:
         csv = yaml.load(stream, Loader=yaml.SafeLoader)
+
+    csv["spec"]["customresourcedefinitions"]["owned"] = owned_crds
 
     csv['spec']['install']['spec']['clusterPermissions'] = []
 

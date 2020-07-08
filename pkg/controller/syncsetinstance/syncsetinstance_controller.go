@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
@@ -71,7 +73,28 @@ const (
 
 var (
 	applyTempFileMatcher = regexp.MustCompile(`/apply-\S*(\s|$)`)
+
+	metricTimeToApplySyncSet = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_syncset_apply_duration_seconds",
+			Help:    "Time to apply syncset",
+			Buckets: []float64{5, 10, 30, 60, 300, 600, 1800, 3600},
+		},
+	)
+	metricTimeToApplySelectorSyncSet = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_selectorsyncset_apply_duration_seconds",
+			Help:    "Time to apply selector syncset",
+			Buckets: []float64{5, 10, 30, 60, 300, 600, 1800, 3600},
+		},
+		[]string{"name"},
+	)
 )
+
+func init() {
+	metrics.Registry.MustRegister(metricTimeToApplySyncSet)
+	metrics.Registry.MustRegister(metricTimeToApplySelectorSyncSet)
+}
 
 // Applier knows how to Apply, Patch and return Info for []byte arrays describing objects and patches.
 type Applier interface {
@@ -303,6 +326,23 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 	applyErr := r.applySyncSet(ssi, spec, dynamicClient, applier, ssiLog)
 	ssi.Status.Applied = applyErr == nil
 
+	var applyTime float64
+	if ssi.Status.Applied && ssi.Status.FirstSuccessTimestamp == nil {
+		now := metav1.Now()
+		ssi.Status.FirstSuccessTimestamp = &now
+		if !original.Status.Applied {
+			startTime := ssi.CreationTimestamp.Time
+			if cd.Status.InstalledTimestamp != nil && startTime.Before(cd.Status.InstalledTimestamp.Time) {
+				startTime = cd.Status.InstalledTimestamp.Time
+			}
+			if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+				hivev1.UnreachableCondition); cond != nil && startTime.Before(cond.LastTransitionTime.Time) {
+				startTime = cond.LastTransitionTime.Time
+			}
+			applyTime = float64(ssi.Status.FirstSuccessTimestamp.Sub(startTime).Seconds())
+		}
+	}
+
 	err = r.updateSyncSetInstanceStatus(ssi, original, ssiLog)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -313,6 +353,14 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 		ssiLog.WithError(applyErr).Warn("failed to apply, requeueing")
 		// Set requeue to true instead of returning the applyErr to requeue the syncsetinstance.
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	if applyTime != 0 {
+		if sss := ssi.Spec.SelectorSyncSetRef; sss != nil {
+			metricTimeToApplySelectorSyncSet.WithLabelValues(sss.Name).Observe(applyTime)
+		} else {
+			metricTimeToApplySyncSet.Observe(applyTime)
+		}
 	}
 
 	reapplyDuration := r.ssiReapplyDuration(ssi)

@@ -86,6 +86,10 @@ type SyncSetInstanceStatus struct {
 	// Applied will be true if all resources, patches, or secrets have successfully been applied on last attempt.
 	// +optional
 	Applied bool `json:"applied,omitempty"`
+
+	// FirstSuccessTimestamp is the time the syncset was successfully applied for the first time.
+	// +optional
+	FirstSuccessTimestamp *metav1.Time `json:"firstSuccessTimestamp,omitempty"`
 }
 
 // +genclient

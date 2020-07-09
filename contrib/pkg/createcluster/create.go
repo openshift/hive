@@ -212,7 +212,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resourc
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),

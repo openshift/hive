@@ -2048,7 +2048,7 @@ spec:
                         of the nodes. Omitting defaults to ovirtmgmt network which
                         is a default network for evert ovirt cluster.
                       type: string
-                    ovirt_storage_domain_id:
+                    storage_domain_id:
                       description: The target storage domain under which all VM disk
                         would be created.
                       type: string
@@ -2056,7 +2056,7 @@ spec:
                   - certificatesSecretRef
                   - credentialsSecretRef
                   - ovirt_cluster_id
-                  - ovirt_storage_domain_id
+                  - storage_domain_id
                   type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on
@@ -2749,22 +2749,23 @@ spec:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                    clusterID:
+                      description: The oVirt cluster ID
+                      type: string
                     credentialsSecretRef:
-                      description: CredentialsSecretRef is the oVirt account credentials
-                        to use for deprovisioning the cluster
+                      description: 'CredentialsSecretRef is the oVirt account credentials
+                        to use for deprovisioning the cluster secret fields: ovirt_url,
+                        ovirt_username, ovirt_password, ovirt_ca_bundle'
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
-                    ovirt_cluster_id:
-                      description: The oVirt cluster ID
-                      type: string
                   required:
                   - certificatesSecretRef
+                  - clusterID
                   - credentialsSecretRef
-                  - ovirt_cluster_id
                   type: object
                 vsphere:
                   description: VSphere contains VMWare vSphere-specific deprovision

@@ -618,7 +618,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		builder.CloudBuilder = vsphereProvider
 	case cloudOVirt:
-		oVirtConfigYAMLContent, err := ovirtutils.GetCreds(o.CredsFile)
+		oVirtConfig, err := ovirtutils.GetCreds(o.CredsFile)
 		if err != nil {
 			return nil, err
 		}
@@ -634,14 +634,14 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			caCerts = append(caCerts, caCert)
 		}
 		oVirtProvider := &clusterresource.OvirtCloudBuilder{
-			OVirtConfigYAMLContent: oVirtConfigYAMLContent,
-			ClusterID:              o.OvirtClusterID,
-			StorageDomainID:        o.OvirtStorageDomainID,
-			NetworkName:            o.OvirtNetworkName,
-			APIVIP:                 o.OvirtAPIVIP,
-			DNSVIP:                 o.OvirtDNSVIP,
-			IngressVIP:             o.OvirtIngressVIP,
-			CACert:                 bytes.Join(caCerts, []byte("\n")),
+			OvirtConfig:     oVirtConfig,
+			ClusterID:       o.OvirtClusterID,
+			StorageDomainID: o.OvirtStorageDomainID,
+			NetworkName:     o.OvirtNetworkName,
+			APIVIP:          o.OvirtAPIVIP,
+			DNSVIP:          o.OvirtDNSVIP,
+			IngressVIP:      o.OvirtIngressVIP,
+			CACert:          bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = oVirtProvider
 		builder.SkipMachinePoolGeneration = true

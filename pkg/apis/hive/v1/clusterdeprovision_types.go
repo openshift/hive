@@ -85,8 +85,9 @@ type VSphereClusterDeprovision struct {
 // OvirtClusterDeprovision contains oVirt-specific configuration for a ClusterDeprovision
 type OvirtClusterDeprovision struct {
 	// The oVirt cluster ID
-	ClusterID string `json:"ovirt_cluster_id"`
+	ClusterID string `json:"clusterID"`
 	// CredentialsSecretRef is the oVirt account credentials to use for deprovisioning the cluster
+	// secret fields: ovirt_url, ovirt_username, ovirt_password, ovirt_ca_bundle
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 	// CertificatesSecretRef refers to a secret that contains the oVirt CA certificates
 	// necessary for communicating with the oVirt.

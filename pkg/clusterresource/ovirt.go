@@ -18,23 +18,23 @@ var _ CloudBuilder = (*OpenStackCloudBuilder)(nil)
 
 // OvirtCloudBuilder encapsulates cluster artifact generation logic specific to oVirt.
 type OvirtCloudBuilder struct {
-	// OVirtConfigYAMLContent is the data that will be used as the ovirt-config.yaml file for
+	// OvirtConfig is the data that will be used as the ovirt-config.yaml file for
 	// cluster provisioning.
-	OVirtConfigYAMLContent []byte
+	OvirtConfig []byte
 	// The target cluster under which all VMs will run
-	ClusterID string `json:"ovirt_cluster_id"`
+	ClusterID string
 	// The target storage domain under which all VM disk would be created.
-	StorageDomainID string `json:"ovirt_storage_domain_id"`
+	StorageDomainID string
 	// The target network of all the network interfaces of the nodes. Omitting defaults to ovirtmgmt
-	// network which is a default network for evert ovirt cluster.
-	NetworkName string `json:"ovirt_network_name,omitempty"`
+	// network which is a default network for every oVirt cluster.
+	NetworkName string
 	// APIVIP is an IP which will be served by bootstrap and then pivoted masters, using keepalived
-	APIVIP string `json:"api_vip"`
+	APIVIP string
 	// DNSVIP is the IP of the internal DNS which will be operated by the cluster
-	DNSVIP string `json:"dns_vip"`
+	DNSVIP string
 	// IngressIP is an external IP which routes to the default ingress controller.
 	// The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
-	IngressVIP string `json:"ingress_vip"`
+	IngressVIP string
 	// CACert is the CA certificate(s) used to communicate with oVirt.
 	CACert []byte
 }
@@ -51,7 +51,7 @@ func (p *OvirtCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			constants.OvirtCredentialsName: p.OVirtConfigYAMLContent,
+			constants.OvirtCredentialsName: p.OvirtConfig,
 		},
 	}
 }

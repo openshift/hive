@@ -66,6 +66,7 @@ func (in *MachinePool) DeepCopy() *MachinePool {
 func (in *Platform) DeepCopyInto(out *Platform) {
 	*out = *in
 	out.CredentialsSecretRef = in.CredentialsSecretRef
+	out.CertificatesSecretRef = in.CertificatesSecretRef
 	return
 }
 

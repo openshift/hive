@@ -256,7 +256,7 @@ const (
 	// OvirtCredentialsName is the name of the oVirt credentials file.
 	OvirtCredentialsName = "ovirt-config.yaml"
 
-	// OvirtConfigEnvVar is hte environment variable specifying the oVirt config path
+	// OvirtConfigEnvVar is the environment variable specifying the oVirt config path
 	OvirtConfigEnvVar = "OVIRT_CONFIG"
 )
 

@@ -455,7 +455,7 @@ spec:
                         of the nodes. Omitting defaults to ovirtmgmt network which
                         is a default network for evert ovirt cluster.
                       type: string
-                    ovirt_storage_domain_id:
+                    storage_domain_id:
                       description: The target storage domain under which all VM disk
                         would be created.
                       type: string
@@ -463,7 +463,7 @@ spec:
                   - certificatesSecretRef
                   - credentialsSecretRef
                   - ovirt_cluster_id
-                  - ovirt_storage_domain_id
+                  - storage_domain_id
                   type: object
                 vsphere:
                   description: VSphere is the configuration used when installing on

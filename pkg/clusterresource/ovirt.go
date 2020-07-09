@@ -83,6 +83,8 @@ func (p *OvirtCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.
 			CertificatesSecretRef: corev1.LocalObjectReference{
 				Name: p.certificatesSecretName(o),
 			},
+			StorageDomainID: p.StorageDomainID,
+			NetworkName:     p.NetworkName,
 		},
 	}
 }

@@ -322,6 +322,20 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 	if newObject.Spec.Platform.Ovirt != nil {
 		numberOfPlatforms++
+		ovirt := newObject.Spec.Platform.Ovirt
+		ovirtPath := platformPath.Child("ovirt")
+		if ovirt.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("credentialsSecretRef", "name"), "must specify secrets for oVirt access"))
+		}
+		if ovirt.CertificatesSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("certificatesSecretRef", "name"), "must specify certificates for oVirt access"))
+		}
+		if ovirt.ClusterID == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_cluster_id"), "must specify ovirt_cluster_id"))
+		}
+		if ovirt.StorageDomainID == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_storage_domain_id"), "must specify ovirt_storage_domain_id"))
+		}
 	}
 	if newObject.Spec.Platform.BareMetal != nil {
 		numberOfPlatforms++

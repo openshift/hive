@@ -19,6 +19,7 @@ import (
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1ovirt "github.com/openshift/hive/pkg/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -109,6 +110,17 @@ func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
 		Folder:                "/dc1/vm/test",
 		Cluster:               "test",
 		Network:               "Network",
+	}
+	return cd
+}
+
+func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.Ovirt = &hivev1ovirt.Platform{
+		ClusterID:             "fake-cluster-uuid",
+		CredentialsSecretRef:  corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		CertificatesSecretRef: corev1.LocalObjectReference{Name: "fake-cert-secret"},
+		StorageDomainID:       "fake-storage-domain-uuid",
 	}
 	return cd
 }
@@ -715,6 +727,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "vSphere create valid",
 			newObject:       validVSphereClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name:            "oVirt create valid",
+			newObject:       validOvirtClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},

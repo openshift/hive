@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -41,6 +42,7 @@ const (
 	dnsClientTimeout                = 30 * time.Second
 	resolverConfigFile              = "/etc/resolv.conf"
 	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
+	accessDeniedReason              = "AccessDenied"
 )
 
 var (
@@ -215,8 +217,41 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 	r.logger.Debug("Retrieving current state")
 	err := actuator.Refresh()
 	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "AccessDeniedException" {
+			conds, changed := controllerutils.SetDNSZoneConditionWithChangeCheck(
+				dnsZone.Status.Conditions,
+				hivev1.InsufficientCredentialsCondition,
+				corev1.ConditionTrue,
+				accessDeniedReason,
+				awsErr.Message(),
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+			if changed {
+				dnsZone.Status.Conditions = conds
+				if err := r.Status().Update(context.Background(), dnsZone); err != nil {
+					return reconcile.Result{}, err
+				}
+			}
+			r.logger.WithError(err).Warn("Credentials are lacking permissions")
+			return reconcile.Result{}, err
+		}
 		r.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
 		return reconcile.Result{}, err
+	}
+
+	conds, changed := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		dnsZone.Status.Conditions,
+		hivev1.InsufficientCredentialsCondition,
+		corev1.ConditionFalse,
+		accessDeniedReason,
+		"credentials are valid",
+		controllerutils.UpdateConditionNever,
+	)
+	if changed {
+		dnsZone.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), dnsZone); err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	zoneFound, err := actuator.Exists()

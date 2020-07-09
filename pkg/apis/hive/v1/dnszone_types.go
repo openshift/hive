@@ -166,6 +166,9 @@ const (
 	// DomainNotManaged is true if we try to reconcile a DNSZone and the HiveConfig
 	// does not contain a ManagedDNS entry for the domain in the DNSZone
 	DomainNotManaged DNSZoneConditionType = "DomainNotManaged"
+	// InsufficientCredentialsCondition is true when credentials cannot be used to create a
+	// DNS zone because of insufficient permissions
+	InsufficientCredentialsCondition DNSZoneConditionType = "InsufficientCredentials"
 )
 
 // +genclient

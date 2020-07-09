@@ -688,6 +688,24 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Set condition when DNSZone cannot be created due to credentials missing permissions",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testDNSZoneWithInvalidCredentialsCondition(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.DNSNotReadyCondition, "InsufficientCredentials")
+			},
+		},
+		{
 			name: "Clear condition when DNSZone is available",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -1733,6 +1751,20 @@ func testAvailableDNSZone() *hivev1.DNSZone {
 	return zone
 }
 
+func testDNSZoneWithInvalidCredentialsCondition() *hivev1.DNSZone {
+	zone := testDNSZone()
+	zone.Status.Conditions = []hivev1.DNSZoneCondition{
+		{
+			Type:   hivev1.InsufficientCredentialsCondition,
+			Status: corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{
+				Time: time.Now(),
+			},
+		},
+	}
+	return zone
+}
+
 func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType hivev1.ClusterDeploymentConditionType, status corev1.ConditionStatus) {
 	found := false
 	for _, cond := range cd.Status.Conditions {
@@ -1742,6 +1774,16 @@ func assertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType 
 		}
 	}
 	assert.True(t, found, "did not find expected condition type: %v", condType)
+}
+
+func assertConditionReason(t *testing.T, cd *hivev1.ClusterDeployment, condType hivev1.ClusterDeploymentConditionType, reason string) {
+	for _, cond := range cd.Status.Conditions {
+		if cond.Type == condType {
+			assert.Equal(t, reason, cond.Reason, "condition found with unexpected reason")
+			return
+		}
+	}
+	t.Errorf("did not find expected condition type: %v", condType)
 }
 
 func getJob(c client.Client, name string) *batchv1.Job {

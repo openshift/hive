@@ -2051,6 +2051,7 @@ func (in *OpenStackClusterDeprovision) DeepCopy() *OpenStackClusterDeprovision {
 func (in *OvirtClusterDeprovision) DeepCopyInto(out *OvirtClusterDeprovision) {
 	*out = *in
 	out.CredentialsSecretRef = in.CredentialsSecretRef
+	out.CertificatesSecretRef = in.CertificatesSecretRef
 	return
 }
 

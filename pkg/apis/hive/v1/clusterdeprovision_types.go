@@ -88,6 +88,9 @@ type OvirtClusterDeprovision struct {
 	ClusterID string `json:"ovirt_cluster_id"`
 	// CredentialsSecretRef is the oVirt account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	// CertificatesSecretRef refers to a secret that contains the oVirt CA certificates
+	// necessary for communicating with the oVirt.
+	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 }
 
 // +genclient

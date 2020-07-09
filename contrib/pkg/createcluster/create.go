@@ -182,6 +182,7 @@ type Options struct {
 	OvirtAPIVIP          string
 	OvirtDNSVIP          string
 	OvirtIngressVIP      string
+	OvirtCACerts         string
 
 	homeDir string
 }
@@ -298,6 +299,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt`,
 	flags.StringVar(&opt.OvirtAPIVIP, "ovirt-api-vip", "", "IP which will be served by bootstrap and then pivoted masters, using keepalived")
 	flags.StringVar(&opt.OvirtDNSVIP, "ovirt-dns-vip", "", "IP of the internal DNS which will be operated by the cluster")
 	flags.StringVar(&opt.OvirtIngressVIP, "ovirt-ingress-vip", "", "External IP which routes to the default ingress controller")
+	flags.StringVar(&opt.OvirtCACerts, "ovirt-ca-certs", "", "Path to oVirt CA certificate, multiple CA paths can be : delimited")
 
 	return cmd
 }
@@ -620,6 +622,17 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
+		if o.OvirtCACerts == "" {
+			return nil, errors.New("must provide --ovirt-ca-certs")
+		}
+		caCerts := [][]byte{}
+		for _, cert := range filepath.SplitList(o.OvirtCACerts) {
+			caCert, err := ioutil.ReadFile(cert)
+			if err != nil {
+				return nil, fmt.Errorf("error reading %s: %w", cert, err)
+			}
+			caCerts = append(caCerts, caCert)
+		}
 		oVirtProvider := &clusterresource.OvirtCloudBuilder{
 			OVirtConfigYAMLContent: oVirtConfigYAMLContent,
 			ClusterID:              o.OvirtClusterID,
@@ -628,6 +641,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			APIVIP:                 o.OvirtAPIVIP,
 			DNSVIP:                 o.OvirtDNSVIP,
 			IngressVIP:             o.OvirtIngressVIP,
+			CACert:                 bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = oVirtProvider
 		builder.SkipMachinePoolGeneration = true

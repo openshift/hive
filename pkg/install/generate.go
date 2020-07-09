@@ -29,6 +29,7 @@ const (
 	openStackCloudsDir = "/etc/openstack"
 	vsphereCloudsDir   = "/vsphere"
 	ovirtCloudsDir     = "/.ovirt"
+	ovirtCADir         = "/.ovirt-ca"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -206,18 +207,34 @@ func InstallerPodSpec(
 		})
 		env = append(env, vSphereCredsEnvVars(cd.Spec.Platform.VSphere.CredentialsSecretRef.Name)...)
 	case cd.Spec.Platform.Ovirt != nil:
-		volumes = append(volumes, corev1.Volume{
-			Name: "ovirt-credentials",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name,
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "ovirt-credentials",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name,
+					},
 				},
 			},
-		})
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "ovirt-credentials",
-			MountPath: ovirtCloudsDir,
-		})
+			corev1.Volume{
+				Name: "ovirt-certificates",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.Platform.Ovirt.CertificatesSecretRef.Name,
+					},
+				},
+			},
+		)
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      "ovirt-credentials",
+				MountPath: ovirtCloudsDir,
+			},
+			corev1.VolumeMount{
+				Name:      "ovirt-certificates",
+				MountPath: ovirtCADir,
+			},
+		)
 		env = append(env, oVirtCredsEnvVars(cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name)...)
 	}
 
@@ -328,6 +345,10 @@ func InstallerPodSpec(
 	if cd.Spec.Platform.VSphere != nil {
 		// Add vSphere certificates to CA trust.
 		hiveArg = fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", vsphereCloudsDir, hiveArg)
+	}
+	if cd.Spec.Platform.Ovirt != nil {
+		// Add oVirt certificates to CA trust.
+		hiveArg = fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", ovirtCADir, hiveArg)
 	}
 
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
@@ -691,18 +712,34 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
-	volumes = append(volumes, corev1.Volume{
-		Name: "ovirt-credentials",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: req.Spec.Platform.Ovirt.CredentialsSecretRef.Name,
+	volumes = append(volumes,
+		corev1.Volume{
+			Name: "ovirt-credentials",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: req.Spec.Platform.Ovirt.CredentialsSecretRef.Name,
+				},
 			},
 		},
-	})
-	volumeMounts = append(volumeMounts, corev1.VolumeMount{
-		Name:      "ovirt-credentials",
-		MountPath: ovirtCloudsDir,
-	})
+		corev1.Volume{
+			Name: "ovirt-certificates",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: req.Spec.Platform.Ovirt.CertificatesSecretRef.Name,
+				},
+			},
+		},
+	)
+	volumeMounts = append(volumeMounts,
+		corev1.VolumeMount{
+			Name:      "ovirt-credentials",
+			MountPath: ovirtCloudsDir,
+		},
+		corev1.VolumeMount{
+			Name:      "ovirt-certificates",
+			MountPath: ovirtCADir,
+		},
+	)
 
 	env := oVirtCredsEnvVars(req.Spec.Platform.Ovirt.CredentialsSecretRef.Name)
 
@@ -713,7 +750,7 @@ func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
-			Args:            []string{fmt.Sprintf("/usr/bin/hiveutil deprovision ovirt --ovirt-cluster-id %s --loglevel debug %s", req.Spec.Platform.Ovirt.ClusterID, req.Spec.InfraID)},
+			Args:            []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && /usr/bin/hiveutil deprovision ovirt --ovirt-cluster-id %s --loglevel debug %s", ovirtCADir, req.Spec.Platform.Ovirt.ClusterID, req.Spec.InfraID)},
 			VolumeMounts:    volumeMounts,
 		},
 	}

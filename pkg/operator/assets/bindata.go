@@ -2020,6 +2020,16 @@ spec:
                   description: Ovirt is the configuration used when installing on
                     oVirt
                   properties:
+                    certificatesSecretRef:
+                      description: CertificatesSecretRef refers to a secret that contains
+                        the oVirt CA certificates necessary for communicating with
+                        oVirt.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
                     credentialsSecretRef:
                       description: 'CredentialsSecretRef refers to a secret that contains
                         the oVirt account access credentials with fields: ovirt_url,
@@ -2043,6 +2053,7 @@ spec:
                         would be created.
                       type: string
                   required:
+                  - certificatesSecretRef
                   - credentialsSecretRef
                   - ovirt_cluster_id
                   - ovirt_storage_domain_id
@@ -2728,6 +2739,16 @@ spec:
                 ovirt:
                   description: Ovirt contains oVirt-specific deprovision settings
                   properties:
+                    certificatesSecretRef:
+                      description: CertificatesSecretRef refers to a secret that contains
+                        the oVirt CA certificates necessary for communicating with
+                        the oVirt.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
                     credentialsSecretRef:
                       description: CredentialsSecretRef is the oVirt account credentials
                         to use for deprovisioning the cluster
@@ -2741,6 +2762,7 @@ spec:
                       description: The oVirt cluster ID
                       type: string
                   required:
+                  - certificatesSecretRef
                   - credentialsSecretRef
                   - ovirt_cluster_id
                   type: object

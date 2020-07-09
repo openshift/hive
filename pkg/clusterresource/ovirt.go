@@ -35,6 +35,8 @@ type OvirtCloudBuilder struct {
 	// IngressIP is an external IP which routes to the default ingress controller.
 	// The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
 	IngressVIP string `json:"ingress_vip"`
+	// CACert is the CA certificate(s) used to communicate with oVirt.
+	CACert []byte
 }
 
 func (p *OvirtCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -55,7 +57,20 @@ func (p *OvirtCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret
 }
 
 func (p *OvirtCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
-	return nil
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      p.certificatesSecretName(o),
+			Namespace: o.Namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			".cacert": p.CACert,
+		},
+	}
 }
 
 func (p *OvirtCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
@@ -64,6 +79,9 @@ func (p *OvirtCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.
 			ClusterID: p.ClusterID,
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
+			},
+			CertificatesSecretRef: corev1.LocalObjectReference{
+				Name: p.certificatesSecretName(o),
 			},
 		},
 	}
@@ -88,4 +106,8 @@ func (p *OvirtCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 
 func (p *OvirtCloudBuilder) credsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-ovirt-creds", o.Name)
+}
+
+func (p *OvirtCloudBuilder) certificatesSecretName(o *Builder) string {
+	return fmt.Sprintf("%s-ovirt-certs", o.Name)
 }

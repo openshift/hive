@@ -63,6 +63,10 @@ const (
 	adminKubeconfigSecretKey = "kubeconfig"
 )
 
+var (
+	testTimestamp = time.Date(2020, time.July, 9, 23, 47, 0, 0, time.UTC)
+)
+
 func init() {
 	log.SetLevel(log.DebugLevel)
 }
@@ -87,6 +91,28 @@ func TestSyncSetReconcile(t *testing.T) {
 		expectRequeue          bool
 		expectApplied          bool
 	}{
+		{
+			name:    "Check FirstSuccessTimestamp applied",
+			syncSet: testSyncSet("ss1", nil, nil),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				if ssi.Status.FirstSuccessTimestamp == nil {
+					t.Errorf("expected firstSucessTimestamp to be present")
+				}
+			},
+			expectApplied: true,
+		},
+		{
+			name:    "Ensure FirstSuccessTimestamp not reapplied",
+			status:  hivev1.SyncSetInstanceStatus{FirstSuccessTimestamp: &metav1.Time{Time: testTimestamp}},
+			syncSet: testSyncSet("ss1", nil, nil),
+			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
+				if !ssi.Status.FirstSuccessTimestamp.Time.Equal(testTimestamp) {
+					t.Errorf("expected firstSuccessTimestamp to not be set again. Got %s",
+						ssi.Status.FirstSuccessTimestamp.Time)
+				}
+			},
+			expectApplied: true,
+		},
 		{
 			name:    "Create single resource successfully",
 			syncSet: testSyncSetWithResources("ss1", testCM("cm1", "foo", "bar")),

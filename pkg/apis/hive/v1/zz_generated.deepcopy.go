@@ -2670,6 +2670,10 @@ func (in *SyncSetInstanceStatus) DeepCopyInto(out *SyncSetInstanceStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.FirstSuccessTimestamp != nil {
+		in, out := &in.FirstSuccessTimestamp, &out.FirstSuccessTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

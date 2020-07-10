@@ -11334,6 +11334,11 @@ spec:
                 - type
                 type: object
               type: array
+            firstSuccessTimestamp:
+              description: FirstSuccessTimestamp is the time the syncset was successfully
+                applied for the first time.
+              format: date-time
+              type: string
             patches:
               description: Patches is the list of SyncStatus for patches that have
                 been applied.

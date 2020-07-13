@@ -38,6 +38,7 @@ func TestGCPActuator(t *testing.T) {
 	tests := []struct {
 		name                            string
 		pool                            *hivev1.MachinePool
+		requireLeases                   bool
 		existing                        []runtime.Object
 		mockGCPClient                   func(*mockgcp.MockClient)
 		setupPendingCreationExpectation bool
@@ -47,6 +48,71 @@ func TestGCPActuator(t *testing.T) {
 	}{
 		{
 			name: "generate single machineset for single zone",
+			pool: testGCPPool(testPoolName),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeImage(client, []string{"testImage"}, testInfraID)
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
+		{
+			name: "generate machinesets across zones",
+			pool: testGCPPool(testPoolName),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeImage(client, []string{"testImage"}, testInfraID)
+				mockListComputeZones(client, []string{"zone1", "zone2", "zone3"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 1,
+				generateGCPMachineSetName("worker", "zone2"): 1,
+				generateGCPMachineSetName("worker", "zone3"): 1,
+			},
+		},
+		{
+			name: "generate machinesets for specified zones",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.Zones = []string{"zone1", "zone2", "zone3"}
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeImage(client, []string{"testImage"}, testInfraID)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 1,
+				generateGCPMachineSetName("worker", "zone2"): 1,
+				generateGCPMachineSetName("worker", "zone3"): 1,
+			},
+		},
+		{
+			name: "list images returns zero",
+			pool: testGCPPool(testPoolName),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeImage(client, []string{}, testInfraID)
+			},
+			expectedErr: true,
+		},
+		{
+			name: "list images returns more than 1",
+			pool: testGCPPool(testPoolName),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeImage(client, []string{"imageA", "imageB"}, testInfraID)
+			},
+			expectedErr: true,
+		},
+		{
+			name: "list zones returns zero",
+			pool: testGCPPool(testPoolName),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeImage(client, []string{"imageA"}, testInfraID)
+				mockListComputeZones(client, []string{}, testRegion)
+			},
+			expectedErr: true,
+		},
+		{
+			name: "generate machinesets for existing lease",
 			pool: testGCPPool(testPoolName),
 			existing: []runtime.Object{
 				testPoolLease(testPoolName, testName, testInfraID, "w"),
@@ -60,76 +126,7 @@ func TestGCPActuator(t *testing.T) {
 			},
 		},
 		{
-			name: "generate machinesets across zones",
-			pool: testGCPPool(testPoolName),
-			existing: []runtime.Object{
-				testPoolLease(testPoolName, testName, testInfraID, "w"),
-			},
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
-				mockListComputeZones(client, []string{"zone1", "zone2", "zone3"}, testRegion)
-			},
-			expectedMachineSetReplicas: map[string]int64{
-				generateGCPMachineSetName("w", "zone1"): 1,
-				generateGCPMachineSetName("w", "zone2"): 1,
-				generateGCPMachineSetName("w", "zone3"): 1,
-			},
-		},
-		{
-			name: "generate machinesets for specified zones",
-			pool: func() *hivev1.MachinePool {
-				pool := testGCPPool(testPoolName)
-				pool.Spec.Platform.GCP.Zones = []string{"zone1", "zone2", "zone3"}
-				return pool
-			}(),
-			existing: []runtime.Object{
-				testPoolLease(testPoolName, testName, testInfraID, "w"),
-			},
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
-			},
-			expectedMachineSetReplicas: map[string]int64{
-				generateGCPMachineSetName("w", "zone1"): 1,
-				generateGCPMachineSetName("w", "zone2"): 1,
-				generateGCPMachineSetName("w", "zone3"): 1,
-			},
-		},
-		{
-			name: "list images returns zero",
-			pool: testGCPPool(testPoolName),
-			existing: []runtime.Object{
-				testPoolLease(testPoolName, testName, testInfraID, "w"),
-			},
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{}, testInfraID)
-			},
-			expectedErr: true,
-		},
-		{
-			name: "list images returns more than 1",
-			pool: testGCPPool(testPoolName),
-			existing: []runtime.Object{
-				testPoolLease(testPoolName, testName, testInfraID, "w"),
-			},
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"imageA", "imageB"}, testInfraID)
-			},
-			expectedErr: true,
-		},
-		{
-			name: "list zones returns zero",
-			pool: testGCPPool(testPoolName),
-			existing: []runtime.Object{
-				testPoolLease(testPoolName, testName, testInfraID, "w"),
-			},
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"imageA"}, testInfraID)
-				mockListComputeZones(client, []string{}, testRegion)
-			},
-			expectedErr: true,
-		},
-		{
-			name: "generate machinesets for different pool name",
+			name: "generate machinesets for different lease",
 			pool: func() *hivev1.MachinePool {
 				pool := testGCPPool("additional-compute")
 				pool.Spec.Platform.GCP.Zones = []string{"zone1", "zone2", "zone3"}
@@ -148,10 +145,9 @@ func TestGCPActuator(t *testing.T) {
 			},
 		},
 		{
-			name: "no lease pending create expectation",
-			pool: testGCPPool(testPoolName),
-			mockGCPClient: func(client *mockgcp.MockClient) {
-			},
+			name:                            "no lease pending create expectation",
+			pool:                            testGCPPool(testPoolName),
+			requireLeases:                   true,
 			setupPendingCreationExpectation: true,
 		},
 	}
@@ -179,15 +175,18 @@ func TestGCPActuator(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 
 			// set up mock expectations
-			test.mockGCPClient(gClient)
+			if test.mockGCPClient != nil {
+				test.mockGCPClient(gClient)
+			}
 
 			ga := &GCPActuator{
-				gcpClient:    gClient,
-				logger:       logger,
-				client:       fakeClient,
-				scheme:       scheme.Scheme,
-				expectations: controllerExpectations,
-				projectID:    testProjectID,
+				gcpClient:      gClient,
+				logger:         logger,
+				client:         fakeClient,
+				scheme:         scheme.Scheme,
+				expectations:   controllerExpectations,
+				projectID:      testProjectID,
+				leasesRequired: test.requireLeases,
 			}
 
 			generatedMachineSets, _, err := ga.GenerateMachineSets(clusterDeployment, test.pool, ga.logger)
@@ -505,7 +504,12 @@ func TestObtainLeaseChar(t *testing.T) {
 			pool := &hivev1.MachinePool{}
 			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: test.poolName}, pool)
 			require.NoError(t, err)
-			leaseChar, proceed, err := ga.obtainLease(pool, test.existingCD, log.WithField("test", test.name))
+
+			leases := &hivev1.MachinePoolNameLeaseList{}
+			err = fakeClient.List(context.TODO(), leases)
+			require.NoError(t, err)
+
+			leaseChar, proceed, err := ga.obtainLease(pool, test.existingCD, leases)
 			if test.expectErr {
 				require.Error(t, err)
 				return
@@ -548,6 +552,74 @@ func TestObtainLeaseChar(t *testing.T) {
 				require.Equal(t, test.poolName, lease.OwnerReferences[0].Name)
 			}
 
+		})
+	}
+}
+
+func TestUseLeases(t *testing.T) {
+	cases := []struct {
+		name            string
+		clusterVersion  string
+		machineSetNames []string
+		expectedResult  bool
+	}{
+		{
+			name:           "before 4.4.8",
+			clusterVersion: "4.4.7",
+			expectedResult: true,
+		},
+		{
+			name:           "4.4.8",
+			clusterVersion: "4.4.8",
+			expectedResult: false,
+		},
+		{
+			name:           "after 4.4.8",
+			clusterVersion: "4.4.9",
+			expectedResult: false,
+		},
+		{
+			name:           "4.5",
+			clusterVersion: "4.5.0",
+			expectedResult: false,
+		},
+		{
+			name:           "after 4.5",
+			clusterVersion: "4.6.0",
+			expectedResult: false,
+		},
+		{
+			name:           "invalid version",
+			clusterVersion: "bad-version",
+			expectedResult: false,
+		},
+		{
+			name:            "worker machine pool",
+			clusterVersion:  "4.5.0",
+			machineSetNames: []string{"cluster-id-worker-a", "cluster-id-worker-b"},
+			expectedResult:  false,
+		},
+		{
+			name:            "w machine pool",
+			clusterVersion:  "4.5.0",
+			machineSetNames: []string{"cluster-id-w-a", "cluster-id-w-a"},
+			expectedResult:  true,
+		},
+		{
+			name:            "worker and w machine pools",
+			clusterVersion:  "4.5.0",
+			machineSetNames: []string{"cluster-id-worker-a", "cluster-id-worker-a", "cluster-id-w-a", "cluster-id-w-a"},
+			expectedResult:  false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			machineSets := make([]machineapi.MachineSet, len(tc.machineSetNames))
+			for i, n := range tc.machineSetNames {
+				machineSets[i].Name = n
+			}
+			actualResult := useLeases(tc.clusterVersion, machineSets)
+			assert.Equal(t, tc.expectedResult, actualResult)
 		})
 	}
 }

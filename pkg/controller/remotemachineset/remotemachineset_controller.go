@@ -793,7 +793,11 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewGCPActuator(r.Client, creds, r.scheme, r.expectations, logger)
+		clusterVersion, err := getClusterVersion(cd)
+		if err != nil {
+			return nil, err
+		}
+		return NewGCPActuator(r.Client, creds, clusterVersion, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.Azure != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -855,4 +859,14 @@ func getMinMaxReplicasForMachineSet(pool *hivev1.MachinePool, machineSets []*mac
 		max = min
 	}
 	return
+}
+
+func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
+	if cd.Status.ClusterVersionStatus == nil {
+		return "", errors.New("cluster version status not set in clusterdeployment")
+	}
+	if cd.Status.ClusterVersionStatus.Desired.Version == "" {
+		return "", errors.New("cluster version not available")
+	}
+	return cd.Status.ClusterVersionStatus.Desired.Version, nil
 }

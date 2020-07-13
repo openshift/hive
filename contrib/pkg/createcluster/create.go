@@ -148,6 +148,9 @@ type Options struct {
 	AdoptAdminPassword       string
 	MachineNetwork           string
 
+	// AWS
+	AWSUserTags []string
+
 	// Azure
 	AzureBaseDomainResourceGroupName string
 
@@ -252,6 +255,9 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.
 	flags.StringVar(&opt.AdoptAdminUsername, "adopt-admin-username", "", "Username for cluster web console administrator. (optional)")
 	flags.StringVar(&opt.AdoptAdminPassword, "adopt-admin-password", "", "Password for cluster web console administrator. (optional)")
 
+	// AWS flags
+	flags.StringSliceVar(&opt.AWSUserTags, "aws-user-tags", nil, "Additional tags to add to resources. Must be in the form \"key=value\"")
+
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
 
@@ -279,6 +285,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.
 // Complete finishes parsing arguments for the command
 func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 	o.Name = args[0]
+
 	return nil
 }
 
@@ -460,9 +467,21 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
+		userTags := make(map[string]string, len(o.AWSUserTags))
+		for _, t := range o.AWSUserTags {
+			tagParts := strings.SplitN(t, "=", 2)
+			switch len(tagParts) {
+			case 0:
+			case 1:
+				userTags[tagParts[0]] = ""
+			case 2:
+				userTags[tagParts[0]] = tagParts[1]
+			}
+		}
 		awsProvider := &clusterresource.AWSCloudBuilder{
 			AccessKeyID:     accessKeyID,
 			SecretAccessKey: secretAccessKey,
+			UserTags:        userTags,
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:

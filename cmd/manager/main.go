@@ -5,6 +5,7 @@ import (
 	golog "log"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -128,9 +129,19 @@ func newRootCommand() *cobra.Command {
 			hiveNSName := utils.GetHiveNamespace()
 			log.Infof("hive namespace: %s", hiveNSName)
 
+			// Allow an env var to disable leader election, useful when testing from source with make run to eliminate the wait time.
+			var disableLeaderElection bool
+			val := os.Getenv("DISABLE_LEADER_ELECTION")
+			if val != "" {
+				disableLeaderElection, err = strconv.ParseBool(val)
+				if err != nil {
+					log.WithField("value", val).Fatal("Error parsing DISABLE_LEADER_ELECTION env var")
+				}
+			}
+
 			// Create a new Cmd to provide shared dependencies and start components
 			mgr, err := manager.New(cfg, manager.Options{
-				LeaderElection:          true,
+				LeaderElection:          !disableLeaderElection,
 				LeaderElectionNamespace: hiveNSName,
 				LeaderElectionID:        leaderElectionConfigMap,
 				LeaseDuration:           &leaseDuration,

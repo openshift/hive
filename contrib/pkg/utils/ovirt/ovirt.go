@@ -27,6 +27,5 @@ func GetCreds(credsFile string) ([]byte, error) {
 			break
 		}
 	}
-	// log.WithField("credsFile", credsFile).Info("Loading oVirt creds")
 	return ioutil.ReadFile(credsFile)
 }

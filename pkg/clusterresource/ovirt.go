@@ -14,7 +14,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
-var _ CloudBuilder = (*OpenStackCloudBuilder)(nil)
+var _ CloudBuilder = (*OvirtCloudBuilder)(nil)
 
 // OvirtCloudBuilder encapsulates cluster artifact generation logic specific to oVirt.
 type OvirtCloudBuilder struct {
@@ -90,7 +90,17 @@ func (p *OvirtCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.
 }
 
 func (p *OvirtCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
-	mp.Spec.Platform.Ovirt = &hivev1ovirt.MachinePool{}
+	mp.Spec.Platform.Ovirt = &hivev1ovirt.MachinePool{
+		CPU: &hivev1ovirt.CPU{
+			Sockets: 1,
+			Cores:   4,
+		},
+		MemoryMB: 16348,
+		OSDisk: &hivev1ovirt.Disk{
+			SizeGB: 120,
+		},
+		VMType: hivev1ovirt.VMTypeServer,
+	}
 }
 
 func (p *OvirtCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {

@@ -134,6 +134,7 @@ case "${CLOUD}" in
 "aws")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/.awscred"
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
+	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 	;;
 "azure")
 	CREDS_FILE="${CLOUD_CREDS_DIR}/osServicePrincipal.json"

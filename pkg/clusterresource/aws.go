@@ -29,6 +29,8 @@ type AWSCloudBuilder struct {
 	AccessKeyID string
 	// SecretAccessKey is the AWS secret access key.
 	SecretAccessKey string
+	// UserTags are user-provided tags to add to resources.
+	UserTags map[string]string
 }
 
 func (p *AWSCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -59,7 +61,8 @@ func (p *AWSCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.Cl
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region: awsRegion,
+			Region:   awsRegion,
+			UserTags: p.UserTags,
 		},
 	}
 }

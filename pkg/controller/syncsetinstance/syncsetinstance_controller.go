@@ -48,7 +48,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sigs.k8s.io/yaml"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -635,29 +634,6 @@ func (r *ReconcileSyncSetInstance) reapplyTime(status hivev1.SyncStatus) time.Ti
 func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInstance, resources []runtime.RawExtension, applyBehavior hivev1.SyncSetApplyBehavior, dynamicClient dynamic.Interface, h Applier, ssiLog log.FieldLogger) error {
 	ssiLog = ssiLog.WithField("applyTerm", "resource")
 
-	// determine if we can gather info for all resources
-	infos := []hiveresource.Info{}
-	unstructureds := make([]*unstructured.Unstructured, len(resources))
-	for i, resource := range resources {
-		u := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal(resource.Raw, u); err != nil {
-			ssiLog.WithError(err).Warn("error decoding unstructured object")
-			return err
-		}
-		unstructureds[i] = u
-
-		// TODO: read required info from unstructured
-		info, err := h.Info(resource.Raw)
-		if err != nil {
-			ssi.Status.Conditions = r.setUnknownObjectSyncCondition(ssi.Status.Conditions, err, i)
-			ssiLog.WithError(err).Warn("unable to parse resource")
-			return err
-		}
-		infos = append(infos, *info)
-
-	}
-
-	ssi.Status.Conditions = r.clearUnknownObjectSyncCondition(ssi.Status.Conditions)
 	syncStatusList := []hivev1.SyncStatus{}
 
 	applyFn := h.Apply
@@ -667,28 +643,39 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	case hivev1.CreateOnlySyncSetApplyBehavior:
 		applyFn = h.Create
 	}
-
+	// determine if we can gather info for the resource and apply it
 	var applyErr error
-	for i, resource := range resources {
-		resourceSyncStatus := hivev1.SyncStatus{
-			APIVersion: infos[i].APIVersion,
-			Kind:       infos[i].Kind,
-			Resource:   infos[i].Resource,
-			Name:       infos[i].Name,
-			Namespace:  infos[i].Namespace,
-			Hash:       r.hash(resource.Raw),
-		}
+	var discoveryErr error
+	info := &hiveresource.Info{}
+	for _, resource := range resources {
+		resourceSyncStatus := hivev1.SyncStatus{}
 
 		ssiLog := ssiLog.WithField("syncNamespace", resourceSyncStatus.Namespace).
 			WithField("syncName", resourceSyncStatus.Name).
 			WithField("syncAPIVersion", resourceSyncStatus.APIVersion).
 			WithField("syncKind", resourceSyncStatus.Kind)
 
+		info, discoveryErr = h.Info(resource.Raw)
+		// If an error occurred, stop processing right here
+		if discoveryErr != nil {
+			resourceSyncStatus.Conditions = r.setUnknownObjectSyncCondition(resourceSyncStatus.Conditions, discoveryErr)
+			syncStatusList = append(syncStatusList, resourceSyncStatus)
+			ssiLog.WithError(discoveryErr).Warn("unable to parse resource")
+			break
+		}
+
+		resourceSyncStatus.APIVersion = info.APIVersion
+		resourceSyncStatus.Kind = info.Kind
+		resourceSyncStatus.Name = info.Name
+		resourceSyncStatus.Namespace = info.Namespace
+		resourceSyncStatus.Hash = r.hash(resource.Raw)
+		resourceSyncStatus.Resource = info.Resource
+		resourceSyncStatus.Conditions = r.clearUnknownObjectSyncCondition(resourceSyncStatus.Conditions)
+
 		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply(resourceSyncStatus, *rss, ssiLog) {
 			// Apply resource
 			ssiLog.Debug("applying resource")
-
-			applyErr = applyResource(unstructureds[i], ssiLog, applyFn)
+			applyErr = applyResource(info.Object, ssiLog, applyFn)
 
 			var resourceSyncConditions []hivev1.SyncCondition
 			if rss != nil {
@@ -711,9 +698,11 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	}
 
 	ssi.Status.Resources = r.reconcileDeleted(ssi.Spec.ResourceApplyMode, dynamicClient, ssi.Status.Resources, syncStatusList, applyErr, ssiLog)
-
-	// Return applyErr for the controller to trigger retries and go into exponential backoff
+	// Return applyErr/discoveryErr for the controller to trigger retries and go into exponential backoff
 	// if the problem does not resolve itself.
+	if discoveryErr != nil {
+		return discoveryErr
+	}
 	if applyErr != nil {
 		return applyErr
 	}
@@ -988,13 +977,13 @@ func (r *ReconcileSyncSetInstance) updateSyncSetInstanceStatus(ssi *hivev1.SyncS
 	return nil
 }
 
-func (r *ReconcileSyncSetInstance) setUnknownObjectSyncCondition(syncSetConditions []hivev1.SyncCondition, err error, index int) []hivev1.SyncCondition {
+func (r *ReconcileSyncSetInstance) setUnknownObjectSyncCondition(syncSetConditions []hivev1.SyncCondition, err error) []hivev1.SyncCondition {
 	return controllerutils.SetSyncCondition(
 		syncSetConditions,
 		hivev1.UnknownObjectSyncCondition,
 		corev1.ConditionTrue,
 		unknownObjectFoundReason,
-		fmt.Sprintf("Unable to gather Info for SyncSet resource at index %v in resources: %v", index, err),
+		fmt.Sprintf("Unable to gather Info for SyncSet resource: %v", err),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 }
@@ -1005,7 +994,7 @@ func (r *ReconcileSyncSetInstance) clearUnknownObjectSyncCondition(syncSetCondit
 		hivev1.UnknownObjectSyncCondition,
 		corev1.ConditionFalse,
 		unknownObjectFoundReason,
-		fmt.Sprintf("Info available for all SyncSet resources"),
+		fmt.Sprintf("Info available for SyncSet resource"),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 }

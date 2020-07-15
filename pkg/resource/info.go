@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -15,6 +16,7 @@ type Info struct {
 	APIVersion string
 	Kind       string
 	Resource   string
+	Object     *unstructured.Unstructured
 }
 
 // Info determines the name/namespace and type of the passed in resource bytes
@@ -55,5 +57,6 @@ func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
 		Kind:       info.ResourceMapping().GroupVersionKind.Kind,
 		APIVersion: info.ResourceMapping().GroupVersionKind.GroupVersion().String(),
 		Resource:   info.ResourceMapping().Resource.Resource,
+		Object:     info.Object.(*unstructured.Unstructured),
 	}, nil
 }

@@ -187,11 +187,10 @@ func TestSyncSetReconcile(t *testing.T) {
 		{
 			name: "Check for failed info call, set condition",
 			syncSet: testSyncSetWithResources("foo",
-				testCM("cm1", "key1", "value1"),
 				testCM("info-error", "key2", "value2"),
 			),
 			validate: func(t *testing.T, ssi *hivev1.SyncSetInstance) {
-				validateUnknownObjectCondition(t, ssi.Status)
+				validateUnknownObjectCondition(t, ssi.Status.Resources[0])
 			},
 			expectRequeue: true,
 		},
@@ -671,7 +670,6 @@ func TestSyncSetReconcile(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			mockRemoteClientBuilder.EXPECT().RESTConfig().Return(nil, nil).AnyTimes()
 			mockRemoteClientBuilder.EXPECT().BuildDynamic().Return(dynamicClient, nil).AnyTimes()
-
 			r := &ReconcileSyncSetInstance{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
@@ -681,6 +679,7 @@ func TestSyncSetReconcile(t *testing.T) {
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				reapplyInterval:               2 * time.Hour,
 			}
+
 			rec, err := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      ssi.Name,
@@ -1292,12 +1291,21 @@ func (f *fakeHelper) Info(data []byte) (*resource.Info, error) {
 		return nil, fmt.Errorf("cannot determine info")
 	}
 
+	// convert the runtime.Object to unstructured.Unstructured
+	u := &unstructured.Unstructured{}
+	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r)
+	if err != nil {
+		return nil, err
+	}
+	u.Object = unstructuredObj
+
 	return &resource.Info{
 		Name:       obj.GetName(),
 		Namespace:  obj.GetNamespace(),
 		Kind:       r.GetObjectKind().GroupVersionKind().Kind,
 		APIVersion: r.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 		Resource:   r.GetObjectKind().GroupVersionKind().Kind,
+		Object:     u,
 	}, nil
 }
 
@@ -1417,9 +1425,9 @@ func validateSyncStatus(t *testing.T, actual, expected hivev1.SyncStatus) {
 	}
 }
 
-func validateUnknownObjectCondition(t *testing.T, status hivev1.SyncSetInstanceStatus) {
+func validateUnknownObjectCondition(t *testing.T, status hivev1.SyncStatus) {
 	if len(status.Conditions) != 1 {
-		t.Errorf("did not get the expected number of syncset level conditions (1)")
+		t.Errorf("did not get the expected number of syncset level conditions (1) for resource: %s", status.Name)
 		return
 	}
 	condition := status.Conditions[0]

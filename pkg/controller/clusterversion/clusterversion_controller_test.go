@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +25,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
@@ -76,6 +78,18 @@ func TestClusterVersionReconcile(t *testing.T) {
 				if !reflect.DeepEqual(cd.Status.ClusterVersionStatus, expected) {
 					t.Errorf("did not get expected clusterversion status. Expected: \n%#v\nGot: \n%#v", expected, cd.Status.ClusterVersionStatus)
 				}
+			},
+		},
+		{
+			name: "version in labels",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "2", cd.Labels[constants.VersionMajorLabel], "unexpected version major label")
+				assert.Equal(t, "2.3", cd.Labels[constants.VersionMajorMinorLabel], "unexpected version major-minor label")
+				assert.Equal(t, "2.3.4", cd.Labels[constants.VersionMajorMinorPatchLabel], "unexpected version major-minor-patch label")
 			},
 		},
 	}
@@ -199,6 +213,9 @@ func testRemoteClusterAPIClient() client.Client {
 func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {
 	zeroTime := metav1.NewTime(time.Unix(0, 0))
 	return &configv1.ClusterVersionStatus{
+		Desired: configv1.Update{
+			Version: "2.3.4+somebuild",
+		},
 		History: []configv1.UpdateHistory{
 			{
 				State:          configv1.CompletedUpdate,

@@ -241,6 +241,18 @@ const (
 
 	// VSphereDataStoreEnvVar is the environment variable specifying the vSphere default datastore.
 	VSphereDataStoreEnvVar = "GOVC_DATASTORE"
+
+	// VersionMajorLabel is a label applied to ClusterDeployments to show the version of the cluster
+	// in the form "[MAJOR]".
+	VersionMajorLabel = "hive.openshift.io/version-major"
+
+	// VersionMajorMinorLabel is a label applied to ClusterDeployments to show the version of the cluster
+	// in the form "[MAJOR].[MINOR]".
+	VersionMajorMinorLabel = "hive.openshift.io/version-major-minor"
+
+	// VersionMajorMinorPatchLabel is a label applied to ClusterDeployments to show the version of the cluster
+	// in the form "[MAJOR].[MINOR].[PATCH]".
+	VersionMajorMinorPatchLabel = "hive.openshift.io/version-major-minor-patch"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

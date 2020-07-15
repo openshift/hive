@@ -2,9 +2,11 @@ package clusterversion
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/blang/semver"
 	log "github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,6 +22,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -163,6 +166,20 @@ func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterD
 	if reflect.DeepEqual(cd.Status, origCD.Status) {
 		cdLog.Debug("status has not changed, nothing to update")
 		return nil
+	}
+
+	if version, err := semver.ParseTolerant(clusterVersion.Status.Desired.Version); err == nil {
+		if cd.Labels == nil {
+			cd.Labels = make(map[string]string, 3)
+		}
+		cd.Labels[constants.VersionMajorLabel] = fmt.Sprintf("%d", version.Major)
+		cd.Labels[constants.VersionMajorMinorLabel] = fmt.Sprintf("%d.%d", version.Major, version.Minor)
+		cd.Labels[constants.VersionMajorMinorPatchLabel] = fmt.Sprintf("%d.%d.%d", version.Major, version.Minor, version.Patch)
+	} else {
+		cdLog.WithField("version", clusterVersion.Status.Desired.Version).WithError(err).Warn("could not parse the cluster version")
+		delete(cd.Labels, constants.VersionMajorLabel)
+		delete(cd.Labels, constants.VersionMajorMinorLabel)
+		delete(cd.Labels, constants.VersionMajorMinorPatchLabel)
 	}
 
 	// Update cluster deployment status if changed:

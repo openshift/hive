@@ -160,7 +160,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	// Re-use existing AWS resources for generated MachineSets.
 	for _, ms := range installerMachineSets {
-		a.updateProviderConfig(ms, cd.Spec.ClusterMetadata.InfraID)
+		a.updateProviderConfig(ms, cd.Spec.ClusterMetadata.InfraID, pool)
 	}
 
 	return installerMachineSets, true, nil
@@ -233,7 +233,7 @@ func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 // updateProviderConfig modifies values in a MachineSet's AWSMachineProviderConfig.
 // Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
 // the values match the worker pool originally created by the installer.
-func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, infraID string) {
+func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, infraID string, pool *hivev1.MachinePool) {
 	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
 
 	// TODO: assumptions about pre-existing objects by name here is quite dangerous, it's already
@@ -249,15 +249,23 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 			}},
 		}
 	}
+
 	providerConfig.SecurityGroups = []awsprovider.AWSResourceReference{{
 		Filters: []awsprovider.Filter{{
 			Name:   "tag:Name",
 			Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
 		}},
 	}}
+	if pool.Spec.Platform.AWS.SpotMarketOptions != nil {
+		providerConfig.SpotMarketOptions = &awsprovider.SpotMarketOptions{
+			MaxPrice: pool.Spec.Platform.AWS.SpotMarketOptions.MaxPrice,
+		}
+	}
+
 	machineSet.Spec.Template.Spec.ProviderSpec = machineapi.ProviderSpec{
 		Value: &runtime.RawExtension{Object: providerConfig},
 	}
+
 }
 
 // getSubnetsByAvailabilityZones maps availability zones to subnet

@@ -1191,27 +1191,106 @@ func (r *ReconcileClusterDeployment) setClusterStatusURLs(cd *hivev1.ClusterDepl
 // linked to the parent cluster deployment gets a deletionTimestamp when the parent is deleted.
 // Normally we expect Kube garbage collection to do this for us, but in rare cases we've seen it
 // not working as intended.
-func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {
+func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (gone bool, returnErr error) {
 	if !cd.Spec.ManageDNS {
-		return nil, nil
+		return true, nil
 	}
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
-	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
-	if err != nil && !apierrors.IsNotFound(err) {
+	switch err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone); {
+	case apierrors.IsNotFound(err):
+		cdLog.Debug("dnszone has been removed from storage")
+		return true, nil
+	case err != nil:
 		cdLog.WithError(err).Error("error looking up managed dnszone")
-		return &reconcile.Result{}, err
+		return false, err
+	case !dnsZone.DeletionTimestamp.IsZero():
+		cdLog.Debug("dnszone has been deleted but is still in storage")
+		return false, nil
 	}
-	if apierrors.IsNotFound(err) || !dnsZone.DeletionTimestamp.IsZero() {
-		cdLog.Debug("dnszone has been deleted or is getting deleted")
-		return nil, nil
-	}
-	err = r.Delete(context.TODO(), dnsZone,
-		client.PropagationPolicy(metav1.DeletePropagationForeground))
-	if err != nil {
+	if err := r.Delete(context.TODO(), dnsZone); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting managed dnszone")
+		return false, err
 	}
-	return &reconcile.Result{}, err
+	return false, nil
+}
+
+func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (deprovisioned bool, returnErr error) {
+	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed
+	if cd.Spec.PreserveOnDelete {
+		if cd.Spec.Installed {
+			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
+			return true, nil
+		}
+		// Overriding PreserveOnDelete because we might have deleted the cluster deployment before it finished
+		// installing, which can cause AWS resources to leak
+		cdLog.Info("PreserveOnDelete=true but creating deprovisioning request as cluster was never successfully provisioned")
+	}
+
+	if cd.Spec.ClusterMetadata == nil {
+		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
+		return true, nil
+	}
+
+	// We do not yet support deprovision for BareMetal, for now skip deprovision and remove finalizer.
+	if cd.Spec.Platform.BareMetal != nil {
+		cdLog.Info("skipping deprovision for BareMetal cluster, removing finalizer")
+		return true, nil
+	}
+
+	// Generate a deprovision request
+	request, err := generateDeprovision(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("error generating deprovision request")
+		return false, err
+	}
+
+	cdLog.WithField("derivedObject", request.Name).Debug("Setting label on derived object")
+	request.Labels = k8slabels.AddLabel(request.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+	err = controllerutil.SetControllerReference(cd, request, r.scheme)
+	if err != nil {
+		cdLog.Errorf("error setting controller reference on deprovision request: %v", err)
+		return false, err
+	}
+
+	// Check if deprovision request already exists:
+	existingRequest := &hivev1.ClusterDeprovision{}
+	switch err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Name, Namespace: cd.Namespace}, existingRequest); {
+	case apierrors.IsNotFound(err):
+		cdLog.Info("creating deprovision request for cluster deployment")
+		switch err = r.Create(context.TODO(), request); {
+		case apierrors.IsAlreadyExists(err):
+			cdLog.Info("deprovision request already exists")
+			return false, nil
+		case err != nil:
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating deprovision request")
+			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
+			// the cluster go away.
+			ns := &corev1.Namespace{}
+			err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, ns)
+			if err != nil {
+				cdLog.WithError(err).Error("error checking for deletionTimestamp on namespace")
+				return false, err
+			}
+			if ns.DeletionTimestamp != nil {
+				cdLog.Warn("detected a namespace deleted before deprovision request could be created, giving up on deprovision and removing finalizer")
+				return true, err
+			}
+			return false, err
+		default:
+			return false, nil
+		}
+	case err != nil:
+		cdLog.WithError(err).Error("error getting deprovision request")
+		return false, err
+	}
+
+	if !existingRequest.Status.Completed {
+		cdLog.Debug("deprovision request not yet completed")
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
@@ -1236,10 +1315,8 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, nil
 	}
 
-	switch result, err := r.ensureManagedDNSZoneDeleted(cd, cdLog); {
-	case result != nil:
-		return *result, err
-	case err != nil:
+	dnsZoneGone, err := r.ensureManagedDNSZoneDeleted(cd, cdLog)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -1251,107 +1328,24 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 
-	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed
-	if cd.Spec.PreserveOnDelete {
-		if cd.Spec.Installed {
-			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
-			if controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-				err := r.removeClusterDeploymentFinalizer(cd, cdLog)
-				if err != nil {
-					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
-				}
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, nil
-		}
-		// Overriding PreserveOnDelete because we might have deleted the cluster deployment before it finished
-		// installing, which can cause AWS resources to leak
-		cdLog.Infof("PreserveOnDelete=true but creating deprovisioning request as cluster was never successfully provisioned")
-	}
-
-	if cd.Spec.ClusterMetadata == nil {
-		cdLog.Warn("skipping uninstall for cluster that never had clusterID set")
-		err := r.removeClusterDeploymentFinalizer(cd, cdLog)
-		if err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
-		}
-		return reconcile.Result{}, err
-	}
-
-	// We do not yet support deprovision for BareMetal, for now skip deprovision and remove finalizer.
-	if cd.Spec.Platform.BareMetal != nil {
-		cdLog.Info("skipping deprovision for BareMetal cluster, removing finalizer")
-		err := r.removeClusterDeploymentFinalizer(cd, cdLog)
-		if err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
-		}
-		return reconcile.Result{}, err
-	}
-
-	// Generate a deprovision request
-	request, err := generateDeprovision(cd)
+	deprovisioned, err := r.ensureClusterDeprovisioned(cd, cdLog)
 	if err != nil {
-		cdLog.WithError(err).Error("error generating deprovision request")
 		return reconcile.Result{}, err
 	}
 
-	cdLog.WithField("derivedObject", request.Name).Debug("Setting label on derived object")
-	request.Labels = k8slabels.AddLabel(request.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
-	err = controllerutil.SetControllerReference(cd, request, r.scheme)
-	if err != nil {
-		cdLog.Errorf("error setting controller reference on deprovision request: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Check if deprovision request already exists:
-	existingRequest := &hivev1.ClusterDeprovision{}
-	switch err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Name, Namespace: cd.Namespace}, existingRequest); {
-	case apierrors.IsNotFound(err):
-		cdLog.Info("creating deprovision request for cluster deployment")
-		switch err = r.Create(context.TODO(), request); {
-		case apierrors.IsAlreadyExists(err):
-			cdLog.Info("deprovision request already exists")
-			// requeue the clusterdeployment immediately to process the status of the deprovision request
-			return reconcile.Result{Requeue: true}, nil
-		case err != nil:
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating deprovision request")
-			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
-			// the cluster go away.
-			ns := &corev1.Namespace{}
-			err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, ns)
-			if err != nil {
-				cdLog.WithError(err).Error("error checking for deletionTimestamp on namespace")
-				return reconcile.Result{}, err
-			}
-			if ns.DeletionTimestamp != nil {
-				cdLog.Warn("detected a namespace deleted before deprovision request could be created, giving up on deprovision and removing finalizer")
-				err = r.removeClusterDeploymentFinalizer(cd, cdLog)
-				if err != nil {
-					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
-				}
-			}
+	switch {
+	case !deprovisioned:
+		return reconcile.Result{}, nil
+	case !dnsZoneGone:
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	default:
+		cdLog.Infof("DNSZone gone and deprovision request completed, removing finalizer")
+		if err := r.removeClusterDeploymentFinalizer(cd, cdLog); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 			return reconcile.Result{}, err
-		default:
-			return reconcile.Result{}, nil
 		}
-	case err != nil:
-		cdLog.WithError(err).Error("error getting deprovision request")
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
-
-	// Deprovision request exists, check whether it has completed
-	if existingRequest.Status.Completed {
-		cdLog.Infof("deprovision request completed, removing finalizer")
-		err = r.removeClusterDeploymentFinalizer(cd, cdLog)
-		if err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
-		}
-		return reconcile.Result{}, err
-	}
-
-	cdLog.Debug("deprovision request not yet completed")
-
-	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileClusterDeployment) stopProvisioning(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {

@@ -40,6 +40,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testclusterdeprovision "github.com/openshift/hive/pkg/test/clusterdeprovision"
 )
 
 const (
@@ -1222,6 +1223,134 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					assert.Truef(t, cdAsOwnerRef, "cluster deployment not owner of %s", secretName)
 				}
 			},
+		},
+		{
+			name: "delete finalizer when deprovision complete and dnszone gone",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.Completed(),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.NotContains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+			},
+		},
+		{
+			name: "wait for deprovision to complete",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+			},
+		},
+		{
+			name: "wait for dnszone to be gone",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.Completed(),
+				),
+				func() *hivev1.DNSZone {
+					dnsZone := testDNSZone()
+					now := metav1.Now()
+					dnsZone.DeletionTimestamp = &now
+					return dnsZone
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+			},
+			expectedRequeueAfter: defaultRequeueTime,
+		},
+		{
+			name: "do not wait for dnszone to be gone when not using managed dns",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.Completed(),
+				),
+				func() *hivev1.DNSZone {
+					dnsZone := testDNSZone()
+					now := metav1.Now()
+					dnsZone.DeletionTimestamp = &now
+					return dnsZone
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.NotContains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+			},
+		},
+		{
+			name: "wait for dnszone to be gone when install failed early",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					cd.Spec.ClusterMetadata = nil
+					return cd
+				}(),
+				func() *hivev1.DNSZone {
+					dnsZone := testDNSZone()
+					now := metav1.Now()
+					dnsZone.DeletionTimestamp = &now
+					return dnsZone
+				}(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+			},
+			expectedRequeueAfter: defaultRequeueTime,
 		},
 	}
 

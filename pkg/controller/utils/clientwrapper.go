@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/rest"
 
@@ -22,10 +24,17 @@ var (
 	},
 		[]string{"controller", "method", "resource", "remote", "status"},
 	)
+	metricKubeClientRequestSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "hive_kube_client_request_seconds",
+		Help: "Length of time for kubernetes client requests.",
+	},
+		[]string{"controller", "method", "resource", "remote", "status"},
+	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricKubeClientRequests)
+	metrics.Registry.MustRegister(metricKubeClientRequestSeconds)
 }
 
 // NewClientWithMetricsOrDie creates a new controller-runtime client with a wrapper which increments
@@ -89,6 +98,7 @@ type ControllerMetricsTripper struct {
 
 // RoundTrip implements the http RoundTripper interface.
 func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	startTime := time.Now()
 	remoteStr := "false"
 	if cmt.Remote {
 		remoteStr = "true"
@@ -96,8 +106,10 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	path, pathErr := parsePath(req.URL.Path)
 	// Call the nested RoundTripper.
 	resp, err := cmt.RoundTripper.RoundTrip(req)
+	applyTime := metav1.Now().Sub(startTime).Seconds()
 	if err == nil && pathErr == nil {
 		metricKubeClientRequests.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Inc()
+		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Observe(applyTime)
 	}
 
 	return resp, err

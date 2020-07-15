@@ -6,11 +6,9 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -193,24 +191,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			return err
 		}
 		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
-	}
-
-	// Due to bug with OLM not updating CRDs on upgrades, we are re-applying
-	// the latest in the operator to ensure updates roll out.
-	// TODO: Attempt removing this once Hive is running purely on 4.x,
-	// as it requires a significant privilege escalation we would rather
-	// leave in the hands of OLM.
-	crdFiles, err := assets.AssetDir("config/crds")
-	if err != nil {
-		return errors.Wrap(err, "error listing CRD asset files")
-	}
-	for _, a := range crdFiles {
-		crdPath := filepath.Join("config/crds", a)
-		// WARNING: we explicitly do not use the apply with garbage collection here as we do not want
-		// CRDs to be cleaned up if HiveConfig is deleted, which could be extremely destructive.
-		if err := util.ApplyAsset(h, crdPath, hLog); err != nil {
-			return errors.Wrapf(err, "unable to apply CRD %s", crdPath)
-		}
 	}
 
 	// In very rare cases we use OpenShift specific types which will not apply if running on

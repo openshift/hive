@@ -68,6 +68,11 @@ const (
 	secretsResource          = "secrets"
 	secretKind               = "Secret"
 	secretAPIVersion         = "v1"
+	labelApply               = "apply"
+	labelCreateOrUpdate      = "createOrUpdate"
+	labelCreateOnly          = "createOnly"
+	metricResultSuccess      = "success"
+	metricResultError        = "error"
 )
 
 var (
@@ -76,23 +81,41 @@ var (
 	metricTimeToApplySyncSet = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "hive_syncset_apply_duration_seconds",
-			Help:    "Time to apply syncset",
+			Help:    "Time to first successfully apply syncset to a cluster",
 			Buckets: []float64{5, 10, 30, 60, 300, 600, 1800, 3600},
 		},
 	)
 	metricTimeToApplySelectorSyncSet = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "hive_selectorsyncset_apply_duration_seconds",
-			Help:    "Time to apply selector syncset",
+			Help:    "Time to first successfully apply selector syncset to a cluster",
 			Buckets: []float64{5, 10, 30, 60, 300, 600, 1800, 3600},
 		},
 		[]string{"name"},
+	)
+
+	metricResourcesApplied = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_syncsetinstance_resources_applied_total",
+		Help: "Counter incremented each time we sync a resource to a remote cluster, labeled by type of apply and result.",
+	},
+		[]string{"type", "result"},
+	)
+
+	metricTimeToApplySyncSetResource = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_syncsetinstance_apply_duration_seconds",
+			Help:    "Time to apply individual resources in a syncset, labeled by type of apply and result.",
+			Buckets: []float64{0.5, 1, 3, 5, 10, 20, 30},
+		},
+		[]string{"type", "result"},
 	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricTimeToApplySyncSet)
 	metrics.Registry.MustRegister(metricTimeToApplySelectorSyncSet)
+	metrics.Registry.MustRegister(metricResourcesApplied)
+	metrics.Registry.MustRegister(metricTimeToApplySyncSetResource)
 }
 
 // Applier knows how to Apply, Patch and return Info for []byte arrays describing objects and patches.
@@ -637,11 +660,14 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	syncStatusList := []hivev1.SyncStatus{}
 
 	applyFn := h.Apply
+	applyFnMetricsLabel := labelApply
 	switch applyBehavior {
 	case hivev1.CreateOrUpdateSyncSetApplyBehavior:
 		applyFn = h.CreateOrUpdate
+		applyFnMetricsLabel = labelCreateOrUpdate
 	case hivev1.CreateOnlySyncSetApplyBehavior:
 		applyFn = h.Create
+		applyFnMetricsLabel = labelCreateOnly
 	}
 	// determine if we can gather info for the resource and apply it
 	var applyErr error
@@ -675,7 +701,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply(resourceSyncStatus, *rss, ssiLog) {
 			// Apply resource
 			ssiLog.Debug("applying resource")
-			applyErr = applyResource(info.Object, ssiLog, applyFn)
+			applyErr = applyResource(info.Object, ssiLog, applyFnMetricsLabel, applyFn)
 
 			var resourceSyncConditions []hivev1.SyncCondition
 			if rss != nil {
@@ -710,7 +736,9 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	return nil
 }
 
-func applyResource(u *unstructured.Unstructured, logger log.FieldLogger, applyFn func(obj []byte) (hiveresource.ApplyResult, error)) error {
+func applyResource(u *unstructured.Unstructured, logger log.FieldLogger, applyFnMetricLabel string, applyFn func(obj []byte) (hiveresource.ApplyResult, error)) error {
+
+	startTime := time.Now()
 	labels := u.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string, 1)
@@ -726,10 +754,17 @@ func applyResource(u *unstructured.Unstructured, logger log.FieldLogger, applyFn
 	}
 
 	applyResult, err := applyFn(bytes)
+	// Record the amount of time we took to apply this specific resource. When combined with the metric for duration of
+	// our kube client requests, we can get an idea how much time we're spending cpu bound vs network bound.
+	applyTime := metav1.Now().Sub(startTime).Seconds()
 	if err != nil {
 		logger.WithError(err).Warn("error applying resource")
+		metricResourcesApplied.WithLabelValues(applyFnMetricLabel, metricResultError).Inc()
+		metricTimeToApplySyncSetResource.WithLabelValues(applyFnMetricLabel, metricResultError).Observe(applyTime)
 	} else {
 		logger.WithField("applyResult", applyResult).Debug("resource applied")
+		metricResourcesApplied.WithLabelValues(applyFnMetricLabel, metricResultSuccess).Inc()
+		metricTimeToApplySyncSetResource.WithLabelValues(applyFnMetricLabel, metricResultSuccess).Observe(applyTime)
 	}
 	return err
 }

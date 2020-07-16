@@ -500,6 +500,11 @@ func (r *ReconcileSyncSetInstance) deleteSyncSetResources(ssi *hivev1.SyncSetIns
 		itemLog := ssiLog.WithField("resource", fmt.Sprintf("%s/%s", resourceStatus.Namespace, resourceStatus.Name)).
 			WithField("apiversion", resourceStatus.APIVersion).
 			WithField("kind", resourceStatus.Kind)
+		unknownObjectSyncCondition := controllerutils.FindSyncCondition(resourceStatus.Conditions, hivev1.UnknownObjectSyncCondition)
+		if unknownObjectSyncCondition != nil {
+			itemLog.Info("UnknownObject condition is set, skipping deletion")
+			continue
+		}
 		gv, err := schema.ParseGroupVersion(resourceStatus.APIVersion)
 		if err != nil {
 			itemLog.WithError(err).Warn("cannot parse resource apiVersion, skipping deletion")
@@ -1071,7 +1076,7 @@ func (r *ReconcileSyncSetInstance) setDeletionFailedSyncCondition(resourceSyncCo
 		corev1.ConditionTrue,
 		deletionFailedReason,
 		fmt.Sprintf("Failed to delete resource: %v", err),
-		controllerutils.UpdateConditionAlways)
+		controllerutils.UpdateConditionIfReasonOrMessageChange)
 }
 
 func (r *ReconcileSyncSetInstance) resourceHash(data []byte) string {

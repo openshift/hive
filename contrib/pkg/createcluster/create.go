@@ -150,6 +150,8 @@ type Options struct {
 	AdoptAdminUsername       string
 	AdoptAdminPassword       string
 	MachineNetwork           string
+	Labels                   []string
+	SkipMachinePools         bool
 
 	// AWS
 	AWSUserTags []string
@@ -219,10 +221,12 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
-				return
+				fmt.Printf("Completion error: %s\n", err)
+				os.Exit(1)
 			}
 			if err := opt.Validate(cmd); err != nil {
-				return
+				fmt.Printf("Validation error: %s\n", err)
+				os.Exit(1)
 			}
 			err := opt.Run()
 			if err != nil {
@@ -259,6 +263,8 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
+	flags.StringSliceVarP(&opt.Labels, "labels", "l", []string{}, "Label to apply to the ClusterDeployment (key=val)")
+	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -362,6 +368,14 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-admin-username, --adopt-admin-password")
 		}
 	}
+	if len(o.Labels) > 0 {
+		for _, ls := range o.Labels {
+			tokens := strings.Split(ls, "=")
+			if len(tokens) != 2 {
+				return fmt.Errorf("unable to parse key=value label: %s", ls)
+			}
+		}
+	}
 	return nil
 }
 
@@ -452,22 +466,29 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		return nil, err
 	}
 
+	labels := map[string]string{
+		hiveutilCreatedLabel: "true", // implied
+	}
+	for _, ls := range o.Labels {
+		tokens := strings.Split(ls, "=")
+		labels[tokens[0]] = tokens[1]
+	}
+
 	builder := &clusterresource.Builder{
-		Name:             o.Name,
-		Namespace:        o.Namespace,
-		WorkerNodesCount: o.WorkerNodesCount,
-		PullSecret:       pullSecret,
-		SSHPrivateKey:    sshPrivateKey,
-		SSHPublicKey:     sshPublicKey,
-		InstallOnce:      o.InstallOnce,
-		BaseDomain:       o.BaseDomain,
-		ManageDNS:        o.ManageDNS,
-		DeleteAfter:      o.DeleteAfter,
-		Labels: map[string]string{
-			hiveutilCreatedLabel: "true",
-		},
+		Name:               o.Name,
+		Namespace:          o.Namespace,
+		WorkerNodesCount:   o.WorkerNodesCount,
+		PullSecret:         pullSecret,
+		SSHPrivateKey:      sshPrivateKey,
+		SSHPublicKey:       sshPublicKey,
+		InstallOnce:        o.InstallOnce,
+		BaseDomain:         o.BaseDomain,
+		ManageDNS:          o.ManageDNS,
+		DeleteAfter:        o.DeleteAfter,
+		Labels:             labels,
 		InstallerManifests: manifestFileData,
 		MachineNetwork:     o.MachineNetwork,
+		SkipMachinePools:   o.SkipMachinePools,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
@@ -644,7 +665,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			CACert:          bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = oVirtProvider
-		builder.SkipMachinePoolGeneration = true
+		builder.SkipMachinePools = true
 	}
 
 	if len(o.ServingCert) != 0 {

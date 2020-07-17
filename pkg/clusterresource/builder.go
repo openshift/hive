@@ -106,8 +106,8 @@ type Builder struct {
 	// MachineNetwork is the subnet to use for the cluster's machine network.
 	MachineNetwork string
 
-	// SkipMachinePoolGeneration is set to skip generating MachinePool objects
-	SkipMachinePoolGeneration bool
+	// SkipMachinePools should be true if you do not want to manage MachineSets in-cluster once it is installed.
+	SkipMachinePools bool
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -158,7 +158,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 
 	var allObjects []runtime.Object
 	allObjects = append(allObjects, o.generateClusterDeployment())
-	if !o.SkipMachinePoolGeneration {
+	if !o.SkipMachinePools {
 		allObjects = append(allObjects, o.generateMachinePool())
 	}
 	installConfigSecret, err := o.generateInstallConfigSecret()

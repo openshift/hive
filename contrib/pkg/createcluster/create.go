@@ -72,12 +72,12 @@ AWS credentials. These are only relevant for creating a cluster on AWS. If
 --creds-file is used it will take precedence over these environment
 variables.
 
-GOVC_USERNAME and GOVC_PASSWORD - Are used to determine your vSphere 
+GOVC_USERNAME and GOVC_PASSWORD - Are used to determine your vSphere
 credentials.
 GOVC_TLS_CA_CERTS - Is used to provide CA certificates for communicating
 with the vSphere API.
 GOVC_NETWORK, GOVC_DATACENTER, GOVC_DATASTORE and GOVC_HOST (vCenter host)
-can be used as alternatives to the associated commandline argument. 
+can be used as alternatives to the associated commandline argument.
 These are only relevant for creating a cluster on vSphere.
 
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
@@ -150,6 +150,8 @@ type Options struct {
 	AdoptAdminPassword       string
 	MachineNetwork           string
 	Region                   string
+	Labels                   []string
+	SkipMachinePools         bool
 
 	// AWS
 	AWSUserTags []string
@@ -226,8 +228,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 			}
 			err := opt.Run()
 			if err != nil {
-				log.WithError(err).Error("Error")
-				os.Exit(1)
+				log.WithError(err).Fatal("Error")
 			}
 		},
 	}
@@ -260,6 +261,8 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
 	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, and GCP.")
+	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val)")
+	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -383,6 +386,12 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		}
 	}
 
+	for _, ls := range o.Labels {
+		tokens := strings.Split(ls, "=")
+		if len(tokens) != 2 {
+			return fmt.Errorf("unable to parse key=value label: %s", ls)
+		}
+	}
 	return nil
 }
 
@@ -473,22 +482,29 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		return nil, err
 	}
 
+	labels := map[string]string{
+		hiveutilCreatedLabel: "true", // implied
+	}
+	for _, ls := range o.Labels {
+		tokens := strings.Split(ls, "=")
+		labels[tokens[0]] = tokens[1]
+	}
+
 	builder := &clusterresource.Builder{
-		Name:             o.Name,
-		Namespace:        o.Namespace,
-		WorkerNodesCount: o.WorkerNodesCount,
-		PullSecret:       pullSecret,
-		SSHPrivateKey:    sshPrivateKey,
-		SSHPublicKey:     sshPublicKey,
-		InstallOnce:      o.InstallOnce,
-		BaseDomain:       o.BaseDomain,
-		ManageDNS:        o.ManageDNS,
-		DeleteAfter:      o.DeleteAfter,
-		Labels: map[string]string{
-			hiveutilCreatedLabel: "true",
-		},
+		Name:               o.Name,
+		Namespace:          o.Namespace,
+		WorkerNodesCount:   o.WorkerNodesCount,
+		PullSecret:         pullSecret,
+		SSHPrivateKey:      sshPrivateKey,
+		SSHPublicKey:       sshPublicKey,
+		InstallOnce:        o.InstallOnce,
+		BaseDomain:         o.BaseDomain,
+		ManageDNS:          o.ManageDNS,
+		DeleteAfter:        o.DeleteAfter,
+		Labels:             labels,
 		InstallerManifests: manifestFileData,
 		MachineNetwork:     o.MachineNetwork,
+		SkipMachinePools:   o.SkipMachinePools,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
@@ -668,6 +684,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			CACert:          bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = oVirtProvider
+		builder.SkipMachinePools = true
 	}
 
 	if len(o.ServingCert) != 0 {

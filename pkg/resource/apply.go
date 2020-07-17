@@ -3,9 +3,13 @@ package resource
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/jonboulle/clockwork"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	cliresource "k8s.io/cli-runtime/pkg/resource"
 	kresource "k8s.io/cli-runtime/pkg/resource"
 	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
 
@@ -47,11 +52,99 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 		return "", err
 	}
 	defer r.deleteTempFile(fileName)
+
 	factory, err := r.getFactory("")
 	if err != nil {
 		r.logger.WithError(err).Error("failed to obtain factory for apply")
 		return "", err
 	}
+
+	// TODO: Replace with a cluster version check, if this cluster is 4.5+ and thus Kube 1.18+, we should have
+	// server side apply available, which is drastically faster than the local approach which currently involves a file
+	// write.
+	if true {
+		info, err := r.getResourceInternalInfo(factory, obj)
+		if err != nil {
+			return "", err
+		}
+
+		// Send the full object to be applied on the server side.
+		data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
+		if err != nil {
+			return "", err
+			//return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
+		}
+
+		options := metav1.PatchOptions{
+			Force:        pointer.BoolPtr(true), // force conflicts?
+			FieldManager: "openshift-hive-syncset",
+		}
+
+		helper := cliresource.NewHelper(info.Client, info.Mapping)
+		/*
+			if o.DryRunStrategy == cmdutil.DryRunServer {
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return "", err
+				}
+				helper.DryRun(true)
+			}
+		*/
+		rObj, err := helper.Patch(
+			info.Namespace,
+			info.Name,
+			types.ApplyPatchType,
+			data,
+			&options,
+		)
+		if err != nil {
+			if isIncompatibleServerError(err) {
+				err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
+			}
+			if errors.IsConflict(err) {
+				err = fmt.Errorf(`%v
+Please review the fields above--they currently have other managers. Here
+are the ways you can resolve this warning:
+* If you intend to manage all of these fields, please re-run the apply
+  command with the `+"`--force-conflicts`"+` flag.
+* If you do not intend to manage all of the fields, please edit your
+  manifest to remove references to the fields that should keep their
+  current managers.
+* You may co-own fields by updating your manifest to match the existing
+  value; in this case, you'll become the manager if the other manager(s)
+  stop managing the field (remove it from their configuration).
+See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
+			}
+			return "", err
+		}
+
+		info.Refresh(rObj, true)
+
+		/*
+			if err := o.MarkObjectVisited(info); err != nil {
+				return err
+			}
+
+			if o.shouldPrintObject() {
+				return nil
+			}
+
+			printer, err := o.ToPrinter("serverside-applied")
+			if err != nil {
+				return err
+			}
+
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			return nil
+		*/
+
+		return UnchangedApplyResult, nil
+	}
+
+	// TODO: It should be possible to replace this approach and no longer write a temp file. Cesar noted there is an
+	// option to use an in-memory cache that was not available when this was originally written. Staying off disk should
+	// mean a major improvement even for older clusters without server side apply.
 	ioStreams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
 		Out:    &bytes.Buffer{},
@@ -70,6 +163,16 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 		return "", err
 	}
 	return changeTracker.GetResult(), nil
+}
+
+func isIncompatibleServerError(err error) bool {
+	// 415: Unsupported media type means we're talking to a server which doesn't
+	// support server-side apply.
+	if _, ok := err.(*errors.StatusError); !ok {
+		// Non-StatusError means the error isn't because the server is incompatible.
+		return false
+	}
+	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
 
 // ApplyRuntimeObject serializes an object and applies it to the target cluster specified by the kubeconfig.

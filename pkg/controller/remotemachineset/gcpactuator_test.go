@@ -556,7 +556,7 @@ func TestObtainLeaseChar(t *testing.T) {
 	}
 }
 
-func TestUseLeases(t *testing.T) {
+func TestRequireLeases(t *testing.T) {
 	cases := []struct {
 		name            string
 		clusterVersion  string
@@ -618,7 +618,7 @@ func TestUseLeases(t *testing.T) {
 			for i, n := range tc.machineSetNames {
 				machineSets[i].Name = n
 			}
-			actualResult := useLeases(tc.clusterVersion, machineSets)
+			actualResult := requireLeases(tc.clusterVersion, machineSets, log.WithFields(nil))
 			assert.Equal(t, tc.expectedResult, actualResult)
 		})
 	}

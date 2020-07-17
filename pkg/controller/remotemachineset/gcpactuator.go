@@ -83,7 +83,7 @@ func NewGCPActuator(
 		scheme:         scheme,
 		expectations:   expectations,
 		projectID:      projectID,
-		leasesRequired: useLeases(clusterVersion, remoteMachineSets),
+		leasesRequired: requireLeases(clusterVersion, remoteMachineSets, logger),
 	}
 	return actuator, nil
 }
@@ -116,7 +116,17 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	// If leases are required by the cluster version or existing "w" worker machinesets in the cluster or are already
 	// being used as indicated by the existence of MachinePoolLeases, then use leases for determining the machine pool
 	// name.
-	if a.leasesRequired || len(leases.Items) > 0 {
+	useLeases := true
+	switch {
+	case a.leasesRequired:
+		logger.Debug("using leases since they are required by the cluster")
+	case len(leases.Items) > 0:
+		logger.Debug("using leases since there are existing MachinePoolNameLeases")
+	default:
+		logger.Debug("not using leases")
+		useLeases = false
+	}
+	if useLeases {
 		leaseChar, proceed, err := a.obtainLease(pool, cd, leases)
 		if err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "error obtaining pool name lease")
@@ -371,9 +381,11 @@ func (a *GCPActuator) findAvailableLeaseChars(cd *hivev1.ClusterDeployment, leas
 	return keys, nil
 }
 
-func useLeases(clusterVersion string, remoteMachineSets []machineapi.MachineSet) bool {
+func requireLeases(clusterVersion string, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) bool {
+	logger = logger.WithField("clusterVersion", clusterVersion)
 	if v, err := semver.ParseTolerant(clusterVersion); err == nil {
 		if !versionsSupportingFullNames(v) {
+			logger.Debug("leases are required since cluster does not support full machine names")
 			return true
 		}
 	}
@@ -393,5 +405,10 @@ func useLeases(clusterVersion string, remoteMachineSets []machineapi.MachineSet)
 	// installer-created worker pool when there are Hive-managed pools that are not using leases. Hive will block
 	// through validation MachinePools with a pool name of "w", but the user could still create such machinesets on
 	// the cluster manually.
-	return poolNames["w"] && !poolNames["worker"]
+	if poolNames["w"] && !poolNames["worker"] {
+		logger.Debug("leases are required since there is a \"w\" machine pool in the cluster that is likely the installer-created worker pool")
+		return true
+	}
+	logger.Debug("leases are not required")
+	return false
 }

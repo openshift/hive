@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/resource"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -59,6 +60,8 @@ const (
 
 	// watchResyncInterval is used for a couple handcrafted watches we do with our own informers.
 	watchResyncInterval = 30 * time.Minute
+
+	controllerName = "hive"
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -231,8 +234,15 @@ type ReconcileHiveConfig struct {
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
 // and what is in the Hive.Spec
 func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	hLog := log.WithField("controller", "hive")
+	start := time.Now()
+	hLog := log.WithField("controller", controllerName)
 	hLog.Info("Reconciling Hive components")
+
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		hLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
 
 	// Fetch the Hive instance
 	instance := &hivev1.HiveConfig{}

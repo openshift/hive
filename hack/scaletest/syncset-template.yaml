@@ -15,15 +15,139 @@ objects:
     name: scaletest-${RESOURCE_INDEX}-configmap
   spec:
     resources:
+    # Create 10 unique configmaps in the default namespace for each set:
     - apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: scaletest-${RESOURCE_INDEX}-configmap
+        name: scaletest-${RESOURCE_INDEX}-configmap-0
         namespace: default
         labels:
           scaletest: "true"
       data:
         foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-1
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-2
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-3
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-4
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-5
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-6
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-7
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-8
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scaletest-${RESOURCE_INDEX}-configmap-9
+        namespace: default
+        labels:
+          scaletest: "true"
+      data:
+        foo: bar
+        a: asdddaasdjksdhlkajshdkljasdhlaksjdhlaksjdhlaksdhlaksjdhlaksjdhlkasjdhlkajsdhlaksjdhalksdjhalkdsjhlakshdhlkajssdhlkajsdhlaksjdhlkasjdhalksjdhalksjh
+        b: asdhakjsdhlaksdhlaksjsdhlkasjdhlkashdlkasdhlaksjdhlaksdhalskdjhalkdhaksljdhalksjdhaklsjdh
+        c: asjkdhaskjdhalksjdhaklsjdhlkjhllljkkkkkkkkkkkkkkkkkkkkkkhddhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        d: asdiuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu
+    resourceApplyMode: Sync
     clusterDeploymentSelector:
       matchLabels:
-        scaletest: "true"
+        # Added automatically by hiveutil create-cluster, so will match what we create in the adoption script:
+        hive.openshift.io/hiveutil-created: "true"

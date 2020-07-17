@@ -360,7 +360,8 @@ Run the Hive e2e script:
 Hive publishes a number of metrics that can be scraped by prometheus. If you do not have an in-cluster prometheus that can scrape hive's endpoint, you can deploy a stateless prometheus pod in the hive namespace with:
 
 ```
-oc apply -f config/prometheus
+oc apply -f config/prometheus/prometheus-configmap.yaml
+oc apply -f config/prometheus/prometheus-deployment.yaml
 oc port-forward svc/prometheus -n hive 9090:9090
 ```
 
@@ -368,4 +369,9 @@ Once the pods come up you should be able to view prometheus at http://localhost:
 
 Hive metrics have a hive_ or controller_runtime_ prefix.
 
-Note that this prometheus uses an emptyDir volume and all data is lost on pod restart.
+Note that this prometheus uses an emptyDir volume and all data is lost on pod restart. You can instead use the deployment yaml with pvc if desired:
+
+```
+oc apply -f config/prometheus/prometheus-deployment-with-pvc.yaml
+```
+

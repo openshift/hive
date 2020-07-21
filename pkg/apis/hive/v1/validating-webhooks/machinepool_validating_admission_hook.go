@@ -33,6 +33,7 @@ const (
 
 	defaultMasterPoolName = "master"
 	defaultWorkerPoolName = "worker"
+	legacyWorkerPoolName  = "w"
 )
 
 // MachinePoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -234,8 +235,10 @@ func validateMachinePoolName(pool *hivev1.MachinePool) field.ErrorList {
 	if pool.Name != fmt.Sprintf("%s-%s", pool.Spec.ClusterDeploymentRef.Name, pool.Spec.Name) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "name"), pool.Name, "name must be ${CD_NAME}-${POOL_NAME}, where ${CD_NAME} is the name of the clusterdeployment and ${POOL_NAME} is the name of the remote machine pool"))
 	}
-	if pool.Spec.Name == defaultMasterPoolName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "name"), pool.Spec.Name, fmt.Sprintf("pool name cannot be %q", defaultMasterPoolName)))
+	for _, invalidName := range []string{defaultMasterPoolName, legacyWorkerPoolName} {
+		if pool.Spec.Name == invalidName {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "name"), pool.Spec.Name, fmt.Sprintf("pool name cannot be %q", invalidName)))
+		}
 	}
 	return allErrs
 }

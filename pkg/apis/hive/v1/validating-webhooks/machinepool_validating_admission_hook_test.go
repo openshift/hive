@@ -148,6 +148,15 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			}(),
 		},
 		{
+			name: "legacy worker pool name",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Name = fmt.Sprintf("%s-%s", pool.Spec.ClusterDeploymentRef.Name, legacyWorkerPoolName)
+				pool.Spec.Name = legacyWorkerPoolName
+				return pool
+			}(),
+		},
+		{
 			name: "invalid name",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()

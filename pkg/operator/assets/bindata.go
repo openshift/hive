@@ -960,6 +960,7 @@ rules:
   - configmaps
   - events
   - persistentvolumeclaims
+  - namespaces
   verbs:
   - get
   - list
@@ -972,7 +973,6 @@ rules:
   - ""
   resources:
   - pods
-  - namespaces
   verbs:
   - get
   - list

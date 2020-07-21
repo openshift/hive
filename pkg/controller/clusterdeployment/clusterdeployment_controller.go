@@ -1650,6 +1650,12 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CertificatesSecretRef: cd.Spec.Platform.VSphere.CertificatesSecretRef,
 			VCenter:               cd.Spec.Platform.VSphere.VCenter,
 		}
+	case cd.Spec.Platform.Ovirt != nil:
+		req.Spec.Platform.Ovirt = &hivev1.OvirtClusterDeprovision{
+			CredentialsSecretRef:  cd.Spec.Platform.Ovirt.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.Ovirt.CertificatesSecretRef,
+			ClusterID:             cd.Spec.Platform.Ovirt.ClusterID,
+		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
 	}

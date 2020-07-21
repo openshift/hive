@@ -55,10 +55,12 @@ import (
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/openstack"
+	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
+	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 )
 
@@ -637,6 +639,20 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			},
 		}
 		uninstaller, err := vsphere.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+		return uninstaller.Run()
+	case cd.Spec.Platform.Ovirt != nil:
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Ovirt: &installertypesovirt.Metadata{
+					ClusterID: cd.Spec.Platform.Ovirt.ClusterID,
+				},
+			},
+		}
+		uninstaller, err := ovirt.New(logger, metadata)
 		if err != nil {
 			return err
 		}

@@ -3,8 +3,10 @@ package clusterpool
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -14,15 +16,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testgeneric "github.com/openshift/hive/pkg/test/generic"
+	testsecret "github.com/openshift/hive/pkg/test/secret"
 )
 
 const (
@@ -37,57 +39,208 @@ func init() {
 }
 
 func TestReconcileClusterPool(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	scheme := runtime.NewScheme()
+	hivev1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+
+	cdBuilder := func(name string) testcd.Builder {
+		return testcd.FullBuilder(name, name, scheme)
+	}
+	unclaimedCDBuilder := func(name string) testcd.Builder {
+		return cdBuilder(name).Options(
+			testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, hivev1.ClusterPoolStateUnclaimed),
+		)
+	}
+	secretBuilder := testsecret.FullBuilder(testNamespace, credsSecretName, scheme).Options(
+		testsecret.WithDataKeyValue("dummykey", []byte("dummyval")),
+	)
 
 	tests := []struct {
-		name      string
-		existing  []runtime.Object
-		expectErr bool
-		//validate                func(client.Client, *testing.T)
-		expectedClusters int
+		name                      string
+		existing                  []runtime.Object
+		expectedTotalClusters     int
+		expectedUnclaimedClusters int
+		expectedDeletedClusters   []string
+		expectFinalizerRemoved    bool
 	}{
 		{
 			name: "create all clusters",
 			existing: []runtime.Object{
 				buildPool(5),
-				buildSecret(corev1.SecretTypeOpaque, testNamespace, credsSecretName, "dummykey", "dummyval"),
+				secretBuilder.Build(),
 			},
-			expectedClusters: 5,
+			expectedTotalClusters:     5,
+			expectedUnclaimedClusters: 5,
 		},
 		{
 			name: "scale up",
 			existing: []runtime.Object{
 				buildPool(5),
-				buildSecret(corev1.SecretTypeOpaque, testNamespace, credsSecretName, "dummykey", "dummyval"),
-				testClusterDeployment("c1"),
-				testClusterDeployment("c2"),
-				testClusterDeployment("c3"),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
 			},
-			expectedClusters: 5,
+			expectedTotalClusters:     5,
+			expectedUnclaimedClusters: 5,
 		},
 		{
 			name: "scale down",
 			existing: []runtime.Object{
 				buildPool(3),
-				buildSecret(corev1.SecretTypeOpaque, testNamespace, credsSecretName, "dummykey", "dummyval"),
-				testClusterDeployment("c1"),
-				testClusterDeployment("c2"),
-				testClusterDeployment("c3"),
-				testClusterDeployment("c4"),
-				testClusterDeployment("c5"),
-				testClusterDeployment("c6"),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				unclaimedCDBuilder("c4").Build(),
+				unclaimedCDBuilder("c5").Build(),
+				unclaimedCDBuilder("c6").Build(),
 			},
-			expectedClusters: 3,
+			expectedTotalClusters:     3,
+			expectedUnclaimedClusters: 3,
+		},
+		{
+			name: "delete installing clusters first",
+			existing: []runtime.Object{
+				buildPool(1),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(),
+			},
+			expectedTotalClusters:     1,
+			expectedUnclaimedClusters: 1,
+			expectedDeletedClusters:   []string{"c2"},
+		},
+		{
+			name: "delete most recent installing clusters first",
+			existing: []runtime.Object{
+				buildPool(1),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").GenericOptions(
+					testgeneric.WithCreationTimestamp(time.Date(2020, 1, 2, 3, 4, 5, 6, time.UTC)),
+				).Build(),
+				unclaimedCDBuilder("c2").GenericOptions(
+					testgeneric.WithCreationTimestamp(time.Date(2020, 2, 2, 3, 4, 5, 6, time.UTC)),
+				).Build(),
+			},
+			expectedTotalClusters:     1,
+			expectedUnclaimedClusters: 1,
+			expectedDeletedClusters:   []string{"c2"},
+		},
+		{
+			name: "delete installed clusters when there are not enough installing to delete",
+			existing: []runtime.Object{
+				buildPool(3),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				unclaimedCDBuilder("c5").Build(testcd.Installed()),
+				unclaimedCDBuilder("c6").Build(),
+			},
+			expectedTotalClusters:     3,
+			expectedUnclaimedClusters: 3,
+			expectedDeletedClusters:   []string{"c3", "c6"},
+		},
+		{
+			name: "clusters deleted when clusterpool deleted",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					p := buildPool(3)
+					now := metav1.Now()
+					p.DeletionTimestamp = &now
+					return p
+				}(),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:     0,
+			expectedUnclaimedClusters: 0,
+			expectFinalizerRemoved:    true,
+		},
+		{
+			name: "finalizer added to clusterpool",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					p := buildPool(3)
+					p.Finalizers = nil
+					return p
+				}(),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:     3,
+			expectedUnclaimedClusters: 3,
+		},
+		{
+			name: "clusters not part of pool are not counted against pool size",
+			existing: []runtime.Object{
+				buildPool(3),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").Build(),
+			},
+			expectedTotalClusters:     4,
+			expectedUnclaimedClusters: 3,
+		},
+		{
+			name: "claimed clusters are not counted against pool size",
+			existing: []runtime.Object{
+				buildPool(3),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").Build(
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, hivev1.ClusterPoolStateClaimed),
+				),
+			},
+			expectedTotalClusters:     4,
+			expectedUnclaimedClusters: 3,
+		},
+		{
+			name: "clusters in different pool are not counted against pool size",
+			existing: []runtime.Object{
+				buildPool(3),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").Build(
+					testcd.WithClusterPoolReference(testNamespace, "other-pool", hivev1.ClusterPoolStateUnclaimed),
+				),
+			},
+			expectedTotalClusters:     4,
+			expectedUnclaimedClusters: 3,
+		},
+		{
+			name: "deleting clusters are not counted against pool size",
+			existing: []runtime.Object{
+				buildPool(3),
+				secretBuilder.Build(),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(),
+			},
+			expectedTotalClusters:     4,
+			expectedUnclaimedClusters: 3,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			//logger := log.WithField("controller", "clusterProvision")
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewFakeClientWithScheme(scheme, test.existing...)
 			rcp := &ReconcileClusterPool{
 				Client: fakeClient,
-				scheme: scheme.Scheme,
+				logger: log.WithFields(nil),
 			}
 
 			reconcileRequest := reconcile.Request{
@@ -98,40 +251,51 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 
 			_, err := rcp.Reconcile(reconcileRequest)
-
-			if test.expectErr {
-				assert.Error(t, err, "expected error from reconcile")
-			} else {
-				assert.NoError(t, err, "expected no error from reconcile")
-			}
+			require.NoError(t, err, "expected no error from reconcile")
 
 			cds := &hivev1.ClusterDeploymentList{}
 			err = fakeClient.List(context.Background(), cds)
 			require.NoError(t, err)
 
-			var deletingCDs int
+			assert.Len(t, cds.Items, test.expectedTotalClusters, "unexpected number of total clusters")
+
+			actualUnclaimedClusters := 0
+			poolRef := hivev1.ClusterPoolReference{
+				Namespace: testNamespace,
+				Name:      testLeasePoolName,
+				State:     hivev1.ClusterPoolStateUnclaimed,
+			}
 			for _, cd := range cds.Items {
-				if cd.DeletionTimestamp != nil {
-					deletingCDs++
+				if cd.Spec.ClusterPoolRef != nil && *cd.Spec.ClusterPoolRef == poolRef {
+					actualUnclaimedClusters++
+				}
+			}
+			assert.Equal(t, test.expectedUnclaimedClusters, actualUnclaimedClusters, "unexpected number of unclaimed clusters")
+
+			for _, expectedDeletedName := range test.expectedDeletedClusters {
+				for _, cd := range cds.Items {
+					assert.NotEqual(t, expectedDeletedName, cd.Name, "expected cluster to have been deleted")
 				}
 			}
 
-			assert.Equal(t, test.expectedClusters, len(cds.Items))
-
-			for _, cd := range cds.Items {
-				assert.Equal(t, testNamespace, cd.Spec.ClusterPoolRef.Namespace)
-				assert.Equal(t, testLeasePoolName, cd.Spec.ClusterPoolRef.Name)
-				assert.Equal(t, hivev1.ClusterPoolStateUnclaimed, cd.Spec.ClusterPoolRef.State)
+			pool := &hivev1.ClusterPool{}
+			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
+			assert.NoError(t, err, "unexpected error getting clusterpool")
+			if test.expectFinalizerRemoved {
+				assert.NotContains(t, pool.Finalizers, finalizer, "expected no finalizer on clusterpool")
+			} else {
+				assert.Contains(t, pool.Finalizers, finalizer, "expect finalizer on clusterpool")
 			}
 		})
 	}
 }
 
-func buildPool(size int) *hivev1.ClusterPool {
+func buildPool(size int32) *hivev1.ClusterPool {
 	return &hivev1.ClusterPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testLeasePoolName,
-			Namespace: testNamespace,
+			Name:       testLeasePoolName,
+			Namespace:  testNamespace,
+			Finalizers: []string{finalizer},
 		},
 		Spec: hivev1.ClusterPoolSpec{
 			Platform: hivev1.Platform{
@@ -158,49 +322,4 @@ func buildSecret(secretType corev1.SecretType, namespace, name, key, value strin
 		},
 	}
 	return s
-}
-
-func testClusterDeployment(clusterName string) *hivev1.ClusterDeployment {
-	cd := &hivev1.ClusterDeployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: hivev1.SchemeGroupVersion.String(),
-			Kind:       "ClusterDeployment",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       clusterName,
-			Namespace:  testNamespace,
-			Finalizers: []string{hivev1.FinalizerDeprovision},
-			UID:        types.UID("1234"),
-		},
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: clusterName,
-			PullSecretRef: &corev1.LocalObjectReference{
-				Name: "fakesecretref",
-			},
-			Platform: hivev1.Platform{
-				AWS: &hivev1aws.Platform{
-					CredentialsSecretRef: corev1.LocalObjectReference{
-						Name: "aws-credentials",
-					},
-					Region: "us-east-1",
-				},
-			},
-			Provisioning: &hivev1.Provisioning{
-				InstallConfigSecretRef: corev1.LocalObjectReference{Name: "install-config-secret"},
-			},
-			ClusterMetadata: &hivev1.ClusterMetadata{
-				ClusterID:                "fakeUUID",
-				InfraID:                  "fakeInfraID",
-				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "fakesecret1"},
-				AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: "fakesecret2"},
-			},
-			ClusterPoolRef: &hivev1.ClusterPoolReference{
-				Namespace: testNamespace,
-				Name:      testLeasePoolName,
-				State:     hivev1.ClusterPoolStateUnclaimed,
-			},
-		},
-	}
-
-	return cd
 }

@@ -8,6 +8,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	"github.com/openshift/hive/pkg/constants"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	azureinstallertypes "github.com/openshift/installer/pkg/types/azure"
@@ -28,6 +29,14 @@ type AzureCloudBuilder struct {
 
 	// BaseDomainResourceGroupName is the resource group where the base domain for this cluster is configured.
 	BaseDomainResourceGroupName string
+}
+
+func NewAzureCloudBuilderFromSecret(credsSecret *corev1.Secret, baseDomainResourceGroupName string) *AzureCloudBuilder {
+	azureSP := credsSecret.Data[constants.AzureCredentialsName]
+	return &AzureCloudBuilder{
+		ServicePrincipal:            azureSP,
+		BaseDomainResourceGroupName: baseDomainResourceGroupName,
+	}
 }
 
 func (p *AzureCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {

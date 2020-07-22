@@ -18,7 +18,7 @@ type ClusterPoolSpec struct {
 
 	// Size is the default number of clusters that we should keep provisioned and waiting for use.
 	// +required
-	Size int `json:"size"`
+	Size int32 `json:"size"`
 
 	// BaseDomain is the base domain to use for all clusters created in this pool.
 	// +required

@@ -34,6 +34,15 @@ type AWSCloudBuilder struct {
 	UserTags map[string]string
 }
 
+func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
+	accessKeyID := credsSecret.Data[constants.AWSAccessKeyIDSecretKey]
+	secretAccessKey := credsSecret.Data[constants.AWSSecretAccessKeySecretKey]
+	return &AWSCloudBuilder{
+		AccessKeyID:     string(accessKeyID),
+		SecretAccessKey: string(secretAccessKey),
+	}
+}
+
 func (p *AWSCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

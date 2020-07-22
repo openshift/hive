@@ -177,7 +177,7 @@ func (a *ClusterPoolValidatingAdmissionHook) validateCreate(admissionSpec *admis
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
-	allErrs = validateClusterPlatform(specPath, newObject.Spec.Platform, allErrs)
+	allErrs = append(allErrs, validateClusterPlatform(specPath, newObject.Spec.Platform)...)
 
 	if len(allErrs) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
@@ -237,7 +237,7 @@ func (a *ClusterPoolValidatingAdmissionHook) validateUpdate(admissionSpec *admis
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
-	allErrs = validateClusterPlatform(specPath, newObject.Spec.Platform, allErrs)
+	allErrs = append(allErrs, validateClusterPlatform(specPath, newObject.Spec.Platform)...)
 
 	if len(allErrs) > 0 {
 		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")

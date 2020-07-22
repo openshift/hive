@@ -247,8 +247,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	allErrs = validateClusterPlatform(specPath, newObject.Spec.Platform, allErrs)
-	allErrs = validateCanManageDNSForClusterPlatform(specPath, newObject.Spec, allErrs)
+	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), newObject.Spec.Platform)...)
+	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, newObject.Spec)...)
 
 	if newObject.Spec.Provisioning != nil {
 		if newObject.Spec.Provisioning.SSHPrivateKeySecretRef != nil && newObject.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
@@ -277,13 +277,12 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 }
 
-func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, allErrs field.ErrorList) field.ErrorList {
-	platformPath := specPath.Child("platform")
+func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.ErrorList {
+	allErrs := field.ErrorList{}
 	numberOfPlatforms := 0
-	if platform.AWS != nil {
+	if aws := platform.AWS; aws != nil {
 		numberOfPlatforms++
-		aws := platform.AWS
-		awsPath := platformPath.Child("aws")
+		awsPath := path.Child("aws")
 		if aws.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsSecretRef", "name"), "must specify secrets for AWS access"))
 		}
@@ -291,10 +290,9 @@ func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, all
 			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
 		}
 	}
-	if platform.Azure != nil {
+	if azure := platform.Azure; azure != nil {
 		numberOfPlatforms++
-		azure := platform.Azure
-		azurePath := platformPath.Child("azure")
+		azurePath := path.Child("azure")
 		if azure.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(azurePath.Child("credentialsSecretRef", "name"), "must specify secrets for Azure access"))
 		}
@@ -305,10 +303,9 @@ func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, all
 			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
 		}
 	}
-	if platform.GCP != nil {
+	if gcp := platform.GCP; gcp != nil {
 		numberOfPlatforms++
-		gcp := platform.GCP
-		gcpPath := platformPath.Child("gcp")
+		gcpPath := path.Child("gcp")
 		if gcp.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(gcpPath.Child("credentialsSecretRef", "name"), "must specify secrets for GCP access"))
 		}
@@ -316,10 +313,9 @@ func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, all
 			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
 		}
 	}
-	if platform.OpenStack != nil {
+	if openstack := platform.OpenStack; openstack != nil {
 		numberOfPlatforms++
-		openstack := platform.OpenStack
-		openstackPath := platformPath.Child("openStack")
+		openstackPath := path.Child("openStack")
 		if openstack.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(openstackPath.Child("credentialsSecretRef", "name"), "must specify secrets for OpenStack access"))
 		}
@@ -327,10 +323,9 @@ func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, all
 			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
 		}
 	}
-	if platform.VSphere != nil {
+	if vsphere := platform.VSphere; vsphere != nil {
 		numberOfPlatforms++
-		vsphere := platform.VSphere
-		vspherePath := platformPath.Child("vsphere")
+		vspherePath := path.Child("vsphere")
 		if vsphere.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
 		}
@@ -347,10 +342,9 @@ func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, all
 			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
 		}
 	}
-	if platform.Ovirt != nil {
+	if ovirt := platform.Ovirt; ovirt != nil {
 		numberOfPlatforms++
-		ovirt := platform.Ovirt
-		ovirtPath := platformPath.Child("ovirt")
+		ovirtPath := path.Child("ovirt")
 		if ovirt.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(ovirtPath.Child("credentialsSecretRef", "name"), "must specify secrets for oVirt access"))
 		}
@@ -364,19 +358,20 @@ func validateClusterPlatform(specPath *field.Path, platform hivev1.Platform, all
 			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_storage_domain_id"), "must specify ovirt_storage_domain_id"))
 		}
 	}
-	if platform.BareMetal != nil {
+	if baremetal := platform.BareMetal; baremetal != nil {
 		numberOfPlatforms++
 	}
 	switch {
 	case numberOfPlatforms == 0:
-		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))
+		allErrs = append(allErrs, field.Required(path, "must specify a platform"))
 	case numberOfPlatforms > 1:
-		allErrs = append(allErrs, field.Invalid(platformPath, platform, "must specify only a single platform"))
+		allErrs = append(allErrs, field.Invalid(path, platform, "must specify only a single platform"))
 	}
 	return allErrs
 }
 
-func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.ClusterDeploymentSpec, allErrs field.ErrorList) field.ErrorList {
+func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.ClusterDeploymentSpec) field.ErrorList {
+	allErrs := field.ErrorList{}
 	canManageDNS := false
 	if spec.Platform.AWS != nil {
 		canManageDNS = true

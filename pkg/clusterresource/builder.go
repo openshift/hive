@@ -4,15 +4,15 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -109,9 +109,6 @@ type Builder struct {
 
 	// SkipMachinePoolGeneration is set to skip generating MachinePool objects
 	SkipMachinePoolGeneration bool
-
-	// ClusterPool is an optional reference to a ClusterPool this ClusterDeployment is a part of.
-	ClusterPool types.NamespacedName
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -161,6 +158,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	}
 
 	var allObjects []runtime.Object
+	allObjects = append(allObjects, o.generateClusterDeployment())
 	if !o.SkipMachinePoolGeneration {
 		allObjects = append(allObjects, o.generateMachinePool())
 	}
@@ -200,8 +198,6 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 			allObjects = append(allObjects, o.generateAdoptedAdminPasswordSecret())
 		}
 	}
-
-	allObjects = append(allObjects, o.generateClusterDeployment())
 
 	return allObjects, nil
 }
@@ -285,14 +281,6 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
 	} else if o.ImageSet != "" {
 		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: o.ImageSet}
-	}
-
-	if o.ClusterPool.Name != "" {
-		cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
-			Namespace: o.ClusterPool.Namespace,
-			Name:      o.ClusterPool.Name,
-			State:     hivev1.ClusterPoolStateUnclaimed,
-		}
 	}
 
 	cd.Spec.Provisioning.InstallConfigSecretRef = corev1.LocalObjectReference{Name: o.getInstallConfigSecretName()}

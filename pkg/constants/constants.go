@@ -43,9 +43,10 @@ const (
 	// ClusterProvisionNameLabel is the label that is used to identify a relationship to a given cluster provision object.
 	ClusterProvisionNameLabel = "hive.openshift.io/cluster-provision-name"
 
-	// OriginClusterPoolNameLabel is the label that is used to signal that a cluster was originally created for a ClusterPool.
-	// It should always remain set even after a cluster is assigned to fill a request and thus removed from the pool.
-	OriginClusterPoolNameLabel = "hive.openshift.io/origin-cluster-pool-name"
+	// ClusterPoolNameLabel is the label that is used to signal that a namespace was created to house a
+	// ClusterDeployment created for a ClusterPool. The label is used to reap namespaces after the ClusterDeployment
+	// has been deleted.
+	ClusterPoolNameLabel = "hive.openshift.io/cluster-pool-name"
 
 	// SyncSetNameLabel is the label that is used to identify a relationship to a given syncset object.
 	SyncSetNameLabel = "hive.openshift.io/syncset-name"

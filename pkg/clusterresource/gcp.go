@@ -3,6 +3,7 @@ package clusterresource
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -12,6 +13,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/gcpclient"
 )
 
 const (
@@ -28,6 +30,18 @@ type GCPCloudBuilder struct {
 
 	// ProjectID is the GCP project to use.
 	ProjectID string
+}
+
+func NewGCPCloudBuilderFromSecret(credsSecret *corev1.Secret) (*GCPCloudBuilder, error) {
+	gcpSA := credsSecret.Data[constants.GCPCredentialsName]
+	projectID, err := gcpclient.ProjectID(gcpSA)
+	if err != nil {
+		return nil, errors.Wrap(err, "error loading GCP project ID from service account json")
+	}
+	return &GCPCloudBuilder{
+		ServiceAccount: gcpSA,
+		ProjectID:      projectID,
+	}, nil
 }
 
 func (p *GCPCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {

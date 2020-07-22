@@ -98,3 +98,19 @@ func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 		clusterDeployment.Status.Conditions = append(clusterDeployment.Status.Conditions, cond)
 	}
 }
+
+func WithClusterPoolReference(namespace, name string, state hivev1.ClusterPoolState) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+			Namespace: namespace,
+			Name:      name,
+			State:     state,
+		}
+	}
+}
+
+func Installed() Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Installed = true
+	}
+}

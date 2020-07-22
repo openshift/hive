@@ -2,7 +2,7 @@ package clusterpool
 
 import (
 	"context"
-	"fmt"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -11,12 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -30,11 +26,11 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/gcpclient"
 )
 
 const (
 	ControllerName = "clusterpool"
+	finalizer      = "hive.openshift.io/clusters"
 )
 
 // Add creates a new ClusterPool Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -47,7 +43,7 @@ func Add(mgr manager.Manager) error {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileClusterPool{
 		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
-		scheme: mgr.GetScheme(),
+		logger: log.WithField("controller", ControllerName),
 	}
 	return r
 }
@@ -89,16 +85,6 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	r.(*ReconcileClusterPool).dynamicClient, err = dynamic.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-
-	r.(*ReconcileClusterPool).discoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -107,19 +93,14 @@ var _ reconcile.Reconciler = &ReconcileClusterPool{}
 // ReconcileClusterPool reconciles a CLusterLeasePool object
 type ReconcileClusterPool struct {
 	client.Client
-	scheme          *runtime.Scheme
-	dynamicClient   dynamic.Interface
-	discoveryClient discovery.DiscoveryInterface
+	logger log.FieldLogger
 }
 
 // Reconcile reads the state of the ClusterPool, checks if we currently have enough ClusterDeployments waiting, and
 // attempts to reach the desired state if not.
 func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	logger := log.WithFields(log.Fields{
-		"clusterPool": request.Name,
-		"controller":  ControllerName,
-	})
+	logger := r.logger.WithField("clusterPool", request.Name)
 
 	logger.Infof("reconciling cluster pool: %v", request.Name)
 	defer func() {
@@ -143,23 +124,25 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	// If the pool is deleted, do not reconcile.
+	// If the pool is deleted, clear finalizer once all ClusterDeployments have been deleted.
 	if clp.DeletionTimestamp != nil {
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, r.reconcileDeletedPool(clp, logger)
+	}
+
+	// Add finalizer if not already present
+	if !controllerutils.HasFinalizer(clp, finalizer) {
+		logger.Debug("adding finalizer to ClusterPool")
+		controllerutils.AddFinalizer(clp, finalizer)
+		if err := r.Update(context.Background(), clp); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer to ClusterPool")
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Find all ClusterDeployments from this pool:
-	allCDs := &hivev1.ClusterDeploymentList{}
-	if err := r.Client.List(context.Background(), allCDs); err != nil {
-		logger.WithError(err).Error("error listing ClusterDeployments")
+	poolCDs, err := r.getAllUnclaimedClusterDeployments(clp, logger)
+	if err != nil {
 		return reconcile.Result{}, err
-	}
-	var poolCDs []*hivev1.ClusterDeployment
-	for i := range allCDs.Items {
-		cd := &allCDs.Items[i]
-		if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.Name == clp.Name && cd.Spec.ClusterPoolRef.Namespace == clp.Namespace {
-			poolCDs = append(poolCDs, cd)
-		}
 	}
 
 	installing := 0
@@ -178,16 +161,15 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		"ready":      len(poolCDs) - installing - deleting,
 	}).Info("found clusters for ClusterPool")
 
+	switch drift := len(poolCDs) - deleting - int(clp.Spec.Size); {
 	// If too many, delete some.
-	// TODO: improve logic here, delete oldest, or delete still installing in favor of those that are ready
-	if len(poolCDs)-deleting > clp.Spec.Size {
-		deletionsNeeded := len(poolCDs) - deleting - clp.Spec.Size
-		if err := r.deleteExcessClusters(clp, poolCDs, deletionsNeeded, logger); err != nil {
+	case drift > 0:
+		if err := r.deleteExcessClusters(clp, poolCDs, drift, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-	} else if len(poolCDs)-deleting < clp.Spec.Size {
-		// If too few, create new InstallConfig and ClusterDeployment.
-		if err := r.addClusters(clp, clp.Spec.Size-len(poolCDs)+deleting, logger); err != nil {
+	// If too few, create new InstallConfig and ClusterDeployment.
+	case drift < 0:
+		if err := r.addClusters(clp, -drift, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
@@ -215,12 +197,12 @@ func (r *ReconcileClusterPool) createCluster(
 	clp *hivev1.ClusterPool,
 	logger log.FieldLogger) error {
 
-	ns, err := r.obtainRandomNamespace(clp)
+	ns, err := r.createRandomNamespace(clp)
 	if err != nil {
 		logger.WithError(err).Error("error obtaining random namespace")
 		return err
 	}
-	logger.Infof("Creating new cluster in namespace: %s", ns.Name)
+	logger.WithField("cluster", ns.Name).Info("Creating new cluster")
 
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
@@ -231,7 +213,6 @@ func (r *ReconcileClusterPool) createCluster(
 		ReleaseImage:     "quay.io/openshift-release-dev/ocp-release:4.3.3-x86_64",
 		WorkerNodesCount: int64(3),
 		MachineNetwork:   "10.0.0.0/16",
-		ClusterPool:      types.NamespacedName{Namespace: clp.Namespace, Name: clp.Name},
 	}
 
 	// Load the pull secret if one is specified (may not be if using a global pull secret)
@@ -248,61 +229,29 @@ func (r *ReconcileClusterPool) createCluster(
 	}
 
 	// TODO: regions being ignored throughout, and not exposed in create-cluster cmd either
-	var credsSecretName string
-	if clp.Spec.Platform.AWS != nil {
-		credsSecretName = clp.Spec.Platform.AWS.CredentialsSecretRef.Name
-		// Lookup the platform creds secret for this pool:
-		credsSecret := &corev1.Secret{}
-		if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: clp.Namespace, Name: credsSecretName}, credsSecret); err != nil {
-			logger.WithError(err).Error("error looking up credentials secret for pool in hive namespace")
-			return err
-		}
-
-		accessKeyID := credsSecret.Data[constants.AWSAccessKeyIDSecretKey]
-		secretAccessKey := credsSecret.Data[constants.AWSSecretAccessKeySecretKey]
-		awsProvider := &clusterresource.AWSCloudBuilder{
-			AccessKeyID:     string(accessKeyID),
-			SecretAccessKey: string(secretAccessKey),
-		}
-		builder.CloudBuilder = awsProvider
-
-	} else if clp.Spec.Platform.GCP != nil {
-		credsSecretName = clp.Spec.Platform.GCP.CredentialsSecretRef.Name
-		// Lookup the platform creds secret for this pool:
-		credsSecret := &corev1.Secret{}
-		if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: clp.Namespace, Name: credsSecretName}, credsSecret); err != nil {
-			logger.WithError(err).Error("error looking up credentials secret for pool in hive namespace")
-			return err
-		}
-
-		gcpSA := credsSecret.Data[constants.GCPCredentialsName]
-
-		projectID, err := gcpclient.ProjectID(gcpSA)
+	switch platform := clp.Spec.Platform; {
+	case platform.AWS != nil:
+		credsSecret, err := r.getCredentialsSecret(clp, platform.AWS.CredentialsSecretRef.Name, logger)
 		if err != nil {
-			return errors.Wrap(err, "error loading GCP project ID from service account json")
-		}
-
-		gcpProvider := &clusterresource.GCPCloudBuilder{
-			ServiceAccount: gcpSA,
-			ProjectID:      projectID,
-		}
-		builder.CloudBuilder = gcpProvider
-
-	} else if clp.Spec.Platform.Azure != nil {
-		credsSecretName = clp.Spec.Platform.Azure.CredentialsSecretRef.Name
-		// Lookup the platform creds secret for this pool:
-		credsSecret := &corev1.Secret{}
-		if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: clp.Namespace, Name: credsSecretName}, credsSecret); err != nil {
-			logger.WithError(err).Error("error looking up credentials secret for pool in hive namespace")
 			return err
 		}
-		azureSP := credsSecret.Data[constants.AzureCredentialsName]
-
-		azureProvider := &clusterresource.AzureCloudBuilder{
-			ServicePrincipal:            azureSP,
-			BaseDomainResourceGroupName: clp.Spec.Platform.Azure.BaseDomainResourceGroupName,
+		builder.CloudBuilder = clusterresource.NewAWSCloudBuilderFromSecret(credsSecret)
+	case platform.GCP != nil:
+		credsSecret, err := r.getCredentialsSecret(clp, platform.GCP.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return err
 		}
-		builder.CloudBuilder = azureProvider
+		cloudBuilder, err := clusterresource.NewGCPCloudBuilderFromSecret(credsSecret)
+		if err != nil {
+			return err
+		}
+		builder.CloudBuilder = cloudBuilder
+	case platform.Azure != nil:
+		credsSecret, err := r.getCredentialsSecret(clp, platform.Azure.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return err
+		}
+		builder.CloudBuilder = clusterresource.NewAzureCloudBuilderFromSecret(credsSecret, platform.Azure.BaseDomainResourceGroupName)
 	}
 	// TODO: OpenStack, VMware, and Ovirt.
 
@@ -310,6 +259,18 @@ func (r *ReconcileClusterPool) createCluster(
 	if err != nil {
 		return errors.Wrap(err, "error building resources")
 	}
+	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
+	for i, obj := range objs {
+		cd, ok := obj.(*hivev1.ClusterDeployment)
+		if !ok {
+			continue
+		}
+		poolRef := poolReference(clp)
+		cd.Spec.ClusterPoolRef = &poolRef
+		lastIndex := len(objs) - 1
+		objs[i], objs[lastIndex] = objs[lastIndex], objs[i]
+	}
+	// Create the resources.
 	for _, obj := range objs {
 		if err := r.Client.Create(context.Background(), obj); err != nil {
 			return err
@@ -319,14 +280,14 @@ func (r *ReconcileClusterPool) createCluster(
 	return nil
 }
 
-func (r *ReconcileClusterPool) obtainRandomNamespace(clp *hivev1.ClusterPool) (*corev1.Namespace, error) {
+func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*corev1.Namespace, error) {
 	namespaceName := apihelpers.GetResourceName(clp.Name, utilrand.String(5))
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
 			Labels: map[string]string{
 				// Should never be removed.
-				constants.OriginClusterPoolNameLabel: clp.Name,
+				constants.ClusterPoolNameLabel: clp.Name,
 			},
 		},
 	}
@@ -340,24 +301,112 @@ func (r *ReconcileClusterPool) deleteExcessClusters(
 	deletionsNeeded int,
 	logger log.FieldLogger) error {
 
-	logger.Infof("too many clusters, searching for %d to delete", deletionsNeeded)
-	counter := 0
+	logger.WithField("deletionsNeeded", deletionsNeeded).Info("deleting excess clusters")
+	var installingClusters []*hivev1.ClusterDeployment
+	var installedClusters []*hivev1.ClusterDeployment
 	for _, cd := range poolCDs {
-		cdLog := logger.WithField("cluster", fmt.Sprintf("%s/%s", cd.Namespace, cd.Name))
-		if cd.DeletionTimestamp != nil {
-			cdLog.WithFields(log.Fields{"cdName": cd.Name, "cdNamespace": cd.Namespace}).Debug("cluster already deleting")
-			continue
-		}
-		cdLog.Info("deleting cluster deployment")
-		if err := r.Client.Delete(context.Background(), cd); err != nil {
-			cdLog.WithError(err).Error("error deleting cluster deployment")
-			return err
-		}
-		counter += 1
-		if counter == deletionsNeeded {
-			logger.Info("no more deletions required")
-			break
+		logger := logger.WithField("cluster", cd.Name)
+		switch {
+		case cd.DeletionTimestamp != nil:
+			logger.Debug("cluster already deleting")
+		case cd.Spec.Installed:
+			logger.Debug("cluster is installed")
+			installedClusters = append(installedClusters, cd)
+		default:
+			logger.Debug("cluster is installing")
+			installingClusters = append(installingClusters, cd)
 		}
 	}
+	clustersToDelete := make([]*hivev1.ClusterDeployment, 0, deletionsNeeded)
+	if deletionsNeeded < len(installingClusters) {
+		// Sort the installing clusters in order by creation timestamp from newest to oldest. This has the effect of
+		// prioritizing deleting those clusters that have the longest time until they are installed.
+		sort.Slice(installingClusters, func(i, j int) bool {
+			return installingClusters[i].CreationTimestamp.After(installingClusters[j].CreationTimestamp.Time)
+		})
+		clustersToDelete = installingClusters[:deletionsNeeded]
+	} else {
+		clustersToDelete = append(clustersToDelete, installingClusters...)
+		deletionsOfInstalledClustersNeeded := deletionsNeeded - len(installingClusters)
+		if deletionsOfInstalledClustersNeeded <= len(installedClusters) {
+			clustersToDelete = append(clustersToDelete, installedClusters[:deletionsOfInstalledClustersNeeded]...)
+		} else {
+			logger.WithField("deletionsNeeded", deletionsNeeded).
+				WithField("installingClusters", len(installingClusters)).
+				WithField("installedClusters", len(installedClusters)).
+				Error("trying to delete more clusters than there are available")
+			clustersToDelete = append(clustersToDelete, installedClusters...)
+		}
+	}
+	for _, cd := range clustersToDelete {
+		logger := logger.WithField("cluster", cd.Name)
+		logger.Info("deleting cluster deployment")
+		if err := r.Client.Delete(context.Background(), cd); err != nil {
+			logger.WithError(err).Error("error deleting cluster deployment")
+			return err
+		}
+	}
+	logger.Info("no more deletions required")
 	return nil
+}
+
+func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, logger log.FieldLogger) error {
+	if !controllerutils.HasFinalizer(pool, finalizer) {
+		return nil
+	}
+	poolCDs, err := r.getAllUnclaimedClusterDeployments(pool, logger)
+	if err != nil {
+		return err
+	}
+	for _, cd := range poolCDs {
+		if cd.DeletionTimestamp != nil {
+			continue
+		}
+		if err := r.Delete(context.Background(), cd); err != nil {
+			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete ClusterDeployment")
+			return errors.Wrap(err, "could not delete ClusterDeployment")
+		}
+	}
+	controllerutils.DeleteFinalizer(pool, finalizer)
+	if err := r.Update(context.Background(), pool); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer from ClusterPool")
+		return errors.Wrap(err, "could not delete finalizer from ClusterPool")
+	}
+	return nil
+}
+
+func (r *ReconcileClusterPool) getAllUnclaimedClusterDeployments(pool *hivev1.ClusterPool, logger log.FieldLogger) ([]*hivev1.ClusterDeployment, error) {
+	cdList := &hivev1.ClusterDeploymentList{}
+	if err := r.Client.List(context.Background(), cdList); err != nil {
+		logger.WithError(err).Error("error listing ClusterDeployments")
+		return nil, err
+	}
+	var poolCDs []*hivev1.ClusterDeployment
+	for i, cd := range cdList.Items {
+		if refInCD := cd.Spec.ClusterPoolRef; refInCD != nil && *refInCD == poolReference(pool) {
+			poolCDs = append(poolCDs, &cdList.Items[i])
+		}
+	}
+	return poolCDs, nil
+}
+
+func poolReference(pool *hivev1.ClusterPool) hivev1.ClusterPoolReference {
+	return hivev1.ClusterPoolReference{
+		Name:      pool.Name,
+		Namespace: pool.Namespace,
+		State:     hivev1.ClusterPoolStateUnclaimed,
+	}
+}
+
+func (r *ReconcileClusterPool) getCredentialsSecret(pool *hivev1.ClusterPool, secretName string, logger log.FieldLogger) (*corev1.Secret, error) {
+	credsSecret := &corev1.Secret{}
+	if err := r.Client.Get(
+		context.Background(),
+		client.ObjectKey{Namespace: pool.Namespace, Name: secretName},
+		credsSecret,
+	); err != nil {
+		logger.WithError(err).Error("error looking up credentials secret for pool in hive namespace")
+		return nil, err
+	}
+	return credsSecret, nil
 }

@@ -1397,6 +1397,21 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			expectedRequeueAfter: defaultRequeueTime,
 		},
+		{
+			name: "set InstallLaunchErrorCondition when install pod is stuck in pending phase",
+			existing: []runtime.Object{
+				testClusterDeploymentWithProvision(),
+				testProvisionWithStuckInstallPod(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.InstallLaunchErrorCondition, "PodInPendingPhase")
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1827,6 +1842,19 @@ func testFailedProvisionTime(time time.Time) *hivev1.ClusterProvision {
 			Type:               hivev1.ClusterProvisionFailedCondition,
 			Status:             corev1.ConditionTrue,
 			LastTransitionTime: metav1.NewTime(time),
+		},
+	}
+	return provision
+}
+
+func testProvisionWithStuckInstallPod() *hivev1.ClusterProvision {
+	provision := testProvision()
+	provision.Status.Conditions = []hivev1.ClusterProvisionCondition{
+		{
+			Type:    hivev1.InstallPodStuckCondition,
+			Status:  corev1.ConditionTrue,
+			Reason:  "PodInPendingPhase",
+			Message: "pod is in pending phase",
 		},
 	}
 	return provision

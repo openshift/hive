@@ -60,6 +60,8 @@ func TestReconcileClusterPool(t *testing.T) {
 		existing                  []runtime.Object
 		expectedTotalClusters     int
 		expectedUnclaimedClusters int
+		expectedObservedSize      int32
+		expectedObservedReady     int32
 		expectedDeletedClusters   []string
 		expectFinalizerRemoved    bool
 	}{
@@ -71,33 +73,39 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters:     5,
 			expectedUnclaimedClusters: 5,
+			expectedObservedSize:      0,
+			expectedObservedReady:     0,
 		},
 		{
 			name: "scale up",
 			existing: []runtime.Object{
 				buildPool(5),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
 			expectedTotalClusters:     5,
 			expectedUnclaimedClusters: 5,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
 		},
 		{
 			name: "scale down",
 			existing: []runtime.Object{
 				buildPool(3),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
-				unclaimedCDBuilder("c3").Build(),
-				unclaimedCDBuilder("c4").Build(),
-				unclaimedCDBuilder("c5").Build(),
-				unclaimedCDBuilder("c6").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				unclaimedCDBuilder("c5").Build(testcd.Installed()),
+				unclaimedCDBuilder("c6").Build(testcd.Installed()),
 			},
 			expectedTotalClusters:     3,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      6,
+			expectedObservedReady:     6,
 		},
 		{
 			name: "delete installing clusters first",
@@ -109,6 +117,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters:     1,
 			expectedUnclaimedClusters: 1,
+			expectedObservedSize:      2,
+			expectedObservedReady:     1,
 			expectedDeletedClusters:   []string{"c2"},
 		},
 		{
@@ -125,6 +135,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters:     1,
 			expectedUnclaimedClusters: 1,
+			expectedObservedSize:      2,
+			expectedObservedReady:     0,
 			expectedDeletedClusters:   []string{"c2"},
 		},
 		{
@@ -141,6 +153,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters:     3,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      6,
+			expectedObservedReady:     4,
 			expectedDeletedClusters:   []string{"c3", "c6"},
 		},
 		{
@@ -170,33 +184,37 @@ func TestReconcileClusterPool(t *testing.T) {
 					return p
 				}(),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
 			expectedTotalClusters:     3,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
 		},
 		{
 			name: "clusters not part of pool are not counted against pool size",
 			existing: []runtime.Object{
 				buildPool(3),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(),
 			},
 			expectedTotalClusters:     4,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
 		},
 		{
 			name: "claimed clusters are not counted against pool size",
 			existing: []runtime.Object{
 				buildPool(3),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(
 					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, hivev1.ClusterPoolStateClaimed),
@@ -204,14 +222,16 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters:     4,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
 		},
 		{
 			name: "clusters in different pool are not counted against pool size",
 			existing: []runtime.Object{
 				buildPool(3),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(
 					testcd.WithClusterPoolReference(testNamespace, "other-pool", hivev1.ClusterPoolStateUnclaimed),
@@ -219,19 +239,24 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters:     4,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
 		},
 		{
 			name: "deleting clusters are not counted against pool size",
 			existing: []runtime.Object{
 				buildPool(3),
 				secretBuilder.Build(),
-				unclaimedCDBuilder("c1").Build(),
-				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
-				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(),
+				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
+				cdBuilder("c5").GenericOptions(testgeneric.Deleted()).Build(),
 			},
-			expectedTotalClusters:     4,
+			expectedTotalClusters:     5,
 			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
 		},
 	}
 
@@ -285,6 +310,8 @@ func TestReconcileClusterPool(t *testing.T) {
 				assert.NotContains(t, pool.Finalizers, finalizer, "expected no finalizer on clusterpool")
 			} else {
 				assert.Contains(t, pool.Finalizers, finalizer, "expect finalizer on clusterpool")
+				assert.Equal(t, test.expectedObservedSize, pool.Status.Size, "unexpected observed size")
+				assert.Equal(t, test.expectedObservedReady, pool.Status.Ready, "unexpected observed ready count")
 			}
 		})
 	}

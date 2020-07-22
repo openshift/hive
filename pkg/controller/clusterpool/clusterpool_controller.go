@@ -2,6 +2,7 @@ package clusterpool
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"time"
 
@@ -154,14 +155,26 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 			installing += 1
 		}
 	}
+	size := len(poolCDs) - deleting
+	ready := size - installing
 	logger.WithFields(log.Fields{
 		"installing": installing,
 		"deleting":   deleting,
 		"total":      len(poolCDs),
-		"ready":      len(poolCDs) - installing - deleting,
+		"ready":      ready,
 	}).Info("found clusters for ClusterPool")
 
-	switch drift := len(poolCDs) - deleting - int(clp.Spec.Size); {
+	origStatus := clp.Status.DeepCopy()
+	clp.Status.Size = int32(size)
+	clp.Status.Ready = int32(ready)
+	if !reflect.DeepEqual(origStatus, &clp.Status) {
+		if err := r.Status().Update(context.Background(), clp); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool status")
+			return reconcile.Result{}, errors.Wrap(err, "could not update ClusterPool status")
+		}
+	}
+
+	switch drift := size - int(clp.Spec.Size); {
 	// If too many, delete some.
 	case drift > 0:
 		if err := r.deleteExcessClusters(clp, poolCDs, drift, logger); err != nil {

@@ -14,6 +14,9 @@ spec:
     singular: clusterpool
   scope: Namespaced
   subresources:
+    scale:
+      specReplicasPath: .spec.size
+      statusReplicasPath: .status.size
     status: {}
   validation:
     openAPIV3Schema:
@@ -270,6 +273,7 @@ spec:
               description: Size is the default number of clusters that we should keep
                 provisioned and waiting for use.
               format: int32
+              minimum: 0
               type: integer
           required:
           - baseDomain
@@ -278,6 +282,20 @@ spec:
           type: object
         status:
           description: ClusterPoolStatus defines the observed state of ClusterPool
+          properties:
+            ready:
+              description: Ready is the number of unclaimed clusters that have been
+                installed and are ready to be claimed.
+              format: int32
+              type: integer
+            size:
+              description: Size is the number of unclaimed clusters that have been
+                created for the pool.
+              format: int32
+              type: integer
+          required:
+          - ready
+          - size
           type: object
       required:
       - spec

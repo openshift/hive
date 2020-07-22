@@ -17,6 +17,7 @@ type ClusterPoolSpec struct {
 	PullSecretRef *corev1.LocalObjectReference `json:"pullSecretRef,omitempty"`
 
 	// Size is the default number of clusters that we should keep provisioned and waiting for use.
+	// +kubebuilder:validation:Minimum=0
 	// +required
 	Size int32 `json:"size"`
 
@@ -27,7 +28,11 @@ type ClusterPoolSpec struct {
 
 // ClusterPoolStatus defines the observed state of ClusterPool
 type ClusterPoolStatus struct {
-	// TODO: current number of clusters? installing, ready
+	// Size is the number of unclaimed clusters that have been created for the pool.
+	Size int32 `json:"size"`
+
+	// Ready is the number of unclaimed clusters that have been installed and are ready to be claimed.
+	Ready int32 `json:"ready"`
 }
 
 // +genclient
@@ -37,6 +42,7 @@ type ClusterPoolStatus struct {
 // from the pool once claimed and then automatically replaced with a new one.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.size,statuspath=.status.size
 // +kubebuilder:resource:path=clusterpools,shortName=cp
 type ClusterPool struct {
 	metav1.TypeMeta   `json:",inline"`

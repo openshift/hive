@@ -158,7 +158,6 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 
 	var allObjects []runtime.Object
 	allObjects = append(allObjects, o.generateClusterDeployment())
-	allObjects = append(allObjects, o.generateMachinePool())
 	if !o.SkipMachinePoolGeneration {
 		allObjects = append(allObjects, o.generateMachinePool())
 	}

@@ -24,6 +24,10 @@ type ClusterPoolSpec struct {
 	// BaseDomain is the base domain to use for all clusters created in this pool.
 	// +required
 	BaseDomain string `json:"baseDomain"`
+
+	// ImageSetRef is a reference to a ClusterImageSet. The release image specified in the ClusterImageSet will be used
+	// by clusters created for this cluster pool.
+	ImageSetRef ClusterImageSetReference `json:"imageSetRef"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

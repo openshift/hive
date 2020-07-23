@@ -43,6 +43,18 @@ spec:
               description: BaseDomain is the base domain to use for all clusters created
                 in this pool.
               type: string
+            imageSetRef:
+              description: ImageSetRef is a reference to a ClusterImageSet. The release
+                image specified in the ClusterImageSet will be used by clusters created
+                for this cluster pool.
+              properties:
+                name:
+                  description: Name is the name of the ClusterImageSet that this refers
+                    to
+                  type: string
+              required:
+              - name
+              type: object
             platform:
               description: Platform encompasses the desired platform for the cluster.
               properties:
@@ -277,6 +289,7 @@ spec:
               type: integer
           required:
           - baseDomain
+          - imageSetRef
           - platform
           - size
           type: object

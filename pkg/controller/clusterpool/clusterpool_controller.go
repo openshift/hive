@@ -219,11 +219,10 @@ func (r *ReconcileClusterPool) createCluster(
 
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
-		Name:       ns.Name,
-		Namespace:  ns.Name,
-		BaseDomain: clp.Spec.BaseDomain,
-		// TODO:
-		ReleaseImage:     "quay.io/openshift-release-dev/ocp-release:4.3.3-x86_64",
+		Name:             ns.Name,
+		Namespace:        ns.Name,
+		BaseDomain:       clp.Spec.BaseDomain,
+		ImageSet:         clp.Spec.ImageSetRef.Name,
 		WorkerNodesCount: int64(3),
 		MachineNetwork:   "10.0.0.0/16",
 	}

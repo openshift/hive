@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	awsRegion       = "us-east-1"
 	awsInstanceType = "m4.xlarge"
 	volumeIOPS      = 100
 	volumeSize      = 22
@@ -32,6 +31,8 @@ type AWSCloudBuilder struct {
 	SecretAccessKey string
 	// UserTags are user-provided tags to add to resources.
 	UserTags map[string]string
+	// Region is the AWS region to which to install the cluster
+	Region string
 }
 
 func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
@@ -71,7 +72,7 @@ func (p *AWSCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.Cl
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region:   awsRegion,
+			Region:   p.Region,
 			UserTags: p.UserTags,
 		},
 	}
@@ -93,7 +94,7 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	// Inject platform details into InstallConfig:
 	ic.Platform = installertypes.Platform{
 		AWS: &awsinstallertypes.Platform{
-			Region: awsRegion,
+			Region: p.Region,
 		},
 	}
 

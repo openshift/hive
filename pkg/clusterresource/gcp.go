@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	gcpRegion       = "us-east1"
 	gcpInstanceType = "n1-standard-4"
 )
 
@@ -30,6 +29,9 @@ type GCPCloudBuilder struct {
 
 	// ProjectID is the GCP project to use.
 	ProjectID string
+
+	// Region is the GCP region to which to install the cluster.
+	Region string
 }
 
 func NewGCPCloudBuilderFromSecret(credsSecret *corev1.Secret) (*GCPCloudBuilder, error) {
@@ -71,7 +73,7 @@ func (p *GCPCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.Cl
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region: gcpRegion,
+			Region: p.Region,
 		},
 	}
 }
@@ -87,7 +89,7 @@ func (p *GCPCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	ic.Platform = installertypes.Platform{
 		GCP: &installergcp.Platform{
 			ProjectID: p.ProjectID,
-			Region:    gcpRegion,
+			Region:    p.Region,
 		},
 	}
 

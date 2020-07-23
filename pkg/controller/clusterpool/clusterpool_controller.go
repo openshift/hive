@@ -480,14 +480,15 @@ func (r *ReconcileClusterPool) getPullSecret(pool *hivev1.ClusterPool, logger lo
 }
 
 func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logger log.FieldLogger) (clusterresource.CloudBuilder, error) {
-	// TODO: regions being ignored throughout, and not exposed in create-cluster cmd either
 	switch platform := pool.Spec.Platform; {
 	case platform.AWS != nil:
 		credsSecret, err := r.getCredentialsSecret(pool, platform.AWS.CredentialsSecretRef.Name, logger)
 		if err != nil {
 			return nil, err
 		}
-		return clusterresource.NewAWSCloudBuilderFromSecret(credsSecret), nil
+		cloudBuilder := clusterresource.NewAWSCloudBuilderFromSecret(credsSecret)
+		cloudBuilder.Region = platform.AWS.Region
+		return cloudBuilder, nil
 	case platform.GCP != nil:
 		credsSecret, err := r.getCredentialsSecret(pool, platform.GCP.CredentialsSecretRef.Name, logger)
 		if err != nil {
@@ -496,14 +497,19 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder, err := clusterresource.NewGCPCloudBuilderFromSecret(credsSecret)
 		if err != nil {
 			logger.WithError(err).Info("could not build GCP cloud builder")
+			return nil, err
 		}
-		return cloudBuilder, err
+		cloudBuilder.Region = platform.GCP.Region
+		return cloudBuilder, nil
 	case platform.Azure != nil:
 		credsSecret, err := r.getCredentialsSecret(pool, platform.Azure.CredentialsSecretRef.Name, logger)
 		if err != nil {
 			return nil, err
 		}
-		return clusterresource.NewAzureCloudBuilderFromSecret(credsSecret, platform.Azure.BaseDomainResourceGroupName), nil
+		cloudBuilder := clusterresource.NewAzureCloudBuilderFromSecret(credsSecret)
+		cloudBuilder.BaseDomainResourceGroupName = platform.Azure.BaseDomainResourceGroupName
+		cloudBuilder.Region = platform.Azure.Region
+		return cloudBuilder, nil
 	// TODO: OpenStack, VMware, and Ovirt.
 	default:
 		logger.Info("unsupported platform")

@@ -4,6 +4,19 @@ metadata:
   creationTimestamp: null
   name: clusterpools.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.ready
+    name: Ready
+    type: string
+  - JSONPath: .spec.size
+    name: Size
+    type: string
+  - JSONPath: .spec.baseDomain
+    name: BaseDomain
+    type: string
+  - JSONPath: .spec.imageSetRef.name
+    name: ImageSet
+    type: string
   group: hive.openshift.io
   names:
     kind: ClusterPool

@@ -80,6 +80,10 @@ const (
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.size,statuspath=.status.size
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
+// +kubebuilder:printcolumn:name="Size",type="string",JSONPath=".spec.size"
+// +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
+// +kubebuilder:printcolumn:name="ImageSet",type="string",JSONPath=".spec.imageSetRef.name"
 // +kubebuilder:resource:path=clusterpools,shortName=cp
 type ClusterPool struct {
 	metav1.TypeMeta   `json:",inline"`

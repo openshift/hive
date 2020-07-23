@@ -2,12 +2,14 @@ package clusterpool
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,8 +32,11 @@ import (
 )
 
 const (
-	ControllerName = "clusterpool"
-	finalizer      = "hive.openshift.io/clusters"
+	ControllerName             = "clusterpool"
+	finalizer                  = "hive.openshift.io/clusters"
+	imageSetDependent          = "cluster image set"
+	pullSecretDependent        = "pull secret"
+	credentialsSecretDependent = "credentials secret"
 )
 
 // Add creates a new ClusterPool Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -162,7 +167,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		"deleting":   deleting,
 		"total":      len(poolCDs),
 		"ready":      ready,
-	}).Info("found clusters for ClusterPool")
+	}).Debug("found clusters for ClusterPool")
 
 	origStatus := clp.Status.DeepCopy()
 	clp.Status.Size = int32(size)
@@ -194,11 +199,39 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 func (r *ReconcileClusterPool) addClusters(
 	clp *hivev1.ClusterPool,
 	newClusterCount int,
-	logger log.FieldLogger) error {
-	logger.Infof("Adding %d clusters", newClusterCount)
+	logger log.FieldLogger,
+) error {
+	logger.WithField("count", newClusterCount).Info("Adding new clusters")
+
+	var errs []error
+
+	if err := r.verifyClusterImageSet(clp, logger); err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", imageSetDependent, err))
+	}
+
+	// Load the pull secret if one is specified (may not be if using a global pull secret)
+	pullSecret, err := r.getPullSecret(clp, logger)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", pullSecretDependent, err))
+	}
+
+	cloudBuilder, err := r.createCloudBuilder(clp, logger)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", credentialsSecretDependent, err))
+	}
+
+	dependenciesError := utilerrors.NewAggregate(errs)
+
+	if err := r.setMissingDependenciesCondition(clp, dependenciesError, logger); err != nil {
+		return err
+	}
+
+	if dependenciesError != nil {
+		return dependenciesError
+	}
 
 	for i := 0; i < newClusterCount; i++ {
-		if err := r.createCluster(clp, logger); err != nil {
+		if err := r.createCluster(clp, cloudBuilder, pullSecret, logger); err != nil {
 			return err
 		}
 	}
@@ -208,8 +241,10 @@ func (r *ReconcileClusterPool) addClusters(
 
 func (r *ReconcileClusterPool) createCluster(
 	clp *hivev1.ClusterPool,
-	logger log.FieldLogger) error {
-
+	cloudBuilder clusterresource.CloudBuilder,
+	pullSecret string,
+	logger log.FieldLogger,
+) error {
 	ns, err := r.createRandomNamespace(clp)
 	if err != nil {
 		logger.WithError(err).Error("error obtaining random namespace")
@@ -225,47 +260,9 @@ func (r *ReconcileClusterPool) createCluster(
 		ImageSet:         clp.Spec.ImageSetRef.Name,
 		WorkerNodesCount: int64(3),
 		MachineNetwork:   "10.0.0.0/16",
+		PullSecret:       pullSecret,
+		CloudBuilder:     cloudBuilder,
 	}
-
-	// Load the pull secret if one is specified (may not be if using a global pull secret)
-	if clp.Spec.PullSecretRef != nil {
-		pullSec := &corev1.Secret{}
-		err := r.Client.Get(context.Background(),
-			types.NamespacedName{Namespace: clp.Namespace, Name: clp.Spec.PullSecretRef.Name},
-			pullSec)
-		if err != nil {
-			logger.WithError(err).Error("error reading pull secret")
-			return err
-		}
-		builder.PullSecret = string(pullSec.Data[".dockerconfigjson"])
-	}
-
-	// TODO: regions being ignored throughout, and not exposed in create-cluster cmd either
-	switch platform := clp.Spec.Platform; {
-	case platform.AWS != nil:
-		credsSecret, err := r.getCredentialsSecret(clp, platform.AWS.CredentialsSecretRef.Name, logger)
-		if err != nil {
-			return err
-		}
-		builder.CloudBuilder = clusterresource.NewAWSCloudBuilderFromSecret(credsSecret)
-	case platform.GCP != nil:
-		credsSecret, err := r.getCredentialsSecret(clp, platform.GCP.CredentialsSecretRef.Name, logger)
-		if err != nil {
-			return err
-		}
-		cloudBuilder, err := clusterresource.NewGCPCloudBuilderFromSecret(credsSecret)
-		if err != nil {
-			return err
-		}
-		builder.CloudBuilder = cloudBuilder
-	case platform.Azure != nil:
-		credsSecret, err := r.getCredentialsSecret(clp, platform.Azure.CredentialsSecretRef.Name, logger)
-		if err != nil {
-			return err
-		}
-		builder.CloudBuilder = clusterresource.NewAzureCloudBuilderFromSecret(credsSecret, platform.Azure.BaseDomainResourceGroupName)
-	}
-	// TODO: OpenStack, VMware, and Ovirt.
 
 	objs, err := builder.Build()
 	if err != nil {
@@ -417,8 +414,99 @@ func (r *ReconcileClusterPool) getCredentialsSecret(pool *hivev1.ClusterPool, se
 		client.ObjectKey{Namespace: pool.Namespace, Name: secretName},
 		credsSecret,
 	); err != nil {
-		logger.WithError(err).Error("error looking up credentials secret for pool in hive namespace")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error looking up credentials secret for pool in hive namespace")
 		return nil, err
 	}
 	return credsSecret, nil
+}
+
+func (r *ReconcileClusterPool) setMissingDependenciesCondition(pool *hivev1.ClusterPool, err error, logger log.FieldLogger) error {
+	status := corev1.ConditionFalse
+	reason := "Verified"
+	message := "Dependencies verified"
+	updateConditionCheck := controllerutils.UpdateConditionNever
+	if err != nil {
+		status = corev1.ConditionTrue
+		reason = "Missing"
+		message = err.Error()
+		updateConditionCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
+	}
+	conds, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.ClusterPoolMissingDependenciesCondition,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), pool); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool conditions")
+			return fmt.Errorf("could not update ClusterPool conditions: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileClusterPool) verifyClusterImageSet(pool *hivev1.ClusterPool, logger log.FieldLogger) error {
+	err := r.Get(context.Background(), client.ObjectKey{Name: pool.Spec.ImageSetRef.Name}, &hivev1.ClusterImageSet{})
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error getting cluster image set")
+	}
+	return err
+}
+
+func (r *ReconcileClusterPool) getPullSecret(pool *hivev1.ClusterPool, logger log.FieldLogger) (string, error) {
+	if pool.Spec.PullSecretRef == nil {
+		return "", nil
+	}
+	pullSecretSecret := &corev1.Secret{}
+	err := r.Client.Get(
+		context.Background(),
+		types.NamespacedName{Namespace: pool.Namespace, Name: pool.Spec.PullSecretRef.Name},
+		pullSecretSecret,
+	)
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error reading pull secret")
+		return "", err
+	}
+	pullSecret, ok := pullSecretSecret.Data[".dockerconfigjson"]
+	if !ok {
+		logger.Info("pull secret does not contain .dockerconfigjson data")
+		return "", errors.New("pull secret does not contain .dockerconfigjson data")
+	}
+	return string(pullSecret), nil
+}
+
+func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logger log.FieldLogger) (clusterresource.CloudBuilder, error) {
+	// TODO: regions being ignored throughout, and not exposed in create-cluster cmd either
+	switch platform := pool.Spec.Platform; {
+	case platform.AWS != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.AWS.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+		return clusterresource.NewAWSCloudBuilderFromSecret(credsSecret), nil
+	case platform.GCP != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.GCP.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+		cloudBuilder, err := clusterresource.NewGCPCloudBuilderFromSecret(credsSecret)
+		if err != nil {
+			logger.WithError(err).Info("could not build GCP cloud builder")
+		}
+		return cloudBuilder, err
+	case platform.Azure != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.Azure.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+		return clusterresource.NewAzureCloudBuilderFromSecret(credsSecret, platform.Azure.BaseDomainResourceGroupName), nil
+	// TODO: OpenStack, VMware, and Ovirt.
+	default:
+		logger.Info("unsupported platform")
+		return nil, errors.New("unsupported platform")
+	}
 }

@@ -37,7 +37,40 @@ type ClusterPoolStatus struct {
 
 	// Ready is the number of unclaimed clusters that have been installed and are ready to be claimed.
 	Ready int32 `json:"ready"`
+
+	// Conditions includes more detailed status for the cluster pool
+	// +optional
+	Conditions []ClusterPoolCondition `json:"conditions,omitempty"`
 }
+
+// ClusterPoolCondition contains details for the current condition of a cluster pool
+type ClusterPoolCondition struct {
+	// Type is the type of the condition.
+	Type ClusterPoolConditionType `json:"type"`
+	// Status is the status of the condition.
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// ClusterPoolConditionType is a valid value for ClusterPoolCondition.Type
+type ClusterPoolConditionType string
+
+const (
+	// ClusterPoolMissingDependentsCondition is set when a cluster pool is missing dependencies required to create a
+	// cluster. Dependencies include resources such as the ClusterImageSet and the credentials Secret.
+	ClusterPoolMissingDependenciesCondition ClusterPoolConditionType = "MissingDependencies"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

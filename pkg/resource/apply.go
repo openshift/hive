@@ -46,13 +46,6 @@ const fieldTooLong metav1.CauseType = "FieldValueTooLong"
 
 // Apply applies the given resource bytes to the target cluster specified by kubeconfig
 func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
-	fileName, err := r.createTempFile("apply-", obj)
-	if err != nil {
-		r.logger.WithError(err).Error("failed to create temp file for apply")
-		return "", err
-	}
-	defer r.deleteTempFile(fileName)
-
 	factory, err := r.getFactory("")
 	if err != nil {
 		r.logger.WithError(err).Error("failed to obtain factory for apply")
@@ -150,7 +143,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		Out:    &bytes.Buffer{},
 		ErrOut: &bytes.Buffer{},
 	}
-	applyOptions, changeTracker, err := r.setupApplyCommand(factory, fileName, ioStreams)
+	applyOptions, changeTracker, err := r.setupApplyCommand(factory, obj, ioStreams)
 	if err != nil {
 		r.logger.WithError(err).Error("failed to setup apply command")
 		return "", err
@@ -304,7 +297,7 @@ func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 	return result, nil
 }
 
-func (r *Helper) setupApplyCommand(f cmdutil.Factory, fileName string, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
+func (r *Helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
 	r.logger.Debug("setting up apply command")
 	o := kcmdapply.NewApplyOptions(ioStreams)
 	dynamicClient, err := f.DynamicClient()
@@ -336,7 +329,11 @@ func (r *Helper) setupApplyCommand(f cmdutil.Factory, fileName string, ioStreams
 		internalToPrinter: func(string) (printers.ResourcePrinter, error) { return o.PrintFlags.ToPrinter() },
 	}
 	o.ToPrinter = tracker.ToPrinter
-	o.DeleteOptions.FilenameOptions.Filenames = []string{fileName}
+	info, err := r.getResourceInternalInfo(f, obj)
+	if err != nil {
+		return nil, nil, err
+	}
+	o.SetObjects([]*kresource.Info{info})
 	return o, tracker, nil
 }
 

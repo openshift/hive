@@ -366,9 +366,11 @@ func TestReconcileClusterPool(t *testing.T) {
 			fakeClient := fake.NewFakeClientWithScheme(scheme, test.existing...)
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
+			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterPool{
-				Client: fakeClient,
-				logger: logger,
+				Client:       fakeClient,
+				logger:       logger,
+				expectations: controllerExpectations,
 			}
 
 			reconcileRequest := reconcile.Request{

@@ -39,23 +39,29 @@ const (
 	credentialsSecretDependent = "credentials secret"
 )
 
+var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterPool")
+)
+
 // Add creates a new ClusterPool Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return AddToManager(mgr, NewReconciler(mgr))
 }
 
-// NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	r := &ReconcileClusterPool{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
-		logger: log.WithField("controller", ControllerName),
+// NewReconciler returns a new ReconcileClusterPool
+func NewReconciler(mgr manager.Manager) *ReconcileClusterPool {
+	logger := log.WithField("controller", ControllerName)
+	return &ReconcileClusterPool{
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		logger:       logger,
+		expectations: controllerutils.NewExpectations(logger),
 	}
-	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
+func AddToManager(mgr manager.Manager, r *ReconcileClusterPool) error {
 	// Create a new controller
 	c, err := controller.New("clusterpool-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
 	if err != nil {
@@ -69,25 +75,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to ClusterDeployments originating from a pool:
-	clusterPoolMapFn := handler.ToRequestsFunc(
-		func(a handler.MapObject) []reconcile.Request {
-			var requests []reconcile.Request
-
-			cd := a.Object.(*hivev1.ClusterDeployment)
-			if cd.Spec.ClusterPoolRef != nil {
-				nsName := types.NamespacedName{Namespace: cd.Spec.ClusterPoolRef.Namespace, Name: cd.Spec.ClusterPoolRef.Name}
-				requests = append(requests, reconcile.Request{
-					NamespacedName: nsName,
-				})
-			}
-			return requests
-		})
-	err = c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: clusterPoolMapFn,
-		})
-	if err != nil {
+	if err := r.watchClusterDeployments(c); err != nil {
 		return err
 	}
 
@@ -100,6 +88,8 @@ var _ reconcile.Reconciler = &ReconcileClusterPool{}
 type ReconcileClusterPool struct {
 	client.Client
 	logger log.FieldLogger
+	// A TTLCache of ClusterDeployment creates each ClusterPool expects to see
+	expectations controllerutils.ExpectationsInterface
 }
 
 // Reconcile reads the state of the ClusterPool, checks if we currently have enough ClusterDeployments waiting, and
@@ -121,8 +111,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logger.Info("pool not found")
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
+			r.expectations.DeleteExpectations(request.NamespacedName.String())
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -143,6 +132,11 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer to ClusterPool")
 			return reconcile.Result{}, err
 		}
+	}
+
+	if !r.expectations.SatisfiedExpectations(request.NamespacedName.String()) {
+		logger.Debug("waiting for expectations to be satisfied")
+		return reconcile.Result{}, nil
 	}
 
 	// Find all ClusterDeployments from this pool:
@@ -268,6 +262,8 @@ func (r *ReconcileClusterPool) createCluster(
 	if err != nil {
 		return errors.Wrap(err, "error building resources")
 	}
+	poolKey := types.NamespacedName{Namespace: clp.Namespace, Name: clp.Name}.String()
+	r.expectations.ExpectCreations(poolKey, 1)
 	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
 	for i, obj := range objs {
 		cd, ok := obj.(*hivev1.ClusterDeployment)
@@ -282,6 +278,7 @@ func (r *ReconcileClusterPool) createCluster(
 	// Create the resources.
 	for _, obj := range objs {
 		if err := r.Client.Create(context.Background(), obj); err != nil {
+			r.expectations.CreationObserved(poolKey)
 			return err
 		}
 	}

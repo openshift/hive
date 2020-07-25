@@ -208,6 +208,13 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 		"lastSyncGeneration": desiredState.Status.LastSyncGeneration,
 	}).Info("Syncing DNS Zone")
 	result, err := r.reconcileDNSProvider(actuator, desiredState)
+	conditionsChanged := actuator.SetConditionsForError(err)
+
+	if conditionsChanged {
+		if err := r.Status().Update(context.Background(), desiredState); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
 	if err != nil {
 		dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "Encountered error while attempting to reconcile")
 	}
@@ -218,14 +225,6 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone) (reconcile.Result, error) {
 	r.logger.Debug("Retrieving current state")
 	err := actuator.Refresh()
-	conditionsChanged := actuator.SetConditionsForError(err)
-
-	if conditionsChanged {
-		if err := r.Status().Update(context.Background(), dnsZone); err != nil {
-			return reconcile.Result{}, err
-		}
-	}
-
 	if err != nil {
 		r.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
 		return reconcile.Result{}, err

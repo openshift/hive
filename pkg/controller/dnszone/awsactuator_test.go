@@ -95,27 +95,6 @@ func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DN
 	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 }
 
-func mockAccessDeniedException(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
-	accessDeniedErr := awserr.New("AccessDeniedException",
-		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
-		fmt.Errorf("User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny"))
-	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(accessDeniedErr).Times(1)
-}
-
-func mockUnrecognizedClientException(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
-	accessDeniedErr := awserr.New("UnrecognizedClientException",
-		"The security token included in the request is invalid.",
-		fmt.Errorf("The security token included in the request is invalid"))
-	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(accessDeniedErr).Times(1)
-}
-
-func mockInvalidSignatureException(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
-	accessDeniedErr := awserr.New("InvalidSignatureException",
-		"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
-		fmt.Errorf("The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details"))
-	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(accessDeniedErr).Times(1)
-}
-
 func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).Return(&route53.CreateHostedZoneOutput{
 		HostedZone: &route53.HostedZone{

@@ -3,6 +3,7 @@ package syncset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -145,6 +147,17 @@ type ReconcileSyncSet struct {
 // Reconcile lists SyncSets and SelectorSyncSets which apply to a ClusterDeployment object and applies resources and patches
 // found in each SyncSet object
 func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+	cdLog := r.logger.WithFields(log.Fields{
+		"clusterDeployment": request.NamespacedName,
+	})
+
+	defer func() {
+		dur := time.Since(start)
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
 
@@ -158,10 +171,6 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 		r.logger.WithError(err).WithField("clusterDeployment", request.NamespacedName).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-
-	cdLog := r.logger.WithFields(log.Fields{
-		"clusterDeployment": request.NamespacedName,
-	})
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, cdLog)

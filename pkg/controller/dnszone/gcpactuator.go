@@ -183,6 +183,11 @@ func (a *GCPActuator) Refresh() error {
 	return nil
 }
 
+// SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
+func (a *GCPActuator) SetConditionsForError(err error) bool {
+	return false // Not implemented for GCP yet.
+}
+
 func generateManagedZoneName(zone string) string {
 	tmp := strings.ToLower(zone)
 	tmp = strings.ReplaceAll(tmp, ".", "-")

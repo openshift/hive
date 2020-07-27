@@ -148,3 +148,8 @@ func (a *AzureActuator) Refresh() error {
 func (a *AzureActuator) UpdateMetadata() error {
 	return nil
 }
+
+// SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
+func (a *AzureActuator) SetConditionsForError(err error) bool {
+	return false // Not implemented for Azure yet.
+}

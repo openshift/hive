@@ -23,4 +23,7 @@ type Actuator interface {
 	// Refresh signals to the actuator that it should get the latest version of the zone from the dns provider.
 	// Refresh MUST be called before any other function is called by the actuator.
 	Refresh() error
+
+	// SetConditionsForError sets conditions on the dnszone given a specific error
+	SetConditionsForError(err error) bool
 }

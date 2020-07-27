@@ -472,6 +472,103 @@ func (a *AWSActuator) Exists() (bool, error) {
 	return a.zoneID != nil, nil
 }
 
+func (a *AWSActuator) setInsufficientCredentialsConditionToFalse() bool {
+	accessDeniedConds, accessDeniedCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.InsufficientCredentialsCondition,
+		corev1.ConditionFalse,
+		accessGrantedReason,
+		"credentials are valid",
+		controllerutils.UpdateConditionNever,
+	)
+	if accessDeniedCondsChanged {
+		a.dnsZone.Status.Conditions = accessDeniedConds
+	}
+
+	return accessDeniedCondsChanged
+}
+
+func (a *AWSActuator) setInsufficientCredentialsConditionToTrue(message string) bool {
+	accessDeniedConds, accessDeniedCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.InsufficientCredentialsCondition,
+		corev1.ConditionTrue,
+		accessDeniedReason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	if accessDeniedCondsChanged {
+		// Conditions have changed. Update them in the object.
+		a.dnsZone.Status.Conditions = accessDeniedConds
+	}
+	return accessDeniedCondsChanged
+}
+
+func (a *AWSActuator) setAuthenticationFailureConditionToFalse() bool {
+	authenticationFailureConds, authenticationFailureCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.AuthenticationFailureCondition,
+		corev1.ConditionFalse,
+		authenticationSucceededReason,
+		"credentials authenticated",
+		controllerutils.UpdateConditionNever,
+	)
+	if authenticationFailureCondsChanged {
+		a.dnsZone.Status.Conditions = authenticationFailureConds
+	}
+
+	return authenticationFailureCondsChanged
+}
+
+func (a *AWSActuator) setAuthenticationFailureConditionToTrue(message string) bool {
+	var authenticationFailureConds []hivev1.DNSZoneCondition
+	authenticationFailureConds, authenticationFailureCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.AuthenticationFailureCondition,
+		corev1.ConditionTrue,
+		authenticationFailedReason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	if authenticationFailureCondsChanged {
+		// Conditions have changed. Update them in the object.
+		a.dnsZone.Status.Conditions = authenticationFailureConds
+	}
+
+	return authenticationFailureCondsChanged
+}
+
+// SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
+func (a *AWSActuator) SetConditionsForError(err error) bool {
+	awsErr, ok := err.(awserr.Error)
+	if !ok {
+		accessDeniedCondsChanged := a.setInsufficientCredentialsConditionToFalse()
+		authenticationFailureCondsChanged := a.setAuthenticationFailureConditionToFalse()
+
+		return accessDeniedCondsChanged || authenticationFailureCondsChanged
+	}
+
+	accessDeniedCondsChanged := false
+	authenticationFailureCondsChanged := false
+
+	if awsErr.Code() == "AccessDeniedException" {
+		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.Message())
+	} else {
+		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
+	}
+
+	if awsErr.Code() == "InvalidSignatureException" ||
+		awsErr.Code() == "UnrecognizedClientException" {
+		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToTrue(awsErr.Message())
+	} else {
+		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
+	}
+
+	return accessDeniedCondsChanged || authenticationFailureCondsChanged
+}
+
 func tagEquals(a, b *route53.Tag) bool {
 	if a == nil && b == nil {
 		return true

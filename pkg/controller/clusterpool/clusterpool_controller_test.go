@@ -22,6 +22,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
@@ -54,7 +55,7 @@ func TestReconcileClusterPool(t *testing.T) {
 	}
 	unclaimedCDBuilder := func(name string) testcd.Builder {
 		return cdBuilder(name).Options(
-			testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, hivev1.ClusterPoolStateUnclaimed),
+			testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
 		)
 	}
 
@@ -72,6 +73,8 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectFinalizerRemoved             bool
 		expectedMissingDependenciesStatus  *bool
 		expectedMissingDependenciesMessage string
+		expectedAssignedClaims             int
+		expectedUnassignedClaims           int
 	}{
 		{
 			name: "create all clusters",
@@ -206,7 +209,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(
-					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, hivev1.ClusterPoolStateClaimed),
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 				),
 			},
 			expectedTotalClusters:     4,
@@ -222,7 +225,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(
-					testcd.WithClusterPoolReference(testNamespace, "other-pool", hivev1.ClusterPoolStateUnclaimed),
+					testcd.WithClusterPoolReference(testNamespace, "other-pool", "test-claim"),
 				),
 			},
 			expectedTotalClusters:     4,
@@ -344,6 +347,88 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedMissingDependenciesStatus:  pointer.BoolPtr(true),
 			expectedMissingDependenciesMessage: `pull secret: pull secret does not contain .dockerconfigjson data`,
 		},
+		{
+			name: "assign to claim",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters:     4,
+			expectedUnclaimedClusters: 4,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
+			expectedAssignedClaims:    1,
+			expectedUnassignedClaims:  0,
+		},
+		{
+			name: "no ready clusters to assign to claim",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters:     3,
+			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     0,
+			expectedAssignedClaims:    0,
+			expectedUnassignedClaims:  1,
+		},
+		{
+			name: "assign to multiple claims",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				testclaim.FullBuilder(testNamespace, "test-claim-1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim-2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim-3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters:     5,
+			expectedUnclaimedClusters: 5,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
+			expectedAssignedClaims:    2,
+			expectedUnassignedClaims:  1,
+		},
+		{
+			name: "do not assign to claims for other pools",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool("other-pool")),
+			},
+			expectedTotalClusters:     3,
+			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
+			expectedAssignedClaims:    0,
+			expectedUnassignedClaims:  1,
+		},
+		{
+			name: "do not assign to claims in other namespaces",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				testclaim.FullBuilder("other-namespace", "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters:     3,
+			expectedUnclaimedClusters: 3,
+			expectedObservedSize:      3,
+			expectedObservedReady:     2,
+			expectedAssignedClaims:    0,
+			expectedUnassignedClaims:  1,
+		},
 	}
 
 	for _, test := range tests {
@@ -396,8 +481,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			actualUnclaimedClusters := 0
 			poolRef := hivev1.ClusterPoolReference{
 				Namespace: testNamespace,
-				Name:      testLeasePoolName,
-				State:     hivev1.ClusterPoolStateUnclaimed,
+				PoolName:  testLeasePoolName,
 			}
 			for _, cd := range cds.Items {
 				if cd.Spec.ClusterPoolRef != nil && *cd.Spec.ClusterPoolRef == poolRef {
@@ -435,6 +519,22 @@ func TestReconcileClusterPool(t *testing.T) {
 				assert.Equal(t, expectedStatus, missingDependentsCondition.Status, "expected MissingDependencies condition to be true")
 				assert.Equal(t, test.expectedMissingDependenciesMessage, missingDependentsCondition.Message, "unexpected MissingDependencies conditon message")
 			}
+
+			claims := &hivev1.ClusterClaimList{}
+			err = fakeClient.List(context.Background(), claims)
+			require.NoError(t, err)
+
+			actualAssignedClaims := 0
+			actualUnassignedClaims := 0
+			for _, claim := range claims.Items {
+				if claim.Status.Namespace == "" {
+					actualUnassignedClaims++
+				} else {
+					actualAssignedClaims++
+				}
+			}
+			assert.Equal(t, test.expectedAssignedClaims, actualAssignedClaims, "unexpected number of assigned claims")
+			assert.Equal(t, test.expectedUnassignedClaims, actualUnassignedClaims, "unexpected number of unassigned claims")
 		})
 	}
 }

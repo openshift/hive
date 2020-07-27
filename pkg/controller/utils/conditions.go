@@ -109,6 +109,74 @@ func SetClusterDeploymentConditionWithChangeCheck(
 	return conditions, changed
 }
 
+// SetClusterClaimCondition sets a condition on a ClusterClaim resource's status
+func SetClusterClaimCondition(
+	conditions []hivev1.ClusterClaimCondition,
+	conditionType hivev1.ClusterClaimConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) []hivev1.ClusterClaimCondition {
+	newConditions, _ := SetClusterClaimConditionWithChangeCheck(
+		conditions,
+		conditionType,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	return newConditions
+}
+
+// SetClusterClaimConditionWithChangeCheck sets a condition on a ClusterClaim resource's status.
+// It returns the conditions as well a boolean indicating whether there was a change made
+// to the conditions.
+func SetClusterClaimConditionWithChangeCheck(
+	conditions []hivev1.ClusterClaimCondition,
+	conditionType hivev1.ClusterClaimConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) ([]hivev1.ClusterClaimCondition, bool) {
+	changed := false
+	now := metav1.Now()
+	existingCondition := FindClusterClaimCondition(conditions, conditionType)
+	if existingCondition == nil {
+		if status == corev1.ConditionTrue {
+			conditions = append(
+				conditions,
+				hivev1.ClusterClaimCondition{
+					Type:               conditionType,
+					Status:             status,
+					Reason:             reason,
+					Message:            message,
+					LastTransitionTime: now,
+					LastProbeTime:      now,
+				},
+			)
+			changed = true
+		}
+	} else {
+		if shouldUpdateCondition(
+			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
+			status, reason, message,
+			updateConditionCheck,
+		) {
+			if existingCondition.Status != status {
+				existingCondition.LastTransitionTime = now
+			}
+			existingCondition.Status = status
+			existingCondition.Reason = reason
+			existingCondition.Message = message
+			existingCondition.LastProbeTime = now
+			changed = true
+		}
+	}
+	return conditions, changed
+}
+
 // SetClusterPoolCondition sets a condition on a ClusterPool resource's status
 func SetClusterPoolCondition(
 	conditions []hivev1.ClusterPoolCondition,
@@ -402,6 +470,17 @@ func SetMachinePoolConditionWithChangeCheck(
 // FindClusterDeploymentCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
 func FindClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentCondition, conditionType hivev1.ClusterDeploymentConditionType) *hivev1.ClusterDeploymentCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
+// FindClusterClaimCondition finds in the condition that has the
+// specified condition type in the given list. If none exists, then returns nil.
+func FindClusterClaimCondition(conditions []hivev1.ClusterClaimCondition, conditionType hivev1.ClusterClaimConditionType) *hivev1.ClusterClaimCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

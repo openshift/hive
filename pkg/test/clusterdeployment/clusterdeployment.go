@@ -99,12 +99,16 @@ func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 	}
 }
 
-func WithClusterPoolReference(namespace, name string, state hivev1.ClusterPoolState) Option {
+func WithUnclaimedClusterPoolReference(namespace, poolName string) Option {
+	return WithClusterPoolReference(namespace, poolName, "")
+}
+
+func WithClusterPoolReference(namespace, poolName, claimName string) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
 			Namespace: namespace,
-			Name:      name,
-			State:     state,
+			PoolName:  poolName,
+			ClaimName: claimName,
 		}
 	}
 }

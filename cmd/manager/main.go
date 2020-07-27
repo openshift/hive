@@ -30,6 +30,7 @@ import (
 
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/clusterclaim"
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
 	"github.com/openshift/hive/pkg/controller/clusterdeprovision"
 	"github.com/openshift/hive/pkg/controller/clusterpool"
@@ -65,6 +66,7 @@ const (
 type controllerSetupFunc func(manager.Manager) error
 
 var controllerFuncs = map[string]controllerSetupFunc{
+	clusterclaim.ControllerName:         clusterclaim.Add,
 	clusterdeployment.ControllerName:    clusterdeployment.Add,
 	clusterdeprovision.ControllerName:   clusterdeprovision.Add,
 	clusterpoolnamespace.ControllerName: clusterpoolnamespace.Add,

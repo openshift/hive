@@ -7,7 +7,6 @@ import (
 
 // ClusterClaimSpec defines the desired state of the ClusterClaim.
 type ClusterClaimSpec struct {
-
 	ClusterPoolName string `json:"clusterPoolName"`
 
 	// Subjects hold object references to authorize access to the claimed cluster.
@@ -50,7 +49,7 @@ type ClusterClaimConditionType string
 
 const (
 	// ClusterClaimNotReadyCondition is set when a cluster has not yet been assigned and made ready to the claim.
-	ClusterClaimNotReadyCondition ClusterClaimConditionType = "NotReadu"
+	ClusterClaimNotReadyCondition ClusterClaimConditionType = "NotReady"
 	// ClusterClaimClusterDeletedCondition is set when the cluster assigned to the claim has been deleted.
 	ClusterClaimClusterDeletedCondition ClusterClaimConditionType = "ClusterDeleted"
 )

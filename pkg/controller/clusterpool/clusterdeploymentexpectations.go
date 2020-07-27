@@ -63,5 +63,5 @@ func clusterPoolKey(cd *hivev1.ClusterDeployment) *types.NamespacedName {
 	if cd.Spec.ClusterPoolRef == nil {
 		return nil
 	}
-	return &types.NamespacedName{Namespace: cd.Spec.ClusterPoolRef.Namespace, Name: cd.Spec.ClusterPoolRef.Name}
+	return &types.NamespacedName{Namespace: cd.Spec.ClusterPoolRef.Namespace, Name: cd.Spec.ClusterPoolRef.PoolName}
 }

@@ -256,9 +256,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if newObject.Spec.ClusterPoolRef != nil {
-		if newObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateClaimed {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "state"), newObject.Spec.ClusterPoolRef.State, "cannot create a ClusterDeployment that is already in claimed state"))
+	if poolRef := newObject.Spec.ClusterPoolRef; poolRef != nil {
+		if claimName := poolRef.ClaimName; claimName != "" {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "claimName"), claimName, "cannot create a ClusterDeployment that is already claimed"))
 		}
 	}
 
@@ -480,18 +480,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	}
 
 	// Validate the ClusterPoolRef:
-	if oldObject.Spec.ClusterPoolRef != nil {
-		if newObject.Spec.ClusterPoolRef == nil {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newObject.Spec.ClusterPoolRef, "cannot remove clusterPoolRef"))
-		} else {
-			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterPoolRef.Namespace, oldObject.Spec.ClusterPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
-			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterPoolRef.Name, oldObject.Spec.ClusterPoolRef.Name, specPath.Child("clusterPoolRef", "name"))...)
-			if newObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateUnclaimed && oldObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateClaimed {
-				allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "state"), newObject.Spec.ClusterPoolRef.State, "cannot move state from claimed back to unclaimed"))
-			}
+	switch oldPoolRef, newPoolRef := oldObject.Spec.ClusterPoolRef, newObject.Spec.ClusterPoolRef; {
+	case oldPoolRef != nil && newPoolRef != nil:
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.Namespace, oldPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.PoolName, oldPoolRef.PoolName, specPath.Child("clusterPoolRef", "poolName"))...)
+		if oldClaim := oldPoolRef.ClaimName; oldClaim != "" {
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.ClaimName, oldClaim, specPath.Child("clusterPoolRef", "claimName"))...)
 		}
-	} else if newObject.Spec.ClusterPoolRef != nil {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newObject.Spec.ClusterPoolRef, "cannot add clusterPoolRef"))
+	case oldPoolRef != nil && newPoolRef == nil:
+		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newPoolRef, "cannot remove clusterPoolRef"))
+	case oldPoolRef == nil && newPoolRef != nil:
+		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newPoolRef, "cannot add clusterPoolRef"))
 	}
 
 	if len(allErrs) > 0 {

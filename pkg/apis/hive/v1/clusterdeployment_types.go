@@ -172,22 +172,14 @@ type ClusterImageSetReference struct {
 
 // ClusterPoolReference is a reference to a ClusterPool
 type ClusterPoolReference struct {
-	// Name is the name of the ClusterPool that this refers to.
-	Name string `json:"name"`
 	// Namespace is the namespace where the ClusterPool resides.
 	Namespace string `json:"namespace"`
-	// State reflects the state of the ClusterDeployment in relation to the ClusterPool it originated from.
-	State ClusterPoolState `json:"state"`
+	// PoolName is the name of the ClusterPool for which the cluster was created.
+	PoolName string `json:"poolName"`
+	// ClaimName is the name of the ClusterClaim that claimed the cluster from the pool.
+	// +optional
+	ClaimName string `json:"claimName,omitempty"`
 }
-
-type ClusterPoolState string
-
-const (
-	// ClusterPoolStateUnclaimed indicates the ClusterDeployment has not been claimed by a user and is actively in the pool.
-	ClusterPoolStateUnclaimed ClusterPoolState = "Unclaimed"
-	// ClusterPoolStateClaimed indicates the ClusterDeployment has been claimed by a user and is no longer actively in the pool.
-	ClusterPoolStateClaimed ClusterPoolState = "Claimed"
-)
 
 // ClusterMetadata contains metadata information about the installed cluster.
 type ClusterMetadata struct {

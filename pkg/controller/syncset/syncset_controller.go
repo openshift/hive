@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -19,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -31,6 +33,20 @@ import (
 const (
 	ControllerName = "syncset"
 )
+
+var (
+	metricTimeToApplySyncSets = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_time_to_apply_all_syncsets_seconds",
+			Help:    "Time between cluster install complete and all syncsets applied.",
+			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
+		},
+	)
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricTimeToApplySyncSets)
+}
 
 // Add creates a new SyncSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
@@ -202,6 +218,13 @@ func (r *ReconcileSyncSet) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		cdLog.WithError(err).Error("unable to list related sync set instances for cluster deployment")
 		return reconcile.Result{}, err
+	}
+
+	if len(syncSetInstances) > 0 && cd.Status.FirstSyncSetsSuccessTimestamp == nil {
+		err := r.setClusterDeploymentFirstSyncSetsSuccessTimestamp(syncSetInstances, cd, cdLog)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	toAdd, toUpdate, toDelete, err := r.reconcileSyncSetInstances(cd, syncSets, selectorSyncSets, syncSetInstances)
@@ -458,6 +481,41 @@ func (r *ReconcileSyncSet) syncSetInstanceForSelectorSyncSet(cd *hivev1.ClusterD
 	syncSetInstance.Labels = k8slabels.AddLabel(syncSetInstance.Labels, constants.SelectorSyncSetNameLabel, selectorSyncSet.Name)
 
 	return syncSetInstance, nil
+}
+
+func (r *ReconcileSyncSet) setClusterDeploymentFirstSyncSetsSuccessTimestamp(syncSetInstances []*hivev1.SyncSetInstance, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	successful := 0
+	lastSuccessTimestamp := &metav1.Time{}
+	for _, ssi := range syncSetInstances {
+		if ssi.Status.FirstSuccessTimestamp != nil {
+			if lastSuccessTimestamp == nil || ssi.Status.FirstSuccessTimestamp.Time.After(lastSuccessTimestamp.Time) {
+				lastSuccessTimestamp = ssi.Status.FirstSuccessTimestamp
+			}
+			successful++
+		}
+	}
+	if successful == len(syncSetInstances) && lastSuccessTimestamp != nil {
+		cd.Status.FirstSyncSetsSuccessTimestamp = lastSuccessTimestamp
+		err := r.updateClusterDeploymentStatus(cd, cdLog)
+		if err != nil {
+			return err
+		}
+		// existing adopted clusterdeployments may not have an installedTimestamp
+		if cd.Status.InstalledTimestamp != nil {
+			allSyncSetsAppliedDuration := lastSuccessTimestamp.Time.Sub(cd.Status.InstalledTimestamp.Time)
+			metricTimeToApplySyncSets.Observe(float64(allSyncSetsAppliedDuration.Seconds()))
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileSyncSet) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cdLog.Info("updating clusterdeployment status")
+	err := r.Status().Update(context.TODO(), cd)
+	if err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot update clusterdeployment status")
+	}
+	return nil
 }
 
 func containsSyncSet(name string, syncSets []*hivev1.SyncSet) bool {

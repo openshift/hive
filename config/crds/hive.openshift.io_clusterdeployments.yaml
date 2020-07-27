@@ -959,6 +959,11 @@ spec:
                 - type
                 type: object
               type: array
+            firstSyncSetsSuccessTimestamp:
+              description: FirstSyncSetsSuccessTimestamp is the time we first successfully
+                applied all syncsets to a cluster.
+              format: date-time
+              type: string
             installRestarts:
               description: InstallRestarts is the total count of container restarts
                 on the clusters install job.

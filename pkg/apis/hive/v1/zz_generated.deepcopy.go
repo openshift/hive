@@ -481,6 +481,10 @@ func (in *ClusterDeploymentStatus) DeepCopyInto(out *ClusterDeploymentStatus) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.FirstSyncSetsSuccessTimestamp != nil {
+		in, out := &in.FirstSyncSetsSuccessTimestamp, &out.FirstSyncSetsSuccessTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

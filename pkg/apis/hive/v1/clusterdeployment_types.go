@@ -199,6 +199,10 @@ type ClusterDeploymentStatus struct {
 	// ProvisionRef is a reference to the last ClusterProvision created for the deployment
 	// +optional
 	ProvisionRef *corev1.LocalObjectReference `json:"provisionRef,omitempty"`
+
+	// FirstSyncSetsSuccessTimestamp is the time we first successfully applied all syncsets to a cluster.
+	// +optional
+	FirstSyncSetsSuccessTimestamp *metav1.Time `json:"firstSyncSetsSuccessTimestamp,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment

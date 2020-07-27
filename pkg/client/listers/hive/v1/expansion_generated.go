@@ -10,6 +10,14 @@ type CheckpointListerExpansion interface{}
 // CheckpointNamespaceLister.
 type CheckpointNamespaceListerExpansion interface{}
 
+// ClusterClaimListerExpansion allows custom methods to be added to
+// ClusterClaimLister.
+type ClusterClaimListerExpansion interface{}
+
+// ClusterClaimNamespaceListerExpansion allows custom methods to be added to
+// ClusterClaimNamespaceLister.
+type ClusterClaimNamespaceListerExpansion interface{}
+
 // ClusterDeploymentListerExpansion allows custom methods to be added to
 // ClusterDeploymentLister.
 type ClusterDeploymentListerExpansion interface{}

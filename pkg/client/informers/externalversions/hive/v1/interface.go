@@ -10,6 +10,8 @@ import (
 type Interface interface {
 	// Checkpoints returns a CheckpointInformer.
 	Checkpoints() CheckpointInformer
+	// ClusterClaims returns a ClusterClaimInformer.
+	ClusterClaims() ClusterClaimInformer
 	// ClusterDeployments returns a ClusterDeploymentInformer.
 	ClusterDeployments() ClusterDeploymentInformer
 	// ClusterDeprovisions returns a ClusterDeprovisionInformer.
@@ -58,6 +60,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // Checkpoints returns a CheckpointInformer.
 func (v *version) Checkpoints() CheckpointInformer {
 	return &checkpointInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterClaims returns a ClusterClaimInformer.
+func (v *version) ClusterClaims() ClusterClaimInformer {
+	return &clusterClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterDeployments returns a ClusterDeploymentInformer.

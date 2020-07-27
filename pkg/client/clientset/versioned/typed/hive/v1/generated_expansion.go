@@ -4,6 +4,8 @@ package v1
 
 type CheckpointExpansion interface{}
 
+type ClusterClaimExpansion interface{}
+
 type ClusterDeploymentExpansion interface{}
 
 type ClusterDeprovisionExpansion interface{}

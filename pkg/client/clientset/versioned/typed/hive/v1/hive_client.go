@@ -11,6 +11,7 @@ import (
 type HiveV1Interface interface {
 	RESTClient() rest.Interface
 	CheckpointsGetter
+	ClusterClaimsGetter
 	ClusterDeploymentsGetter
 	ClusterDeprovisionsGetter
 	ClusterImageSetsGetter
@@ -36,6 +37,10 @@ type HiveV1Client struct {
 
 func (c *HiveV1Client) Checkpoints(namespace string) CheckpointInterface {
 	return newCheckpoints(c, namespace)
+}
+
+func (c *HiveV1Client) ClusterClaims(namespace string) ClusterClaimInterface {
+	return newClusterClaims(c, namespace)
 }
 
 func (c *HiveV1Client) ClusterDeployments(namespace string) ClusterDeploymentInterface {

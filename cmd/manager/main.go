@@ -4,9 +4,12 @@ import (
 	"flag"
 	golog "log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	_ "net/http/pprof"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	log "github.com/sirupsen/logrus"
@@ -254,6 +257,9 @@ func (writer klogWriter) Write(data []byte) (n int, err error) {
 func main() {
 	defer klog.Flush()
 	rand.Seed(time.Now().UnixNano())
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	cmd := newRootCommand()
 	err := cmd.Execute()
 	if err != nil {

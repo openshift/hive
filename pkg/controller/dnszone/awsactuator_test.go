@@ -178,5 +178,6 @@ func mockListAWSZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hive
 }
 
 func mockDeleteAWSZone(expect *mock.MockClientMockRecorder) {
+	expect.ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{}, nil).Times(1)
 	expect.DeleteHostedZone(gomock.Any()).Return(nil, nil).Times(1)
 }

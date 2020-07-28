@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -122,11 +121,17 @@ func LogLevel(err error) log.Level {
 			apierrors.IsNotFound(err):
 			return log.InfoLevel
 		}
-		cause := errors.Cause(err)
-		if cause == err {
-			return log.ErrorLevel
+		// It would be easier to use errors.Cause(), but unfortunately with that there is no way to safely tell when
+		// the error does not have a cause. We used to check that the cause returned from errors.Cause() was equal to
+		// the original error. However, that causes a runtime panic if the error is a non-comparable type.
+		type causer interface {
+			Cause() error
 		}
-		err = cause
+		if cause, ok := err.(causer); !ok {
+			return log.ErrorLevel
+		} else {
+			err = cause.Cause()
+		}
 	}
 }
 

@@ -87,6 +87,9 @@ func mockCreateAzureZone(expect *mock.MockClientMockRecorder) {
 	}, nil).Times(1)
 }
 
-func mockDeleteAzureZone(expect *mock.MockClientMockRecorder) {
+func mockDeleteAzureZone(mockCtrl *gomock.Controller, expect *mock.MockClientMockRecorder) {
+	recordSetPage := mock.NewMockRecordSetPage(mockCtrl)
+	recordSetPage.EXPECT().NotDone().Return(false).Times(1)
+	expect.ListRecordSetsByZone(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(recordSetPage, nil)
 	expect.DeleteZone(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 }

@@ -412,6 +412,11 @@ func (a *AWSActuator) Delete() error {
 	}
 
 	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone).WithField("id", aws.StringValue(a.zoneID))
+
+	if err := a.deleteRecordSets(logger); err != nil {
+		return err
+	}
+
 	logger.Info("Deleting route53 hostedzone")
 	_, err := a.awsClient.DeleteHostedZone(&route53.DeleteHostedZoneInput{
 		Id: a.zoneID,
@@ -424,6 +429,49 @@ func (a *AWSActuator) Delete() error {
 		log.WithError(err).Log(logLevel, "Cannot delete hosted zone")
 	}
 	return err
+}
+
+func (a *AWSActuator) deleteRecordSets(logger log.FieldLogger) error {
+	logger.Info("Deleting route53 recordsets in hostedzone")
+	maxItems := "100"
+	listInput := &route53.ListResourceRecordSetsInput{
+		HostedZoneId: a.zoneID,
+		MaxItems:     &maxItems,
+	}
+	for {
+		listOutput, err := a.awsClient.ListResourceRecordSets(listInput)
+		if err != nil {
+			return err
+		}
+		var changes []*route53.Change
+		for _, recordSet := range listOutput.ResourceRecordSets {
+			// Ignore the 2 recordsets that are created with the hosted zone and that cannot be deleted
+			if n, t := aws.StringValue(recordSet.Name), aws.StringValue(recordSet.Type); n == controllerutils.Dotted(a.dnsZone.Spec.Zone) && (t == route53.RRTypeNs || t == route53.RRTypeSoa) {
+				continue
+			}
+			logger.WithField("name", aws.StringValue(recordSet.Name)).WithField("type", aws.StringValue(recordSet.Type)).Info("recordset set for deletion")
+			changes = append(changes, &route53.Change{
+				Action:            aws.String(route53.ChangeActionDelete),
+				ResourceRecordSet: recordSet,
+			})
+		}
+		if len(changes) > 0 {
+			logger.WithField("count", len(changes)).Info("deleting recordsets")
+			if _, err := a.awsClient.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
+				ChangeBatch:  &route53.ChangeBatch{Changes: changes},
+				HostedZoneId: a.zoneID,
+			}); err != nil {
+				return err
+			}
+		}
+		if listOutput.IsTruncated == nil || !*listOutput.IsTruncated {
+			break
+		}
+		listInput.StartRecordIdentifier = listOutput.NextRecordIdentifier
+		listInput.StartRecordName = listOutput.NextRecordName
+		listInput.StartRecordType = listOutput.NextRecordType
+	}
+	return nil
 }
 
 // GetNameServers returns the nameservers listed in the route53 hosted zone NS record.

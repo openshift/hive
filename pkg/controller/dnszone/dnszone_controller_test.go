@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -358,7 +359,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 	cases := []struct {
 		name            string
 		dnsZone         *hivev1.DNSZone
-		setupAzureMock  func(*azuremock.MockClientMockRecorder)
+		setupAzureMock  func(*gomock.Controller, *azuremock.MockClientMockRecorder)
 		validateZone    func(*testing.T, *hivev1.DNSZone)
 		errorExpected   bool
 		soaLookupResult bool
@@ -366,7 +367,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 		{
 			name:    "DNSZone without finalizer",
 			dnsZone: validAzureDNSZoneWithoutFinalizer(),
-			setupAzureMock: func(expect *azuremock.MockClientMockRecorder) {
+			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneExists(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
@@ -376,7 +377,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 		{
 			name:    "Create Managed Zone",
 			dnsZone: validAzureDNSZone(),
-			setupAzureMock: func(expect *azuremock.MockClientMockRecorder) {
+			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneDoesntExist(expect)
 				mockCreateAzureZone(expect)
 			},
@@ -387,7 +388,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 		{
 			name:    "Adopt existing zone",
 			dnsZone: validAzureDNSZone(),
-			setupAzureMock: func(expect *azuremock.MockClientMockRecorder) {
+			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneExists(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
@@ -397,9 +398,9 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 		{
 			name:    "Delete managed zone",
 			dnsZone: validAzureDNSZoneBeingDeleted(),
-			setupAzureMock: func(expect *azuremock.MockClientMockRecorder) {
+			setupAzureMock: func(mockCtrl *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneExists(expect)
-				mockDeleteAzureZone(expect)
+				mockDeleteAzureZone(mockCtrl, expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
@@ -408,7 +409,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 		{
 			name:    "Delete non-existent managed zone",
 			dnsZone: validAzureDNSZoneBeingDeleted(),
-			setupAzureMock: func(expect *azuremock.MockClientMockRecorder) {
+			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneDoesntExist(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
@@ -419,7 +420,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			name:            "Existing zone, link to parent, reachable SOA",
 			dnsZone:         validAzureDNSZoneWithLinkToParent(),
 			soaLookupResult: true,
-			setupAzureMock: func(expect *azuremock.MockClientMockRecorder) {
+			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneExists(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
@@ -457,7 +458,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
 			if tc.setupAzureMock != nil {
-				tc.setupAzureMock(mocks.mockAzureClient.EXPECT())
+				tc.setupAzureMock(mocks.mockCtrl, mocks.mockAzureClient.EXPECT())
 			}
 
 			// Act

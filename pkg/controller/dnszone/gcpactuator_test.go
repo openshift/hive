@@ -76,5 +76,6 @@ func mockCreateGCPZone(expect *mock.MockClientMockRecorder) {
 }
 
 func mockDeleteGCPZone(expect *mock.MockClientMockRecorder) {
+	expect.ListResourceRecordSets(gomock.Any(), gomock.Any()).Return(&dns.ResourceRecordSetsListResponse{}, nil)
 	expect.DeleteManagedZone(gomock.Any()).Return(nil).Times(1)
 }

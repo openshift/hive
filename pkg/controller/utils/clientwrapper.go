@@ -110,6 +110,14 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	if err == nil && pathErr == nil {
 		metricKubeClientRequests.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Inc()
 		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Observe(applyTime)
+		log.WithFields(log.Fields{
+			"controller": cmt.Controller,
+			"method":     req.Method,
+			"path":       path,
+			"remoteStr":  remoteStr,
+			"status":     resp.Status,
+			"time":       applyTime,
+		}).Info("client request complete")
 	}
 
 	return resp, err

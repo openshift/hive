@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
@@ -171,7 +172,7 @@ func applierBuilderFunc(restConfig *rest.Config, logger log.FieldLogger) Applier
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("syncsetinstance-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New("syncsetinstance-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 200})
 	if err != nil {
 		return err
 	}
@@ -239,7 +240,8 @@ type ReconcileSyncSetInstance struct {
 // Reconcile applies SyncSet or SelectorSyncSets associated with SyncSetInstances to the owning cluster.
 func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	ssiLog := r.logger.WithField("syncsetinstance", request.NamespacedName)
+	ssiLog := r.logger.WithField("syncsetinstance", request.NamespacedName).WithField("uuid", uuid.New())
+	ssiLog.Info("starting reconcile loop")
 	defer func() {
 		dur := time.Since(start)
 		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
@@ -268,7 +270,6 @@ func (r *ReconcileSyncSetInstance) Reconcile(request reconcile.Request) (reconci
 	}
 
 	if !controllerutils.HasFinalizer(ssi, hivev1.FinalizerSyncSetInstance) {
-		ssiLog.Debug("adding finalizer")
 		return reconcile.Result{}, r.addSyncSetInstanceFinalizer(ssi, ssiLog)
 	}
 
@@ -436,10 +437,13 @@ func (r *ReconcileSyncSetInstance) getClusterDeployment(ssi *hivev1.SyncSetInsta
 func (r *ReconcileSyncSetInstance) addSyncSetInstanceFinalizer(ssi *hivev1.SyncSetInstance, ssiLog log.FieldLogger) error {
 	ssiLog.Debug("adding finalizer")
 	controllerutils.AddFinalizer(ssi, hivev1.FinalizerSyncSetInstance)
+	ssiLog.Debug("updating")
 	err := r.Update(context.TODO(), ssi)
+	ssiLog.Debug("done updating")
 	if err != nil {
 		ssiLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot add finalizer")
 	}
+	ssiLog.Debug("returning")
 	return err
 }
 

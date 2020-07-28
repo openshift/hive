@@ -159,6 +159,36 @@ func (mr *MockClientMockRecorder) TerminateInstances(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TerminateInstances", reflect.TypeOf((*MockClient)(nil).TerminateInstances), arg0)
 }
 
+// StopInstances mocks base method
+func (m *MockClient) StopInstances(arg0 *ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StopInstances", arg0)
+	ret0, _ := ret[0].(*ec2.StopInstancesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StopInstances indicates an expected call of StopInstances
+func (mr *MockClientMockRecorder) StopInstances(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstances", reflect.TypeOf((*MockClient)(nil).StopInstances), arg0)
+}
+
+// StartInstances mocks base method
+func (m *MockClient) StartInstances(arg0 *ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartInstances", arg0)
+	ret0, _ := ret[0].(*ec2.StartInstancesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartInstances indicates an expected call of StartInstances
+func (mr *MockClientMockRecorder) StartInstances(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartInstances", reflect.TypeOf((*MockClient)(nil).StartInstances), arg0)
+}
+
 // RegisterInstancesWithLoadBalancer mocks base method
 func (m *MockClient) RegisterInstancesWithLoadBalancer(arg0 *elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {
 	m.ctrl.T.Helper()

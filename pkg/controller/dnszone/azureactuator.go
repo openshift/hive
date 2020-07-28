@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
 	log "github.com/sirupsen/logrus"
@@ -82,7 +83,12 @@ func (a *AzureActuator) Delete() error {
 	}
 
 	resourceGroupName := a.dnsZone.Spec.Azure.ResourceGroupName
-	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone).WithField("zoneName", a.managedZone.Name)
+	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone)
+
+	if err := a.deleteRecordsets(logger); err != nil {
+		return err
+	}
+
 	logger.Info("Deleting managed zone")
 	err := a.azureClient.DeleteZone(context.TODO(), resourceGroupName, *a.managedZone.Name)
 	if err != nil {
@@ -90,6 +96,41 @@ func (a *AzureActuator) Delete() error {
 	}
 
 	return err
+}
+
+func (a *AzureActuator) deleteRecordsets(logger log.FieldLogger) error {
+	logger.Info("Deleting recordsets in managedzone")
+	resourceGroupName := a.dnsZone.Spec.Azure.ResourceGroupName
+	zoneName := *a.managedZone.Name
+	recordSetsPage, err := a.azureClient.ListRecordSetsByZone(context.Background(), resourceGroupName, zoneName, "")
+	if err != nil {
+		return err
+	}
+	for recordSetsPage.NotDone() {
+		for _, recordSet := range recordSetsPage.Values() {
+			if recordSet.Name == nil || recordSet.Type == nil {
+				logger.Warn("found recordset with missing name or type")
+				continue
+			}
+			name := *recordSet.Name
+			// The type comes in as, for example, "Microsoft.Network/dnszones/NS". We need just the last part of that,
+			// in this case "NS".
+			typeParts := strings.Split(*recordSet.Type, "/")
+			recordType := dns.RecordType(typeParts[len(typeParts)-1])
+			// Ignore the 2 recordsets that are created with the managed zone and that cannot be deleted
+			if name == "@" && (recordType == dns.NS || recordType == dns.SOA) {
+				continue
+			}
+			logger.WithField("name", name).WithField("type", recordType).Info("deleting recordset")
+			if err := a.azureClient.DeleteRecordSet(context.Background(), resourceGroupName, zoneName, name, recordType); err != nil {
+				return err
+			}
+		}
+		if err := recordSetsPage.NextWithContext(context.Background()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Exists implements the Exists call of the actuator interface
@@ -125,7 +166,7 @@ func (a *AzureActuator) Refresh() error {
 	resourceGroupName := a.dnsZone.Spec.Azure.ResourceGroupName
 
 	// Fetch the managed zone
-	logger := a.logger.WithField("zoneName", zoneName)
+	logger := a.logger.WithField("zone", zoneName)
 	logger.Debug("Fetching managed zone by zone name")
 	resp, err := a.azureClient.GetZone(context.TODO(), resourceGroupName, zoneName)
 	if err != nil {

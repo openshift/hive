@@ -375,3 +375,40 @@ Note that this prometheus uses an emptyDir volume and all data is lost on pod re
 oc apply -f config/prometheus/prometheus-deployment-with-pvc.yaml
 ```
 
+## Hive Controllers CPU Profiling
+
+Enable CPU profiling by importing the pprof module in cmd/manager/main.go:
+
+```golang
+_ "net/http/pprof"
+```
+
+Launch an http server to expose the data in the main method of cmd/manager/main.go:
+
+```golang
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+```
+
+Port 6060 is already exposed in the hive-controllers service, forward it locally:
+
+```bash
+$ oc port-forward svc/hive-controllers -n hive 6060
+```
+
+Visit [the webUI](http://localhost:6060/debug/pprof/) to view available profiles and some live data.
+
+Grab a profile snapshot with curl:
+
+```bash
+$ curl "http://127.0.0.1:6060/debug/pprof/profile?seconds=300" > cpu.pprof
+```
+
+Display some text data on the snapshot:
+
+```bash
+$ go tool pprof --text cpu.pprof
+```
+
+

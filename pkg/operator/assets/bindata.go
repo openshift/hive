@@ -1083,6 +1083,11 @@ spec:
   - name: metrics
     port: 2112
     protocol: TCP
+  # Expose 6060 for pprof data. Normally nothing listening here unless a developer has
+  # compiled in pprof support. See Hive developer documentation for how to use.
+  - name: profiling
+    port: 6060
+    protocol: TCP
 `)
 
 func configControllersServiceYamlBytes() ([]byte, error) {

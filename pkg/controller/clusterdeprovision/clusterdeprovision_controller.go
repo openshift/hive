@@ -76,7 +76,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		}
 	}
 	return &ReconcileClusterDeprovision{
-		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme:               mgr.GetScheme(),
 		deprovisionsDisabled: deprovisionsDisabled,
 	}, nil

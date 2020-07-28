@@ -30,6 +30,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -150,8 +153,9 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, logger log.FieldLogger, reapplyInterval time.Duration) reconcile.Reconciler {
+	rateLimiter := flowcontrol.NewTokenBucketRateLimiter(500, 700)
 	r := &ReconcileSyncSetInstance{
-		Client:          controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:          controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:          mgr.GetScheme(),
 		logger:          logger,
 		applierBuilder:  applierBuilderFunc,
@@ -169,10 +173,24 @@ func applierBuilderFunc(restConfig *rest.Config, logger log.FieldLogger) Applier
 	return hiveresource.NewHelperFromRESTConfig(restConfig, logger)
 }
 
+// DefaultControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
+// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
+func SyncSetControllerRateLimiter() workqueue.RateLimiter {
+	return workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+		// 20 qps, 200 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(100), 200)},
+	)
+}
+
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("syncsetinstance-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 200})
+	c, err := controller.New("syncsetinstance-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: 200,
+		RateLimiter:             SyncSetControllerRateLimiter(),
+	})
 	if err != nil {
 		return err
 	}

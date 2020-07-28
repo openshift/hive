@@ -48,7 +48,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileSyncIdentityProviders{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme: mgr.GetScheme(),
 		logger: log.WithField("controller", ControllerName),
 	}

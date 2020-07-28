@@ -36,7 +36,7 @@ const (
 // Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName)
+	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil)
 
 	reconciler, nameServerChangeNotifier, err := newReconciler(mgr, c)
 	if err != nil {

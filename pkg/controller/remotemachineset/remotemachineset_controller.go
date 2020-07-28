@@ -50,7 +50,7 @@ var controllerKind = hivev1.SchemeGroupVersion.WithKind("MachinePool")
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
 	r := &ReconcileRemoteMachineSet{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),

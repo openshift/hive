@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -41,9 +41,12 @@ func init() {
 // metrics for requests by controller name, HTTP method, URL path, and whether or not the request was
 // to a remote cluster.. The client will re-use the managers cache. This should be used in
 // all Hive controllers.
-func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Client {
+func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string, rateLimiter *flowcontrol.RateLimiter) client.Client {
 	// Copy the rest config as we want our round trippers to be controller specific.
 	cfg := rest.CopyConfig(mgr.GetConfig())
+	if rateLimiter != nil {
+		cfg.RateLimiter = *rateLimiter
+	}
 	AddControllerMetricsTransportWrapper(cfg, ctrlrName, false)
 
 	options := client.Options{

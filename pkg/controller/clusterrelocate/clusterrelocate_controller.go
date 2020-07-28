@@ -69,7 +69,7 @@ func init() {
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
 	r := &ReconcileClusterRelocate{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		logger: logger,
 	}
 	r.remoteClusterAPIClientBuilder = func(secret *corev1.Secret) remoteclient.Builder {

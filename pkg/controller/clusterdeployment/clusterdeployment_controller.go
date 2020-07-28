@@ -152,7 +152,7 @@ func Add(mgr manager.Manager) error {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", ControllerName)
 	r := &ReconcileClusterDeployment{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),

@@ -95,7 +95,7 @@ func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	}
 
 	return &ReconcileBackup{
-		Client:                     controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:                     controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme:                     mgr.GetScheme(),
 		reconcileRateLimitDuration: reconcileRateLimitDuration,
 		logger:                     logger,

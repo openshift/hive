@@ -67,7 +67,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileDNSZone {
 	return &ReconcileDNSZone{
-		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme:    mgr.GetScheme(),
 		logger:    log.WithField("controller", ControllerName),
 		soaLookup: lookupSOARecord,

@@ -69,7 +69,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	logger := log.WithField("controller", ControllerName)
 	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
 	r := &ReconcileControlPlaneCerts{
-		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, nil),
 		scheme:  mgr.GetScheme(),
 		applier: helper,
 	}

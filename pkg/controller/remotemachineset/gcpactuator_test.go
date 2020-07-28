@@ -564,18 +564,18 @@ func TestRequireLeases(t *testing.T) {
 		expectedResult  bool
 	}{
 		{
-			name:           "before 4.4.8",
-			clusterVersion: "4.4.7",
+			name:           "before 4.4.7",
+			clusterVersion: "4.4.6",
 			expectedResult: true,
 		},
 		{
-			name:           "4.4.8",
-			clusterVersion: "4.4.8",
+			name:           "4.4.7",
+			clusterVersion: "4.4.7",
 			expectedResult: false,
 		},
 		{
-			name:           "after 4.4.8",
-			clusterVersion: "4.4.9",
+			name:           "after 4.4.7",
+			clusterVersion: "4.4.8",
 			expectedResult: false,
 		},
 		{

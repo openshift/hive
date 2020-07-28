@@ -35,7 +35,7 @@ const (
 )
 
 var (
-	versionsSupportingFullNames = semver.MustParseRange(">=4.4.8")
+	versionsSupportingFullNames = semver.MustParseRange(">=4.4.7")
 )
 
 // GCPActuator encapsulates the pieces necessary to be able to generate

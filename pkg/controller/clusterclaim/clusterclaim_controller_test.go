@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -22,50 +24,75 @@ import (
 )
 
 const (
-	claimNamespace = "claim-namespace"
-	claimName      = "test-claim"
+	claimNamespace       = "claim-namespace"
+	claimName            = "test-claim"
+	clusterName          = "test-cluster"
+	kubeconfigSecretName = "kubeconfig-secret"
+	passwordSecretName   = "password-secret"
+)
+
+var (
+	subjects = []rbacv1.Subject{
+		{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.GroupKind,
+			Name:     "test-group",
+		},
+		{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     "test-user",
+		},
+	}
 )
 
 func TestReconcileClusterClaim(t *testing.T) {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)
+	rbacv1.AddToScheme(scheme)
 
-	claimBuilder := testclaim.FullBuilder(claimNamespace, claimName, scheme)
-	cdBuilder := func(name string) testcd.Builder {
-		return testcd.FullBuilder(name, name, scheme)
-	}
+	claimBuilder := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
+		testclaim.WithSubjects(subjects),
+	)
+	cdBuilder := testcd.FullBuilder(clusterName, clusterName, scheme).Options(
+		func(cd *hivev1.ClusterDeployment) {
+			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: kubeconfigSecretName},
+				AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: passwordSecretName},
+			}
+		},
+	)
 
 	tests := []struct {
 		name                                   string
+		claim                                  *hivev1.ClusterClaim
+		cd                                     *hivev1.ClusterDeployment
 		existing                               []runtime.Object
 		expectCompletedClaim                   bool
 		expectNoAssignment                     bool
 		expectedConditions                     []hivev1.ClusterClaimCondition
 		expectNoFinalizer                      bool
 		expectAssignedClusterDeploymentDeleted bool
+		expectRBAC                             bool
 	}{
 		{
-			name: "new assignment",
-			existing: []runtime.Object{
-				claimBuilder.Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
-			},
+			name:                 "new assignment",
+			claim:                claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd:                   cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
 			expectCompletedClaim: true,
+			expectRBAC:           true,
 		},
 		{
-			name: "existing assignment",
-			existing: []runtime.Object{
-				claimBuilder.Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
-			},
+			name:                 "existing assignment",
+			claim:                claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd:                   cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
 			expectCompletedClaim: true,
+			expectRBAC:           true,
 		},
 		{
-			name: "assignment conflict",
-			existing: []runtime.Object{
-				claimBuilder.Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
-			},
+			name:               "assignment conflict",
+			claim:              claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd:                 cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
 			expectNoAssignment: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{{
 				Type:    hivev1.ClusterClaimPendingCondition,
@@ -75,10 +102,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 			}},
 		},
 		{
-			name: "deleted cluster",
-			existing: []runtime.Object{
-				claimBuilder.Build(testclaim.WithCluster("test-cluster")),
-			},
+			name:  "deleted cluster",
+			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
 			expectedConditions: []hivev1.ClusterClaimCondition{{
 				Type:    hivev1.ClusterClaimClusterDeletedCondition,
 				Status:  corev1.ConditionTrue,
@@ -89,18 +114,16 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "new assignment clears pending condition",
-			existing: []runtime.Object{
-				claimBuilder.Build(
-					testclaim.WithCluster("test-cluster"),
-					testclaim.WithCondition(
-						hivev1.ClusterClaimCondition{
-							Type:   hivev1.ClusterClaimPendingCondition,
-							Status: corev1.ConditionTrue,
-						},
-					),
+			claim: claimBuilder.Build(
+				testclaim.WithCluster(clusterName),
+				testclaim.WithCondition(
+					hivev1.ClusterClaimCondition{
+						Type:   hivev1.ClusterClaimPendingCondition,
+						Status: corev1.ConditionTrue,
+					},
 				),
-				cdBuilder("test-cluster").Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
-			},
+			),
+			cd:                   cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
 			expectCompletedClaim: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{{
 				Type:    hivev1.ClusterClaimPendingCondition,
@@ -108,64 +131,125 @@ func TestReconcileClusterClaim(t *testing.T) {
 				Reason:  "ClusterClaimed",
 				Message: "Cluster claimed",
 			}},
+			expectRBAC: true,
 		},
 		{
 			name: "deleted claim with no assignment",
-			existing: []runtime.Object{
-				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(),
-			},
+			claim: claimBuilder.GenericOptions(
+				testgeneric.WithFinalizer(finalizer),
+				testgeneric.Deleted(),
+			).Build(),
 			expectNoAssignment:                     true,
 			expectNoFinalizer:                      true,
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
 			name: "deleted claim with unclaimed assignment",
+			claim: claimBuilder.GenericOptions(
+				testgeneric.WithFinalizer(finalizer),
+				testgeneric.Deleted(),
+			).Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
 			existing: []runtime.Object{
-				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
+				testRole(),
+				testRoleBinding(),
 			},
 			expectNoFinalizer: true,
+			expectRBAC:        true,
 		},
 		{
 			name: "deleted claim with claimed assignment",
+			claim: claimBuilder.GenericOptions(
+				testgeneric.WithFinalizer(finalizer),
+				testgeneric.Deleted(),
+			).Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
 			existing: []runtime.Object{
-				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
+				testRole(),
+				testRoleBinding(),
 			},
-			expectCompletedClaim: true,
-			expectNoFinalizer:    true,
+			expectCompletedClaim:                   true,
+			expectNoFinalizer:                      true,
+			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
 			name: "deleted claim with missing clusterdeployment",
-			existing: []runtime.Object{
-				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
-			},
+			claim: claimBuilder.GenericOptions(
+				testgeneric.WithFinalizer(finalizer),
+				testgeneric.Deleted(),
+			).Build(testclaim.WithCluster(clusterName)),
 			expectNoFinalizer:                      true,
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
 			name: "deleted claim with deleted clusterdeployment",
+			claim: claimBuilder.GenericOptions(
+				testgeneric.WithFinalizer(finalizer),
+				testgeneric.Deleted(),
+			).Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.GenericOptions(testgeneric.Deleted()).
+				Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
 			existing: []runtime.Object{
-				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").
-					GenericOptions(testgeneric.Deleted()).
-					Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
+				testRole(),
+				testRoleBinding(),
 			},
 			expectCompletedClaim: true,
 			expectNoFinalizer:    true,
 		},
 		{
 			name: "deleted claim with clusterdeployment assigned to other claim",
-			existing: []runtime.Object{
-				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
-				cdBuilder("test-cluster").Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
-			},
+			claim: claimBuilder.GenericOptions(
+				testgeneric.WithFinalizer(finalizer),
+				testgeneric.Deleted(),
+			).Build(testclaim.WithCluster(clusterName)),
+			cd:                cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
 			expectNoFinalizer: true,
+		},
+		{
+			name:                 "no RBAC when no subjects",
+			claim:                claimBuilder.Build(testclaim.WithCluster(clusterName), testclaim.WithSubjects(nil)),
+			cd:                   cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
+			expectCompletedClaim: true,
+		},
+		{
+			name:  "update existing role",
+			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd:    cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
+			existing: []runtime.Object{
+				func() runtime.Object {
+					r := testRole()
+					r.Rules = nil
+					return r
+				}(),
+			},
+			expectCompletedClaim: true,
+			expectRBAC:           true,
+		},
+		{
+			name:  "update existing rolebinding",
+			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd:    cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
+			existing: []runtime.Object{
+				func() runtime.Object {
+					rb := testRoleBinding()
+					rb.Subjects = nil
+					rb.RoleRef = rbacv1.RoleRef{}
+					return rb
+				}(),
+			},
+			expectCompletedClaim: true,
+			expectRBAC:           true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.claim != nil {
+				test.existing = append(test.existing, test.claim)
+			}
+			if test.cd != nil {
+				test.existing = append(test.existing, test.cd)
+			}
 			c := fake.NewFakeClientWithScheme(scheme, test.existing...)
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
@@ -226,6 +310,76 @@ func TestReconcileClusterClaim(t *testing.T) {
 			} else {
 				assert.Contains(t, claim.Finalizers, finalizer, "expected finalizer on claim")
 			}
+
+			role := &rbacv1.Role{}
+			getRoleError := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleName}, role)
+			roleBinding := &rbacv1.RoleBinding{}
+			getRoleBindingError := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleBindingName}, roleBinding)
+			if test.expectRBAC {
+				assert.NoError(t, getRoleError, "unexpected error getting role")
+				assert.NoError(t, getRoleBindingError, "unexpected error getting role binding")
+				expectedRules := []rbacv1.PolicyRule{
+					{
+						APIGroups: []string{"hive.openshift.io"},
+						Resources: []string{"*"},
+						Verbs:     []string{"*"},
+					},
+					{
+						APIGroups:     []string{""},
+						Resources:     []string{"secrets"},
+						ResourceNames: []string{kubeconfigSecretName, passwordSecretName},
+						Verbs:         []string{"get"},
+					},
+				}
+				assert.Equal(t, expectedRules, role.Rules, "unexpected role rules")
+				assert.Equal(t, subjects, roleBinding.Subjects, "unexpected role binding subjects")
+				expectedRoleRef := rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
+					Kind:     "Role",
+					Name:     hiveClaimOwnerRoleName,
+				}
+				assert.Equal(t, expectedRoleRef, roleBinding.RoleRef, "unexpected role binding role ref")
+			} else {
+				assert.True(t, apierrors.IsNotFound(getRoleError), "expected no role")
+				assert.True(t, apierrors.IsNotFound(getRoleBindingError), "expected no role binding")
+			}
 		})
+	}
+}
+
+func testRole() *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterName,
+			Name:      hiveClaimOwnerRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"hive.openshift.io"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+			{
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{kubeconfigSecretName, passwordSecretName},
+				Verbs:         []string{"get"},
+			},
+		},
+	}
+}
+
+func testRoleBinding() *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterName,
+			Name:      hiveClaimOwnerRoleBindingName,
+		},
+		Subjects: subjects,
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     hiveClaimOwnerRoleName,
+		},
 	}
 }

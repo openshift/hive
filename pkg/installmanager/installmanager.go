@@ -28,8 +28,8 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
-
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1233,7 +1233,7 @@ func (m *InstallManager) cleanupAdminPasswordSecret() error {
 }
 
 // deleteAnyExistingObject will look for any object that exists that matches the passed in 'obj' and will delete it if it exists
-func (m *InstallManager) deleteAnyExistingObject(namespacedName types.NamespacedName, obj runtime.Object) error {
+func (m *InstallManager) deleteAnyExistingObject(namespacedName types.NamespacedName, obj hivev1.MetaRuntimeObject) error {
 	return resource.DeleteAnyExistingObject(m.DynamicClient, namespacedName, obj, m.log)
 }
 

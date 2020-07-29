@@ -1,6 +1,7 @@
 package clusterclaim
 
 import (
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -80,6 +81,12 @@ func WithPool(poolName string) Option {
 func WithCluster(clusterName string) Option {
 	return func(clusterClaim *hivev1.ClusterClaim) {
 		clusterClaim.Spec.Namespace = clusterName
+	}
+}
+
+func WithSubjects(subjects []rbacv1.Subject) Option {
+	return func(clusterClaim *hivev1.ClusterClaim) {
+		clusterClaim.Spec.Subjects = subjects
 	}
 }
 

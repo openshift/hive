@@ -14,6 +14,7 @@ import (
 	ovirt "github.com/openshift/hive/pkg/apis/hive/v1/ovirt"
 	vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -402,7 +403,7 @@ func (in *ClusterClaimSpec) DeepCopyInto(out *ClusterClaimSpec) {
 	*out = *in
 	if in.Subjects != nil {
 		in, out := &in.Subjects, &out.Subjects
-		*out = make([]corev1.ObjectReference, len(*in))
+		*out = make([]rbacv1.Subject, len(*in))
 		copy(*out, *in)
 	}
 	return

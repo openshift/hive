@@ -5,7 +5,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -144,7 +143,7 @@ func (r *ReconcileHiveConfig) tearDownHiveAPI(hLog log.FieldLogger, hiveNSName s
 
 	objects := []struct {
 		key    client.ObjectKey
-		object runtime.Object
+		object hivev1.MetaRuntimeObject
 	}{
 		{
 			key:    client.ObjectKey{Namespace: hiveNSName, Name: "hiveapi"},

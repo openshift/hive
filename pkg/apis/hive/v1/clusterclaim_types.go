@@ -2,6 +2,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -10,9 +11,9 @@ type ClusterClaimSpec struct {
 	// ClusterPoolName is the name of the cluster pool from which to claim a cluster.
 	ClusterPoolName string `json:"clusterPoolName"`
 
-	// Subjects hold object references to authorize access to the claimed cluster.
+	// Subjects hold references to which to authorize access to the claimed cluster.
 	// +optional
-	Subjects []corev1.ObjectReference `json:"subjects,omitempty"`
+	Subjects []rbacv1.Subject `json:"subjects,omitempty"`
 
 	// Namespace is the namespace containing the ClusterDeployment of the claimed cluster.
 	// This field will be set by the ClusterPool when the claim is assigned a cluster.

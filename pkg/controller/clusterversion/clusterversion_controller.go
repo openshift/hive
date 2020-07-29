@@ -147,12 +147,16 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
+	if err := r.updateClusterVersionLabels(cd, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	cdLog.Debug("reconcile complete")
 	return reconcile.Result{}, nil
 }
 
 func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
-	origCD := cd.DeepCopy()
+	origClusterVersionStatus := cd.Status.ClusterVersionStatus.DeepCopy()
 	cdLog.WithField("clusterversion.status", clusterVersion.Status).Debug("remote cluster version status")
 	cd.Status.ClusterVersionStatus = clusterVersion.Status.DeepCopy()
 
@@ -163,23 +167,9 @@ func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterD
 		cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
 	}
 
-	if reflect.DeepEqual(cd.Status, origCD.Status) {
+	if reflect.DeepEqual(cd.Status.ClusterVersionStatus, origClusterVersionStatus) {
 		cdLog.Debug("status has not changed, nothing to update")
 		return nil
-	}
-
-	if version, err := semver.ParseTolerant(clusterVersion.Status.Desired.Version); err == nil {
-		if cd.Labels == nil {
-			cd.Labels = make(map[string]string, 3)
-		}
-		cd.Labels[constants.VersionMajorLabel] = fmt.Sprintf("%d", version.Major)
-		cd.Labels[constants.VersionMajorMinorLabel] = fmt.Sprintf("%d.%d", version.Major, version.Minor)
-		cd.Labels[constants.VersionMajorMinorPatchLabel] = fmt.Sprintf("%d.%d.%d", version.Major, version.Minor, version.Patch)
-	} else {
-		cdLog.WithField("version", clusterVersion.Status.Desired.Version).WithError(err).Warn("could not parse the cluster version")
-		delete(cd.Labels, constants.VersionMajorLabel)
-		delete(cd.Labels, constants.VersionMajorMinorLabel)
-		delete(cd.Labels, constants.VersionMajorMinorPatchLabel)
 	}
 
 	// Update cluster deployment status if changed:
@@ -187,6 +177,42 @@ func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterD
 	err := r.Status().Update(context.TODO(), cd)
 	if err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment status")
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	changed := false
+	if version, err := semver.ParseTolerant(cd.Status.ClusterVersionStatus.Desired.Version); err == nil {
+		if cd.Labels == nil {
+			cd.Labels = make(map[string]string, 3)
+		}
+		major := fmt.Sprintf("%d", version.Major)
+		majorMinor := fmt.Sprintf("%s.%d", major, version.Minor)
+		majorMinorPatch := fmt.Sprintf("%s.%d", majorMinor, version.Patch)
+		changed = cd.Labels[constants.VersionMajorLabel] != major ||
+			cd.Labels[constants.VersionMajorMinorLabel] != majorMinor ||
+			cd.Labels[constants.VersionMajorMinorPatchLabel] != majorMinorPatch
+		cd.Labels[constants.VersionMajorLabel] = major
+		cd.Labels[constants.VersionMajorMinorLabel] = majorMinor
+		cd.Labels[constants.VersionMajorMinorPatchLabel] = majorMinorPatch
+	} else {
+		cdLog.WithField("version", cd.Status.ClusterVersionStatus.Desired.Version).WithError(err).Warn("could not parse the cluster version")
+		origLen := len(cd.Labels)
+		delete(cd.Labels, constants.VersionMajorLabel)
+		delete(cd.Labels, constants.VersionMajorMinorLabel)
+		delete(cd.Labels, constants.VersionMajorMinorPatchLabel)
+		changed = origLen != len(cd.Labels)
+	}
+
+	if !changed {
+		cdLog.Debug("labels have not changed, nothing to update")
+		return nil
+	}
+
+	if err := r.Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error update cluster deployment labels")
 		return err
 	}
 	return nil

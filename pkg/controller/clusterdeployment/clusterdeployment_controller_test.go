@@ -707,6 +707,24 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Set condition when DNSZone cannot be created due to authentication failure",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testDNSZoneWithAuthenticationFailureCondition(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.DNSNotReadyCondition, "AuthenticationFailure")
+			},
+		},
+		{
 			name: "Clear condition when DNSZone is available",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -1885,6 +1903,20 @@ func testDNSZoneWithInvalidCredentialsCondition() *hivev1.DNSZone {
 	zone.Status.Conditions = []hivev1.DNSZoneCondition{
 		{
 			Type:   hivev1.InsufficientCredentialsCondition,
+			Status: corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{
+				Time: time.Now(),
+			},
+		},
+	}
+	return zone
+}
+
+func testDNSZoneWithAuthenticationFailureCondition() *hivev1.DNSZone {
+	zone := testDNSZone()
+	zone.Status.Conditions = []hivev1.DNSZoneCondition{
+		{
+			Type:   hivev1.AuthenticationFailureCondition,
 			Status: corev1.ConditionTrue,
 			LastTransitionTime: metav1.Time{
 				Time: time.Now(),

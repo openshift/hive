@@ -156,6 +156,34 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			},
 			errorExpected: true,
 		},
+		{
+			name:    "Cannot create a hosted zone as credentials fail authentication because aws_access_key_id invalid",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockUnrecognizedClientException(expect, validDNSZoneWithoutID())
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.AuthenticationFailureCondition)
+				assert.NotNil(t, condition, "failed authentication condition should be set on dnszone")
+				assert.Equalf(t, "The security token included in the request is invalid.",
+					condition.Message, "condition has an unexpected message")
+			},
+			errorExpected: true,
+		},
+		{
+			name:    "Cannot create a hosted zone as credentials fail authentication because aws_secret_access_key invalid",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockInvalidSignatureException(expect, validDNSZoneWithoutID())
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.AuthenticationFailureCondition)
+				assert.NotNil(t, condition, "failed authentication condition should be set on dnszone")
+				assert.Equalf(t, "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+					condition.Message, "condition has an unexpected message")
+			},
+			errorExpected: true,
+		},
 	}
 
 	for _, tc := range cases {

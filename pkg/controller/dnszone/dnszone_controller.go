@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,6 +42,9 @@ const (
 	resolverConfigFile              = "/etc/resolv.conf"
 	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
 	accessDeniedReason              = "AccessDenied"
+	accessGrantedReason             = "AccessGranted"
+	authenticationFailedReason      = "AuthenticationFailed"
+	authenticationSucceededReason   = "AuthenticationSucceeded"
 )
 
 var (
@@ -216,42 +218,17 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone) (reconcile.Result, error) {
 	r.logger.Debug("Retrieving current state")
 	err := actuator.Refresh()
-	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "AccessDeniedException" {
-			conds, changed := controllerutils.SetDNSZoneConditionWithChangeCheck(
-				dnsZone.Status.Conditions,
-				hivev1.InsufficientCredentialsCondition,
-				corev1.ConditionTrue,
-				accessDeniedReason,
-				awsErr.Message(),
-				controllerutils.UpdateConditionIfReasonOrMessageChange,
-			)
-			if changed {
-				dnsZone.Status.Conditions = conds
-				if err := r.Status().Update(context.Background(), dnsZone); err != nil {
-					return reconcile.Result{}, err
-				}
-			}
-			r.logger.WithError(err).Warn("Credentials are lacking permissions")
-			return reconcile.Result{}, err
-		}
-		r.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
-		return reconcile.Result{}, err
-	}
+	conditionsChanged := actuator.SetConditionsForError(err)
 
-	conds, changed := controllerutils.SetDNSZoneConditionWithChangeCheck(
-		dnsZone.Status.Conditions,
-		hivev1.InsufficientCredentialsCondition,
-		corev1.ConditionFalse,
-		accessDeniedReason,
-		"credentials are valid",
-		controllerutils.UpdateConditionNever,
-	)
-	if changed {
-		dnsZone.Status.Conditions = conds
+	if conditionsChanged {
 		if err := r.Status().Update(context.Background(), dnsZone); err != nil {
 			return reconcile.Result{}, err
 		}
+	}
+
+	if err != nil {
+		r.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
+		return reconcile.Result{}, err
 	}
 
 	zoneFound, err := actuator.Exists()

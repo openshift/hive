@@ -169,6 +169,9 @@ const (
 	// InsufficientCredentialsCondition is true when credentials cannot be used to create a
 	// DNS zone because of insufficient permissions
 	InsufficientCredentialsCondition DNSZoneConditionType = "InsufficientCredentials"
+	// AuthenticationFailureCondition is true when credentials cannot be used to create a
+	// DNS zone because they fail authentication
+	AuthenticationFailureCondition DNSZoneConditionType = "AuthenticationFailure"
 )
 
 // +genclient

@@ -1466,6 +1466,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 
 	availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 	insufficientCredentialsCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.InsufficientCredentialsCondition)
+	authenticationFailureCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.AuthenticationFailureCondition)
 	var (
 		status          corev1.ConditionStatus
 		reason, message string
@@ -1479,6 +1480,10 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		status = corev1.ConditionTrue
 		reason = "InsufficientCredentials"
 		message = insufficientCredentialsCondition.Message
+	case authenticationFailureCondition != nil && authenticationFailureCondition.Status == corev1.ConditionTrue:
+		status = corev1.ConditionTrue
+		reason = "AuthenticationFailure"
+		message = authenticationFailureCondition.Message
 	default:
 		status = corev1.ConditionTrue
 		reason = dnsNotReadyReason

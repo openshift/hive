@@ -134,6 +134,26 @@ spec:
                 used for subdomains, some resource tagging, and other instances where
                 a friendly name for the cluster is useful.
               type: string
+            clusterPoolRef:
+              description: ClusterPoolRef is a reference to the ClusterPool that this
+                ClusterDeployment originated from.
+              properties:
+                name:
+                  description: Name is the name of the ClusterPool that this refers
+                    to.
+                  type: string
+                namespace:
+                  description: Namespace is the namespace where the ClusterPool resides.
+                  type: string
+                state:
+                  description: State reflects the state of the ClusterDeployment in
+                    relation to the ClusterPool it originated from.
+                  type: string
+              required:
+              - name
+              - namespace
+              - state
+              type: object
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for
                 the target cluster's control plane

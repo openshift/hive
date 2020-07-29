@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete"}
+	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -247,112 +247,18 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	platformPath := specPath.Child("platform")
-	numberOfPlatforms := 0
-	canManageDNS := false
-	if newObject.Spec.Platform.AWS != nil {
-		numberOfPlatforms++
-		canManageDNS = true
-		aws := newObject.Spec.Platform.AWS
-		awsPath := platformPath.Child("aws")
-		if aws.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsSecretRef", "name"), "must specify secrets for AWS access"))
-		}
-		if aws.Region == "" {
-			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
-		}
-	}
-	if newObject.Spec.Platform.Azure != nil {
-		numberOfPlatforms++
-		canManageDNS = true
-		azure := newObject.Spec.Platform.Azure
-		azurePath := platformPath.Child("azure")
-		if azure.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(azurePath.Child("credentialsSecretRef", "name"), "must specify secrets for Azure access"))
-		}
-		if azure.Region == "" {
-			allErrs = append(allErrs, field.Required(azurePath.Child("region"), "must specify Azure region"))
-		}
-		if azure.BaseDomainResourceGroupName == "" {
-			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
-		}
-	}
-	if newObject.Spec.Platform.GCP != nil {
-		numberOfPlatforms++
-		canManageDNS = true
-		gcp := newObject.Spec.Platform.GCP
-		gcpPath := platformPath.Child("gcp")
-		if gcp.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(gcpPath.Child("credentialsSecretRef", "name"), "must specify secrets for GCP access"))
-		}
-		if gcp.Region == "" {
-			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
-		}
-	}
-	if newObject.Spec.Platform.OpenStack != nil {
-		numberOfPlatforms++
-		openstack := newObject.Spec.Platform.OpenStack
-		openstackPath := platformPath.Child("openStack")
-		if openstack.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(openstackPath.Child("credentialsSecretRef", "name"), "must specify secrets for OpenStack access"))
-		}
-		if openstack.Cloud == "" {
-			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
-		}
-	}
-	if newObject.Spec.Platform.VSphere != nil {
-		numberOfPlatforms++
-		vsphere := newObject.Spec.Platform.VSphere
-		vspherePath := platformPath.Child("vsphere")
-		if vsphere.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
-		}
-		if vsphere.CertificatesSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
-		}
-		if vsphere.VCenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
-		}
-		if vsphere.Datacenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
-		}
-		if vsphere.DefaultDatastore == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
-		}
-	}
-	if newObject.Spec.Platform.Ovirt != nil {
-		numberOfPlatforms++
-		ovirt := newObject.Spec.Platform.Ovirt
-		ovirtPath := platformPath.Child("ovirt")
-		if ovirt.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(ovirtPath.Child("credentialsSecretRef", "name"), "must specify secrets for oVirt access"))
-		}
-		if ovirt.CertificatesSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(ovirtPath.Child("certificatesSecretRef", "name"), "must specify certificates for oVirt access"))
-		}
-		if ovirt.ClusterID == "" {
-			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_cluster_id"), "must specify ovirt_cluster_id"))
-		}
-		if ovirt.StorageDomainID == "" {
-			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_storage_domain_id"), "must specify ovirt_storage_domain_id"))
-		}
-	}
-	if newObject.Spec.Platform.BareMetal != nil {
-		numberOfPlatforms++
-	}
-	switch {
-	case numberOfPlatforms == 0:
-		allErrs = append(allErrs, field.Required(platformPath, "must specify a platform"))
-	case numberOfPlatforms > 1:
-		allErrs = append(allErrs, field.Invalid(platformPath, newObject.Spec.Platform, "must specify only a single platform"))
-	}
-	if !canManageDNS && newObject.Spec.ManageDNS {
-		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), newObject.Spec.ManageDNS, "cannot manage DNS for the selected platform"))
-	}
+	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), newObject.Spec.Platform)...)
+	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, newObject.Spec)...)
 
 	if newObject.Spec.Provisioning != nil {
 		if newObject.Spec.Provisioning.SSHPrivateKeySecretRef != nil && newObject.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
+		}
+	}
+
+	if newObject.Spec.ClusterPoolRef != nil {
+		if newObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateClaimed {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "state"), newObject.Spec.ClusterPoolRef.State, "cannot create a ClusterDeployment that is already in claimed state"))
 		}
 	}
 
@@ -369,6 +275,117 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
+}
+
+func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.ErrorList {
+	allErrs := field.ErrorList{}
+	numberOfPlatforms := 0
+	if aws := platform.AWS; aws != nil {
+		numberOfPlatforms++
+		awsPath := path.Child("aws")
+		if aws.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsSecretRef", "name"), "must specify secrets for AWS access"))
+		}
+		if aws.Region == "" {
+			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))
+		}
+	}
+	if azure := platform.Azure; azure != nil {
+		numberOfPlatforms++
+		azurePath := path.Child("azure")
+		if azure.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("credentialsSecretRef", "name"), "must specify secrets for Azure access"))
+		}
+		if azure.Region == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("region"), "must specify Azure region"))
+		}
+		if azure.BaseDomainResourceGroupName == "" {
+			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
+		}
+	}
+	if gcp := platform.GCP; gcp != nil {
+		numberOfPlatforms++
+		gcpPath := path.Child("gcp")
+		if gcp.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(gcpPath.Child("credentialsSecretRef", "name"), "must specify secrets for GCP access"))
+		}
+		if gcp.Region == "" {
+			allErrs = append(allErrs, field.Required(gcpPath.Child("region"), "must specify GCP region"))
+		}
+	}
+	if openstack := platform.OpenStack; openstack != nil {
+		numberOfPlatforms++
+		openstackPath := path.Child("openStack")
+		if openstack.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(openstackPath.Child("credentialsSecretRef", "name"), "must specify secrets for OpenStack access"))
+		}
+		if openstack.Cloud == "" {
+			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
+		}
+	}
+	if vsphere := platform.VSphere; vsphere != nil {
+		numberOfPlatforms++
+		vspherePath := path.Child("vsphere")
+		if vsphere.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
+		}
+		if vsphere.CertificatesSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
+		}
+		if vsphere.VCenter == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
+		}
+		if vsphere.Datacenter == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
+		}
+		if vsphere.DefaultDatastore == "" {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		}
+	}
+	if ovirt := platform.Ovirt; ovirt != nil {
+		numberOfPlatforms++
+		ovirtPath := path.Child("ovirt")
+		if ovirt.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("credentialsSecretRef", "name"), "must specify secrets for oVirt access"))
+		}
+		if ovirt.CertificatesSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("certificatesSecretRef", "name"), "must specify certificates for oVirt access"))
+		}
+		if ovirt.ClusterID == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_cluster_id"), "must specify ovirt_cluster_id"))
+		}
+		if ovirt.StorageDomainID == "" {
+			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_storage_domain_id"), "must specify ovirt_storage_domain_id"))
+		}
+	}
+	if baremetal := platform.BareMetal; baremetal != nil {
+		numberOfPlatforms++
+	}
+	switch {
+	case numberOfPlatforms == 0:
+		allErrs = append(allErrs, field.Required(path, "must specify a platform"))
+	case numberOfPlatforms > 1:
+		allErrs = append(allErrs, field.Invalid(path, platform, "must specify only a single platform"))
+	}
+	return allErrs
+}
+
+func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.ClusterDeploymentSpec) field.ErrorList {
+	allErrs := field.ErrorList{}
+	canManageDNS := false
+	if spec.Platform.AWS != nil {
+		canManageDNS = true
+	}
+	if spec.Platform.Azure != nil {
+		canManageDNS = true
+	}
+	if spec.Platform.GCP != nil {
+		canManageDNS = true
+	}
+	if !canManageDNS && spec.ManageDNS {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("manageDNS"), spec.ManageDNS, "cannot manage DNS for the selected platform"))
+	}
+	return allErrs
 }
 
 // validateUpdate specifically validates update operations for ClusterDeployment objects.
@@ -460,6 +477,21 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		if oldObject.Spec.Installed {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
 		}
+	}
+
+	// Validate the ClusterPoolRef:
+	if oldObject.Spec.ClusterPoolRef != nil {
+		if newObject.Spec.ClusterPoolRef == nil {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newObject.Spec.ClusterPoolRef, "cannot remove clusterPoolRef"))
+		} else {
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterPoolRef.Namespace, oldObject.Spec.ClusterPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
+			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterPoolRef.Name, oldObject.Spec.ClusterPoolRef.Name, specPath.Child("clusterPoolRef", "name"))...)
+			if newObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateUnclaimed && oldObject.Spec.ClusterPoolRef.State == hivev1.ClusterPoolStateClaimed {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "state"), newObject.Spec.ClusterPoolRef.State, "cannot move state from claimed back to unclaimed"))
+			}
+		}
+	} else if newObject.Spec.ClusterPoolRef != nil {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newObject.Spec.ClusterPoolRef, "cannot add clusterPoolRef"))
 	}
 
 	if len(allErrs) > 0 {

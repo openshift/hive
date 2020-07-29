@@ -16,6 +16,8 @@ type Interface interface {
 	ClusterDeprovisions() ClusterDeprovisionInformer
 	// ClusterImageSets returns a ClusterImageSetInformer.
 	ClusterImageSets() ClusterImageSetInformer
+	// ClusterPools returns a ClusterPoolInformer.
+	ClusterPools() ClusterPoolInformer
 	// ClusterProvisions returns a ClusterProvisionInformer.
 	ClusterProvisions() ClusterProvisionInformer
 	// ClusterRelocates returns a ClusterRelocateInformer.
@@ -71,6 +73,11 @@ func (v *version) ClusterDeprovisions() ClusterDeprovisionInformer {
 // ClusterImageSets returns a ClusterImageSetInformer.
 func (v *version) ClusterImageSets() ClusterImageSetInformer {
 	return &clusterImageSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterPools returns a ClusterPoolInformer.
+func (v *version) ClusterPools() ClusterPoolInformer {
+	return &clusterPoolInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterProvisions returns a ClusterProvisionInformer.

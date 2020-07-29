@@ -8,13 +8,13 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/constants"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	awsinstallertypes "github.com/openshift/installer/pkg/types/aws"
 )
 
 const (
-	awsRegion       = "us-east-1"
 	awsInstanceType = "m4.xlarge"
 	volumeIOPS      = 100
 	volumeSize      = 22
@@ -31,6 +31,17 @@ type AWSCloudBuilder struct {
 	SecretAccessKey string
 	// UserTags are user-provided tags to add to resources.
 	UserTags map[string]string
+	// Region is the AWS region to which to install the cluster
+	Region string
+}
+
+func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
+	accessKeyID := credsSecret.Data[constants.AWSAccessKeyIDSecretKey]
+	secretAccessKey := credsSecret.Data[constants.AWSSecretAccessKeySecretKey]
+	return &AWSCloudBuilder{
+		AccessKeyID:     string(accessKeyID),
+		SecretAccessKey: string(secretAccessKey),
+	}
 }
 
 func (p *AWSCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -45,8 +56,8 @@ func (p *AWSCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"aws_access_key_id":     p.AccessKeyID,
-			"aws_secret_access_key": p.SecretAccessKey,
+			constants.AWSAccessKeyIDSecretKey:     p.AccessKeyID,
+			constants.AWSSecretAccessKeySecretKey: p.SecretAccessKey,
 		},
 	}
 }
@@ -61,7 +72,7 @@ func (p *AWSCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.Cl
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region:   awsRegion,
+			Region:   p.Region,
 			UserTags: p.UserTags,
 		},
 	}
@@ -83,7 +94,7 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	// Inject platform details into InstallConfig:
 	ic.Platform = installertypes.Platform{
 		AWS: &awsinstallertypes.Platform{
-			Region: awsRegion,
+			Region: p.Region,
 		},
 	}
 

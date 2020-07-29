@@ -4,14 +4,15 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (

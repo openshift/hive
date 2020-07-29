@@ -80,6 +80,20 @@ func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func validAWSClusterDeploymentFromPool(poolNS, poolName string, state hivev1.ClusterPoolState) *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.AWS = &hivev1aws.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		Region:               "test-region",
+	}
+	cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+		Namespace: poolNS,
+		Name:      poolName,
+		State:     state,
+	}
+	return cd
+}
+
 func validAzureClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.Azure = &hivev1azure.Platform{
@@ -229,6 +243,53 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			newObject:       validAWSClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test create with ClusterPoolReference",
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateUnclaimed),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test create with Claimed ClusterPoolReference",
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateClaimed),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with removed ClusterPoolReference",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateUnclaimed),
+			newObject:       validAWSClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with added ClusterPoolReference",
+			oldObject:       validAWSClusterDeployment(),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateUnclaimed),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with modified ClusterPoolReference",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateUnclaimed),
+			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "new-mypool", hivev1.ClusterPoolStateUnclaimed),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with claimed ClusterPoolReference",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateUnclaimed),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateClaimed),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:            "Test update with unclaimed ClusterPoolReference",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateClaimed),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", hivev1.ClusterPoolStateUnclaimed),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},

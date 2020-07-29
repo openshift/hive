@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -150,6 +149,7 @@ type Options struct {
 	AdoptAdminUsername       string
 	AdoptAdminPassword       string
 	MachineNetwork           string
+	Region                   string
 
 	// AWS
 	AWSUserTags []string
@@ -259,6 +259,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
+	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, and GCP.")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -307,6 +308,17 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 // Complete finishes parsing arguments for the command
 func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 	o.Name = args[0]
+
+	if o.Region == "" {
+		switch o.Cloud {
+		case cloudAWS:
+			o.Region = "us-east-1"
+		case cloudAzure:
+			o.Region = "centralus"
+		case cloudGCP:
+			o.Region = "us-east1"
+		}
+	}
 
 	return nil
 }
@@ -362,6 +374,15 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-admin-username, --adopt-admin-password")
 		}
 	}
+
+	if o.Region != "" {
+		switch c := o.Cloud; c {
+		case cloudAWS, cloudAzure, cloudGCP:
+		default:
+			return fmt.Errorf("cannot specify region when cloud is %q", c)
+		}
+	}
+
 	return nil
 }
 
@@ -504,6 +525,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			AccessKeyID:     accessKeyID,
 			SecretAccessKey: secretAccessKey,
 			UserTags:        userTags,
+			Region:          o.Region,
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
@@ -516,6 +538,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		azureProvider := &clusterresource.AzureCloudBuilder{
 			ServicePrincipal:            creds,
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
+			Region:                      o.Region,
 		}
 		builder.CloudBuilder = azureProvider
 	case cloudGCP:
@@ -531,6 +554,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		gcpProvider := &clusterresource.GCPCloudBuilder{
 			ProjectID:      projectID,
 			ServiceAccount: creds,
+			Region:         o.Region,
 		}
 		builder.CloudBuilder = gcpProvider
 	case cloudOpenStack:

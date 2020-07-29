@@ -32,6 +32,8 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
 	"github.com/openshift/hive/pkg/controller/clusterdeprovision"
+	"github.com/openshift/hive/pkg/controller/clusterpool"
+	"github.com/openshift/hive/pkg/controller/clusterpoolnamespace"
 	"github.com/openshift/hive/pkg/controller/clusterprovision"
 	"github.com/openshift/hive/pkg/controller/clusterrelocate"
 	"github.com/openshift/hive/pkg/controller/clusterstate"
@@ -64,6 +66,7 @@ type controllerSetupFunc func(manager.Manager) error
 var controllerFuncs = map[string]controllerSetupFunc{
 	clusterdeployment.ControllerName:    clusterdeployment.Add,
 	clusterdeprovision.ControllerName:   clusterdeprovision.Add,
+	clusterpoolnamespace.ControllerName: clusterpoolnamespace.Add,
 	clusterprovision.ControllerName:     clusterprovision.Add,
 	clusterrelocate.ControllerName:      clusterrelocate.Add,
 	clusterstate.ControllerName:         clusterstate.Add,
@@ -79,6 +82,7 @@ var controllerFuncs = map[string]controllerSetupFunc{
 	syncsetinstance.ControllerName:      syncsetinstance.Add,
 	unreachable.ControllerName:          unreachable.Add,
 	velerobackup.ControllerName:         velerobackup.Add,
+	clusterpool.ControllerName:          clusterpool.Add,
 }
 
 type controllerManagerOptions struct {

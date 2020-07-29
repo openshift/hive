@@ -1,6 +1,8 @@
 package generic
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -151,6 +153,13 @@ func WithoutFinalizer(finalizer string) Option {
 		finalizers := sets.NewString(meta.GetFinalizers()...)
 		finalizers.Delete(finalizer)
 		meta.SetFinalizers(finalizers.List())
+	}
+}
+
+// WithCreationTimestamp sets the creation timestamp on the object.
+func WithCreationTimestamp(time time.Time) Option {
+	return func(meta hivev1.MetaRuntimeObject) {
+		meta.SetCreationTimestamp(metav1.NewTime(time))
 	}
 }
 

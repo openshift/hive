@@ -14,6 +14,7 @@ type HiveV1Interface interface {
 	ClusterDeploymentsGetter
 	ClusterDeprovisionsGetter
 	ClusterImageSetsGetter
+	ClusterPoolsGetter
 	ClusterProvisionsGetter
 	ClusterRelocatesGetter
 	ClusterStatesGetter
@@ -47,6 +48,10 @@ func (c *HiveV1Client) ClusterDeprovisions(namespace string) ClusterDeprovisionI
 
 func (c *HiveV1Client) ClusterImageSets() ClusterImageSetInterface {
 	return newClusterImageSets(c)
+}
+
+func (c *HiveV1Client) ClusterPools(namespace string) ClusterPoolInterface {
+	return newClusterPools(c, namespace)
 }
 
 func (c *HiveV1Client) ClusterProvisions(namespace string) ClusterProvisionInterface {

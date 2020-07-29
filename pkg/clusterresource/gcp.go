@@ -3,6 +3,7 @@ package clusterresource
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -12,10 +13,10 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/gcpclient"
 )
 
 const (
-	gcpRegion       = "us-east1"
 	gcpInstanceType = "n1-standard-4"
 )
 
@@ -28,6 +29,21 @@ type GCPCloudBuilder struct {
 
 	// ProjectID is the GCP project to use.
 	ProjectID string
+
+	// Region is the GCP region to which to install the cluster.
+	Region string
+}
+
+func NewGCPCloudBuilderFromSecret(credsSecret *corev1.Secret) (*GCPCloudBuilder, error) {
+	gcpSA := credsSecret.Data[constants.GCPCredentialsName]
+	projectID, err := gcpclient.ProjectID(gcpSA)
+	if err != nil {
+		return nil, errors.Wrap(err, "error loading GCP project ID from service account json")
+	}
+	return &GCPCloudBuilder{
+		ServiceAccount: gcpSA,
+		ProjectID:      projectID,
+	}, nil
 }
 
 func (p *GCPCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -57,7 +73,7 @@ func (p *GCPCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.Cl
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.credsSecretName(o),
 			},
-			Region: gcpRegion,
+			Region: p.Region,
 		},
 	}
 }
@@ -73,7 +89,7 @@ func (p *GCPCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	ic.Platform = installertypes.Platform{
 		GCP: &installergcp.Platform{
 			ProjectID: p.ProjectID,
-			Region:    gcpRegion,
+			Region:    p.Region,
 		},
 	}
 

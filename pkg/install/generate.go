@@ -123,7 +123,7 @@ func InstallerPodSpec(
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
-						Key:                  "aws_access_key_id",
+						Key:                  constants.AWSAccessKeyIDSecretKey,
 					},
 				},
 			},
@@ -132,7 +132,7 @@ func InstallerPodSpec(
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
-						Key:                  "aws_secret_access_key",
+						Key:                  constants.AWSSecretAccessKeySecretKey,
 					},
 				},
 			},
@@ -513,7 +513,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
-						Key:                  "aws_access_key_id",
+						Key:                  constants.AWSAccessKeyIDSecretKey,
 					},
 				},
 			},
@@ -522,7 +522,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
-						Key:                  "aws_secret_access_key",
+						Key:                  constants.AWSSecretAccessKeySecretKey,
 					},
 				},
 			},

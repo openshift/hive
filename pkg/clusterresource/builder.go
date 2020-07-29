@@ -344,8 +344,8 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"install-config.yaml": d,
+		StringData: map[string]string{
+			"install-config.yaml": string(d),
 		},
 	}, nil
 }

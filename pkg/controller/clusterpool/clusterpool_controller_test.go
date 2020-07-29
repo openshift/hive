@@ -66,7 +66,6 @@ func TestReconcileClusterPool(t *testing.T) {
 		noCredsSecret                      bool
 		expectError                        bool
 		expectedTotalClusters              int
-		expectedUnclaimedClusters          int
 		expectedObservedSize               int32
 		expectedObservedReady              int32
 		expectedDeletedClusters            []string
@@ -81,10 +80,9 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithSize(5)),
 			},
-			expectedTotalClusters:     5,
-			expectedUnclaimedClusters: 5,
-			expectedObservedSize:      0,
-			expectedObservedReady:     0,
+			expectedTotalClusters: 5,
+			expectedObservedSize:  0,
+			expectedObservedReady: 0,
 		},
 		{
 			name: "scale up",
@@ -94,10 +92,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
-			expectedTotalClusters:     5,
-			expectedUnclaimedClusters: 5,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
+			expectedTotalClusters: 5,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
 		},
 		{
 			name: "scale down",
@@ -110,10 +107,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c5").Build(testcd.Installed()),
 				unclaimedCDBuilder("c6").Build(testcd.Installed()),
 			},
-			expectedTotalClusters:     3,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      6,
-			expectedObservedReady:     6,
+			expectedTotalClusters: 3,
+			expectedObservedSize:  6,
+			expectedObservedReady: 6,
 		},
 		{
 			name: "delete installing clusters first",
@@ -122,11 +118,10 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(),
 			},
-			expectedTotalClusters:     1,
-			expectedUnclaimedClusters: 1,
-			expectedObservedSize:      2,
-			expectedObservedReady:     1,
-			expectedDeletedClusters:   []string{"c2"},
+			expectedTotalClusters:   1,
+			expectedObservedSize:    2,
+			expectedObservedReady:   1,
+			expectedDeletedClusters: []string{"c2"},
 		},
 		{
 			name: "delete most recent installing clusters first",
@@ -139,11 +134,10 @@ func TestReconcileClusterPool(t *testing.T) {
 					testgeneric.WithCreationTimestamp(time.Date(2020, 2, 2, 3, 4, 5, 6, time.UTC)),
 				).Build(),
 			},
-			expectedTotalClusters:     1,
-			expectedUnclaimedClusters: 1,
-			expectedObservedSize:      2,
-			expectedObservedReady:     0,
-			expectedDeletedClusters:   []string{"c2"},
+			expectedTotalClusters:   1,
+			expectedObservedSize:    2,
+			expectedObservedReady:   0,
+			expectedDeletedClusters: []string{"c2"},
 		},
 		{
 			name: "delete installed clusters when there are not enough installing to delete",
@@ -156,11 +150,10 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c5").Build(testcd.Installed()),
 				unclaimedCDBuilder("c6").Build(),
 			},
-			expectedTotalClusters:     3,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      6,
-			expectedObservedReady:     4,
-			expectedDeletedClusters:   []string{"c3", "c6"},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    6,
+			expectedObservedReady:   4,
+			expectedDeletedClusters: []string{"c3", "c6"},
 		},
 		{
 			name: "clusters deleted when clusterpool deleted",
@@ -170,9 +163,8 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(),
 				unclaimedCDBuilder("c3").Build(),
 			},
-			expectedTotalClusters:     0,
-			expectedUnclaimedClusters: 0,
-			expectFinalizerRemoved:    true,
+			expectedTotalClusters:  0,
+			expectFinalizerRemoved: true,
 		},
 		{
 			name: "finalizer added to clusterpool",
@@ -182,10 +174,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
-			expectedTotalClusters:     3,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
+			expectedTotalClusters: 3,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
 		},
 		{
 			name: "clusters not part of pool are not counted against pool size",
@@ -196,10 +187,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(),
 			},
-			expectedTotalClusters:     4,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
 		},
 		{
 			name: "claimed clusters are not counted against pool size",
@@ -212,10 +202,9 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 				),
 			},
-			expectedTotalClusters:     4,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
 		},
 		{
 			name: "clusters in different pool are not counted against pool size",
@@ -228,10 +217,9 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcd.WithClusterPoolReference(testNamespace, "other-pool", "test-claim"),
 				),
 			},
-			expectedTotalClusters:     4,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
 		},
 		{
 			name: "deleting clusters are not counted against pool size",
@@ -243,10 +231,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
 				cdBuilder("c5").GenericOptions(testgeneric.Deleted()).Build(),
 			},
-			expectedTotalClusters:     5,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
+			expectedTotalClusters: 5,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
 		},
 		{
 			name: "missing ClusterImageSet",
@@ -303,7 +290,6 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedMissingDependenciesStatus:  pointer.BoolPtr(false),
 			expectedMissingDependenciesMessage: "Dependencies verified",
 			expectedTotalClusters:              1,
-			expectedUnclaimedClusters:          1,
 			expectedObservedSize:               0,
 			expectedObservedReady:              0,
 		},
@@ -317,10 +303,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				testsecret.FullBuilder(testNamespace, "test-pull-secret", scheme).
 					Build(testsecret.WithDataKeyValue(".dockerconfigjson", []byte("test docker config data"))),
 			},
-			expectedTotalClusters:     1,
-			expectedUnclaimedClusters: 1,
-			expectedObservedSize:      0,
-			expectedObservedReady:     0,
+			expectedTotalClusters: 1,
+			expectedObservedSize:  0,
+			expectedObservedReady: 0,
 		},
 		{
 			name: "missing pull secret",
@@ -356,12 +341,11 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 			},
-			expectedTotalClusters:     4,
-			expectedUnclaimedClusters: 4,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
-			expectedAssignedClaims:    1,
-			expectedUnassignedClaims:  0,
+			expectedTotalClusters:    4,
+			expectedObservedSize:     3,
+			expectedObservedReady:    2,
+			expectedAssignedClaims:   1,
+			expectedUnassignedClaims: 0,
 		},
 		{
 			name: "no ready clusters to assign to claim",
@@ -372,12 +356,11 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 			},
-			expectedTotalClusters:     3,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     0,
-			expectedAssignedClaims:    0,
-			expectedUnassignedClaims:  1,
+			expectedTotalClusters:    4,
+			expectedObservedSize:     3,
+			expectedObservedReady:    0,
+			expectedAssignedClaims:   0,
+			expectedUnassignedClaims: 1,
 		},
 		{
 			name: "assign to multiple claims",
@@ -390,12 +373,11 @@ func TestReconcileClusterPool(t *testing.T) {
 				testclaim.FullBuilder(testNamespace, "test-claim-2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 				testclaim.FullBuilder(testNamespace, "test-claim-3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 			},
-			expectedTotalClusters:     5,
-			expectedUnclaimedClusters: 5,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
-			expectedAssignedClaims:    2,
-			expectedUnassignedClaims:  1,
+			expectedTotalClusters:    6,
+			expectedObservedSize:     3,
+			expectedObservedReady:    2,
+			expectedAssignedClaims:   2,
+			expectedUnassignedClaims: 1,
 		},
 		{
 			name: "do not assign to claims for other pools",
@@ -406,12 +388,11 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool("other-pool")),
 			},
-			expectedTotalClusters:     3,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
-			expectedAssignedClaims:    0,
-			expectedUnassignedClaims:  1,
+			expectedTotalClusters:    3,
+			expectedObservedSize:     3,
+			expectedObservedReady:    2,
+			expectedAssignedClaims:   0,
+			expectedUnassignedClaims: 1,
 		},
 		{
 			name: "do not assign to claims in other namespaces",
@@ -422,12 +403,11 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				testclaim.FullBuilder("other-namespace", "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 			},
-			expectedTotalClusters:     3,
-			expectedUnclaimedClusters: 3,
-			expectedObservedSize:      3,
-			expectedObservedReady:     2,
-			expectedAssignedClaims:    0,
-			expectedUnassignedClaims:  1,
+			expectedTotalClusters:    3,
+			expectedObservedSize:     3,
+			expectedObservedReady:    2,
+			expectedAssignedClaims:   0,
+			expectedUnassignedClaims: 1,
 		},
 	}
 
@@ -477,18 +457,6 @@ func TestReconcileClusterPool(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Len(t, cds.Items, test.expectedTotalClusters, "unexpected number of total clusters")
-
-			actualUnclaimedClusters := 0
-			poolRef := hivev1.ClusterPoolReference{
-				Namespace: testNamespace,
-				PoolName:  testLeasePoolName,
-			}
-			for _, cd := range cds.Items {
-				if cd.Spec.ClusterPoolRef != nil && *cd.Spec.ClusterPoolRef == poolRef {
-					actualUnclaimedClusters++
-				}
-			}
-			assert.Equal(t, test.expectedUnclaimedClusters, actualUnclaimedClusters, "unexpected number of unclaimed clusters")
 
 			for _, expectedDeletedName := range test.expectedDeletedClusters {
 				for _, cd := range cds.Items {

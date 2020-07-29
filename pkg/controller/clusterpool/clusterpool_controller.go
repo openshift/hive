@@ -203,12 +203,15 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	}
 	logger.WithField("count", len(pendingClaims)).Debug("found pending claims for ClusterPool")
 
+	// reserveSize is the number of clusters that the pool currently has in reserve
+	reserveSize := len(installingCDs) + len(readyCDs) - len(pendingClaims)
+
 	readyCDs, err = r.assignClustersToClaims(pendingClaims, readyCDs, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	switch drift := len(installingCDs) + len(readyCDs) - int(clp.Spec.Size); {
+	switch drift := reserveSize - int(clp.Spec.Size); {
 	// If too many, delete some.
 	case drift > 0:
 		if err := r.deleteExcessClusters(installingCDs, readyCDs, drift, logger); err != nil {

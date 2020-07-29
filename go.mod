@@ -26,6 +26,7 @@ require (
 	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
 	github.com/openshift/cluster-api v0.0.0-20191129101638-b09907ac6668
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156
+	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/generic-admission-server v1.14.0
 	github.com/openshift/installer v0.9.0-master.0.20200603112517-20e472f69982

@@ -107,6 +107,13 @@ func newRootCommand() *cobra.Command {
 				log.WithError(err).Fatal("Cannot parse log level")
 			}
 			log.SetLevel(level)
+
+			// Add some millisecond precision to log timestamps, useful for debugging performance.
+			formatter := new(log.TextFormatter)
+			formatter.TimestampFormat = "2006-01-02T15:04:05.999Z07:00"
+			formatter.FullTimestamp = true
+			log.SetFormatter(formatter)
+
 			log.Infof("Version: %s", version.String())
 			log.Debug("debug logging enabled")
 

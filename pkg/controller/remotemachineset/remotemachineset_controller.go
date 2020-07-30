@@ -815,6 +815,8 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		return NewOpenStackActuator(logger)
 	case cd.Spec.Platform.VSphere != nil:
 		return NewVSphereActuator(logger)
+	case cd.Spec.Platform.Ovirt != nil:
+		return NewOvirtActuator(logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

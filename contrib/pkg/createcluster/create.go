@@ -668,7 +668,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			CACert:          bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = oVirtProvider
-		builder.SkipMachinePoolGeneration = true
 	}
 
 	if len(o.ServingCert) != 0 {

@@ -118,3 +118,9 @@ func Installed() Option {
 		clusterDeployment.Spec.Installed = true
 	}
 }
+
+func WithPowerState(powerState hivev1.ClusterPowerState) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.PowerState = powerState
+	}
+}

@@ -15,11 +15,12 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	routev1 "github.com/openshift/api/route/v1"
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -234,12 +235,11 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to SyncSetInstance
-	err = c.Watch(&source.Kind{Type: &hivev1.SyncSetInstance{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})
-	if err != nil {
+	// Watch for changes to ClusterSyncSets
+	if err := c.Watch(
+		&source.Kind{Type: &hivev1.ClusterSyncSet{}},
+		&handler.EnqueueRequestForOwner{OwnerType: &hivev1.ClusterDeployment{}},
+	); err != nil {
 		return fmt.Errorf("cannot start watch on syncset instance: %v", err)
 	}
 
@@ -523,7 +523,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	if cd.Spec.Installed {
 		// update SyncSetFailedCondition status condition
-		cdLog.Info("Check if any syncsetinstance Failed")
+		cdLog.Info("Check if any syncsets Failed")
 		updateCD, err := r.setSyncSetFailedCondition(cd, cdLog)
 		if err != nil {
 			cdLog.WithError(err).Error("Error updating SyncSetFailedCondition status condition")
@@ -1917,75 +1917,29 @@ func (r *ReconcileClusterDeployment) deleteOldFailedProvisions(provs []*hivev1.C
 	}
 }
 
-// getAllSyncSetInstances returns all syncset instances for a specific cluster deployment
-func (r *ReconcileClusterDeployment) getAllSyncSetInstances(cd *hivev1.ClusterDeployment) ([]*hivev1.SyncSetInstance, error) {
-
-	list := &hivev1.SyncSetInstanceList{}
-	err := r.List(context.TODO(), list, client.InNamespace(cd.Namespace))
-	if err != nil {
-		return nil, err
-	}
-
-	syncSetInstances := []*hivev1.SyncSetInstance{}
-	for i, syncSetInstance := range list.Items {
-		if syncSetInstance.Spec.ClusterDeploymentRef.Name == cd.Name {
-			syncSetInstances = append(syncSetInstances, &list.Items[i])
-		}
-	}
-	return syncSetInstances, nil
-}
-
-// checkForFailedSyncSetInstance returns true if it finds failed syncset instance
-func checkForFailedSyncSetInstance(syncSetInstances []*hivev1.SyncSetInstance) bool {
-
-	for _, syncSetInstance := range syncSetInstances {
-		if checkSyncSetConditionsForFailure(syncSetInstance.Status.Conditions) {
-			return true
-		}
-		for _, r := range syncSetInstance.Status.Resources {
-			if checkSyncSetConditionsForFailure(r.Conditions) {
-				return true
-			}
-		}
-		for _, p := range syncSetInstance.Status.Patches {
-			if checkSyncSetConditionsForFailure(p.Conditions) {
-				return true
-			}
-		}
-		for _, s := range syncSetInstance.Status.Secrets {
-			if checkSyncSetConditionsForFailure(s.Conditions) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// checkSyncSetConditionsForFailure returns true when the condition contains hivev1.ApplyFailureSyncCondition
-// and condition status is equal to true
-func checkSyncSetConditionsForFailure(conds []hivev1.SyncCondition) bool {
-	for _, c := range conds {
-		if c.Status != corev1.ConditionTrue {
-			continue
-		}
-		switch c.Type {
-		case hivev1.ApplyFailureSyncCondition, hivev1.DeletionFailedSyncCondition, hivev1.UnknownObjectSyncCondition:
-			return true
+// checkForFailedSyncSet returns true if it finds that the ClusterSyncSet has the Failed condition set
+func checkForFailedSyncSet(clusterSyncSet *hivev1.ClusterSyncSet) bool {
+	for _, cond := range clusterSyncSet.Status.Conditions {
+		if cond.Type == hivev1.ClusterSyncSetFailed {
+			return cond.Status == corev1.ConditionTrue
 		}
 	}
 	return false
 }
 
 // setSyncSetFailedCondition returns true when it sets or updates the hivev1.SyncSetFailedCondition
-func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
-	// get all syncset instances for this cluster deployment
-	syncSetInstances, err := r.getAllSyncSetInstances(cd)
-	if err != nil {
-		cdLog.WithError(err).Error("Unable to list related syncset instances for cluster deployment")
+func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (updated bool, returnErr error) {
+	clusterSyncSet := &hivev1.ClusterSyncSet{}
+	switch err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSyncSet); {
+	case apierrors.IsNotFound(err):
+		cdLog.Info("ClusterSyncSet has not yet been created")
+		return false, nil
+	case err != nil:
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSyncSet")
 		return false, err
 	}
 
-	isFailedCondition := checkForFailedSyncSetInstance(syncSetInstances)
+	isFailedCondition := checkForFailedSyncSet(clusterSyncSet)
 
 	status := corev1.ConditionFalse
 	reason := "SyncSetApplySuccess"
@@ -1993,7 +1947,7 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 	if isFailedCondition {
 		status = corev1.ConditionTrue
 		reason = "SyncSetApplyFailure"
-		message = "One of the SyncSetInstance apply has failed"
+		message = "One of the SyncSetInstance applies has failed"
 	}
 	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,

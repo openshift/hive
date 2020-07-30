@@ -58,6 +58,14 @@ type ClusterStateListerExpansion interface{}
 // ClusterStateNamespaceLister.
 type ClusterStateNamespaceListerExpansion interface{}
 
+// ClusterSyncSetListerExpansion allows custom methods to be added to
+// ClusterSyncSetLister.
+type ClusterSyncSetListerExpansion interface{}
+
+// ClusterSyncSetNamespaceListerExpansion allows custom methods to be added to
+// ClusterSyncSetNamespaceLister.
+type ClusterSyncSetNamespaceListerExpansion interface{}
+
 // DNSZoneListerExpansion allows custom methods to be added to
 // DNSZoneLister.
 type DNSZoneListerExpansion interface{}
@@ -109,11 +117,3 @@ type SyncSetListerExpansion interface{}
 // SyncSetNamespaceListerExpansion allows custom methods to be added to
 // SyncSetNamespaceLister.
 type SyncSetNamespaceListerExpansion interface{}
-
-// SyncSetInstanceListerExpansion allows custom methods to be added to
-// SyncSetInstanceLister.
-type SyncSetInstanceListerExpansion interface{}
-
-// SyncSetInstanceNamespaceListerExpansion allows custom methods to be added to
-// SyncSetInstanceNamespaceLister.
-type SyncSetInstanceNamespaceListerExpansion interface{}

@@ -1121,59 +1121,12 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterdeployments
-  - clusterprovisions
-  - dnszones
-  - machinepools
-  - machinepoolnameleases
-  - selectorsyncidentityproviders
-  - syncidentityproviders
-  - syncsets
-  - syncsetinstances
-  - clusterdeprovisions
-  # TODO: remove once v1alpha1 compat removed
-  - clusterdeprovisionrequests
-  - clusterstates
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - hive.openshift.io
-  resources:
-  - clusterimagesets
-  - hiveconfigs
-  - selectorsyncsets
-  - selectorsyncidentityproviders
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - admission.hive.openshift.io
-  resources:
-  - clusterdeployments
-  - clusterimagesets
-  - clusterprovisions
-  - dnszones
-  - machinepools
-  - selectorsyncsets
-  - syncsets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
+- apiGroups: ["hive.openshift.io"]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["admission.hive.openshift.io"]
+  resources: ["*"]
+  verbs: ["*"]
 - apiGroups:
   - apiextensions.k8s.io
   resources:
@@ -1426,7 +1379,7 @@ rules:
   - selectorsyncsets
   - syncidentityproviders
   - syncsets
-  - syncsetinstances
+  - clustersyncsets
   - clusterdeprovisions
   # TODO: remove once v1alpha1 compat removed
   - clusterdeprovisionrequests

@@ -13,6 +13,8 @@ spec:
     - sss
     singular: selectorsyncset
   scope: Cluster
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: SelectorSyncSet is the Schema for the SelectorSyncSet API
@@ -186,6 +188,66 @@ spec:
           type: object
         status:
           description: SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
+          properties:
+            conditions:
+              items:
+                description: SyncSetCondition contains details for the current condition
+                  of a SyncSet or SelectorSyncSet
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
+            observedGeneration:
+              format: int64
+              type: integer
+            resources:
+              items:
+                properties:
+                  apiVersion:
+                    description: APIVersion is the Group and Version of the resource.
+                      This is omitted for secret mappings.
+                    type: string
+                  kind:
+                    description: Kind is the Kind of the resource This is omitted
+                      for secret mappings.
+                    type: string
+                  name:
+                    description: Name is the name of the resource.
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the resource.
+                    type: string
+                required:
+                - name
+                type: object
+              type: array
+          required:
+          - observedGeneration
           type: object
   version: v1
   versions:

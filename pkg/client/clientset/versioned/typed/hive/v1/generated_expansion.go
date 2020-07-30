@@ -18,6 +18,8 @@ type ClusterRelocateExpansion interface{}
 
 type ClusterStateExpansion interface{}
 
+type ClusterSyncSetExpansion interface{}
+
 type DNSZoneExpansion interface{}
 
 type HiveConfigExpansion interface{}
@@ -33,5 +35,3 @@ type SelectorSyncSetExpansion interface{}
 type SyncIdentityProviderExpansion interface{}
 
 type SyncSetExpansion interface{}
-
-type SyncSetInstanceExpansion interface{}

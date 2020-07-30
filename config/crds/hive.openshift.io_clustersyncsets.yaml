@@ -1,0 +1,168 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: clustersyncsets.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: ClusterSyncSet
+    listKind: ClusterSyncSetList
+    plural: clustersyncsets
+    singular: clustersyncset
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ClusterSyncSet is the Schema for the ClusterSyncSets API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ClusterSyncSetSpec defines the desired state of ClusterSyncSet
+          properties:
+            clusterDeploymentName:
+              description: ClusterDeploymentName is the name of the ClusterDeployment
+                for this ClusterSyncSet.
+              type: string
+          required:
+          - clusterDeploymentName
+          type: object
+        status:
+          description: ClusterSyncSetStatus defines the observed state of ClusterSyncSet
+          properties:
+            conditions:
+              items:
+                description: ClusterSyncSetCondition contains details for the current
+                  condition of a ClusterSyncSet
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
+            lastFullApplyTime:
+              format: date-time
+              type: string
+            selectorSyncSets:
+              items:
+                properties:
+                  name:
+                    type: string
+                  observedGeneration:
+                    format: int64
+                    type: integer
+                  resourcesToDelete:
+                    items:
+                      properties:
+                        apiVersion:
+                          description: APIVersion is the Group and Version of the
+                            resource. This is omitted for secret mappings.
+                          type: string
+                        kind:
+                          description: Kind is the Kind of the resource This is omitted
+                            for secret mappings.
+                          type: string
+                        name:
+                          description: Name is the name of the resource.
+                          type: string
+                        namespace:
+                          description: Namespace is the namespace of the resource.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  result:
+                    type: string
+                required:
+                - name
+                - observedGeneration
+                - result
+                type: object
+              type: array
+            syncSets:
+              items:
+                properties:
+                  name:
+                    type: string
+                  observedGeneration:
+                    format: int64
+                    type: integer
+                  resourcesToDelete:
+                    items:
+                      properties:
+                        apiVersion:
+                          description: APIVersion is the Group and Version of the
+                            resource. This is omitted for secret mappings.
+                          type: string
+                        kind:
+                          description: Kind is the Kind of the resource This is omitted
+                            for secret mappings.
+                          type: string
+                        name:
+                          description: Name is the name of the resource.
+                          type: string
+                        namespace:
+                          description: Namespace is the namespace of the resource.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  result:
+                    type: string
+                required:
+                - name
+                - observedGeneration
+                - result
+                type: object
+              type: array
+          required:
+          - lastFullApplyTime
+          type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

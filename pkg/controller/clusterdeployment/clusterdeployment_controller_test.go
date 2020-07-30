@@ -1066,7 +1066,20 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "setSyncSetFailedCondition should be present",
 			existing: []runtime.Object{
 				testInstalledClusterDeployment(time.Now()),
-				createSyncSetInstanceObj(hivev1.ApplyFailureSyncCondition),
+				&hivev1.ClusterSyncSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespace,
+						Name:      testName,
+					},
+					Status: hivev1.ClusterSyncSetStatus{
+						Conditions: []hivev1.ClusterSyncSetCondition{{
+							Type:    hivev1.ClusterSyncSetFailed,
+							Status:  corev1.ConditionTrue,
+							Reason:  "FailureReason",
+							Message: "Failure message",
+						}},
+					},
+				},
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -1093,7 +1106,20 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					)
 					return cd
 				}(),
-				createSyncSetInstanceObj(hivev1.ApplySuccessSyncCondition),
+				&hivev1.ClusterSyncSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespace,
+						Name:      testName,
+					},
+					Status: hivev1.ClusterSyncSetStatus{
+						Conditions: []hivev1.ClusterSyncSetCondition{{
+							Type:    hivev1.ClusterSyncSetFailed,
+							Status:  corev1.ConditionFalse,
+							Reason:  "SuccessReason",
+							Message: "Success message",
+						}},
+					},
+				},
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -2206,42 +2232,6 @@ func getProvisions(c client.Client) []*hivev1.ClusterProvision {
 		provisions[i] = &provisionList.Items[i]
 	}
 	return provisions
-}
-
-func createSyncSetInstanceObj(syncCondType hivev1.SyncConditionType) *hivev1.SyncSetInstance {
-	ssi := &hivev1.SyncSetInstance{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testSyncsetInstanceName,
-			Namespace: testNamespace,
-		},
-	}
-	ssi.Spec.ClusterDeploymentRef.Name = testName
-	ssi.Status = createSyncSetInstanceStatus(syncCondType)
-	return ssi
-}
-
-func createSyncSetInstanceStatus(syncCondType hivev1.SyncConditionType) hivev1.SyncSetInstanceStatus {
-	conditionTime := metav1.NewTime(time.Now())
-	var ssiStatus corev1.ConditionStatus
-	var condType hivev1.SyncConditionType
-	if syncCondType == hivev1.ApplyFailureSyncCondition {
-		ssiStatus = corev1.ConditionTrue
-		condType = syncCondType
-	} else {
-		ssiStatus = corev1.ConditionFalse
-		condType = syncCondType
-	}
-	status := hivev1.SyncSetInstanceStatus{
-		Conditions: []hivev1.SyncCondition{
-			{
-				Type:               condType,
-				Status:             ssiStatus,
-				LastTransitionTime: conditionTime,
-				LastProbeTime:      conditionTime,
-			},
-		},
-	}
-	return status
 }
 
 func testCompletedImageSetJob() *batchv1.Job {

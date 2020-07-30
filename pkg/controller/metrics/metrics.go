@@ -304,11 +304,11 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 }
 
 func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
-	mcLog.Debug("calculating metrics across all SyncSetInstances")
-	ssis := &hivev1.SyncSetInstanceList{}
-	err := mc.Client.List(context.Background(), ssis)
+	mcLog.Debug("calculating metrics across all ClusterSyncSets")
+	cssList := &hivev1.ClusterSyncSetList{}
+	err := mc.Client.List(context.Background(), cssList)
 	if err != nil {
-		mcLog.WithError(err).Error("error listing all SyncSetInstances")
+		mcLog.WithError(err).Error("error listing all ClusterSyncSets")
 		return
 	}
 
@@ -317,17 +317,16 @@ func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
 
 	ssInstancesTotal := 0
 	ssInstancesUnappliedTotal := 0
-	for _, ssi := range ssis.Items {
-		if sss := ssi.Spec.SelectorSyncSetRef; sss != nil {
-			// Process SyncSetInstances with a SelectorSyncSet reference:
+	for _, css := range cssList.Items {
+		for _, sss := range css.Status.SelectorSyncSets {
 			sssInstancesTotal[sss.Name]++
-			if !ssi.Status.Applied {
+			if sss.Result != hivev1.SuccessSyncSetResult {
 				sssInstancesUnappliedTotal[sss.Name]++
 			}
-		} else {
-			// Process SyncSetInstances with a non-selector SyncSet reference:
+		}
+		for _, ss := range css.Status.SyncSets {
 			ssInstancesTotal++
-			if !ssi.Status.Applied {
+			if ss.Result != hivev1.SuccessSyncSetResult {
 				ssInstancesUnappliedTotal++
 			}
 		}

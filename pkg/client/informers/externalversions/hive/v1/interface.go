@@ -24,6 +24,8 @@ type Interface interface {
 	ClusterRelocates() ClusterRelocateInformer
 	// ClusterStates returns a ClusterStateInformer.
 	ClusterStates() ClusterStateInformer
+	// ClusterSyncSets returns a ClusterSyncSetInformer.
+	ClusterSyncSets() ClusterSyncSetInformer
 	// DNSZones returns a DNSZoneInformer.
 	DNSZones() DNSZoneInformer
 	// HiveConfigs returns a HiveConfigInformer.
@@ -40,8 +42,6 @@ type Interface interface {
 	SyncIdentityProviders() SyncIdentityProviderInformer
 	// SyncSets returns a SyncSetInformer.
 	SyncSets() SyncSetInformer
-	// SyncSetInstances returns a SyncSetInstanceInformer.
-	SyncSetInstances() SyncSetInstanceInformer
 }
 
 type version struct {
@@ -95,6 +95,11 @@ func (v *version) ClusterStates() ClusterStateInformer {
 	return &clusterStateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// ClusterSyncSets returns a ClusterSyncSetInformer.
+func (v *version) ClusterSyncSets() ClusterSyncSetInformer {
+	return &clusterSyncSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // DNSZones returns a DNSZoneInformer.
 func (v *version) DNSZones() DNSZoneInformer {
 	return &dNSZoneInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -133,9 +138,4 @@ func (v *version) SyncIdentityProviders() SyncIdentityProviderInformer {
 // SyncSets returns a SyncSetInformer.
 func (v *version) SyncSets() SyncSetInformer {
 	return &syncSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// SyncSetInstances returns a SyncSetInstanceInformer.
-func (v *version) SyncSetInstances() SyncSetInstanceInformer {
-	return &syncSetInstanceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

@@ -53,6 +53,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterRelocates().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterstates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterStates().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("clustersyncsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterSyncSets().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("dnszones"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().DNSZones().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("hiveconfigs"):
@@ -69,8 +71,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncIdentityProviders().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("syncsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncSets().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("syncsetinstances"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncSetInstances().Informer()}, nil
 
 	}
 

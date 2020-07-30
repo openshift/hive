@@ -37,6 +37,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/clusterprovision"
 	"github.com/openshift/hive/pkg/controller/clusterrelocate"
 	"github.com/openshift/hive/pkg/controller/clusterstate"
+	"github.com/openshift/hive/pkg/controller/clustersyncset"
 	"github.com/openshift/hive/pkg/controller/clusterversion"
 	"github.com/openshift/hive/pkg/controller/controlplanecerts"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint"
@@ -47,7 +48,6 @@ import (
 	"github.com/openshift/hive/pkg/controller/remotemachineset"
 	"github.com/openshift/hive/pkg/controller/syncidentityprovider"
 	"github.com/openshift/hive/pkg/controller/syncset"
-	"github.com/openshift/hive/pkg/controller/syncsetinstance"
 	"github.com/openshift/hive/pkg/controller/unreachable"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/controller/velerobackup"
@@ -71,6 +71,7 @@ var controllerFuncs = map[string]controllerSetupFunc{
 	clusterprovision.ControllerName:     clusterprovision.Add,
 	clusterrelocate.ControllerName:      clusterrelocate.Add,
 	clusterstate.ControllerName:         clusterstate.Add,
+	clustersyncset.ControllerName:       clustersyncset.Add,
 	clusterversion.ControllerName:       clusterversion.Add,
 	controlplanecerts.ControllerName:    controlplanecerts.Add,
 	dnsendpoint.ControllerName:          dnsendpoint.Add,
@@ -80,7 +81,6 @@ var controllerFuncs = map[string]controllerSetupFunc{
 	remotemachineset.ControllerName:     remotemachineset.Add,
 	syncidentityprovider.ControllerName: syncidentityprovider.Add,
 	syncset.ControllerName:              syncset.Add,
-	syncsetinstance.ControllerName:      syncsetinstance.Add,
 	unreachable.ControllerName:          unreachable.Add,
 	velerobackup.ControllerName:         velerobackup.Add,
 	clusterpool.ControllerName:          clusterpool.Add,

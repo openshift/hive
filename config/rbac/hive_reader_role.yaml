@@ -33,7 +33,7 @@ rules:
   - selectorsyncsets
   - syncidentityproviders
   - syncsets
-  - syncsetinstances
+  - clustersyncsets
   - clusterdeprovisions
   # TODO: remove once v1alpha1 compat removed
   - clusterdeprovisionrequests

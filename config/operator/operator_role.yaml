@@ -145,35 +145,12 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - admission.hive.openshift.io
-  resources:
-  - dnszones
-  verbs:
-  - get
-  - list
-  - watch
+- apiGroups: ["admission.hive.openshift.io"]
+  resources: ["*"]
+  verbs: ["*"]
 - apiGroups:
   - authorization.k8s.io
   resources:
   - subjectaccessreviews
   verbs:
   - create
-- apiGroups:
-    - admission.hive.openshift.io
-  resources:
-    - clusterdeployments
-    - clusterimagesets
-    - clusterprovisions
-    - dnszones
-    - machinepools
-    - selectorsyncsets
-    - syncsets
-  verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
-    - patch
-    - delete

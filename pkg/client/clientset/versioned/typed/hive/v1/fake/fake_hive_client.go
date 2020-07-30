@@ -44,6 +44,10 @@ func (c *FakeHiveV1) ClusterStates(namespace string) v1.ClusterStateInterface {
 	return &FakeClusterStates{c, namespace}
 }
 
+func (c *FakeHiveV1) ClusterSyncSets(namespace string) v1.ClusterSyncSetInterface {
+	return &FakeClusterSyncSets{c, namespace}
+}
+
 func (c *FakeHiveV1) DNSZones(namespace string) v1.DNSZoneInterface {
 	return &FakeDNSZones{c, namespace}
 }
@@ -74,10 +78,6 @@ func (c *FakeHiveV1) SyncIdentityProviders(namespace string) v1.SyncIdentityProv
 
 func (c *FakeHiveV1) SyncSets(namespace string) v1.SyncSetInterface {
 	return &FakeSyncSets{c, namespace}
-}
-
-func (c *FakeHiveV1) SyncSetInstances(namespace string) v1.SyncSetInstanceInterface {
-	return &FakeSyncSetInstances{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
+	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +34,9 @@ type Builder interface {
 
 	// BuildDynamic will return a dynamic kubeclient for the remote cluster.
 	BuildDynamic() (dynamic.Interface, error)
+
+	// BuildKubeClient will return a kubernetes client for the remote cluster.
+	BuildKubeClient() (kubeclient.Interface, error)
 
 	// RESTConfig returns the config for a REST client that connects to the remote cluster.
 	RESTConfig() (*rest.Config, error)
@@ -103,6 +107,30 @@ func ConnectToRemoteClusterWithDynamicClient(
 		return
 	}
 	remoteClient = rawRemoteClient.(dynamic.Interface)
+	return
+}
+
+// ConnectToRemoteClusterWithKubeClient connects to a remote cluster using the specified builder and builds a kubernetes client.
+// If the ClusterDeployment is marked as unreachable, then no connection will be made.
+// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
+func ConnectToRemoteClusterWithKubeClient(
+	cd *hivev1.ClusterDeployment,
+	remoteClientBuilder Builder,
+	localClient client.Client,
+	logger log.FieldLogger,
+) (remoteClient kubeclient.Interface, unreachable, requeue bool) {
+	var rawRemoteClient interface{}
+	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
+		cd,
+		remoteClientBuilder,
+		localClient,
+		logger,
+		func(builder Builder) (interface{}, error) { return builder.BuildKubeClient() },
+	)
+	if unreachable {
+		return
+	}
+	remoteClient = rawRemoteClient.(kubeclient.Interface)
 	return
 }
 
@@ -236,6 +264,20 @@ func (b *builder) BuildDynamic() (dynamic.Interface, error) {
 	}
 
 	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func (b *builder) BuildKubeClient() (kubeclient.Interface, error) {
+	cfg, err := b.RESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubeclient.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
 	}

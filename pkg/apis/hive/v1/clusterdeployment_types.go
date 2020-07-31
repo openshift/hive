@@ -47,6 +47,21 @@ const (
 	HiveClusterRegionLabel = "hive.openshift.io/cluster-region"
 )
 
+// ClusterPowerState is used to indicate whether a cluster is running or in a
+// hibernating state.
+// +kubebuilder:validation:Enum="";Running;Hibernating
+type ClusterPowerState string
+
+const (
+	// RunningClusterPowerState is the default state of a cluster after it has
+	// been installed. All of its machines should be running.
+	RunningClusterPowerState ClusterPowerState = "Running"
+
+	// HibernatingClusterPowerState is used to stop the machines belonging to a cluster
+	// and move it to a hibernating state.
+	HibernatingClusterPowerState ClusterPowerState = "Hibernating"
+)
+
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
 type ClusterDeploymentSpec struct {
 
@@ -103,6 +118,11 @@ type ClusterDeploymentSpec struct {
 	// ClusterPoolRef is a reference to the ClusterPool that this ClusterDeployment originated from.
 	// +optional
 	ClusterPoolRef *ClusterPoolReference `json:"clusterPoolRef,omitempty"`
+
+	// PowerState indicates whether a cluster should be running or hibernating. When omitted,
+	// PowerState defaults to the Running state.
+	// +optional
+	PowerState ClusterPowerState `json:"powerState,omitempty"`
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.
@@ -288,6 +308,10 @@ const (
 
 	// RelocationFailedCondition indicates if a relocation to another Hive instance has failed
 	RelocationFailedCondition ClusterDeploymentConditionType = "RelocationFailed"
+
+	// ClusterHibernatingCondition is set when the ClusterDeployment is either
+	// transitioning to/from a hibernating state or is in a hibernating state.
+	ClusterHibernatingCondition ClusterDeploymentConditionType = "Hibernating"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -304,7 +328,29 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ProvisionFailedCondition,
 	SyncSetFailedCondition,
 	RelocationFailedCondition,
+	ClusterHibernatingCondition,
 }
+
+// Cluster hibernating reasons
+const (
+	// ResumingHibernationReason is used as the reason when the cluster is transitioning
+	// from a Hibernating state to a Running state.
+	ResumingHibernationReason = "Resuming"
+	// RunningHibernationReason is used as the reason when the cluster is running and
+	// the Hibernating condition is false.
+	RunningHibernationReason = "Running"
+	// StoppingHibernationReason is used as the reason when the cluster is transitioning
+	// from a Running state to a Hibernating state.
+	StoppingHibernationReason = "Stopping"
+	// HibernatingHibernationReason is used as the reason when the cluster is in a
+	// Hibernating state.
+	HibernatingHibernationReason = "Hibernating"
+	// UnsupportedHibernationReason is used as the reason when the cluster spec
+	// specifies that the cluster be moved to a Hibernating state, but either the cluster
+	// version is not compatible with hibernation (< 4.4.8) or the cloud provider of
+	// the cluster is not supported.
+	UnsupportedHibernationReason = "Unsupported"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

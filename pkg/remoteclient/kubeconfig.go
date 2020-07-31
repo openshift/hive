@@ -4,6 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
+	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,6 +45,20 @@ func (b *kubeconfigBuilder) BuildDynamic() (dynamic.Interface, error) {
 	}
 
 	client, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+func (b *kubeconfigBuilder) BuildKubeClient() (kubeclient.Interface, error) {
+	cfg, err := b.RESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubeclient.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
 	}

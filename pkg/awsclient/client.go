@@ -59,6 +59,8 @@ type Client interface {
 	RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error)
 	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
 	TerminateInstances(*ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
+	StopInstances(*ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error)
+	StartInstances(*ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error)
 
 	// ELB
 	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
@@ -144,6 +146,16 @@ func (c *awsClient) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.D
 func (c *awsClient) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
 	metricAWSAPICalls.WithLabelValues("TerminateInstances").Inc()
 	return c.ec2Client.TerminateInstances(input)
+}
+
+func (c *awsClient) StopInstances(input *ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error) {
+	metricAWSAPICalls.WithLabelValues("StopInstances").Inc()
+	return c.ec2Client.StopInstances(input)
+}
+
+func (c *awsClient) StartInstances(input *ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error) {
+	metricAWSAPICalls.WithLabelValues("StartInstances").Inc()
+	return c.ec2Client.StartInstances(input)
 }
 
 func (c *awsClient) RegisterInstancesWithLoadBalancer(input *elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {

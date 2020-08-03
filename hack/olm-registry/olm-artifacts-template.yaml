@@ -18,6 +18,8 @@ parameters:
   value: "[]"
 - name: DISABLED_CONTROLLERS
   value: "[]"
+- name: DELETE_PROTECTION
+  value: ""
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -59,3 +61,4 @@ objects:
     disabledControllers: "${{DISABLED_CONTROLLERS}}"
     globalPullSecretRef:
       name: ${GLOBAL_PULL_SECRET}
+    deleteProtection: ${DELETE_PROTECTION}

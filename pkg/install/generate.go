@@ -8,6 +8,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
@@ -351,6 +352,10 @@ func InstallerPodSpec(
 		hiveArg = fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", ovirtCADir, hiveArg)
 	}
 
+	// This is used when scheduling the installer pod. It ensures that installer pods don't overwhelm
+	// a given node's memory.
+	memoryRequest := resource.MustParse("800Mi")
+
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	containers := []corev1.Container{
@@ -384,6 +389,11 @@ func InstallerPodSpec(
 			Command:         []string{"/bin/sh", "-c"},
 			Args:            []string{hiveArg},
 			VolumeMounts:    volumeMounts,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceMemory: memoryRequest,
+				},
+			},
 		},
 	}
 

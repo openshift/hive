@@ -15,8 +15,6 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	kresource "k8s.io/cli-runtime/pkg/resource"
 	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
-
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // ApplyResult indicates what type of change was performed
@@ -41,17 +39,12 @@ const fieldTooLong metav1.CauseType = "FieldValueTooLong"
 
 // Apply applies the given resource bytes to the target cluster specified by kubeconfig
 func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
-	factory, err := r.getFactory("")
-	if err != nil {
-		r.logger.WithError(err).Error("failed to obtain factory for apply")
-		return "", err
-	}
 	ioStreams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
 		Out:    &bytes.Buffer{},
 		ErrOut: &bytes.Buffer{},
 	}
-	applyOptions, changeTracker, err := r.setupApplyCommand(factory, obj, ioStreams)
+	applyOptions, changeTracker, err := r.setupApplyCommand(obj, ioStreams)
 	if err != nil {
 		r.logger.WithError(err).Error("failed to setup apply command")
 		return "", err
@@ -77,14 +70,8 @@ func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) 
 }
 
 func (r *Helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
-	factory, err := r.getFactory("")
-	if err != nil {
-		r.logger.WithError(err).Error("failed to obtain factory for apply")
-		return "", err
-	}
-
 	errOut := &bytes.Buffer{}
-	result, err := r.createOrUpdate(factory, obj, errOut)
+	result, err := r.createOrUpdate(obj, errOut)
 	if err != nil {
 		r.logger.WithError(err).
 			WithField("stderr", errOut.String()).Warn("running the apply command failed")
@@ -103,12 +90,7 @@ func (r *Helper) CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime
 }
 
 func (r *Helper) Create(obj []byte) (ApplyResult, error) {
-	factory, err := r.getFactory("")
-	if err != nil {
-		r.logger.WithError(err).Error("failed to obtain factory for apply")
-		return "", err
-	}
-	result, err := r.createOnly(factory, obj)
+	result, err := r.createOnly(obj)
 	if err != nil {
 		r.logger.WithError(err).Warn("running the create command failed")
 		return "", err
@@ -125,12 +107,12 @@ func (r *Helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme)
 	return r.Create(data)
 }
 
-func (r *Helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {
-	info, err := r.getResourceInternalInfo(f, obj)
+func (r *Helper) createOnly(obj []byte) (ApplyResult, error) {
+	info, err := r.getResourceInternalInfo(obj)
 	if err != nil {
 		return "", err
 	}
-	c, err := f.DynamicClient()
+	c, err := r.factory.DynamicClient()
 	if err != nil {
 		return "", err
 	}
@@ -149,12 +131,12 @@ func (r *Helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) 
 	return UnchangedApplyResult, nil
 }
 
-func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
-	info, err := r.getResourceInternalInfo(f, obj)
+func (r *Helper) createOrUpdate(obj []byte, errOut io.Writer) (ApplyResult, error) {
+	info, err := r.getResourceInternalInfo(obj)
 	if err != nil {
 		return "", err
 	}
-	c, err := f.DynamicClient()
+	c, err := r.factory.DynamicClient()
 	if err != nil {
 		return "", err
 	}
@@ -171,7 +153,7 @@ func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 		}
 		return CreatedApplyResult, nil
 	}
-	openAPISchema, _ := f.OpenAPISchema()
+	openAPISchema, _ := r.factory.OpenAPISchema()
 	patcher := kcmdapply.Patcher{
 		Mapping:       info.Mapping,
 		Helper:        kresource.NewHelper(info.Client, info.Mapping),
@@ -195,39 +177,34 @@ func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 	return result, nil
 }
 
-func (r *Helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
+func (r *Helper) setupApplyCommand(obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
 	r.logger.Debug("setting up apply command")
 	o := kcmdapply.NewApplyOptions(ioStreams)
-	dynamicClient, err := f.DynamicClient()
+	dynamicClient, err := r.factory.DynamicClient()
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain dynamic client from factory")
 		return nil, nil, err
 	}
 	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
-	o.OpenAPISchema, _ = f.OpenAPISchema()
-	o.Validator, err = f.Validator(false)
+	o.OpenAPISchema, _ = r.factory.OpenAPISchema()
+	o.Validator, err = r.factory.Validator(false)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain schema to validate objects from factory")
 		return nil, nil, err
 	}
-	o.Builder = f.NewBuilder()
-	o.Mapper, err = f.ToRESTMapper()
+	o.Builder = r.factory.NewBuilder()
+	o.Mapper, err = r.factory.ToRESTMapper()
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain RESTMapper from factory")
 		return nil, nil, err
 	}
 
 	o.DynamicClient = dynamicClient
-	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		r.logger.WithError(err).Error("cannot obtain namespace from factory")
-		return nil, nil, err
-	}
 	tracker := &changeTracker{
 		internalToPrinter: func(string) (printers.ResourcePrinter, error) { return o.PrintFlags.ToPrinter() },
 	}
 	o.ToPrinter = tracker.ToPrinter
-	info, err := r.getResourceInternalInfo(f, obj)
+	info, err := r.getResourceInternalInfo(obj)
 	if err != nil {
 		return nil, nil, err
 	}

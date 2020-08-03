@@ -445,7 +445,11 @@ func (o *Options) getResourceHelper() (*resource.Helper, error) {
 		log.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	helper := resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "create-cluster"))
+	helper, err := resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "create-cluster"))
+	if err != nil {
+		log.WithError(err).Error("Cannot create helper")
+		return nil, err
+	}
 	return helper, nil
 }
 

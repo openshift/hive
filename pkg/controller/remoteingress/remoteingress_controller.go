@@ -62,19 +62,26 @@ type kubeCLIApplier interface {
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	r, err := NewReconciler(mgr)
+	if err != nil {
+		return err
+	}
+	return AddToManager(mgr, r)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	logger := log.WithField("controller", ControllerName)
-	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
+	helper, err := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not create helper: %w", err)
+	}
 	return &ReconcileRemoteClusterIngress{
 		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:  mgr.GetScheme(),
 		logger:  log.WithField("controller", ControllerName),
 		kubeCLI: helper,
-	}
+	}, nil
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler

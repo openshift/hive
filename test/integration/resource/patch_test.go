@@ -73,7 +73,10 @@ func TestPatch(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
-			h := resource.NewHelper(kubeconfig, logger)
+			h, err := resource.NewHelper(kubeconfig, logger)
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
 			err = h.Patch(types.NamespacedName{Namespace: namespace.Name, Name: cm.Name}, "ConfigMap", "v1", []byte(test.patch), test.patchType)
 			if err != nil {
 				t.Errorf("unexpected error calling patch: %v", err)

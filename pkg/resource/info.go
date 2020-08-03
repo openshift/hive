@@ -6,7 +6,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/resource"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // Info contains information obtained from a resource submitted to the Apply function
@@ -21,19 +20,15 @@ type Info struct {
 
 // Info determines the name/namespace and type of the passed in resource bytes
 func (r *Helper) Info(obj []byte) (*Info, error) {
-	factory, err := r.getFactory("")
-	if err != nil {
-		return nil, err
-	}
-	resourceInfo, err := r.getResourceInfo(factory, obj)
+	resourceInfo, err := r.getResourceInfo(obj)
 	if err != nil {
 		return nil, err
 	}
 	return resourceInfo, err
 }
 
-func (r *Helper) getResourceInternalInfo(f cmdutil.Factory, obj []byte) (*resource.Info, error) {
-	builder := f.NewBuilder()
+func (r *Helper) getResourceInternalInfo(obj []byte) (*resource.Info, error) {
+	builder := r.factory.NewBuilder()
 	infos, err := builder.Unstructured().Stream(bytes.NewBuffer(obj), "object").Flatten().Do().Infos()
 	if err != nil {
 		r.logger.WithError(err).Error("Failed to obtain resource info")
@@ -46,8 +41,8 @@ func (r *Helper) getResourceInternalInfo(f cmdutil.Factory, obj []byte) (*resour
 	return infos[0], nil
 }
 
-func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
-	info, err := r.getResourceInternalInfo(f, obj)
+func (r *Helper) getResourceInfo(obj []byte) (*Info, error) {
+	info, err := r.getResourceInternalInfo(obj)
 	if err != nil {
 		return nil, err
 	}

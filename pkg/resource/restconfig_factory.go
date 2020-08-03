@@ -1,16 +1,16 @@
 package resource
 
 import (
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-func (r *Helper) getRESTConfigFactory(namespace string) (cmdutil.Factory, error) {
+func (r *Helper) getRESTConfigFactory() (*namespacedFactory, error) {
 	if r.metricsEnabled {
 		// Copy the possibly shared restConfig reference and add a metrics wrapper.
 		cfg := rest.CopyConfig(r.restConfig)
@@ -18,14 +18,13 @@ func (r *Helper) getRESTConfigFactory(namespace string) (cmdutil.Factory, error)
 		r.restConfig = cfg
 	}
 	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from REST client config and cache directory")
-	f := cmdutil.NewFactory(&restConfigClientGetter{restConfig: r.restConfig, cacheDir: r.cacheDir, namespace: namespace})
+	f := newFactory(&restConfigClientGetter{restConfig: r.restConfig, cacheDir: r.cacheDir})
 	return f, nil
 }
 
 type restConfigClientGetter struct {
 	restConfig *rest.Config
 	cacheDir   string
-	namespace  string
 }
 
 // ToRESTConfig returns restconfig
@@ -54,9 +53,5 @@ func (r *restConfigClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 // ToRawKubeConfigLoader return kubeconfig loader as-is
 func (r *restConfigClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	cfg := GenerateClientConfigFromRESTConfig("default", r.restConfig)
-	overrides := &clientcmd.ConfigOverrides{}
-	if len(r.namespace) > 0 {
-		overrides.Context.Namespace = r.namespace
-	}
-	return clientcmd.NewNonInteractiveClientConfig(*cfg, "", overrides, nil)
+	return clientcmd.NewNonInteractiveClientConfig(*cfg, "", &clientcmd.ConfigOverrides{}, nil)
 }

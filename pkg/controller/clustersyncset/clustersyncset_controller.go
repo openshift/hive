@@ -129,7 +129,7 @@ func NewReconciler(mgr manager.Manager) (*ReconcileClusterSyncSet, error) {
 }
 
 // applierBuilderFunc returns an Applier which implements Info, Apply and Patch
-func applierBuilderFunc(restConfig *rest.Config, logger log.FieldLogger) applier {
+func applierBuilderFunc(restConfig *rest.Config, logger log.FieldLogger) (applier, error) {
 	return resource.NewHelperFromRESTConfig(restConfig, logger)
 }
 
@@ -216,7 +216,7 @@ type ReconcileClusterSyncSet struct {
 	logger          log.FieldLogger
 	reapplyInterval time.Duration
 
-	applierBuilder func(*rest.Config, log.FieldLogger) applier
+	applierBuilder func(*rest.Config, log.FieldLogger) (applier, error)
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
@@ -263,7 +263,11 @@ func (r *ReconcileClusterSyncSet) Reconcile(request reconcile.Request) (reconcil
 		logger.WithError(err).Error("unable to get REST config")
 		return reconcile.Result{}, err
 	}
-	applier := r.applierBuilder(restConfig, logger)
+	applier, err := r.applierBuilder(restConfig, logger)
+	if err != nil {
+		log.WithError(err).Error("cannot create helper")
+		return reconcile.Result{}, err
+	}
 
 	needToCreate := false
 	clusterSyncSet := &hivev1.ClusterSyncSet{}

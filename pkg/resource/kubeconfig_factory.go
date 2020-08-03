@@ -1,26 +1,22 @@
 package resource
 
 import (
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error) {
+func (r *Helper) getKubeconfigFactory() (*namespacedFactory, error) {
 	config, err := clientcmd.Load(r.kubeconfig)
 	if err != nil {
 		r.logger.WithError(err).Error("an error occurred loading the kubeconfig")
 		return nil, err
 	}
-	overrides := &clientcmd.ConfigOverrides{}
-	if len(namespace) > 0 {
-		overrides.Context.Namespace = namespace
-	}
-	clientConfig := clientcmd.NewNonInteractiveClientConfig(*config, "", overrides, nil)
+	clientConfig := clientcmd.NewNonInteractiveClientConfig(*config, "", &clientcmd.ConfigOverrides{}, nil)
 	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, err
@@ -30,7 +26,7 @@ func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error)
 	}
 
 	r.logger.WithField("cache-dir", r.cacheDir).Debug("creating cmdutil.Factory from client config and cache directory")
-	f := cmdutil.NewFactory(&kubeconfigClientGetter{
+	f := newFactory(&kubeconfigClientGetter{
 		clientConfig:   clientConfig,
 		cacheDir:       r.cacheDir,
 		controllerName: r.controllerName,

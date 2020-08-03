@@ -118,9 +118,12 @@ func TestApply(t *testing.T) {
 				}
 				var h *resource.Helper
 				if clientConfig == "kubeconfig" {
-					h = resource.NewHelper(kubeconfig, logger)
+					h, err = resource.NewHelper(kubeconfig, logger)
 				} else {
-					h = resource.NewHelperFromRESTConfig(cfg, logger)
+					h, err = resource.NewHelperFromRESTConfig(cfg, logger)
+				}
+				if err != nil {
+					t.Fatalf("unexpected err: %v", err)
 				}
 				accessor := meta.NewAccessor()
 				for _, obj := range test.existing {

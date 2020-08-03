@@ -61,20 +61,25 @@ type applier interface {
 // Add creates a new ControlPlaneCerts Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	r, err := NewReconciler(mgr)
+	if err != nil {
+		return err
+	}
+	return AddToManager(mgr, r)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	logger := log.WithField("controller", ControllerName)
-	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
-	r := &ReconcileControlPlaneCerts{
+	helper, err := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create helper")
+	}
+	return &ReconcileControlPlaneCerts{
 		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:  mgr.GetScheme(),
 		applier: helper,
-	}
-
-	return r
+	}, nil
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler

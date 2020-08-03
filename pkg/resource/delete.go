@@ -32,11 +32,7 @@ func DeleteAnyExistingObject(c client.Client, key client.ObjectKey, obj runtime.
 }
 
 func (r *Helper) Delete(apiVersion, kind, namespace, name string) error {
-	f, err := r.getFactory(namespace)
-	if err != nil {
-		return errors.Wrap(err, "could not get factory")
-	}
-	mapper, err := f.ToRESTMapper()
+	mapper, err := r.factory.ToRESTMapper()
 	if err != nil {
 		return errors.Wrap(err, "could not get mapper")
 	}
@@ -45,7 +41,7 @@ func (r *Helper) Delete(apiVersion, kind, namespace, name string) error {
 	if err != nil {
 		return errors.Wrap(err, "could not get mapping")
 	}
-	dynamicClient, err := f.DynamicClient()
+	dynamicClient, err := r.factory.DynamicClient()
 	if err != nil {
 		return errors.Wrap(err, "could not create dynamic client")
 	}

@@ -94,7 +94,8 @@ def generate_csv_base(version, prev_version, hive_image):
     for file_name in crd_files:
         full_path = os.path.join(crds_dir, file_name)
         if os.path.isfile(os.path.join(crds_dir, file_name)):
-            shutil.copy(full_path, os.path.join(version_dir, file_name))
+            dest_path = os.path.join(version_dir, file_name)
+            shutil.copy(full_path, dest_path)
             # Read the CRD yaml to add to owned CRDs list
             with open(dest_path, 'r') as stream:
                 crd_csv = yaml.load(stream, Loader=yaml.SafeLoader)
@@ -106,7 +107,6 @@ def generate_csv_base(version, prev_version, hive_image):
                             'name': crd_csv['metadata']['name'],
                             'version': crd_csv['spec']['version'],
                         })
-
 
     with open(csv_template, 'r') as stream:
         csv = yaml.load(stream, Loader=yaml.SafeLoader)

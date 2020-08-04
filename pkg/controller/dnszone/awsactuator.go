@@ -601,7 +601,7 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 	accessDeniedCondsChanged := false
 	authenticationFailureCondsChanged := false
 
-	if awsErr.Code() == "AccessDeniedException" {
+	if awsErr.Code() == "AccessDeniedException" || awsErr.Code() == "AccessDenied" {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.Message())
 	} else {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()

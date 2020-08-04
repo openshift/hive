@@ -2,12 +2,15 @@ package dnszone
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -141,48 +144,6 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
 			},
-		},
-		{
-			name:    "Cannot create a hosted zone as credentials are missing permissions",
-			dnsZone: validDNSZoneWithoutID(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockAccessDeniedException(expect, validDNSZoneWithoutID())
-			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.InsufficientCredentialsCondition)
-				assert.NotNil(t, condition, "invalid credentials condition should be set on dnszone")
-				assert.Equalf(t, "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
-					condition.Message, "condition has an unexpected message")
-			},
-			errorExpected: true,
-		},
-		{
-			name:    "Cannot create a hosted zone as credentials fail authentication because aws_access_key_id invalid",
-			dnsZone: validDNSZoneWithoutID(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockUnrecognizedClientException(expect, validDNSZoneWithoutID())
-			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.AuthenticationFailureCondition)
-				assert.NotNil(t, condition, "failed authentication condition should be set on dnszone")
-				assert.Equalf(t, "The security token included in the request is invalid.",
-					condition.Message, "condition has an unexpected message")
-			},
-			errorExpected: true,
-		},
-		{
-			name:    "Cannot create a hosted zone as credentials fail authentication because aws_secret_access_key invalid",
-			dnsZone: validDNSZoneWithoutID(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
-				mockInvalidSignatureException(expect, validDNSZoneWithoutID())
-			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.AuthenticationFailureCondition)
-				assert.NotNil(t, condition, "failed authentication condition should be set on dnszone")
-				assert.Equalf(t, "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
-					condition.Message, "condition has an unexpected message")
-			},
-			errorExpected: true,
 		},
 	}
 
@@ -510,4 +471,105 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetConditionsForErrorForAWS(t *testing.T) {
+
+	log.SetLevel(log.DebugLevel)
+
+	cases := []struct {
+		name            string
+		dnsZone         *hivev1.DNSZone
+		error           error
+		expectCondition *hivev1.DNSZoneCondition
+	}{
+		{
+			name:    "Set InsufficientCredentialsCondition on DNSZone for AccessDeniedException error",
+			dnsZone: validDNSZone(),
+			error:   testAccessDeniedExceptionError(),
+			expectCondition: &hivev1.DNSZoneCondition{
+				Type:    hivev1.InsufficientCredentialsCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  accessDeniedReason,
+				Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+			},
+		},
+		{
+			name:    "Set AuthenticationFailureCondition on DNSZone for UnrecognizedClientException error",
+			dnsZone: validDNSZone(),
+			error:   testUnrecognizedClientExceptionError(),
+			expectCondition: &hivev1.DNSZoneCondition{
+				Type:    hivev1.AuthenticationFailureCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  authenticationFailedReason,
+				Message: "The security token included in the request is invalid.",
+			},
+		},
+		{
+			name:    "Set AuthenticationFailureCondition on DNSZone for InvalidSignatureException error",
+			dnsZone: validDNSZone(),
+			error:   testInvalidSignatureExceptionError(),
+			expectCondition: &hivev1.DNSZoneCondition{
+				Type:    hivev1.AuthenticationFailureCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  authenticationFailedReason,
+				Message: "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			mocks := setupDefaultMocks(t)
+
+			zr, _ := NewAWSActuator(
+				log.WithField("controller", ControllerName),
+				validAWSSecret(),
+				tc.dnsZone,
+				fakeAWSClientBuilder(mocks.mockAWSClient),
+			)
+
+			zr.dnsZone = tc.dnsZone
+
+			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
+			defer mocks.mockCtrl.Finish()
+
+			// Act
+			zr.SetConditionsForError(tc.error)
+
+			// Assert
+			if tc.expectCondition != nil {
+				for _, cond := range zr.dnsZone.Status.Conditions {
+					assert.Equal(t, cond.Type, tc.expectCondition.Type)
+					assert.Equal(t, cond.Status, tc.expectCondition.Status)
+					assert.Equal(t, cond.Reason, tc.expectCondition.Reason)
+					assert.Equal(t, cond.Message, tc.expectCondition.Message)
+				}
+			} else {
+				// Assuming if you didn't expect a condition, there shouldn't be any.
+				assert.Equal(t, 0, len(zr.dnsZone.Status.Conditions))
+			}
+		})
+	}
+}
+
+func testAccessDeniedExceptionError() error {
+	accessDeniedErr := awserr.New("AccessDeniedException",
+		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+		fmt.Errorf("User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny"))
+	return accessDeniedErr
+}
+
+func testUnrecognizedClientExceptionError() error {
+	unrecognizedClientErr := awserr.New("UnrecognizedClientException",
+		"The security token included in the request is invalid.",
+		fmt.Errorf("The security token included in the request is invalid"))
+	return unrecognizedClientErr
+}
+
+func testInvalidSignatureExceptionError() error {
+	invalidSignatureErr := awserr.New("InvalidSignatureException",
+		"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+		fmt.Errorf("The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details"))
+	return invalidSignatureErr
 }

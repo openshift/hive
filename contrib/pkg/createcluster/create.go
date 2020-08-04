@@ -219,10 +219,10 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
-				return
+				log.WithError(err).Fatal("Error")
 			}
 			if err := opt.Validate(cmd); err != nil {
-				return
+				log.WithError(err).Fatal("Error")
 			}
 			err := opt.Run()
 			if err != nil {

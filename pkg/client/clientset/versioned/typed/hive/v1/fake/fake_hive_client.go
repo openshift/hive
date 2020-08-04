@@ -16,6 +16,10 @@ func (c *FakeHiveV1) Checkpoints(namespace string) v1.CheckpointInterface {
 	return &FakeCheckpoints{c, namespace}
 }
 
+func (c *FakeHiveV1) ClusterClaims(namespace string) v1.ClusterClaimInterface {
+	return &FakeClusterClaims{c, namespace}
+}
+
 func (c *FakeHiveV1) ClusterDeployments(namespace string) v1.ClusterDeploymentInterface {
 	return &FakeClusterDeployments{c, namespace}
 }

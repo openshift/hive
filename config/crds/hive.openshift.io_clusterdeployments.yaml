@@ -138,21 +138,20 @@ spec:
               description: ClusterPoolRef is a reference to the ClusterPool that this
                 ClusterDeployment originated from.
               properties:
-                name:
-                  description: Name is the name of the ClusterPool that this refers
-                    to.
+                claimName:
+                  description: ClaimName is the name of the ClusterClaim that claimed
+                    the cluster from the pool.
                   type: string
                 namespace:
                   description: Namespace is the namespace where the ClusterPool resides.
                   type: string
-                state:
-                  description: State reflects the state of the ClusterDeployment in
-                    relation to the ClusterPool it originated from.
+                poolName:
+                  description: PoolName is the name of the ClusterPool for which the
+                    cluster was created.
                   type: string
               required:
-              - name
               - namespace
-              - state
+              - poolName
               type: object
             controlPlaneConfig:
               description: ControlPlaneConfig contains additional configuration for

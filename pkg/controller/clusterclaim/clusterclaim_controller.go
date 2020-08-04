@@ -67,7 +67,7 @@ type ReconcileClusterClaim struct {
 // Reconcile reconciles a ClusterClaim.
 func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	logger := r.logger.WithField("clusterClaim", request.Name)
+	logger := r.logger.WithField("clusterClaim", request.NamespacedName)
 
 	logger.Infof("reconciling cluster claim")
 	defer func() {
@@ -81,7 +81,7 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.
 	err := r.Get(context.TODO(), request.NamespacedName, claim)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("pool not found")
+			logger.Info("claim not found")
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -103,7 +103,7 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 
-	clusterName := claim.Status.Namespace
+	clusterName := claim.Spec.Namespace
 	if clusterName == "" {
 		logger.Debug("claim has not yet been assigned a cluster")
 		return reconcile.Result{}, nil
@@ -135,7 +135,7 @@ func (r *ReconcileClusterClaim) reconcileDeletedClaim(claim *hivev1.ClusterClaim
 		return reconcile.Result{}, nil
 	}
 
-	if clusterName := claim.Status.Namespace; clusterName != "" {
+	if clusterName := claim.Spec.Namespace; clusterName != "" {
 		logger := logger.WithField("cluster", clusterName)
 		cd := &hivev1.ClusterDeployment{}
 		switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
@@ -199,10 +199,10 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 	logger.Debug("claim has existing cluster assignment")
 	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
 		claim.Status.Conditions,
-		hivev1.ClusterClaimNotReadyCondition,
+		hivev1.ClusterClaimPendingCondition,
 		corev1.ConditionFalse,
-		"ClusterReady",
-		"Cluster is ready",
+		"ClusterClaimed",
+		"Cluster claimed",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	if changed {
@@ -216,14 +216,14 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 }
 
 func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
-	logger.Info("claim assigned a cluster that has already been assigned to another claim")
-	claim.Status.Namespace = ""
+	logger.Info("claim assigned a cluster that has already been claimed by another ClusterClaim")
+	claim.Spec.Namespace = ""
 	claim.Status.Conditions = controllerutils.SetClusterClaimCondition(
 		claim.Status.Conditions,
-		hivev1.ClusterClaimNotReadyCondition,
+		hivev1.ClusterClaimPendingCondition,
 		corev1.ConditionTrue,
 		"AssignmentConflict",
-		"Cluster assigned to a different claim",
+		"Assigned cluster was claimed by a different ClusterClaim",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	if err := r.Update(context.Background(), claim); err != nil {

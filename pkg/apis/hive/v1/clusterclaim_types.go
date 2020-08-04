@@ -7,24 +7,27 @@ import (
 
 // ClusterClaimSpec defines the desired state of the ClusterClaim.
 type ClusterClaimSpec struct {
+	// ClusterPoolName is the name of the cluster pool from which to claim a cluster.
 	ClusterPoolName string `json:"clusterPoolName"`
 
 	// Subjects hold object references to authorize access to the claimed cluster.
 	// +optional
 	Subjects []corev1.ObjectReference `json:"subjects,omitempty"`
+
+	// Namespace is the namespace containing the ClusterDeployment of the claimed cluster.
+	// This field will be set by the ClusterPool when the claim is assigned a cluster.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
-// ClusterClaimStatus defines the observed state of ClusterClaim
+// ClusterClaimStatus defines the observed state of ClusterClaim.
 type ClusterClaimStatus struct {
-	// Namespace is the namespace containing the ClusterDeployment of the claimed cluster.
-	Namespace string `json:"namespace,omitempty"`
-
-	// Conditions includes more detailed status for the cluster pool
+	// Conditions includes more detailed status for the cluster pool.
 	// +optional
 	Conditions []ClusterClaimCondition `json:"conditions,omitempty"`
 }
 
-// ClusterClaimCondition contains details for the current condition of a cluster claim
+// ClusterClaimCondition contains details for the current condition of a cluster claim.
 type ClusterClaimCondition struct {
 	// Type is the type of the condition.
 	Type ClusterClaimConditionType `json:"type"`
@@ -44,12 +47,12 @@ type ClusterClaimCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// ClusterClaimConditionType is a valid value for ClusterClaimCondition.Type
+// ClusterClaimConditionType is a valid value for ClusterClaimCondition.Type.
 type ClusterClaimConditionType string
 
 const (
-	// ClusterClaimNotReadyCondition is set when a cluster has not yet been assigned and made ready to the claim.
-	ClusterClaimNotReadyCondition ClusterClaimConditionType = "NotReady"
+	// ClusterClaimPendingCondition is set when a cluster has not yet been assigned and made ready to the claim.
+	ClusterClaimPendingCondition ClusterClaimConditionType = "Pending"
 	// ClusterClaimClusterDeletedCondition is set when the cluster assigned to the claim has been deleted.
 	ClusterClaimClusterDeletedCondition ClusterClaimConditionType = "ClusterDeleted"
 )
@@ -71,7 +74,7 @@ type ClusterClaim struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterClaimList contains a list of ClusterClaims
+// ClusterClaimList contains a list of ClusterClaims.
 type ClusterClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -79,7 +79,7 @@ func WithPool(poolName string) Option {
 
 func WithCluster(clusterName string) Option {
 	return func(clusterClaim *hivev1.ClusterClaim) {
-		clusterClaim.Status.Namespace = clusterName
+		clusterClaim.Spec.Namespace = clusterName
 	}
 }
 

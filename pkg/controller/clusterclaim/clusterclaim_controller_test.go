@@ -68,10 +68,10 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 			expectNoAssignment: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{{
-				Type:    hivev1.ClusterClaimNotReadyCondition,
+				Type:    hivev1.ClusterClaimPendingCondition,
 				Status:  corev1.ConditionTrue,
 				Reason:  "AssignmentConflict",
-				Message: "Cluster assigned to a different claim",
+				Message: "Assigned cluster was claimed by a different ClusterClaim",
 			}},
 		},
 		{
@@ -88,13 +88,13 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
-			name: "new assignment clears not ready condition",
+			name: "new assignment clears pending condition",
 			existing: []runtime.Object{
 				claimBuilder.Build(
 					testclaim.WithCluster("test-cluster"),
 					testclaim.WithCondition(
 						hivev1.ClusterClaimCondition{
-							Type:   hivev1.ClusterClaimNotReadyCondition,
+							Type:   hivev1.ClusterClaimPendingCondition,
 							Status: corev1.ConditionTrue,
 						},
 					),
@@ -103,10 +103,10 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 			expectCompletedClaim: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{{
-				Type:    hivev1.ClusterClaimNotReadyCondition,
+				Type:    hivev1.ClusterClaimPendingCondition,
 				Status:  corev1.ConditionFalse,
-				Reason:  "ClusterReady",
-				Message: "Cluster is ready",
+				Reason:  "ClusterClaimed",
+				Message: "Cluster claimed",
 			}},
 		},
 		{
@@ -119,7 +119,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
-			name: "deleted claim with non-completed assignment",
+			name: "deleted claim with unclaimed assignment",
 			existing: []runtime.Object{
 				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
 				cdBuilder("test-cluster").Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
@@ -127,7 +127,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectNoFinalizer: true,
 		},
 		{
-			name: "deleted claim with completed assignment",
+			name: "deleted claim with claimed assignment",
 			existing: []runtime.Object{
 				claimBuilder.GenericOptions(testgeneric.Deleted()).Build(testclaim.WithCluster("test-cluster")),
 				cdBuilder("test-cluster").Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
@@ -194,7 +194,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 
 			assignedClusterDeploymentExists := false
 			for _, cd := range cds.Items {
-				isAssignedCD := cd.Name == claim.Status.Namespace
+				isAssignedCD := cd.Name == claim.Spec.Namespace
 				if isAssignedCD && test.expectCompletedClaim {
 					assert.Equal(t, claimName, cd.Spec.ClusterPoolRef.ClaimName, "expected ClusterDeployment to be claimed by ClusterClaim")
 				} else {
@@ -204,14 +204,14 @@ func TestReconcileClusterClaim(t *testing.T) {
 					assignedClusterDeploymentExists = true
 				}
 			}
-			if claim.Status.Namespace != "" {
+			if claim.Spec.Namespace != "" {
 				assert.NotEqual(t, test.expectAssignedClusterDeploymentDeleted, assignedClusterDeploymentExists, "unexpected assigned ClusterDeployment")
 			}
 
 			if test.expectNoAssignment {
-				assert.Empty(t, claim.Status.Namespace, "expected no assignment set on claim")
+				assert.Empty(t, claim.Spec.Namespace, "expected no assignment set on claim")
 			} else {
-				assert.NotEmpty(t, claim.Status.Namespace, "expected assignment set on claim")
+				assert.NotEmpty(t, claim.Spec.Namespace, "expected assignment set on claim")
 			}
 
 			for i := range claim.Status.Conditions {

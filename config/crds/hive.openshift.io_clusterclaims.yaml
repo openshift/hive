@@ -33,6 +33,13 @@ spec:
           description: ClusterClaimSpec defines the desired state of the ClusterClaim.
           properties:
             clusterPoolName:
+              description: ClusterPoolName is the name of the cluster pool from which
+                to claim a cluster.
+              type: string
+            namespace:
+              description: Namespace is the namespace containing the ClusterDeployment
+                of the claimed cluster. This field will be set by the ClusterPool
+                when the claim is assigned a cluster.
               type: string
             subjects:
               description: Subjects hold object references to authorize access to
@@ -101,14 +108,14 @@ spec:
           - clusterPoolName
           type: object
         status:
-          description: ClusterClaimStatus defines the observed state of ClusterClaim
+          description: ClusterClaimStatus defines the observed state of ClusterClaim.
           properties:
             conditions:
               description: Conditions includes more detailed status for the cluster
-                pool
+                pool.
               items:
                 description: ClusterClaimCondition contains details for the current
-                  condition of a cluster claim
+                  condition of a cluster claim.
                 properties:
                   lastProbeTime:
                     description: LastProbeTime is the last time we probed the condition.
@@ -138,10 +145,6 @@ spec:
                 - type
                 type: object
               type: array
-            namespace:
-              description: Namespace is the namespace containing the ClusterDeployment
-                of the claimed cluster.
-              type: string
           type: object
       required:
       - spec

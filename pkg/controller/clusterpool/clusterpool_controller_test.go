@@ -495,7 +495,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			actualAssignedClaims := 0
 			actualUnassignedClaims := 0
 			for _, claim := range claims.Items {
-				if claim.Status.Namespace == "" {
+				if claim.Spec.Namespace == "" {
 					actualUnassignedClaims++
 				} else {
 					actualAssignedClaims++

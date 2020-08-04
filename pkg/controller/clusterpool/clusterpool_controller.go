@@ -105,7 +105,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool) error {
 
 var _ reconcile.Reconciler = &ReconcileClusterPool{}
 
-// ReconcileClusterPool reconciles a CLusterPool object
+// ReconcileClusterPool reconciles a ClusterPool object
 type ReconcileClusterPool struct {
 	client.Client
 	logger log.FieldLogger
@@ -552,7 +552,7 @@ func (r *ReconcileClusterPool) getAllPendingClusterClaims(pool *hivev1.ClusterPo
 			continue
 		}
 		// skip claims that have been assigned already
-		if claim.Status.Namespace != "" {
+		if claim.Spec.Namespace != "" {
 			continue
 		}
 		pendingClaims = append(pendingClaims, &claimsList.Items[i])
@@ -568,36 +568,41 @@ func (r *ReconcileClusterPool) getAllPendingClusterClaims(pool *hivev1.ClusterPo
 
 func (r *ReconcileClusterPool) assignClustersToClaims(claims []*hivev1.ClusterClaim, cds []*hivev1.ClusterDeployment, logger log.FieldLogger) ([]*hivev1.ClusterDeployment, error) {
 	for _, claim := range claims {
+		logger := logger.WithField("claim", claim.Name)
 		var conds []hivev1.ClusterClaimCondition
-		var changed bool
+		var statusChanged bool
 		if len(cds) > 0 {
-			claim.Status.Namespace = cds[0].Namespace
+			claim.Spec.Namespace = cds[0].Namespace
 			cds = cds[1:]
-			logger.WithField("cluster", claim.Status.Namespace).Info("assigning cluster to claim")
+			logger.WithField("cluster", claim.Spec.Namespace).Info("assigning cluster to claim")
+			if err := r.Update(context.Background(), claim); err != nil {
+				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not assign cluster to claim")
+				return cds, err
+			}
 			conds = controllerutils.SetClusterClaimCondition(
 				claim.Status.Conditions,
-				hivev1.ClusterClaimNotReadyCondition,
+				hivev1.ClusterClaimPendingCondition,
 				corev1.ConditionTrue,
 				"ClusterAssigned",
-				"Cluster assigned to claim",
+				"Cluster assigned to ClusterClaim, awaiting claim",
 				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
-			changed = true
+			statusChanged = true
 		} else {
 			logger.Debug("no clusters ready to assign to claim")
-			conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
+			conds, statusChanged = controllerutils.SetClusterClaimConditionWithChangeCheck(
 				claim.Status.Conditions,
-				hivev1.ClusterClaimNotReadyCondition,
+				hivev1.ClusterClaimPendingCondition,
 				corev1.ConditionTrue,
 				"NoClusters",
 				"No clusters in pool are ready to be claimed",
 				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
 		}
-		if changed {
+		if statusChanged {
 			claim.Status.Conditions = conds
 			if err := r.Status().Update(context.Background(), claim); err != nil {
-				logger.WithField("claim", claim.Name).WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
+				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
 				return cds, err
 			}
 		}

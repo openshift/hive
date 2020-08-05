@@ -2,11 +2,16 @@ package clusterclaim
 
 import (
 	"context"
+	"reflect"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -17,11 +22,14 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/resource"
 )
 
 const (
-	ControllerName = "clusterclaim"
-	finalizer      = "hive.openshift.io/claim"
+	ControllerName                = "clusterclaim"
+	finalizer                     = "hive.openshift.io/claim"
+	hiveClaimOwnerRoleName        = "hive-claim-owner"
+	hiveClaimOwnerRoleBindingName = "hive-claim-owner"
 )
 
 // Add creates a new ClusterClaim Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -48,12 +56,85 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim) error {
 	}
 
 	// Watch for changes to ClusterClaim
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
+	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, &handler.EnqueueRequestForObject{}); err != nil {
+		return err
+	}
+
+	// Watch for changes to ClusterDeployment
+	if err := c.Watch(
+		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(requestsForClusterDeployment),
+		},
+	); err != nil {
+		return err
+	}
+
+	// Watch for changes to the hive-claim-owner Role
+	if err := c.Watch(
+		&source.Kind{Type: &rbacv1.Role{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: requestsForRBACResources(r.Client, hiveClaimOwnerRoleName, r.logger),
+		},
+	); err != nil {
+		return err
+	}
+
+	// Watch for changes to the hive-claim-owner RoleBinding
+	if err := c.Watch(
+		&source.Kind{Type: &rbacv1.Role{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger),
+		},
+	); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func claimForClusterDeployment(cd *hivev1.ClusterDeployment) *types.NamespacedName {
+	if cd.Spec.ClusterPoolRef == nil {
+		return nil
+	}
+	if cd.Spec.ClusterPoolRef.ClaimName == "" {
+		return nil
+	}
+	return &types.NamespacedName{
+		Namespace: cd.Spec.ClusterPoolRef.Namespace,
+		Name:      cd.Spec.ClusterPoolRef.ClaimName,
+	}
+}
+
+func requestsForClusterDeployment(o handler.MapObject) []reconcile.Request {
+	cd, ok := o.Object.(*hivev1.ClusterDeployment)
+	if !ok {
+		return nil
+	}
+	claim := claimForClusterDeployment(cd)
+	if claim == nil {
+		return nil
+	}
+	return []reconcile.Request{{NamespacedName: *claim}}
+}
+
+func requestsForRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.ToRequestsFunc {
+	return func(o handler.MapObject) []reconcile.Request {
+		if o.Meta.GetName() != resourceName {
+			return nil
+		}
+		clusterName := o.Meta.GetNamespace()
+		cd := &hivev1.ClusterDeployment{}
+		if err := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to get ClusterDeployment for RBAC resource")
+			return nil
+		}
+		claim := claimForClusterDeployment(cd)
+		if claim == nil {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: *claim}}
+	}
 }
 
 var _ reconcile.Reconciler = &ReconcileClusterClaim{}
@@ -124,7 +205,7 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.
 	case "":
 		return r.reconcileForNewAssignment(claim, cd, logger)
 	case claim.Name:
-		return r.reconcileForExistingAssignment(claim, logger)
+		return r.reconcileForExistingAssignment(claim, cd, logger)
 	default:
 		return r.reconcileForAssignmentConflict(claim, logger)
 	}
@@ -135,27 +216,11 @@ func (r *ReconcileClusterClaim) reconcileDeletedClaim(claim *hivev1.ClusterClaim
 		return reconcile.Result{}, nil
 	}
 
-	if clusterName := claim.Spec.Namespace; clusterName != "" {
-		logger := logger.WithField("cluster", clusterName)
-		cd := &hivev1.ClusterDeployment{}
-		switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
-		case apierrors.IsNotFound(err), cd.DeletionTimestamp != nil:
-			logger.Info("cluster has already been deleted")
-		case err != nil:
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "error get ClusterDeployment")
-			return reconcile.Result{}, err
-		case cd.Spec.ClusterPoolRef == nil, cd.Spec.ClusterPoolRef.Namespace != claim.Namespace, cd.Spec.ClusterPoolRef.ClaimName != claim.Name:
-			logger.Info("assignment of cluster to claim was not completed")
-		default:
-			if err := r.Delete(context.Background(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "error deleting ClusterDeployment")
-				return reconcile.Result{}, err
-			}
-		}
-	} else {
-		logger.Info("removing finalizer from claim that was never assigned a cluster")
+	if err := r.cleanupResources(claim, logger); err != nil {
+		return reconcile.Result{}, err
 	}
 
+	logger.Info("removing finalizer from ClusterClaim")
 	controllerutils.DeleteFinalizer(claim, finalizer)
 	if err := r.Update(context.Background(), claim); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer from ClusterClaim")
@@ -163,6 +228,61 @@ func (r *ReconcileClusterClaim) reconcileDeletedClaim(claim *hivev1.ClusterClaim
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, logger log.FieldLogger) error {
+	clusterName := claim.Spec.Namespace
+	if clusterName == "" {
+		logger.Info("no resources to clean up since claim was never assigned a cluster")
+		return nil
+	}
+	logger = logger.WithField("cluster", clusterName)
+
+	cd := &hivev1.ClusterDeployment{}
+	switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
+	case apierrors.IsNotFound(err):
+		logger.Info("cluster does not exist")
+		return nil
+	case err != nil:
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error getting ClusterDeployment")
+		return err
+	}
+
+	if poolRef := cd.Spec.ClusterPoolRef; poolRef == nil || poolRef.Namespace != claim.Namespace || poolRef.ClaimName != claim.Name {
+		logger.Info("assigned cluster was not claimed")
+		return nil
+	}
+
+	// Delete RoleBinding
+	if err := resource.DeleteAnyExistingObject(
+		r,
+		client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleBindingName},
+		&rbacv1.RoleBinding{},
+		logger,
+	); err != nil {
+		return err
+	}
+
+	// Delete Role
+	if err := resource.DeleteAnyExistingObject(
+		r,
+		client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleName},
+		&rbacv1.Role{},
+		logger,
+	); err != nil {
+		return err
+	}
+
+	// Delete ClusterDeployment
+	if cd.DeletionTimestamp == nil {
+		logger.Info("deleting clusterDeployment")
+		if err := r.Delete(context.Background(), cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "error deleting ClusterDeployment")
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
@@ -192,11 +312,14 @@ func (r *ReconcileClusterClaim) reconcileForNewAssignment(claim *hivev1.ClusterC
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not set claim for ClusterDeployment")
 		return reconcile.Result{}, err
 	}
-	return r.reconcileForExistingAssignment(claim, logger)
+	return r.reconcileForExistingAssignment(claim, cd, logger)
 }
 
-func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
 	logger.Debug("claim has existing cluster assignment")
+	if err := r.createRBAC(claim, cd, logger); err != nil {
+		return reconcile.Result{}, err
+	}
 	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
 		claim.Status.Conditions,
 		hivev1.ClusterClaimPendingCondition,
@@ -231,4 +354,119 @@ func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterClaim) createRBAC(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	if len(claim.Spec.Subjects) == 0 {
+		logger.Debug("not creating RBAC since claim does not specify any subjects")
+		return nil
+	}
+	if cd.Spec.ClusterMetadata == nil {
+		return errors.New("ClusterDeployment does not have ClusterMetadata")
+	}
+	if err := r.applyHiveClaimOwnerRole(claim, cd, logger); err != nil {
+		return err
+	}
+	if err := r.applyHiveClaimOwnerRoleBinding(claim, cd, logger); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	desiredRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cd.Namespace,
+			Name:      hiveClaimOwnerRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+			// Allow full access to all Hive resources
+			{
+				APIGroups: []string{hivev1.HiveAPIGroup},
+				Resources: []string{rbacv1.ResourceAll},
+				Verbs:     []string{rbacv1.VerbAll},
+			},
+			// Allow read access to the kubeconfig and admin password secrets
+			{
+				APIGroups: []string{corev1.GroupName},
+				Resources: []string{"secrets"},
+				ResourceNames: []string{
+					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name,
+					cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name,
+				},
+				Verbs: []string{"get"},
+			},
+		},
+	}
+	observedRole := &rbacv1.Role{}
+	updateRole := func() bool {
+		if reflect.DeepEqual(desiredRole.Rules, observedRole.Rules) {
+			return false
+		}
+		observedRole.Rules = desiredRole.Rules
+		return true
+	}
+	if err := r.applyResource(desiredRole, observedRole, updateRole, logger); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterClaim) applyHiveClaimOwnerRoleBinding(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	desiredRoleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cd.Namespace,
+			Name:      hiveClaimOwnerRoleBindingName,
+		},
+		Subjects: claim.Spec.Subjects,
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     hiveClaimOwnerRoleName,
+		},
+	}
+	observedRoleBinding := &rbacv1.RoleBinding{}
+	updateRole := func() bool {
+		if reflect.DeepEqual(desiredRoleBinding.Subjects, observedRoleBinding.Subjects) &&
+			reflect.DeepEqual(desiredRoleBinding.RoleRef, observedRoleBinding.RoleRef) {
+			return false
+		}
+		observedRoleBinding.Subjects = desiredRoleBinding.Subjects
+		observedRoleBinding.RoleRef = desiredRoleBinding.RoleRef
+		return true
+	}
+	if err := r.applyResource(desiredRoleBinding, observedRoleBinding, updateRole, logger); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterClaim) applyResource(desired, observed hivev1.MetaRuntimeObject, update func() bool, logger log.FieldLogger) error {
+	key := client.ObjectKey{
+		Namespace: desired.GetNamespace(),
+		Name:      desired.GetName(),
+	}
+	logger = logger.WithField("resource", key)
+	switch err := r.Get(context.Background(), key, observed); {
+	case apierrors.IsNotFound(err):
+		logger.Info("creating resource")
+		if err := r.Create(context.Background(), desired); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create resource")
+			return errors.Wrap(err, "could not create resource")
+		}
+		return nil
+	case err != nil:
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get resource")
+		return errors.Wrap(err, "could not get resource")
+	}
+	if !update() {
+		logger.Debug("resource is up-to-date")
+		return nil
+	}
+	logger.Info("updating resource")
+	if err := r.Update(context.Background(), observed); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update resource")
+		return errors.Wrap(err, "could not update resource")
+	}
+	return nil
 }

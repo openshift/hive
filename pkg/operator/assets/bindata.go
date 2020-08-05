@@ -515,6 +515,7 @@ spec:
         - "--v=2"
         ports:
         - containerPort: 9443
+          protocol: TCP
         volumeMounts:
         - mountPath: /var/serving-cert
           name: serving-cert
@@ -798,6 +799,7 @@ spec:
   ports:
   - port: 443
     targetPort: 9443
+    protocol: TCP
 `)
 
 func configHiveadmissionServiceYamlBytes() ([]byte, error) {
@@ -1080,6 +1082,12 @@ spec:
   ports:
   - name: metrics
     port: 2112
+    protocol: TCP
+  # Expose 6060 for pprof data. Normally nothing listening here unless a developer has
+  # compiled in pprof support. See Hive developer documentation for how to use.
+  - name: profiling
+    port: 6060
+    protocol: TCP
 `)
 
 func configControllersServiceYamlBytes() ([]byte, error) {

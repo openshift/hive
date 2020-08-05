@@ -3,23 +3,37 @@
 set -e
 
 usage(){
-	echo "Usage: $0 [KUBECONFIG] [COUNT]"
+	echo "Usage: $0 [KUBECONFIG] [STARTINDEX] [ENDINDEX]"
 	exit 1
 }
 
 
 # Get the duplication count
-COUNT=${2:-1}
-if [[ "${COUNT}" -le 0 ]]
+START=${2:-1}
+if [[ "${START}" -le 0 ]]
 then
-	echo "COUNT must be a positive integer: ${COUNT}"
+	echo "STARTINDEX must be a positive integer: ${START}"
 	usage
 	exit 1
 fi
 
-echo "Adopting cluster kubeconfig ${COUNT} times"
+END=${3:-1}
+if [[ "${END}" -le 0 ]]
+then
+	echo "ENDINDEX must be a positive integer: ${END}"
+	usage
+	exit 1
+fi
 
-for (( i=0; i<${COUNT}; i++ ))
+if [[ "${END}" -le "${START}" ]]
+then
+	echo "ENDINDEX must be greater than STARTINDEX"
+	usage
+	exit 1
+fi
+
+
+for (( i=${START}; i<=${END}; i++ ))
 do
 	cluster_name="c${i}"
 	ns="ns${i}"
@@ -31,13 +45,7 @@ do
 		--adopt-admin-kubeconfig=${1} \
 		--adopt-infra-id="fake-${cluster_name}" \
 		--adopt-cluster-id="fake-${cluster_name}" \
+		-l scaletest=true --skip-machine-pools \
 		${cluster_name}
-	oc label cd -n ${ns} ${cluster_name} scaletest=true --overwrite=true
-
-	#for (( j=0; j<10; j++ ))
-	#do
-		#oc process -f hack/scaletest/syncset-template.yaml CLUSTER_NAME=${cluster_name} CLUSTER_NAMESPACE=${ns} RESOURCE_INDEX="${j}" | oc apply -f -
-	#done
-
 done
 

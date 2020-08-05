@@ -106,6 +106,9 @@ type Builder struct {
 
 	// MachineNetwork is the subnet to use for the cluster's machine network.
 	MachineNetwork string
+
+	// SkipMachinePools should be true if you do not want Hive to manage MachineSets in the spoke cluster once it is installed.
+	SkipMachinePools bool
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -157,8 +160,8 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	var allObjects []runtime.Object
 	allObjects = append(allObjects, o.generateClusterDeployment())
 
-	if mp := o.generateMachinePool(); mp != nil {
-		allObjects = append(allObjects, mp)
+	if mp := o.generateMachinePool(); mp != nil && !o.SkipMachinePools {
+		allObjects = append(allObjects, o.generateMachinePool())
 	}
 
 	installConfigSecret, err := o.generateInstallConfigSecret()
@@ -341,8 +344,8 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"install-config.yaml": d,
+		StringData: map[string]string{
+			"install-config.yaml": string(d),
 		},
 	}, nil
 }

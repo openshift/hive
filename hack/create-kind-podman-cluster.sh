@@ -34,7 +34,7 @@ apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${reg_port}"]
-    endpoint = ["http://${reg_ip}:5000"]
+    endpoint = ["http://${reg_ip}:${reg_port}"]
 EOF
 
 # connect the registry to the cluster network

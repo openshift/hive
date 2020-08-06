@@ -362,7 +362,7 @@ func InstallerPodSpec(
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
@@ -373,7 +373,7 @@ func InstallerPodSpec(
 		{
 			Name:            "cli",
 			Image:           cliImage,
-			ImagePullPolicy: corev1.PullAlways,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for

@@ -43,7 +43,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			{
 				Name:            "release",
 				Image:           releaseImage,
-				ImagePullPolicy: corev1.PullAlways,
+				ImagePullPolicy: corev1.PullIfNotPresent,
 				Command:         []string{"/bin/sh", "-c"},
 				Args:            []string{"cp -v /release-manifests/image-references /common/image-references"},
 				VolumeMounts:    volumeMounts,

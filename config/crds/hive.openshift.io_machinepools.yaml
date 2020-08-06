@@ -106,6 +106,15 @@ spec:
                       - size
                       - type
                       type: object
+                    spotMarketOptions:
+                      description: SpotMarketOptions allows users to configure instances
+                        to be run using AWS Spot instances.
+                      properties:
+                        maxPrice:
+                          description: 'The maximum price the user is willing to pay
+                            for their instances Default: On-Demand price'
+                          type: string
+                      type: object
                     subnets:
                       description: Subnets is the list of subnets to which to attach
                         the machines. There must be exactly one subnet for each availability

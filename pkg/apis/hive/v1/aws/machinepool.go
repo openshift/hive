@@ -16,6 +16,20 @@ type MachinePoolPlatform struct {
 
 	// EC2RootVolume defines the storage for ec2 instance.
 	EC2RootVolume `json:"rootVolume"`
+
+	// SpotMarketOptions allows users to configure instances to be run using AWS Spot instances.
+	// +optional
+	SpotMarketOptions *SpotMarketOptions `json:"spotMarketOptions,omitempty"`
+}
+
+// SpotMarketOptions defines the options available to a user when configuring
+// Machines to run on Spot instances.
+// Most users should provide an empty struct.
+type SpotMarketOptions struct {
+	// The maximum price the user is willing to pay for their instances
+	// Default: On-Demand price
+	// +optional
+	MaxPrice *string `json:"maxPrice,omitempty"`
 }
 
 // EC2RootVolume defines the storage for an ec2 instance.

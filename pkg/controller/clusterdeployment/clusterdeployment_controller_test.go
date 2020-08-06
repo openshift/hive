@@ -1196,7 +1196,34 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.Equal(t, 1, len(cd.Status.Conditions))
+				require.Equal(t, corev1.ConditionTrue, cd.Status.Conditions[0].Status)
 				require.Equal(t, clusterImageSetNotFoundReason, cd.Status.Conditions[0].Reason)
+			},
+		},
+		{
+			name: "clear ClusterImageSet missing condition",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Status.Conditions = []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.ClusterImageSetNotFoundCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  "test-reason",
+						Message: "test-message",
+					}}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.Equal(t, 1, len(cd.Status.Conditions))
+				require.Equal(t, corev1.ConditionFalse, cd.Status.Conditions[0].Status)
+				require.Equal(t, clusterImageSetFoundReason, cd.Status.Conditions[0].Reason)
 			},
 		},
 		{

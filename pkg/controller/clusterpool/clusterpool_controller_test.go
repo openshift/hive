@@ -51,7 +51,9 @@ func TestReconcileClusterPool(t *testing.T) {
 			testcp.WithImageSet(imageSetName),
 		)
 	cdBuilder := func(name string) testcd.Builder {
-		return testcd.FullBuilder(name, name, scheme)
+		return testcd.FullBuilder(name, name, scheme).Options(
+			testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+		)
 	}
 	unclaimedCDBuilder := func(name string) testcd.Builder {
 		return cdBuilder(name).Options(
@@ -462,6 +464,10 @@ func TestReconcileClusterPool(t *testing.T) {
 				for _, cd := range cds.Items {
 					assert.NotEqual(t, expectedDeletedName, cd.Name, "expected cluster to have been deleted")
 				}
+			}
+
+			for _, cd := range cds.Items {
+				assert.Equal(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected cluster to be hibernating")
 			}
 
 			pool := &hivev1.ClusterPool{}

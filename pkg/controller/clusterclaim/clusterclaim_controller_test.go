@@ -74,6 +74,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		expectNoFinalizer                      bool
 		expectAssignedClusterDeploymentDeleted bool
 		expectRBAC                             bool
+		expectHibernating                      bool
 	}{
 		{
 			name:                 "new assignment",
@@ -240,6 +241,28 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectCompletedClaim: true,
 			expectRBAC:           true,
 		},
+		{
+			name:  "new assignment bring cluster out of hibernation",
+			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(
+				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
+				testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+			),
+			expectCompletedClaim: true,
+			expectRBAC:           true,
+			expectHibernating:    false,
+		},
+		{
+			name:  "existing assignment does not change power state",
+			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+			),
+			expectCompletedClaim: true,
+			expectRBAC:           true,
+			expectHibernating:    true,
+		},
 	}
 
 	for _, test := range tests {
@@ -286,6 +309,11 @@ func TestReconcileClusterClaim(t *testing.T) {
 				}
 				if isAssignedCD {
 					assignedClusterDeploymentExists = true
+					if test.expectHibernating {
+						assert.Equal(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected ClusterDeployment to be hibernating")
+					} else {
+						assert.NotEqual(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected ClusterDeployment to not be hibernating")
+					}
 				}
 			}
 			if claim.Spec.Namespace != "" {

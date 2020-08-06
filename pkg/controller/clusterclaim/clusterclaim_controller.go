@@ -308,6 +308,7 @@ func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.Cluster
 func (r *ReconcileClusterClaim) reconcileForNewAssignment(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
 	logger.Info("cluster assigned to claim")
 	cd.Spec.ClusterPoolRef.ClaimName = claim.Name
+	cd.Spec.PowerState = hivev1.RunningClusterPowerState
 	if err := r.Update(context.Background(), cd); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not set claim for ClusterDeployment")
 		return reconcile.Result{}, err

@@ -310,6 +310,7 @@ func (r *ReconcileClusterPool) createCluster(
 		}
 		poolRef := poolReference(clp)
 		cd.Spec.ClusterPoolRef = &poolRef
+		cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
 		lastIndex := len(objs) - 1
 		objs[i], objs[lastIndex] = objs[lastIndex], objs[i]
 	}

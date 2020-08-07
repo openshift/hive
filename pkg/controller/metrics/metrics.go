@@ -4,22 +4,21 @@ import (
 	"context"
 	"time"
 
-	"github.com/openshift/hive/pkg/imageset"
-
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/imageset"
 )
 
 const (
@@ -304,11 +303,11 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 }
 
 func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
-	mcLog.Debug("calculating metrics across all SyncSetInstances")
-	ssis := &hivev1.SyncSetInstanceList{}
-	err := mc.Client.List(context.Background(), ssis)
+	mcLog.Debug("calculating metrics across all ClusterSyncs")
+	clusterSyncList := &hiveintv1alpha1.ClusterSyncList{}
+	err := mc.Client.List(context.Background(), clusterSyncList)
 	if err != nil {
-		mcLog.WithError(err).Error("error listing all SyncSetInstances")
+		mcLog.WithError(err).Error("error listing all ClusterSyncs")
 		return
 	}
 
@@ -317,17 +316,16 @@ func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
 
 	ssInstancesTotal := 0
 	ssInstancesUnappliedTotal := 0
-	for _, ssi := range ssis.Items {
-		if sss := ssi.Spec.SelectorSyncSetRef; sss != nil {
-			// Process SyncSetInstances with a SelectorSyncSet reference:
+	for _, cs := range clusterSyncList.Items {
+		for _, sss := range cs.Status.SelectorSyncSets {
 			sssInstancesTotal[sss.Name]++
-			if !ssi.Status.Applied {
+			if sss.Result != hiveintv1alpha1.SuccessSyncSetResult {
 				sssInstancesUnappliedTotal[sss.Name]++
 			}
-		} else {
-			// Process SyncSetInstances with a non-selector SyncSet reference:
+		}
+		for _, ss := range cs.Status.SyncSets {
 			ssInstancesTotal++
-			if !ssi.Status.Applied {
+			if ss.Result != hiveintv1alpha1.SuccessSyncSetResult {
 				ssInstancesUnappliedTotal++
 			}
 		}

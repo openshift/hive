@@ -48,7 +48,6 @@ import (
 	"github.com/openshift/hive/pkg/controller/remotemachineset"
 	"github.com/openshift/hive/pkg/controller/syncidentityprovider"
 	"github.com/openshift/hive/pkg/controller/syncset"
-	"github.com/openshift/hive/pkg/controller/syncsetinstance"
 	"github.com/openshift/hive/pkg/controller/unreachable"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/controller/velerobackup"
@@ -82,7 +81,6 @@ var controllerFuncs = map[string]controllerSetupFunc{
 	remotemachineset.ControllerName:     remotemachineset.Add,
 	syncidentityprovider.ControllerName: syncidentityprovider.Add,
 	syncset.ControllerName:              syncset.Add,
-	syncsetinstance.ControllerName:      syncsetinstance.Add,
 	unreachable.ControllerName:          unreachable.Add,
 	velerobackup.ControllerName:         velerobackup.Add,
 	clusterpool.ControllerName:          clusterpool.Add,

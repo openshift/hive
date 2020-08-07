@@ -181,11 +181,14 @@ func (r *hibernationReconciler) setUnsupportedCondition(cd *hivev1.ClusterDeploy
 	var changed bool
 	existing := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	if existing == nil {
+		now := metav1.Now()
 		cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
-			Type:    hivev1.ClusterHibernatingCondition,
-			Status:  corev1.ConditionFalse,
-			Reason:  hivev1.UnsupportedHibernationReason,
-			Message: message,
+			Type:               hivev1.ClusterHibernatingCondition,
+			Status:             corev1.ConditionFalse,
+			Reason:             hivev1.UnsupportedHibernationReason,
+			Message:            message,
+			LastProbeTime:      now,
+			LastTransitionTime: now,
 		})
 		changed = true
 	} else {
@@ -332,8 +335,8 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		controllerutils.UpdateConditionIfReasonOrMessageChange)
 	if changed {
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to update condition")
-			return reconcile.Result{}, errors.Wrap(err, "failed to set unsupported condition")
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to update hibernating condition")
+			return reconcile.Result{}, errors.Wrap(err, "failed to update hibernating condition")
 		}
 	}
 	logger.Info("Cluster has started and is in Running state")

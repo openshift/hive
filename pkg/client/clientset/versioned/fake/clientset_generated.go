@@ -6,6 +6,8 @@ import (
 	clientset "github.com/openshift/hive/pkg/client/clientset/versioned"
 	hivev1 "github.com/openshift/hive/pkg/client/clientset/versioned/typed/hive/v1"
 	fakehivev1 "github.com/openshift/hive/pkg/client/clientset/versioned/typed/hive/v1/fake"
+	hiveinternalv1alpha1 "github.com/openshift/hive/pkg/client/clientset/versioned/typed/hiveinternal/v1alpha1"
+	fakehiveinternalv1alpha1 "github.com/openshift/hive/pkg/client/clientset/versioned/typed/hiveinternal/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -63,4 +65,9 @@ var _ clientset.Interface = &Clientset{}
 // HiveV1 retrieves the HiveV1Client
 func (c *Clientset) HiveV1() hivev1.HiveV1Interface {
 	return &fakehivev1.FakeHiveV1{Fake: &c.Fake}
+}
+
+// HiveinternalV1alpha1 retrieves the HiveinternalV1alpha1Client
+func (c *Clientset) HiveinternalV1alpha1() hiveinternalv1alpha1.HiveinternalV1alpha1Interface {
+	return &fakehiveinternalv1alpha1.FakeHiveinternalV1alpha1{Fake: &c.Fake}
 }

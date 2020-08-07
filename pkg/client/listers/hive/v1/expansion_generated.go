@@ -117,11 +117,3 @@ type SyncSetListerExpansion interface{}
 // SyncSetNamespaceListerExpansion allows custom methods to be added to
 // SyncSetNamespaceLister.
 type SyncSetNamespaceListerExpansion interface{}
-
-// SyncSetInstanceListerExpansion allows custom methods to be added to
-// SyncSetInstanceLister.
-type SyncSetInstanceListerExpansion interface{}
-
-// SyncSetInstanceNamespaceListerExpansion allows custom methods to be added to
-// SyncSetInstanceNamespaceLister.
-type SyncSetInstanceNamespaceListerExpansion interface{}

@@ -35,5 +35,3 @@ type SelectorSyncSetExpansion interface{}
 type SyncIdentityProviderExpansion interface{}
 
 type SyncSetExpansion interface{}
-
-type SyncSetInstanceExpansion interface{}

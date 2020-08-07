@@ -72,8 +72,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncIdentityProviders().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("syncsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncSets().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("syncsetinstances"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncSetInstances().Informer()}, nil
 
 		// Group=hiveinternal.openshift.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("clustersyncs"):

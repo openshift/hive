@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	ControllerName = "metrics"
+	ControllerName = hivev1.MetricsControllerName
 )
 
 var (
@@ -165,7 +165,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		mcLog := log.WithField("controller", "metrics")
 		defer func() {
 			dur := time.Since(start)
-			MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+			MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 			mcLog.WithField("elapsed", dur).Info("reconcile complete")
 		}()
 

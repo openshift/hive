@@ -17,6 +17,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -35,7 +37,7 @@ import (
 )
 
 const (
-	ControllerName    = "clusterDeprovision"
+	ControllerName    = hivev1.ClusterDeprovisionControllerName
 	jobHashAnnotation = "hive.openshift.io/jobhash"
 )
 
@@ -56,15 +58,21 @@ func init() {
 // Add creates a new ClusterDeprovision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	r, err := newReconciler(mgr)
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	r, err := newReconciler(mgr, clientRateLimiter)
 	if err != nil {
 		return err
 	}
-	return add(mgr, r)
+	return add(mgr, r, concurrentReconciles, queueRateLimiter)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
+func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (reconcile.Reconciler, error) {
 	deprovisionsDisabled := false
 	if val, ok := os.LookupEnv(constants.DeprovisionsDisabledEnvVar); ok {
 		var err error
@@ -76,16 +84,20 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		}
 	}
 	return &ReconcileClusterDeprovision{
-		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:               mgr.GetScheme(),
 		deprovisionsDisabled: deprovisionsDisabled,
 	}, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
-	c, err := controller.New("clusterdeprovision-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("clusterdeprovision-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new clusterdeprovision-controller")
 		return err
@@ -132,7 +144,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 	rLog.Info("reconciling cluster deprovision request")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		rLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 	// Fetch the ClusterDeprovision instance

@@ -28,6 +28,7 @@ import (
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
 	"github.com/openshift/hive/pkg/apis"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/clusterclaim"
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
@@ -63,7 +64,7 @@ const (
 
 type controllerSetupFunc func(manager.Manager) error
 
-var controllerFuncs = map[string]controllerSetupFunc{
+var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	clusterclaim.ControllerName:         clusterclaim.Add,
 	clusterdeployment.ControllerName:    clusterdeployment.Add,
 	clusterdeprovision.ControllerName:   clusterdeprovision.Add,
@@ -196,7 +197,7 @@ func newRootCommand() *cobra.Command {
 			disabledControllersSet := sets.NewString(opts.DisabledControllers...)
 			// Setup all Controllers
 			for _, name := range opts.Controllers {
-				fn, ok := controllerFuncs[name]
+				fn, ok := controllerFuncs[hivev1.ControllerName(name)]
 				if !ok {
 					log.WithField("controller", name).Fatal("no entry for controller found")
 				}
@@ -234,7 +235,7 @@ func newControllerManagerOptions() *controllerManagerOptions {
 	// By default we have all of the controllers enabled
 	controllers := make([]string, 0, len(controllerFuncs))
 	for name := range controllerFuncs {
-		controllers = append(controllers, name)
+		controllers = append(controllers, name.String())
 	}
 	return &controllerManagerOptions{
 		Controllers: controllers,

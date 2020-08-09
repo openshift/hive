@@ -71,7 +71,7 @@ func TestNewReconciler(t *testing.T) {
 			test.setup()
 
 			// Act
-			tmpResult, actualError := NewReconciler(mockManager)
+			tmpResult, actualError := NewReconciler(mockManager, nil)
 			actualResult := tmpResult.(*ReconcileBackup)
 
 			// Assert

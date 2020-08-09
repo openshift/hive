@@ -30,13 +30,20 @@ import (
 )
 
 const (
-	ControllerName = "dnsendpoint"
+	ControllerName = hivev1.DNSEndpointControllerName
 )
 
 // Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName)
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+
+	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter)
 
 	reconciler, nameServerChangeNotifier, err := newReconciler(mgr, c)
 	if err != nil {
@@ -48,11 +55,12 @@ func Add(mgr manager.Manager) error {
 	}
 
 	ctrl, err := controller.New(
-		ControllerName,
+		ControllerName.String(),
 		mgr,
 		controller.Options{
 			Reconciler:              reconciler,
-			MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles(),
+			MaxConcurrentReconciles: concurrentReconciles,
+			RateLimiter:             queueRateLimiter,
 		},
 	)
 	if err != nil {
@@ -168,7 +176,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.R
 	dnsLog.Info("reconciling dns endpoint")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

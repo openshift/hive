@@ -12,6 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -30,7 +32,7 @@ import (
 
 const (
 	// ControllerName is the name of this controller
-	ControllerName = "hibernation"
+	ControllerName = hivev1.HibernationControllerName
 
 	// stateCheckInterval is the time interval for polling
 	// whether a cluster's machines are stopped or are running
@@ -59,7 +61,13 @@ var (
 
 // Add creates a new Hibernation controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	return AddToManager(mgr, NewReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
 // RegisterActuator register an actuator with this controller. The actuator
@@ -79,10 +87,10 @@ type hibernationReconciler struct {
 }
 
 // NewReconciler returns a new Reconciler
-func NewReconciler(mgr manager.Manager) *hibernationReconciler {
+func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hibernationReconciler {
 	logger := log.WithField("controller", ControllerName)
 	r := &hibernationReconciler{
-		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		logger:  logger,
 		csrUtil: &csrUtility{},
 	}
@@ -93,8 +101,12 @@ func NewReconciler(mgr manager.Manager) *hibernationReconciler {
 }
 
 // AddToManager adds a new Controller to the controller manager
-func AddToManager(mgr manager.Manager, r *hibernationReconciler) error {
-	c, err := controller.New("hibernation-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+	c, err := controller.New("hibernation-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Log(controllerutils.LogLevel(err), "Error creating controller")
 		return err
@@ -120,7 +132,7 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (reconcile.
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

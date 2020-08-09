@@ -75,6 +75,109 @@ spec:
                       type: string
                   type: object
               type: object
+            controllersConfig:
+              description: ControllersConfig is used to configure different hive controllers
+              properties:
+                controllers:
+                  description: Controllers contains a list of configurations for different
+                    controllers
+                  items:
+                    description: SpecificControllerConfig contains the configuration
+                      for a specific controller
+                    properties:
+                      config:
+                        description: ControllerConfig contains the configuration for
+                          the controller specified by Name field
+                        properties:
+                          clientBurst:
+                            description: ClientBurst specifies client rate limiter
+                              burst for a controller
+                            format: int32
+                            type: integer
+                          clientQPS:
+                            description: ClientQPS specifies client rate limiter QPS
+                              for a controller
+                            format: int32
+                            type: integer
+                          concurrentReconciles:
+                            description: ConcurrentReconciles specifies number of
+                              concurrent reconciles for a controller
+                            format: int32
+                            type: integer
+                          queueBurst:
+                            description: QueueBurst specifies workqueue rate limiter
+                              burst for a controller
+                            format: int32
+                            type: integer
+                          queueQPS:
+                            description: QueueQPS specifies workqueue rate limiter
+                              QPS for a controller
+                            format: int32
+                            type: integer
+                        type: object
+                      name:
+                        description: Name specifies the name of the controller
+                        enum:
+                        - clusterDeployment
+                        - clusterrelocate
+                        - clusterstate
+                        - clusterversion
+                        - controlPlaneCerts
+                        - dnsendpoint
+                        - dnszone
+                        - remoteingress
+                        - remotemachineset
+                        - syncidentityprovider
+                        - unreachable
+                        - velerobackup
+                        - clusterprovision
+                        - clusterDeprovision
+                        - clusterpool
+                        - clusterpoolnamespace
+                        - hibernation
+                        - clusterclaim
+                        - metrics
+                        - clustersync
+                        type: string
+                    required:
+                    - config
+                    - name
+                    type: object
+                  type: array
+                default:
+                  description: Default specifies default configuration for all the
+                    controllers, can be used to override following coded defaults
+                    default for concurrent reconciles is 5 default for client qps
+                    is 5 default for client burst is 10 default for queue qps is 10
+                    default for queue burst is 100
+                  properties:
+                    clientBurst:
+                      description: ClientBurst specifies client rate limiter burst
+                        for a controller
+                      format: int32
+                      type: integer
+                    clientQPS:
+                      description: ClientQPS specifies client rate limiter QPS for
+                        a controller
+                      format: int32
+                      type: integer
+                    concurrentReconciles:
+                      description: ConcurrentReconciles specifies number of concurrent
+                        reconciles for a controller
+                      format: int32
+                      type: integer
+                    queueBurst:
+                      description: QueueBurst specifies workqueue rate limiter burst
+                        for a controller
+                      format: int32
+                      type: integer
+                    queueQPS:
+                      description: QueueQPS specifies workqueue rate limiter QPS for
+                        a controller
+                      format: int32
+                      type: integer
+                  type: object
+              type: object
             deleteProtection:
               description: DeleteProtection can be set to "enabled" to turn on automatic
                 delete protection for ClusterDeployments. When enabled, Hive will

@@ -19,12 +19,13 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -35,7 +36,7 @@ import (
 )
 
 const (
-	ControllerName                  = "dnszone"
+	ControllerName                  = hivev1.DNSZoneControllerName
 	zoneResyncDuration              = 2 * time.Hour
 	domainAvailabilityCheckInterval = 30 * time.Second
 	dnsClientTimeout                = 30 * time.Second
@@ -63,13 +64,19 @@ func init() {
 // Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	return add(mgr, newReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) *ReconcileDNSZone {
+func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *ReconcileDNSZone {
 	return &ReconcileDNSZone{
-		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:    mgr.GetScheme(),
 		logger:    log.WithField("controller", ControllerName),
 		soaLookup: lookupSOARecord,
@@ -77,9 +84,13 @@ func newReconciler(mgr manager.Manager) *ReconcileDNSZone {
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileDNSZone) error {
+func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
-	c, err := controller.New(ControllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New(ControllerName.String(), mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		return err
 	}
@@ -127,7 +138,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	dnsLog.Info("reconciling dns zone")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

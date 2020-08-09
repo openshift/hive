@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,6 +28,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
@@ -38,6 +41,14 @@ const (
 	// that will contain the aggregate of all AdditionalCertificateAuthorities
 	// secrets specified in HiveConfig
 	hiveAdditionalCASecret = "hive-additional-ca"
+
+	// hiveControllersConfigMapName is the name of the configmap to store the
+	// configurations like goroutines, qps, burst etc. for different hive controllers
+	hiveControllersConfigMapName = "hive-controllers-config"
+
+	// hiveConfigHashAnnotation is annotation on hivedeployment that contains
+	// the hash of the contents of the hive-controllers-config configmap
+	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
 )
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
@@ -162,6 +173,34 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveDeployment.Spec.Replicas = &replicas
 	}
 
+	hiveControllersConfigMap := &corev1.ConfigMap{}
+	hiveControllersConfigMap.Name = hiveControllersConfigMapName
+	hiveControllersConfigMap.Namespace = hiveNSName
+	hiveControllersConfigMap.Data = make(map[string]string)
+
+	if instance.Spec.ControllersConfig != nil {
+		if instance.Spec.ControllersConfig.Default != nil {
+			setHiveControllersConfig(instance.Spec.ControllersConfig.Default, hiveControllersConfigMap, "default")
+		}
+		for _, controller := range instance.Spec.ControllersConfig.Controllers {
+			setHiveControllersConfig(&controller.Config, hiveControllersConfigMap, controller.Name)
+		}
+	}
+
+	result, err := util.ApplyRuntimeObjectWithGC(h, hiveControllersConfigMap, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error applying hive-controllers-config configmap")
+		return err
+	}
+	hLog.WithField("result", result).Info("hive-controllers-config configmap applied")
+
+	hLog.Info("Hashing hive-controllers-config data onto a hive deployment annotation")
+	hiveControllersConfigHash := computeHiveControllersConfigHash(hiveControllersConfigMap)
+	if hiveDeployment.Spec.Template.Annotations == nil {
+		hiveDeployment.Spec.Template.Annotations = make(map[string]string, 1)
+	}
+	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
+
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	namespacedAssets := []string{
 		"config/controllers/service.yaml",
@@ -230,7 +269,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 
 	hiveDeployment.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObjectWithGC(h, hiveDeployment, instance)
+	result, err = util.ApplyRuntimeObjectWithGC(h, hiveDeployment, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -426,4 +465,28 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 		listOptions.Continue = cont
 	}
 	return
+}
+
+func computeHiveControllersConfigHash(hiveControllersConfigMap *corev1.ConfigMap) string {
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%v", hiveControllersConfigMap.Data)))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func setHiveControllersConfig(config *hivev1.ControllerConfig, hiveControllersConfigMap *corev1.ConfigMap, controllerName hivev1.ControllerName) {
+	if config.ConcurrentReconciles != nil {
+		hiveControllersConfigMap.Data[fmt.Sprintf(utils.ConcurrentReconcilesEnvVariableFormat, controllerName)] = strconv.Itoa(int(*config.ConcurrentReconciles))
+	}
+	if config.ClientQPS != nil {
+		hiveControllersConfigMap.Data[fmt.Sprintf(utils.ClientQPSEnvVariableFormat, controllerName)] = strconv.Itoa(int(*config.ClientQPS))
+	}
+	if config.ClientBurst != nil {
+		hiveControllersConfigMap.Data[fmt.Sprintf(utils.ClientBurstEnvVariableFormat, controllerName)] = strconv.Itoa(int(*config.ClientBurst))
+	}
+	if config.QueueQPS != nil {
+		hiveControllersConfigMap.Data[fmt.Sprintf(utils.QueueQPSEnvVariableFormat, controllerName)] = strconv.Itoa(int(*config.QueueQPS))
+	}
+	if config.QueueBurst != nil {
+		hiveControllersConfigMap.Data[fmt.Sprintf(utils.QueueBurstEnvVariableFormat, controllerName)] = strconv.Itoa(int(*config.QueueBurst))
+	}
 }

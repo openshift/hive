@@ -56,7 +56,7 @@ type Builder interface {
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
 // ClusterDeployment.
 // The controllerName is needed for metrics.
-func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName string) Builder {
+func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
 	return &builder{
 		c:              c,
 		cd:             cd,
@@ -236,7 +236,7 @@ func SetUnreachableCondition(cd *hivev1.ClusterDeployment, connectionError error
 type builder struct {
 	c              client.Client
 	cd             *hivev1.ClusterDeployment
-	controllerName string
+	controllerName hivev1.ControllerName
 	urlToUse       int
 }
 

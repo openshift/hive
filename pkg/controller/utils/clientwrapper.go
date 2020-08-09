@@ -11,10 +11,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 var (
@@ -41,9 +44,12 @@ func init() {
 // metrics for requests by controller name, HTTP method, URL path, and whether or not the request was
 // to a remote cluster.. The client will re-use the managers cache. This should be used in
 // all Hive controllers.
-func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Client {
+func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) client.Client {
 	// Copy the rest config as we want our round trippers to be controller specific.
 	cfg := rest.CopyConfig(mgr.GetConfig())
+	if rateLimiter != nil {
+		cfg.RateLimiter = *rateLimiter
+	}
 	AddControllerMetricsTransportWrapper(cfg, ctrlrName, false)
 
 	options := client.Options{
@@ -67,7 +73,7 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName string) client.Cli
 
 // AddControllerMetricsTransportWrapper adds a transport wrapper to the given rest config which
 // exposes metrics based on the requests being made.
-func AddControllerMetricsTransportWrapper(cfg *rest.Config, controllerName string, remote bool) {
+func AddControllerMetricsTransportWrapper(cfg *rest.Config, controllerName hivev1.ControllerName, remote bool) {
 	// If the restConfig already has a transport wrapper, wrap it.
 	if cfg.WrapTransport != nil {
 		origFunc := cfg.WrapTransport
@@ -92,7 +98,7 @@ func AddControllerMetricsTransportWrapper(cfg *rest.Config, controllerName strin
 // ControllerMetricsTripper is a RoundTripper implementation which tracks our metrics for client requests.
 type ControllerMetricsTripper struct {
 	http.RoundTripper
-	Controller string
+	Controller hivev1.ControllerName
 	Remote     bool
 }
 
@@ -108,8 +114,8 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	resp, err := cmt.RoundTripper.RoundTrip(req)
 	applyTime := metav1.Now().Sub(startTime).Seconds()
 	if err == nil && pathErr == nil {
-		metricKubeClientRequests.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Inc()
-		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller, req.Method, path, remoteStr, resp.Status).Observe(applyTime)
+		metricKubeClientRequests.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Inc()
+		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Observe(applyTime)
 	}
 
 	return resp, err

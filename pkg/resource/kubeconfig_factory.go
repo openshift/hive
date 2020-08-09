@@ -1,6 +1,7 @@
 package resource
 
 import (
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
@@ -43,7 +44,7 @@ func (r *helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error)
 type kubeconfigClientGetter struct {
 	clientConfig   clientcmd.ClientConfig
 	cacheDir       string
-	controllerName string
+	controllerName hivev1.ControllerName
 	metricsEnabled bool
 	restConfig     *rest.Config
 }

@@ -664,6 +664,9 @@ spec:
             memory: 512Mi
         command:
           - /opt/services/manager
+        envFrom:
+          - configMapRef:
+              name: hive-controllers-config
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl

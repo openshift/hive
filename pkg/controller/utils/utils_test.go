@@ -1,7 +1,11 @@
 package utils
 
 import (
+	"fmt"
+	"golang.org/x/time/rate"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -9,6 +13,13 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
+)
+
+const (
+	testControllerName = "foo"
 )
 
 func TestMergeJsons(t *testing.T) {
@@ -109,5 +120,206 @@ func TestLogLevel(t *testing.T) {
 	for _, tc := range cases {
 		actualLevel := LogLevel(tc.err)
 		assert.Equal(t, tc.expectedLevel, actualLevel)
+	}
+}
+
+func TestGetConcurrentReconciles(t *testing.T) {
+	cases := []struct {
+		name                         string
+		environmentVariables         map[string]string
+		expectedConcurrentReconciles int
+		expectedError                bool
+	}{
+		{
+			name: "Only default goroutines is set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ConcurrentReconcilesEnvVariableFormat, "default"): "10",
+			},
+			expectedConcurrentReconciles: 10,
+		},
+		{
+			name: "Only controller goroutines is set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ConcurrentReconcilesEnvVariableFormat, testControllerName): "10",
+			},
+			expectedConcurrentReconciles: 10,
+		},
+		{
+			name: "Both default and controller goroutines are set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ConcurrentReconcilesEnvVariableFormat, "default"):          "10",
+				fmt.Sprintf(ConcurrentReconcilesEnvVariableFormat, testControllerName): "20",
+			},
+			expectedConcurrentReconciles: 20,
+		},
+		{
+			name:                         "Neither default nor controller goroutines are set",
+			environmentVariables:         map[string]string{},
+			expectedConcurrentReconciles: defaultConcurrentReconciles,
+		},
+		{
+			name: "default goroutines are set incorrectly",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ConcurrentReconcilesEnvVariableFormat, "default"): "not-a-int",
+			},
+			expectedError: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// set environment variables
+			for k, v := range tc.environmentVariables {
+				os.Setenv(k, v)
+				defer os.Unsetenv(k)
+			}
+
+			concurrentReconciles, err := getConcurrentReconciles(testControllerName)
+			if tc.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equalf(t, tc.expectedConcurrentReconciles, concurrentReconciles, "unexpected concurrent reconciles")
+		})
+	}
+}
+
+func TestGetClientRateLimiter(t *testing.T) {
+	cases := []struct {
+		name                 string
+		environmentVariables map[string]string
+		expectedRateLimiter  flowcontrol.RateLimiter
+		expectedError        bool
+	}{
+		{
+			name:                 "No qps or burst is set",
+			environmentVariables: map[string]string{},
+			expectedRateLimiter:  flowcontrol.NewTokenBucketRateLimiter(rest.DefaultQPS, rest.DefaultBurst),
+		},
+		{
+			name: "default qps and default burst is set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ClientQPSEnvVariableFormat, "default"):   "500",
+				fmt.Sprintf(ClientBurstEnvVariableFormat, "default"): "1000",
+			},
+			expectedRateLimiter: flowcontrol.NewTokenBucketRateLimiter(500, 1000),
+		},
+		{
+			name: "controller qps and burst are set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ClientQPSEnvVariableFormat, testControllerName):   "500",
+				fmt.Sprintf(ClientBurstEnvVariableFormat, testControllerName): "1000",
+			},
+			expectedRateLimiter: flowcontrol.NewTokenBucketRateLimiter(500, 1000),
+		},
+		{
+			name: "Both default as well as controller qps and burst are set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ClientQPSEnvVariableFormat, "default"):            "500",
+				fmt.Sprintf(ClientQPSEnvVariableFormat, testControllerName):   "501",
+				fmt.Sprintf(ClientBurstEnvVariableFormat, "default"):          "1000",
+				fmt.Sprintf(ClientBurstEnvVariableFormat, testControllerName): "1001",
+			},
+			expectedRateLimiter: flowcontrol.NewTokenBucketRateLimiter(501, 1001),
+		},
+		{
+			name: "default qps is set incorrectly",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(ClientQPSEnvVariableFormat, "default"): "not-a-int",
+			},
+			expectedError: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// set environment variables
+			for k, v := range tc.environmentVariables {
+				os.Setenv(k, v)
+				defer os.Unsetenv(k)
+			}
+			rateLimiter, err := getClientRateLimiter(testControllerName)
+			if tc.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equalf(t, tc.expectedRateLimiter, rateLimiter, "unexpected rate limiter")
+		})
+	}
+}
+
+func TestGetQueueRateLimiter(t *testing.T) {
+	cases := []struct {
+		name                 string
+		environmentVariables map[string]string
+		expectedRateLimiter  workqueue.RateLimiter
+		expectedError        bool
+	}{
+		{
+			name:                 "No qps or burst is set",
+			environmentVariables: map[string]string{},
+			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
+				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(defaultQueueQPS), defaultQueueBurst)},
+			),
+		},
+		{
+			name: "default qps and default burst is set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(QueueQPSEnvVariableFormat, "default"):   "500",
+				fmt.Sprintf(QueueBurstEnvVariableFormat, "default"): "1000",
+			},
+			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
+				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(500), 1000)},
+			),
+		},
+		{
+			name: "controller qps and burst are set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(QueueQPSEnvVariableFormat, testControllerName):   "500",
+				fmt.Sprintf(QueueBurstEnvVariableFormat, testControllerName): "1000",
+			},
+			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
+				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(500), 1000)},
+			),
+		},
+		{
+			name: "Both default as well as controller qps and burst are set",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(QueueQPSEnvVariableFormat, "default"):            "500",
+				fmt.Sprintf(QueueQPSEnvVariableFormat, testControllerName):   "501",
+				fmt.Sprintf(QueueBurstEnvVariableFormat, "default"):          "1000",
+				fmt.Sprintf(QueueBurstEnvVariableFormat, testControllerName): "1001",
+			},
+			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
+				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(501), 1001)},
+			),
+		},
+		{
+			name: "default qps is set incorrectly",
+			environmentVariables: map[string]string{
+				fmt.Sprintf(QueueQPSEnvVariableFormat, "default"): "not-a-int",
+			},
+			expectedError: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// set environment variables
+			for k, v := range tc.environmentVariables {
+				os.Setenv(k, v)
+				defer os.Unsetenv(k)
+			}
+			rateLimiter, err := getQueueRateLimiter(testControllerName)
+			if tc.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equalf(t, tc.expectedRateLimiter, rateLimiter, "unexpected rate limiter")
+		})
 	}
 }

@@ -21,15 +21,16 @@ import (
 )
 
 const (
-	testNamespace            = "test-namespace"
-	testKubeconfigSecretName = "test-kubeconfig"
-	apiURL                   = "https://api.hive-cluster.example.com:6443"
+	testNamespace                                  = "test-namespace"
+	testKubeconfigSecretName                       = "test-kubeconfig"
+	apiURL                                         = "https://api.hive-cluster.example.com:6443"
+	testControllerName       hivev1.ControllerName = "test-controller-name"
 )
 
 func TestNewBuilder(t *testing.T) {
 	cd := testClusterDeployment()
 	c := fakeClient(cd)
-	controllerName := "test-controller-name"
+	controllerName := testControllerName
 	expected := &builder{
 		c:              c,
 		cd:             cd,

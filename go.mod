@@ -12,7 +12,7 @@ require (
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6 // indirect
+	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.26.0
 	github.com/google/uuid v1.1.1
@@ -43,6 +43,7 @@ require (
 	golang.org/x/mod v0.3.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.25.0
 	gopkg.in/ini.v1 v1.51.0
 	gopkg.in/yaml.v2 v2.3.0

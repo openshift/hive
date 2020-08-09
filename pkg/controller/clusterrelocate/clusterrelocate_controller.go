@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	ControllerName = "clusterRelocate"
+	ControllerName = hivev1.ClusterRelocateControllerName
 )
 
 var (
@@ -68,15 +68,25 @@ func init() {
 // Add creates a new ClusterRelocate controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+
 	r := &ReconcileClusterRelocate{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		logger: logger,
 	}
 	r.remoteClusterAPIClientBuilder = func(secret *corev1.Secret) remoteclient.Builder {
 		return remoteclient.NewBuilderFromKubeconfig(r.Client, secret)
 	}
 
-	c, err := controller.New("clusterrelocate-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New("clusterrelocate-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             queueRateLimiter,
+	})
 	if err != nil {
 		logger.WithError(err).Error("error creating controller")
 		return err
@@ -153,7 +163,7 @@ func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconci
 	logger.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

@@ -1012,6 +1012,9 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 		}
 		return nil, err
 	}
+	if err := r.setImageSetNotFoundCondition(cd, false, cdLog); err != nil {
+		return nil, err
+	}
 	return imageSet, nil
 }
 

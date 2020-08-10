@@ -671,15 +671,22 @@ func validateIngressList(newObject *hivev1.ClusterDeploymentSpec) bool {
 }
 
 func validateDomain(domain string, validDomains []string) bool {
+	matchFound := false
 	for _, validDomain := range validDomains {
-		if strings.HasSuffix(domain, "."+validDomain) {
-			childPart := strings.TrimSuffix(domain, "."+validDomain)
-			if !strings.Contains(childPart, ".") {
-				return true
-			}
+		// Do not allow the base domain to be the same as one of the managed domains.
+		if domain == validDomain {
+			return false
+		}
+		dottedValidDomain := "." + validDomain
+		if !strings.HasSuffix(domain, dottedValidDomain) {
+			continue
+		}
+		childPart := strings.TrimSuffix(domain, dottedValidDomain)
+		if !strings.ContainsRune(childPart, '.') {
+			matchFound = true
 		}
 	}
-	return false
+	return matchFound
 }
 
 func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {

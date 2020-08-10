@@ -456,8 +456,20 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name:            "Test invalid managed domain",
+			name:            "Test base domain is not child of a managed domain",
+			newObject:       clusterDeploymentWithManagedDomain("bar.bad-domain.com"),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test base domain is not direct child of a managed domain",
 			newObject:       clusterDeploymentWithManagedDomain("baz.foo.bbb.com"),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test base domain is not same as one of the managed domains",
+			newObject:       clusterDeploymentWithManagedDomain("foo.aaa.com"),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
 		},

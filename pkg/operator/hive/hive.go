@@ -9,7 +9,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/utils/pointer"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+
+	oappsv1 "github.com/openshift/api/apps/v1"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -18,16 +31,6 @@ import (
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
-
-	oappsv1 "github.com/openshift/api/apps/v1"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
-
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -341,4 +344,84 @@ func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) (bool, er
 	}
 
 	return len(list.APIResources) > 0, nil
+}
+
+func (r *ReconcileHiveConfig) cleanupLegacySyncSetInstances(hLog log.FieldLogger) error {
+	crdClient := r.dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1beta1",
+		Resource: "customresourcedefinitions",
+	})
+	syncSetInstanceCRD, err := crdClient.Get(context.Background(), "syncsetinstances.hive.openshift.io", metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		hLog.Debug("syncsetinstance crd has already been deleted")
+		return nil
+	case err != nil:
+		return errors.Wrap(err, "could not get the syncsetinstance CRD")
+	}
+	// Delete all the SyncSetInstance. List until there are no more SyncSetInstances to catch SyncSetInstances that may
+	// have been created since the last List was run. There should not be more SyncSetInstance created since the Hive
+	// controller that would create SyncSetInstances should not be running, but let's List until there is a zero count
+	// just in case.
+	for {
+		numberDeleted, err := r.deleteAllSyncSetInstances(hLog)
+		if err != nil {
+			return err
+		}
+		if numberDeleted == 0 {
+			break
+		}
+	}
+	if err := crdClient.Delete(context.Background(), syncSetInstanceCRD.GetName(), metav1.DeleteOptions{}); err != nil {
+		return errors.Wrap(err, "failed to delete syncsetinstance CRD")
+	}
+	return nil
+}
+
+func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (numberDeleted int, returnErr error) {
+	syncSetInstanceClient := r.dynamicClient.Resource(hivev1.SchemeGroupVersion.WithResource("syncsetinstances"))
+	hLog.Info("deleting SyncSetInstances")
+	listOptions := metav1.ListOptions{}
+	for {
+		syncSetInstanceList, err := syncSetInstanceClient.List(context.Background(), listOptions)
+		if err != nil {
+			return numberDeleted, errors.Wrap(err, "failed to list SyncSetInstances")
+		}
+		hLog.WithField("numberDeleted", numberDeleted).WithField("batchSize", len(syncSetInstanceList.Items)).Infof("deleting the next batch of SyncSetInstances")
+		for _, syncSetInstance := range syncSetInstanceList.Items {
+			c := syncSetInstanceClient.Namespace(syncSetInstance.GetNamespace())
+			if len(syncSetInstance.GetFinalizers()) != 0 {
+				syncSetInstance.SetFinalizers(nil)
+				if syncSetInstance, err := c.Update(context.Background(), &syncSetInstance, metav1.UpdateOptions{}); err != nil {
+					return numberDeleted, errors.Wrapf(err, "failed to remove finalizers from SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName())
+				}
+			}
+			// Ensure that we are deleting the SyncSetInstance version to which we just updated. In case the Hive
+			// syncsetinstance controller is still running, this will protect against the controller putting back the
+			// finalizer between when we removed the finalizers and when we did the delete. If the controller is running
+			// and puts back the finalizer, then the controller may attempt to delete synced resources in the target
+			// cluster.
+			uid := syncSetInstance.GetUID()
+			if err := c.Delete(
+				context.Background(),
+				syncSetInstance.GetName(),
+				metav1.DeleteOptions{
+					Preconditions: &metav1.Preconditions{
+						UID:             &uid,
+						ResourceVersion: pointer.StringPtr(syncSetInstance.GetResourceVersion()),
+					},
+				},
+			); err != nil {
+				return numberDeleted, errors.Wrapf(err, "failed to delete SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName())
+			}
+		}
+		numberDeleted += len(syncSetInstanceList.Items)
+		cont := syncSetInstanceList.GetContinue()
+		if cont == "" {
+			break
+		}
+		listOptions.Continue = cont
+	}
+	return
 }

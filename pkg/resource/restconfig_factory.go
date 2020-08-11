@@ -10,7 +10,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func (r *Helper) getRESTConfigFactory(namespace string) (cmdutil.Factory, error) {
+func (r *helper) getRESTConfigFactory(namespace string) (cmdutil.Factory, error) {
 	if r.metricsEnabled {
 		// Copy the possibly shared restConfig reference and add a metrics wrapper.
 		cfg := rest.CopyConfig(r.restConfig)

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	log "github.com/sirupsen/logrus"
-
+	
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +116,7 @@ func TestApply(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)
 				}
-				var h *resource.Helper
+				var h resource.Helper
 				if clientConfig == "kubeconfig" {
 					h = resource.NewHelper(kubeconfig, logger)
 				} else {
@@ -132,7 +132,7 @@ func TestApply(t *testing.T) {
 					}
 				}
 				accessor.SetNamespace(test.apply, namespace.Name)
-				data, err := h.Serialize(test.apply, scheme.Scheme)
+				data, err := resource.Serialize(test.apply, scheme.Scheme)
 				if err != nil {
 					t.Errorf("unexpected error calling serialize: %v", err)
 					return
@@ -162,10 +162,6 @@ func testConfigMap() *corev1.ConfigMap {
 	cm.Name = "test-config-map"
 	cm.Data = map[string]string{"foo": "bar"}
 	return cm
-}
-
-func strptr(s string) *string {
-	return &s
 }
 
 func testDNSZone() *hivev1.DNSZone {

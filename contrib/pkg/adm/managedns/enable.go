@@ -368,7 +368,7 @@ func (o *Options) generateAzureCredentialsSecret() (*corev1.Secret, error) {
 	}, nil
 }
 
-func (o *Options) getResourceHelper() (*resource.Helper, error) {
+func (o *Options) getResourceHelper() (resource.Helper, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.WithError(err).Error("Cannot get client config")

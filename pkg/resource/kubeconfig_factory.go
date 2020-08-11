@@ -10,7 +10,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func (r *Helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error) {
+func (r *helper) getKubeconfigFactory(namespace string) (cmdutil.Factory, error) {
 	config, err := clientcmd.Load(r.kubeconfig)
 	if err != nil {
 		r.logger.WithError(err).Error("an error occurred loading the kubeconfig")

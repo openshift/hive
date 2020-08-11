@@ -105,6 +105,19 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "fail to stop machines",
+			cd:   cdBuilder.Options(o.shouldHibernate).Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(fmt.Errorf("error"))
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.FailedToStopHibernationReason, cond.Reason)
+			},
+		},
+		{
 			name: "stopping, machines have stopped",
 			cd:   cdBuilder.Options(o.shouldHibernate, o.stopping).Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
@@ -141,6 +154,19 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+			},
+		},
+		{
+			name: "fail to start machines",
+			cd:   cdBuilder.Options(o.hibernating).Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(fmt.Errorf("error"))
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, hivev1.FailedToStartHibernationReason, cond.Reason)
 			},
 		},
 		{

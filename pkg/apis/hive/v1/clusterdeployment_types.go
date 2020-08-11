@@ -342,6 +342,12 @@ const (
 	// version is not compatible with hibernation (< 4.4.8) or the cloud provider of
 	// the cluster is not supported.
 	UnsupportedHibernationReason = "Unsupported"
+	// FailedToStopHibernationReason is used when there was an error stopping machines
+	// to enter hibernation
+	FailedToStopHibernationReason = "FailedToStop"
+	// FailedToStartHibernationReason is used when there was an error starting machines
+	// to leave hibernation
+	FailedToStartHibernationReason = "FailedToStart"
 )
 
 // +genclient

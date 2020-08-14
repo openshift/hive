@@ -103,6 +103,11 @@ func TestCreateOnly(t *testing.T) {
 				}
 				accessor.SetNamespace(test.apply, namespace.Name)
 				data, err := h.Serialize(test.apply, scheme.Scheme)
+				if err != nil {
+					t.Errorf("unexpected error calling serialize: %v", err)
+					return
+				}
+
 				t.Logf("The serialized resource:\n%s\n", string(data))
 				info, err := h.Info(data)
 				if err != nil {

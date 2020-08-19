@@ -112,6 +112,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h *resource.Helpe
 			Value: "true",
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
+
+		if instance.Spec.Backup.Velero.Namespace != "" {
+			hLog.Infof("Velero Backup Namespace specified.")
+			tmpEnvVar := corev1.EnvVar{
+				Name:  hiveconstants.VeleroNamespaceEnvVar,
+				Value: instance.Spec.Backup.Velero.Namespace,
+			}
+			hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
+		}
 	}
 
 	if instance.Spec.DeprovisionsDisabled != nil && *instance.Spec.DeprovisionsDisabled {

@@ -94,11 +94,24 @@ func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		reconcileRateLimitDuration = time.Duration(minBackupPeriodSeconds) * time.Second
 	}
 
+	veleroNamespace := velerov1.DefaultNamespace
+	if ns, found := os.LookupEnv(hiveconstants.VeleroNamespaceEnvVar); found {
+		veleroNamespace = ns
+	}
+
+	scheme := mgr.GetScheme()
+
+	var client client.Client
+	if scheme != nil {
+		client = controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName)
+	}
+
 	return &ReconcileBackup{
-		Client:                     controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
-		scheme:                     mgr.GetScheme(),
+		Client:                     client,
+		scheme:                     scheme,
 		reconcileRateLimitDuration: reconcileRateLimitDuration,
 		logger:                     logger,
+		veleroNamespace:            veleroNamespace,
 	}, nil
 }
 
@@ -136,6 +149,7 @@ type ReconcileBackup struct {
 	client.Client
 	reconcileRateLimitDuration time.Duration
 	scheme                     *runtime.Scheme
+	veleroNamespace            string
 
 	logger log.FieldLogger
 }
@@ -223,13 +237,17 @@ func (r *ReconcileBackup) createVeleroBackupObject(namespace string, t metav1.Ti
 	backup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("backup-%v-%v", namespace, timestamp),
-			Namespace: velerov1.DefaultNamespace,
+			Namespace: r.veleroNamespace,
 		},
 		Spec: velerov1.BackupSpec{
+			VolumeSnapshotLocations: []string{},
 			IncludedNamespaces: []string{
 				namespace,
 			},
 			ExcludedResources: defaultExcludedBackupResources,
+		},
+		Status: velerov1.BackupStatus{
+			Phase: velerov1.BackupPhaseNew,
 		},
 	}
 

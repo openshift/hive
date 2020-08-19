@@ -11,6 +11,9 @@ const (
 	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.
 	VeleroBackupEnvVar = "HIVE_VELERO_BACKUP"
 
+	// VeleroNamespaceEnvVar is the name of the environment variable used to tell the controller manager which namespace velero backup objects should be created in.
+	VeleroNamespaceEnvVar = "HIVE_VELERO_NAMESPACE"
+
 	// DeprovisionsDisabledEnvVar is the name of the environment variable used to tell the controller manager to skip
 	// processing of any ClusterDeprovisions.
 	DeprovisionsDisabledEnvVar = "DEPROVISIONS_DISABLED"

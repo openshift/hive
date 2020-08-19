@@ -49,9 +49,15 @@ const (
 	ClusterPoolNameLabel = "hive.openshift.io/cluster-pool-name"
 
 	// SyncSetNameLabel is the label that is used to identify a relationship to a given syncset object.
+	// It is used in two places:
+	// 1) The SyncSetInstance
+	// 2) Each resource pushed down to the managed cluster at the behest of the SyncSet object.
 	SyncSetNameLabel = "hive.openshift.io/syncset-name"
 
 	// SelectorSyncSetNameLabel is the label that is used to identify a relationship to a given selector syncset object.
+	// It is used in two places:
+	// 1) The SyncSetInstance
+	// 2) Each resource pushed down to the managed cluster at the behest of the SelectorSyncSet object.
 	SelectorSyncSetNameLabel = "hive.openshift.io/selector-syncset-name"
 
 	// PVCTypeLabel is the label that is used to identify what a PVC is being used for.

@@ -706,7 +706,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 		if rss := findSyncStatus(resourceSyncStatus, ssi.Status.Resources); rss == nil || r.needToReapply(resourceSyncStatus, *rss, ssiLog) {
 			// Apply resource
 			ssiLog.Debug("applying resource")
-			applyErr = applyResource(info.Object, ssiLog, applyFnMetricsLabel, applyFn)
+			applyErr = applyResource(ssi, info.Object, ssiLog, applyFnMetricsLabel, applyFn)
 
 			var resourceSyncConditions []hivev1.SyncCondition
 			if rss != nil {
@@ -741,16 +741,32 @@ func (r *ReconcileSyncSetInstance) applySyncSetResources(ssi *hivev1.SyncSetInst
 	return nil
 }
 
-func applyResource(u *unstructured.Unstructured, logger log.FieldLogger, applyFnMetricLabel string, applyFn func(obj []byte) (hiveresource.ApplyResult, error)) error {
+// addHiveLabels injects labels to help end-users and support see that a resource is managed by hive,
+// and which [Selector]SyncSet it originated from.
+func addHiveLabels(ssi *hivev1.SyncSetInstance, obj metav1.Object) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string, 2)
+	}
+	// Resource is managed by hive:
+	labels[constants.HiveManagedLabel] = "true"
+	// Which [Selector]SyncSet it originated from:
+	if ssi.Spec.SelectorSyncSetRef != nil {
+		labels[constants.SelectorSyncSetNameLabel] = ssi.Spec.SelectorSyncSetRef.Name
+	} else if ssi.Spec.SyncSetRef != nil {
+		labels[constants.SyncSetNameLabel] = ssi.Spec.SyncSetRef.Name
+	}
+	// TODO(efried): else panic? This is a developer error (forgot to add a condition for new ssi source type).
+	// For now, this is super safe; worst case we just omit the label.
+
+	obj.SetLabels(labels)
+}
+
+func applyResource(ssi *hivev1.SyncSetInstance, u *unstructured.Unstructured, logger log.FieldLogger, applyFnMetricLabel string, applyFn func(obj []byte) (hiveresource.ApplyResult, error)) error {
 
 	startTime := time.Now()
-	labels := u.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string, 1)
-	}
-	// Inject the hive managed annotation to help end-users see that a resource is managed by hive:
-	labels[constants.HiveManagedLabel] = "true"
-	u.SetLabels(labels)
+
+	addHiveLabels(ssi, u)
 
 	bytes, err := json.Marshal(u)
 	if err != nil {
@@ -937,11 +953,7 @@ func (r *ReconcileSyncSetInstance) applySyncSetSecretMappings(ssi *hivev1.SyncSe
 		secret.UID = ""
 		secret.OwnerReferences = nil
 
-		// Inject our managed-by-Hive annotation:
-		if secret.Labels == nil {
-			secret.Labels = make(map[string]string, 1)
-		}
-		secret.Labels[constants.HiveManagedLabel] = "true"
+		addHiveLabels(ssi, secret)
 
 		var hash string
 		hash, applyErr = controllerutils.GetChecksumOfObject(secret)

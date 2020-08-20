@@ -68,6 +68,11 @@ spec:
                       description: Enabled dictates if Velero backup integration is
                         enabled. If not specified, the default is disabled.
                       type: boolean
+                    namespace:
+                      description: Namespace specifies in which namespace velero backup
+                        objects should be created. If not specified, the default is
+                        a namespace named "velero".
+                      type: string
                   type: object
               type: object
             deleteProtection:

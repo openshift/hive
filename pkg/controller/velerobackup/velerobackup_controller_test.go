@@ -3,9 +3,11 @@ package velerobackup
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 
@@ -25,8 +27,59 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/hive/pkg/test/generic"
+	"github.com/openshift/hive/pkg/test/manager/mock"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
 )
+
+const (
+	veleroNSEnvKey = "HIVE_VELERO_NAMESPACE"
+)
+
+func TestNewReconciler(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+	velerov1.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name                    string
+		expectedVeleroNamespace string
+		expectedError           error
+		setup                   func()
+	}{
+		{
+			name:                    "Default",
+			expectedVeleroNamespace: "velero",
+			setup: func() {
+				os.Unsetenv(veleroNSEnvKey)
+			},
+		},
+		{
+			name:                    "Velero project set",
+			expectedVeleroNamespace: "openshift-velero",
+			setup: func() {
+				os.Setenv(veleroNSEnvKey, "openshift-velero")
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockManager := mock.NewMockManager(mockCtrl)
+			mockManager.EXPECT().GetScheme().Return(nil)
+			test.setup()
+
+			// Act
+			tmpResult, actualError := NewReconciler(mockManager)
+			actualResult := tmpResult.(*ReconcileBackup)
+
+			// Assert
+			assert.Equal(t, test.expectedVeleroNamespace, actualResult.veleroNamespace, "Velero Namespace set incorrectly")
+			assert.Equal(t, test.expectedError, actualError, "unexpected error returned")
+		})
+	}
+}
 
 func TestReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)

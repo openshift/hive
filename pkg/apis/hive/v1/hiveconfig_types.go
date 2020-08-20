@@ -115,6 +115,11 @@ type VeleroBackupConfig struct {
 	// If not specified, the default is disabled.
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
+
+	// Namespace specifies in which namespace velero backup objects should be created.
+	// If not specified, the default is a namespace named "velero".
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // FailedProvisionConfig contains settings to control behavior undertaken by Hive when an installation attempt fails.

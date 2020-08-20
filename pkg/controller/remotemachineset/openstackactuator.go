@@ -42,6 +42,10 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	if pool.Spec.Platform.OpenStack == nil {
 		return nil, false, errors.New("MachinePool is not for OpenStack")
 	}
+	clusterVersion, err := getClusterVersion(cd)
+	if err != nil {
+		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
+	}
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.OpenStack = &installertypesosp.MachinePool{
@@ -81,7 +85,13 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	// cluster install), we should stick to this same name format, or update this line of code.
 	osImage := fmt.Sprintf("%s-rhcos", cd.Spec.ClusterMetadata.InfraID)
 
-	installerMachineSets, err := installosp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, osImage, workerRole, workerUserData)
+	workerUserDataSecret, err := workerUserData(clusterVersion)
+
+	if err != nil {
+		return nil, false, fmt.Errorf("error determining worker user data secret: %v", err)
+	}
+
+	installerMachineSets, err := installosp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, osImage, workerRole, workerUserDataSecret)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}

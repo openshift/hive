@@ -100,9 +100,13 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	if pool.Spec.Platform.GCP == nil {
 		return nil, false, errors.New("MachinePool is not for GCP")
 	}
+	clusterVersion, err := getClusterVersion(cd)
+	if err != nil {
+		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
+	}
 
 	leases := &hivev1.MachinePoolNameLeaseList{}
-	err := a.client.List(context.TODO(), leases, client.InNamespace(pool.Namespace),
+	err = a.client.List(context.TODO(), leases, client.InNamespace(pool.Namespace),
 		client.MatchingLabels(map[string]string{
 			constants.ClusterDeploymentNameLabel: cd.Name,
 		}))
@@ -175,8 +179,14 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		computePool.Platform.GCP.Zones = zones
 	}
 
+	workerUserDataSecret, err := workerUserData(clusterVersion)
+
+	if err != nil {
+		return nil, false, fmt.Errorf("error determining worker user data secret: %v", err)
+	}
+
 	// Assuming all machine pools are workers at this time.
-	installerMachineSets, err := installgcp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, workerRole, workerUserData)
+	installerMachineSets, err := installgcp.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, imageID, workerRole, workerUserDataSecret)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
 

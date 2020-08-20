@@ -42,6 +42,10 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	if pool.Spec.Platform.VSphere == nil {
 		return nil, false, errors.New("MachinePool is not for VSphere")
 	}
+	clusterVersion, err := getClusterVersion(cd)
+	if err != nil {
+		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
+	}
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.VSphere = &installertypesvsphere.MachinePool{
@@ -76,7 +80,13 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	// cluster install), we should stick to this same name format, or update this line of code.
 	osImage := fmt.Sprintf("%s-rhcos", cd.Spec.ClusterMetadata.InfraID)
 
-	installerMachineSets, err := installvsphere.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, osImage, workerRole, workerUserData)
+	workerUserDataSecret, err := workerUserData(clusterVersion)
+
+	if err != nil {
+		return nil, false, fmt.Errorf("error determining worker user data secret: %v", err)
+	}
+
+	installerMachineSets, err := installvsphere.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, osImage, workerRole, workerUserDataSecret)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}

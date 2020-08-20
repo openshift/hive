@@ -32,6 +32,7 @@ type Helper interface {
 	Info(obj []byte) (*Info, error)
 	// Patch invokes the kubectl patch command with the given resource, patch and patch type
 	Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error
+	Delete(apiVersion, kind, namespace, name string) error
 }
 
 // helper contains configuration for apply and patch operations

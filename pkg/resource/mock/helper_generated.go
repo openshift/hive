@@ -153,3 +153,17 @@ func (mr *MockHelperMockRecorder) Patch(name, kind, apiVersion, patch, patchType
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Patch", reflect.TypeOf((*MockHelper)(nil).Patch), name, kind, apiVersion, patch, patchType)
 }
+
+// Delete mocks base method
+func (m *MockHelper) Delete(apiVersion, kind, namespace, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", apiVersion, kind, namespace, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete
+func (mr *MockHelperMockRecorder) Delete(apiVersion, kind, namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockHelper)(nil).Delete), apiVersion, kind, namespace, name)
+}

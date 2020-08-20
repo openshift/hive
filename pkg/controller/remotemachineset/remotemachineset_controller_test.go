@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/golang/mock/gomock"
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -916,6 +917,11 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				Type:   hivev1.UnreachableCondition,
 				Status: corev1.ConditionFalse,
 			}},
+			ClusterVersionStatus: &openshiftapiv1.ClusterVersionStatus{
+				Desired: openshiftapiv1.Update{
+					Version: "4.4.0",
+				},
+			},
 		},
 	}
 }

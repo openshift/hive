@@ -83,6 +83,10 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	if pool.Spec.Platform.AWS == nil {
 		return nil, false, errors.New("MachinePool is not for AWS")
 	}
+	clusterVersion, err := getClusterVersion(cd)
+	if err != nil {
+		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
+	}
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.AWS = &installertypesaws.MachinePool{
@@ -121,7 +125,15 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	// from the machinepool / installconfig in the future.
 	userTags := map[string]string{}
 
-	installerMachineSets, err := installaws.MachineSets(cd.Spec.ClusterMetadata.InfraID, cd.Spec.Platform.AWS.Region, subnets, computePool, pool.Spec.Name, workerUserData, userTags)
+	installerMachineSets, err := installaws.MachineSets(
+		cd.Spec.ClusterMetadata.InfraID,
+		cd.Spec.Platform.AWS.Region,
+		subnets,
+		computePool,
+		pool.Spec.Name,
+		workerUserData(clusterVersion),
+		userTags,
+	)
 	if err != nil {
 		if strings.Contains(err.Error(), "no subnet for zone") {
 			conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(

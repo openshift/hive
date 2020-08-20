@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	log "github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

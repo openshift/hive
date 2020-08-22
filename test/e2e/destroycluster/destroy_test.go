@@ -127,6 +127,10 @@ func monitorDeprovisionJob(cd *hivev1.ClusterDeployment, jobObserved *int32, log
 		return false, nil
 	}
 	_, err = clientwatch.UntilWithSync(context.TODO(), listWatcher, &batchv1.Job{}, nil, monitor)
+	if err != nil {
+		logger.WithError(err).Error("Cannot watch client")
+		return
+	}
 }
 
 func writeJobLog(job *batchv1.Job, logger *log.Entry) {
@@ -156,6 +160,10 @@ func writeJobLog(job *batchv1.Job, logger *log.Entry) {
 	}
 	listWatcher := cache.NewFilteredListWatchFromClient(client.CoreV1().RESTClient(), "pods", job.Namespace, podFilter)
 	_, err = clientwatch.UntilWithSync(context.TODO(), listWatcher, &corev1.Pod{}, nil, waitForPodRunning)
+	if err != nil {
+		logger.WithError(err).Error("failed to watch client")
+		return
+	}
 	request := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Follow: true})
 	readCloser, err := request.Stream(context.TODO())
 	if err != nil {

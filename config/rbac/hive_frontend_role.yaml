@@ -71,3 +71,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - clustersyncs
+  - clustersyncleases
+  verbs:
+  - get
+  - list
+  - watch

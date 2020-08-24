@@ -2,6 +2,7 @@ package clusterprovision
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -41,6 +42,8 @@ const (
 
 	resultSuccess = "success"
 	resultFailure = "failure"
+
+	podStatusCheckDelay = 60 * time.Second
 )
 
 var (
@@ -246,7 +249,7 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 
 func (r *ReconcileClusterProvision) adoptJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
 	instance.Status.JobRef = &corev1.LocalObjectReference{Name: job.Name}
-	return reconcile.Result{}, r.setCondition(instance, hivev1.ClusterProvisionJobCreated, "JobCreated", "Install job has been created", pLog)
+	return reconcile.Result{}, r.setCondition(instance, hivev1.ClusterProvisionJobCreated, corev1.ConditionTrue, "JobCreated", "Install job has been created", controllerutils.UpdateConditionAlways, pLog)
 }
 
 // check if the job has completed
@@ -258,7 +261,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 	case apierrors.IsNotFound(err):
 		if cond := controllerutils.FindClusterProvisionCondition(instance.Status.Conditions, hivev1.ClusterProvisionFailedCondition); cond == nil {
 			pLog.Error("install job lost")
-			if err := r.setCondition(instance, hivev1.ClusterProvisionFailedCondition, "JobNotFound", "install job not found", pLog); err != nil {
+			if err := r.setCondition(instance, hivev1.ClusterProvisionFailedCondition, corev1.ConditionTrue, "JobNotFound", "install job not found", controllerutils.UpdateConditionAlways, pLog); err != nil {
 				return reconcile.Result{}, err
 			}
 		} else {
@@ -285,6 +288,33 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 
 	pLog.Debug("install job still running")
 
+	if time.Since(job.CreationTimestamp.Time) > podStatusCheckDelay {
+		installPod, err := r.getInstallPod(job, pLog)
+		if err != nil {
+			pLog.WithError(err).Error("could not get install pod")
+			if err := r.setCondition(instance, hivev1.InstallPodStuckCondition, corev1.ConditionTrue, "InstallPodMissing", err.Error(), controllerutils.UpdateConditionIfReasonOrMessageChange, pLog); err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, err
+		}
+
+		if installPod.Status.Phase == "Pending" {
+			pLog.WithField("pod", installPod.Name).Error("install pod is stuck")
+			if err := r.setCondition(instance, hivev1.InstallPodStuckCondition, corev1.ConditionTrue, "PodInPendingPhase", "pod is in pending phase", controllerutils.UpdateConditionIfReasonOrMessageChange, pLog); err != nil {
+				return reconcile.Result{}, err
+			}
+			// Since this controller is not watching pods, the ClusterProvision will not be re-synced if the pod does
+			// transition to the running phase later. However, if the pod does start running, then soon after either the
+			// install manager will set the InfraID on the ClusterProvision or the pod will fail.
+			return reconcile.Result{}, nil
+		}
+		if cond := controllerutils.FindClusterProvisionCondition(instance.Status.Conditions, hivev1.InstallPodStuckCondition); cond != nil && cond.Status == corev1.ConditionTrue {
+			if err := r.setCondition(instance, hivev1.InstallPodStuckCondition, corev1.ConditionFalse, "PodInRunningPhase", "pod is in running phase", controllerutils.UpdateConditionNever, pLog); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+	}
+
 	if instance.Spec.Stage == hivev1.ClusterProvisionStageInitializing && instance.Spec.InfraID != nil {
 		cd := hivev1.ClusterDeployment{}
 		if err := r.Get(
@@ -303,7 +333,39 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 		}
 	}
 
+	if timeUntilNextPodStatusCheck := podStatusCheckDelay - time.Since(job.CreationTimestamp.Time); timeUntilNextPodStatusCheck > 0 {
+		return reconcile.Result{RequeueAfter: timeUntilNextPodStatusCheck}, nil
+	}
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterProvision) getInstallPod(job *batchv1.Job, pLog log.FieldLogger) (*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	podLabelSelector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+	if err != nil {
+		pLog.WithError(err).Error("could not create pod selector from job")
+		return nil, fmt.Errorf("could not create pod selector from job")
+	}
+	if err := r.List(
+		context.TODO(),
+		podList,
+		client.MatchingLabelsSelector{Selector: podLabelSelector},
+		client.InNamespace(job.Namespace),
+	); err != nil {
+		pLog.WithError(err).Error("could not list install pods")
+		return nil, fmt.Errorf("could not list install pods")
+	}
+
+	switch len(podList.Items) {
+	case 0:
+		pLog.Error("install pod not found")
+		return nil, fmt.Errorf("install pod not found")
+	case 1:
+		return &podList.Items[0], nil
+	default:
+		pLog.Error("more than one install pod exists")
+		return nil, fmt.Errorf("more than one install pod exists")
+	}
 }
 
 func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
@@ -337,7 +399,7 @@ func (r *ReconcileClusterProvision) abortProvision(instance *hivev1.ClusterProvi
 	if instance.Status.JobRef == nil {
 		return r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	}
-	if err := r.setCondition(instance, hivev1.ClusterProvisionFailedCondition, reason, message, pLog); err != nil {
+	if err := r.setCondition(instance, hivev1.ClusterProvisionFailedCondition, corev1.ConditionTrue, reason, message, controllerutils.UpdateConditionAlways, pLog); err != nil {
 		return reconcile.Result{}, err
 	}
 	job := &batchv1.Job{}
@@ -377,7 +439,7 @@ func (r *ReconcileClusterProvision) transitionStage(
 	default:
 		return reconcile.Result{}, errors.New("unknown stage")
 	}
-	if err := r.setCondition(instance, conditionType, reason, message, pLog); err != nil {
+	if err := r.setCondition(instance, conditionType, corev1.ConditionTrue, reason, message, controllerutils.UpdateConditionAlways, pLog); err != nil {
 		return reconcile.Result{}, err
 	}
 	if err := r.setStage(instance, stage, pLog); err != nil {
@@ -389,17 +451,19 @@ func (r *ReconcileClusterProvision) transitionStage(
 func (r *ReconcileClusterProvision) setCondition(
 	instance *hivev1.ClusterProvision,
 	conditionType hivev1.ClusterProvisionConditionType,
+	status corev1.ConditionStatus,
 	reason string,
 	message string,
+	updateConditionCheck controllerutils.UpdateConditionCheck,
 	pLog log.FieldLogger,
 ) error {
 	instance.Status.Conditions = controllerutils.SetClusterProvisionCondition(
 		instance.Status.Conditions,
 		conditionType,
-		corev1.ConditionTrue,
+		status,
 		reason,
 		message,
-		controllerutils.UpdateConditionAlways,
+		updateConditionCheck,
 	)
 	if err := r.Status().Update(context.TODO(), instance); err != nil {
 		pLog.WithError(err).Error("cannot update status conditions")

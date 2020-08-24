@@ -105,6 +105,9 @@ const (
 
 	// ClusterProvisionJobCreated is set when the install job is created for a cluster provision.
 	ClusterProvisionJobCreated ClusterProvisionConditionType = "ClusterProvisionJobCreated"
+
+	// InstallPodStuckCondition is set when the install pod is stuck
+	InstallPodStuckCondition ClusterProvisionConditionType = "InstallPodStuck"
 )
 
 // +genclient

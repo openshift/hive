@@ -304,6 +304,9 @@ const (
 	// ClusterHibernatingCondition is set when the ClusterDeployment is either
 	// transitioning to/from a hibernating state or is in a hibernating state.
 	ClusterHibernatingCondition ClusterDeploymentConditionType = "Hibernating"
+
+	// InstallLaunchErrorCondition is set when a cluster provision fails to launch an install pod
+	InstallLaunchErrorCondition ClusterDeploymentConditionType = "InstallLaunchError"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with

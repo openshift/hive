@@ -20,6 +20,8 @@ parameters:
   value: "[]"
 - name: DELETE_PROTECTION
   value: ""
+- name: HIVE_API_ENABLED
+  value: true
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -62,3 +64,4 @@ objects:
     globalPullSecretRef:
       name: ${GLOBAL_PULL_SECRET}
     deleteProtection: ${DELETE_PROTECTION}
+    hiveAPIEnabled: ${HIVE_API_ENABLED}

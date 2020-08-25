@@ -122,7 +122,7 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 }
 
 // Reconcile syncs a single ClusterDeployment
-func (r *hibernationReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
 	start := time.Now()
 	cdLog := r.logger.WithFields(log.Fields{
 		"controller":        ControllerName,
@@ -164,6 +164,64 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (reconcile.
 	shouldHibernate := cd.Spec.PowerState == hivev1.HibernatingClusterPowerState
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 
+	// Signal a problem if we should be hibernating or have requested hibernate after and the cluster does not support it.
+	if shouldHibernate || cd.Spec.HibernateAfter != nil {
+		if supported, msg := r.canHibernate(cd); !supported {
+			return r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
+		}
+	}
+
+	// Check if HibernateAfter is set, and if the cluster has been in running state for longer than this duration, put it to sleep.
+	if cd.Spec.HibernateAfter != nil && cd.Spec.PowerState != hivev1.HibernatingClusterPowerState {
+		hibernateAfterDur := cd.Spec.HibernateAfter.Duration
+		runningSince := cd.Status.InstalledTimestamp.Time
+		hibLog := cdLog.WithFields(log.Fields{
+			"runningSince":   runningSince,
+			"hibernateAfter": hibernateAfterDur,
+		})
+		var isRunning bool
+
+		cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+		if cond == nil {
+			hibLog.Debug("cluster has no hibernating condition (never hibernated), using installed time")
+			isRunning = true
+		} else if cond.Status == corev1.ConditionFalse {
+			runningSince = cond.LastTransitionTime.Time
+			hibLog = hibLog.WithField("runningSince", runningSince)
+			hibLog.WithField("reason", cond.Reason).Debug("hibernating condition false")
+			isRunning = true
+		}
+
+		if isRunning {
+			expiry := runningSince.Add(hibernateAfterDur)
+			hibLog.Debugf("cluster should be hibernating after: %s", expiry)
+			if time.Now().After(expiry) {
+				hibLog.WithField("expiry", expiry).Debug("cluster has been running longer than hibernate-after duration, moving to hibernating powerState")
+				cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
+				err := r.Update(context.TODO(), cd)
+				if err != nil {
+					hibLog.WithError(err).Log(controllerutils.LogLevel(err), "error hibernating cluster")
+				}
+				return reconcile.Result{}, err
+			}
+
+			defer func() {
+				requeueNow := result.Requeue && result.RequeueAfter <= 0
+				if returnErr == nil && !requeueNow {
+					// We have an hibernate after time but cluster has not been running that long yet.
+					// Set requeueAfter for just after so that we requeue cluster for hibernation once reconcile has completed
+					requeueAfter := time.Until(expiry)
+					if requeueAfter < result.RequeueAfter || result.RequeueAfter <= 0 {
+						hibLog.Infof("cluster will reconcile due to hibernate-after time in: %v", requeueAfter)
+						result.RequeueAfter = requeueAfter
+						result.Requeue = true
+					}
+				}
+			}()
+		}
+
+	}
+
 	if !shouldHibernate {
 		if hibernatingCondition == nil || hibernatingCondition.Status == corev1.ConditionFalse {
 			return reconcile.Result{}, nil
@@ -177,9 +235,6 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil
 	}
 
-	if supported, msg := r.canHibernate(cd); !supported {
-		return r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
-	}
 	if hibernatingCondition == nil || hibernatingCondition.Status == corev1.ConditionFalse || hibernatingCondition.Reason == hivev1.ResumingHibernationReason {
 		return r.stopMachines(cd, cdLog)
 	}

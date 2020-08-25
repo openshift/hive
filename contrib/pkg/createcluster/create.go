@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -131,6 +132,8 @@ type Options struct {
 	ReleaseImage             string
 	ReleaseImageSource       string
 	DeleteAfter              string
+	HibernateAfter           string
+	HibernateAfterDur        *time.Duration
 	ServingCert              string
 	ServingCertKey           string
 	UseClusterImageSet       bool
@@ -243,6 +246,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.BaseDomain, "base-domain", "new-installer.openshift.com", "Base domain for the cluster")
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster. Takes precedence over pull-secret-file.")
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
+	flags.StringVar(&opt.HibernateAfter, "hibernate-after", "", "Automatically hibernate the cluster whenever it has been running for the given duration")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
@@ -324,6 +328,14 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 		case cloudGCP:
 			o.Region = "us-east1"
 		}
+	}
+
+	if o.HibernateAfter != "" {
+		dur, err := time.ParseDuration(o.HibernateAfter)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse HibernateAfter duration")
+		}
+		o.HibernateAfterDur = &dur
 	}
 
 	return nil
@@ -509,6 +521,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		BaseDomain:            o.BaseDomain,
 		ManageDNS:             o.ManageDNS,
 		DeleteAfter:           o.DeleteAfter,
+		HibernateAfter:        o.HibernateAfterDur,
 		Labels:                labels,
 		InstallerManifests:    manifestFileData,
 		MachineNetwork:        o.MachineNetwork,

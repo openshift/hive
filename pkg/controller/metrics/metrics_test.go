@@ -39,6 +39,10 @@ func TestClusterAccumulator(t *testing.T) {
 				hivev1.ClusterImageSetNotFoundCondition,
 				hivev1.ControlPlaneCertificateNotFoundCondition,
 			}),
+		testClusterDeploymentWithConditions("b1", "managed", fiveMinsAgo, false,
+			[]hivev1.ClusterDeploymentConditionType{
+				hivev1.InstallLaunchErrorCondition,
+			}),
 		testClusterDeployment("c", "managed", tenMinsAgo, false),
 
 		// One managed cluster installing between 1h and 2h:
@@ -72,9 +76,9 @@ func TestClusterAccumulator(t *testing.T) {
 		accumulator.processCluster(&cd)
 	}
 
-	assert.Equal(t, 12, accumulator.total["managed"])
+	assert.Equal(t, 13, accumulator.total["managed"])
 	assert.Equal(t, 4, accumulator.installed["managed"])
-	assert.Equal(t, 8, accumulator.uninstalled["0h"]["managed"])
+	assert.Equal(t, 9, accumulator.uninstalled["0h"]["managed"])
 	assert.Equal(t, 5, accumulator.uninstalled["1h"]["managed"])
 	assert.Equal(t, 4, accumulator.uninstalled["2h"]["managed"])
 	assert.Equal(t, 2, accumulator.uninstalled["8h"]["managed"])
@@ -107,9 +111,9 @@ func TestClusterAccumulator(t *testing.T) {
 	for _, cd := range clusters {
 		accumulator.processCluster(&cd)
 	}
-	assert.Equal(t, 8, accumulator.total["managed"])
+	assert.Equal(t, 9, accumulator.total["managed"])
 	assert.Equal(t, 2, accumulator.installed["managed"])
-	assert.Equal(t, 6, accumulator.uninstalled["0h"]["managed"])
+	assert.Equal(t, 7, accumulator.uninstalled["0h"]["managed"])
 	assert.Equal(t, 3, accumulator.uninstalled["1h"]["managed"])
 	assert.Equal(t, 2, accumulator.uninstalled["2h"]["managed"])
 	assert.Equal(t, 0, accumulator.uninstalled["8h"]["managed"])

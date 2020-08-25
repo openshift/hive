@@ -524,6 +524,13 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	// Process conditions regardless if installed or not:
 	for _, cond := range cd.Status.Conditions {
 		if cond.Status == corev1.ConditionTrue {
+			// Should have been handled by the initialization above which ensures we have 0's in the metrics for
+			// conditions that are not currently present on any clusters. This is a safety check to avoid crashing Hive
+			// in the event a developer adds a new condition but misses the list of all types.
+			if ca.conditions[cond.Type] == nil {
+				log.Warnf("condition type %s missing from AllClusterDeploymentConditions slice", cond.Type)
+				ca.conditions[cond.Type] = map[string]int{}
+			}
 			ca.conditions[cond.Type][clusterType]++
 		}
 	}

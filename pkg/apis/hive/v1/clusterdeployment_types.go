@@ -259,6 +259,7 @@ type ClusterDeploymentCondition struct {
 // ClusterDeploymentConditionType is a valid value for ClusterDeploymentCondition.Type
 type ClusterDeploymentConditionType string
 
+// WARNING: All ClusterDeploymentConditionTypes should be added to the AllClusterDeploymentConditions slice below.
 const (
 	// ClusterImageSetNotFoundCondition is set when the ClusterImageSet referenced by the
 	// ClusterDeployment is not found.
@@ -324,6 +325,7 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	SyncSetFailedCondition,
 	RelocationFailedCondition,
 	ClusterHibernatingCondition,
+	InstallLaunchErrorCondition,
 }
 
 // Cluster hibernating reasons

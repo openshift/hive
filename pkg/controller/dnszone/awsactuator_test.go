@@ -174,3 +174,16 @@ func mockDeleteAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{}, nil).Times(1)
 	expect.DeleteHostedZone(gomock.Any()).Return(nil, nil).Times(1)
 }
+
+func mockGetResourcePages(expect *mock.MockClientMockRecorder) {
+	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Do(func(i *resourcegroupstaggingapi.GetResourcesInput, f func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) {
+		getResourcesOutput := &resourcegroupstaggingapi.GetResourcesOutput{
+			ResourceTagMappingList: []*resourcegroupstaggingapi.ResourceTagMapping{
+				{
+					ResourceARN: aws.String("arn:aws:route53:::hostedzone/Z055920326CHQAW0WSG5N"),
+				},
+			},
+		}
+		f(getResourcesOutput, true)
+	})
+}

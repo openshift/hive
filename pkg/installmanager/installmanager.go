@@ -564,7 +564,9 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		uninstaller.GraphAuthorizer = session.GraphAuthorizer
 		uninstaller.Authorizer = session.Authorizer
 
-		return uninstaller.Run()
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
 	case cd.Spec.Platform.GCP != nil:
 		credsFile := os.Getenv("GOOGLE_CREDENTIALS")
 		projectID, err := gcpclient.ProjectIDFromFile(credsFile)
@@ -584,7 +586,10 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if err != nil {
 			return err
 		}
-		return uninstaller.Run()
+
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
 	case cd.Spec.Platform.OpenStack != nil:
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
@@ -601,7 +606,10 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if err != nil {
 			return err
 		}
-		return uninstaller.Run()
+
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
 	case cd.Spec.Platform.VSphere != nil:
 		vSphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
 		if vSphereUsername == "" {
@@ -625,7 +633,10 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if err != nil {
 			return err
 		}
-		return uninstaller.Run()
+
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
 	case cd.Spec.Platform.Ovirt != nil:
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
@@ -639,11 +650,16 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if err != nil {
 			return err
 		}
-		return uninstaller.Run()
+
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
 	default:
 		logger.Warn("unknown platform for re-try cleanup")
 		return errors.New("unknown platform for re-try cleanup")
 	}
+
+	return cleanupDNSZone(dynClient, cd, logger)
 }
 
 // generateAssets runs openshift-install commands to generate on-disk assets we need to

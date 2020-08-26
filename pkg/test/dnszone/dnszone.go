@@ -115,3 +115,14 @@ func WithZone(zone string) Option {
 		dnsZone.Spec.Zone = zone
 	}
 }
+
+// WithGCPPlatform will set the GCP spce and status fields non-nil and populate
+// the status fields with the provided name for the zone.
+func WithGCPPlatform(zoneName string) Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		dnsZone.Spec.GCP = &hivev1.GCPDNSZoneSpec{}
+		dnsZone.Status.GCP = &hivev1.GCPDNSZoneStatus{
+			ZoneName: &zoneName,
+		}
+	}
+}

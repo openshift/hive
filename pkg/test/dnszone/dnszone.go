@@ -3,6 +3,7 @@ package dnszone
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -113,5 +114,14 @@ func WithLabelOwner(owner *hivev1.ClusterDeployment) Option {
 func WithZone(zone string) Option {
 	return func(dnsZone *hivev1.DNSZone) {
 		dnsZone.Spec.Zone = zone
+	}
+}
+
+func WithGCPPlatform() Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		dnsZone.Spec.GCP = &hivev1.GCPDNSZoneSpec{}
+		dnsZone.Status.GCP = &hivev1.GCPDNSZoneStatus{
+			ZoneName: pointer.StringPtr("testZoneName"),
+		}
 	}
 }

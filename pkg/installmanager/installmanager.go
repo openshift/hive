@@ -583,7 +583,12 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if err != nil {
 			return err
 		}
-		return uninstaller.Run()
+
+		if err := uninstaller.Run(); err != nil {
+			return err
+		}
+
+		return cleanupDNSZone(dynClient, cd, logger)
 	case cd.Spec.Platform.OpenStack != nil:
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,

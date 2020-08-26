@@ -119,16 +119,20 @@ func (a *GCPActuator) Delete() error {
 
 func (a *GCPActuator) deleteRecordSets(logger log.FieldLogger) error {
 	logger.Info("Deleting recordsets in managedzone")
+	return DeleteGCPRecordSets(a.gcpClient, a.dnsZone, logger)
+}
+
+func DeleteGCPRecordSets(gcpClient gcpclient.Client, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 	listOpts := gcpclient.ListResourceRecordSetsOptions{}
 	for {
-		listOutput, err := a.gcpClient.ListResourceRecordSets(a.managedZone.Name, listOpts)
+		listOutput, err := gcpClient.ListResourceRecordSets(*dnsZone.Status.GCP.ZoneName, listOpts)
 		if err != nil {
 			return err
 		}
 		var recordSetsToDelete []*dns.ResourceRecordSet
 		for _, recordSet := range listOutput.Rrsets {
 			// Ignore the 2 recordsets that are created with the managed zone and that cannot be deleted
-			if n, t := recordSet.Name, recordSet.Type; n == controllerutils.Dotted(a.dnsZone.Spec.Zone) && (t == "NS" || t == "SOA") {
+			if n, t := recordSet.Name, recordSet.Type; n == controllerutils.Dotted(dnsZone.Spec.Zone) && (t == "NS" || t == "SOA") {
 				continue
 			}
 			logger.WithField("name", recordSet.Name).WithField("type", recordSet.Type).Info("recordset set for deletion")
@@ -136,7 +140,7 @@ func (a *GCPActuator) deleteRecordSets(logger log.FieldLogger) error {
 		}
 		if len(recordSetsToDelete) > 0 {
 			logger.WithField("count", len(recordSetsToDelete)).Info("deleting recordsets")
-			if err := a.gcpClient.DeleteResourceRecordSets(a.managedZone.Name, recordSetsToDelete); err != nil {
+			if err := gcpClient.DeleteResourceRecordSets(*dnsZone.Status.GCP.ZoneName, recordSetsToDelete); err != nil {
 				return err
 			}
 		}

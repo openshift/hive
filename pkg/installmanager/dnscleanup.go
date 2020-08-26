@@ -3,6 +3,7 @@ package installmanager
 import (
 	"context"
 	"fmt"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -10,9 +11,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	dns "github.com/openshift/hive/pkg/controller/dnszone"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/gcpclient"
 )
 
 // cleanupDNSZone will handle any needed DNS cleanup for ClusterDeployments with
@@ -38,7 +40,15 @@ func cleanupDNSZone(dynClient client.Client, cd *hivev1.ClusterDeployment, logge
 			return fmt.Errorf("DNSZone %s has no ZoneID set", dnsZone.Name)
 		}
 		return cleanupAWSDNSZone(dnsZone, cd.Spec.Platform.AWS.Region, logger)
-
+	case cd.Spec.Platform.GCP != nil:
+		if dnsZone.Status.GCP == nil {
+			return fmt.Errorf("found non-GCP DNSZone for DNS ClusterDeployment")
+		}
+		if dnsZone.Status.GCP.ZoneName == nil {
+			// Shouldn't happen as we block installs until DNS is ready
+			return fmt.Errorf("DNSZone %s has no ZoneName set", dnsZone.Name)
+		}
+		return cleanupGCPDNSZone(dnsZone, logger)
 	default:
 		log.Debug("No DNS cleanup for platform type")
 		return nil
@@ -58,6 +68,25 @@ func cleanupAWSDNSZone(dnsZone *hivev1.DNSZone, region string, logger log.FieldL
 
 	if err := dns.DeleteAWSRecordSets(awsClient, dnsZone, zoneLogger); err != nil {
 		logger.WithError(err).Error("failed to clean up DNS Zone")
+		return err
+	}
+	zoneLogger.Info("DNSZone cleaned")
+	return nil
+}
+
+func cleanupGCPDNSZone(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
+	zoneLogger := logger.WithField("zoneName", *dnsZone.Status.GCP.ZoneName)
+	zoneLogger.Info("cleaning up DNSZone")
+
+	credsFile := os.Getenv("GOOGLE_CREDENTIALS")
+	gcpClient, err := gcpclient.NewClientFromFile(credsFile)
+	if err != nil {
+		logger.WithError(err).Error("failed to create GCP client")
+		return err
+	}
+
+	if err := dns.DeleteGCPRecordSets(gcpClient, dnsZone, logger); err != nil {
+		logger.WithError(err).Error("failed to clean up DNS zone")
 		return err
 	}
 	zoneLogger.Info("DNSZone cleaned")

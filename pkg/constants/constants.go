@@ -272,6 +272,9 @@ const (
 
 	// OvirtConfigEnvVar is the environment variable specifying the oVirt config path
 	OvirtConfigEnvVar = "OVIRT_CONFIG"
+
+	// AWSCredsMount is the location where the AWS credentials secret is mounted for uninstall pods.
+	AWSCredsMount = "/etc/aws-creds"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

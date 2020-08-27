@@ -2,9 +2,12 @@ package clusterresource
 
 import (
 	"fmt"
+	"net"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/openshift/installer/pkg/ipnet"
+	"github.com/openshift/installer/pkg/validate"
 	installertypes "github.com/openshift/installer/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,6 +112,16 @@ type Builder struct {
 
 	// SkipMachinePools should be true if you do not want Hive to manage MachineSets in the spoke cluster once it is installed.
 	SkipMachinePools bool
+
+	// HTTPProxy can be required for private deployments
+	HTTPProxy string
+
+	// HTTPSProxy can be required for private deployments
+	HTTPSProxy string
+
+	// NoProxy can be required for private deployments
+	NoProxy string
+
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -131,6 +144,32 @@ func (o *Builder) Validate() error {
 
 	if len(o.ServingCert) > 0 && len(o.ServingCertKey) == 0 {
 		return fmt.Errorf("must set serving cert key to use with serving cert")
+	}
+
+	if len(o.HTTPProxy) > 0  || len(o.HTTPSProxy) > 0  {
+		if o.HTTPProxy == "" && o.HTTPSProxy == "" {
+			return fmt.Errorf("must set HTTPProxy or HTTPSProxy")
+		}
+	}
+	if len(o.HTTPProxy) > 0 && o.HTTPProxy != "" {
+		if err := validate.URI(o.HTTPProxy); err != nil {
+			return fmt.Errorf("HTTPProxy specified in wrong format: %s", err.Error())
+		}
+	}
+	if len(o.HTTPSProxy) > 0 && o.HTTPSProxy != "" {
+		if err := validate.URI(o.HTTPSProxy); err != nil {
+			return fmt.Errorf("HTTPSProxy specified in wrong format: %s", err.Error())
+		}
+	}
+	if len(o.NoProxy) > 0 && o.NoProxy != "" {
+		for _, v := range strings.Split(o.NoProxy, ",") {
+			v = strings.TrimSpace(v)
+			errDomain := validate.NoProxyDomainName(v)
+			_, _, errCIDR := net.ParseCIDR(v)
+			if errDomain != nil && errCIDR != nil {
+				return fmt.Errorf("NoProxy specified in wrong format - must be a CIDR or domain, without wildcard characters")
+			}
+		}		
 	}
 
 	if o.Adopt {
@@ -301,6 +340,11 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 		},
 		SSHKey:     o.SSHPublicKey,
 		BaseDomain: o.BaseDomain,
+		Proxy: &installertypes.Proxy{
+			HTTPProxy:      o.HTTPProxy,
+			HTTPSProxy:     o.HTTPSProxy,
+			NoProxy:        o.NoProxy,
+		},
 		Networking: &installertypes.Networking{
 			NetworkType:    "OpenShiftSDN",
 			ServiceNetwork: []ipnet.IPNet{*ipnet.MustParseCIDR("172.30.0.0/16")},

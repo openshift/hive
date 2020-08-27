@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -34,6 +35,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/resource"
+	"github.com/openshift/installer/pkg/validate"
 )
 
 const longDesc = `
@@ -152,6 +154,9 @@ type Options struct {
 	Region                   string
 	Labels                   []string
 	SkipMachinePools         bool
+	HttpProxy                string
+	HttpsProxy               string
+	NoProxy                  string
 
 	// AWS
 	AWSUserTags []string
@@ -263,6 +268,11 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, and GCP.")
 	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
+
+	// HTTP Proxy flags
+	flags.StringVar(&opt.HttpProxy, "http-proxy", "", "HTTP-Proxy defines the proxy settings for the cluster")
+	flags.StringVar(&opt.HttpsProxy, "https-proxy", "", "HTTPS-Proxy defines the proxy settings for the cluster")
+	flags.StringVar(&opt.NoProxy, "no-proxy", "", "NO-Proxy defines the proxy settings for the cluster")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -392,6 +402,42 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("unable to parse key=value label: %s", ls)
 		}
 	}
+
+	if len(o.HttpProxy) > 0 || len(o.HttpsProxy) > 0 {
+		if o.HttpProxy == "" && o.HttpsProxy == "" {
+			cmd.Usage()
+			log.Info("must set --http-proxy or --https-proxy")
+			return fmt.Errorf("must set --http-proxy or --https-proxy")			
+		}
+	}
+		
+	if len(o.HttpProxy) > 0 && o.HttpProxy != "" {
+		if err := validate.URI(o.HttpProxy); err != nil {
+			cmd.Usage()
+			log.Info("--http-proxy specified in wrong format")
+			return fmt.Errorf("--http-proxy specified in wrong format: %s", err.Error())
+		}
+	}
+	if len(o.HttpsProxy) > 0 && o.HttpsProxy != "" {
+		if err := validate.URI(o.HttpsProxy); err != nil {
+			cmd.Usage()
+			log.Info("--https-proxy specified in wrong format")
+			return fmt.Errorf("--https-proxy specified in wrong format: %s", err.Error())
+		}
+	}
+	if len(o.NoProxy) > 0 && o.NoProxy != "" {
+		for _, v := range strings.Split(o.NoProxy, ",") {
+			v = strings.TrimSpace(v)
+			errDomain := validate.NoProxyDomainName(v)
+			_, _, errCIDR := net.ParseCIDR(v)
+			if errDomain != nil && errCIDR != nil {
+				cmd.Usage()
+				log.Info("--no-proxy specified in wrong format - must be a CIDR or domain, without wildcard characters")
+				return fmt.Errorf("--no-proxy specified in wrong format - must be a CIDR or domain, without wildcard characters")
+			}
+		}		
+	}
+	
 	return nil
 }
 
@@ -505,6 +551,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		InstallerManifests: manifestFileData,
 		MachineNetwork:     o.MachineNetwork,
 		SkipMachinePools:   o.SkipMachinePools,
+		HTTPProxy:          o.HttpProxy,
+		HTTPSProxy:         o.HttpsProxy,
+		NoProxy:            o.NoProxy,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)

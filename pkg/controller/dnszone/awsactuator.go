@@ -227,6 +227,12 @@ func (a *AWSActuator) Refresh() error {
 		}
 		logger.Debug("Found hosted zone")
 		a.zoneID = &zoneID
+
+		// Update dnsZone status now that we have the zoneID
+		if err := a.ModifyStatus(); err != nil {
+			a.logger.WithError(err).Error("failed to update status after refresh")
+			return err
+		}
 	}
 
 	if a.zoneID == nil {

@@ -26,6 +26,7 @@ import (
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 
@@ -548,7 +549,24 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		// If we're managing DNS for this cluster, lookup the DNSZone and cleanup
 		// any leftover A records that may have leaked due to
 		// https://jira.coreos.com/browse/CORS-1195.
-		return cleanupDNSZone(dynClient, cd, logger)
+		if cd.Spec.ManageDNS {
+			dnsZone := &hivev1.DNSZone{}
+			dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
+			err := dynClient.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
+			if err != nil {
+				logger.WithError(err).Error("error looking up managed dnszone")
+				return err
+			}
+			if dnsZone.Status.AWS == nil {
+				return fmt.Errorf("found non-AWS DNSZone for AWS ClusterDeployment")
+			}
+			if dnsZone.Status.AWS.ZoneID == nil {
+				// Shouldn't really be possible as we block install until DNS is ready:
+				return fmt.Errorf("DNSZone %s has no ZoneID set", dnsZone.Name)
+			}
+			return cleanupDNSZone(*dnsZone.Status.AWS.ZoneID, cd.Spec.Platform.AWS.Region, logger)
+		}
+		return nil
 	case cd.Spec.Platform.Azure != nil:
 		uninstaller := &azure.ClusterUninstaller{}
 		uninstaller.Logger = logger

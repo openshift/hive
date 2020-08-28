@@ -1635,6 +1635,12 @@ func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDepl
 		return err
 	}
 
+	// Also check if we've already deleted it, pvc won't be deleted until the install pod is, and that is retained
+	// for one day.
+	if pvc.DeletionTimestamp != nil {
+		return nil
+	}
+
 	pvcLog := cdLog.WithField("pvc", pvc.Name)
 
 	switch {

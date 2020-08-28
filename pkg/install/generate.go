@@ -16,6 +16,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
+	"github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -552,6 +553,19 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"--region",
 				req.Spec.Platform.AWS.Region,
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
+			},
+		},
+		{
+			Name:            "credentials-monitor",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"file-watcher-watchdog",
+				fmt.Sprintf("--namespace=%s", utils.GetHiveNamespace()), // for events
+				"--process-name=manager",
+				"--termination-grace-period=30s",
+				"--files=/etc/secrets/tls.crt,/etc/secrets/tls.key",
 			},
 		},
 	}

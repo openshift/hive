@@ -527,11 +527,14 @@ github.com/openshift/installer/pkg/types/vsphere
 github.com/openshift/installer/pkg/validate
 github.com/openshift/installer/pkg/version
 # github.com/openshift/library-go v0.0.0-20200429122220-9e6c27e916a0
+github.com/openshift/library-go/pkg/config/client
 github.com/openshift/library-go/pkg/controller
 github.com/openshift/library-go/pkg/controller/fileobserver
 github.com/openshift/library-go/pkg/operator/events
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/resource/resourceread
+github.com/openshift/library-go/pkg/operator/resource/retry
+github.com/openshift/library-go/pkg/operator/watchdog
 # github.com/openshift/machine-api-operator v0.2.1-0.20200429102619-d36974451290
 github.com/openshift/machine-api-operator/pkg/apis/machine
 github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1

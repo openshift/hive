@@ -10,6 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -107,6 +110,19 @@ func ConnectToRemoteClusterWithDynamicClient(
 		return
 	}
 	remoteClient = rawRemoteClient.(dynamic.Interface)
+
+	// The dynamic client creation does not include a discovery API call, and thus may not fail even though the
+	// cluster is down. To work around this we do a Get for a resource we expect and return unreachable if we see
+	// an unexpected error.
+	_, err := remoteClient.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "namespaces",
+	}).Get(context.Background(), "kube-system", metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		logger.WithError(err).Info("error getting kube-system namespace, considering cluster unreachable")
+		unreachable = true
+	}
 	return
 }
 

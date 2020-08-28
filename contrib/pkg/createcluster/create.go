@@ -308,7 +308,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.OvirtCACerts, "ovirt-ca-certs", "", "Path to oVirt CA certificate, multiple CA paths can be : delimited")
 
 	// Additional CA Trust Bundle
-	flags.StringVar(&opt.AdditionalTrustBundle , "additional-trust-bundle", "", "Path to a CA Trust Bundle which will be added to the nodes trusted certificate store.")
+	flags.StringVar(&opt.AdditionalTrustBundle, "additional-trust-bundle", "", "Path to a CA Trust Bundle which will be added to the nodes trusted certificate store.")
 
 	return cmd
 }
@@ -483,7 +483,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 
 	additionalTrustBundle, err := o.getAdditionalTrustBundle()
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	// Load installer manifest files:
@@ -501,21 +501,21 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	}
 
 	builder := &clusterresource.Builder{
-		Name:               	o.Name,
-		Namespace:          	o.Namespace,
-		WorkerNodesCount:   	o.WorkerNodesCount,
-		PullSecret:         	pullSecret,
-		SSHPrivateKey:      	sshPrivateKey,
-		SSHPublicKey:       	sshPublicKey,
-		InstallOnce:        	o.InstallOnce,
-		BaseDomain:         	o.BaseDomain,
-		ManageDNS:          	o.ManageDNS,
-		DeleteAfter:        	o.DeleteAfter,
-		Labels:             	labels,
-		InstallerManifests: 	manifestFileData,
-		MachineNetwork:    		o.MachineNetwork,
-		SkipMachinePools:   	o.SkipMachinePools,
-		AdditionalTrustBundle: 	additionalTrustBundle,
+		Name:                  o.Name,
+		Namespace:             o.Namespace,
+		WorkerNodesCount:      o.WorkerNodesCount,
+		PullSecret:            pullSecret,
+		SSHPrivateKey:         sshPrivateKey,
+		SSHPublicKey:          sshPublicKey,
+		InstallOnce:           o.InstallOnce,
+		BaseDomain:            o.BaseDomain,
+		ManageDNS:             o.ManageDNS,
+		DeleteAfter:           o.DeleteAfter,
+		Labels:                labels,
+		InstallerManifests:    manifestFileData,
+		MachineNetwork:        o.MachineNetwork,
+		SkipMachinePools:      o.SkipMachinePools,
+		AdditionalTrustBundle: additionalTrustBundle,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)
@@ -789,24 +789,23 @@ func (o *Options) getSSHPrivateKey() (string, error) {
 	return "", nil
 }
 
-func (o *Options) getAdditionalTrustBundle()(string, error) {
+func (o *Options) getAdditionalTrustBundle() (string, error) {
 	if len(o.AdditionalTrustBundle) > 0 {
-			data, err := ioutil.ReadFile(o.AdditionalTrustBundle)
-			if err != nil {
-					log.Error("Cannot read AdditionalTrustBundle file")
-					return "", err
-			}
-			if err := validate.CABundle(string(data)); err != nil {
-				  log.Error("AdditionalTrustBundle is not valid")
-				  return "", err
-			}
-			additionalTrustBundle := string(data)
-			return additionalTrustBundle, nil
+		data, err := ioutil.ReadFile(o.AdditionalTrustBundle)
+		if err != nil {
+			log.Error("Cannot read AdditionalTrustBundle file")
+			return "", err
+		}
+		if err := validate.CABundle(string(data)); err != nil {
+			log.Error("AdditionalTrustBundle is not valid")
+			return "", err
+		}
+		additionalTrustBundle := string(data)
+		return additionalTrustBundle, nil
 	}
 	log.Debug("No AdditionalTrustBundle provided")
 	return "", nil
 }
-
 
 func (o *Options) getManifestFileBytes() (map[string][]byte, error) {
 	if o.ManifestsDir == "" && !o.SimulateBootstrapFailure {

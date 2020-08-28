@@ -5,8 +5,8 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/openshift/installer/pkg/ipnet"
-	"github.com/openshift/installer/pkg/validate"
 	installertypes "github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/validate"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -155,7 +155,7 @@ func (o *Builder) Validate() error {
 	if len(o.AdditionalTrustBundle) > 0 {
 		if err := validate.CABundle(o.AdditionalTrustBundle); err != nil {
 			return fmt.Errorf("AdditionalTrustBundle is not valid: %s", err.Error())
-	  }
+		}
 	}
 
 	return nil
@@ -337,7 +337,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 				Replicas: &o.WorkerNodesCount,
 			},
 		},
-		AdditionalTrustBundle:  o.AdditionalTrustBundle,
+		AdditionalTrustBundle: o.AdditionalTrustBundle,
 	}
 
 	o.CloudBuilder.addInstallConfigPlatform(o, installConfig)

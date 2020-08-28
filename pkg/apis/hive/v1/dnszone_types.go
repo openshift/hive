@@ -126,6 +126,8 @@ type AWSDNSZoneStatus struct {
 
 // AzureDNSZoneStatus contains status information specific to Azure DNS zones
 type AzureDNSZoneStatus struct {
+	// ZoneName is the name of the zone on Azure
+	ZoneName *string `json:"zoneName,omitempty"`
 }
 
 // GCPDNSZoneStatus contains status information specific to GCP Cloud DNS zones

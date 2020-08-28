@@ -156,6 +156,10 @@ func (a *AzureActuator) ModifyStatus() error {
 		return errors.New("managedZone is unpopulated")
 	}
 
+	a.dnsZone.Status.Azure = &hivev1.AzureDNSZoneStatus{
+		ZoneName: a.managedZone.Name,
+	}
+
 	return nil
 }
 
@@ -182,6 +186,13 @@ func (a *AzureActuator) Refresh() error {
 
 	logger.Debug("Found managed zone")
 	a.managedZone = &resp
+
+	// Update dnsZone status now that we have the zone's name
+	if err := a.ModifyStatus(); err != nil {
+		logger.WithError(err).Error("failed ot update DNSZone status")
+		return err
+	}
+
 	return nil
 }
 

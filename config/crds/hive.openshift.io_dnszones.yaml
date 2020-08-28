@@ -136,6 +136,10 @@ spec:
             azure:
               description: AzureDNSZoneStatus contains status information specific
                 to Azure
+              properties:
+                zoneName:
+                  description: ZoneName is the name of the zone on Azure
+                  type: string
               type: object
             conditions:
               description: Conditions includes more detailed status for the DNSZone

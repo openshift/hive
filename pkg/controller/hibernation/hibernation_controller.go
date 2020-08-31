@@ -43,7 +43,7 @@ const (
 	// ready check after a cluster started resuming. This is to
 	// avoid a false positive when the node status is checked too
 	// soon after the cluster is ready
-	nodeCheckWaitTime = 2 * time.Minute
+	nodeCheckWaitTime = 4 * time.Minute
 )
 
 var (

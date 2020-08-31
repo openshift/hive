@@ -8,10 +8,11 @@ RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clea
 RUN yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*
 
 
+ADD bin/hiveutil /usr/bin/
+ADD bin/filewatch /usr/bin/
 ADD bin/hiveadmission /opt/services/
 ADD bin/operator /opt/services/hive-operator
 ADD bin/manager /opt/services/
-ADD bin/hiveutil /usr/bin/
 ADD bin/hive-apiserver /opt/services
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.

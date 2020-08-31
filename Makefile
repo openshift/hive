@@ -30,7 +30,7 @@ IMG ?= hive-controller:latest
 DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
 
 GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out vendor/,$(filter-out v1alpha1apiserver/,$(wildcard */)))))
-GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
+GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil ./contrib/cmd/filewatch
 GO_BUILD_BINDIR :=bin
 # Exclude e2e tests from unit testing
 GO_TEST_PACKAGES :=./pkg/... ./cmd/... ./contrib/...

@@ -2,6 +2,7 @@ package install
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -515,8 +516,30 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 	if len(req.Spec.Platform.AWS.CredentialsSecretRef.Name) > 0 {
 		credentialsSecret = req.Spec.Platform.AWS.CredentialsSecretRef.Name
 	}
+
+	containers := []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"aws-tag-deprovision",
+				"--loglevel",
+				"debug",
+				"--region",
+				req.Spec.Platform.AWS.Region,
+				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
+			},
+		},
+	}
 	env := []corev1.EnvVar{}
+	if len(req.Spec.ClusterID) > 0 {
+		// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
+		containers[0].Args = append(containers[0].Args, fmt.Sprintf("openshiftClusterID=%s", req.Spec.ClusterID))
+	}
 	if len(credentialsSecret) > 0 {
+		// TODO: why are we guarding against empty creds secret? This should always be specified and caught elsewhere.
 		env = append(
 			env,
 			corev1.EnvVar{
@@ -538,41 +561,42 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				},
 			},
 		)
-	}
-	containers := []corev1.Container{
-		{
-			Name:            "deprovision",
-			Image:           images.GetHiveImage(),
-			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env:             env,
-			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"aws-tag-deprovision",
-				"--loglevel",
-				"debug",
-				"--region",
-				req.Spec.Platform.AWS.Region,
-				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
+		containers[0].Env = env
+
+		// Setup a sidecar container to watch for changes to the credentials and kill the pod if detected:
+		deprovisionCredsMount := "/etc/deprovision-creds"
+		job.Spec.Template.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "creds",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: credentialsSecret,
+					},
+				},
 			},
-		},
-		{
+		}
+		containers = append(containers, corev1.Container{
 			Name:            "credentials-monitor",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Command:         []string{"/usr/bin/hiveutil"},
+			Command:         []string{"/usr/bin/filewatch"},
 			Args: []string{
-				"file-watcher-watchdog",
 				fmt.Sprintf("--namespace=%s", utils.GetHiveNamespace()), // for events
-				"--process-name=manager",
+				"--process-name=hiveutil",
 				"--termination-grace-period=30s",
-				"--files=/etc/secrets/tls.crt,/etc/secrets/tls.key",
+				fmt.Sprintf("--files=%s,%s",
+					filepath.Join(deprovisionCredsMount, constants.AWSAccessKeyIDSecretKey),
+					filepath.Join(deprovisionCredsMount, constants.AWSSecretAccessKeySecretKey)),
 			},
-		},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "creds",
+					MountPath: deprovisionCredsMount,
+				},
+			},
+		})
 	}
-	if len(req.Spec.ClusterID) > 0 {
-		// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
-		containers[0].Args = append(containers[0].Args, fmt.Sprintf("openshiftClusterID=%s", req.Spec.ClusterID))
-	}
+
 	job.Spec.Template.Spec.Containers = containers
 }
 

@@ -7,8 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/library-go/pkg/operator/watchdog"
-
 	"github.com/openshift/hive/contrib/pkg/adm"
 	"github.com/openshift/hive/contrib/pkg/certificate"
 	"github.com/openshift/hive/contrib/pkg/createcluster"
@@ -54,7 +52,6 @@ func newHiveutilCommand() *cobra.Command {
 	cmd.AddCommand(certificate.NewCertificateCommand())
 	cmd.AddCommand(adm.NewAdmCommand())
 	cmd.AddCommand(version.NewVersionCommand())
-	cmd.AddCommand(watchdog.NewFileWatcherWatchdog())
 
 	return cmd
 }

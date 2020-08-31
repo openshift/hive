@@ -16,9 +16,10 @@ RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clea
 # libvirt libraries required for running bare metal installer.
 RUN if ! rpm -q libvirt-devel; then yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*; fi
 
+COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
+COPY --from=builder /go/src/github.com/openshift/hive/bin/filewatch /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
-COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin
 COPY --from=builder /go/src/github.com/openshift/hive/bin/operator /opt/services/hive-operator
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hive-apiserver /opt/services/
 

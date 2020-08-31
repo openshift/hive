@@ -6,6 +6,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/validate"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -109,6 +110,10 @@ type Builder struct {
 
 	// SkipMachinePools should be true if you do not want Hive to manage MachineSets in the spoke cluster once it is installed.
 	SkipMachinePools bool
+
+	// AdditionalTrustBundle is a PEM-encoded X.509 certificate bundle
+	// that will be added to the nodes' trusted certificate store.
+	AdditionalTrustBundle string
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -144,6 +149,12 @@ func (o *Builder) Validate() error {
 	} else {
 		if len(o.AdoptAdminKubeconfig) > 0 || o.AdoptInfraID != "" || o.AdoptClusterID != "" || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
 			return fmt.Errorf("cannot set adoption fields if Adopt is false")
+		}
+	}
+
+	if len(o.AdditionalTrustBundle) > 0 {
+		if err := validate.CABundle(o.AdditionalTrustBundle); err != nil {
+			return fmt.Errorf("AdditionalTrustBundle is not valid: %s", err.Error())
 		}
 	}
 
@@ -326,6 +337,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 				Replicas: &o.WorkerNodesCount,
 			},
 		},
+		AdditionalTrustBundle: o.AdditionalTrustBundle,
 	}
 
 	o.CloudBuilder.addInstallConfigPlatform(o, installConfig)

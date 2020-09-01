@@ -373,6 +373,7 @@ func (r *ReconcileHiveConfig) cleanupLegacySyncSetInstances(hLog log.FieldLogger
 			break
 		}
 	}
+	hLog.Info("Deleting SyncSetInstance CRD")
 	if err := crdClient.Delete(context.Background(), syncSetInstanceCRD.GetName(), metav1.DeleteOptions{}); err != nil {
 		return errors.Wrap(err, "failed to delete syncsetinstance CRD")
 	}

@@ -17,7 +17,6 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
-	"github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -565,7 +564,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		containers[0].Env = env
 
 		// Setup a sidecar container to watch for changes to the credentials and kill the pod if detected:
-		deprovisionCredsMount := "/etc/deprovision-creds"
+		deprovisionCredsMount := "/etc/secrets"
 		job.Spec.Template.Spec.Volumes = []corev1.Volume{
 			{
 				Name: "creds",
@@ -576,24 +575,28 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				},
 			},
 		}
+		// The file watcher expects the files to exist in the container with the process name hiveutil,
+		// (acessed via /proc/{pid}/root/...) so we must
+		// mount them into the other container even though it does not explicitly use them right now. (env vars)
+		containers[0].VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "creds",
+				MountPath: deprovisionCredsMount,
+			},
+		}
+		// Add the sidecar container
 		containers = append(containers, corev1.Container{
 			Name:            "credentials-monitor",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Command:         []string{"/usr/bin/filewatch"},
 			Args: []string{
-				fmt.Sprintf("--namespace=%s", utils.GetHiveNamespace()), // for events
+				fmt.Sprintf("--namespace=%s", req.Namespace), // for events
 				"--process-name=hiveutil",
 				"--termination-grace-period=30s",
 				fmt.Sprintf("--files=%s,%s",
 					filepath.Join(deprovisionCredsMount, constants.AWSAccessKeyIDSecretKey),
 					filepath.Join(deprovisionCredsMount, constants.AWSSecretAccessKeySecretKey)),
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "creds",
-					MountPath: deprovisionCredsMount,
-				},
 			},
 		})
 	}

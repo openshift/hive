@@ -464,8 +464,9 @@ func GenerateUninstallerJobForDeprovision(
 	restartPolicy := corev1.RestartPolicyOnFailure
 
 	podSpec := corev1.PodSpec{
-		DNSPolicy:     corev1.DNSClusterFirst,
-		RestartPolicy: restartPolicy,
+		DNSPolicy:             corev1.DNSClusterFirst,
+		RestartPolicy:         restartPolicy,
+		ShareProcessNamespace: pointer.BoolPtr(true),
 	}
 
 	completions := int32(1)

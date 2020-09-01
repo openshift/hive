@@ -48,19 +48,27 @@ const (
 	testLeaseName       = "test-cluster-deployment-sync"
 )
 
+var (
+	timeInThePast = metav1.NewTime(time.Date(2020, 1, 2, 3, 4, 5, 0, time.Local))
+)
+
 type reconcileTest struct {
-	logger                          log.FieldLogger
-	c                               client.Client
-	r                               *ReconcileClusterSync
-	mockCtrl                        *gomock.Controller
-	mockResourceHelper              *resourcemock.MockHelper
-	mockRemoteClientBuilder         *remoteclientmock.MockBuilder
-	expectedFailedMessage           string
+	logger                  log.FieldLogger
+	c                       client.Client
+	r                       *ReconcileClusterSync
+	mockCtrl                *gomock.Controller
+	mockResourceHelper      *resourcemock.MockHelper
+	mockRemoteClientBuilder *remoteclientmock.MockBuilder
+	expectedFailedMessage   string
+
+	// A zero LastTransitionTime indicates that the time should be set to now.
+	// A FirstSuccessTime that points to a zero time indicates that the time should be set to now.
 	expectedSyncSetStatuses         []hiveintv1alpha1.SyncStatus
 	expectedSelectorSyncSetStatuses []hiveintv1alpha1.SyncStatus
-	expectUnchangedLeaseRenewTime   bool
-	expectRequeue                   bool
-	expectNoWorkDone                bool
+
+	expectUnchangedLeaseRenewTime bool
+	expectRequeue                 bool
+	expectNoWorkDone              bool
 }
 
 func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime.Scheme, existing ...runtime.Object) *reconcileTest {
@@ -118,6 +126,8 @@ func (rt *reconcileTest) run(t *testing.T) {
 	result, err := rt.r.Reconcile(reconcileRequest)
 	require.NoError(t, err, "unexpected error from Reconcile")
 	endTime := time.Now()
+	startTime = startTime.Truncate(time.Second)
+	endTime = endTime.Add(time.Second).Truncate(time.Second)
 
 	if rt.expectNoWorkDone {
 		assert.False(t, result.Requeue, "expected no requeue")
@@ -178,8 +188,29 @@ func (rt *reconcileTest) run(t *testing.T) {
 	assert.Equal(t, string(expectedConditionStatus), string(syncFailedCond.Status), "unexpected sync failed status")
 	assert.Equal(t, expectedConditionMessage, syncFailedCond.Message, "unexpected sync failed message")
 
-	assert.Equal(t, rt.expectedSyncSetStatuses, clusterSync.Status.SyncSets, "unexpected syncset statuses")
-	assert.Equal(t, rt.expectedSelectorSyncSetStatuses, clusterSync.Status.SelectorSyncSets, "unexpected selectorsyncset statuses")
+	areSyncStatusesEqual(t, "syncset", rt.expectedSyncSetStatuses, clusterSync.Status.SyncSets, startTime, endTime)
+	areSyncStatusesEqual(t, "selectorsyncset", rt.expectedSelectorSyncSetStatuses, clusterSync.Status.SelectorSyncSets, startTime, endTime)
+}
+
+func areSyncStatusesEqual(t *testing.T, syncSetType string, expectedStatuses, actualStatuses []hiveintv1alpha1.SyncStatus, startTime, endTime time.Time) {
+	if !assert.Equalf(t, len(expectedStatuses), len(actualStatuses), "unexpected number of %s statuses", syncSetType) {
+		return
+	}
+	for i, expectedStatus := range expectedStatuses {
+		if expectedStatus.LastTransitionTime.IsZero() {
+			actual := actualStatuses[i].LastTransitionTime
+			hiveassert.BetweenTimes(t, actual.Time, startTime, endTime, "expected %s status %d to have LastTransitionTime of now", syncSetType, i)
+			expectedStatuses[i].LastTransitionTime = actual
+		}
+		if expectedStatus.FirstSuccessTime != nil && expectedStatus.FirstSuccessTime.IsZero() {
+			if actualStatuses[i].FirstSuccessTime != nil {
+				actual := actualStatuses[i].FirstSuccessTime
+				hiveassert.BetweenTimes(t, actual.Time, startTime, endTime, "expected %s status %d to have FirstSuccessTime of now", syncSetType, i)
+				*expectedStatuses[i].FirstSuccessTime = *actualStatuses[i].FirstSuccessTime
+			}
+		}
+	}
+	assert.Equalf(t, expectedStatuses, actualStatuses, "unexpected %s statuses", syncSetType)
 }
 
 func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
@@ -251,27 +282,19 @@ func TestReconcileClusterSync_ApplyResource(t *testing.T) {
 			resourceToApply := testConfigMap("dest-namespace", "dest-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.ResourceApplyMode = tc.applyMode
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: resourceToApply,
-					}}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithApplyMode(tc.applyMode),
+				testsyncset.WithResources(resourceToApply),
 			)
 			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
-			syncSetStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
+			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			if tc.includeResourcesToDelete {
-				syncSetStatus.ResourcesToDelete = []hiveintv1alpha1.SyncResourceReference{
-					testConfigMapRef("dest-namespace", "dest-name"),
-				}
+				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(
+					withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
+				)
 			}
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			rt.run(t)
 		})
 	}
@@ -298,13 +321,11 @@ func TestReconcileClusterSync_ApplySecret(t *testing.T) {
 			scheme := newScheme()
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.ResourceApplyMode = tc.applyMode
-					ss.Spec.Secrets = []hivev1.SecretMapping{
-						testSecretMapping("test-secret", "dest-namespace", "dest-name"),
-					}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithApplyMode(tc.applyMode),
+				testsyncset.WithSecrets(
+					testSecretMapping("test-secret", "dest-namespace", "dest-name"),
+				),
 			)
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
@@ -318,17 +339,13 @@ func TestReconcileClusterSync_ApplySecret(t *testing.T) {
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(secretToApply)).Return(resource.CreatedApplyResult, nil)
-			syncSetStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
+			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			if tc.includeResourcesToDelete {
-				syncSetStatus.ResourcesToDelete = []hiveintv1alpha1.SyncResourceReference{
-					testSecretRef("dest-namespace", "dest-name"),
-				}
+				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(
+					withResourcesToDelete(testSecretRef("dest-namespace", "dest-name")),
+				)
 			}
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			rt.run(t)
 		})
 	}
@@ -348,18 +365,16 @@ func TestReconcileClusterSync_ApplyPatch(t *testing.T) {
 			scheme := newScheme()
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.ResourceApplyMode = tc.applyMode
-					ss.Spec.Patches = []hivev1.SyncObjectPatch{{
-						APIVersion: "v1",
-						Kind:       "ConfigMap",
-						Namespace:  "dest-namespace",
-						Name:       "dest-name",
-						PatchType:  "patch-type",
-						Patch:      "test-patch",
-					}}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithApplyMode(tc.applyMode),
+				testsyncset.WithPatches(hivev1.SyncObjectPatch{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+					Namespace:  "dest-namespace",
+					Name:       "dest-name",
+					PatchType:  "patch-type",
+					Patch:      "test-patch",
+				}),
 			)
 			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
 			rt.mockResourceHelper.EXPECT().Patch(
@@ -369,13 +384,7 @@ func TestReconcileClusterSync_ApplyPatch(t *testing.T) {
 				[]byte("test-patch"),
 				"patch-type",
 			).Return(nil)
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses,
-				hiveintv1alpha1.SyncStatus{
-					Name:               "test-syncset",
-					ObservedGeneration: 1,
-					Result:             hiveintv1alpha1.SuccessSyncSetResult,
-				},
-			)
+			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, buildSyncStatus("test-syncset"))
 			rt.run(t)
 		})
 	}
@@ -403,24 +412,20 @@ func TestReconcileClusterSync_ApplyAllTypes(t *testing.T) {
 			resourceToApply := testConfigMap("resource-namespace", "resource-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.ResourceApplyMode = tc.applyMode
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: resourceToApply,
-					}}
-					ss.Spec.Secrets = []hivev1.SecretMapping{
-						testSecretMapping("test-secret", "secret-namespace", "secret-name"),
-					}
-					ss.Spec.Patches = []hivev1.SyncObjectPatch{{
-						APIVersion: "patch-api/v1",
-						Kind:       "PatchKind",
-						Namespace:  "patch-namespace",
-						Name:       "patch-name",
-						PatchType:  "patch-type",
-						Patch:      "test-patch",
-					}}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithApplyMode(tc.applyMode),
+				testsyncset.WithResources(resourceToApply),
+				testsyncset.WithSecrets(
+					testSecretMapping("test-secret", "secret-namespace", "secret-name"),
+				),
+				testsyncset.WithPatches(hivev1.SyncObjectPatch{
+					APIVersion: "patch-api/v1",
+					Kind:       "PatchKind",
+					Namespace:  "patch-namespace",
+					Name:       "patch-name",
+					PatchType:  "patch-type",
+					Patch:      "test-patch",
+				}),
 			)
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
@@ -442,18 +447,16 @@ func TestReconcileClusterSync_ApplyAllTypes(t *testing.T) {
 				[]byte("test-patch"),
 				"patch-type",
 			).Return(nil)
-			syncSetStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
+			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			if tc.includeResourcesToDelete {
-				syncSetStatus.ResourcesToDelete = []hiveintv1alpha1.SyncResourceReference{
-					testConfigMapRef("resource-namespace", "resource-name"),
-					testSecretRef("secret-namespace", "secret-name"),
-				}
+				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(
+					withResourcesToDelete(
+						testConfigMapRef("resource-namespace", "resource-name"),
+						testSecretRef("secret-namespace", "secret-name"),
+					),
+				)
 			}
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			rt.run(t)
 		})
 	}
@@ -501,27 +504,30 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 			resourceToApply := testConfigMap("dest-namespace", "dest-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: resourceToApply,
-					}}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithResources(resourceToApply),
 			)
-			syncStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
 			existing := []runtime.Object{cdBuilder(scheme).Build(), syncSet}
 			if !tc.noClusterSync {
-				existing = append(existing, clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(syncStatus)))
+				existing = append(existing, clusterSyncBuilder(scheme).Build(
+					testcs.WithSyncSetStatus(buildSyncStatus("test-syncset",
+						withTransitionInThePast(),
+						withFirstSuccessTimeInThePast(),
+					),
+					)))
 			}
 			if !tc.noSyncLease {
 				existing = append(existing, buildSyncLease(tc.renewTime))
 			}
 			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncStatus)
+			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
+			if !tc.noClusterSync {
+				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(
+					withTransitionInThePast(),
+					withFirstSuccessTimeInThePast(),
+				)
+			}
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			if tc.expectApply {
 				rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
 			} else {
@@ -539,38 +545,25 @@ func TestReconcileClusterSync_NewSyncSetApplied(t *testing.T) {
 	existingResource := testConfigMap("dest-namespace", "dest-name")
 	existingSyncSet := testsyncset.FullBuilder(testNamespace, "existing-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: existingResource,
-			}}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(existingResource),
 	)
-	existingSyncStatus := hiveintv1alpha1.SyncStatus{
-		Name:               "existing-syncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.SuccessSyncSetResult,
-	}
 	newResource := testConfigMap("other-namespace", "other-name")
 	newSyncSet := testsyncset.FullBuilder(testNamespace, "new-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: newResource,
-			}}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(newResource),
 	)
-	newSyncStatus := hiveintv1alpha1.SyncStatus{
-		Name:               "new-syncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.SuccessSyncSetResult,
-	}
-	clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
+	clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(
+		buildSyncStatus("existing-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
+	))
 	lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
 	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), existingSyncSet, newSyncSet, clusterSync, lease)
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(newResource)).Return(resource.CreatedApplyResult, nil)
-	rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, existingSyncStatus, newSyncStatus)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("existing-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
+		buildSyncStatus("new-syncset"),
+	}
 	rt.expectUnchangedLeaseRenewTime = true
 	rt.run(t)
 }
@@ -597,17 +590,16 @@ func TestReconcileClusterSync_SyncSetDeleted(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			scheme := newScheme()
-			existingSyncStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
+			existingSyncStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
+				withTransitionInThePast(),
+				withFirstSuccessTimeInThePast(),
+			)
 			if tc.includeResourcesToDelete {
-				existingSyncStatus.ResourcesToDelete = []hiveintv1alpha1.SyncResourceReference{
-					testConfigMapRef("dest-namespace", "dest-name"),
-				}
+				existingSyncStatusBuilder = existingSyncStatusBuilder.Options(
+					withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
+				)
 			}
-			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
+			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatusBuilder.Build()))
 			lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
 			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSync, lease)
 			if tc.expectDelete {
@@ -646,25 +638,20 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 			resourceToApply := testConfigMap("dest-namespace", "retained-resource")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 2
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: resourceToApply,
-					}}
-				},
+				testsyncset.WithGeneration(2),
+				testsyncset.WithResources(resourceToApply),
 			)
-			existingSyncStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
+			existingSyncStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
+				withTransitionInThePast(),
+				withFirstSuccessTimeInThePast(),
+			)
 			if tc.includeResourcesToDelete {
-				existingSyncStatus.ResourcesToDelete = []hiveintv1alpha1.SyncResourceReference{
+				existingSyncStatusBuilder = existingSyncStatusBuilder.Options(withResourcesToDelete(
 					testConfigMapRef("dest-namespace", "deleted-resource"),
 					testConfigMapRef("dest-namespace", "retained-resource"),
-				}
+				))
 			}
-			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
+			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatusBuilder.Build()))
 			lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
 			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, clusterSync, lease)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
@@ -673,17 +660,16 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 					Delete("v1", "ConfigMap", "dest-namespace", "deleted-resource").
 					Return(nil)
 			}
-			expectedSyncStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 2,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
+			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
+				withObservedGeneration(2),
+				withFirstSuccessTimeInThePast(),
+			)
 			if tc.includeResourcesToDelete {
-				expectedSyncStatus.ResourcesToDelete = []hiveintv1alpha1.SyncResourceReference{
+				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(withResourcesToDelete(
 					testConfigMapRef("dest-namespace", "retained-resource"),
-				}
+				))
 			}
-			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatus}
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			rt.expectUnchangedLeaseRenewTime = true
 			rt.run(t)
 		})
@@ -697,25 +683,36 @@ func TestReconcileClusterSync_ErrorApplyingResource(t *testing.T) {
 	resourceToApply := testConfigMap("dest-namespace", "dest-name")
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: resourceToApply,
-			}}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(resourceToApply),
 	)
 	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).
 		Return(resource.ApplyResult(""), errors.New("test apply error"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-	syncSetStatus := hiveintv1alpha1.SyncStatus{
-		Name:               "test-syncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.FailureSyncSetResult,
-		FailureMessage:     "Failed to apply resource 0: test apply error",
-	}
-	rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult("failed to apply resource 0: test apply error"),
+		withNoFirstSuccessTime(),
+	)}
 	rt.expectRequeue = true
+	rt.run(t)
+}
+
+func TestReconcileClusterSync_ErrorDecodingResource(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+	)
+	syncSet.Spec.Resources = []runtime.RawExtension{{Raw: []byte("{}")}}
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult("failed to decode resource 0: error unmarshaling JSON: while decoding JSON: Object 'Kind' is missing in '{}'"),
+		withNoFirstSuccessTime(),
+	)}
 	rt.run(t)
 }
 
@@ -725,12 +722,10 @@ func TestReconcileClusterSync_ErrorApplyingSecret(t *testing.T) {
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Secrets = []hivev1.SecretMapping{
-				testSecretMapping("test-secret", "dest-namespace", "dest-name"),
-			}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithSecrets(
+			testSecretMapping("test-secret", "dest-namespace", "dest-name"),
+		),
 	)
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
@@ -746,13 +741,10 @@ func TestReconcileClusterSync_ErrorApplyingSecret(t *testing.T) {
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(secretToApply)).
 		Return(resource.ApplyResult(""), errors.New("test apply error"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-	syncSetStatus := hiveintv1alpha1.SyncStatus{
-		Name:               "test-syncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.FailureSyncSetResult,
-		FailureMessage:     "Failed to apply secret 0: test apply error",
-	}
-	rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult("failed to apply secret 0: test apply error"),
+		withNoFirstSuccessTime(),
+	)}
 	rt.expectRequeue = true
 	rt.run(t)
 }
@@ -763,17 +755,15 @@ func TestReconcileClusterSync_ErrorApplyingPatch(t *testing.T) {
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Patches = []hivev1.SyncObjectPatch{{
-				APIVersion: "v1",
-				Kind:       "ConfigMap",
-				Namespace:  "dest-namespace",
-				Name:       "dest-name",
-				PatchType:  "patch-type",
-				Patch:      "test-patch",
-			}}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithPatches(hivev1.SyncObjectPatch{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+			Namespace:  "dest-namespace",
+			Name:       "dest-name",
+			PatchType:  "patch-type",
+			Patch:      "test-patch",
+		}),
 	)
 	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
 	rt.mockResourceHelper.EXPECT().Patch(
@@ -784,14 +774,10 @@ func TestReconcileClusterSync_ErrorApplyingPatch(t *testing.T) {
 		"patch-type",
 	).Return(errors.New("test patch error"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-	rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses,
-		hiveintv1alpha1.SyncStatus{
-			Name:               "test-syncset",
-			ObservedGeneration: 1,
-			Result:             hiveintv1alpha1.FailureSyncSetResult,
-			FailureMessage:     "Failed to apply patch 0: test patch error",
-		},
-	)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult("failed to apply patch 0: test patch error"),
+		withNoFirstSuccessTime(),
+	)}
 	rt.expectRequeue = true
 	rt.run(t)
 }
@@ -807,56 +793,56 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 		{
 			name:                "resource 0 fails",
 			successfulResources: 0,
-			failureMessage:      "Failed to apply resource 0: test apply error",
+			failureMessage:      "failed to apply resource 0: test apply error",
 		},
 		{
 			name:                "resource 1 fails",
 			successfulResources: 1,
-			failureMessage:      "Failed to apply resource 1: test apply error",
+			failureMessage:      "failed to apply resource 1: test apply error",
 		},
 		{
 			name:                "resource 2 fails",
 			successfulResources: 2,
-			failureMessage:      "Failed to apply resource 2: test apply error",
+			failureMessage:      "failed to apply resource 2: test apply error",
 		},
 		{
 			name:                "secret 0 fails",
 			successfulResources: 3,
 			successfulSecrets:   0,
-			failureMessage:      "Failed to apply secret 0: test apply error",
+			failureMessage:      "failed to apply secret 0: test apply error",
 		},
 		{
 			name:                "secret 1 fails",
 			successfulResources: 3,
 			successfulSecrets:   1,
-			failureMessage:      "Failed to apply secret 1: test apply error",
+			failureMessage:      "failed to apply secret 1: test apply error",
 		},
 		{
 			name:                "secret 2 fails",
 			successfulResources: 3,
 			successfulSecrets:   2,
-			failureMessage:      "Failed to apply secret 2: test apply error",
+			failureMessage:      "failed to apply secret 2: test apply error",
 		},
 		{
 			name:                "patch 0 fails",
 			successfulResources: 3,
 			successfulSecrets:   3,
 			successfulPatches:   0,
-			failureMessage:      "Failed to apply patch 0: test patch error",
+			failureMessage:      "failed to apply patch 0: test patch error",
 		},
 		{
 			name:                "patch 1 fails",
 			successfulResources: 3,
 			successfulSecrets:   3,
 			successfulPatches:   1,
-			failureMessage:      "Failed to apply patch 1: test patch error",
+			failureMessage:      "failed to apply patch 1: test patch error",
 		},
 		{
 			name:                "patch 2 fails",
 			successfulResources: 3,
 			successfulSecrets:   3,
 			successfulPatches:   2,
-			failureMessage:      "Failed to apply patch 2: test patch error",
+			failureMessage:      "failed to apply patch 2: test patch error",
 		},
 	}
 	for _, tc := range cases {
@@ -906,25 +892,14 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 			}
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.Resources = make([]runtime.RawExtension, len(resourcesToApply))
-					for i, r := range resourcesToApply {
-						ss.Spec.Resources[i].Object = r
-					}
-					ss.Spec.Secrets = make([]hivev1.SecretMapping, len(srcSecrets))
-					for i := range srcSecrets {
-						ss.Spec.Secrets[i] = testSecretMapping(
-							fmt.Sprintf("test-secret-%d", i),
-							fmt.Sprintf("secret-namespace-%d", i),
-							fmt.Sprintf("secret-name-%d", i),
-						)
-					}
-					ss.Spec.Patches = make([]hivev1.SyncObjectPatch, len(patchesToApply))
-					for i, p := range patchesToApply {
-						ss.Spec.Patches[i] = p
-					}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithResources(resourcesToApply...),
+				testsyncset.WithSecrets(
+					testSecretMapping("test-secret-0", "secret-namespace-0", "secret-name-0"),
+					testSecretMapping("test-secret-1", "secret-namespace-1", "secret-name-1"),
+					testSecretMapping("test-secret-2", "secret-namespace-2", "secret-name-2"),
+				),
+				testsyncset.WithPatches(patchesToApply...),
 			)
 			existing := []runtime.Object{cdBuilder(scheme).Build(), syncSet}
 			for _, s := range srcSecrets {
@@ -976,13 +951,10 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 			}
 			gomock.InOrder(resourceHelperCalls...)
 			rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-			syncSetStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.FailureSyncSetResult,
-				FailureMessage:     tc.failureMessage,
-			}
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+				withFailureResult(tc.failureMessage),
+				withNoFirstSuccessTime(),
+			)}
 			rt.expectRequeue = true
 			rt.run(t)
 		})
@@ -1048,27 +1020,21 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 				defer mockCtrl.Finish()
 				syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 					testsyncset.ForClusterDeployments(testCDName),
-					func(ss *hivev1.SyncSet) {
-						ss.Generation = 1
-						ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
-						ss.Spec.Resources = make([]runtime.RawExtension, len(resourcesToApply))
-						for i, r := range resourcesToApply {
-							ss.Spec.Resources[i].Object = r
-						}
-						ss.Spec.Secrets = secretMappings
-					},
+					testsyncset.WithGeneration(2),
+					testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
+					testsyncset.WithResources(resourcesToApply...),
+					testsyncset.WithSecrets(secretMappings...),
 				)
 				clusterSync := clusterSyncBuilder(scheme).Build(
-					testcs.WithSyncSetStatus(hiveintv1alpha1.SyncStatus{
-						Name:               "test-syncset",
-						ObservedGeneration: 0,
-						ResourcesToDelete: []hiveintv1alpha1.SyncResourceReference{
+					testcs.WithSyncSetStatus(buildSyncStatus("test-syncset",
+						withResourcesToDelete(
 							testConfigMapRef("namespace-A", "resource-failing-to-delete-A"),
 							testConfigMapRef("namespace-A", "resource-failing-to-delete-B"),
 							testConfigMapRef("namespace-B", "resource-failing-to-delete-A"),
-						},
-						Result: hiveintv1alpha1.SuccessSyncSetResult,
-					}),
+						),
+						withTransitionInThePast(),
+						withFirstSuccessTimeInThePast(),
+					)),
 				)
 				rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSync, syncSet, srcSecret)
 				var resourceHelperCalls []*gomock.Call
@@ -1099,13 +1065,12 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 				)
 				gomock.InOrder(resourceHelperCalls...)
 				rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-				syncSetStatus := hiveintv1alpha1.SyncStatus{
-					Name:               "test-syncset",
-					ObservedGeneration: 1,
-					Result:             hiveintv1alpha1.FailureSyncSetResult,
-					FailureMessage:     "[Failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-A: error deleting resource, Failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-B: error deleting resource, Failed to delete v1, Kind=ConfigMap namespace-B/resource-failing-to-delete-A: error deleting resource]",
-					ResourcesToDelete: []hiveintv1alpha1.SyncResourceReference{
-						{
+				rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+					withObservedGeneration(2),
+					withFailureResult("[Failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-A: error deleting resource, Failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-B: error deleting resource, Failed to delete v1, Kind=ConfigMap namespace-B/resource-failing-to-delete-A: error deleting resource]"),
+					withFirstSuccessTimeInThePast(),
+					withResourcesToDelete(
+						hiveintv1alpha1.SyncResourceReference{
 							APIVersion: "hive.openshift.io/v1",
 							Kind:       "ClusterDeployment",
 							Namespace:  "namespace-A",
@@ -1120,15 +1085,14 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 						testSecretRef("namespace-A", "name-A"),
 						testSecretRef("namespace-A", "name-B"),
 						testSecretRef("namespace-B", "name-A"),
-						{
+						hiveintv1alpha1.SyncResourceReference{
 							APIVersion: "v1",
 							Kind:       "Service",
 							Namespace:  "namespace-A",
 							Name:       "name-A",
 						},
-					},
-				}
-				rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+					),
+				)}
 				rt.expectRequeue = true
 				rt.run(t)
 			})
@@ -1171,12 +1135,8 @@ func TestReconcileClusterSync_FailingSyncSetDoesNotBlockOtherSyncSets(t *testing
 			for i := range resourcesToApply {
 				syncSets[i] = testsyncset.FullBuilder(testNamespace, fmt.Sprintf("test-syncset-%d", i), scheme).Build(
 					testsyncset.ForClusterDeployments(testCDName),
-					func(ss *hivev1.SyncSet) {
-						ss.Generation = 1
-						ss.Spec.Resources = []runtime.RawExtension{{
-							Object: resourcesToApply[i],
-						}}
-					},
+					testsyncset.WithGeneration(1),
+					testsyncset.WithResources(resourcesToApply[i]),
 				)
 			}
 			existing := []runtime.Object{cdBuilder(scheme).Build()}
@@ -1198,17 +1158,14 @@ func TestReconcileClusterSync_FailingSyncSetDoesNotBlockOtherSyncSets(t *testing
 			}
 			rt.expectedFailedMessage = fmt.Sprintf("SyncSet test-syncset-%d is failing", tc.failingSyncSet)
 			for i, s := range syncSets {
-				syncSetStatus := hiveintv1alpha1.SyncStatus{
-					Name:               s.Name,
-					ObservedGeneration: s.Generation,
-				}
+				expectedSyncSetStatusBuilder := newSyncStatusBuilder(s.Name)
 				if i == tc.failingSyncSet {
-					syncSetStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-					syncSetStatus.FailureMessage = "Failed to apply resource 0: test apply error"
-				} else {
-					syncSetStatus.Result = hiveintv1alpha1.SuccessSyncSetResult
+					expectedSyncSetStatusBuilder = expectedSyncSetStatusBuilder.Options(
+						withFailureResult("failed to apply resource 0: test apply error"),
+						withNoFirstSuccessTime(),
+					)
 				}
-				rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+				rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, expectedSyncSetStatusBuilder.Build())
 			}
 			rt.expectRequeue = true
 			rt.run(t)
@@ -1255,30 +1212,20 @@ func TestReconcileClusterSync_FailureMessage(t *testing.T) {
 			for i := range syncSets {
 				syncSets[i] = testsyncset.FullBuilder(testNamespace, fmt.Sprintf("test-syncset-%d", i), scheme).Build(
 					testsyncset.ForClusterDeployments(testCDName),
-					func(ss *hivev1.SyncSet) {
-						ss.Generation = 1
-						ss.Spec.Resources = []runtime.RawExtension{{
-							Object: testConfigMap(
-								fmt.Sprintf("syncset-namespace-%d", i),
-								fmt.Sprintf("syncset-name-%d", i),
-							),
-						}}
-					},
+					testsyncset.WithGeneration(1),
+					testsyncset.WithResources(
+						testConfigMap(fmt.Sprintf("syncset-namespace-%d", i), fmt.Sprintf("syncset-name-%d", i)),
+					),
 				)
 			}
 			selectorSyncSets := make([]runtime.Object, tc.failingSelectorSyncSets)
 			for i := range selectorSyncSets {
 				selectorSyncSets[i] = testselectorsyncset.FullBuilder(fmt.Sprintf("test-selectorsyncset-%d", i), scheme).Build(
 					testselectorsyncset.WithLabelSelector("test-label-key", "test-label-value"),
-					func(ss *hivev1.SelectorSyncSet) {
-						ss.Generation = 1
-						ss.Spec.Resources = []runtime.RawExtension{{
-							Object: testConfigMap(
-								fmt.Sprintf("selectorsyncset-namespace-%d", i),
-								fmt.Sprintf("selectorsyncset-name-%d", i),
-							),
-						}}
-					},
+					testselectorsyncset.WithGeneration(1),
+					testselectorsyncset.WithResources(
+						testConfigMap(fmt.Sprintf("selectorsyncset-namespace-%d", i), fmt.Sprintf("selectorsyncset-name-%d", i)),
+					),
 				)
 			}
 			existing := []runtime.Object{cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value"))}
@@ -1292,23 +1239,19 @@ func TestReconcileClusterSync_FailureMessage(t *testing.T) {
 			if tc.failingSyncSets > 0 {
 				rt.expectedSyncSetStatuses = make([]hiveintv1alpha1.SyncStatus, tc.failingSyncSets)
 				for i := range rt.expectedSyncSetStatuses {
-					rt.expectedSyncSetStatuses[i] = hiveintv1alpha1.SyncStatus{
-						Name:               fmt.Sprintf("test-syncset-%d", i),
-						ObservedGeneration: 1,
-						Result:             hiveintv1alpha1.FailureSyncSetResult,
-						FailureMessage:     "Failed to apply resource 0: test apply error",
-					}
+					rt.expectedSyncSetStatuses[i] = buildSyncStatus(fmt.Sprintf("test-syncset-%d", i),
+						withFailureResult("failed to apply resource 0: test apply error"),
+						withNoFirstSuccessTime(),
+					)
 				}
 			}
 			if tc.failingSelectorSyncSets > 0 {
 				rt.expectedSelectorSyncSetStatuses = make([]hiveintv1alpha1.SyncStatus, tc.failingSelectorSyncSets)
 				for i := range rt.expectedSelectorSyncSetStatuses {
-					rt.expectedSelectorSyncSetStatuses[i] = hiveintv1alpha1.SyncStatus{
-						Name:               fmt.Sprintf("test-selectorsyncset-%d", i),
-						ObservedGeneration: 1,
-						Result:             hiveintv1alpha1.FailureSyncSetResult,
-						FailureMessage:     "Failed to apply resource 0: test apply error",
-					}
+					rt.expectedSelectorSyncSetStatuses[i] = buildSyncStatus(fmt.Sprintf("test-selectorsyncset-%d", i),
+						withFailureResult("failed to apply resource 0: test apply error"),
+						withNoFirstSuccessTime(),
+					)
 				}
 			}
 			rt.expectRequeue = true
@@ -1319,24 +1262,32 @@ func TestReconcileClusterSync_FailureMessage(t *testing.T) {
 
 func TestReconcileClusterSync_PartialApply(t *testing.T) {
 	cases := []struct {
-		name       string
-		syncStatus hiveintv1alpha1.SyncStatus
+		name               string
+		existingSyncStatus hiveintv1alpha1.SyncStatus
+		expectedSyncStatus hiveintv1alpha1.SyncStatus
 	}{
 		{
 			name: "last apply failed",
-			syncStatus: hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 2,
-				Result:             hiveintv1alpha1.FailureSyncSetResult,
-			},
+			existingSyncStatus: buildSyncStatus("test-syncset",
+				withObservedGeneration(2),
+				withFailureResult("existing failure"),
+				withTransitionInThePast(),
+			),
+			expectedSyncStatus: buildSyncStatus("test-syncset",
+				withObservedGeneration(2),
+			),
 		},
 		{
 			name: "syncset generation changed",
-			syncStatus: hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			},
+			existingSyncStatus: buildSyncStatus("test-syncset",
+				withObservedGeneration(1),
+				withTransitionInThePast(),
+				withFirstSuccessTimeInThePast(),
+			),
+			expectedSyncStatus: buildSyncStatus("test-syncset",
+				withObservedGeneration(2),
+				withFirstSuccessTimeInThePast(),
+			),
 		},
 	}
 	for _, tc := range cases {
@@ -1347,22 +1298,14 @@ func TestReconcileClusterSync_PartialApply(t *testing.T) {
 			resourceToApply := testConfigMap("dest-namespace", "dest-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 2
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: resourceToApply,
-					}}
-				},
+				testsyncset.WithGeneration(2),
+				testsyncset.WithResources(resourceToApply),
 			)
-			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(tc.syncStatus))
+			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(tc.existingSyncStatus))
 			syncLease := buildSyncLease(time.Now())
 			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, clusterSync, syncLease)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
-			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{{
-				Name:               "test-syncset",
-				ObservedGeneration: 2,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}}
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{tc.expectedSyncStatus}
 			rt.expectUnchangedLeaseRenewTime = true
 			rt.run(t)
 		})
@@ -1373,14 +1316,11 @@ func TestReconcileClusterSync_ErrorDeleting(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	scheme := newScheme()
-	existingSyncStatus := hiveintv1alpha1.SyncStatus{
-		Name:               "test-syncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.SuccessSyncSetResult,
-		ResourcesToDelete: []hiveintv1alpha1.SyncResourceReference{
-			testConfigMapRef("dest-namespace", "dest-name"),
-		},
-	}
+	existingSyncStatus := buildSyncStatus("test-syncset",
+		withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
+		withTransitionInThePast(),
+		withFirstSuccessTimeInThePast(),
+	)
 	clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
 	lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
 	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSync, lease)
@@ -1388,14 +1328,12 @@ func TestReconcileClusterSync_ErrorDeleting(t *testing.T) {
 		Delete("v1", "ConfigMap", "dest-namespace", "dest-name").
 		Return(errors.New("error deleting resource"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{{
-		Name: "test-syncset",
-		ResourcesToDelete: []hiveintv1alpha1.SyncResourceReference{
-			testConfigMapRef("dest-namespace", "dest-name"),
-		},
-		Result:         hiveintv1alpha1.FailureSyncSetResult,
-		FailureMessage: "Failed to delete v1, Kind=ConfigMap dest-namespace/dest-name: error deleting resource",
-	}}
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withObservedGeneration(0),
+		withFailureResult("Failed to delete v1, Kind=ConfigMap dest-namespace/dest-name: error deleting resource"),
+		withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
+		withFirstSuccessTimeInThePast(),
+	)}
 	rt.expectUnchangedLeaseRenewTime = true
 	rt.expectRequeue = true
 	rt.run(t)
@@ -1420,15 +1358,14 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			scheme := newScheme()
-			existingSyncStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-				ResourcesToDelete: []hiveintv1alpha1.SyncResourceReference{
+			existingSyncStatus := buildSyncStatus("test-syncset",
+				withResourcesToDelete(
 					testConfigMapRef("dest-namespace", "failing-resource"),
 					testConfigMapRef("dest-namespace", "successful-resource"),
-				},
-			}
+				),
+				withTransitionInThePast(),
+				withFirstSuccessTimeInThePast(),
+			)
 			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
 			lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
 			existing := []runtime.Object{cdBuilder(scheme).Build(), clusterSync, lease}
@@ -1436,9 +1373,7 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 				existing = append(existing,
 					testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 						testsyncset.ForClusterDeployments(testCDName),
-						func(ss *hivev1.SyncSet) {
-							ss.Generation = 2
-						},
+						testsyncset.WithGeneration(2),
 					),
 				)
 			}
@@ -1450,74 +1385,21 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 				Delete("v1", "ConfigMap", "dest-namespace", "successful-resource").
 				Return(nil)
 			rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-			expectedSyncSetStatus := hiveintv1alpha1.SyncStatus{
-				Name: "test-syncset",
-				ResourcesToDelete: []hiveintv1alpha1.SyncResourceReference{
+			expectedSyncSetStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
+				withFailureResult("Failed to delete v1, Kind=ConfigMap dest-namespace/failing-resource: error deleting resource"),
+				withResourcesToDelete(
 					testConfigMapRef("dest-namespace", "failing-resource"),
-				},
-				Result:         hiveintv1alpha1.FailureSyncSetResult,
-				FailureMessage: "Failed to delete v1, Kind=ConfigMap dest-namespace/failing-resource: error deleting resource",
+				),
+				withFirstSuccessTimeInThePast(),
+			)
+			if tc.syncSetRemoved {
+				expectedSyncSetStatusBuilder = expectedSyncSetStatusBuilder.Options(withObservedGeneration(0))
+			} else {
+				expectedSyncSetStatusBuilder = expectedSyncSetStatusBuilder.Options(withObservedGeneration(2))
 			}
-			if !tc.syncSetRemoved {
-				expectedSyncSetStatus.ObservedGeneration = 2
-			}
-			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncSetStatus}
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncSetStatusBuilder.Build()}
 			rt.expectUnchangedLeaseRenewTime = true
 			rt.expectRequeue = true
-			rt.run(t)
-		})
-	}
-}
-
-func TestReconcileClusterSync_DoNotApplyNotReadySyncSet(t *testing.T) {
-	scheme := newScheme()
-	cases := []struct {
-		name           string
-		syncSet        *hivev1.SyncSet
-		failureMessage string
-	}{
-		{
-			name: "latest generation not observed",
-			syncSet: testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
-				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 2
-					ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: testConfigMap("dest-namespace", "dest-name"),
-					}}
-				},
-			),
-			failureMessage: "Current generation has not been observed yet",
-		},
-		{
-			name: "invalid resource",
-			syncSet: testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
-				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.ResourceApplyMode = hivev1.SyncResourceApplyMode
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: testConfigMap("dest-namespace", "dest-name"),
-					}}
-				},
-			),
-			failureMessage: "Invalid resource",
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-			existing := []runtime.Object{cdBuilder(scheme).Build(), tc.syncSet}
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
-			rt.expectedFailedMessage = "SyncSet test-syncset is failing"
-			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.FailureSyncSetResult,
-				FailureMessage:     tc.failureMessage,
-			}}
 			rt.run(t)
 		})
 	}
@@ -1545,24 +1427,20 @@ func TestReconcileClusterSync_ApplyBehavior(t *testing.T) {
 			resourceToApply := testConfigMap("resource-namespace", "resource-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
-				func(ss *hivev1.SyncSet) {
-					ss.Generation = 1
-					ss.Spec.ApplyBehavior = tc.applyBehavior
-					ss.Spec.Resources = []runtime.RawExtension{{
-						Object: resourceToApply,
-					}}
-					ss.Spec.Secrets = []hivev1.SecretMapping{
-						testSecretMapping("test-secret", "secret-namespace", "secret-name"),
-					}
-					ss.Spec.Patches = []hivev1.SyncObjectPatch{{
-						APIVersion: "patch-api/v1",
-						Kind:       "PatchKind",
-						Namespace:  "patch-namespace",
-						Name:       "patch-name",
-						PatchType:  "patch-type",
-						Patch:      "test-patch",
-					}}
-				},
+				testsyncset.WithGeneration(1),
+				testsyncset.WithApplyBehavior(tc.applyBehavior),
+				testsyncset.WithResources(resourceToApply),
+				testsyncset.WithSecrets(
+					testSecretMapping("test-secret", "secret-namespace", "secret-name"),
+				),
+				testsyncset.WithPatches(hivev1.SyncObjectPatch{
+					APIVersion: "patch-api/v1",
+					Kind:       "PatchKind",
+					Namespace:  "patch-namespace",
+					Name:       "patch-name",
+					PatchType:  "patch-type",
+					Patch:      "test-patch",
+				}),
 			)
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
@@ -1593,12 +1471,7 @@ func TestReconcileClusterSync_ApplyBehavior(t *testing.T) {
 				[]byte("test-patch"),
 				"patch-type",
 			).Return(nil)
-			syncSetStatus := hiveintv1alpha1.SyncStatus{
-				Name:               "test-syncset",
-				ObservedGeneration: 1,
-				Result:             hiveintv1alpha1.SuccessSyncSetResult,
-			}
-			rt.expectedSyncSetStatuses = append(rt.expectedSyncSetStatuses, syncSetStatus)
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset")}
 			rt.run(t)
 		})
 	}
@@ -1611,40 +1484,28 @@ func TestReconcileClusterSync_IgnoreNotApplicableSyncSets(t *testing.T) {
 	syncSetResourceToApply := testConfigMap("dest-namespace", "resource-from-applicable-syncset")
 	applicableSyncSet := testsyncset.FullBuilder(testNamespace, "applicable-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: syncSetResourceToApply,
-			}}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(syncSetResourceToApply),
 	)
 	nonApplicableSyncSet := testsyncset.FullBuilder(testNamespace, "non-applicable-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments("other-cd"),
-		func(ss *hivev1.SyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: testConfigMap("dest-namespace", "resource-from-non-applicable-syncset"),
-			}}
-		},
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(
+			testConfigMap("dest-namespace", "resource-from-non-applicable-syncset"),
+		),
 	)
 	selectorSyncSetResourceToApply := testConfigMap("dest-namespace", "resource-from-applicable-selectorsyncset")
 	applicableSelectorSyncSet := testselectorsyncset.FullBuilder("applicable-selectorsyncset", scheme).Build(
 		testselectorsyncset.WithLabelSelector("test-label-key", "test-label-value"),
-		func(ss *hivev1.SelectorSyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: selectorSyncSetResourceToApply,
-			}}
-		},
+		testselectorsyncset.WithGeneration(1),
+		testselectorsyncset.WithResources(selectorSyncSetResourceToApply),
 	)
 	nonApplicableSelectorSyncSet := testselectorsyncset.FullBuilder("non-applicable-selectorsyncset", scheme).Build(
 		testselectorsyncset.WithLabelSelector("test-label-key", "other-label-value"),
-		func(ss *hivev1.SelectorSyncSet) {
-			ss.Generation = 1
-			ss.Spec.Resources = []runtime.RawExtension{{
-				Object: testConfigMap("dest-namespace", "resource-from-non-applicable-selectorsyncset"),
-			}}
-		},
+		testselectorsyncset.WithGeneration(1),
+		testselectorsyncset.WithResources(
+			testConfigMap("dest-namespace", "resource-from-non-applicable-selectorsyncset"),
+		),
 	)
 	rt := newReconcileTest(t, mockCtrl, scheme,
 		cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value")),
@@ -1655,17 +1516,186 @@ func TestReconcileClusterSync_IgnoreNotApplicableSyncSets(t *testing.T) {
 	)
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(syncSetResourceToApply)).Return(resource.CreatedApplyResult, nil)
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(selectorSyncSetResourceToApply)).Return(resource.CreatedApplyResult, nil)
-	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{{
-		Name:               "applicable-syncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.SuccessSyncSetResult,
-	}}
-	rt.expectedSelectorSyncSetStatuses = []hiveintv1alpha1.SyncStatus{{
-		Name:               "applicable-selectorsyncset",
-		ObservedGeneration: 1,
-		Result:             hiveintv1alpha1.SuccessSyncSetResult,
-	}}
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("applicable-syncset")}
+	rt.expectedSelectorSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("applicable-selectorsyncset")}
 	rt.run(t)
+}
+
+func TestReconcileClusterSync_ApplySecretForSelectorSyncSet(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	cd := cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value"))
+	selectorSyncSet := testselectorsyncset.FullBuilder("test-selectorsyncset", scheme).Build(
+		testselectorsyncset.WithLabelSelector("test-label-key", "test-label-value"),
+		testselectorsyncset.WithGeneration(1),
+		testselectorsyncset.WithSecrets(
+			hivev1.SecretMapping{
+				SourceRef: hivev1.SecretReference{Namespace: "src-namespace", Name: "src-name"},
+				TargetRef: hivev1.SecretReference{Namespace: "dest-namespace", Name: "dest-name"},
+			},
+		),
+	)
+	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, selectorSyncSet, srcSecret)
+	secretToApply := testsecret.BasicBuilder().GenericOptions(
+		testgeneric.WithNamespace("dest-namespace"),
+		testgeneric.WithName("dest-name"),
+		testgeneric.WithTypeMeta(scheme),
+	).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(secretToApply)).Return(resource.CreatedApplyResult, nil)
+	rt.expectedSelectorSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-selectorsyncset")}
+	rt.run(t)
+}
+
+func TestReconcileClusterSync_MissingSecretNamespaceForSelectorSyncSet(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	cd := cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value"))
+	selectorSyncSet := testselectorsyncset.FullBuilder("test-selectorsyncset", scheme).Build(
+		testselectorsyncset.WithLabelSelector("test-label-key", "test-label-value"),
+		testselectorsyncset.WithGeneration(1),
+		testselectorsyncset.WithSecrets(
+			testSecretMapping("test-secret", "dest-namespace", "dest-name"),
+		),
+	)
+	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, selectorSyncSet, srcSecret)
+	rt.expectedFailedMessage = "SelectorSyncSet test-selectorsyncset is failing"
+	rt.expectedSelectorSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-selectorsyncset",
+		withFailureResult("source namespace missing for secret 0"),
+		withNoFirstSuccessTime(),
+	)}
+	rt.run(t)
+}
+
+func TestReconcileClusterSync_ValidSecretNamespaceForSyncSet(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithSecrets(
+			hivev1.SecretMapping{
+				SourceRef: hivev1.SecretReference{Namespace: testNamespace, Name: "test-secret"},
+				TargetRef: hivev1.SecretReference{Namespace: "dest-namespace", Name: "dest-name"},
+			},
+		),
+	)
+	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+	secretToApply := testsecret.BasicBuilder().GenericOptions(
+		testgeneric.WithNamespace("dest-namespace"),
+		testgeneric.WithName("dest-name"),
+		testgeneric.WithTypeMeta(scheme),
+	).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(secretToApply)).Return(resource.CreatedApplyResult, nil)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset")}
+	rt.run(t)
+}
+
+func TestReconcileClusterSync_InvalidSecretNamespaceForSyncSet(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithSecrets(
+			hivev1.SecretMapping{
+				SourceRef: hivev1.SecretReference{Namespace: "src-namespace", Name: "src-name"},
+				TargetRef: hivev1.SecretReference{Namespace: "dest-namespace", Name: "dest-name"},
+			},
+		),
+	)
+	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult("source in wrong namespace for secret 0"),
+		withNoFirstSuccessTime(),
+	)}
+	rt.run(t)
+}
+
+func TestReconcileClusterSync_MissingSourceSecret(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithSecrets(
+			testSecretMapping("test-secret", "dest-namespace", "dest-name"),
+		),
+	)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult(`failed to read secret 0: secrets "test-secret" not found`),
+		withNoFirstSuccessTime(),
+	)}
+	rt.expectRequeue = true
+	rt.run(t)
+}
+
+func TestReconcileClusterSync_ConditionNotMutatedWhenMessageNotChanged(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	resourceToApply := testConfigMap("dest-namespace", "dest-name")
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(resourceToApply),
+	)
+	existingClusterSync := clusterSyncBuilder(scheme).Build(
+		testcs.WithSyncSetStatus(buildSyncStatus("test-syncset",
+			withFailureResult("failed to apply"),
+			withTransitionInThePast(),
+		)),
+		testcs.WithCondition(hiveintv1alpha1.ClusterSyncCondition{
+			Type:               hiveintv1alpha1.ClusterSyncFailed,
+			Status:             corev1.ConditionTrue,
+			Reason:             "Failure",
+			Message:            "SyncSet test-syncset is failing",
+			LastTransitionTime: timeInThePast,
+			LastProbeTime:      timeInThePast,
+		}),
+	)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), existingClusterSync, syncSet)
+	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).
+		Return(resource.ApplyResult(""), errors.New("test apply error"))
+	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
+		withFailureResult("failed to apply resource 0: test apply error"),
+		withNoFirstSuccessTime(),
+	)}
+	rt.expectRequeue = true
+	rt.run(t)
+	actualClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testClusterSyncName}, actualClusterSync)
+	require.NoError(t, err, "unexpected error getting ClusterSync")
+	require.Len(t, actualClusterSync.Status.Conditions, 1, "expected exactly 1 condition")
+	cond := actualClusterSync.Status.Conditions[0]
+	require.Equal(t, hiveintv1alpha1.ClusterSyncFailed, cond.Type, "expected Failed condition")
+	require.Equal(t, string(corev1.ConditionTrue), string(cond.Status), "expected Failed condition to be true")
+	assert.Equal(t, timeInThePast, cond.LastTransitionTime, "expected no change in last transition time")
+	assert.Equal(t, timeInThePast, cond.LastProbeTime, "expected no change in last probe time")
 }
 
 func newScheme() *runtime.Scheme {
@@ -1810,5 +1840,77 @@ func permute(x []interface{}, foo func([]interface{})) {
 			})
 			x[0], x[i] = x[i], x[0]
 		}
+	}
+}
+
+type syncStatusOption func(syncStatus *hiveintv1alpha1.SyncStatus)
+
+type syncStatusBuilder struct {
+	name    string
+	options []syncStatusOption
+}
+
+func newSyncStatusBuilder(name string) *syncStatusBuilder {
+	return &syncStatusBuilder{name: name}
+}
+
+func (b *syncStatusBuilder) Build(opts ...syncStatusOption) hiveintv1alpha1.SyncStatus {
+	return buildSyncStatus(b.name, append(b.options, opts...)...)
+}
+
+func (b *syncStatusBuilder) Options(opts ...syncStatusOption) *syncStatusBuilder {
+	return &syncStatusBuilder{
+		name:    b.name,
+		options: append(b.options, opts...),
+	}
+}
+
+func buildSyncStatus(name string, opts ...syncStatusOption) hiveintv1alpha1.SyncStatus {
+	syncStatus := &hiveintv1alpha1.SyncStatus{
+		Name:               name,
+		ObservedGeneration: 1,
+		Result:             hiveintv1alpha1.SuccessSyncSetResult,
+		FirstSuccessTime:   &metav1.Time{},
+	}
+	for _, opt := range opts {
+		opt(syncStatus)
+	}
+	return *syncStatus
+}
+
+func withObservedGeneration(observedGeneration int64) syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.ObservedGeneration = observedGeneration
+	}
+}
+
+func withFailureResult(message string) syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
+		syncStatus.FailureMessage = message
+	}
+}
+
+func withResourcesToDelete(resourcesToDelete ...hiveintv1alpha1.SyncResourceReference) syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.ResourcesToDelete = resourcesToDelete
+	}
+}
+
+func withTransitionInThePast() syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.LastTransitionTime = timeInThePast
+	}
+}
+
+func withNoFirstSuccessTime() syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.FirstSuccessTime = nil
+	}
+}
+
+func withFirstSuccessTimeInThePast() syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.FirstSuccessTime = &timeInThePast
 	}
 }

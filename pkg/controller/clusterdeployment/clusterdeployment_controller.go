@@ -239,7 +239,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
 		&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}},
 		&handler.EnqueueRequestForOwner{OwnerType: &hivev1.ClusterDeployment{}},
 	); err != nil {
-		return fmt.Errorf("cannot start watch on ClusterSyncs: %v", err)
+		return errors.Wrap(err, "cannot start watch on ClusterSyncs")
 	}
 
 	return nil
@@ -1978,7 +1978,7 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 	switch err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync); {
 	case apierrors.IsNotFound(err):
 		cdLog.Info("ClusterSync has not yet been created")
-		status = corev1.ConditionFalse
+		status = corev1.ConditionTrue
 		reason = "MissingClusterSync"
 		message = "ClusterSync has not yet been created"
 	case err != nil:

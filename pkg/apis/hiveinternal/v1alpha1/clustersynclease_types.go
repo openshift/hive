@@ -9,7 +9,7 @@ import (
 
 // ClusterSyncLease is a record of the last time that SyncSets and SelectorSyncSets were applied to a cluster.
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:path=clustersyncleases,scope=Namespaced
+// +kubebuilder:resource:path=clustersyncleases,shortName=csl,scope=Namespaced
 type ClusterSyncLease struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

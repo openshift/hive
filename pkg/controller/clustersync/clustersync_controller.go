@@ -10,8 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -298,11 +300,6 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 
 	origStatus := clusterSync.Status.DeepCopy()
 
-	needToDoFullReapply := needToCreateClusterSync || r.timeUntilFullReapply(lease) <= 0
-	if needToDoFullReapply {
-		logger.Info("need to reapply all syncsets")
-	}
-
 	syncSets, err := r.getSyncSetsForClusterDeployment(cd, logger)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -312,8 +309,14 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	needToDoFullReapply := needToCreateClusterSync || r.timeUntilFullReapply(lease) <= 0
+	if needToDoFullReapply {
+		logger.Info("need to reapply all syncsets")
+	}
+
 	// Apply SyncSets
 	syncStatusesForSyncSets, syncSetsNeedRequeue := r.applySyncSets(
+		cd,
 		"SyncSet",
 		syncSets,
 		clusterSync.Status.SyncSets,
@@ -325,6 +328,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 
 	// Apply SelectorSyncSets
 	syncStatusesForSelectorSyncSets, selectorSyncSetsNeedRequeue := r.applySyncSets(
+		cd,
 		"SelectorSyncSet",
 		selectorSyncSets,
 		clusterSync.Status.SelectorSyncSets,
@@ -334,7 +338,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	)
 	clusterSync.Status.SelectorSyncSets = syncStatusesForSelectorSyncSets
 
-	setFailedCondition(clusterSync, needToDoFullReapply)
+	setFailedCondition(clusterSync)
 
 	// Create or Update the ClusterSync
 	if needToCreateClusterSync {
@@ -352,7 +356,8 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
 			return reconcile.Result{}, err
 		}
-	} else if !reflect.DeepEqual(origStatus, &clusterSync.Status) {
+	}
+	if needToCreateClusterSync || !reflect.DeepEqual(origStatus, &clusterSync.Status) {
 		logger.Info("updating ClusterSync")
 		if err := r.Status().Update(context.Background(), clusterSync); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterSync")
@@ -395,6 +400,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 }
 
 func (r *ReconcileClusterSync) applySyncSets(
+	cd *hivev1.ClusterDeployment,
 	syncSetType string,
 	syncSets []CommonSyncSet,
 	syncStatuses []hiveintv1alpha1.SyncStatus,
@@ -436,16 +442,30 @@ func (r *ReconcileClusterSync) applySyncSets(
 		}
 
 		// Apply the syncset
-		newSyncStatus, syncSetNeedsRequeue := r.applySyncSet(syncSet, resourceHelper, logger)
+		resourcesApplied, resourcesInSyncSet, syncSetNeedsRequeue, err := r.applySyncSet(syncSet, resourceHelper, logger)
+		newSyncStatus := hiveintv1alpha1.SyncStatus{
+			Name:               syncSet.AsMetaObject().GetName(),
+			ObservedGeneration: syncSet.AsMetaObject().GetGeneration(),
+			Result:             hiveintv1alpha1.SuccessSyncSetResult,
+		}
+		if syncSet.GetSpec().ResourceApplyMode == hivev1.SyncResourceApplyMode {
+			newSyncStatus.ResourcesToDelete = resourcesApplied
+		}
+		if err != nil {
+			newSyncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
+			newSyncStatus.FailureMessage = err.Error()
+		}
 		if syncSetNeedsRequeue {
 			requeue = true
 		}
 
 		if indexOfOldStatus >= 0 {
 			// Delete any resources that were included in the syncset previously but are no longer included now.
-			remainingResources, err := deleteResources(
+			remainingResources, err := deleteFromTargetCluster(
 				oldSyncStatus.ResourcesToDelete,
-				func(r hiveintv1alpha1.SyncResourceReference) bool { return !isResourceStillIncludedInSyncSet(r, syncSet) },
+				func(r hiveintv1alpha1.SyncResourceReference) bool {
+					return !containsResource(resourcesInSyncSet, r)
+				},
 				resourceHelper,
 				logger,
 			)
@@ -459,13 +479,32 @@ func (r *ReconcileClusterSync) applySyncSets(
 			}
 			newSyncStatus.ResourcesToDelete = mergeResources(newSyncStatus.ResourcesToDelete, remainingResources)
 
-			// Update the last transition time if there were any changes to the sync status.
 			newSyncStatus.LastTransitionTime = oldSyncStatus.LastTransitionTime
-			if !reflect.DeepEqual(oldSyncStatus, newSyncStatus) {
-				newSyncStatus.LastTransitionTime = metav1.Now()
-			}
-		} else {
+			newSyncStatus.FirstSuccessTime = oldSyncStatus.FirstSuccessTime
+		}
+
+		// Update the last transition time if there were any changes to the sync status.
+		if !reflect.DeepEqual(oldSyncStatus, newSyncStatus) {
 			newSyncStatus.LastTransitionTime = metav1.Now()
+		}
+
+		// Set the FirstSuccessTime if this is the first success. Also, observe the apply-duration metric.
+		if newSyncStatus.Result == hiveintv1alpha1.SuccessSyncSetResult && oldSyncStatus.FirstSuccessTime == nil {
+			now := metav1.Now()
+			newSyncStatus.FirstSuccessTime = &now
+			startTime := syncSet.AsMetaObject().GetCreationTimestamp().Time
+			if cd.Status.InstalledTimestamp != nil && startTime.Before(cd.Status.InstalledTimestamp.Time) {
+				startTime = cd.Status.InstalledTimestamp.Time
+			}
+			if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition); cond != nil && startTime.Before(cond.LastTransitionTime.Time) {
+				startTime = cond.LastTransitionTime.Time
+			}
+			applyTime := now.Sub(startTime).Seconds()
+			if syncSet.AsMetaObject().GetNamespace() == "" {
+				metricTimeToApplySelectorSyncSet.WithLabelValues(syncSet.AsMetaObject().GetName()).Observe(applyTime)
+			} else {
+				metricTimeToApplySyncSet.Observe(applyTime)
+			}
 		}
 
 		// Sort ResourcesToDelete to prevent update thrashing.
@@ -477,16 +516,22 @@ func (r *ReconcileClusterSync) applySyncSets(
 
 	// The remaining sync statuses in syncStatuses do not match any syncsets. Any resources to delete in the sync status
 	// need to be deleted.
-	for _, status := range syncStatuses {
-		remainingResources, err := deleteResources(status.ResourcesToDelete, nil, resourceHelper, logger)
+	for _, oldSyncStatus := range syncStatuses {
+		remainingResources, err := deleteFromTargetCluster(oldSyncStatus.ResourcesToDelete, nil, resourceHelper, logger)
 		if err != nil {
 			requeue = true
-			newSyncStatuses = append(newSyncStatuses, hiveintv1alpha1.SyncStatus{
-				Name:              status.Name,
-				ResourcesToDelete: remainingResources,
-				Result:            hiveintv1alpha1.FailureSyncSetResult,
-				FailureMessage:    err.Error(),
-			})
+			newSyncStatus := hiveintv1alpha1.SyncStatus{
+				Name:               oldSyncStatus.Name,
+				ResourcesToDelete:  remainingResources,
+				Result:             hiveintv1alpha1.FailureSyncSetResult,
+				FailureMessage:     err.Error(),
+				LastTransitionTime: oldSyncStatus.LastTransitionTime,
+				FirstSuccessTime:   oldSyncStatus.FirstSuccessTime,
+			}
+			if !reflect.DeepEqual(oldSyncStatus, newSyncStatus) {
+				newSyncStatus.LastTransitionTime = metav1.Now()
+			}
+			newSyncStatuses = append(newSyncStatuses, newSyncStatus)
 		}
 	}
 
@@ -502,20 +547,24 @@ func getOldSyncStatus(syncSet CommonSyncSet, syncSetStatuses []hiveintv1alpha1.S
 	return hiveintv1alpha1.SyncStatus{}, -1
 }
 
-func (r *ReconcileClusterSync) applySyncSet(syncSet CommonSyncSet, resourceHelper resource.Helper, logger log.FieldLogger) (ss hiveintv1alpha1.SyncStatus, requeue bool) {
-	syncStatus := hiveintv1alpha1.SyncStatus{
-		Name:               syncSet.AsMetaObject().GetName(),
-		ObservedGeneration: syncSet.AsMetaObject().GetGeneration(),
+func (r *ReconcileClusterSync) applySyncSet(
+	syncSet CommonSyncSet,
+	resourceHelper resource.Helper,
+	logger log.FieldLogger,
+) (
+	resourcesApplied []hiveintv1alpha1.SyncResourceReference,
+	resourcesInSyncSet []hiveintv1alpha1.SyncResourceReference,
+	requeue bool,
+	returnErr error,
+) {
+	resources, referencesToResources, decodeErr := decodeResources(syncSet, logger)
+	referencesToSecrets := referencesToSecrets(syncSet)
+	resourcesInSyncSet = append(referencesToResources, referencesToSecrets...)
+	if decodeErr != nil {
+		returnErr = decodeErr
+		return
 	}
-	for _, cond := range syncSet.GetStatus().Conditions {
-		if cond.Type == hivev1.SyncSetInvalidResourceCondition &&
-			cond.Status == corev1.ConditionTrue {
-			logger.Info("not applying syncset as it contains an invalid resource")
-			syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-			syncStatus.FailureMessage = "Invalid resource"
-			return syncStatus, false
-		}
-	}
+
 	applyFn := resourceHelper.Apply
 	applyFnMetricsLabel := labelApply
 	switch syncSet.GetSpec().ApplyBehavior {
@@ -526,89 +575,168 @@ func (r *ReconcileClusterSync) applySyncSet(syncSet CommonSyncSet, resourceHelpe
 		applyFn = resourceHelper.Create
 		applyFnMetricsLabel = labelCreateOnly
 	}
+
 	// Apply Resources
-	for i, resource := range syncSet.GetSpec().Resources {
-		identification := syncSet.GetStatus().Resources[i]
-		logger := logger.WithField("resourceNamespace", identification.Namespace).
-			WithField("resourceName", identification.Name).
-			WithField("resourceAPIVersion", identification.APIVersion).
-			WithField("resourceKind", identification.Kind)
-		logger.Debug("applying resource")
-		u := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal(resource.Raw, u); err != nil {
-			logger.WithError(err).Warn("error decoding unstructured object")
-			syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-			syncStatus.FailureMessage = fmt.Sprintf("Failed to decode resource %d: %v", i, err)
-			return syncStatus, false
-		}
-		if err := applyResource(u, applyFnMetricsLabel, applyFn, logger); err != nil {
-			syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-			syncStatus.FailureMessage = fmt.Sprintf("Failed to apply resource %d: %v", i, err)
-			return syncStatus, true
-		}
-		if syncSet.GetSpec().ResourceApplyMode == hivev1.SyncResourceApplyMode {
-			syncStatus.ResourcesToDelete = append(syncStatus.ResourcesToDelete, identification)
+	for i, resource := range resources {
+		returnErr, requeue = r.applyResource(i, resource, referencesToResources[i], applyFn, applyFnMetricsLabel, logger)
+		if returnErr != nil {
+			resourcesApplied = referencesToResources[:i]
+			return
 		}
 	}
+	resourcesApplied = referencesToResources
+
 	// Apply Secrets
 	for i, secretMapping := range syncSet.GetSpec().Secrets {
-		logger := logger.WithField("secretNamespace", secretMapping.TargetRef.Namespace).
-			WithField("secretName", secretMapping.TargetRef.Name)
-		logger.Debug("applying secret")
-		secret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Namespace: syncSet.AsMetaObject().GetNamespace(), Name: secretMapping.SourceRef.Name}, secret); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "cannot read secret")
-			syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-			syncStatus.FailureMessage = fmt.Sprintf("Failed to read secret %d: %v", i, err)
-			return syncStatus, true
-		}
-		secret.Namespace = secretMapping.TargetRef.Namespace
-		secret.Name = secretMapping.TargetRef.Name
-		// These pieces of metadata need to be set to nil values to perform an update from the original secret
-		secret.Generation = 0
-		secret.ResourceVersion = ""
-		secret.UID = ""
-		secret.OwnerReferences = nil
-		if err := applyResource(secret, applyFnMetricsLabel, applyFn, logger); err != nil {
-			syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-			syncStatus.FailureMessage = fmt.Sprintf("Failed to apply secret %d: %v", i, err)
-			return syncStatus, true
-		}
-		if syncSet.GetSpec().ResourceApplyMode == hivev1.SyncResourceApplyMode {
-			syncStatus.ResourcesToDelete = append(syncStatus.ResourcesToDelete,
-				hiveintv1alpha1.SyncResourceReference{
-					APIVersion: secretAPIVersion,
-					Kind:       secretKind,
-					Namespace:  secretMapping.TargetRef.Namespace,
-					Name:       secretMapping.TargetRef.Name,
-				})
+		returnErr, requeue = r.applySecret(syncSet, i, secretMapping, referencesToSecrets[i], applyFn, applyFnMetricsLabel, logger)
+		if returnErr != nil {
+			resourcesApplied = append(resourcesApplied, referencesToSecrets[:i]...)
+			return
 		}
 	}
+	resourcesApplied = append(resourcesApplied, referencesToSecrets...)
+
 	// Apply Patches
 	for i, patch := range syncSet.GetSpec().Patches {
-		logger := logger.WithField("patchNamespace", patch.Namespace).
-			WithField("patchName", patch.Name).
-			WithField("patchAPIVersion", patch.APIVersion).
-			WithField("patchKind", patch.Kind)
-		logger.Debug("applying patch")
-		if err := resourceHelper.Patch(
-			types.NamespacedName{Namespace: patch.Namespace, Name: patch.Name},
-			patch.Kind,
-			patch.APIVersion,
-			[]byte(patch.Patch),
-			patch.PatchType,
-		); err != nil {
-			syncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
-			syncStatus.FailureMessage = fmt.Sprintf("Failed to apply patch %d: %v", i, err)
-			return syncStatus, true
+		returnErr, requeue = r.applyPatch(i, patch, resourceHelper, logger)
+		if returnErr != nil {
+			return
 		}
 	}
+
 	logger.Info("syncset applied")
-	syncStatus.Result = hiveintv1alpha1.SuccessSyncSetResult
-	return syncStatus, false
+	return
 }
 
-func applyResource(
+func decodeResources(syncSet CommonSyncSet, logger log.FieldLogger) (
+	resources []*unstructured.Unstructured, references []hiveintv1alpha1.SyncResourceReference, returnErr error,
+) {
+	var decodeErrors []error
+	for i, resource := range syncSet.GetSpec().Resources {
+		u := &unstructured.Unstructured{}
+		if err := yaml.Unmarshal(resource.Raw, u); err != nil {
+			logger.WithField("resourceIndex", i).WithError(err).Warn("error decoding unstructured object")
+			decodeErrors = append(decodeErrors, errors.Wrapf(err, "failed to decode resource %d", i))
+			continue
+		}
+		resources = append(resources, u)
+		references = append(references, hiveintv1alpha1.SyncResourceReference{
+			APIVersion: u.GetAPIVersion(),
+			Kind:       u.GetKind(),
+			Namespace:  u.GetNamespace(),
+			Name:       u.GetName(),
+		})
+	}
+	returnErr = utilerrors.NewAggregate(decodeErrors)
+	return
+}
+
+func referencesToSecrets(syncSet CommonSyncSet) []hiveintv1alpha1.SyncResourceReference {
+	var references []hiveintv1alpha1.SyncResourceReference
+	for _, secretMapping := range syncSet.GetSpec().Secrets {
+		references = append(references, hiveintv1alpha1.SyncResourceReference{
+			APIVersion: secretAPIVersion,
+			Kind:       secretKind,
+			Namespace:  secretMapping.TargetRef.Namespace,
+			Name:       secretMapping.TargetRef.Name,
+		})
+	}
+	return references
+}
+
+func (r *ReconcileClusterSync) applyResource(
+	resourceIndex int,
+	resource *unstructured.Unstructured,
+	reference hiveintv1alpha1.SyncResourceReference,
+	applyFn func(obj []byte) (resource.ApplyResult, error),
+	applyFnMetricsLabel string,
+	logger log.FieldLogger,
+) (returnErr error, requeue bool) {
+	logger = logger.WithField("resourceIndex", resourceIndex).
+		WithField("resourceNamespace", reference.Namespace).
+		WithField("resourceName", reference.Name).
+		WithField("resourceAPIVersion", reference.APIVersion).
+		WithField("resourceKind", reference.Kind)
+	logger.Debug("applying resource")
+	if err := applyToTargetCluster(resource, applyFnMetricsLabel, applyFn, logger); err != nil {
+		return errors.Wrapf(err, "failed to apply resource %d", resourceIndex), true
+	}
+	return nil, false
+}
+
+func (r *ReconcileClusterSync) applySecret(
+	syncSet CommonSyncSet,
+	secretIndex int,
+	secretMapping hivev1.SecretMapping,
+	reference hiveintv1alpha1.SyncResourceReference,
+	applyFn func(obj []byte) (resource.ApplyResult, error),
+	applyFnMetricsLabel string,
+	logger log.FieldLogger,
+) (returnErr error, requeue bool) {
+	logger = logger.WithField("secretIndex", secretIndex).
+		WithField("secretNamespace", reference.Namespace).
+		WithField("secretName", reference.Name)
+	syncSetNamespace := syncSet.AsMetaObject().GetNamespace()
+	srcNamespace := secretMapping.SourceRef.Namespace
+	if srcNamespace == "" {
+		// The namespace of the source secret is required for SelectorSyncSets.
+		if syncSetNamespace == "" {
+			logger.Warn("namespace must be specified for source secret")
+			return fmt.Errorf("source namespace missing for secret %d", secretIndex), false
+		}
+		// Use the namespace of the SyncSet if the namespace of the source secret is omitted.
+		srcNamespace = syncSetNamespace
+	} else {
+		// If the namespace of the source secret is specified, then it must match the namespace of the SyncSet.
+		if syncSetNamespace != "" && syncSetNamespace != srcNamespace {
+			logger.Warn("source secret must be in same namespace as SyncSet")
+			return fmt.Errorf("source in wrong namespace for secret %d", secretIndex), false
+		}
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Namespace: srcNamespace, Name: secretMapping.SourceRef.Name}, secret); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "cannot read secret")
+		return errors.Wrapf(err, "failed to read secret %d", secretIndex), true
+	}
+	// Clear out the fields of the metadata which are specific to the cluster to which the secret belongs.
+	secret.ObjectMeta = metav1.ObjectMeta{
+		Namespace:   secretMapping.TargetRef.Namespace,
+		Name:        secretMapping.TargetRef.Name,
+		Annotations: secret.Annotations,
+		Labels:      secret.Labels,
+	}
+	logger.Debug("applying secret")
+	if err := applyToTargetCluster(secret, applyFnMetricsLabel, applyFn, logger); err != nil {
+		return errors.Wrapf(err, "failed to apply secret %d", secretIndex), true
+	}
+	return nil, false
+}
+
+func (r *ReconcileClusterSync) applyPatch(
+	patchIndex int,
+	patch hivev1.SyncObjectPatch,
+	resourceHelper resource.Helper,
+	logger log.FieldLogger,
+) (returnErr error, requeue bool) {
+	logger = logger.WithField("patchIndex", patchIndex).
+		WithField("patchNamespace", patch.Namespace).
+		WithField("patchName", patch.Name).
+		WithField("patchAPIVersion", patch.APIVersion).
+		WithField("patchKind", patch.Kind)
+	logger.Debug("applying patch")
+	if err := resourceHelper.Patch(
+		types.NamespacedName{Namespace: patch.Namespace, Name: patch.Name},
+		patch.Kind,
+		patch.APIVersion,
+		[]byte(patch.Patch),
+		patch.PatchType,
+	); err != nil {
+		return errors.Wrapf(err, "failed to apply patch %d", patchIndex), true
+	}
+	return nil, false
+}
+
+func applyToTargetCluster(
 	obj hivev1.MetaRuntimeObject,
 	applyFnMetricLabel string,
 	applyFn func(obj []byte) (resource.ApplyResult, error),
@@ -645,7 +773,7 @@ func applyResource(
 	return err
 }
 
-func deleteResources(
+func deleteFromTargetCluster(
 	resources []hiveintv1alpha1.SyncResourceReference,
 	shouldDelete func(hiveintv1alpha1.SyncResourceReference) bool,
 	resourceHelper resource.Helper,
@@ -669,21 +797,6 @@ func deleteResources(
 		}
 	}
 	return remainingResources, utilerrors.NewAggregate(allErrs)
-}
-
-func isResourceStillIncludedInSyncSet(resource hiveintv1alpha1.SyncResourceReference, syncSet CommonSyncSet) bool {
-	if containsResource(syncSet.GetStatus().Resources, resource) {
-		return true
-	}
-	if resource.APIVersion == secretAPIVersion && resource.Kind == secretKind {
-		for _, s := range syncSet.GetSpec().Secrets {
-			if s.TargetRef.Namespace == resource.Namespace &&
-				s.TargetRef.Name == resource.Name {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (r *ReconcileClusterSync) getSyncSetsForClusterDeployment(cd *hivev1.ClusterDeployment, logger log.FieldLogger) ([]CommonSyncSet, error) {
@@ -736,7 +849,7 @@ func doesSelectorSyncSetApplyToClusterDeployment(selectorSyncSet *hivev1.Selecto
 	return labelSelector.Matches(labels.Set(cd.Labels))
 }
 
-func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync, fullApply bool) {
+func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync) {
 	status := corev1.ConditionFalse
 	reason := "Success"
 	message := "All SyncSets and SelectorSyncSets have been applied to the cluster"
@@ -758,7 +871,7 @@ func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync, fullApply bool
 		}
 		message = fmt.Sprintf("%s %s failing", strings.Join(failureNames, " and "), verb)
 	}
-	if !fullApply && len(clusterSync.Status.Conditions) > 0 {
+	if len(clusterSync.Status.Conditions) > 0 {
 		cond := clusterSync.Status.Conditions[0]
 		if status == cond.Status &&
 			reason == cond.Reason &&

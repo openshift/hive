@@ -242,6 +242,10 @@ func (in *SyncStatus) DeepCopyInto(out *SyncStatus) {
 		copy(*out, *in)
 	}
 	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	if in.FirstSuccessTime != nil {
+		in, out := &in.FirstSuccessTime, &out.FirstSuccessTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

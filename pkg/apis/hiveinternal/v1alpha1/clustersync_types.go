@@ -11,7 +11,7 @@ import (
 // ClusterSync is the status of all of the SelectorSyncSets and SyncSets that apply to a ClusterDeployment.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=clustersyncs,scope=Namespaced
+// +kubebuilder:resource:path=clustersyncs,shortName=csync,scope=Namespaced
 type ClusterSync struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -61,6 +61,10 @@ type SyncStatus struct {
 
 	// LastTransitionTime is the time when this status last changed.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+
+	// FirstSuccessTime is the time when the SyncSet or SelectorSyncSet was first successfully applied to the cluster.
+	// +optional
+	FirstSuccessTime *metav1.Time `json:"firstSuccessTime,omitempty"`
 }
 
 // SyncResourceReference is a reference to a resource that is synced to a cluster via a SyncSet or SelectorSyncSet.
@@ -108,7 +112,7 @@ type ClusterSyncCondition struct {
 	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty"`
-	// Message is a human-readable message indicating details about last transition.
+	// Message is a human-readable message indicating details about the last transition.
 	// +optional
 	Message string `json:"message,omitempty"`
 }

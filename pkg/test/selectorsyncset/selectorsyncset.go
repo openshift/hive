@@ -80,6 +80,10 @@ func WithNamespace(namespace string) Option {
 	return Generic(generic.WithNamespace(namespace))
 }
 
+func WithGeneration(generation int64) Option {
+	return Generic(generic.WithGeneration(generation))
+}
+
 func WithLabelSelector(labelKey, labelValue string) Option {
 	return func(selectorSyncSet *hivev1.SelectorSyncSet) {
 		if selectorSyncSet.Spec.ClusterDeploymentSelector.MatchLabels == nil {
@@ -92,5 +96,32 @@ func WithLabelSelector(labelKey, labelValue string) Option {
 func WithApplyMode(applyMode hivev1.SyncSetResourceApplyMode) Option {
 	return func(selectorSyncSet *hivev1.SelectorSyncSet) {
 		selectorSyncSet.Spec.ResourceApplyMode = applyMode
+	}
+}
+
+func WithApplyBehavior(applyBehavior hivev1.SyncSetApplyBehavior) Option {
+	return func(selectorSyncSet *hivev1.SelectorSyncSet) {
+		selectorSyncSet.Spec.ApplyBehavior = applyBehavior
+	}
+}
+
+func WithResources(objs ...hivev1.MetaRuntimeObject) Option {
+	return func(selectorSyncSet *hivev1.SelectorSyncSet) {
+		selectorSyncSet.Spec.Resources = make([]runtime.RawExtension, len(objs))
+		for i, obj := range objs {
+			selectorSyncSet.Spec.Resources[i].Object = obj
+		}
+	}
+}
+
+func WithSecrets(secrets ...hivev1.SecretMapping) Option {
+	return func(selectorSyncSet *hivev1.SelectorSyncSet) {
+		selectorSyncSet.Spec.Secrets = secrets
+	}
+}
+
+func WithPatches(patches ...hivev1.SyncObjectPatch) Option {
+	return func(selectorSyncSet *hivev1.SelectorSyncSet) {
+		selectorSyncSet.Spec.Patches = patches
 	}
 }

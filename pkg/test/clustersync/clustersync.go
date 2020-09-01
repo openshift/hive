@@ -77,7 +77,7 @@ func WithSyncSetStatus(syncStatus hiveinternalv1alpha1.SyncStatus) Option {
 	}
 }
 
-func WithSelectorSyncSetStatuc(syncStatus hiveinternalv1alpha1.SyncStatus) Option {
+func WithSelectorSyncSetStatus(syncStatus hiveinternalv1alpha1.SyncStatus) Option {
 	return func(clusterSync *hiveinternalv1alpha1.ClusterSync) {
 		clusterSync.Status.SelectorSyncSets = append(clusterSync.Status.SyncSets, syncStatus)
 	}

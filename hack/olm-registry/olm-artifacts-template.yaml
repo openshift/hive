@@ -21,7 +21,7 @@ parameters:
 - name: DELETE_PROTECTION
   value: ""
 - name: BACKUP_VELERO_ENABLED
-  value: false
+  value: "false"
 - name: BACKUP_VELERO_NAMESPACE
   value: openshift-velero
 

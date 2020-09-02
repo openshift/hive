@@ -20,7 +20,7 @@ type Info struct {
 }
 
 // Info determines the name/namespace and type of the passed in resource bytes
-func (r *Helper) Info(obj []byte) (*Info, error) {
+func (r *helper) Info(obj []byte) (*Info, error) {
 	factory, err := r.getFactory("")
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (r *Helper) Info(obj []byte) (*Info, error) {
 	return resourceInfo, err
 }
 
-func (r *Helper) getResourceInternalInfo(f cmdutil.Factory, obj []byte) (*resource.Info, error) {
+func (r *helper) getResourceInternalInfo(f cmdutil.Factory, obj []byte) (*resource.Info, error) {
 	builder := f.NewBuilder()
 	infos, err := builder.Unstructured().Stream(bytes.NewBuffer(obj), "object").Flatten().Do().Infos()
 	if err != nil {
@@ -46,7 +46,7 @@ func (r *Helper) getResourceInternalInfo(f cmdutil.Factory, obj []byte) (*resour
 	return infos[0], nil
 }
 
-func (r *Helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
+func (r *helper) getResourceInfo(f cmdutil.Factory, obj []byte) (*Info, error) {
 	info, err := r.getResourceInternalInfo(f, obj)
 	if err != nil {
 		return nil, err

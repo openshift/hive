@@ -40,7 +40,7 @@ const (
 const fieldTooLong metav1.CauseType = "FieldValueTooLong"
 
 // Apply applies the given resource bytes to the target cluster specified by kubeconfig
-func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
+func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 	factory, err := r.getFactory("")
 	if err != nil {
 		r.logger.WithError(err).Error("failed to obtain factory for apply")
@@ -67,8 +67,8 @@ func (r *Helper) Apply(obj []byte) (ApplyResult, error) {
 }
 
 // ApplyRuntimeObject serializes an object and applies it to the target cluster specified by the kubeconfig.
-func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
-	data, err := r.Serialize(obj, scheme)
+func (r *helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
+	data, err := Serialize(obj, scheme)
 	if err != nil {
 		r.logger.WithError(err).Warn("cannot serialize runtime object")
 		return "", err
@@ -76,7 +76,7 @@ func (r *Helper) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) 
 	return r.Apply(data)
 }
 
-func (r *Helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
+func (r *helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
 	factory, err := r.getFactory("")
 	if err != nil {
 		r.logger.WithError(err).Error("failed to obtain factory for apply")
@@ -93,8 +93,8 @@ func (r *Helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
 	return result, nil
 }
 
-func (r *Helper) CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
-	data, err := r.Serialize(obj, scheme)
+func (r *helper) CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
+	data, err := Serialize(obj, scheme)
 	if err != nil {
 		r.logger.WithError(err).Warn("cannot serialize runtime object")
 		return "", err
@@ -102,7 +102,7 @@ func (r *Helper) CreateOrUpdateRuntimeObject(obj runtime.Object, scheme *runtime
 	return r.CreateOrUpdate(data)
 }
 
-func (r *Helper) Create(obj []byte) (ApplyResult, error) {
+func (r *helper) Create(obj []byte) (ApplyResult, error) {
 	factory, err := r.getFactory("")
 	if err != nil {
 		r.logger.WithError(err).Error("failed to obtain factory for apply")
@@ -116,8 +116,8 @@ func (r *Helper) Create(obj []byte) (ApplyResult, error) {
 	return result, nil
 }
 
-func (r *Helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
-	data, err := r.Serialize(obj, scheme)
+func (r *helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (ApplyResult, error) {
+	data, err := Serialize(obj, scheme)
 	if err != nil {
 		r.logger.WithError(err).Warn("cannot serialize runtime object")
 		return "", err
@@ -125,7 +125,7 @@ func (r *Helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme)
 	return r.Create(data)
 }
 
-func (r *Helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {
+func (r *helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {
 	info, err := r.getResourceInternalInfo(f, obj)
 	if err != nil {
 		return "", err
@@ -149,7 +149,7 @@ func (r *Helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) 
 	return UnchangedApplyResult, nil
 }
 
-func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
+func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {
 	info, err := r.getResourceInternalInfo(f, obj)
 	if err != nil {
 		return "", err
@@ -195,7 +195,7 @@ func (r *Helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 	return result, nil
 }
 
-func (r *Helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
+func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
 	r.logger.Debug("setting up apply command")
 	o := kcmdapply.NewApplyOptions(ioStreams)
 	dynamicClient, err := f.DynamicClient()

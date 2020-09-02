@@ -73,11 +73,10 @@ func (p *jsonPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // This is needed for us to prevent patching from happening unnecessarily when applying resources
 // that don't have a timeCreated timestamp. With the default serializer, they output a
 // `timeCreated: null` which always causes a mismatch with whatever's already in the server.
-func (r *Helper) Serialize(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {
+func Serialize(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {
 	printer := printers.NewTypeSetter(scheme).ToPrinter(&jsonPrinter{})
 	buf := &bytes.Buffer{}
 	if err := printer.PrintObj(obj, buf); err != nil {
-		r.logger.WithError(err).Warnf("cannot serialize runtime object of type %T", obj)
 		return nil, err
 	}
 	return buf.Bytes(), nil

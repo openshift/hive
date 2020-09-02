@@ -20,7 +20,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
-func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.Helper, hiveConfig *hivev1.HiveConfig) error {
+func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h resource.Helper, hiveConfig *hivev1.HiveConfig) error {
 
 	hiveNSName := getHiveNamespace(hiveConfig)
 
@@ -74,7 +74,7 @@ func (r *ReconcileHiveConfig) deployHiveAPI(hLog log.FieldLogger, h *resource.He
 	return nil
 }
 
-func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h *resource.Helper, hiveNSName string, hiveConfig *hivev1.HiveConfig) error {
+func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h resource.Helper, hiveNSName string, hiveConfig *hivev1.HiveConfig) error {
 	hLog.Debug("reading apiservice")
 	asset := assets.MustAsset("config/apiserver/apiservice.yaml")
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
@@ -115,7 +115,7 @@ func (r *ReconcileHiveConfig) createAPIServerAPIService(hLog log.FieldLogger, h 
 	return nil
 }
 
-func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h *resource.Helper, hiveNSName string, hiveConfig *hivev1.HiveConfig) error {
+func (r *ReconcileHiveConfig) createHiveAPIDeployment(hLog log.FieldLogger, h resource.Helper, hiveNSName string, hiveConfig *hivev1.HiveConfig) error {
 	asset := assets.MustAsset("config/apiserver/deployment.yaml")
 	hLog.Debug("reading deployment")
 	hiveAPIDeployment := resourceread.ReadDeploymentV1OrDie(asset)

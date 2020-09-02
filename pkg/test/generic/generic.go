@@ -170,3 +170,9 @@ func Deleted() Option {
 		meta.SetDeletionTimestamp(&now)
 	}
 }
+
+func WithGeneration(generation int64) Option {
+	return func(meta hivev1.MetaRuntimeObject) {
+		meta.SetGeneration(generation)
+	}
+}

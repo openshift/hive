@@ -453,7 +453,7 @@ func (o *Options) defaultNamespace() (string, error) {
 	return ns, err
 }
 
-func (o *Options) getResourceHelper() (*resource.Helper, error) {
+func (o *Options) getResourceHelper() (resource.Helper, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		log.WithError(err).Error("Cannot get client config")

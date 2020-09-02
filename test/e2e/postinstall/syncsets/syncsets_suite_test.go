@@ -2,7 +2,7 @@ package syncsets_test
 
 import (
 	"context"
-
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
 )
@@ -91,35 +92,35 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 					}
 				}
 
-				By("Create a syncset resources using 'Sync' apply mode and verify syncsetinstance created successfully")
+				By("Create a syncset resources using 'Sync' apply mode and verify syncset applied successfully")
 				syncSetWithSyncApplyMode := testSyncSet(hivev1.SyncResourceApplyMode)
 				err := hiveClient.Create(ctx, syncSetWithSyncApplyMode)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-syncresource", "syncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-syncresource", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
-				By("Verify the resource is synced on taret cluster")
+				By("Verify the resource is synced on target cluster")
 				resultConfigMap := &corev1.ConfigMap{}
 				err = targetClusterClient.Get(ctx, client.ObjectKey{Name: "foo", Namespace: "default"}, resultConfigMap)
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(resultConfigMap.Data).Should(Equal(map[string]string{"foo": "bar"}))
 
-				By("Delete the syncset and verify syncset and syncsetinstance are deleted")
+				By("Delete the syncset and verify syncset deleted and syncset disassociated with cluster")
 				deleteSyncSets(hiveClient, clusterNamespace, "test-syncresource")
 				err = waitForSyncSetDeleted(clusterNamespace, "test-syncresource")
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceDeleted(clusterNamespace, "test-syncresource", "syncset")
+				err = waitForSyncSetDisassociated(clusterNamespace, clusterName, "test-syncresource", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the ConfigMap is deleted on the target cluster")
 				err = targetClusterClient.Get(ctx, client.ObjectKey{Name: "foo", Namespace: "default"}, resultConfigMap)
 				Ω(errors.IsNotFound(err)).Should(BeTrue())
 
-				By("Create a syncset resource using 'Upsert' apply mode, verify syncsetinstance created successfully")
+				By("Create a syncset resource using 'Upsert' apply mode, verify syncset applied successfully")
 				syncSetWithUpsertApplyMode := testSyncSet(hivev1.UpsertResourceApplyMode)
 				err = hiveClient.Create(ctx, syncSetWithUpsertApplyMode)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-syncresource", "syncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-syncresource", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the resource is synced on target cluster")
@@ -131,11 +132,11 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				By("Verify the managed-by-Hive label was injected automatically")
 				Ω(resultConfigMap.Labels[constants.HiveManagedLabel]).Should(Equal("true"))
 
-				By("Delete the syncset and verify syncset and syncsetinstance are deleted")
+				By("Delete the syncset and verify syncset deleted and syncset disassociated with cluster")
 				deleteSyncSets(hiveClient, clusterNamespace, "test-syncresource")
 				err = waitForSyncSetDeleted(clusterNamespace, "test-syncresource")
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceDeleted(clusterNamespace, "test-syncresource", "syncset")
+				err = waitForSyncSetDisassociated(clusterNamespace, clusterName, "test-syncresource", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the ConfigMap won't delete on the target cluster")
@@ -199,7 +200,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				syncPatchWithMergeType := testSyncSetPatch(patch, patchType)
 				err = hiveClient.Create(ctx, syncPatchWithMergeType)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-syncpatch", "syncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-syncpatch", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the resource is patched on target cluster")
@@ -208,11 +209,11 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(resultConfigMap.Data).Should(Equal(map[string]string{"foo": "baz-merge"}))
 
-				By("Delete the SyncSetPatch and verify syncset and syncsetinstance are deleted")
+				By("Delete the SyncSetPatch and verify syncset deleted and syncset disassociated with cluster")
 				deleteSyncSets(hiveClient, clusterNamespace, "test-syncpatch")
 				err = waitForSyncSetDeleted(clusterNamespace, "test-syncpatch")
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceDeleted(clusterNamespace, "test-syncpatch", "syncset")
+				err = waitForSyncSetDisassociated(clusterNamespace, clusterName, "test-syncpatch", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Create a syncpatch with strategic patchType and verify syncpatch create successfully")
@@ -221,7 +222,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				syncPatchWithstrategicType := testSyncSetPatch(patch, patchType)
 				err = hiveClient.Create(ctx, syncPatchWithstrategicType)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-syncpatch", "syncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-syncpatch", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the resource is patched on target cluster")
@@ -230,11 +231,11 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(resultConfigMap.Data).Should(Equal(map[string]string{"foo": "baz-strategic"}))
 
-				By("Delete the SyncSetPatch and verify syncset and syncsetinstance are deleted")
+				By("Delete the SyncSetPatch and verify syncset deleted and syncset disassociated with cluster")
 				deleteSyncSets(hiveClient, clusterNamespace, "test-syncpatch")
 				err = waitForSyncSetDeleted(clusterNamespace, "test-syncpatch")
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceDeleted(clusterNamespace, "test-syncpatch", "syncset")
+				err = waitForSyncSetDisassociated(clusterNamespace, clusterName, "test-syncpatch", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Create a syncpatch with json patchType and verify syncpatch created successfully")
@@ -243,7 +244,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				syncPatchWithPatchType := testSyncSetPatch(patch, patchType)
 				err = hiveClient.Create(ctx, syncPatchWithPatchType)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-syncpatch", "syncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-syncpatch", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the resource is patched on target cluster")
@@ -292,7 +293,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				By("Create a syncSet SecretMappings and verify syncset is created successfully")
 				err = hiveClient.Create(ctx, syncSetSecretMappings)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-syncsecret", "syncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-syncsecret", "syncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the secret is copied to target cluster")
@@ -394,7 +395,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				By("Create a selectorSyncSet  including resources, patches and secretMappings and verify create successfully")
 				err = hiveClient.Create(ctx, selectorSyncSet)
 				Ω(err).ShouldNot(HaveOccurred())
-				err = waitForSyncSetInstanceApplied(clusterNamespace, "test-selectorsyncset", "selectorsyncset")
+				err = waitForSyncSetApplied(clusterNamespace, clusterName, "test-selectorsyncset", "selectorsyncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the resource is synced on target cluster")
@@ -422,8 +423,8 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(cd.ObjectMeta.Labels).Should(Equal(cdLabels))
 
-				By("Verify syncset and syncsetinstance are deleted")
-				err = waitForSyncSetInstanceDeleted(clusterNamespace, "test-selectorsyncset", "selectorsyncset")
+				By("Verify syncset disassociated with cluster")
+				err = waitForSyncSetDisassociated(clusterNamespace, clusterName, "test-selectorsyncset", "selectorsyncset")
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By("Verify the resource is deleted on target cluster")
@@ -440,11 +441,11 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 	})
 })
 
-func waitForSyncSetInstanceApplied(namespace, syncsetname, syncsettype string) error {
+func waitForSyncSetApplied(namespace, cdName, syncsetname, syncsettype string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
-	gvk, err := apiutil.GVKForObject(&hivev1.SyncSetInstance{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hiveintv1alpha1.ClusterSync{}, scheme.Scheme)
 	if err != nil {
 		return err
 	}
@@ -452,27 +453,33 @@ func waitForSyncSetInstanceApplied(namespace, syncsetname, syncsettype string) e
 	if err != nil {
 		return err
 	}
-	labelSelectorFilter := func(options *metav1.ListOptions) {
-		switch {
-		case syncsettype == "syncset":
-			options.LabelSelector = "hive.openshift.io/syncset-name=" + syncsetname
-		case syncsettype == "selectorsyncset":
-			options.LabelSelector = "hive.openshift.io/selector-syncset-name=" + syncsetname
-		}
-	}
-	listWatcher := cache.NewFilteredListWatchFromClient(restClient, "syncsetinstances", namespace, labelSelectorFilter)
-	syncSetInstanceApplied := func(event watch.Event) (bool, error) {
+	listWatcher := cache.NewListWatchFromClient(restClient, "clustersyncs", namespace, fields.OneTermEqualSelector("metadata.name", cdName))
+	syncSetApplied := func(event watch.Event) (bool, error) {
 		if event.Type != watch.Added && event.Type != watch.Modified {
 			return false, nil
 		}
-		syncSetInstance, ok := event.Object.(*hivev1.SyncSetInstance)
+		clusterSync, ok := event.Object.(*hiveintv1alpha1.ClusterSync)
 		if !ok {
 			// Object is not of type syncssetinstance
 			return false, nil
 		}
-		return syncSetInstance.Status.Applied, nil
+		var syncStatuses []hiveintv1alpha1.SyncStatus
+		switch syncsettype {
+		case "syncset":
+			syncStatuses = clusterSync.Status.SyncSets
+		case "selectorsyncset":
+			syncStatuses = clusterSync.Status.SelectorSyncSets
+		default:
+			return false, fmt.Errorf("unknown syncset type")
+		}
+		for _, status := range syncStatuses {
+			if status.Name == syncsetname {
+				return status.Result == hiveintv1alpha1.SuccessSyncSetResult, nil
+			}
+		}
+		return false, nil
 	}
-	_, err = clientwatch.UntilWithSync(ctx, listWatcher, &hivev1.SyncSetInstance{}, nil, syncSetInstanceApplied)
+	_, err = clientwatch.UntilWithSync(ctx, listWatcher, &hiveintv1alpha1.ClusterSync{}, nil, syncSetApplied)
 	return err
 }
 
@@ -502,11 +509,11 @@ func waitForSyncSetDeleted(namespace, syncsetname string) error {
 	return err
 }
 
-func waitForSyncSetInstanceDeleted(namespace, syncsetname, syncsettype string) error {
+func waitForSyncSetDisassociated(namespace, cdName, syncsetname, syncsettype string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
-	gvk, err := apiutil.GVKForObject(&hivev1.SyncSetInstance{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hiveintv1alpha1.ClusterSync{}, scheme.Scheme)
 	if err != nil {
 		return err
 	}
@@ -514,25 +521,33 @@ func waitForSyncSetInstanceDeleted(namespace, syncsetname, syncsettype string) e
 	if err != nil {
 		return err
 	}
-	labelSelectorFilter := func(options *metav1.ListOptions) {
-		switch {
-		case syncsettype == "syncset":
-			options.LabelSelector = "hive.openshift.io/syncset-name=" + syncsetname
-		case syncsettype == "selectorsyncset":
-			options.LabelSelector = "hive.openshift.io/selector-syncset-name=" + syncsetname
+	listWatcher := cache.NewListWatchFromClient(restClient, "clustersyncs", namespace, fields.OneTermEqualSelector("metadata.name", cdName))
+	syncSetDisassociated := func(event watch.Event) (bool, error) {
+		if event.Type != watch.Added && event.Type != watch.Modified {
+			return false, nil
 		}
+		clusterSync, ok := event.Object.(*hiveintv1alpha1.ClusterSync)
+		if !ok {
+			// Object is not of type syncssetinstance
+			return false, nil
+		}
+		var syncStatuses []hiveintv1alpha1.SyncStatus
+		switch syncsettype {
+		case "syncset":
+			syncStatuses = clusterSync.Status.SyncSets
+		case "selectorsyncset":
+			syncStatuses = clusterSync.Status.SelectorSyncSets
+		default:
+			return false, fmt.Errorf("unknown syncset type")
+		}
+		for _, status := range syncStatuses {
+			if status.Name == syncsetname {
+				return false, nil
+			}
+		}
+		return true, nil
 	}
-	listWatcher := cache.NewFilteredListWatchFromClient(restClient, "syncsetinstances", namespace, labelSelectorFilter)
-	_, err = clientwatch.UntilWithSync(
-		ctx,
-		listWatcher,
-		&hivev1.SyncSetInstance{},
-		func(store cache.Store) (bool, error) {
-			return len(store.List()) == 0, nil
-		},
-		func(event watch.Event) (bool, error) {
-			return event.Type == watch.Deleted, nil
-		})
+	_, err = clientwatch.UntilWithSync(ctx, listWatcher, &hiveintv1alpha1.ClusterSync{}, nil, syncSetDisassociated)
 	return err
 }
 

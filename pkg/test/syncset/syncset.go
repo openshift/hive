@@ -82,6 +82,10 @@ func WithNamespace(namespace string) Option {
 	return Generic(generic.WithNamespace(namespace))
 }
 
+func WithGeneration(generation int64) Option {
+	return Generic(generic.WithGeneration(generation))
+}
+
 func ForClusterDeployments(clusterDeploymentNames ...string) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.ClusterDeploymentRefs = make([]corev1.LocalObjectReference, len(clusterDeploymentNames))
@@ -94,5 +98,32 @@ func ForClusterDeployments(clusterDeploymentNames ...string) Option {
 func WithApplyMode(applyMode hivev1.SyncSetResourceApplyMode) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.ResourceApplyMode = applyMode
+	}
+}
+
+func WithApplyBehavior(applyBehavior hivev1.SyncSetApplyBehavior) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.ApplyBehavior = applyBehavior
+	}
+}
+
+func WithResources(objs ...hivev1.MetaRuntimeObject) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.Resources = make([]runtime.RawExtension, len(objs))
+		for i, obj := range objs {
+			syncSet.Spec.Resources[i].Object = obj
+		}
+	}
+}
+
+func WithSecrets(secrets ...hivev1.SecretMapping) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.Secrets = secrets
+	}
+}
+
+func WithPatches(patches ...hivev1.SyncObjectPatch) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.Patches = patches
 	}
 }

@@ -20,7 +20,7 @@ var (
 )
 
 // Patch invokes the kubectl patch command with the given resource, patch and patch type
-func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error {
+func (r *helper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error {
 
 	ioStreams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
@@ -46,7 +46,7 @@ func (r *Helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 	return nil
 }
 
-func (r *Helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmdpatch.PatchOptions, error) {
+func (r *helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmdpatch.PatchOptions, error) {
 
 	cmd := kcmdpatch.NewCmdPatch(f, ioStreams)
 	cmd.Flags().Parse([]string{})

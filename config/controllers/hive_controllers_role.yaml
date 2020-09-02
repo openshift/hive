@@ -11,6 +11,12 @@ rules:
   verbs:
   - "*"
 - apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
   - batch
   resources:
   - jobs

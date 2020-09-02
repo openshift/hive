@@ -355,7 +355,16 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	r.updateHiveConfigStatus(origHiveConfig, instance, hLog, true)
+	if err := r.cleanupLegacySyncSetInstances(hLog); err != nil {
+		hLog.WithError(err).Error("error cleaning up legacy SyncSetInstances")
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	if err := r.updateHiveConfigStatus(origHiveConfig, instance, hLog, true); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	v1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -71,8 +72,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncIdentityProviders().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("syncsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncSets().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("syncsetinstances"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().SyncSetInstances().Informer()}, nil
+
+		// Group=hiveinternal.openshift.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("clustersyncs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hiveinternal().V1alpha1().ClusterSyncs().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("clustersyncleases"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hiveinternal().V1alpha1().ClusterSyncLeases().Informer()}, nil
 
 	}
 

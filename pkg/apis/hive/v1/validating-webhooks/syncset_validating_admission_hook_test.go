@@ -243,9 +243,15 @@ func TestSyncSetValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
-			name:            "Test invalid unmarshalable TypeMeta Resource create",
+			name:            "Test invalid unmarshalable Resource create",
 			operation:       admissionv1beta1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": 798786}`),
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test missing Kind Resource create",
+			operation:       admissionv1beta1.Create,
+			syncSet:         testSyncSetWithResources(`{"apiVersion": "v1"}`),
 			expectedAllowed: false,
 		},
 		{

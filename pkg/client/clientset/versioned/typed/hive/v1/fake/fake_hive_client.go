@@ -80,10 +80,6 @@ func (c *FakeHiveV1) SyncSets(namespace string) v1.SyncSetInterface {
 	return &FakeSyncSets{c, namespace}
 }
 
-func (c *FakeHiveV1) SyncSetInstances(namespace string) v1.SyncSetInstanceInterface {
-	return &FakeSyncSetInstances{c, namespace}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeHiveV1) RESTClient() rest.Interface {

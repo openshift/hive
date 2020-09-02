@@ -36,6 +36,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
+	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -1063,10 +1064,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "setSyncSetFailedCondition should be present",
+			name: "SyncSetFailedCondition should be present",
 			existing: []runtime.Object{
 				testInstalledClusterDeployment(time.Now()),
-				createSyncSetInstanceObj(hivev1.ApplyFailureSyncCondition),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				&hiveintv1alpha1.ClusterSync{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespace,
+						Name:      testName,
+					},
+					Status: hiveintv1alpha1.ClusterSyncStatus{
+						Conditions: []hiveintv1alpha1.ClusterSyncCondition{{
+							Type:    hiveintv1alpha1.ClusterSyncFailed,
+							Status:  corev1.ConditionTrue,
+							Reason:  "FailureReason",
+							Message: "Failure message",
+						}},
+					},
+				},
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -1079,9 +1095,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "setSyncSetFailedCondition value should be corev1.ConditionFalse",
+			name: "SyncSetFailedCondition value should be corev1.ConditionFalse",
 			existing: []runtime.Object{
-
 				func() runtime.Object {
 					cd := testInstalledClusterDeployment(time.Now())
 					cd.Status.Conditions = append(
@@ -1093,7 +1108,22 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					)
 					return cd
 				}(),
-				createSyncSetInstanceObj(hivev1.ApplySuccessSyncCondition),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				&hiveintv1alpha1.ClusterSync{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testNamespace,
+						Name:      testName,
+					},
+					Status: hiveintv1alpha1.ClusterSyncStatus{
+						Conditions: []hiveintv1alpha1.ClusterSyncCondition{{
+							Type:    hiveintv1alpha1.ClusterSyncFailed,
+							Status:  corev1.ConditionFalse,
+							Reason:  "SuccessReason",
+							Message: "Success message",
+						}},
+					},
+				},
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -2261,42 +2291,6 @@ func getProvisions(c client.Client) []*hivev1.ClusterProvision {
 		provisions[i] = &provisionList.Items[i]
 	}
 	return provisions
-}
-
-func createSyncSetInstanceObj(syncCondType hivev1.SyncConditionType) *hivev1.SyncSetInstance {
-	ssi := &hivev1.SyncSetInstance{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testSyncsetInstanceName,
-			Namespace: testNamespace,
-		},
-	}
-	ssi.Spec.ClusterDeploymentRef.Name = testName
-	ssi.Status = createSyncSetInstanceStatus(syncCondType)
-	return ssi
-}
-
-func createSyncSetInstanceStatus(syncCondType hivev1.SyncConditionType) hivev1.SyncSetInstanceStatus {
-	conditionTime := metav1.NewTime(time.Now())
-	var ssiStatus corev1.ConditionStatus
-	var condType hivev1.SyncConditionType
-	if syncCondType == hivev1.ApplyFailureSyncCondition {
-		ssiStatus = corev1.ConditionTrue
-		condType = syncCondType
-	} else {
-		ssiStatus = corev1.ConditionFalse
-		condType = syncCondType
-	}
-	status := hivev1.SyncSetInstanceStatus{
-		Conditions: []hivev1.SyncCondition{
-			{
-				Type:               condType,
-				Status:             ssiStatus,
-				LastTransitionTime: conditionTime,
-				LastProbeTime:      conditionTime,
-			},
-		},
-	}
-	return status
 }
 
 func testCompletedImageSetJob() *batchv1.Job {

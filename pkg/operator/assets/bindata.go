@@ -943,6 +943,12 @@ rules:
   verbs:
   - "*"
 - apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
   - batch
   resources:
   - jobs
@@ -1165,6 +1171,15 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - clustersyncs
+  - clustersyncleases
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - admission.hive.openshift.io
   resources:
   - clusterdeployments
@@ -1328,6 +1343,15 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - clustersyncs
+  - clustersyncleases
+  verbs:
+  - get
+  - list
+  - watch
 `)
 
 func configRbacHive_frontend_roleYamlBytes() ([]byte, error) {
@@ -1448,6 +1472,15 @@ rules:
   resources:
   - clusterimagesets
   - hiveconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - clustersyncs
+  - clustersyncleases
   verbs:
   - get
   - list

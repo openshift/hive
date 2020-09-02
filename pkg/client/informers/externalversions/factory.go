@@ -9,6 +9,7 @@ import (
 
 	versioned "github.com/openshift/hive/pkg/client/clientset/versioned"
 	hive "github.com/openshift/hive/pkg/client/informers/externalversions/hive"
+	hiveinternal "github.com/openshift/hive/pkg/client/informers/externalversions/hiveinternal"
 	internalinterfaces "github.com/openshift/hive/pkg/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -157,8 +158,13 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	Hive() hive.Interface
+	Hiveinternal() hiveinternal.Interface
 }
 
 func (f *sharedInformerFactory) Hive() hive.Interface {
 	return hive.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Hiveinternal() hiveinternal.Interface {
+	return hiveinternal.New(f, f.namespace, f.tweakListOptions)
 }

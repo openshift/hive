@@ -7,8 +7,8 @@ package mock
 import (
 	gomock "github.com/golang/mock/gomock"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
-	v1 "google.golang.org/api/compute/v1"
-	v10 "google.golang.org/api/dns/v1"
+	compute "google.golang.org/api/compute/v1"
+	dns "google.golang.org/api/dns/v1"
 	reflect "reflect"
 )
 
@@ -36,10 +36,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // ListManagedZones mocks base method
-func (m *MockClient) ListManagedZones(opts gcpclient.ListManagedZonesOptions) (*v10.ManagedZonesListResponse, error) {
+func (m *MockClient) ListManagedZones(opts gcpclient.ListManagedZonesOptions) (*dns.ManagedZonesListResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListManagedZones", opts)
-	ret0, _ := ret[0].(*v10.ManagedZonesListResponse)
+	ret0, _ := ret[0].(*dns.ManagedZonesListResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -51,10 +51,10 @@ func (mr *MockClientMockRecorder) ListManagedZones(opts interface{}) *gomock.Cal
 }
 
 // ListResourceRecordSets mocks base method
-func (m *MockClient) ListResourceRecordSets(managedZone string, opts gcpclient.ListResourceRecordSetsOptions) (*v10.ResourceRecordSetsListResponse, error) {
+func (m *MockClient) ListResourceRecordSets(managedZone string, opts gcpclient.ListResourceRecordSetsOptions) (*dns.ResourceRecordSetsListResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListResourceRecordSets", managedZone, opts)
-	ret0, _ := ret[0].(*v10.ResourceRecordSetsListResponse)
+	ret0, _ := ret[0].(*dns.ResourceRecordSetsListResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -66,7 +66,7 @@ func (mr *MockClientMockRecorder) ListResourceRecordSets(managedZone, opts inter
 }
 
 // AddResourceRecordSet mocks base method
-func (m *MockClient) AddResourceRecordSet(managedZone string, recordSet *v10.ResourceRecordSet) error {
+func (m *MockClient) AddResourceRecordSet(managedZone string, recordSet *dns.ResourceRecordSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddResourceRecordSet", managedZone, recordSet)
 	ret0, _ := ret[0].(error)
@@ -80,7 +80,7 @@ func (mr *MockClientMockRecorder) AddResourceRecordSet(managedZone, recordSet in
 }
 
 // DeleteResourceRecordSet mocks base method
-func (m *MockClient) DeleteResourceRecordSet(managedZone string, recordSet *v10.ResourceRecordSet) error {
+func (m *MockClient) DeleteResourceRecordSet(managedZone string, recordSet *dns.ResourceRecordSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteResourceRecordSet", managedZone, recordSet)
 	ret0, _ := ret[0].(error)
@@ -94,7 +94,7 @@ func (mr *MockClientMockRecorder) DeleteResourceRecordSet(managedZone, recordSet
 }
 
 // DeleteResourceRecordSets mocks base method
-func (m *MockClient) DeleteResourceRecordSets(managedZone string, recordSet []*v10.ResourceRecordSet) error {
+func (m *MockClient) DeleteResourceRecordSets(managedZone string, recordSet []*dns.ResourceRecordSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteResourceRecordSets", managedZone, recordSet)
 	ret0, _ := ret[0].(error)
@@ -108,7 +108,7 @@ func (mr *MockClientMockRecorder) DeleteResourceRecordSets(managedZone, recordSe
 }
 
 // UpdateResourceRecordSet mocks base method
-func (m *MockClient) UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *v10.ResourceRecordSet) error {
+func (m *MockClient) UpdateResourceRecordSet(managedZone string, addRecordSet, removeRecordSet *dns.ResourceRecordSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateResourceRecordSet", managedZone, addRecordSet, removeRecordSet)
 	ret0, _ := ret[0].(error)
@@ -122,10 +122,10 @@ func (mr *MockClientMockRecorder) UpdateResourceRecordSet(managedZone, addRecord
 }
 
 // GetManagedZone mocks base method
-func (m *MockClient) GetManagedZone(managedZone string) (*v10.ManagedZone, error) {
+func (m *MockClient) GetManagedZone(managedZone string) (*dns.ManagedZone, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetManagedZone", managedZone)
-	ret0, _ := ret[0].(*v10.ManagedZone)
+	ret0, _ := ret[0].(*dns.ManagedZone)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -137,10 +137,10 @@ func (mr *MockClientMockRecorder) GetManagedZone(managedZone interface{}) *gomoc
 }
 
 // CreateManagedZone mocks base method
-func (m *MockClient) CreateManagedZone(managedZone *v10.ManagedZone) (*v10.ManagedZone, error) {
+func (m *MockClient) CreateManagedZone(managedZone *dns.ManagedZone) (*dns.ManagedZone, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateManagedZone", managedZone)
-	ret0, _ := ret[0].(*v10.ManagedZone)
+	ret0, _ := ret[0].(*dns.ManagedZone)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -166,10 +166,10 @@ func (mr *MockClientMockRecorder) DeleteManagedZone(managedZone interface{}) *go
 }
 
 // ListComputeZones mocks base method
-func (m *MockClient) ListComputeZones(arg0 gcpclient.ListComputeZonesOptions) (*v1.ZoneList, error) {
+func (m *MockClient) ListComputeZones(arg0 gcpclient.ListComputeZonesOptions) (*compute.ZoneList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListComputeZones", arg0)
-	ret0, _ := ret[0].(*v1.ZoneList)
+	ret0, _ := ret[0].(*compute.ZoneList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -181,10 +181,10 @@ func (mr *MockClientMockRecorder) ListComputeZones(arg0 interface{}) *gomock.Cal
 }
 
 // ListComputeImages mocks base method
-func (m *MockClient) ListComputeImages(arg0 gcpclient.ListComputeImagesOptions) (*v1.ImageList, error) {
+func (m *MockClient) ListComputeImages(arg0 gcpclient.ListComputeImagesOptions) (*compute.ImageList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListComputeImages", arg0)
-	ret0, _ := ret[0].(*v1.ImageList)
+	ret0, _ := ret[0].(*compute.ImageList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

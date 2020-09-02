@@ -42,8 +42,6 @@ type Interface interface {
 	SyncIdentityProviders() SyncIdentityProviderInformer
 	// SyncSets returns a SyncSetInformer.
 	SyncSets() SyncSetInformer
-	// SyncSetInstances returns a SyncSetInstanceInformer.
-	SyncSetInstances() SyncSetInstanceInformer
 }
 
 type version struct {
@@ -140,9 +138,4 @@ func (v *version) SyncIdentityProviders() SyncIdentityProviderInformer {
 // SyncSets returns a SyncSetInformer.
 func (v *version) SyncSets() SyncSetInformer {
 	return &syncSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// SyncSetInstances returns a SyncSetInstanceInformer.
-func (v *version) SyncSetInstances() SyncSetInstanceInformer {
-	return &syncSetInstanceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

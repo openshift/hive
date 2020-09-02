@@ -11,6 +11,12 @@ rules:
   verbs:
   - "*"
 - apiGroups:
+  - hiveinternal.openshift.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
   - velero.io
   resources:
   - backups
@@ -85,7 +91,7 @@ rules:
   - create
   - update
   - patch
-  # NOTE: delete not being granted as it should not be necessary and would be destructive
+  - delete
 # Allow creating ClusterRoles and Bindings for the hive-admin role.
 - apiGroups:
   - rbac.authorization.k8s.io

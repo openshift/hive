@@ -8,7 +8,7 @@ verify="${VERIFY:-}"
 GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "all" \
   github.com/openshift/hive/pkg/client \
   github.com/openshift/hive/pkg/apis \
-  "hive:v1" \
+  "hive:v1 hiveinternal:v1alpha1" \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
   ${verify}
 

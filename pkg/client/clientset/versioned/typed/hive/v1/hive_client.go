@@ -27,7 +27,6 @@ type HiveV1Interface interface {
 	SelectorSyncSetsGetter
 	SyncIdentityProvidersGetter
 	SyncSetsGetter
-	SyncSetInstancesGetter
 }
 
 // HiveV1Client is used to interact with features provided by the hive.openshift.io group.
@@ -101,10 +100,6 @@ func (c *HiveV1Client) SyncIdentityProviders(namespace string) SyncIdentityProvi
 
 func (c *HiveV1Client) SyncSets(namespace string) SyncSetInterface {
 	return newSyncSets(c, namespace)
-}
-
-func (c *HiveV1Client) SyncSetInstances(namespace string) SyncSetInstanceInterface {
-	return newSyncSetInstances(c, namespace)
 }
 
 // NewForConfig creates a new HiveV1Client for the given config.

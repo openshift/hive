@@ -20,6 +20,8 @@ parameters:
   value: "[]"
 - name: DELETE_PROTECTION
   value: ""
+- name: VELERO_ENABLED
+  value: false
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -62,3 +64,6 @@ objects:
     globalPullSecretRef:
       name: ${GLOBAL_PULL_SECRET}
     deleteProtection: ${DELETE_PROTECTION}
+    backup:
+      velero:
+        enabled: ${VELERO_ENABLED}

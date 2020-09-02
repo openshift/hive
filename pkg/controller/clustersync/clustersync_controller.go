@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +22,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -284,17 +282,13 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	needToCreateLease := false
-	leaseKey := client.ObjectKey{
-		Namespace: cd.Namespace,
-		Name:      fmt.Sprintf("%s-sync", cd.Name),
-	}
 	lease := &hiveintv1alpha1.ClusterSyncLease{}
-	switch err := r.Get(context.Background(), leaseKey, lease); {
+	switch err := r.Get(context.Background(), request.NamespacedName, lease); {
 	case apierrors.IsNotFound(err):
 		logger.Info("Lease for ClusterSync does not exist; will need to create")
 		needToCreateLease = true
 	case err != nil:
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create lease for ClusterSync")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get lease for ClusterSync")
 		return reconcile.Result{}, err
 	}
 
@@ -345,13 +339,9 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		logger.Info("creating ClusterSync")
 		clusterSync.Namespace = cd.Namespace
 		clusterSync.Name = cd.Name
-		clusterSync.OwnerReferences = []metav1.OwnerReference{{
-			APIVersion:         hivev1.SchemeGroupVersion.String(),
-			Kind:               "ClusterDeployment",
-			Name:               cd.Name,
-			UID:                cd.UID,
-			BlockOwnerDeletion: pointer.BoolPtr(true),
-		}}
+		ownerRef := metav1.NewControllerRef(cd, cd.GroupVersionKind())
+		ownerRef.Controller = nil
+		clusterSync.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 		if err := r.Create(context.Background(), clusterSync); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
 			return reconcile.Result{}, err
@@ -370,15 +360,11 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		lease.Spec.RenewTime = metav1.NowMicro()
 		if needToCreateLease {
 			logger.Info("creating lease for ClusterSync")
-			lease.Namespace = leaseKey.Namespace
-			lease.Name = leaseKey.Name
-			lease.OwnerReferences = []metav1.OwnerReference{{
-				APIVersion:         hivev1.SchemeGroupVersion.String(),
-				Kind:               "ClusterSync",
-				Name:               clusterSync.Name,
-				UID:                clusterSync.UID,
-				BlockOwnerDeletion: pointer.BoolPtr(true),
-			}}
+			lease.Namespace = cd.Namespace
+			lease.Name = cd.Name
+			ownerRef := metav1.NewControllerRef(clusterSync, clusterSync.GroupVersionKind())
+			ownerRef.Controller = nil
+			lease.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 			if err := r.Create(context.Background(), lease); err != nil {
 				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create lease for ClusterSync")
 				return reconcile.Result{}, err

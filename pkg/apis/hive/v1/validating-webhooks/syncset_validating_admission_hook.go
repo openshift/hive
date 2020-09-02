@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -290,15 +291,15 @@ func validateResources(resources []runtime.RawExtension, fldPath *field.Path) fi
 func validateResource(resource runtime.RawExtension, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	rType := &metav1.TypeMeta{}
-	err := json.Unmarshal(resource.Raw, rType)
+	u := &unstructured.Unstructured{}
+	err := json.Unmarshal(resource.Raw, u)
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, resource.Raw, "Unable to unmarshal resource Kind and APIVersion"))
+		allErrs = append(allErrs, field.Invalid(fldPath, resource.Raw, "Unable to unmarshal resource"))
 		return allErrs
 	}
 
-	if invalidResourceGroupKinds[rType.GroupVersionKind().Group][rType.Kind] {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("APIVersion"), rType.APIVersion, "must use kubernetes group for this resource kind"))
+	if invalidResourceGroupKinds[u.GroupVersionKind().Group][u.GetKind()] {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("APIVersion"), u.GetAPIVersion(), "must use kubernetes group for this resource kind"))
 	}
 
 	return allErrs

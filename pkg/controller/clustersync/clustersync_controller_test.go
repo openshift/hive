@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/pointer"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,8 +45,10 @@ import (
 const (
 	testNamespace       = "test-namespace"
 	testCDName          = "test-cluster-deployment"
-	testClusterSyncName = "test-cluster-deployment"
-	testLeaseName       = "test-cluster-deployment-sync"
+	testCDUID           = "test-cluster-deployment-uid"
+	testClusterSyncName = testCDName
+	testClusterSyncUID  = "test-cluster-sync-uid"
+	testLeaseName       = testCDName
 )
 
 var (
@@ -75,7 +78,7 @@ func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
-	c := fake.NewFakeClientWithScheme(scheme, existing...)
+	c := &clientWrapper{fake.NewFakeClientWithScheme(scheme, existing...)}
 
 	mockResourceHelper := resourcemock.NewMockHelper(mockCtrl)
 	mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -170,6 +173,24 @@ func (rt *reconcileTest) run(t *testing.T) {
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	err = rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testClusterSyncName}, clusterSync)
 	require.NoError(t, err, "unexpected error getting ClusterSync")
+
+	expectedOwnerReferenceFromClusterSync := metav1.OwnerReference{
+		APIVersion:         hivev1.SchemeGroupVersion.String(),
+		Kind:               "ClusterDeployment",
+		Name:               testCDName,
+		UID:                testCDUID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}
+	assert.Contains(t, clusterSync.OwnerReferences, expectedOwnerReferenceFromClusterSync, "expected owner reference from ClusterSync to ClusterDeployment")
+
+	expectedOwnerReferenceFromLease := metav1.OwnerReference{
+		APIVersion:         hiveintv1alpha1.SchemeGroupVersion.String(),
+		Kind:               "ClusterSync",
+		Name:               testClusterSyncName,
+		UID:                testClusterSyncUID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}
+	assert.Contains(t, lease.OwnerReferences, expectedOwnerReferenceFromLease, "expected owner reference from ClusterSyncLease to ClusterSync")
 
 	var syncFailedCond *hiveintv1alpha1.ClusterSyncCondition
 	for i, cond := range clusterSync.Status.Conditions {
@@ -1707,17 +1728,24 @@ func newScheme() *runtime.Scheme {
 }
 
 func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
-	return testcd.FullBuilder(testNamespace, testCDName, scheme).Options(
-		testcd.Installed(),
-		testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-			Type:   hivev1.UnreachableCondition,
-			Status: corev1.ConditionFalse,
-		}),
-	)
+	return testcd.FullBuilder(testNamespace, testCDName, scheme).
+		GenericOptions(
+			testgeneric.WithUID(testCDUID),
+		).
+		Options(
+			testcd.Installed(),
+			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}),
+		)
 }
 
 func clusterSyncBuilder(scheme *runtime.Scheme) testcs.Builder {
-	return testcs.FullBuilder(testNamespace, testClusterSyncName, scheme)
+	return testcs.FullBuilder(testNamespace, testClusterSyncName, scheme).GenericOptions(
+		testgeneric.WithUID(testClusterSyncUID),
+		testgeneric.WithOwnerReference(cdBuilder(scheme).Build()),
+	)
 }
 
 func buildSyncLease(t time.Time) *hiveintv1alpha1.ClusterSyncLease {
@@ -1725,6 +1753,13 @@ func buildSyncLease(t time.Time) *hiveintv1alpha1.ClusterSyncLease {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testNamespace,
 			Name:      testLeaseName,
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion:         "hiveinternal.openshift.io/v1alpha1",
+				Kind:               "ClusterSync",
+				Name:               testClusterSyncName,
+				UID:                testClusterSyncUID,
+				BlockOwnerDeletion: pointer.BoolPtr(true),
+			}},
 		},
 		Spec: hiveintv1alpha1.ClusterSyncLeaseSpec{
 			RenewTime: metav1.NewMicroTime(t),

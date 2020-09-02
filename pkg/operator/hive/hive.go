@@ -11,8 +11,6 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/utils/pointer"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -392,11 +390,14 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 		hLog.WithField("numberDeleted", numberDeleted).WithField("batchSize", len(syncSetInstanceList.Items)).Infof("deleting the next batch of SyncSetInstances")
 		for _, syncSetInstance := range syncSetInstanceList.Items {
 			c := syncSetInstanceClient.Namespace(syncSetInstance.GetNamespace())
+			resourceVersion := syncSetInstance.GetResourceVersion()
 			if len(syncSetInstance.GetFinalizers()) != 0 {
 				syncSetInstance.SetFinalizers(nil)
-				if syncSetInstance, err := c.Update(context.Background(), &syncSetInstance, metav1.UpdateOptions{}); err != nil {
+				updatedSyncSetInstance, err := c.Update(context.Background(), &syncSetInstance, metav1.UpdateOptions{})
+				if err != nil {
 					return numberDeleted, errors.Wrapf(err, "failed to remove finalizers from SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName())
 				}
+				resourceVersion = updatedSyncSetInstance.GetResourceVersion()
 			}
 			// Ensure that we are deleting the SyncSetInstance version to which we just updated. In case the Hive
 			// syncsetinstance controller is still running, this will protect against the controller putting back the
@@ -410,7 +411,7 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 				metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{
 						UID:             &uid,
-						ResourceVersion: pointer.StringPtr(syncSetInstance.GetResourceVersion()),
+						ResourceVersion: &resourceVersion,
 					},
 				},
 			); err != nil {

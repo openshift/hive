@@ -73,6 +73,10 @@ func (a *AzureActuator) Create() error {
 
 	logger.Debug("Managed zone successfully created")
 	a.managedZone = &managedZone
+	if err := a.ModifyStatus(); err != nil {
+		logger.WithError(err).Error("failed to modify DNSZone status")
+		return err
+	}
 	return nil
 }
 
@@ -85,12 +89,13 @@ func (a *AzureActuator) Delete() error {
 	resourceGroupName := a.dnsZone.Spec.Azure.ResourceGroupName
 	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone)
 
-	if err := a.deleteRecordsets(logger); err != nil {
+	logger.Info("Deleting recordsets in managedzone")
+	if err := DeleteAzureRecordSets(a.azureClient, a.dnsZone, logger); err != nil {
 		return err
 	}
 
 	logger.Info("Deleting managed zone")
-	err := a.azureClient.DeleteZone(context.TODO(), resourceGroupName, *a.managedZone.Name)
+	err := a.azureClient.DeleteZone(context.TODO(), resourceGroupName, a.dnsZone.Spec.Zone)
 	if err != nil {
 		log.WithError(err).Error("Cannot delete managed zone")
 	}
@@ -98,11 +103,11 @@ func (a *AzureActuator) Delete() error {
 	return err
 }
 
-func (a *AzureActuator) deleteRecordsets(logger log.FieldLogger) error {
-	logger.Info("Deleting recordsets in managedzone")
-	resourceGroupName := a.dnsZone.Spec.Azure.ResourceGroupName
-	zoneName := *a.managedZone.Name
-	recordSetsPage, err := a.azureClient.ListRecordSetsByZone(context.Background(), resourceGroupName, zoneName, "")
+// DeleteAzureRecordSets will remove all non-essential records from the DNSZone provided.
+func DeleteAzureRecordSets(azureClient azureclient.Client, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
+	resourceGroupName := dnsZone.Spec.Azure.ResourceGroupName
+	zoneName := dnsZone.Spec.Zone
+	recordSetsPage, err := azureClient.ListRecordSetsByZone(context.Background(), resourceGroupName, zoneName, "")
 	if err != nil {
 		return err
 	}
@@ -122,7 +127,7 @@ func (a *AzureActuator) deleteRecordsets(logger log.FieldLogger) error {
 				continue
 			}
 			logger.WithField("name", name).WithField("type", recordType).Info("deleting recordset")
-			if err := a.azureClient.DeleteRecordSet(context.Background(), resourceGroupName, zoneName, name, recordType); err != nil {
+			if err := azureClient.DeleteRecordSet(context.Background(), resourceGroupName, zoneName, name, recordType); err != nil {
 				return err
 			}
 		}
@@ -182,6 +187,10 @@ func (a *AzureActuator) Refresh() error {
 
 	logger.Debug("Found managed zone")
 	a.managedZone = &resp
+	if err := a.ModifyStatus(); err != nil {
+		logger.WithError(err).Error("failed to modify DNSZone status")
+		return err
+	}
 	return nil
 }
 

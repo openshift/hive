@@ -132,6 +132,23 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			},
 		},
 		{
+			name: "Delete DNSZone without status",
+			dnsZone: func() *hivev1.DNSZone {
+				dz := validDNSZoneBeingDeleted()
+				dz.Status.AWS = nil
+				return dz
+			}(),
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+				mockGetResourcePages(expect)
+				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
+				mockExistingAWSTags(expect)
+				mockDeleteAWSZone(expect)
+			},
+			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
+				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
+			},
+		},
+		{
 			name:            "Existing zone, link to parent, reachable SOA",
 			dnsZone:         validDNSZoneWithLinkToParent(),
 			soaLookupResult: true,

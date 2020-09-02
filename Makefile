@@ -29,7 +29,7 @@ IMG ?= hive-controller:latest
 # Image to use when deploying
 DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
 
-GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out vendor/,$(filter-out v1alpha1apiserver/,$(wildcard */)))))
+GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out vendor/,$(wildcard */))))
 GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
 GO_BUILD_BINDIR :=bin
 # Exclude e2e tests from unit testing
@@ -53,7 +53,7 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
-BINDATA_INPUTS :=./config/apiserver/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
+BINDATA_INPUTS :=./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
 $(call build-image,hive,$(IMG),./Dockerfile,.)
@@ -67,7 +67,6 @@ clean:
 vendor:
 	go mod tidy
 	go mod vendor
-	$(MAKE) -C v1alpha1apiserver vendor
 
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
 # the locations kubebuilder generates them.
@@ -120,11 +119,6 @@ test-e2e-destroycluster:
 .PHONY: test-e2e-uninstallhive
 test-e2e-uninstallhive:
 	go test $(GO_MOD_FLAGS) -v -timeout 0 -count=1 ./test/e2e/uninstallhive/...
-
-.PHONY: build-apiserver
-build-apiserver:
-	$(MAKE) -C v1alpha1apiserver build
-build: build-apiserver
 
 # Run against the configured cluster in ~/.kube/config
 run: build

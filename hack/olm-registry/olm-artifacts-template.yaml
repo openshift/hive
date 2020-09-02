@@ -20,8 +20,10 @@ parameters:
   value: "[]"
 - name: DELETE_PROTECTION
   value: ""
-- name: VELERO_ENABLED
+- name: BACKUP_VELERO_ENABLED
   value: false
+- name: BACKUP_VELERO_NAMESPACE
+  value: openshift-velero
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -66,4 +68,5 @@ objects:
     deleteProtection: ${DELETE_PROTECTION}
     backup:
       velero:
-        enabled: ${VELERO_ENABLED}
+        enabled: ${BACKUP_VELERO_ENABLED}
+        namespace: ${BACKUP_VELERO_NAMESPACE}

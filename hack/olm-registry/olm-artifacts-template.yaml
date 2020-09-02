@@ -68,5 +68,5 @@ objects:
     deleteProtection: ${DELETE_PROTECTION}
     backup:
       velero:
-        enabled: ${BACKUP_VELERO_ENABLED}
+        enabled: "${{BACKUP_VELERO_ENABLED}}"
         namespace: ${BACKUP_VELERO_NAMESPACE}

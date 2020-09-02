@@ -239,7 +239,20 @@ func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
 	defer mockCtrl.Finish()
 	scheme := newScheme()
 	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build())
-	rt.run(t)
+	rt.mockRemoteClientBuilder.EXPECT().RESTConfig().Return(&rest.Config{}, nil)
+	reconcileRequest := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: testNamespace,
+			Name:      testCDName,
+		},
+	}
+	result, err := rt.r.Reconcile(reconcileRequest)
+	require.NoError(t, err, "unexpected error from Reconcile")
+	assert.Equal(t, result, reconcile.Result{}, "unexpected result from reconcile")
+	err = rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeaseName}, &hiveintv1alpha1.ClusterSyncLease{})
+	assert.True(t, apierrors.IsNotFound(err), "expected no lease")
+	err = rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testClusterSyncName}, &hiveintv1alpha1.ClusterSync{})
+	assert.Nil(t, err, "expected there to be a ClusterSync")
 }
 
 func TestReconcileClusterSync_NoWorkToDo(t *testing.T) {
@@ -307,7 +320,7 @@ func TestReconcileClusterSync_ApplyResource(t *testing.T) {
 				testsyncset.WithApplyMode(tc.applyMode),
 				testsyncset.WithResources(resourceToApply),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
 			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			if tc.includeResourcesToDelete {
@@ -351,7 +364,7 @@ func TestReconcileClusterSync_ApplySecret(t *testing.T) {
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet, srcSecret)
 			secretToApply := testsecret.BasicBuilder().GenericOptions(
 				testgeneric.WithNamespace("dest-namespace"),
 				testgeneric.WithName("dest-name"),
@@ -397,7 +410,7 @@ func TestReconcileClusterSync_ApplyPatch(t *testing.T) {
 					Patch:      "test-patch",
 				}),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet)
 			rt.mockResourceHelper.EXPECT().Patch(
 				types.NamespacedName{Namespace: "dest-namespace", Name: "dest-name"},
 				"ConfigMap",
@@ -451,7 +464,7 @@ func TestReconcileClusterSync_ApplyAllTypes(t *testing.T) {
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet, srcSecret)
 			secretToApply := testsecret.BasicBuilder().GenericOptions(
 				testgeneric.WithNamespace("secret-namespace"),
 				testgeneric.WithName("secret-name"),
@@ -485,11 +498,10 @@ func TestReconcileClusterSync_ApplyAllTypes(t *testing.T) {
 
 func TestReconcileClusterSync_Reapply(t *testing.T) {
 	cases := []struct {
-		name          string
-		noClusterSync bool
-		noSyncLease   bool
-		renewTime     time.Time
-		expectApply   bool
+		name        string
+		noSyncLease bool
+		renewTime   time.Time
+		expectApply bool
 	}{
 		{
 			name:        "too soon",
@@ -500,12 +512,6 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 			name:        "time for reapply",
 			renewTime:   time.Now().Add(-3 * time.Hour),
 			expectApply: true,
-		},
-		{
-			name:          "too soon but no ClusterSync",
-			noClusterSync: true,
-			renewTime:     time.Now().Add(-time.Hour),
-			expectApply:   true,
 		},
 		{
 			name:        "no sync lease",
@@ -528,27 +534,23 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 				testsyncset.WithGeneration(1),
 				testsyncset.WithResources(resourceToApply),
 			)
-			existing := []runtime.Object{cdBuilder(scheme).Build(), syncSet}
-			if !tc.noClusterSync {
-				existing = append(existing, clusterSyncBuilder(scheme).Build(
+			existing := []runtime.Object{
+				cdBuilder(scheme).Build(),
+				clusterSyncBuilder(scheme).Build(
 					testcs.WithSyncSetStatus(buildSyncStatus("test-syncset",
 						withTransitionInThePast(),
 						withFirstSuccessTimeInThePast(),
 					),
-					)))
+					)),
+				syncSet,
 			}
 			if !tc.noSyncLease {
 				existing = append(existing, buildSyncLease(tc.renewTime))
 			}
 			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
-			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
-			if !tc.noClusterSync {
-				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(
-					withTransitionInThePast(),
-					withFirstSuccessTimeInThePast(),
-				)
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+				buildSyncStatus("test-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
 			}
-			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			if tc.expectApply {
 				rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
 			} else {
@@ -707,7 +709,7 @@ func TestReconcileClusterSync_ErrorApplyingResource(t *testing.T) {
 		testsyncset.WithGeneration(1),
 		testsyncset.WithResources(resourceToApply),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet)
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).
 		Return(resource.ApplyResult(""), errors.New("test apply error"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
@@ -728,7 +730,7 @@ func TestReconcileClusterSync_ErrorDecodingResource(t *testing.T) {
 		testsyncset.WithGeneration(1),
 	)
 	syncSet.Spec.Resources = []runtime.RawExtension{{Raw: []byte("{}")}}
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet)
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withFailureResult("failed to decode resource 0: error unmarshaling JSON: while decoding JSON: Object 'Kind' is missing in '{}'"),
@@ -751,7 +753,7 @@ func TestReconcileClusterSync_ErrorApplyingSecret(t *testing.T) {
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet, srcSecret)
 	secretToApply := testsecret.BasicBuilder().GenericOptions(
 		testgeneric.WithNamespace("dest-namespace"),
 		testgeneric.WithName("dest-name"),
@@ -786,7 +788,7 @@ func TestReconcileClusterSync_ErrorApplyingPatch(t *testing.T) {
 			Patch:      "test-patch",
 		}),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet)
 	rt.mockResourceHelper.EXPECT().Patch(
 		types.NamespacedName{Namespace: "dest-namespace", Name: "dest-name"},
 		"ConfigMap",
@@ -922,7 +924,7 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 				),
 				testsyncset.WithPatches(patchesToApply...),
 			)
-			existing := []runtime.Object{cdBuilder(scheme).Build(), syncSet}
+			existing := []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet}
 			for _, s := range srcSecrets {
 				existing = append(existing, s)
 			}
@@ -1160,7 +1162,7 @@ func TestReconcileClusterSync_FailingSyncSetDoesNotBlockOtherSyncSets(t *testing
 					testsyncset.WithResources(resourcesToApply[i]),
 				)
 			}
-			existing := []runtime.Object{cdBuilder(scheme).Build()}
+			existing := []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build()}
 			for _, r := range resourcesToApply {
 				existing = append(existing, r)
 			}
@@ -1249,7 +1251,10 @@ func TestReconcileClusterSync_FailureMessage(t *testing.T) {
 					),
 				)
 			}
-			existing := []runtime.Object{cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value"))}
+			existing := []runtime.Object{
+				cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value")),
+				clusterSyncBuilder(scheme).Build(),
+			}
 			existing = append(existing, syncSets...)
 			existing = append(existing, selectorSyncSets...)
 			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
@@ -1466,7 +1471,7 @@ func TestReconcileClusterSync_ApplyBehavior(t *testing.T) {
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+			rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet, srcSecret)
 			secretToApply := testsecret.BasicBuilder().GenericOptions(
 				testgeneric.WithNamespace("secret-namespace"),
 				testgeneric.WithName("secret-name"),
@@ -1530,6 +1535,7 @@ func TestReconcileClusterSync_IgnoreNotApplicableSyncSets(t *testing.T) {
 	)
 	rt := newReconcileTest(t, mockCtrl, scheme,
 		cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value")),
+		clusterSyncBuilder(scheme).Build(),
 		applicableSyncSet,
 		nonApplicableSyncSet,
 		applicableSelectorSyncSet,
@@ -1560,7 +1566,7 @@ func TestReconcileClusterSync_ApplySecretForSelectorSyncSet(t *testing.T) {
 	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cd, selectorSyncSet, srcSecret)
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, clusterSyncBuilder(scheme).Build(), selectorSyncSet, srcSecret)
 	secretToApply := testsecret.BasicBuilder().GenericOptions(
 		testgeneric.WithNamespace("dest-namespace"),
 		testgeneric.WithName("dest-name"),
@@ -1588,7 +1594,7 @@ func TestReconcileClusterSync_MissingSecretNamespaceForSelectorSyncSet(t *testin
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cd, selectorSyncSet, srcSecret)
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, clusterSyncBuilder(scheme).Build(), selectorSyncSet, srcSecret)
 	rt.expectedFailedMessage = "SelectorSyncSet test-selectorsyncset is failing"
 	rt.expectedSelectorSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-selectorsyncset",
 		withFailureResult("source namespace missing for secret 0"),
@@ -1614,7 +1620,7 @@ func TestReconcileClusterSync_ValidSecretNamespaceForSyncSet(t *testing.T) {
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet, srcSecret)
 	secretToApply := testsecret.BasicBuilder().GenericOptions(
 		testgeneric.WithNamespace("dest-namespace"),
 		testgeneric.WithName("dest-name"),
@@ -1644,7 +1650,7 @@ func TestReconcileClusterSync_InvalidSecretNamespaceForSyncSet(t *testing.T) {
 	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, srcSecret)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet, srcSecret)
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withFailureResult("source in wrong namespace for secret 0"),
@@ -1664,7 +1670,7 @@ func TestReconcileClusterSync_MissingSourceSecret(t *testing.T) {
 			testSecretMapping("test-secret", "dest-namespace", "dest-name"),
 		),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet)
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), syncSet)
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withFailureResult(`failed to read secret 0: secrets "test-secret" not found`),

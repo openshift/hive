@@ -274,8 +274,17 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	switch err := r.Get(context.Background(), request.NamespacedName, clusterSync); {
 	case apierrors.IsNotFound(err):
-		logger.Info("ClusterSync does not exist; will need to create")
-		needToCreateClusterSync = true
+		logger.Info("creating ClusterSync as it does not exist")
+		clusterSync.Namespace = cd.Namespace
+		clusterSync.Name = cd.Name
+		ownerRef := metav1.NewControllerRef(cd, cd.GroupVersionKind())
+		ownerRef.Controller = nil
+		clusterSync.OwnerReferences = []metav1.OwnerReference{*ownerRef}
+		if err := r.Create(context.Background(), clusterSync); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return reconcile.Result{}, err
@@ -334,20 +343,8 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 
 	setFailedCondition(clusterSync)
 
-	// Create or Update the ClusterSync
-	if needToCreateClusterSync {
-		logger.Info("creating ClusterSync")
-		clusterSync.Namespace = cd.Namespace
-		clusterSync.Name = cd.Name
-		ownerRef := metav1.NewControllerRef(cd, cd.GroupVersionKind())
-		ownerRef.Controller = nil
-		clusterSync.OwnerReferences = []metav1.OwnerReference{*ownerRef}
-		if err := r.Create(context.Background(), clusterSync); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
-			return reconcile.Result{}, err
-		}
-	}
-	if needToCreateClusterSync || !reflect.DeepEqual(origStatus, &clusterSync.Status) {
+	// Update the ClusterSync
+	if !reflect.DeepEqual(origStatus, &clusterSync.Status) {
 		logger.Info("updating ClusterSync")
 		if err := r.Status().Update(context.Background(), clusterSync); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterSync")

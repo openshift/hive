@@ -482,8 +482,10 @@ github.com/openshift/cloud-credential-operator/version
 github.com/openshift/cluster-api/pkg/apis/machine/common
 github.com/openshift/cluster-api/pkg/apis/machine/v1beta1
 # github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156
+github.com/openshift/cluster-api-provider-gcp/pkg/apis
 github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
 # github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
+github.com/openshift/cluster-api-provider-ovirt/pkg/apis
 github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1
 # github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1
@@ -537,6 +539,7 @@ github.com/openshift/library-go/pkg/operator/resource/resourceread
 # github.com/openshift/machine-api-operator v0.2.1-0.20200429102619-d36974451290
 github.com/openshift/machine-api-operator/pkg/apis/machine
 github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1
+github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider
 github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1
 # github.com/ovirt/go-ovirt v0.0.0-20200428093010-9bcc4fd4e6c0
 github.com/ovirt/go-ovirt
@@ -1531,6 +1534,7 @@ sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1
 # sigs.k8s.io/cluster-api-provider-azure v0.0.0 => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20200120114645-8a9592f1f87b
 sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1
 # sigs.k8s.io/cluster-api-provider-openstack v0.0.0 => github.com/openshift/cluster-api-provider-openstack v0.0.0-20200526112135-319a35b2e38e
+sigs.k8s.io/cluster-api-provider-openstack/pkg/apis
 sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1
 # sigs.k8s.io/controller-runtime v0.6.0
 sigs.k8s.io/controller-runtime/pkg/cache

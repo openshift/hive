@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -388,6 +389,7 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 			return numberDeleted, errors.Wrap(err, "failed to list SyncSetInstances")
 		}
 		hLog.WithField("numberDeleted", numberDeleted).WithField("batchSize", len(syncSetInstanceList.Items)).Infof("deleting the next batch of SyncSetInstances")
+		var errs []error
 		for _, syncSetInstance := range syncSetInstanceList.Items {
 			c := syncSetInstanceClient.Namespace(syncSetInstance.GetNamespace())
 			resourceVersion := syncSetInstance.GetResourceVersion()
@@ -395,7 +397,8 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 				syncSetInstance.SetFinalizers(nil)
 				updatedSyncSetInstance, err := c.Update(context.Background(), &syncSetInstance, metav1.UpdateOptions{})
 				if err != nil {
-					return numberDeleted, errors.Wrapf(err, "failed to remove finalizers from SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName())
+					errs = append(errs, errors.Wrapf(err, "failed to remove finalizers from SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName()))
+					continue
 				}
 				resourceVersion = updatedSyncSetInstance.GetResourceVersion()
 			}
@@ -405,7 +408,7 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 			// and puts back the finalizer, then the controller may attempt to delete synced resources in the target
 			// cluster.
 			uid := syncSetInstance.GetUID()
-			if err := c.Delete(
+			switch err := c.Delete(
 				context.Background(),
 				syncSetInstance.GetName(),
 				metav1.DeleteOptions{
@@ -414,11 +417,16 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 						ResourceVersion: &resourceVersion,
 					},
 				},
-			); err != nil {
-				return numberDeleted, errors.Wrapf(err, "failed to delete SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName())
+			); {
+			case err == nil, apierrors.IsNotFound(err):
+				numberDeleted++
+			default:
+				errs = append(errs, errors.Wrapf(err, "failed to delete SyncSetInstance %s/%s", syncSetInstance.GetNamespace(), syncSetInstance.GetName()))
 			}
 		}
-		numberDeleted += len(syncSetInstanceList.Items)
+		if len(errs) != 0 {
+			return numberDeleted, utilerrors.NewAggregate(errs)
+		}
 		cont := syncSetInstanceList.GetContinue()
 		if cont == "" {
 			break

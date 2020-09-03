@@ -73,7 +73,7 @@ func (a *AzureActuator) Create() error {
 
 	logger.Debug("Managed zone successfully created")
 	a.managedZone = &managedZone
-	if err := a.ModifyStatus(); err != nil {
+	if err := a.modifyStatus(); err != nil {
 		logger.WithError(err).Error("failed to modify DNSZone status")
 		return err
 	}
@@ -155,8 +155,8 @@ func (a *AzureActuator) GetNameServers() ([]string, error) {
 	return *result, nil
 }
 
-// ModifyStatus implements the ModifyStatus call of the actuator interface
-func (a *AzureActuator) ModifyStatus() error {
+// modifyStatus updates the DnsZone's status with Azure specific information.
+func (a *AzureActuator) modifyStatus() error {
 	if a.managedZone == nil {
 		return errors.New("managedZone is unpopulated")
 	}
@@ -187,7 +187,7 @@ func (a *AzureActuator) Refresh() error {
 
 	logger.Debug("Found managed zone")
 	a.managedZone = &resp
-	if err := a.ModifyStatus(); err != nil {
+	if err := a.modifyStatus(); err != nil {
 		logger.WithError(err).Error("failed to modify DNSZone status")
 		return err
 	}

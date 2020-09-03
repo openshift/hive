@@ -298,14 +298,6 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
 	}
 
-	r.logger.Debug("Letting the actuator modify the DNSZone status before sending it to kube.")
-	err = actuator.ModifyStatus()
-	if err != nil {
-		r.logger.WithError(err).Error("error modifying DNSZone status")
-		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
-		return reconcileResult, err
-	}
-
 	return reconcileResult, r.updateStatus(nameServers, isZoneSOAAvailable, dnsZone)
 }
 

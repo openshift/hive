@@ -194,3 +194,45 @@ func (mr *MockClientMockRecorder) ListComputeImages(arg0 interface{}) *gomock.Ca
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListComputeImages", reflect.TypeOf((*MockClient)(nil).ListComputeImages), arg0)
 }
+
+// ListComputeInstances mocks base method
+func (m *MockClient) ListComputeInstances(arg0 gcpclient.ListComputeInstancesOptions, arg1 func(*compute.InstanceAggregatedList) error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListComputeInstances", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ListComputeInstances indicates an expected call of ListComputeInstances
+func (mr *MockClientMockRecorder) ListComputeInstances(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListComputeInstances", reflect.TypeOf((*MockClient)(nil).ListComputeInstances), arg0, arg1)
+}
+
+// StopInstance mocks base method
+func (m *MockClient) StopInstance(arg0 *compute.Instance) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StopInstance", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StopInstance indicates an expected call of StopInstance
+func (mr *MockClientMockRecorder) StopInstance(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstance", reflect.TypeOf((*MockClient)(nil).StopInstance), arg0)
+}
+
+// StartInstance mocks base method
+func (m *MockClient) StartInstance(arg0 *compute.Instance) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartInstance", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StartInstance indicates an expected call of StartInstance
+func (mr *MockClientMockRecorder) StartInstance(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartInstance", reflect.TypeOf((*MockClient)(nil).StartInstance), arg0)
+}

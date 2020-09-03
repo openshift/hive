@@ -3,6 +3,8 @@ package gcpclient
 import (
 	"context"
 	"io/ioutil"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/openshift/hive/pkg/constants"
@@ -11,6 +13,7 @@ import (
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	compute "google.golang.org/api/compute/v1"
 	dns "google.golang.org/api/dns/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	serviceusage "google.golang.org/api/serviceusage/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,6 +44,12 @@ type Client interface {
 	ListComputeZones(ListComputeZonesOptions) (*compute.ZoneList, error)
 
 	ListComputeImages(ListComputeImagesOptions) (*compute.ImageList, error)
+
+	ListComputeInstances(ListComputeInstancesOptions, func(*compute.InstanceAggregatedList) error) error
+
+	StopInstance(*compute.Instance) error
+
+	StartInstance(*compute.Instance) error
 }
 
 // ListManagedZonesOptions are the options for listing managed zones.
@@ -56,6 +65,11 @@ type ListResourceRecordSetsOptions struct {
 	PageToken  string
 	Name       string
 	Type       string
+}
+
+type ListComputeInstancesOptions struct {
+	Filter string
+	Fields string
 }
 
 type gcpClient struct {
@@ -218,6 +232,39 @@ func (c *gcpClient) ListComputeImages(opts ListComputeImagesOptions) (*compute.I
 	return call.Do()
 }
 
+func (c *gcpClient) ListComputeInstances(opts ListComputeInstancesOptions, pagesFn func(*compute.InstanceAggregatedList) error) error {
+	req := c.computeClient.Instances.AggregatedList(c.projectName)
+	if len(opts.Fields) > 0 {
+		req.Fields(googleapi.Field(opts.Fields))
+	}
+	if len(opts.Filter) > 0 {
+		req = req.Filter(opts.Filter)
+	}
+	err := req.Pages(context.TODO(), pagesFn)
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch compute instances")
+	}
+	return nil
+}
+
+func (c *gcpClient) StopInstance(instance *compute.Instance) error {
+	zone := instanceZone(instance)
+	_, err := c.computeClient.Instances.Stop(c.projectName, zone, instance.Name).Do()
+	if err != nil && !isNotModified(err) {
+		return errors.Wrapf(err, "failed to stop instance %s in zone %s", instance.Name, zone)
+	}
+	return nil
+}
+
+func (c *gcpClient) StartInstance(instance *compute.Instance) error {
+	zone := instanceZone(instance)
+	_, err := c.computeClient.Instances.Start(c.projectName, zone, instance.Name).Do()
+	if err != nil && !isNotModified(err) {
+		return errors.Wrapf(err, "failed to start instance %s in zone %s", instance.Name, zone)
+	}
+	return nil
+}
+
 // NewClient creates our client wrapper object for interacting with GCP. The supplied byte slice contains the GCP creds.
 func NewClient(authJSON []byte) (Client, error) {
 	return newClient(authJSONPassthroughSource(authJSON))
@@ -331,4 +378,25 @@ func authJSONFromFileSource(filename string) func() ([]byte, error) {
 	return func() ([]byte, error) {
 		return ioutil.ReadFile(filename)
 	}
+}
+
+// instanceZone extracts the zone name from a Zone field in a compute Instance.
+// The field is originally returned in the form of a url:
+// https://www.googleapis.com/compute/v1/projects/project-id/zones/us-central1-a
+func instanceZone(instance *compute.Instance) string {
+	parts := strings.Split(instance.Zone, "/")
+	if len(parts) > 1 {
+		return parts[len(parts)-1]
+	}
+	return ""
+}
+
+// isNotModified returns true if the error is a StatusNotModified error, which means
+// the requested operation has already taken place.
+func isNotModified(err error) bool {
+	if err == nil {
+		return false
+	}
+	ae, ok := err.(*googleapi.Error)
+	return ok && ae.Code == http.StatusNotModified
 }

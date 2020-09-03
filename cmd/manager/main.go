@@ -19,7 +19,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"k8s.io/klog"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -191,10 +190,6 @@ func newRootCommand() *cobra.Command {
 			}
 
 			if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
-			}
-
-			if err := awsprovider.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Fatal(err)
 			}
 

@@ -6,6 +6,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	openstackprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis"
+	openstackproviderv1alpha1 "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
+
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installosp "github.com/openshift/installer/pkg/asset/machines/openstack"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -17,15 +22,26 @@ import (
 // OpenStackActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type OpenStackActuator struct {
-	logger log.FieldLogger
+	logger  log.FieldLogger
+	osImage string
 }
 
 var _ Actuator = &OpenStackActuator{}
 
+func addOpenStackProviderToScheme(scheme *runtime.Scheme) error {
+	return openstackprovider.AddToScheme(scheme)
+}
+
 // NewOpenStackActuator is the constructor for building a OpenStackActuator
-func NewOpenStackActuator(logger log.FieldLogger) (*OpenStackActuator, error) {
+func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*OpenStackActuator, error) {
+	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
+	if err != nil {
+		logger.WithError(err).Error("error getting os image from master machine")
+		return nil, err
+	}
 	actuator := &OpenStackActuator{
-		logger: logger,
+		logger:  logger,
+		osImage: osImage,
 	}
 	return actuator, nil
 }
@@ -64,22 +80,17 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	// will be caught by unit tests.
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
-			OpenStack: &installertypesosp.Platform{},
+			OpenStack: &installertypesosp.Platform{
+				Cloud: cd.Spec.Platform.OpenStack.Cloud,
+			},
 		},
 	}
-
-	// The installer will assume to upload a copy of the RHCOS image for the release with this name.
-	// It is possible to override this in the installer with the OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE
-	// env var, but we do not expose this in Hive, so it should be safe to assume the installers default
-	// name format. If we do add support for uploading images more efficiently (as it's a 2GB dl+ul per
-	// cluster install), we should stick to this same name format, or update this line of code.
-	osImage := fmt.Sprintf("%s-rhcos", cd.Spec.ClusterMetadata.InfraID)
 
 	installerMachineSets, err := installosp.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,
-		osImage,
+		a.osImage,
 		workerRole,
 		workerUserData(clusterVersion),
 	)
@@ -88,4 +99,38 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	}
 
 	return installerMachineSets, true, nil
+}
+
+// Get the OS image from an existing master machine.
+func getOpenStackOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+	providerSpec, err := decodeOpenStackMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode OpenstackProviderSpec from master machine")
+		return "", errors.Wrap(err, "cannot decode OpenstackProviderSpec from master machine")
+	}
+	var osImage string
+	if providerSpec.RootVolume != nil {
+		osImage = providerSpec.RootVolume.SourceUUID
+	} else {
+		osImage = providerSpec.Image
+	}
+	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
+	return osImage, nil
+}
+
+func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*openstackproviderv1alpha1.OpenstackProviderSpec, error) {
+	codecFactory := serializer.NewCodecFactory(scheme)
+	decoder := codecFactory.UniversalDecoder(openstackproviderv1alpha1.SchemeGroupVersion)
+	if rawExt == nil {
+		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+	}
+	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode OpenStack ProviderSpec: %v", err)
+	}
+	spec, ok := obj.(*openstackproviderv1alpha1.OpenstackProviderSpec)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
+	}
+	return spec, nil
 }

@@ -6,6 +6,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+
+	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis"
+	ovirtproviderv1beta1 "github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1"
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installovirt "github.com/openshift/installer/pkg/asset/machines/ovirt"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -17,15 +22,26 @@ import (
 // OvirtActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster
 type OvirtActuator struct {
-	logger log.FieldLogger
+	logger  log.FieldLogger
+	osImage string
 }
 
 var _ Actuator = &OvirtActuator{}
 
+func addOvirtProviderToScheme(scheme *runtime.Scheme) error {
+	return ovirtprovider.AddToScheme(scheme)
+}
+
 // NewOvirtActuator is the constructor for building a OvirtActuator
-func NewOvirtActuator(logger log.FieldLogger) (*OvirtActuator, error) {
+func NewOvirtActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*OvirtActuator, error) {
+	osImage, err := getOvirtOSImage(masterMachine, scheme, logger)
+	if err != nil {
+		logger.WithError(err).Error("error getting os image from master machine")
+		return nil, err
+	}
 	actuator := &OvirtActuator{
-		logger: logger,
+		logger:  logger,
+		osImage: osImage,
 	}
 	return actuator, nil
 }
@@ -74,18 +90,11 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		},
 	}
 
-	// The installer will upload a copy of the RHCOS image for the release with this name.
-	// It is possible to override this in the installer with the OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE
-	// env var, but we do not expose this in Hive, so it should be safe to assume the installers default
-	// name format. If we do add support for uploading images more efficiently (as it's a 2GB dl+ul per
-	// cluster install), we should stick to this same name format, or update this line of code.
-	osImage := fmt.Sprintf("%s-rhcos", cd.Spec.ClusterMetadata.InfraID)
-
 	installerMachineSets, err := installovirt.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,
-		osImage,
+		a.osImage,
 		workerRole,
 		workerUserData(clusterVersion),
 	)
@@ -94,4 +103,33 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	}
 
 	return installerMachineSets, true, nil
+}
+
+// Get the OS image from an existing master machine.
+func getOvirtOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+	providerSpec, err := decodeOvirtMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode OvirtMachineProviderSpec from master machine")
+		return "", errors.Wrap(err, "cannot decode OvirtMachineProviderSpec from master machine")
+	}
+	osImage := providerSpec.TemplateName
+	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
+	return osImage, nil
+}
+
+func decodeOvirtMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*ovirtproviderv1beta1.OvirtMachineProviderSpec, error) {
+	codecFactory := serializer.NewCodecFactory(scheme)
+	decoder := codecFactory.UniversalDecoder(ovirtproviderv1beta1.SchemeGroupVersion)
+	if rawExt == nil {
+		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+	}
+	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode Ovirt ProviderSpec: %v", err)
+	}
+	spec, ok := obj.(*ovirtproviderv1beta1.OvirtMachineProviderSpec)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
+	}
+	return spec, nil
 }

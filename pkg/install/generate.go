@@ -466,6 +466,14 @@ func GenerateUninstallerJobForDeprovision(
 		DNSPolicy:             corev1.DNSClusterFirst,
 		RestartPolicy:         restartPolicy,
 		ShareProcessNamespace: pointer.BoolPtr(true),
+		Volumes: []corev1.Volume{
+			{
+				Name: "output",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
+				},
+			},
+		},
 	}
 
 	completions := int32(1)
@@ -529,6 +537,8 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"debug",
 				"--region",
 				req.Spec.Platform.AWS.Region,
+				"--completion-file",
+				constants.DeprovisionCompletedFile,
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
 			},
 		},
@@ -563,28 +573,24 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		)
 		containers[0].Env = env
 
-		// Setup a sidecar container to watch for changes to the credentials and kill the pod if detected:
 		deprovisionCredsMount := "/etc/secrets"
-		job.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				Name: "creds",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: credentialsSecret,
-					},
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "creds",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: credentialsSecret,
 				},
 			},
-		}
+		})
 		// The file watcher expects the files to exist in the container with the process name hiveutil,
 		// (acessed via /proc/{pid}/root/...) so we must
 		// mount them into the other container even though it does not explicitly use them right now. (env vars)
-		containers[0].VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      "creds",
-				MountPath: deprovisionCredsMount,
-			},
-		}
-		// Add the sidecar container
+		containers[0].VolumeMounts = append(containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "creds",
+			MountPath: deprovisionCredsMount,
+		})
+
+		// Setup a sidecar container to watch for changes to the credentials and kill the pod if detected:
 		containers = append(containers, corev1.Container{
 			Name:            "credentials-monitor",
 			Image:           images.GetHiveImage(),
@@ -597,6 +603,14 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				fmt.Sprintf("--files=%s,%s",
 					filepath.Join(deprovisionCredsMount, constants.AWSAccessKeyIDSecretKey),
 					filepath.Join(deprovisionCredsMount, constants.AWSSecretAccessKeySecretKey)),
+				"--completion-file",
+				constants.DeprovisionCompletedFile,
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "output",
+					MountPath: "/output",
+				},
 			},
 		})
 	}

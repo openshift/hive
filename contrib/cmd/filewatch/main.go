@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/openshift/library-go/pkg/operator/watchdog"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/openshift/hive/contrib/pkg/watchdog"
 )
 
 func main() {

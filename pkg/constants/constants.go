@@ -272,6 +272,10 @@ const (
 
 	// OvirtConfigEnvVar is the environment variable specifying the oVirt config path
 	OvirtConfigEnvVar = "OVIRT_CONFIG"
+
+	// DeprovisionCompletedFile is a file written when a hiveutil deprovision command completes, for use by
+	// sidecars which may be monitoring it.
+	DeprovisionCompletedFile = "/output/deprovision-completed"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

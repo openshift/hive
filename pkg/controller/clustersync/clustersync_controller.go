@@ -22,8 +22,10 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -162,6 +164,25 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync) error {
 		&source.Kind{Type: &hivev1.SelectorSyncSet{}},
 		&handler.EnqueueRequestsFromMapFunc{
 			ToRequests: requestsForSelectorSyncSet(r.Client, r.logger),
+		},
+	); err != nil {
+		return err
+	}
+
+	// Watch for creates of ClusterSyncs. The controller only watches creates because there is not spec and no benefit
+	// to requeueing when the status changes.
+	if err := c.Watch(
+		&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}},
+		handler.Funcs{
+			CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+				clusterSync, ok := e.Object.(*hiveintv1alpha1.ClusterSync)
+				if !ok {
+					return
+				}
+				// ClusterSync has the same name as the ClusterDeployment
+				cdKey := client.ObjectKey{Namespace: clusterSync.Namespace, Name: clusterSync.Name}.String()
+				q.Add(cdKey)
+			},
 		},
 	); err != nil {
 		return err

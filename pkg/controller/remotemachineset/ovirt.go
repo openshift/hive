@@ -42,6 +42,10 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	if pool.Spec.Platform.Ovirt == nil {
 		return nil, false, errors.New("MachinePool is not for oVirt")
 	}
+	clusterVersion, err := getClusterVersion(cd)
+	if err != nil {
+		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
+	}
 
 	computePool := baseMachinePool(pool)
 
@@ -77,7 +81,14 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	// cluster install), we should stick to this same name format, or update this line of code.
 	osImage := fmt.Sprintf("%s-rhcos", cd.Spec.ClusterMetadata.InfraID)
 
-	installerMachineSets, err := installovirt.MachineSets(cd.Spec.ClusterMetadata.InfraID, ic, computePool, osImage, workerRole, workerUserData)
+	installerMachineSets, err := installovirt.MachineSets(
+		cd.Spec.ClusterMetadata.InfraID,
+		ic,
+		computePool,
+		osImage,
+		workerRole,
+		workerUserData(clusterVersion),
+	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}

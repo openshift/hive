@@ -59,22 +59,12 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		}
 	}
 
-	// I do not know why the installer chose to represent this as a "0" or "1" string,
-	// but the resulting MachineSets use a bool, so we're opting to model this more correctly
-	// in our API and save a little validation.
-	trunkSupportStr := "0"
-	if cd.Spec.Platform.OpenStack.TrunkSupport {
-		trunkSupportStr = "1"
-	}
-
 	// Fake an install config as we do with other actuators. We only populate what we know is needed today.
 	// WARNING: changes to use more of installconfig in the MachineSets function can break here. Hopefully
 	// will be caught by unit tests.
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
-			OpenStack: &installertypesosp.Platform{
-				TrunkSupport: trunkSupportStr,
-			},
+			OpenStack: &installertypesosp.Platform{},
 		},
 	}
 

@@ -175,7 +175,6 @@ func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 	patcher := kcmdapply.Patcher{
 		Mapping:       info.Mapping,
 		Helper:        kresource.NewHelper(info.Client, info.Mapping),
-		DynamicClient: c,
 		Overwrite:     true,
 		BackOff:       clockwork.NewRealClock(),
 		OpenapiSchema: openAPISchema,

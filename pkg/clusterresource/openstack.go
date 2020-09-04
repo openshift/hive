@@ -84,7 +84,6 @@ func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *install
 			ExternalNetwork: p.ExternalNetwork,
 			FlavorName:      p.ComputeFlavor,
 			LbFloatingIP:    p.APIFloatingIP,
-			OctaviaSupport:  "0",
 		},
 	}
 

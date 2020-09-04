@@ -30,8 +30,6 @@ type OvirtCloudBuilder struct {
 	NetworkName string
 	// APIVIP is an IP which will be served by bootstrap and then pivoted masters, using keepalived
 	APIVIP string
-	// DNSVIP is the IP of the internal DNS which will be operated by the cluster
-	DNSVIP string
 	// IngressIP is an external IP which routes to the default ingress controller.
 	// The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
 	IngressVIP string
@@ -110,7 +108,6 @@ func (p *OvirtCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 			StorageDomainID: p.StorageDomainID,
 			NetworkName:     p.NetworkName,
 			APIVIP:          p.APIVIP,
-			DNSVIP:          p.DNSVIP,
 			IngressVIP:      p.IngressVIP,
 		},
 	}

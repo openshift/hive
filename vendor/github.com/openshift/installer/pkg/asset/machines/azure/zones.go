@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
-	azureutil "github.com/openshift/installer/pkg/asset/installconfig/azure"
+	"github.com/openshift/installer/pkg/asset/installconfig/azure"
 )
 
-// AvailabilityZones retrieves a list of availability zones for the given region and instance type.
-func AvailabilityZones(region string, instanceType string) ([]string, error) {
-	skusClient, err := skusClient()
+// AvailabilityZones retrieves a list of availability zones for the given cloud, region, and instance type.
+func AvailabilityZones(session *azure.Session, region string, instanceType string) ([]string, error) {
+	skusClient, err := skusClient(session)
 	if err != nil {
 		return nil, err
 	}
@@ -25,14 +25,9 @@ func AvailabilityZones(region string, instanceType string) ([]string, error) {
 	return zones, nil
 }
 
-func skusClient() (client *compute.ResourceSkusClient, err error) {
-	ssn, err := azureutil.GetSession()
-	if err != nil {
-		return nil, err
-	}
-
-	skusClient := compute.NewResourceSkusClient(ssn.Credentials.SubscriptionID)
-	skusClient.Authorizer = ssn.Authorizer
+func skusClient(session *azure.Session) (client *compute.ResourceSkusClient, err error) {
+	skusClient := compute.NewResourceSkusClientWithBaseURI(session.Environment.ResourceManagerEndpoint, session.Credentials.SubscriptionID)
+	skusClient.Authorizer = session.Authorizer
 	return &skusClient, nil
 }
 

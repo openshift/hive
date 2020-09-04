@@ -4,6 +4,9 @@ package openstack
 import (
 	"fmt"
 
+	"github.com/gophercloud/gophercloud"
+	netext "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions"
+	"github.com/gophercloud/utils/openstack/clientconfig"
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,15 +37,12 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 	if poolPlatform := pool.Platform.Name(); poolPlatform != openstack.Name {
 		return nil, fmt.Errorf("non-OpenStack machine-pool: %q", poolPlatform)
 	}
+
+	mpool := pool.Platform.OpenStack
 	platform := config.Platform.OpenStack
-
-	az := ""
-	trunk := platform.TrunkSupport
-
-	provider := generateProvider(clusterID, platform, pool.Platform.OpenStack, osImage, az, role, userDataSecret, trunk)
-
-	if role == "master" {
-		provider.ServerGroupName = clusterID + "-master"
+	trunkSupport, err := checkNetworkExtensionAvailability(platform.Cloud, "trunk")
+	if err != nil {
+		return nil, err
 	}
 
 	total := int64(1)
@@ -50,7 +50,33 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 		total = *pool.Replicas
 	}
 	machines := make([]machineapi.Machine, 0, total)
+	providerConfigs := map[string]*openstackprovider.OpenstackProviderSpec{}
 	for idx := int64(0); idx < total; idx++ {
+		zone := mpool.Zones[int(idx)%len(mpool.Zones)]
+		var provider *openstackprovider.OpenstackProviderSpec
+
+		if _, ok := providerConfigs[zone]; !ok {
+			provider, err = generateProvider(
+				clusterID,
+				platform,
+				mpool,
+				osImage,
+				zone,
+				role,
+				userDataSecret,
+				trunkSupport,
+			)
+			if err != nil {
+				return nil, err
+			}
+			providerConfigs[zone] = provider
+		}
+
+		provider = providerConfigs[zone]
+		if role == "master" {
+			provider.ServerGroupName = clusterID + "-master"
+		}
+
 		machine := machineapi.Machine{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "machine.openshift.io/v1beta1",
@@ -78,7 +104,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 	return machines, nil
 }
 
-func generateProvider(clusterID string, platform *openstack.Platform, mpool *openstack.MachinePool, osImage string, az string, role, userDataSecret string, trunk string) *openstackprovider.OpenstackProviderSpec {
+func generateProvider(clusterID string, platform *openstack.Platform, mpool *openstack.MachinePool, osImage string, az string, role, userDataSecret string, trunkSupport bool) (*openstackprovider.OpenstackProviderSpec, error) {
 	var networks []openstackprovider.NetworkParam
 	if platform.MachinesSubnet != "" {
 		networks = []openstackprovider.NetworkParam{{
@@ -126,7 +152,7 @@ func generateProvider(clusterID string, platform *openstack.Platform, mpool *ope
 		Networks:         networks,
 		AvailabilityZone: az,
 		SecurityGroups:   securityGroups,
-		Trunk:            trunkSupportBoolean(trunk),
+		Trunk:            trunkSupport,
 		Tags: []string{
 			fmt.Sprintf("openshiftClusterID=%s", clusterID),
 		},
@@ -145,16 +171,28 @@ func generateProvider(clusterID string, platform *openstack.Platform, mpool *ope
 	} else {
 		spec.Image = osImage
 	}
-	return &spec
+	return &spec, nil
 }
 
-func trunkSupportBoolean(trunkSupport string) (result bool) {
-	if trunkSupport == "1" {
-		result = true
-	} else {
-		result = false
+func checkNetworkExtensionAvailability(cloud, alias string) (bool, error) {
+	opts := &clientconfig.ClientOpts{
+		Cloud: cloud,
 	}
-	return
+
+	conn, err := clientconfig.NewServiceClient("network", opts)
+	if err != nil {
+		return false, err
+	}
+
+	res := netext.Get(conn, alias)
+	if res.Err != nil {
+		if _, ok := res.Err.(gophercloud.ErrDefault404); ok {
+			return false, nil
+		}
+		return false, res.Err
+	}
+
+	return true, nil
 }
 
 // ConfigMasters sets the PublicIP flag and assigns a set of load balancers to the given machines

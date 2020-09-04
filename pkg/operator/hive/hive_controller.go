@@ -348,13 +348,6 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAPI(hLog, h, instance)
-	if err != nil {
-		hLog.WithError(err).Error("error deploying Hive v1alpha1 aggregated API")
-		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
-		return reconcile.Result{}, err
-	}
-
 	if err := r.cleanupLegacySyncSetInstances(hLog); err != nil {
 		hLog.WithError(err).Error("error cleaning up legacy SyncSetInstances")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)

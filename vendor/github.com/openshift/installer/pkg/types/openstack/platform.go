@@ -5,7 +5,8 @@ package openstack
 type Platform struct {
 	// Region specifies the OpenStack region where the cluster will be created.
 	// Deprecated: this value is not used by the installer.
-	Region string `json:"region"`
+	// +optional
+	DeprecatedRegion string `json:"region"`
 
 	// DefaultMachinePlatform is the default configuration used when
 	// installing on OpenStack for machine pools which do not define their own
@@ -17,14 +18,21 @@ type Platform struct {
 	Cloud string `json:"cloud"`
 
 	// ExternalNetwork is name of the external network in your OpenStack cluster.
-	ExternalNetwork string `json:"externalNetwork"`
+	// +optional
+	ExternalNetwork string `json:"externalNetwork,omitempty"`
 
 	// FlavorName is the name of the compute flavor to use for instances in this cluster.
 	FlavorName string `json:"computeFlavor"`
 
 	// LbFloatingIP is the IP address of an available floating IP in your OpenStack cluster
 	// to associate with the OpenShift load balancer.
-	LbFloatingIP string `json:"lbFloatingIP"`
+	// +optional
+	LbFloatingIP string `json:"lbFloatingIP,omitempty"`
+
+	// IngressFloatingIP is the ID of an available floating IP in your OpenStack cluster
+	// that will be associated with the OpenShift ingress port
+	// +optional
+	IngressFloatingIP string `json:"ingressFloatingIP,omitempty"`
 
 	// ExternalDNS holds the IP addresses of dns servers that will
 	// be added to the dns resolution of all instances in the cluster.
@@ -33,11 +41,15 @@ type Platform struct {
 
 	// TrunkSupport holds a `0` or `1` value that indicates whether or not to use trunk ports
 	// in your OpenShift cluster.
-	TrunkSupport string `json:"trunkSupport"`
+	// Deprecated: this value is set by the installer automatically.
+	// +optional
+	DeprecatedTrunkSupport string `json:"trunkSupport"`
 
 	// OctaviaSupport holds a `0` or `1` value that indicates whether your OpenStack
 	// cluster supports Octavia Loadbalancing.
-	OctaviaSupport string `json:"octaviaSupport"`
+	// Deprecated: this value is set by the installer automatically.
+	// +optional
+	DeprecatedOctaviaSupport string `json:"octaviaSupport"`
 
 	// ClusterOSImage is either a URL with `http(s)` or `file` scheme to override
 	// the default OS image for cluster nodes, or an existing Glance image name.

@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -428,6 +429,10 @@ func (*fakeManager) GetAPIReader() client.Reader {
 	panic("not implemented")
 }
 func (*fakeManager) GetWebhookServer() *webhook.Server {
+	panic("not implemented")
+}
+
+func (*fakeManager) GetLogger() logr.Logger {
 	panic("not implemented")
 }
 

@@ -10,7 +10,7 @@ import (
 )
 
 func (o *ClusterUninstaller) listInstanceGroups() ([]cloudResource, error) {
-	return o.listInstanceGroupsWithFilter("items/*/instanceGroups(name,zone),nextPageToken", o.clusterIDFilter(), nil)
+	return o.listInstanceGroupsWithFilter("items/*/instanceGroups(name,selfLink,zone),nextPageToken", o.clusterIDFilter(), nil)
 }
 
 // listInstanceGroupsWithFilter lists addresses in the project that satisfy the filter criteria.
@@ -37,6 +37,7 @@ func (o *ClusterUninstaller) listInstanceGroupsWithFilter(fields string, filter 
 						name:     item.Name,
 						typeName: "instancegroup",
 						zone:     zoneName,
+						url:      item.SelfLink,
 					})
 				}
 			}
@@ -105,13 +106,14 @@ func (o *ClusterUninstaller) destroyInstanceGroups() error {
 		return err
 	}
 	items := o.insertPendingItems("instancegroup", found)
-	errs := []error{}
 	for _, item := range items {
 		err := o.deleteInstanceGroup(item)
 		if err != nil {
-			errs = append(errs, err)
+			o.errorTracker.suppressWarning(item.key, err, o.Logger)
 		}
 	}
-	items = o.getPendingItems("instancegroup")
-	return aggregateError(errs, len(items))
+	if items = o.getPendingItems("instancegroup"); len(items) > 0 {
+		return errors.Errorf("%d items pending", len(items))
+	}
+	return nil
 }

@@ -15,7 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
+	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
+	awsproviderv1beta1 "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
@@ -44,8 +45,20 @@ var (
 	reg = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
 )
 
+func addAWSProviderToScheme(scheme *runtime.Scheme) error {
+	return awsprovider.AddToScheme(scheme)
+}
+
 // NewAWSActuator is the constructor for building a AWSActuator
-func NewAWSActuator(client client.Client, awsCreds *corev1.Secret, region string, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (*AWSActuator, error) {
+func NewAWSActuator(
+	client client.Client,
+	awsCreds *corev1.Secret,
+	region string,
+	pool *hivev1.MachinePool,
+	masterMachine *machineapi.Machine,
+	scheme *runtime.Scheme,
+	logger log.FieldLogger,
+) (*AWSActuator, error) {
 	awsClient, err := awsclient.NewClientFromSecret(awsCreds, region)
 	if err != nil {
 		logger.WithError(err).Warn("failed to create AWS client")
@@ -55,7 +68,7 @@ func NewAWSActuator(client client.Client, awsCreds *corev1.Secret, region string
 	if amiID != "" {
 		log.Infof("using AMI override from %s annotation: %s", hivev1.MachinePoolImageIDOverrideAnnotation, amiID)
 	} else {
-		amiID, err = getAWSAMIID(remoteMachineSets, scheme, logger)
+		amiID, err = getAWSAMIID(masterMachine, scheme, logger)
 		if err != nil {
 			logger.WithError(err).Warn("failed to get AMI ID")
 			return nil, err
@@ -178,31 +191,20 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	return installerMachineSets, true, nil
 }
 
-// Scan the pre-existing machinesets to find an AMI ID we can use if we need to create
-// new machinesets.
-// TODO: this will need work at some point in the future, ideally the AMI should come from
-// release image someday, hopefully we can hold off until that is the case, and look it up when
-// we extract installer image refs.
-func getAWSAMIID(remoteMachineSets []machineapi.MachineSet, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	var amiID string
-	for _, ms := range remoteMachineSets {
-		awsProviderSpec, err := decodeAWSMachineProviderSpec(ms.Spec.Template.Spec.ProviderSpec.Value, scheme)
-		if err != nil {
-			logger.WithError(err).Warn("error decoding AWSMachineProviderConfig, skipping MachineSet for AMI check")
-			continue
-		}
-		if awsProviderSpec.AMI.ID == nil {
-			// Really weird, but keep looking...
-			continue
-		}
-		amiID = *awsProviderSpec.AMI.ID
-		logger.
-			WithField("fromRemoteMachineSet", ms.Name).
-			WithField("ami", amiID).
-			Debug("resolved AMI to use for new machinesets")
-		return amiID, nil
+// Get the AMI ID from an existing master machine.
+func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode AWSMachineProviderConfig from master machine")
+		return "", errors.Wrap(err, "cannot decode AWSMachineProviderConfig from master machine")
 	}
-	return "", errors.New("unable to locate AMI to use from pre-existing machine set")
+	if providerSpec.AMI.ID == nil {
+		logger.Warn("master machine does not have AMI ID set")
+		return "", errors.New("master machine does not have AMI ID set")
+	}
+	amiID := *providerSpec.AMI.ID
+	logger.WithField("ami", amiID).Debug("resolved AMI to use for new machinesets")
+	return amiID, nil
 }
 
 // fetchAvailabilityZones fetches availability zones for the AWS region
@@ -225,9 +227,9 @@ func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
 	return zones, nil
 }
 
-func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*awsprovider.AWSMachineProviderConfig, error) {
+func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*awsproviderv1beta1.AWSMachineProviderConfig, error) {
 	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(awsprovider.SchemeGroupVersion)
+	decoder := codecFactory.UniversalDecoder(awsproviderv1beta1.SchemeGroupVersion)
 	if rawExt == nil {
 		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
 	}
@@ -235,7 +237,7 @@ func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 	if err != nil {
 		return nil, fmt.Errorf("could not decode AWS ProviderConfig: %v", err)
 	}
-	spec, ok := obj.(*awsprovider.AWSMachineProviderConfig)
+	spec, ok := obj.(*awsproviderv1beta1.AWSMachineProviderConfig)
 	if !ok {
 		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
 	}
@@ -246,30 +248,30 @@ func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 // Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
 // the values match the worker pool originally created by the installer.
 func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, infraID string, pool *hivev1.MachinePool) {
-	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
+	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsproviderv1beta1.AWSMachineProviderConfig)
 
 	// TODO: assumptions about pre-existing objects by name here is quite dangerous, it's already
 	// broken on us once via renames in the installer. We need to start querying for what exists
 	// here.
-	providerConfig.IAMInstanceProfile = &awsprovider.AWSResourceReference{ID: aws.String(fmt.Sprintf("%s-worker-profile", infraID))}
+	providerConfig.IAMInstanceProfile = &awsproviderv1beta1.AWSResourceReference{ID: aws.String(fmt.Sprintf("%s-worker-profile", infraID))}
 	// Update the subnet filter only if subnet id is absent
 	if providerConfig.Subnet.ID == nil {
-		providerConfig.Subnet = awsprovider.AWSResourceReference{
-			Filters: []awsprovider.Filter{{
+		providerConfig.Subnet = awsproviderv1beta1.AWSResourceReference{
+			Filters: []awsproviderv1beta1.Filter{{
 				Name:   "tag:Name",
 				Values: []string{fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone)},
 			}},
 		}
 	}
 
-	providerConfig.SecurityGroups = []awsprovider.AWSResourceReference{{
-		Filters: []awsprovider.Filter{{
+	providerConfig.SecurityGroups = []awsproviderv1beta1.AWSResourceReference{{
+		Filters: []awsproviderv1beta1.Filter{{
 			Name:   "tag:Name",
 			Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
 		}},
 	}}
 	if pool.Spec.Platform.AWS.SpotMarketOptions != nil {
-		providerConfig.SpotMarketOptions = &awsprovider.SpotMarketOptions{
+		providerConfig.SpotMarketOptions = &awsproviderv1beta1.SpotMarketOptions{
 			MaxPrice: pool.Spec.Platform.AWS.SpotMarketOptions.MaxPrice,
 		}
 	}

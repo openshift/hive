@@ -57,6 +57,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
@@ -552,7 +553,7 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 	case cd.Spec.Platform.Azure != nil:
 		uninstaller := &azure.ClusterUninstaller{}
 		uninstaller.Logger = logger
-		session, err := azuresession.GetSession()
+		session, err := azuresession.GetSession(installertypesazure.PublicCloud)
 		if err != nil {
 			return err
 		}

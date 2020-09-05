@@ -9,6 +9,7 @@ import (
 
 	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/azure"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 )
@@ -66,7 +67,7 @@ func completeAzureUninstaller(o *azure.ClusterUninstaller, logLevel string, args
 		Level: level,
 	})
 
-	session, err := azuresession.GetSession()
+	session, err := azuresession.GetSession(installertypesazure.PublicCloud)
 	if err != nil {
 		return err
 	}

@@ -238,29 +238,21 @@ func TestAWSActuator(t *testing.T) {
 
 func TestGetAWSAMIID(t *testing.T) {
 	cases := []struct {
-		name        string
-		machineSets []machineapi.MachineSet
-		expectError bool
+		name          string
+		masterMachine *machineapi.Machine
+		expectError   bool
 	}{
 		{
-			name:        "no machinesets",
-			expectError: true,
+			name:          "valid master machine",
+			masterMachine: testMachine("master1", "master"),
 		},
 		{
-			name: "valid machineset",
-			machineSets: []machineapi.MachineSet{
-				*testMachineSet("ms1", "worker", true, 1, 0),
-			},
-		},
-		{
-			name: "invalid machineset",
-			machineSets: []machineapi.MachineSet{
-				func() machineapi.MachineSet {
-					ms := testMachineSet("ms1", "worker", true, 1, 0)
-					ms.Spec.Template.Spec.ProviderSpec.Value = nil
-					return *ms
-				}(),
-			},
+			name: "invalid master machine",
+			masterMachine: func() *machineapi.Machine {
+				ms := testMachine("master1", "master")
+				ms.Spec.ProviderSpec.Value = nil
+				return ms
+			}(),
 			expectError: true,
 		},
 	}
@@ -269,7 +261,7 @@ func TestGetAWSAMIID(t *testing.T) {
 			scheme := runtime.NewScheme()
 			machineapi.SchemeBuilder.AddToScheme(scheme)
 			awsprovider.SchemeBuilder.AddToScheme(scheme)
-			actualAMIID, actualErr := getAWSAMIID(tc.machineSets, scheme, log.StandardLogger())
+			actualAMIID, actualErr := getAWSAMIID(tc.masterMachine, scheme, log.StandardLogger())
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")
 			} else {

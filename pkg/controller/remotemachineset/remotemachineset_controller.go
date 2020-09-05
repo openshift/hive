@@ -38,8 +38,9 @@ import (
 const (
 	ControllerName = "remotemachineset"
 
-	machinePoolNameLabel = "hive.openshift.io/machine-pool"
-	finalizer            = "hive.openshift.io/remotemachineset"
+	machinePoolNameLabel       = "hive.openshift.io/machine-pool"
+	finalizer                  = "hive.openshift.io/remotemachineset"
+	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -49,14 +50,32 @@ var controllerKind = hivev1.SchemeGroupVersion.WithKind("MachinePool")
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
+
+	scheme := mgr.GetScheme()
+	if err := addAWSProviderToScheme(scheme); err != nil {
+		return errors.Wrap(err, "cannot add AWS provider to scheme")
+	}
+	if err := addGCPProviderToScheme(scheme); err != nil {
+		return errors.Wrap(err, "cannot add GCP provider to scheme")
+	}
+	if err := addOpenStackProviderToScheme(scheme); err != nil {
+		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
+	}
+	if err := addOvirtProviderToScheme(scheme); err != nil {
+		return errors.Wrap(err, "cannot add OVirt provider to scheme")
+	}
+	if err := addVSphereProviderToScheme(scheme); err != nil {
+		return errors.Wrap(err, "cannot add vSphere provider to scheme")
+	}
+
 	r := &ReconcileRemoteMachineSet{
 		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
-	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
-		return r.createActuator(cd, pool, remoteMachineSets, logger)
+	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
+		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, logger)
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
@@ -133,7 +152,13 @@ type ReconcileRemoteMachineSet struct {
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 
 	// actuatorBuilder is a function pointer to the function that builds the actuator
-	actuatorBuilder func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error)
+	actuatorBuilder func(
+		cd *hivev1.ClusterDeployment,
+		pool *hivev1.MachinePool,
+		masterMachine *machineapi.Machine,
+		remoteMachineSets []machineapi.MachineSet,
+		logger log.FieldLogger,
+	) (Actuator, error)
 
 	// A TTLCache of machinepoolnamelease creates each machinepool expects to see. Note that not all actuators make use
 	// of expectations.
@@ -236,12 +261,17 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	logger.Info("reconciling machine pool for cluster deployment")
 
-	remoteMachineSets, err := r.getRemoteMachineSets(cd, remoteClusterAPIClient, logger)
+	masterMachine, err := r.getMasterMachine(cd, remoteClusterAPIClient, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, remoteMachineSets, logger)
+	remoteMachineSets, err := r.getRemoteMachineSets(remoteClusterAPIClient, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	} else if !proceed {
@@ -275,8 +305,35 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	return reconcile.Result{}, r.updatePoolStatusForMachineSets(pool, machineSets, logger)
 }
 
-func (r *ReconcileRemoteMachineSet) getRemoteMachineSets(
+func (r *ReconcileRemoteMachineSet) getMasterMachine(
 	cd *hivev1.ClusterDeployment,
+	remoteClusterAPIClient client.Client,
+	logger log.FieldLogger,
+) (*machineapi.Machine, error) {
+	remoteMachines := &machineapi.MachineList{}
+	tm := metav1.TypeMeta{}
+	tm.SetGroupVersionKind(machineapi.SchemeGroupVersion.WithKind("Machine"))
+	if err := remoteClusterAPIClient.List(
+		context.Background(),
+		remoteMachines,
+		&client.ListOptions{
+			Raw: &metav1.ListOptions{
+				TypeMeta:      tm,
+				LabelSelector: masterMachineLabelSelector,
+			},
+		},
+	); err != nil {
+		logger.WithError(err).Error("unable to fetch master machines")
+		return nil, err
+	}
+	if len(remoteMachines.Items) == 0 {
+		logger.Error("no master machines in cluster")
+		return nil, errors.New("no master machines in cluster")
+	}
+	return &remoteMachines.Items[0], nil
+}
+
+func (r *ReconcileRemoteMachineSet) getRemoteMachineSets(
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) (*machineapi.MachineSetList, error) {
@@ -298,6 +355,7 @@ func (r *ReconcileRemoteMachineSet) getRemoteMachineSets(
 func (r *ReconcileRemoteMachineSet) generateMachineSets(
 	pool *hivev1.MachinePool,
 	cd *hivev1.ClusterDeployment,
+	masterMachine *machineapi.Machine,
 	remoteMachineSets *machineapi.MachineSetList,
 	logger log.FieldLogger,
 ) ([]*machineapi.MachineSet, bool, error) {
@@ -305,7 +363,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 		return nil, true, nil
 	}
 
-	actuator, err := r.actuatorBuilder(cd, pool, remoteMachineSets.Items, logger)
+	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, logger)
 	if err != nil {
 		logger.WithError(err).Error("unable to create actuator")
 		return nil, false, err
@@ -766,7 +824,13 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 	return errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
 }
 
-func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
+func (r *ReconcileRemoteMachineSet) createActuator(
+	cd *hivev1.ClusterDeployment,
+	pool *hivev1.MachinePool,
+	masterMachine *machineapi.Machine,
+	remoteMachineSets []machineapi.MachineSet,
+	logger log.FieldLogger,
+) (Actuator, error) {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		creds := &corev1.Secret{}
@@ -780,7 +844,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		); err != nil {
 			return nil, err
 		}
-		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, remoteMachineSets, r.scheme, logger)
+		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.GCP != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -797,7 +861,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		if err != nil {
 			return nil, err
 		}
-		return NewGCPActuator(r.Client, creds, clusterVersion, remoteMachineSets, r.scheme, r.expectations, logger)
+		return NewGCPActuator(r.Client, creds, clusterVersion, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.Azure != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -812,11 +876,11 @@ func (r *ReconcileRemoteMachineSet) createActuator(cd *hivev1.ClusterDeployment,
 		}
 		return NewAzureActuator(creds, logger)
 	case cd.Spec.Platform.OpenStack != nil:
-		return NewOpenStackActuator(logger)
+		return NewOpenStackActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.VSphere != nil:
-		return NewVSphereActuator(logger)
+		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.Ovirt != nil:
-		return NewOvirtActuator(logger)
+		return NewOvirtActuator(masterMachine, r.scheme, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

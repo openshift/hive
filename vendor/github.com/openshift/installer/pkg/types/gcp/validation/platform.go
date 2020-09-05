@@ -1,11 +1,15 @@
 package validation
 
 import (
+	"os"
+
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/types/gcp"
+
+	"github.com/openshift/installer/pkg/validate"
 )
 
 var (
@@ -18,8 +22,10 @@ var (
 		"asia-east2":              "Hong Kong",
 		"asia-northeast1":         "Tokyo, Japan",
 		"asia-northeast2":         "Osaka, Japan",
+		"asia-northeast3":         "Seoul, South Korea",
 		"asia-south1":             "Mumbai, India",
 		"asia-southeast1":         "Jurong West, Singapore",
+		"asia-southeast2":         "Jakarta, Indonesia",
 		"australia-southeast1":    "Sydney, Australia",
 		"europe-north1":           "Hamina, Finland",
 		"europe-west1":            "St. Ghislain, Belgium",
@@ -34,6 +40,8 @@ var (
 		"us-east4":                "Ashburn, Northern Virginia, USA",
 		"us-west1":                "The Dalles, Oregon, USA",
 		"us-west2":                "Los Angeles, California, USA",
+		"us-west3":                "Salt Lake City, Utah, USA",
+		"us-west4":                "Las Vegas, Nevada, USA",
 	}
 	validRegionValues = func() []string {
 		validValues := make([]string, len(Regions))
@@ -67,6 +75,16 @@ func ValidatePlatform(p *gcp.Platform, fldPath *field.Path) field.ErrorList {
 	}
 	if (p.ComputeSubnet != "" || p.ControlPlaneSubnet != "") && p.Network == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("network"), "must provide a VPC network when supplying subnets"))
+	}
+
+	if oi, ok := os.LookupEnv("OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE"); ok && oi != "" && len(p.Licenses) > 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("licenses"), "the use of custom image licenses is forbidden if an OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE is specified"))
+	}
+
+	for i, license := range p.Licenses {
+		if validate.URIWithProtocol(license, "https") != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("licenses").Index(i), license, "licenses must be URLs (https) only"))
+		}
 	}
 
 	return allErrs

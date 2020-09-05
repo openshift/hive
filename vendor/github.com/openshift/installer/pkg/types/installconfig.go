@@ -119,6 +119,25 @@ type InstallConfig struct {
 	// +kubebuilder:default=false
 	// +optional
 	FIPS bool `json:"fips,omitempty"`
+
+	// CredentialsMode is used to explicitly set the mode with which CredentialRequests are satisfied.
+	//
+	// If this field is set, then the installer will not attempt to query the cloud permissions before attempting
+	// installation. If the field is not set or empty, then the installer will perform its normal verification that the
+	// credentials provided are sufficient to perform an installation.
+	//
+	// There are three possible values for this field, but the valid values are dependent upon the platform being used.
+	// "Mint": create new credentials with a subset of the overall permissions for each CredentialsRequest
+	// "Passthrough": copy the credentials with all of the overall permissions for each CredentialsRequest
+	// "Manual": CredentialsRequests must be handled manually by the user
+	//
+	// For each of the following platforms, the field can set to the specified values. For all other platforms, the
+	// field must not be set.
+	// AWS: "Mint", "Passthrough", "Manual"
+	// Azure: "Mint", "Passthrough"
+	// GCP: "Mint", "Passthrough"
+	// +optional
+	CredentialsMode CredentialsMode `json:"credentialsMode,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
@@ -260,8 +279,10 @@ type ClusterNetworkEntry struct {
 	CIDR ipnet.IPNet `json:"cidr"`
 
 	// HostPrefix is the prefix size to allocate to each node from the CIDR.
-	// For example, 24 would allocate 2^8=256 adresses to each node.
-	HostPrefix int32 `json:"hostPrefix"`
+	// For example, 24 would allocate 2^8=256 adresses to each node. If this
+	// field is not used by the plugin, it can be left unset.
+	// +optional
+	HostPrefix int32 `json:"hostPrefix,omitempty"`
 
 	// The size of blocks to allocate from the larger pool.
 	// This is the length in bits - so a 9 here will allocate a /23.
@@ -294,3 +315,20 @@ type ImageContentSource struct {
 	// +optional
 	Mirrors []string `json:"mirrors,omitempty"`
 }
+
+// CredentialsMode is the mode by which CredentialsRequests will be satisfied.
+// +kubebuilder:validation:Enum="";Mint;Passthrough;Manual
+type CredentialsMode string
+
+const (
+	// ManualCredentialsMode indicates that cloud-credential-operator should not process any CredentialsRequests.
+	ManualCredentialsMode CredentialsMode = "Manual"
+
+	// MintCredentialsMode indicates that cloud-credential-operator should be creating users for each
+	// CredentialsRequest.
+	MintCredentialsMode CredentialsMode = "Mint"
+
+	// PassthroughCredentialsMode indicates that cloud-credential-operator should just copy over the cluster's
+	// cloud credentials for each CredentialsRequest.
+	PassthroughCredentialsMode CredentialsMode = "Passthrough"
+)

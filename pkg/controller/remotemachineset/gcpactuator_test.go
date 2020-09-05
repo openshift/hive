@@ -3,7 +3,6 @@ package remotemachineset
 import (
 	"context"
 	"fmt"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -25,6 +24,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"
 )
@@ -50,7 +50,6 @@ func TestGCPActuator(t *testing.T) {
 			name: "generate single machineset for single zone",
 			pool: testGCPPool(testPoolName),
 			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
 				mockListComputeZones(client, []string{"zone1"}, testRegion)
 			},
 			expectedMachineSetReplicas: map[string]int64{
@@ -61,7 +60,6 @@ func TestGCPActuator(t *testing.T) {
 			name: "generate machinesets across zones",
 			pool: testGCPPool(testPoolName),
 			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
 				mockListComputeZones(client, []string{"zone1", "zone2", "zone3"}, testRegion)
 			},
 			expectedMachineSetReplicas: map[string]int64{
@@ -77,9 +75,6 @@ func TestGCPActuator(t *testing.T) {
 				pool.Spec.Platform.GCP.Zones = []string{"zone1", "zone2", "zone3"}
 				return pool
 			}(),
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
-			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateGCPMachineSetName("worker", "zone1"): 1,
 				generateGCPMachineSetName("worker", "zone2"): 1,
@@ -87,26 +82,9 @@ func TestGCPActuator(t *testing.T) {
 			},
 		},
 		{
-			name: "list images returns zero",
-			pool: testGCPPool(testPoolName),
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{}, testInfraID)
-			},
-			expectedErr: true,
-		},
-		{
-			name: "list images returns more than 1",
-			pool: testGCPPool(testPoolName),
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"imageA", "imageB"}, testInfraID)
-			},
-			expectedErr: true,
-		},
-		{
 			name: "list zones returns zero",
 			pool: testGCPPool(testPoolName),
 			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"imageA"}, testInfraID)
 				mockListComputeZones(client, []string{}, testRegion)
 			},
 			expectedErr: true,
@@ -118,7 +96,6 @@ func TestGCPActuator(t *testing.T) {
 				testPoolLease(testPoolName, testName, testInfraID, "w"),
 			},
 			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
 				mockListComputeZones(client, []string{"zone1"}, testRegion)
 			},
 			expectedMachineSetReplicas: map[string]int64{
@@ -134,9 +111,6 @@ func TestGCPActuator(t *testing.T) {
 			}(),
 			existing: []runtime.Object{
 				testPoolLease("additional-compute", testName, testInfraID, "r"),
-			},
-			mockGCPClient: func(client *mockgcp.MockClient) {
-				mockListComputeImage(client, []string{"testImage"}, testInfraID)
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateGCPMachineSetName("r", "zone1"): 1,

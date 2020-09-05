@@ -6,10 +6,15 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
+	vsphereprovider "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider"
+	vsphereproviderv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
@@ -17,15 +22,26 @@ import (
 // VSphereActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster
 type VSphereActuator struct {
-	logger log.FieldLogger
+	logger  log.FieldLogger
+	osImage string
 }
 
 var _ Actuator = &VSphereActuator{}
 
+func addVSphereProviderToScheme(scheme *runtime.Scheme) error {
+	return vsphereprovider.AddToScheme(scheme)
+}
+
 // NewVSphereActuator is the constructor for building a VSphereActuator
-func NewVSphereActuator(logger log.FieldLogger) (*VSphereActuator, error) {
+func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*VSphereActuator, error) {
+	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
+	if err != nil {
+		logger.WithError(err).Error("error getting os image from master machine")
+		return nil, err
+	}
 	actuator := &VSphereActuator{
-		logger: logger,
+		logger:  logger,
+		osImage: osImage,
 	}
 	return actuator, nil
 }
@@ -73,18 +89,11 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		},
 	}
 
-	// The installer will assume to upload a copy of the RHCOS image for the release with this name.
-	// It is possible to override this in the installer with the OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE
-	// env var, but we do not expose this in Hive, so it should be safe to assume the installers default
-	// name format. If we do add support for uploading images more efficiently (as it's a 2GB dl+ul per
-	// cluster install), we should stick to this same name format, or update this line of code.
-	osImage := fmt.Sprintf("%s-rhcos", cd.Spec.ClusterMetadata.InfraID)
-
 	installerMachineSets, err := installvsphere.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,
-		osImage,
+		a.osImage,
 		workerRole,
 		workerUserData(clusterVersion),
 	)
@@ -93,4 +102,33 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 
 	return installerMachineSets, true, nil
+}
+
+// Get the OS image from an existing master machine.
+func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+	providerSpec, err := decodeVSphereMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode VSphereMachineProviderSpec from master machine")
+		return "", errors.Wrap(err, "cannot decode VSphereMachineProviderSpec from master machine")
+	}
+	osImage := providerSpec.Template
+	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
+	return osImage, nil
+}
+
+func decodeVSphereMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*vsphereproviderv1beta1.VSphereMachineProviderSpec, error) {
+	codecFactory := serializer.NewCodecFactory(scheme)
+	decoder := codecFactory.UniversalDecoder(vsphereproviderv1beta1.SchemeGroupVersion)
+	if rawExt == nil {
+		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+	}
+	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode VSphere ProviderSpec: %v", err)
+	}
+	spec, ok := obj.(*vsphereproviderv1beta1.VSphereMachineProviderSpec)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
+	}
+	return spec, nil
 }

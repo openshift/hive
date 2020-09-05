@@ -10,9 +10,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis"
+	gcpproviderv1beta1 "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,6 +49,7 @@ type GCPActuator struct {
 	logger    log.FieldLogger
 	scheme    *runtime.Scheme
 	projectID string
+	imageID   string
 	// expectations is a reference to the reconciler's TTLCache of machinepoolnamelease creates each machinepool
 	// expects to see.
 	expectations   controllerutils.ExpectationsInterface
@@ -54,11 +58,16 @@ type GCPActuator struct {
 
 var _ Actuator = &GCPActuator{}
 
+func addGCPProviderToScheme(scheme *runtime.Scheme) error {
+	return gcpprovider.AddToScheme(scheme)
+}
+
 // NewGCPActuator is the constructor for building a GCPActuator
 func NewGCPActuator(
 	client client.Client,
 	gcpCreds *corev1.Secret,
 	clusterVersion string,
+	masterMachine *machineapi.Machine,
 	remoteMachineSets []machineapi.MachineSet,
 	scheme *runtime.Scheme,
 	expectations controllerutils.ExpectationsInterface,
@@ -76,6 +85,12 @@ func NewGCPActuator(
 		return nil, err
 	}
 
+	imageID, err := getGCPImageID(masterMachine, scheme, logger)
+	if err != nil {
+		logger.WithError(err).Error("error getting image ID from master machine")
+		return nil, err
+	}
+
 	actuator := &GCPActuator{
 		gcpClient:      gcpClient,
 		client:         client,
@@ -83,6 +98,7 @@ func NewGCPActuator(
 		scheme:         scheme,
 		expectations:   expectations,
 		projectID:      projectID,
+		imageID:        imageID,
 		leasesRequired: requireLeases(clusterVersion, remoteMachineSets, logger),
 	}
 	return actuator, nil
@@ -162,12 +178,6 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		},
 	}
 
-	// get image ID for the generated machine sets
-	imageID, err := a.getImageID(cd, logger)
-	if err != nil {
-		return nil, false, errors.Wrap(err, "failed to find image ID for the machine sets")
-	}
-
 	if len(computePool.Platform.GCP.Zones) == 0 {
 		zones, err := a.getZones(cd.Spec.Platform.GCP.Region)
 		if err != nil {
@@ -184,7 +194,7 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,
-		imageID,
+		a.imageID,
 		workerRole,
 		workerUserData(clusterVersion),
 	)
@@ -219,31 +229,6 @@ func (a *GCPActuator) getZones(region string) ([]string, error) {
 	}
 
 	return zones, nil
-}
-
-func (a *GCPActuator) getImageID(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (string, error) {
-	infra := cd.Spec.ClusterMetadata.InfraID
-
-	// find names of the form '<infra>-.*'
-	filter := fmt.Sprintf("name eq \"%s-.*\"", infra)
-	result, err := a.gcpClient.ListComputeImages(gcpclient.ListComputeImagesOptions{Filter: filter})
-	if err != nil {
-		logger.WithError(err).Warnf("failed to find a GCP image starting with name: %s", infra)
-		return "", err
-	}
-	switch len(result.Items) {
-	case 0:
-		msg := fmt.Sprintf("found 0 results searching for GCP image starting with name: %s", infra)
-		logger.Warnf(msg)
-		return "", errors.New(msg)
-	case 1:
-		logger.Debugf("using image with name %s for machine sets", result.Items[0].Name)
-		return result.Items[0].Name, nil
-	default:
-		msg := fmt.Sprintf("unexpected number of results when looking for GCP image with name starting with %s", infra)
-		logger.Warnf(msg)
-		return "", errors.New(msg)
-	}
 }
 
 // obtainLease uses the Hive MachinePoolNameLease resource to obtain a unique, single character
@@ -422,4 +407,37 @@ func requireLeases(clusterVersion string, remoteMachineSets []machineapi.Machine
 	}
 	logger.Debug("leases are not required")
 	return false
+}
+
+// Get the image ID from an existing master machine.
+func getGCPImageID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+	providerSpec, err := decodeGCPMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode GCPMachineProviderSpec from master machine")
+		return "", errors.Wrap(err, "cannot decode GCPMachineProviderSpec from master machine")
+	}
+	if len(providerSpec.Disks) == 0 {
+		logger.Warn("master machine does not have any disks")
+		return "", errors.New("master machine does not have any disks")
+	}
+	imageID := providerSpec.Disks[0].Image
+	logger.WithField("image", imageID).Debug("resolved image to use for new machinesets")
+	return imageID, nil
+}
+
+func decodeGCPMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*gcpproviderv1beta1.GCPMachineProviderSpec, error) {
+	codecFactory := serializer.NewCodecFactory(scheme)
+	decoder := codecFactory.UniversalDecoder(gcpproviderv1beta1.SchemeGroupVersion)
+	if rawExt == nil {
+		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+	}
+	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode GCP ProviderSpec: %v", err)
+	}
+	spec, ok := obj.(*gcpproviderv1beta1.GCPMachineProviderSpec)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
+	}
+	return spec, nil
 }

@@ -184,7 +184,6 @@ type Options struct {
 	OvirtStorageDomainID string
 	OvirtNetworkName     string
 	OvirtAPIVIP          string
-	OvirtDNSVIP          string
 	OvirtIngressVIP      string
 	OvirtCACerts         string
 
@@ -303,7 +302,6 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.OvirtStorageDomainID, "ovirt-storage-domain-id", "", "oVirt storage domain id (uuid) under which all VM disk would be created")
 	flags.StringVar(&opt.OvirtNetworkName, "ovirt-network-name", "ovirtmgmt", "oVirt network name")
 	flags.StringVar(&opt.OvirtAPIVIP, "ovirt-api-vip", "", "IP which will be served by bootstrap and then pivoted masters, using keepalived")
-	flags.StringVar(&opt.OvirtDNSVIP, "ovirt-dns-vip", "", "IP of the internal DNS which will be operated by the cluster")
 	flags.StringVar(&opt.OvirtIngressVIP, "ovirt-ingress-vip", "", "External IP which routes to the default ingress controller")
 	flags.StringVar(&opt.OvirtCACerts, "ovirt-ca-certs", "", "Path to oVirt CA certificate, multiple CA paths can be : delimited")
 
@@ -690,7 +688,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			StorageDomainID: o.OvirtStorageDomainID,
 			NetworkName:     o.OvirtNetworkName,
 			APIVIP:          o.OvirtAPIVIP,
-			DNSVIP:          o.OvirtDNSVIP,
 			IngressVIP:      o.OvirtIngressVIP,
 			CACert:          bytes.Join(caCerts, []byte("\n")),
 		}

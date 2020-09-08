@@ -108,7 +108,7 @@ func (a *AzureActuator) getZones(region string, instanceType string) ([]string, 
 
 	var res azureclient.ResourceSKUsPage
 	var err error
-	for res, err = a.client.ListResourceSKUs(ctx); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
+	for res, err = a.client.ListResourceSKUs(ctx, ""); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
 		for _, resSku := range res.Values() {
 			if strings.EqualFold(to.String(resSku.Name), instanceType) {
 				for _, locationInfo := range *resSku.LocationInfo {

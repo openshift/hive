@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -20,7 +20,7 @@ import (
 
 // Client is a wrapper object for actual Azure libraries to allow for easier mocking/testing.
 type Client interface {
-	ListResourceSKUs(ctx context.Context) (ResourceSKUsPage, error)
+	ListResourceSKUs(ctx context.Context, filter string) (ResourceSKUsPage, error)
 
 	// Zones
 	CreateOrUpdateZone(ctx context.Context, resourceGroupName string, zone string) (dns.Zone, error)
@@ -31,6 +31,11 @@ type Client interface {
 	ListRecordSetsByZone(ctx context.Context, resourceGroupName string, zone string, suffix string) (RecordSetPage, error)
 	CreateOrUpdateRecordSet(ctx context.Context, resourceGroupName string, zone string, recordSetName string, recordType dns.RecordType, recordSet dns.RecordSet) (dns.RecordSet, error)
 	DeleteRecordSet(ctx context.Context, resourceGroupName string, zone string, recordSetName string, recordType dns.RecordType) error
+
+	// Virtual Machines
+	ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error)
+	DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error)
+	StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error)
 }
 
 // ResourceSKUsPage is a page of results from listing resource SKUs.
@@ -48,13 +53,14 @@ type RecordSetPage interface {
 }
 
 type azureClient struct {
-	resourceSKUsClient *compute.ResourceSkusClient
-	recordSetsClient   *dns.RecordSetsClient
-	zonesClient        *dns.ZonesClient
+	resourceSKUsClient    *compute.ResourceSkusClient
+	recordSetsClient      *dns.RecordSetsClient
+	zonesClient           *dns.ZonesClient
+	virtualMachinesClient *compute.VirtualMachinesClient
 }
 
-func (c *azureClient) ListResourceSKUs(ctx context.Context) (ResourceSKUsPage, error) {
-	page, err := c.resourceSKUsClient.List(ctx)
+func (c *azureClient) ListResourceSKUs(ctx context.Context, filter string) (ResourceSKUsPage, error) {
+	page, err := c.resourceSKUsClient.List(ctx, filter)
 	return &page, err
 }
 
@@ -92,6 +98,18 @@ func (c *azureClient) GetZone(ctx context.Context, resourceGroupName string, zon
 
 func (c *azureClient) CreateOrUpdateRecordSet(ctx context.Context, resourceGroupName string, zone string, recordSetName string, recordType dns.RecordType, recordSet dns.RecordSet) (dns.RecordSet, error) {
 	return c.recordSetsClient.CreateOrUpdate(ctx, resourceGroupName, zone, recordSetName, recordType, recordSet, "", "")
+}
+
+func (c *azureClient) ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error) {
+	return c.virtualMachinesClient.ListAll(ctx, statusOnly)
+}
+
+func (c *azureClient) DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error) {
+	return c.virtualMachinesClient.Deallocate(ctx, resourceGroup, name)
+}
+
+func (c *azureClient) StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error) {
+	return c.virtualMachinesClient.Start(ctx, resourceGroup, name)
 }
 
 // NewClientFromSecret creates our client wrapper object for interacting with Azure. The Azure creds are read from the
@@ -153,10 +171,14 @@ func newClient(authJSONSource func() ([]byte, error)) (*azureClient, error) {
 	zonesClient := dns.NewZonesClientWithBaseURI(azure.PublicCloud.ResourceManagerEndpoint, subscriptionID)
 	zonesClient.Authorizer = authorizer
 
+	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(azure.PublicCloud.ResourceManagerEndpoint, subscriptionID)
+	virtualMachinesClient.Authorizer = authorizer
+
 	return &azureClient{
-		resourceSKUsClient: &resourceSKUsClient,
-		recordSetsClient:   &recordSetsClient,
-		zonesClient:        &zonesClient,
+		resourceSKUsClient:    &resourceSKUsClient,
+		recordSetsClient:      &recordSetsClient,
+		zonesClient:           &zonesClient,
+		virtualMachinesClient: &virtualMachinesClient,
 	}, nil
 }
 

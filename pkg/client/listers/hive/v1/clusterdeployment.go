@@ -10,8 +10,10 @@ import (
 )
 
 // ClusterDeploymentLister helps list ClusterDeployments.
+// All objects returned here must be treated as read-only.
 type ClusterDeploymentLister interface {
 	// List lists all ClusterDeployments in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterDeployment, err error)
 	// ClusterDeployments returns an object that can list and get ClusterDeployments.
 	ClusterDeployments(namespace string) ClusterDeploymentNamespaceLister
@@ -42,10 +44,13 @@ func (s *clusterDeploymentLister) ClusterDeployments(namespace string) ClusterDe
 }
 
 // ClusterDeploymentNamespaceLister helps list and get ClusterDeployments.
+// All objects returned here must be treated as read-only.
 type ClusterDeploymentNamespaceLister interface {
 	// List lists all ClusterDeployments in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterDeployment, err error)
 	// Get retrieves the ClusterDeployment from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterDeployment, error)
 	ClusterDeploymentNamespaceListerExpansion
 }

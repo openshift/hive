@@ -10,8 +10,10 @@ import (
 )
 
 // CheckpointLister helps list Checkpoints.
+// All objects returned here must be treated as read-only.
 type CheckpointLister interface {
 	// List lists all Checkpoints in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Checkpoint, err error)
 	// Checkpoints returns an object that can list and get Checkpoints.
 	Checkpoints(namespace string) CheckpointNamespaceLister
@@ -42,10 +44,13 @@ func (s *checkpointLister) Checkpoints(namespace string) CheckpointNamespaceList
 }
 
 // CheckpointNamespaceLister helps list and get Checkpoints.
+// All objects returned here must be treated as read-only.
 type CheckpointNamespaceLister interface {
 	// List lists all Checkpoints in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Checkpoint, err error)
 	// Get retrieves the Checkpoint from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Checkpoint, error)
 	CheckpointNamespaceListerExpansion
 }

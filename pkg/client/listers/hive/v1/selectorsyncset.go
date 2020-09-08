@@ -10,10 +10,13 @@ import (
 )
 
 // SelectorSyncSetLister helps list SelectorSyncSets.
+// All objects returned here must be treated as read-only.
 type SelectorSyncSetLister interface {
 	// List lists all SelectorSyncSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SelectorSyncSet, err error)
 	// Get retrieves the SelectorSyncSet from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.SelectorSyncSet, error)
 	SelectorSyncSetListerExpansion
 }

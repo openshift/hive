@@ -10,8 +10,10 @@ import (
 )
 
 // ClusterPoolLister helps list ClusterPools.
+// All objects returned here must be treated as read-only.
 type ClusterPoolLister interface {
 	// List lists all ClusterPools in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterPool, err error)
 	// ClusterPools returns an object that can list and get ClusterPools.
 	ClusterPools(namespace string) ClusterPoolNamespaceLister
@@ -42,10 +44,13 @@ func (s *clusterPoolLister) ClusterPools(namespace string) ClusterPoolNamespaceL
 }
 
 // ClusterPoolNamespaceLister helps list and get ClusterPools.
+// All objects returned here must be treated as read-only.
 type ClusterPoolNamespaceLister interface {
 	// List lists all ClusterPools in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterPool, err error)
 	// Get retrieves the ClusterPool from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterPool, error)
 	ClusterPoolNamespaceListerExpansion
 }

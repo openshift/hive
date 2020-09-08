@@ -10,8 +10,10 @@ import (
 )
 
 // ClusterClaimLister helps list ClusterClaims.
+// All objects returned here must be treated as read-only.
 type ClusterClaimLister interface {
 	// List lists all ClusterClaims in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterClaim, err error)
 	// ClusterClaims returns an object that can list and get ClusterClaims.
 	ClusterClaims(namespace string) ClusterClaimNamespaceLister
@@ -42,10 +44,13 @@ func (s *clusterClaimLister) ClusterClaims(namespace string) ClusterClaimNamespa
 }
 
 // ClusterClaimNamespaceLister helps list and get ClusterClaims.
+// All objects returned here must be treated as read-only.
 type ClusterClaimNamespaceLister interface {
 	// List lists all ClusterClaims in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterClaim, err error)
 	// Get retrieves the ClusterClaim from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterClaim, error)
 	ClusterClaimNamespaceListerExpansion
 }

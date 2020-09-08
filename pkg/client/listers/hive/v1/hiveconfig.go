@@ -10,10 +10,13 @@ import (
 )
 
 // HiveConfigLister helps list HiveConfigs.
+// All objects returned here must be treated as read-only.
 type HiveConfigLister interface {
 	// List lists all HiveConfigs in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.HiveConfig, err error)
 	// Get retrieves the HiveConfig from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.HiveConfig, error)
 	HiveConfigListerExpansion
 }

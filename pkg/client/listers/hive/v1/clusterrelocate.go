@@ -10,10 +10,13 @@ import (
 )
 
 // ClusterRelocateLister helps list ClusterRelocates.
+// All objects returned here must be treated as read-only.
 type ClusterRelocateLister interface {
 	// List lists all ClusterRelocates in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterRelocate, err error)
 	// Get retrieves the ClusterRelocate from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterRelocate, error)
 	ClusterRelocateListerExpansion
 }

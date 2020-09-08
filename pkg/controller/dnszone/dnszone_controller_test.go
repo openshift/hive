@@ -9,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,6 +21,8 @@ import (
 	azuremock "github.com/openshift/hive/pkg/azureclient/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpmock "github.com/openshift/hive/pkg/gcpclient/mock"
+	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+	testgeneric "github.com/openshift/hive/pkg/test/generic"
 )
 
 // TestReconcileDNSProviderForAWS tests that ReconcileDNSProvider reacts properly under different reconciliation states on AWS.
@@ -269,8 +272,17 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			},
 		},
 		{
-			name:    "Delete managed zone",
-			dnsZone: validDNSZoneBeingDeleted(),
+			name: "Delete managed zone",
+			dnsZone: testdnszone.BasicBuilder().
+				Options(
+					testdnszone.WithGCPPlatform("testDNSZone"),
+				).
+				GenericOptions(
+					testgeneric.WithNamespace("testNamespace"),
+					testgeneric.WithName("testDNSZone"),
+					testgeneric.Deleted(),
+				).
+				Build(),
 			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
 				mockGCPZoneExists(expect)
 				mockDeleteGCPZone(expect)
@@ -328,14 +340,15 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
 			defer mocks.mockCtrl.Finish()
 
-			setFakeDNSZoneInKube(mocks, tc.dnsZone)
+			err := setFakeDNSZoneInKube(mocks, tc.dnsZone)
+			require.NoError(t, err, "failed to create DNSZone into fake client")
 
 			if tc.setupGCPMock != nil {
 				tc.setupGCPMock(mocks.mockGCPClient.EXPECT())
 			}
 
 			// Act
-			_, err := r.reconcileDNSProvider(zr, tc.dnsZone)
+			_, err = r.reconcileDNSProvider(zr, tc.dnsZone)
 
 			// Assert
 			if tc.errorExpected {

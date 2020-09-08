@@ -10,8 +10,10 @@ import (
 )
 
 // SyncIdentityProviderLister helps list SyncIdentityProviders.
+// All objects returned here must be treated as read-only.
 type SyncIdentityProviderLister interface {
 	// List lists all SyncIdentityProviders in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SyncIdentityProvider, err error)
 	// SyncIdentityProviders returns an object that can list and get SyncIdentityProviders.
 	SyncIdentityProviders(namespace string) SyncIdentityProviderNamespaceLister
@@ -42,10 +44,13 @@ func (s *syncIdentityProviderLister) SyncIdentityProviders(namespace string) Syn
 }
 
 // SyncIdentityProviderNamespaceLister helps list and get SyncIdentityProviders.
+// All objects returned here must be treated as read-only.
 type SyncIdentityProviderNamespaceLister interface {
 	// List lists all SyncIdentityProviders in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SyncIdentityProvider, err error)
 	// Get retrieves the SyncIdentityProvider from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.SyncIdentityProvider, error)
 	SyncIdentityProviderNamespaceListerExpansion
 }

@@ -10,10 +10,13 @@ import (
 )
 
 // ClusterImageSetLister helps list ClusterImageSets.
+// All objects returned here must be treated as read-only.
 type ClusterImageSetLister interface {
 	// List lists all ClusterImageSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterImageSet, err error)
 	// Get retrieves the ClusterImageSet from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterImageSet, error)
 	ClusterImageSetListerExpansion
 }

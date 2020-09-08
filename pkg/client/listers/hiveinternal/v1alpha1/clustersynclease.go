@@ -10,8 +10,10 @@ import (
 )
 
 // ClusterSyncLeaseLister helps list ClusterSyncLeases.
+// All objects returned here must be treated as read-only.
 type ClusterSyncLeaseLister interface {
 	// List lists all ClusterSyncLeases in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ClusterSyncLease, err error)
 	// ClusterSyncLeases returns an object that can list and get ClusterSyncLeases.
 	ClusterSyncLeases(namespace string) ClusterSyncLeaseNamespaceLister
@@ -42,10 +44,13 @@ func (s *clusterSyncLeaseLister) ClusterSyncLeases(namespace string) ClusterSync
 }
 
 // ClusterSyncLeaseNamespaceLister helps list and get ClusterSyncLeases.
+// All objects returned here must be treated as read-only.
 type ClusterSyncLeaseNamespaceLister interface {
 	// List lists all ClusterSyncLeases in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ClusterSyncLease, err error)
 	// Get retrieves the ClusterSyncLease from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.ClusterSyncLease, error)
 	ClusterSyncLeaseNamespaceListerExpansion
 }

@@ -10,8 +10,10 @@ import (
 )
 
 // DNSZoneLister helps list DNSZones.
+// All objects returned here must be treated as read-only.
 type DNSZoneLister interface {
 	// List lists all DNSZones in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.DNSZone, err error)
 	// DNSZones returns an object that can list and get DNSZones.
 	DNSZones(namespace string) DNSZoneNamespaceLister
@@ -42,10 +44,13 @@ func (s *dNSZoneLister) DNSZones(namespace string) DNSZoneNamespaceLister {
 }
 
 // DNSZoneNamespaceLister helps list and get DNSZones.
+// All objects returned here must be treated as read-only.
 type DNSZoneNamespaceLister interface {
 	// List lists all DNSZones in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.DNSZone, err error)
 	// Get retrieves the DNSZone from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.DNSZone, error)
 	DNSZoneNamespaceListerExpansion
 }

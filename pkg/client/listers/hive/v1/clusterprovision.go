@@ -10,8 +10,10 @@ import (
 )
 
 // ClusterProvisionLister helps list ClusterProvisions.
+// All objects returned here must be treated as read-only.
 type ClusterProvisionLister interface {
 	// List lists all ClusterProvisions in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterProvision, err error)
 	// ClusterProvisions returns an object that can list and get ClusterProvisions.
 	ClusterProvisions(namespace string) ClusterProvisionNamespaceLister
@@ -42,10 +44,13 @@ func (s *clusterProvisionLister) ClusterProvisions(namespace string) ClusterProv
 }
 
 // ClusterProvisionNamespaceLister helps list and get ClusterProvisions.
+// All objects returned here must be treated as read-only.
 type ClusterProvisionNamespaceLister interface {
 	// List lists all ClusterProvisions in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterProvision, err error)
 	// Get retrieves the ClusterProvision from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterProvision, error)
 	ClusterProvisionNamespaceListerExpansion
 }

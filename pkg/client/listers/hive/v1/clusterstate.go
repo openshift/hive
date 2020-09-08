@@ -10,8 +10,10 @@ import (
 )
 
 // ClusterStateLister helps list ClusterStates.
+// All objects returned here must be treated as read-only.
 type ClusterStateLister interface {
 	// List lists all ClusterStates in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterState, err error)
 	// ClusterStates returns an object that can list and get ClusterStates.
 	ClusterStates(namespace string) ClusterStateNamespaceLister
@@ -42,10 +44,13 @@ func (s *clusterStateLister) ClusterStates(namespace string) ClusterStateNamespa
 }
 
 // ClusterStateNamespaceLister helps list and get ClusterStates.
+// All objects returned here must be treated as read-only.
 type ClusterStateNamespaceLister interface {
 	// List lists all ClusterStates in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterState, err error)
 	// Get retrieves the ClusterState from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterState, error)
 	ClusterStateNamespaceListerExpansion
 }

@@ -10,10 +10,13 @@ import (
 )
 
 // SelectorSyncIdentityProviderLister helps list SelectorSyncIdentityProviders.
+// All objects returned here must be treated as read-only.
 type SelectorSyncIdentityProviderLister interface {
 	// List lists all SelectorSyncIdentityProviders in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SelectorSyncIdentityProvider, err error)
 	// Get retrieves the SelectorSyncIdentityProvider from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.SelectorSyncIdentityProvider, error)
 	SelectorSyncIdentityProviderListerExpansion
 }

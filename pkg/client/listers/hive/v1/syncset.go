@@ -10,8 +10,10 @@ import (
 )
 
 // SyncSetLister helps list SyncSets.
+// All objects returned here must be treated as read-only.
 type SyncSetLister interface {
 	// List lists all SyncSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SyncSet, err error)
 	// SyncSets returns an object that can list and get SyncSets.
 	SyncSets(namespace string) SyncSetNamespaceLister
@@ -42,10 +44,13 @@ func (s *syncSetLister) SyncSets(namespace string) SyncSetNamespaceLister {
 }
 
 // SyncSetNamespaceLister helps list and get SyncSets.
+// All objects returned here must be treated as read-only.
 type SyncSetNamespaceLister interface {
 	// List lists all SyncSets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SyncSet, err error)
 	// Get retrieves the SyncSet from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.SyncSet, error)
 	SyncSetNamespaceListerExpansion
 }

@@ -7,8 +7,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/azure"
+	"github.com/openshift/installer/pkg/destroy/providers"
+	"github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
@@ -16,7 +17,6 @@ import (
 
 // NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
 func NewDeprovisionAzureCommand() *cobra.Command {
-	opt := &azure.ClusterUninstaller{}
 	var logLevel string
 	cmd := &cobra.Command{
 		Use:   "azure INFRAID",
@@ -26,11 +26,12 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 			if err := validate(); err != nil {
 				log.WithError(err).Fatal("Failed validating Azure credentials")
 			}
-			if err := completeAzureUninstaller(opt, logLevel, args); err != nil {
+			uninstaller, err := completeAzureUninstaller(logLevel, args)
+			if err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
 			}
-			if err := opt.Run(); err != nil {
+			if err := uninstaller.Run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
 			}
 		},
@@ -49,16 +50,16 @@ func validate() error {
 	return nil
 }
 
-func completeAzureUninstaller(o *azure.ClusterUninstaller, logLevel string, args []string) error {
+func completeAzureUninstaller(logLevel string, args []string) (providers.Destroyer, error) {
 
 	// Set log level
 	level, err := log.ParseLevel(logLevel)
 	if err != nil {
 		log.WithError(err).Error("cannot parse log level")
-		return err
+		return nil, err
 	}
 
-	o.Logger = log.NewEntry(&log.Logger{
+	logger := log.NewEntry(&log.Logger{
 		Out: os.Stdout,
 		Formatter: &log.TextFormatter{
 			FullTimestamp: true,
@@ -67,16 +68,14 @@ func completeAzureUninstaller(o *azure.ClusterUninstaller, logLevel string, args
 		Level: level,
 	})
 
-	session, err := azuresession.GetSession(installertypesazure.PublicCloud)
-	if err != nil {
-		return err
+	metadata := &types.ClusterMetadata{
+		InfraID: args[0],
+		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
+			Azure: &installertypesazure.Metadata{
+				CloudName: installertypesazure.PublicCloud,
+			},
+		},
 	}
 
-	o.InfraID = args[0]
-	o.SubscriptionID = session.Credentials.SubscriptionID
-	o.TenantID = session.Credentials.TenantID
-	o.GraphAuthorizer = session.GraphAuthorizer
-	o.Authorizer = session.Authorizer
-
-	return nil
+	return azure.New(logger, metadata)
 }

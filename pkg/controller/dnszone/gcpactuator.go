@@ -85,7 +85,7 @@ func (a *GCPActuator) Create() error {
 
 	logger.Debug("Managed zone successfully created")
 	a.managedZone = managedZone
-	if err := a.ModifyStatus(); err != nil {
+	if err := a.modifyStatus(); err != nil {
 		logger.WithError(err).Error("failed to sync DNSZone status fields")
 		return err
 	}
@@ -169,8 +169,8 @@ func (a *GCPActuator) UpdateMetadata() error {
 	return nil
 }
 
-// ModifyStatus implements the ModifyStatus call of the actuator interface
-func (a *GCPActuator) ModifyStatus() error {
+// modifyStatus updates the DnsZone's status with GCP specific information.
+func (a *GCPActuator) modifyStatus() error {
 	if a.managedZone == nil {
 		return errors.New("managedZone is unpopulated")
 	}
@@ -226,7 +226,7 @@ func (a *GCPActuator) Refresh() error {
 
 	logger.Debug("Found managed zone")
 	a.managedZone = resp
-	if err := a.ModifyStatus(); err != nil {
+	if err := a.modifyStatus(); err != nil {
 		logger.WithError(err).Error("failed to sync DNSZone status fields")
 		return err
 	}

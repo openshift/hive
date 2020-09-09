@@ -9,9 +9,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/azureclient"
 	dns "github.com/openshift/hive/pkg/controller/dnszone"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/gcpclient"
@@ -33,6 +35,8 @@ func cleanupDNSZone(dynClient client.Client, cd *hivev1.ClusterDeployment, logge
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		return cleanupAWSDNSZone(dnsZone, cd.Spec.Platform.AWS.Region, logger)
+	case cd.Spec.Platform.Azure != nil:
+		return cleanupAzureDNSZone(dnsZone, logger)
 	case cd.Spec.Platform.GCP != nil:
 		return cleanupGCPDNSZone(dnsZone, logger)
 	default:
@@ -65,6 +69,27 @@ func cleanupAWSDNSZone(dnsZone *hivev1.DNSZone, region string, logger log.FieldL
 		return err
 	}
 	zoneLogger.Info("DNSZone cleaned")
+	return nil
+}
+
+// cleanupAzureDNSZone will return a DNS zone to the minimum set of DNS records
+func cleanupAzureDNSZone(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
+	logger = logger.WithField("dnsZoneID", dnsZone.Spec.Zone)
+	logger.Info("cleaning up DNSZone")
+
+	creds, err := azureutils.GetCreds("")
+	if err != nil {
+		logger.WithError(err).Error("failed to get Azure creds")
+		return err
+	}
+
+	azureClient, err := azureclient.NewClient(creds)
+
+	if err := dns.DeleteAzureRecordSets(azureClient, dnsZone, logger); err != nil {
+		logger.WithError(err).Error("failed to clean up DNS Zone")
+		return err
+	}
+	logger.Info("DNSZone cleaned")
 	return nil
 }
 

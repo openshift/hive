@@ -106,6 +106,11 @@ func NewClientFromFile(filename string) (Client, error) {
 	return newClient(authJSONFromFileSource(filename))
 }
 
+// NewClient creates our client wrapper object for interacting with Azure using the Azure creds provided.
+func NewClient(creds []byte) (Client, error) {
+	return newClient(authJSONFromBytes(creds))
+}
+
 func newClient(authJSONSource func() ([]byte, error)) (*azureClient, error) {
 	authJSON, err := authJSONSource()
 	if err != nil {
@@ -153,6 +158,12 @@ func newClient(authJSONSource func() ([]byte, error)) (*azureClient, error) {
 		recordSetsClient:   &recordSetsClient,
 		zonesClient:        &zonesClient,
 	}, nil
+}
+
+func authJSONFromBytes(creds []byte) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		return creds, nil
+	}
 }
 
 func authJSONFromSecretSource(secret *corev1.Secret) func() ([]byte, error) {

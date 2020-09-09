@@ -163,8 +163,8 @@ func (a *AWSActuator) syncTags() error {
 	return nil
 }
 
-// ModifyStatus updates the DnsZone's status with AWS specific information.
-func (a *AWSActuator) ModifyStatus() error {
+// modifyStatus updates the DnsZone's status with AWS specific information.
+func (a *AWSActuator) modifyStatus() error {
 	if a.hostedZone == nil {
 		return errors.New("zoneID is unpopulated")
 	}
@@ -229,7 +229,7 @@ func (a *AWSActuator) Refresh() error {
 		a.hostedZone = resp.HostedZone
 
 		// Update dnsZone status now that we have the zoneID
-		if err := a.ModifyStatus(); err != nil {
+		if err := a.modifyStatus(); err != nil {
 			a.logger.WithError(err).Error("failed to update status after refresh")
 			return err
 		}
@@ -361,7 +361,7 @@ func (a *AWSActuator) Create() error {
 	}
 
 	a.hostedZone = hostedZone
-	if err := a.ModifyStatus(); err != nil {
+	if err := a.modifyStatus(); err != nil {
 		logger.WithError(err).Error("failed to populate DNSZone status")
 		return err
 	}

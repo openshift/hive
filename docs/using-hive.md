@@ -8,9 +8,21 @@ Hive comes with an optional `hiveutil` binary to assist creating the `ClusterDep
 
 ### DNS
 
-OpenShift installation requires a live and functioning DNS zone in the cloud account into which you will be installing the new cluster(s). For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
+### Native
+
+For clouds where there is support for automated IP allocation and DNS configuration, (AWS, Azure, and GCP) an OpenShift installation requires a live and functioning DNS zone in the cloud account into which you will be installing the new cluster(s). For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
+
+#### Managed DNS
 
 In addition to the default OpenShift DNS support, Hive offers a DNS feature called Managed DNS. With Managed DNS, Hive can automatically create delegated zones for approved base domains. For example, if hive.example.com exists and is specified as your managed domain, you can specify a base domain of cluster1.hive.example.com on your `ClusterDeployment`, and Hive will create this zone for you, add forwarding records in the base domain, wait for it to resolve, and then proceed with installation.
+
+### Non-native
+
+For other platforms/clouds (OpenStack, oVirt, and VSphere), there is presently no native DNS auto-configuration available. This requires some up-front DNS configuration before a cluster can be installed.  It will typically be necessary to reserve virtual IPs (VIPs) that will be used for the cluster's management (eg `api.mycluster.hive.example.com`) and for the cluster's default ingress routes (eg `\*.apps.mycluster.hive.example.com`). Each platform/cloud's configuration will have its own system for alocating or reserving these IPs. Once the IPs are reserved, DNS entries must be published as A records (or simply making local host entries to manage the DNS-to-IP translations on the host(s) running Hive) so that the cluster's API endpoint will be accessible to Hive.
+
+#### oVirt
+
+In addition to reserving IPs for the API and ingress for the cluster, installing pre-4.6 versions of OpenShift onto oVirt requires providing an additional DNS IP for the internal DNS server operated by the cluster. This value must be populated into the Secret containing the `install-config.yaml` information.
 
 ### Pull Secret
 
@@ -128,6 +140,26 @@ metadata:
 type: Opaque
 ```
 
+#### oVirt
+Create a `secret` containing your oVirt credentials information:
+
+```yaml
+apiVersion: v1
+stringData:
+  ovirt_url: https://ovirt.example.com/ovirt-engine/api
+  ovirt_username: admin@internal
+  ovirt_password: secretpassword
+  ovirt_ca_bundle: |-
+    -----BEGIN CERTIFICATE-----
+    CA BUNDLE DATA HERE
+    -----END CERTIFICATE-----
+kind: Secret
+metadata:
+  name: mycluster-ovirt-creds
+  namespace: mynamespace
+type: Opaque
+```
+
 ### SSH Key Pair
 
 (Optional) Hive uses the provided ssh key pair to ssh into the machines in the remote cluster. Hive connects via ssh to gather logs in the event of an installation failure. The ssh key pair is optional, but neither the user nor Hive will be able to ssh into the machines if it is not supplied.
@@ -224,6 +256,24 @@ and replace the contents of `platform` with:
     region: us-east1
 ```
 
+For oVirt, ensure the `compute` and `controlPlane` fields are empty.
+```yaml
+controlPlane:
+compute:
+```
+
+and populate the top-level `platform` fields with the appropriate information:
+```yaml
+platform:
+  ovirt:
+    api_vip: 192.168.1.10
+    dns_vip: 192.168.1.11  # only need dns_vip for pre-4.6 clusters
+    ingress_vip: 192.168.1.12
+    ovirt_cluster_id: 00000000-ovirt-uuid
+    ovirt_network_name: ovirt-network-name
+    ovirt_storage_domain_id: 00000000-storage-domain-uuid
+```
+
 ### ClusterDeployment
 
 Cluster provisioning begins when a `ClusterDeployment` is created.
@@ -276,6 +326,23 @@ gcp:
   region: us-east1
 ```
 
+For oVirt, replace the contents of `spec.platform` with:
+```yaml
+ovirt:
+  certificatesSecretRef:
+    name: mycluster-ovirt-certs
+  credentialsSecretRef:
+    name: mycluster-ovirt-creds
+  ovirt_cluster_id: 00000000-ovirt-uuid
+  ovirt_network_name: ovirt-network-name
+  storage_domain_id: 00000000-storage-domain-uuid
+```
+
+And create a Secret that holds the CA certificate data for the oVirt environment:
+```bash
+oc create secret generic mycluster-ovirt-certs -n mynamespace --from-file=.cacert=$OVIRT_CA_CERT_FILENAME
+```
+
 ### Machine Pools
 
 To manage `MachinePools` Day 2, you need to define these as well. The definition of the worker pool should mostly match what was specified in `InstallConfig` to prevent replacement of all worker nodes.
@@ -319,6 +386,17 @@ gcp:
 ```
 
 WARNING: Due to some naming restrictions on various components in GCP, Hive will restrict you to a max of 35 MachinePools (including the original worker pool created by default). We are left with only a single character to differentiate the machines and nodes from a pool, and 'm' is already reserved for the master hosts, leaving us with a-z (minus m) and 0-9 for a total of 35. Hive will automatically create a MachinePoolNameLease for GCP MachinePools to grab one of the available characters until none are left, at which point your MachinePool will not be provisioned.
+
+For oVirt, replace the contents of `spec.platform` with the settings you want for the instances:
+```yaml
+ovirt:
+  cpu:
+    cores: 2
+    sockets: 1
+  memoryMB: 8174
+  osDisk:
+    sizeGB: 120
+```
 
 #### Create Cluster on Bare Metal
 

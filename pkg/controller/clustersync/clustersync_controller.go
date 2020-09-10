@@ -582,7 +582,7 @@ func (r *ReconcileClusterSync) applySyncSet(
 
 	// Apply Resources
 	for i, resource := range resources {
-		returnErr, requeue = r.applyResource(i, resource, referencesToResources[i], applyFn, applyFnMetricsLabel, logger)
+		returnErr, requeue = r.applyResource(syncSet, i, resource, referencesToResources[i], applyFn, applyFnMetricsLabel, logger)
 		if returnErr != nil {
 			resourcesApplied = referencesToResources[:i]
 			return
@@ -649,6 +649,7 @@ func referencesToSecrets(syncSet CommonSyncSet) []hiveintv1alpha1.SyncResourceRe
 }
 
 func (r *ReconcileClusterSync) applyResource(
+	syncSet CommonSyncSet,
 	resourceIndex int,
 	resource *unstructured.Unstructured,
 	reference hiveintv1alpha1.SyncResourceReference,
@@ -662,7 +663,7 @@ func (r *ReconcileClusterSync) applyResource(
 		WithField("resourceAPIVersion", reference.APIVersion).
 		WithField("resourceKind", reference.Kind)
 	logger.Debug("applying resource")
-	if err := applyToTargetCluster(resource, applyFnMetricsLabel, applyFn, logger); err != nil {
+	if err := applyToTargetCluster(syncSet, resource, applyFnMetricsLabel, applyFn, logger); err != nil {
 		return errors.Wrapf(err, "failed to apply resource %d", resourceIndex), true
 	}
 	return nil, false
@@ -710,7 +711,7 @@ func (r *ReconcileClusterSync) applySecret(
 		Labels:      secret.Labels,
 	}
 	logger.Debug("applying secret")
-	if err := applyToTargetCluster(secret, applyFnMetricsLabel, applyFn, logger); err != nil {
+	if err := applyToTargetCluster(syncSet, secret, applyFnMetricsLabel, applyFn, logger); err != nil {
 		return errors.Wrapf(err, "failed to apply secret %d", secretIndex), true
 	}
 	return nil, false
@@ -727,6 +728,7 @@ func (r *ReconcileClusterSync) applyPatch(
 		WithField("patchName", patch.Name).
 		WithField("patchAPIVersion", patch.APIVersion).
 		WithField("patchKind", patch.Kind)
+	// TODO: label and annotate these?
 	logger.Debug("applying patch")
 	if err := resourceHelper.Patch(
 		types.NamespacedName{Namespace: patch.Namespace, Name: patch.Name},
@@ -740,20 +742,44 @@ func (r *ReconcileClusterSync) applyPatch(
 	return nil, false
 }
 
+// ensureHiveSourceAnnotation makes sure obj has a HiveSourcesAnnotation containing an
+// appropriate value for syncSet.
+// Currently the annotation is a space-separated list of strings of the form Kind/Name,
+// where Kind is either SyncSet or SelectorSyncSet, and Name is the name of the
+// [Selector]SyncSet.
+func ensureHiveSourceAnnotation(obj hivev1.MetaRuntimeObject, syncSet CommonSyncSet) {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string, 1)
+	}
+	hsa := strings.Split(annotations[constants.HiveSourcesAnnotation], " ")
+	source := syncSet.GetSourceAnnotation()
+	for _, s := range hsa {
+		if s == source {
+			return
+		}
+	}
+	hsa = append(hsa, source)
+	annotations[constants.HiveSourcesAnnotation] = strings.Join(hsa, " ")
+	obj.SetAnnotations(annotations)
+}
+
 func applyToTargetCluster(
+	syncSet CommonSyncSet,
 	obj hivev1.MetaRuntimeObject,
 	applyFnMetricLabel string,
 	applyFn func(obj []byte) (resource.ApplyResult, error),
 	logger log.FieldLogger,
 ) error {
 	startTime := time.Now()
+	// Inject the hive managed label and annotation to help end-users see how the resource is managed by hive:
 	labels := obj.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string, 1)
 	}
-	// Inject the hive managed annotation to help end-users see that a resource is managed by hive:
 	labels[constants.HiveManagedLabel] = "true"
 	obj.SetLabels(labels)
+	ensureHiveSourceAnnotation(obj, syncSet)
 
 	bytes, err := json.Marshal(obj)
 	if err != nil {

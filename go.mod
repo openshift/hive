@@ -12,7 +12,7 @@ require (
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6 // indirect
+	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.26.0
 	github.com/google/uuid v1.1.1

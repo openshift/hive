@@ -1,6 +1,8 @@
 package clustersync
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -17,6 +19,10 @@ type CommonSyncSet interface {
 
 	// GetSpec gets the common spec of the syncset
 	GetSpec() *hivev1.SyncSetCommonSpec
+
+	// GetSourceAnnotation produces a string of the form Kind/Name for use in the HiveSourcesAnnotation
+	// on a remote cluster
+	GetSourceAnnotation() string
 }
 
 // SyncSetAsCommon is a SyncSet typed as a CommonSyncSet
@@ -34,6 +40,11 @@ func (s *SyncSetAsCommon) GetSpec() *hivev1.SyncSetCommonSpec {
 	return &s.Spec.SyncSetCommonSpec
 }
 
+func (s *SyncSetAsCommon) GetSourceAnnotation() string {
+	obj := s.AsMetaObject()
+	return fmt.Sprintf("SyncSet/%s", obj.GetName())
+}
+
 // SelectorSyncSetAsCommon is a SelectorSyncSet typed as a CommonSyncSet
 type SelectorSyncSetAsCommon hivev1.SelectorSyncSet
 
@@ -47,4 +58,9 @@ func (s *SelectorSyncSetAsCommon) AsMetaObject() metav1.Object {
 
 func (s *SelectorSyncSetAsCommon) GetSpec() *hivev1.SyncSetCommonSpec {
 	return &s.Spec.SyncSetCommonSpec
+}
+
+func (s *SelectorSyncSetAsCommon) GetSourceAnnotation() string {
+	obj := s.AsMetaObject()
+	return fmt.Sprintf("SelectorSyncSet/%s", obj.GetName())
 }

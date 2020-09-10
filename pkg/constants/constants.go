@@ -126,6 +126,10 @@ const (
 	// managed by Hive, and any manual changes may be undone the next time the resource is reconciled.
 	HiveManagedLabel = "hive.openshift.io/managed"
 
+	// HiveSourcesAnnotation is the key of an annotation added to any resources we sync to the remote cluster that lists
+	// the kind/name of the [Selector]SyncSet(s) that affect(s) it.
+	HiveSourcesAnnotation = "hive.openshift.io/sources"
+
 	// DisableInstallLogPasswordRedactionAnnotation is an annotation used on ClusterDeployments to disable the installmanager
 	// functionality which refuses to print output if it appears to contain a password or sensitive info. This can be
 	// useful in scenarios where debugging is needed and important info is being redacted. Set to "true".

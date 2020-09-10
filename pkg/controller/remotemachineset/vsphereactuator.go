@@ -34,7 +34,7 @@ func addVSphereProviderToScheme(scheme *runtime.Scheme) error {
 
 // NewVSphereActuator is the constructor for building a VSphereActuator
 func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*VSphereActuator, error) {
-	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
+	osImage, err := getVSphereOSImage(masterMachine, scheme, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting os image from master machine")
 		return nil, err

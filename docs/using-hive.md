@@ -160,6 +160,21 @@ metadata:
 type: Opaque
 ```
 
+#### vSphere
+Create a `secret` containing your vSphere credentials information:
+
+```yaml
+apiVersion: v1
+stringData:
+  password: vsphereuser
+  username: secretpassword
+kind: Secret
+metadata:
+  name: mycluster-vsphere-creds
+  namespace: mynamespace
+type: Opaque
+```
+
 ### SSH Key Pair
 
 (Optional) Hive uses the provided ssh key pair to ssh into the machines in the remote cluster. Hive connects via ssh to gather logs in the event of an installation failure. The ssh key pair is optional, but neither the user nor Hive will be able to ssh into the machines if it is not supplied.
@@ -274,6 +289,28 @@ platform:
     ovirt_storage_domain_id: 00000000-storage-domain-uuid
 ```
 
+For vSphere, ensure the `compute` and `controlPlane` fields are empty.
+```yaml
+controlPlane:
+compute:
+```
+
+and populate the top-level `platform` fields with the appropriate information:
+```yaml
+platform:
+  vsphere:
+    apiVIP: 192.168.1.10
+    cluster: devel
+    datacenter: dc1
+    defaultDatastore: ds1
+    folder: /dc1/vm/CLUSTER_NAME
+    ingressVIP: 192.168.1.11
+    network: "VM Network"
+    password: secretpassword
+    username: vsphereuser
+    vCenter: vcenter.example.com
+```
+
 ### ClusterDeployment
 
 Cluster provisioning begins when a `ClusterDeployment` is created.
@@ -341,6 +378,20 @@ ovirt:
 And create a Secret that holds the CA certificate data for the oVirt environment:
 ```bash
 oc create secret generic mycluster-ovirt-certs -n mynamespace --from-file=.cacert=$OVIRT_CA_CERT_FILENAME
+
+For vSphere, replace the contents of `spec.platform` with:
+```yaml
+vsphere:                                                                    
+  certificatesSecretRef:         
+    name: mycluster-vsphere-certs
+  cluster: devel
+  credentialsSecretRef:                                                     
+    name: mycluster-vsphere-creds
+  datacenter: dc1
+  defaultDatastore: ds1     
+  folder: /dc1/vm/CLUSTER_NAME
+  network: "VM Network"
+  vCenter: vsphere.example.com
 ```
 
 ### Machine Pools
@@ -396,6 +447,16 @@ ovirt:
   memoryMB: 8174
   osDisk:
     sizeGB: 120
+```
+
+For vSphere, replace the contents of `spec.platform` with the settings you want for the instances:
+```yaml
+vsphere:
+  coresPerSocket: 1
+  cpus: 2
+  memoryMB: 8192
+  osDisk:
+    diskSizeGB: 120
 ```
 
 #### Create Cluster on Bare Metal

@@ -72,6 +72,13 @@ ovirt_ca_bundle: |-
 
 ```bash
 bin/hiveutil create-cluster --cloud=ovirt --ovirt-api-vip=192.168.1.10  --ovirt-ingress-vip=192.168.1.11 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id storage-domain-UUID --ovirt-cluster-id ovirt-cluster-UUID --ovirt-ca-certs ~/ovirt-ca.pem --base-domain ovirt.hive.example.com mycluster
+
+#### Create Cluster on vSphere
+
+Set credentials/connection information in the following environment variables. `GOVC_USERNAME` should hold the vSphere username, `GOVC_PASSWORD` should be set to the vSphere user's password. If the vCenter instance is using self-signed certificates or is otherwise untrusted by the system being used to connect to vCenter, `GOVC_TLS_CA_CERTS` should be set to the path of a file containing the CA certificate for the vCenter instance. 
+
+```bash
+bin/hiveutil create-cluster --cloud=vsphere --vsphere-vcenter=vcenter.example.com --vsphere-datacenter=dc1 --vsphere-default-datastore=ds1 --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-folder=/dc1/vm/mycluster --base-domain vmware.hive.example.com mycluster
 ```
 
 ### Other Commands

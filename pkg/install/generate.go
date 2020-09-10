@@ -19,10 +19,6 @@ import (
 )
 
 const (
-	// DefaultInstallerImage is the image that will be used to install a ClusterDeployment if no
-	// image is specified through a ClusterImageSet reference or on the ClusterDeployment itself.
-	DefaultInstallerImage = "registry.svc.ci.openshift.org/openshift/origin-v4.0:installer"
-
 	azureAuthDir       = "/.azure"
 	azureAuthFile      = azureAuthDir + "/osServicePrincipal.json"
 	gcpAuthDir         = "/.gcp"
@@ -514,36 +510,11 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 	if len(req.Spec.Platform.AWS.CredentialsSecretRef.Name) > 0 {
 		credentialsSecret = req.Spec.Platform.AWS.CredentialsSecretRef.Name
 	}
-	env := []corev1.EnvVar{}
-	if len(credentialsSecret) > 0 {
-		env = append(
-			env,
-			corev1.EnvVar{
-				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
-						Key:                  constants.AWSAccessKeyIDSecretKey,
-					},
-				},
-			},
-			corev1.EnvVar{
-				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
-						Key:                  constants.AWSSecretAccessKeySecretKey,
-					},
-				},
-			},
-		)
-	}
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{
 				"aws-tag-deprovision",
@@ -560,6 +531,24 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		containers[0].Args = append(containers[0].Args, fmt.Sprintf("openshiftClusterID=%s", req.Spec.ClusterID))
 	}
 	job.Spec.Template.Spec.Containers = containers
+	if len(credentialsSecret) > 0 {
+		containers[0].VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "aws-creds",
+				MountPath: constants.AWSCredsMount,
+			},
+		}
+		job.Spec.Template.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "aws-creds",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: credentialsSecret,
+					},
+				},
+			},
+		}
+	}
 }
 
 func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {

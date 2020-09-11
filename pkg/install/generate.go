@@ -583,6 +583,8 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 				"azure",
 				"--loglevel",
 				"debug",
+				"--creds-dir",
+				azureAuthDir,
 				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,
@@ -625,6 +627,8 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"gcp",
 				"--loglevel",
 				"debug",
+				"--creds-dir",
+				gcpAuthDir,
 				"--region",
 				req.Spec.Platform.GCP.Region,
 				req.Spec.InfraID,
@@ -664,6 +668,8 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 				"openstack",
 				"--loglevel",
 				"debug",
+				"--creds-dir",
+				openStackCloudsDir,
 				"--cloud",
 				req.Spec.Platform.OpenStack.Cloud,
 				req.Spec.InfraID,
@@ -676,20 +682,37 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 }
 
 func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+	const vsphereCredsDir = "/vsphere-creds"
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
-	volumes = append(volumes, corev1.Volume{
-		Name: "vsphere-certificates",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: req.Spec.Platform.VSphere.CertificatesSecretRef.Name,
+	volumes = append(volumes,
+		corev1.Volume{
+			Name: "vsphere-creds",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: req.Spec.Platform.VSphere.CredentialsSecretRef.Name,
+				},
 			},
 		},
-	})
-	volumeMounts = append(volumeMounts, corev1.VolumeMount{
-		Name:      "vsphere-certificates",
-		MountPath: vsphereCloudsDir,
-	})
+		corev1.Volume{
+			Name: "vsphere-certificates",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: req.Spec.Platform.VSphere.CertificatesSecretRef.Name,
+				},
+			},
+		},
+	)
+	volumeMounts = append(volumeMounts,
+		corev1.VolumeMount{
+			Name:      "vsphere-creds",
+			MountPath: vsphereCredsDir,
+		},
+		corev1.VolumeMount{
+			Name:      "vsphere-certificates",
+			MountPath: vsphereCloudsDir,
+		},
+	)
 
 	env := vSphereCredsEnvVars(req.Spec.Platform.VSphere.CredentialsSecretRef.Name)
 
@@ -700,8 +723,18 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
-			Args:            []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && /usr/bin/hiveutil deprovision vsphere --vsphere-vcenter %s --loglevel debug %s", vsphereCloudsDir, req.Spec.Platform.VSphere.VCenter, req.Spec.InfraID)},
-			VolumeMounts:    volumeMounts,
+			Args: []string{
+				fmt.Sprintf(
+					"cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && "+
+						"update-ca-trust && "+
+						"/usr/bin/hiveutil deprovision vsphere --vsphere-vcenter %s --loglevel debug --creds-dir=%s %s",
+					vsphereCloudsDir,
+					req.Spec.Platform.VSphere.VCenter,
+					vsphereCredsDir,
+					req.Spec.InfraID,
+				),
+			},
+			VolumeMounts: volumeMounts,
 		},
 	}
 	job.Spec.Template.Spec.Containers = containers
@@ -749,8 +782,18 @@ func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
-			Args:            []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && /usr/bin/hiveutil deprovision ovirt --ovirt-cluster-id %s --loglevel debug %s", ovirtCADir, req.Spec.Platform.Ovirt.ClusterID, req.Spec.InfraID)},
-			VolumeMounts:    volumeMounts,
+			Args: []string{
+				fmt.Sprintf(
+					"cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && "+
+						"update-ca-trust && "+
+						"/usr/bin/hiveutil deprovision ovirt --ovirt-cluster-id %s --loglevel debug --certs-dir=%s %s",
+					ovirtCADir,
+					req.Spec.Platform.Ovirt.ClusterID,
+					ovirtCloudsDir,
+					req.Spec.InfraID,
+				),
+			},
+			VolumeMounts: volumeMounts,
 		},
 	}
 	job.Spec.Template.Spec.Containers = containers

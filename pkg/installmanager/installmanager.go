@@ -16,18 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openshift/hive/pkg/gcpclient"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
-
-	contributils "github.com/openshift/hive/contrib/pkg/utils"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/resource"
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -38,23 +30,21 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
-	"k8s.io/utils/pointer"
-
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
-
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	azuresession "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/destroy/ovirt"
+	"github.com/openshift/installer/pkg/destroy/providers"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
@@ -62,6 +52,13 @@ import (
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
+
+	contributils "github.com/openshift/hive/contrib/pkg/utils"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/gcpclient"
+	"github.com/openshift/hive/pkg/resource"
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
 const (
@@ -530,41 +527,30 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, prov
 }
 
 func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
+	var uninstaller providers.Destroyer
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		// run the uninstaller to clean up any cloud resources previously created
 		filters := []aws.Filter{
 			{kubernetesKeyPrefix + infraID: "owned"},
 		}
-		uninstaller := &aws.ClusterUninstaller{
+		uninstaller = &aws.ClusterUninstaller{
 			Filters: filters,
 			Region:  cd.Spec.Platform.AWS.Region,
 			Logger:  logger,
 		}
-
-		if err := uninstaller.Run(); err != nil {
-			return err
-		}
-
-		// If we're managing DNS for this cluster, lookup the DNSZone and cleanup
-		// any leftover A records that may have leaked due to
-		// https://jira.coreos.com/browse/CORS-1195.
-		return cleanupDNSZone(dynClient, cd, logger)
 	case cd.Spec.Platform.Azure != nil:
-		uninstaller := &azure.ClusterUninstaller{}
-		uninstaller.Logger = logger
-		session, err := azuresession.GetSession(installertypesazure.PublicCloud)
-		if err != nil {
-			return err
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Azure: &installertypesazure.Metadata{
+					CloudName: installertypesazure.PublicCloud,
+				},
+			},
 		}
-
-		uninstaller.InfraID = infraID
-		uninstaller.SubscriptionID = session.Credentials.SubscriptionID
-		uninstaller.TenantID = session.Credentials.TenantID
-		uninstaller.GraphAuthorizer = session.GraphAuthorizer
-		uninstaller.Authorizer = session.Authorizer
-
-		if err := uninstaller.Run(); err != nil {
+		var err error
+		uninstaller, err = azure.New(logger, metadata)
+		if err != nil {
 			return err
 		}
 	case cd.Spec.Platform.GCP != nil:
@@ -582,12 +568,8 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 				},
 			},
 		}
-		uninstaller, err := gcp.New(logger, metadata)
+		uninstaller, err = gcp.New(logger, metadata)
 		if err != nil {
-			return err
-		}
-
-		if err := uninstaller.Run(); err != nil {
 			return err
 		}
 	case cd.Spec.Platform.OpenStack != nil:
@@ -602,12 +584,9 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 				},
 			},
 		}
-		uninstaller, err := openstack.New(logger, metadata)
+		var err error
+		uninstaller, err = openstack.New(logger, metadata)
 		if err != nil {
-			return err
-		}
-
-		if err := uninstaller.Run(); err != nil {
 			return err
 		}
 	case cd.Spec.Platform.VSphere != nil:
@@ -629,12 +608,9 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 				},
 			},
 		}
-		uninstaller, err := vsphere.New(logger, metadata)
+		var err error
+		uninstaller, err = vsphere.New(logger, metadata)
 		if err != nil {
-			return err
-		}
-
-		if err := uninstaller.Run(); err != nil {
 			return err
 		}
 	case cd.Spec.Platform.Ovirt != nil:
@@ -646,17 +622,18 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 				},
 			},
 		}
-		uninstaller, err := ovirt.New(logger, metadata)
+		var err error
+		uninstaller, err = ovirt.New(logger, metadata)
 		if err != nil {
-			return err
-		}
-
-		if err := uninstaller.Run(); err != nil {
 			return err
 		}
 	default:
 		logger.Warn("unknown platform for re-try cleanup")
 		return errors.New("unknown platform for re-try cleanup")
+	}
+
+	if err := uninstaller.Run(); err != nil {
+		return err
 	}
 
 	return cleanupDNSZone(dynClient, cd, logger)

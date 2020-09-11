@@ -19,6 +19,11 @@ type ClusterClaimSpec struct {
 	// This field will be set by the ClusterPool when the claim is assigned a cluster.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
+
+	// Lifetime is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
+	// when the lifetime has elapsed, the claim will be deleted by Hive.
+	// +optional
+	Lifetime *metav1.Duration `json:"lifetime,omitempty"`
 }
 
 // ClusterClaimStatus defines the observed state of ClusterClaim.

@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -277,4 +278,20 @@ func getValueFromEnvVariable(controllerName hivev1.ControllerName, envVarFormat 
 		return value, true
 	}
 	return "", false
+}
+
+// EnsureRequeueAtLeastWithin ensures that the requeue of the object will occur within the given duration. If the
+// reconcile result and error will already result in a requeue soon enough, then the supplied reconcile result and error
+// will be returned as is.
+func EnsureRequeueAtLeastWithin(duration time.Duration, result reconcile.Result, err error) (reconcile.Result, error) {
+	if err != nil {
+		return result, err
+	}
+	if result.Requeue && result.RequeueAfter <= 0 {
+		return result, err
+	}
+	if ra := result.RequeueAfter; 0 < ra && ra < duration {
+		return result, err
+	}
+	return reconcile.Result{RequeueAfter: duration, Requeue: true}, nil
 }

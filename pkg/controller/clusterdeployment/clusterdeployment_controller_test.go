@@ -950,7 +950,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
-			expectedRequeueAfter: 8*time.Hour + 60*time.Second,
+			expectedRequeueAfter: 8 * time.Hour,
 		},
 		{
 			name: "Wait after failed provision",

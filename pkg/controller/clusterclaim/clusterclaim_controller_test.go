@@ -3,6 +3,7 @@ package clusterclaim
 import (
 	"context"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -75,6 +76,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 		expectAssignedClusterDeploymentDeleted bool
 		expectRBAC                             bool
 		expectHibernating                      bool
+		expectDeleted                          bool
+		expectedRequeueAfter                   *time.Duration
 	}{
 		{
 			name:                 "new assignment",
@@ -263,6 +266,48 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectRBAC:           true,
 			expectHibernating:    true,
 		},
+		{
+			name: "claim with elapsed lifetime is deleted",
+			claim: claimBuilder.Build(
+				testclaim.WithCluster(clusterName),
+				testclaim.WithLifetime(1*time.Hour),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd:            cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
+			expectDeleted: true,
+		},
+		{
+			name: "claim with non-elapsed lifetime is not deleted",
+			claim: claimBuilder.Build(
+				testclaim.WithCluster(clusterName),
+				testclaim.WithLifetime(3*time.Hour),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             "ClusterClaimed",
+					Message:            "Cluster claimed",
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd: cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
+			existing: []runtime.Object{
+				testRole(),
+				testRoleBinding(),
+			},
+			expectCompletedClaim: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{{
+				Type:    hivev1.ClusterClaimPendingCondition,
+				Status:  corev1.ConditionFalse,
+				Reason:  "ClusterClaimed",
+				Message: "Cluster claimed",
+			}},
+			expectRBAC:           true,
+			expectedRequeueAfter: func(d time.Duration) *time.Duration { return &d }(2 * time.Hour),
+		},
 	}
 
 	for _, test := range tests {
@@ -288,12 +333,24 @@ func TestReconcileClusterClaim(t *testing.T) {
 				},
 			}
 
-			_, err := rcp.Reconcile(reconcileRequest)
+			result, err := rcp.Reconcile(reconcileRequest)
 			require.NoError(t, err, "unexpected error from Reconcile")
+
+			if test.expectedRequeueAfter == nil {
+				assert.Zero(t, result.RequeueAfter, "expected no requeue after")
+			} else {
+				assert.GreaterOrEqual(t, result.RequeueAfter.Seconds(), (*test.expectedRequeueAfter - 10*time.Second).Seconds(), "requeue after too small")
+				assert.LessOrEqual(t, result.RequeueAfter.Seconds(), (*test.expectedRequeueAfter + 10*time.Second).Seconds(), "requeue after too large")
+			}
 
 			claim := &hivev1.ClusterClaim{}
 			err = c.Get(context.Background(), client.ObjectKey{Namespace: claimNamespace, Name: claimName}, claim)
-			require.NoError(t, err, "unexpected error getting claim")
+			if !test.expectDeleted {
+				require.NoError(t, err, "unexpected error getting claim")
+			} else {
+				assert.True(t, apierrors.IsNotFound(err), "expected claim to be deleted")
+				return
+			}
 
 			cds := &hivev1.ClusterDeploymentList{}
 			err = c.List(context.Background(), cds)

@@ -506,16 +506,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			}
 
 			defer func() {
-				requeueNow := result.Requeue && result.RequeueAfter <= 0
-				if returnErr == nil && !requeueNow {
-					// We have an expiry time but we're not expired yet. Set requeueAfter for just after expiry time
-					// so that we requeue cluster for deletion once reconcile has completed
-					requeueAfter := time.Until(expiry) + 60*time.Second
-					if requeueAfter < result.RequeueAfter || result.RequeueAfter <= 0 {
-						cdLog.Debugf("cluster will re-sync due to expiry time in: %v", requeueAfter)
-						result.RequeueAfter = requeueAfter
-					}
-				}
+				// We have an expiry time but we're not expired yet. Set requeueAfter to the expiry time
+				// so that we requeue cluster for deletion once reconcile has completed
+				result, returnErr = controllerutils.EnsureRequeueAtLeastWithin(
+					time.Until(cd.CreationTimestamp.Add(dur)),
+					result,
+					returnErr,
+				)
 			}()
 
 		}

@@ -1,7 +1,10 @@
 package clusterclaim
 
 import (
+	"time"
+
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -100,5 +103,11 @@ func WithCondition(cond hivev1.ClusterClaimCondition) Option {
 			}
 		}
 		clusterClaim.Status.Conditions = append(clusterClaim.Status.Conditions, cond)
+	}
+}
+
+func WithLifetime(lifetime time.Duration) Option {
+	return func(clusterClaim *hivev1.ClusterClaim) {
+		clusterClaim.Spec.Lifetime = &metav1.Duration{Duration: lifetime}
 	}
 }

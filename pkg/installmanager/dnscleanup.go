@@ -61,6 +61,7 @@ func cleanupAWSDNSZone(dnsZone *hivev1.DNSZone, region string, logger log.FieldL
 
 	awsClient, err := awsclient.NewClient(nil, "", "", region)
 	if err != nil {
+		logger.WithError(err).Error("failed to create AWS client")
 		return err
 	}
 
@@ -84,6 +85,10 @@ func cleanupAzureDNSZone(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error 
 	}
 
 	azureClient, err := azureclient.NewClient(creds)
+	if err != nil {
+		logger.WithError(err).Error("failed to create Azure client")
+		return err
+	}
 
 	if err := dns.DeleteAzureRecordSets(azureClient, dnsZone, logger); err != nil {
 		logger.WithError(err).Error("failed to clean up DNS Zone")

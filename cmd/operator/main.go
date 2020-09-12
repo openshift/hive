@@ -1,22 +1,30 @@
 package main
 
 import (
+	"context"
 	"flag"
 	golog "log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/klog"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 
@@ -33,9 +41,9 @@ import (
 const (
 	defaultLogLevel             = "info"
 	leaderElectionConfigMap     = "hive-operator-leader"
-	leaderElectionLeaseDuration = "40s"
-	leaderElectionRenewDeadline = "20s"
-	leaderElectionlRetryPeriod  = "4s"
+	leaderElectionLeaseDuration = "360s"
+	leaderElectionRenewDeadline = "270s"
+	leaderElectionRetryPeriod   = "90s"
 )
 
 type controllerManagerOptions struct {
@@ -66,7 +74,7 @@ func newRootCommand() *cobra.Command {
 			if err != nil {
 				log.WithError(err).Fatal("Cannot parse renew deadline")
 			}
-			retryPeriod, err := time.ParseDuration(leaderElectionlRetryPeriod)
+			retryPeriod, err := time.ParseDuration(leaderElectionRetryPeriod)
 			if err != nil {
 				log.WithError(err).Fatal("Cannot parse retry period")
 			}
@@ -84,56 +92,120 @@ func newRootCommand() *cobra.Command {
 				log.Fatalf("%s env var is unset, unable to determine namespace operator is running in", hive.HiveOperatorNamespaceEnvVar)
 			}
 
-			// Create a new Cmd to provide shared dependencies and start components
-			mgr, err := manager.New(cfg, manager.Options{
-				LeaderElectionNamespace: operatorNS,
-				LeaderElection:          true,
-				LeaderElectionID:        leaderElectionConfigMap,
-				LeaseDuration:           &leaseDuration,
-				RenewDeadline:           &renewDeadline,
-				RetryPeriod:             &retryPeriod,
-				MetricsBindAddress:      "0",
-				HealthProbeBindAddress:  ":8080",
+			// Create and start liveness and readiness probe endpoints
+			http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
 			})
-			if err != nil {
-				log.Fatal(err)
+			http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+			log.Info("Starting /healthz and /readyz endpoints")
+			go http.ListenAndServe(":8080", nil)
+
+			run := func(ctx context.Context) {
+				// Create a new Cmd to provide shared dependencies and start components
+				mgr, err := manager.New(cfg, manager.Options{
+					MetricsBindAddress: "0",
+				})
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				log.Info("Registering Components.")
+
+				// Setup Scheme for all resources
+				if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := apiregistrationv1.AddToScheme(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := apiextv1beta1.AddToScheme(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := oappsv1.Install(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := orbacv1.Install(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				// Setup all Controllers
+				if err := operator.AddToOperator(mgr); err != nil {
+					log.Fatal(err)
+				}
+
+				log.Info("Starting the Cmd.")
+
+				// Start the Cmd
+				log.Fatal(mgr.Start(signals.SetupSignalHandler()))
 			}
 
-			log.Info("Registering Components.")
+			// Leader election code based on:
+			// https://github.com/kubernetes/kubernetes/blob/f7e3bcdec2e090b7361a61e21c20b3dbbb41b7f0/staging/src/k8s.io/client-go/examples/leader-election/main.go#L92-L154
+			// This gives us ReleaseOnCancel which is not presently exposed in controller-runtime.
 
-			// Setup Scheme for all resources
-			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
+			// use a Go context so we can tell the leaderelection code when we want to step down
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// listen for interrupts or the Linux SIGTERM signal and cancel
+			// our context, which the leader election code will observe and
+			// step down
+			ch := make(chan os.Signal, 1)
+			signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+			go func() {
+				<-ch
+				log.Info("received termination, signaling shutdown")
+				cancel()
+			}()
+
+			id := uuid.New().String()
+			leLog := log.WithField("id", id)
+			leLog.Info("generated leader election ID")
+
+			lock := &resourcelock.ConfigMapLock{
+				ConfigMapMeta: metav1.ObjectMeta{
+					Namespace: operatorNS,
+					Name:      leaderElectionConfigMap,
+				},
+				Client: kubernetes.NewForConfigOrDie(cfg).CoreV1(),
+				LockConfig: resourcelock.ResourceLockConfig{
+					Identity: id,
+				},
 			}
 
-			if err := apiregistrationv1.AddToScheme(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
-			}
+			// start the leader election code loop
+			leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+				Lock:            lock,
+				ReleaseOnCancel: true,
+				LeaseDuration:   leaseDuration,
+				RenewDeadline:   renewDeadline,
+				RetryPeriod:     retryPeriod,
+				Callbacks: leaderelection.LeaderCallbacks{
+					OnStartedLeading: func(ctx context.Context) {
+						run(ctx)
+					},
+					OnStoppedLeading: func() {
+						// we can do cleanup here if necessary
+						leLog.Infof("leader lost")
+						os.Exit(0)
+					},
+					OnNewLeader: func(identity string) {
+						if identity == id {
+							// We just became the leader
+							leLog.Info("became leader")
+							return
+						}
+						log.Infof("current leader: %s", identity)
+					},
+				},
+			})
 
-			if err := apiextv1beta1.AddToScheme(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
-			}
-
-			if err := oappsv1.Install(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
-			}
-
-			if err := orbacv1.Install(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
-			}
-
-			// Setup all Controllers
-			if err := operator.AddToOperator(mgr); err != nil {
-				log.Fatal(err)
-			}
-
-			mgr.AddReadyzCheck("ping", healthz.Ping)
-			mgr.AddHealthzCheck("ping", healthz.Ping)
-
-			log.Info("Starting the Cmd.")
-
-			// Start the Cmd
-			log.Fatal(mgr.Start(signals.SetupSignalHandler()))
 		},
 	}
 

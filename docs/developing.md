@@ -175,7 +175,7 @@ NOTE: assumes you have [previously deployed Hive](install.md)
 
 ```bash
 oc scale -n hive deployment.v1.apps/hive-controllers --replicas=0
-DISABLE_LEADER_ELECTION="true" HIVE_NS="hive" make run
+HIVE_NS="hive" make run
 ```
 Kind users should also specify `HIVE_IMAGE="localhost:5000/hive:latest"` as the default image location cannot be authenticated to from Kind clusters, resulting in inability to launch install pods.
 

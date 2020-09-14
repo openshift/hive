@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/golang/mock/gomock"
-	openshiftapiv1 "github.com/openshift/api/config/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -927,6 +926,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Namespace:  testNamespace,
 			Finalizers: []string{hivev1.FinalizerDeprovision},
 			UID:        types.UID("1234"),
+			Labels: map[string]string{
+				constants.VersionMajorMinorPatchLabel: "4.4.0",
+			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			ClusterName: testName,
@@ -950,11 +952,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 				Type:   hivev1.UnreachableCondition,
 				Status: corev1.ConditionFalse,
 			}},
-			ClusterVersionStatus: &openshiftapiv1.ClusterVersionStatus{
-				Desired: openshiftapiv1.Update{
-					Version: "4.4.0",
-				},
-			},
 		},
 	}
 }
@@ -968,10 +965,9 @@ func printAWSMachineProviderConfig(cfg *awsprovider.AWSMachineProviderConfig) st
 }
 
 func withClusterVersion(cd *hivev1.ClusterDeployment, version string) *hivev1.ClusterDeployment {
-	cd.Status.ClusterVersionStatus = &openshiftapiv1.ClusterVersionStatus{
-		Desired: openshiftapiv1.Update{
-			Version: version,
-		},
+	if cd.Labels == nil {
+		cd.Labels = make(map[string]string, 1)
 	}
+	cd.Labels[constants.VersionMajorMinorPatchLabel] = version
 	return cd
 }

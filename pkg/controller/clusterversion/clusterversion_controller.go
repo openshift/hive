@@ -3,7 +3,6 @@ package clusterversion
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -154,12 +153,7 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, err
 	}
 
-	err = r.updateClusterVersionStatus(cd, clusterVersion, cdLog)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	if err := r.updateClusterVersionLabels(cd, cdLog); err != nil {
+	if err := r.updateClusterVersionLabels(cd, clusterVersion, cdLog); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -167,36 +161,9 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterVersion) updateClusterVersionStatus(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
-	origClusterVersionStatus := cd.Status.ClusterVersionStatus.DeepCopy()
-	cdLog.WithField("clusterversion.status", clusterVersion.Status).Debug("remote cluster version status")
-	cd.Status.ClusterVersionStatus = clusterVersion.Status.DeepCopy()
-
-	// Force the AvailableUpdates field to an empty array instead of nil. When the field is nil, future reads will
-	// read it as an empty array. Then, when doing a deep equal to see if changes have been made, will consider that
-	// field changed, when it has not been.
-	if cd.Status.ClusterVersionStatus.AvailableUpdates == nil {
-		cd.Status.ClusterVersionStatus.AvailableUpdates = []openshiftapiv1.Update{}
-	}
-
-	if reflect.DeepEqual(cd.Status.ClusterVersionStatus, origClusterVersionStatus) {
-		cdLog.Debug("status has not changed, nothing to update")
-		return nil
-	}
-
-	// Update cluster deployment status if changed:
-	cdLog.Infof("status has changed, updating cluster deployment")
-	err := r.Status().Update(context.TODO(), cd)
-	if err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment status")
-		return err
-	}
-	return nil
-}
-
-func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
 	changed := false
-	if version, err := semver.ParseTolerant(cd.Status.ClusterVersionStatus.Desired.Version); err == nil {
+	if version, err := semver.ParseTolerant(clusterVersion.Status.Desired.Version); err == nil {
 		if cd.Labels == nil {
 			cd.Labels = make(map[string]string, 3)
 		}
@@ -210,7 +177,7 @@ func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterD
 		cd.Labels[constants.VersionMajorMinorLabel] = majorMinor
 		cd.Labels[constants.VersionMajorMinorPatchLabel] = majorMinorPatch
 	} else {
-		cdLog.WithField("version", cd.Status.ClusterVersionStatus.Desired.Version).WithError(err).Warn("could not parse the cluster version")
+		cdLog.WithField("version", clusterVersion.Status.Desired.Version).WithError(err).Warn("could not parse the cluster version")
 		origLen := len(cd.Labels)
 		delete(cd.Labels, constants.VersionMajorLabel)
 		delete(cd.Labels, constants.VersionMajorMinorLabel)

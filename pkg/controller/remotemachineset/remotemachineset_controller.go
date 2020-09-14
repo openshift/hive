@@ -936,11 +936,9 @@ func getMinMaxReplicasForMachineSet(pool *hivev1.MachinePool, machineSets []*mac
 }
 
 func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
-	if cd.Status.ClusterVersionStatus == nil {
-		return "", errors.New("cluster version status not set in clusterdeployment")
+	version, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
+	if !versionPresent {
+		return "", errors.New("cluster version not set in clusterdeployment")
 	}
-	if cd.Status.ClusterVersionStatus.Desired.Version == "" {
-		return "", errors.New("cluster version not available")
-	}
-	return cd.Status.ClusterVersionStatus.Desired.Version, nil
+	return version, nil
 }

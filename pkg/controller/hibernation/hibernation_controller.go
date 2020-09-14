@@ -25,6 +25,7 @@ import (
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -369,10 +370,11 @@ func (r *hibernationReconciler) canHibernate(cd *hivev1.ClusterDeployment) (bool
 	if r.getActuator(cd) == nil {
 		return false, "Unsupported platform: no actuator to handle it"
 	}
-	if cd.Status.ClusterVersionStatus == nil || len(cd.Status.ClusterVersionStatus.Desired.Version) == 0 {
+	versionString, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
+	if !versionPresent {
 		return false, "No cluster version is available yet"
 	}
-	version, err := semver.Parse(cd.Status.ClusterVersionStatus.Desired.Version)
+	version, err := semver.Parse(versionString)
 	if err != nil {
 		return false, fmt.Sprintf("Cannot parse cluster version: %v", err)
 	}

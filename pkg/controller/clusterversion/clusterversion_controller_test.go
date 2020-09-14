@@ -2,7 +2,6 @@ package clusterversion
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
@@ -66,19 +65,6 @@ func TestClusterVersionReconcile(t *testing.T) {
 				testDeletedClusterDeployment(),
 			},
 			noRemoteCall: true,
-		},
-		{
-			name: "needs update",
-			existing: []runtime.Object{
-				testClusterDeployment(),
-				testKubeconfigSecret(),
-			},
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				expected := testClusterVersionStatusWithEmptyAvailableUpdates()
-				if !reflect.DeepEqual(cd.Status.ClusterVersionStatus, expected) {
-					t.Errorf("did not get expected clusterversion status. Expected: \n%#v\nGot: \n%#v", expected, cd.Status.ClusterVersionStatus)
-				}
-			},
 		},
 		{
 			name: "version in labels",
@@ -227,10 +213,4 @@ func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {
 		ObservedGeneration: 123456789,
 		VersionHash:        "TESTVERSIONHASH",
 	}
-}
-
-func testClusterVersionStatusWithEmptyAvailableUpdates() *configv1.ClusterVersionStatus {
-	cvs := testRemoteClusterVersionStatus()
-	cvs.AvailableUpdates = []configv1.Update{}
-	return cvs
 }

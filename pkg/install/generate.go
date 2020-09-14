@@ -181,14 +181,6 @@ func InstallerPodSpec(
 			Name:      "openstack",
 			MountPath: openStackCloudsDir,
 		})
-
-		// TODO: design/implement a system to sync over ClusterImageSet base OS images into OpenStack
-		// so that each cluster install doesn't involve copying down, then uploading 2GB QCOW
-		// images.
-		// env = append(env, corev1.EnvVar{
-		// 	Name:  "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE",
-		// 	Value: "jdiaz-rhcos-4.3",
-		// })
 	case cd.Spec.Platform.VSphere != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "vsphere-certificates",

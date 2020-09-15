@@ -12,6 +12,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -26,7 +28,7 @@ import (
 )
 
 const (
-	ControllerName                = "clusterclaim"
+	ControllerName                = hivev1.ClusterClaimControllerName
 	finalizer                     = "hive.openshift.io/claim"
 	hiveClaimOwnerRoleName        = "hive-claim-owner"
 	hiveClaimOwnerRoleBindingName = "hive-claim-owner"
@@ -35,22 +37,32 @@ const (
 // Add creates a new ClusterClaim Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	return AddToManager(mgr, NewReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
 // NewReconciler returns a new ReconcileClusterClaim
-func NewReconciler(mgr manager.Manager) *ReconcileClusterClaim {
+func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *ReconcileClusterClaim {
 	logger := log.WithField("controller", ControllerName)
 	return &ReconcileClusterClaim{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		logger: logger,
 	}
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim) error {
+func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
-	c, err := controller.New("clusterclaim-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New("clusterclaim-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		return err
 	}
@@ -153,7 +165,7 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.
 	logger.Infof("reconciling cluster claim")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

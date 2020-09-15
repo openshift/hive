@@ -9,6 +9,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -24,7 +26,7 @@ import (
 )
 
 const (
-	ControllerName                                 = "clusterpoolnamespace"
+	ControllerName                                 = hivev1.ClusterpoolNamespaceControllerName
 	minimumLifetime                                = 5 * time.Minute
 	durationBetweenDeletingClusterDeploymentChecks = 1 * time.Minute
 )
@@ -32,27 +34,34 @@ const (
 // Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	return AddToManager(mgr, NewReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterPoolNamespace{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		logger: log.WithField("controller", ControllerName),
 	}
 	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
 	c, err := controller.New(
 		fmt.Sprintf("%s-controller", ControllerName),
 		mgr,
 		controller.Options{
 			Reconciler:              r,
-			MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles(),
+			MaxConcurrentReconciles: concurrentReconciles,
+			RateLimiter:             rateLimiter,
 		},
 	)
 	if err != nil {
@@ -100,7 +109,7 @@ func (r *ReconcileClusterPoolNamespace) Reconcile(request reconcile.Request) (re
 	logger.Info("reconciling namespace")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

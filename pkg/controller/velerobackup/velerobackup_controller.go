@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,7 @@ import (
 )
 
 const (
-	ControllerName = "velerobackup"
+	ControllerName = hivev1.VeleroBackupControllerName
 	errChecksum    = "HIVE_CHECKSUM_ERR_97A29D08"
 
 	// Default reconcile rate limiting to 1 backup every 3 minutes.
@@ -65,22 +67,29 @@ var (
 // Add creates a new Backup Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
+	logger := log.WithField("controller", ControllerName)
 
 	// Don't run the Velero controller unless explicitly enabled.
 	if !strings.EqualFold(os.Getenv(hiveconstants.VeleroBackupEnvVar), "true") {
 		return nil
 	}
 
-	reconciler, err := NewReconciler(mgr)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+
+	reconciler, err := NewReconciler(mgr, clientRateLimiter)
 	if err != nil {
 		return err
 	}
 
-	return AddToManager(mgr, reconciler)
+	return AddToManager(mgr, reconciler, concurrentReconciles, queueRateLimiter)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
+func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (reconcile.Reconciler, error) {
 	logger := log.WithField("controller", ControllerName)
 	reconcileRateLimitDuration := defaultReconcileRateLimitDuration
 	minBackupPeriodSecondsStr := os.Getenv(hiveconstants.MinBackupPeriodSecondsEnvVar)
@@ -103,7 +112,7 @@ func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 
 	var client client.Client
 	if scheme != nil {
-		client = controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName)
+		client = controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	}
 
 	return &ReconcileBackup{
@@ -116,9 +125,13 @@ func NewReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
-	c, err := controller.New(ControllerName+"-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New(ControllerName.String()+"-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		return err
 	}
@@ -163,7 +176,7 @@ func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result
 	nsLogger.Info("reconciling backups and Hive object changes")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		nsLogger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

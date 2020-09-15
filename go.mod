@@ -43,6 +43,7 @@ require (
 	golang.org/x/mod v0.3.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.25.0
 	gopkg.in/ini.v1 v1.51.0
 	gopkg.in/yaml.v2 v2.3.0

@@ -13,6 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -32,19 +34,25 @@ import (
 )
 
 const (
-	ControllerName       = "clusterState"
+	ControllerName       = hivev1.ClusterStateControllerName
 	statusUpdateInterval = 10 * time.Minute
 )
 
 // Add creates a new ClusterState controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	return AddToManager(mgr, NewReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterState{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:       mgr.GetScheme(),
 		logger:       log.WithField("controller", ControllerName),
 		updateStatus: updateClusterStateStatus,
@@ -56,8 +64,12 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
-	c, err := controller.New("clusterstate-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+	c, err := controller.New("clusterstate-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error creating new clusterstate controller")
 		return err
@@ -99,7 +111,7 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 	logger.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

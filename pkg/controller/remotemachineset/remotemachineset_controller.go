@@ -36,8 +36,7 @@ import (
 )
 
 const (
-	ControllerName = "remotemachineset"
-
+	ControllerName             = hivev1.RemoteMachinesetControllerName
 	machinePoolNameLabel       = "hive.openshift.io/machine-pool"
 	finalizer                  = "hive.openshift.io/remotemachineset"
 	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
@@ -67,9 +66,14 @@ func Add(mgr manager.Manager) error {
 	if err := addVSphereProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add vSphere provider to scheme")
 	}
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
 
 	r := &ReconcileRemoteMachineSet{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
@@ -82,7 +86,11 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Create a new controller
-	c, err := controller.New("remotemachineset-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New("remotemachineset-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             queueRateLimiter,
+	})
 	if err != nil {
 		return err
 	}
@@ -177,7 +185,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		logger.WithField("elapsed", dur).Info("reconcile complete")
 	}()
 

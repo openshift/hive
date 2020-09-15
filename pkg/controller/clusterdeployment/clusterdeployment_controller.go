@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -51,7 +53,7 @@ import (
 var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
 
 const (
-	ControllerName     = "clusterDeployment"
+	ControllerName     = hivev1.ClusterDeploymentControllerName
 	defaultRequeueTime = 10 * time.Second
 	maxProvisions      = 3
 
@@ -145,14 +147,19 @@ func init() {
 
 // Add creates a new ClusterDeployment controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
-	return AddToManager(mgr, NewReconciler(mgr))
+	logger := log.WithField("controller", ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	if err != nil {
+		logger.WithError(err).Error("could not get controller configurations")
+		return err
+	}
+	return AddToManager(mgr, NewReconciler(mgr, logger, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	logger := log.WithField("controller", ControllerName)
+func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterDeployment{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
@@ -171,13 +178,17 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler) error {
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	cdReconciler, ok := r.(*ReconcileClusterDeployment)
 	if !ok {
 		return errors.New("reconciler supplied is not a ReconcileClusterDeployment")
 	}
 
-	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: controllerutils.GetConcurrentReconciles()})
+	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: concurrentReconciles,
+		RateLimiter:             rateLimiter,
+	})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new cluster deployment")
 		return err
@@ -280,7 +291,7 @@ func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (resul
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
 		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName).Observe(dur.Seconds())
+		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		cdLog.WithField("elapsed", dur).WithField("result", result).Info("reconcile complete")
 	}()
 

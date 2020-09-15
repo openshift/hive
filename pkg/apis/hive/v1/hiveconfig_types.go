@@ -74,6 +74,10 @@ type HiveConfigSpec struct {
 	// DisabledControllers allows selectively disabling Hive controllers by name.
 	// The name of an individual controller matches the name of the controller as seen in the Hive logging output.
 	DisabledControllers []string `json:"disabledControllers,omitempty"`
+
+	// ControllersConfig is used to configure different hive controllers
+	// +optional
+	ControllersConfig *ControllersConfig `json:"controllersConfig,omitempty"`
 }
 
 // HiveConfigStatus defines the observed state of Hive
@@ -193,6 +197,79 @@ type ManageDNSAzureConfig struct {
 	// ResourceGroupName specifies the Azure resource group containing the DNS zones
 	// for the domains being managed.
 	ResourceGroupName string `json:"resourceGroupName"`
+}
+
+// ControllerConfig contains the configuration for a controller
+type ControllerConfig struct {
+	// ConcurrentReconciles specifies number of concurrent reconciles for a controller
+	// +optional
+	ConcurrentReconciles *int32 `json:"concurrentReconciles,omitempty"`
+	// ClientQPS specifies client rate limiter QPS for a controller
+	// +optional
+	ClientQPS *int32 `json:"clientQPS,omitempty"`
+	// ClientBurst specifies client rate limiter burst for a controller
+	// +optional
+	ClientBurst *int32 `json:"clientBurst,omitempty"`
+	// QueueQPS specifies workqueue rate limiter QPS for a controller
+	// +optional
+	QueueQPS *int32 `json:"queueQPS,omitempty"`
+	// QueueBurst specifies workqueue rate limiter burst for a controller
+	// +optional
+	QueueBurst *int32 `json:"queueBurst,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;syncidentityprovider;unreachable;velerobackup;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync
+type ControllerName string
+
+func (controllerName ControllerName) String() string {
+	return string(controllerName)
+}
+
+// WARNING: All the controller names below should also be added to the kubebuilder validation of the type ControllerName
+const (
+	ClusterClaimControllerName         ControllerName = "clusterclaim"
+	ClusterDeploymentControllerName    ControllerName = "clusterDeployment"
+	ClusterDeprovisionControllerName   ControllerName = "clusterDeprovision"
+	ClusterpoolControllerName          ControllerName = "clusterpool"
+	ClusterpoolNamespaceControllerName ControllerName = "clusterpoolnamespace"
+	ClusterProvisionControllerName     ControllerName = "clusterProvision"
+	ClusterRelocateControllerName      ControllerName = "clusterRelocate"
+	ClusterStateControllerName         ControllerName = "clusterState"
+	ClusterVersionControllerName       ControllerName = "clusterversion"
+	ControlPlaneCertsControllerName    ControllerName = "controlPlaneCerts"
+	DNSEndpointControllerName          ControllerName = "dnsendpoint"
+	DNSZoneControllerName              ControllerName = "dnszone"
+	HibernationControllerName          ControllerName = "hibernation"
+	RemoteIngressControllerName        ControllerName = "remoteingress"
+	RemoteMachinesetControllerName     ControllerName = "remotemachineset"
+	SyncIdentityProviderControllerName ControllerName = "syncidentityprovider"
+	UnreachableControllerName          ControllerName = "unreachable"
+	VeleroBackupControllerName         ControllerName = "velerobackup"
+	MetricsControllerName              ControllerName = "metrics"
+	ClustersyncControllerName          ControllerName = "clustersync"
+)
+
+// SpecificControllerConfig contains the configuration for a specific controller
+type SpecificControllerConfig struct {
+	// Name specifies the name of the controller
+	Name ControllerName `json:"name"`
+	// ControllerConfig contains the configuration for the controller specified by Name field
+	Config ControllerConfig `json:"config"`
+}
+
+// ControllersConfig contains default as well as controller specific configurations
+type ControllersConfig struct {
+	// Default specifies default configuration for all the controllers, can be used to override following coded defaults
+	// default for concurrent reconciles is 5
+	// default for client qps is 5
+	// default for client burst is 10
+	// default for queue qps is 10
+	// default for queue burst is 100
+	// +optional
+	Default *ControllerConfig `json:"default,omitempty"`
+	// Controllers contains a list of configurations for different controllers
+	// +optional
+	Controllers []SpecificControllerConfig `json:"controllers,omitempty"`
 }
 
 // +genclient:nonNamespaced

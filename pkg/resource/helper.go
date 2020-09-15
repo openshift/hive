@@ -10,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
 const (
@@ -40,7 +42,7 @@ type helper struct {
 	logger         log.FieldLogger
 	cacheDir       string
 	metricsEnabled bool
-	controllerName string
+	controllerName hivev1.ControllerName
 	remote         bool
 	kubeconfig     []byte
 	restConfig     *rest.Config
@@ -59,7 +61,7 @@ func NewHelperFromRESTConfig(restConfig *rest.Config, logger log.FieldLogger) He
 }
 
 // NewHelperWithMetricsFromRESTConfig returns a new object that allows apply and patch operations, with metrics tracking enabled.
-func NewHelperWithMetricsFromRESTConfig(restConfig *rest.Config, controllerName string, logger log.FieldLogger) Helper {
+func NewHelperWithMetricsFromRESTConfig(restConfig *rest.Config, controllerName hivev1.ControllerName, logger log.FieldLogger) Helper {
 	r := &helper{
 		logger:         logger,
 		metricsEnabled: true,
@@ -72,7 +74,8 @@ func NewHelperWithMetricsFromRESTConfig(restConfig *rest.Config, controllerName 
 }
 
 // NewHelperWithMetrics returns a new object that allows apply and patch operations, with metrics tracking enabled.
-func NewHelperWithMetrics(kubeconfig []byte, controllerName string, remote bool, logger log.FieldLogger) Helper {
+
+func NewHelperWithMetrics(kubeconfig []byte, controllerName hivev1.ControllerName, remote bool, logger log.FieldLogger) Helper {
 	r := &helper{
 		logger:         logger,
 		controllerName: controllerName,

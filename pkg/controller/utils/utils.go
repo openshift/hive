@@ -5,7 +5,10 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/time/rate"
 	"os"
+	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,11 +17,43 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+)
+
+const (
+	// defaultQueueQPS is the default workqueue qps, same as used in DefaultControllerRateLimiter
+	defaultQueueQPS = 10
+	// defaultQueueBurst is the default workqueue burst, same as used in DefaultControllerRateLimiter
+	defaultQueueBurst = 100
+	// defaultConcurrentReconciles is the default number of concurrent reconciles
+	defaultConcurrentReconciles = 5
+	// ConcurrentReconcilesEnvVariableFormat is the format of the environment variable
+	// that stores concurrent reconciles for a controller
+	ConcurrentReconcilesEnvVariableFormat = "%s-concurrent-reconciles"
+
+	// ClientQPSEnvVariableFormat is the format of the environment variable that stores
+	// client QPS for a controller
+	ClientQPSEnvVariableFormat = "%s-client-qps"
+
+	// ClientBurstEnvVariableFormat is the format of the environment variable that stores
+	// client burst for a controller
+	ClientBurstEnvVariableFormat = "%s-client-burst"
+
+	// QueueQPSEnvVariableFormat is the format of the environment variable that stores
+	// workqueue QPS for a controller
+	QueueQPSEnvVariableFormat = "%s-queue-qps"
+
+	// QueueBurstEnvVariableFormat is the format of the environment variable that stores
+	// workqueue burst for a controller
+	QueueBurstEnvVariableFormat = "%s-queue-burst"
 )
 
 // HasFinalizer returns true if the given object has the given finalizer
@@ -45,15 +80,82 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	object.SetFinalizers(finalizers.List())
 }
 
-const (
-	concurrentControllerReconciles = 5
-)
+// getConcurrentReconciles returns the number of goroutines each controller should
+// use for parallel processing of their queue. Default value, if not set in
+// hive-controllers-config, will be 5.
+func getConcurrentReconciles(controllerName hivev1.ControllerName) (int, error) {
+	if value, ok := getValueFromEnvVariable(controllerName, ConcurrentReconcilesEnvVariableFormat); ok {
+		concurrentReconciles, err := strconv.Atoi(value)
+		if err != nil {
+			return 0, err
+		}
+		return concurrentReconciles, nil
+	}
+	return defaultConcurrentReconciles, nil
+}
 
-// GetConcurrentReconciles returns the number of goroutines each controller should
-// use for parallel processing of their queue. For now this is a static value of 5.
-// In future this may be read from an env var set by the operator, and driven by HiveConfig.
-func GetConcurrentReconciles() int {
-	return concurrentControllerReconciles
+// getClientRateLimiter returns the client rate limiter for the controller
+func getClientRateLimiter(controllerName hivev1.ControllerName) (flowcontrol.RateLimiter, error) {
+	qps := rest.DefaultQPS
+	if value, ok := getValueFromEnvVariable(controllerName, ClientQPSEnvVariableFormat); ok {
+		qpsInt, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+		qps = float32(qpsInt)
+	}
+
+	burst := rest.DefaultBurst
+	if value, ok := getValueFromEnvVariable(controllerName, ClientBurstEnvVariableFormat); ok {
+		var err error
+		burst, err = strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return flowcontrol.NewTokenBucketRateLimiter(qps, burst), nil
+}
+
+// getQueueRateLimiter returns the workqueue rate limiter for the controller
+func getQueueRateLimiter(controllerName hivev1.ControllerName) (workqueue.RateLimiter, error) {
+	var err error
+	qps := defaultQueueQPS
+	if value, ok := getValueFromEnvVariable(controllerName, QueueQPSEnvVariableFormat); ok {
+		qps, err = strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	burst := defaultQueueBurst
+	if value, ok := getValueFromEnvVariable(controllerName, QueueBurstEnvVariableFormat); ok {
+		burst, err = strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(qps), burst)},
+	), nil
+}
+
+func GetControllerConfig(client client.Client, controllerName hivev1.ControllerName) (int, flowcontrol.RateLimiter, workqueue.RateLimiter, error) {
+	concurrentReconciles, err := getConcurrentReconciles(controllerName)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	clientRateLimiter, err := getClientRateLimiter(controllerName)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	queueRateLimiter, err := getQueueRateLimiter(controllerName)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	return concurrentReconciles, clientRateLimiter, queueRateLimiter, nil
 }
 
 // MergeJsons will merge the global and local pull secret and return it
@@ -164,4 +266,15 @@ func GetHiveNamespace() string {
 	}
 	// Returning a default here, mostly for unit test simplicity and to avoid having to pass this around to all controllers and libraries..
 	return constants.DefaultHiveNamespace
+}
+
+// getValueFromEnvVariable gets a configuration value for a controller from the environment variable
+func getValueFromEnvVariable(controllerName hivev1.ControllerName, envVarFormat string) (string, bool) {
+	if value, ok := os.LookupEnv(fmt.Sprintf(envVarFormat, controllerName)); ok {
+		return value, true
+	}
+	if value, ok := os.LookupEnv(fmt.Sprintf(envVarFormat, "default")); ok {
+		return value, true
+	}
+	return "", false
 }

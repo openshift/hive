@@ -49,6 +49,11 @@ func terminateWhenFilesChange(dir string) {
 				return errors.Wrapf(err, "problem encountered walking %s", path)
 			}
 			if info.IsDir() {
+				// skip directories
+				return nil
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				// skip symlinks
 				return nil
 			}
 			data, err := ioutil.ReadFile(path)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -155,7 +155,7 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 
 func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockClient, zones []string) {
 	page := mockazure.NewMockResourceSKUsPage(mockCtrl)
-	client.EXPECT().ListResourceSKUs(gomock.Any()).Return(page, nil)
+	client.EXPECT().ListResourceSKUs(gomock.Any(), "").Return(page, nil)
 	page.EXPECT().NotDone().Return(true)
 	page.EXPECT().Values().Return(
 		[]compute.ResourceSku{

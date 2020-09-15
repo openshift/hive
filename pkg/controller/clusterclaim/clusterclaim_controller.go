@@ -158,7 +158,7 @@ type ReconcileClusterClaim struct {
 }
 
 // Reconcile reconciles a ClusterClaim.
-func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
 	start := time.Now()
 	logger := r.logger.WithField("clusterClaim", request.NamespacedName)
 
@@ -203,6 +203,31 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	logger = logger.WithField("cluster", clusterName)
+
+	// Delete ClusterClaim after its lifetime elapses
+	if lifetime := claim.Spec.Lifetime; lifetime != nil {
+		logger.WithField("lifetime", lifetime).Debug("checking whether lifetime of ClusterClaim has elapsed")
+		pendingCond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
+		if pendingCond != nil && pendingCond.Status == corev1.ConditionFalse {
+			if timeSinceAssigned := time.Since(pendingCond.LastTransitionTime.Time); timeSinceAssigned >= lifetime.Duration {
+				logger.WithField("timeSinceAssigned", timeSinceAssigned).
+					WithField("lifetime", lifetime).
+					Info("deleting ClusterClaim because its lifetime has elapsed")
+				if err := r.Delete(context.Background(), claim); err != nil {
+					logger.WithError(err).Log(controllerutils.LogLevel(err), "could not delete ClusterClaim")
+					return reconcile.Result{}, errors.Wrap(err, "could not delete ClusterClaim")
+				}
+				return reconcile.Result{}, nil
+			}
+			defer func() {
+				result, returnErr = controllerutils.EnsureRequeueAtLeastWithin(
+					claim.Spec.Lifetime.Duration-time.Since(pendingCond.LastTransitionTime.Time),
+					result,
+					returnErr,
+				)
+			}()
+		}
+	}
 
 	cd := &hivev1.ClusterDeployment{}
 	switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {

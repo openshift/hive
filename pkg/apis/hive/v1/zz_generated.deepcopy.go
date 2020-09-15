@@ -406,6 +406,11 @@ func (in *ClusterClaimSpec) DeepCopyInto(out *ClusterClaimSpec) {
 		*out = make([]rbacv1.Subject, len(*in))
 		copy(*out, *in)
 	}
+	if in.Lifetime != nil {
+		in, out := &in.Lifetime, &out.Lifetime
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 

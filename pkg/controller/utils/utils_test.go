@@ -1,8 +1,8 @@
 package utils
 
 import (
+	goerrors "errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"os"
 	"testing"
 	"time"
@@ -10,12 +10,14 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -320,6 +322,54 @@ func TestGetQueueRateLimiter(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			assert.Equalf(t, tc.expectedRateLimiter, rateLimiter, "unexpected rate limiter")
+		})
+	}
+}
+
+func TestEnsureRequeueAtLeastWithin(t *testing.T) {
+	cases := []struct {
+		name           string
+		duration       time.Duration
+		result         reconcile.Result
+		err            error
+		expectedResult reconcile.Result
+		expectedErr    error
+	}{
+		{
+			name:           "no error or requeue",
+			duration:       time.Hour,
+			expectedResult: reconcile.Result{RequeueAfter: time.Hour, Requeue: true},
+		},
+		{
+			name:        "error",
+			duration:    time.Hour,
+			err:         goerrors.New("test error"),
+			expectedErr: goerrors.New("test error"),
+		},
+		{
+			name:           "requeue",
+			duration:       time.Hour,
+			result:         reconcile.Result{Requeue: true},
+			expectedResult: reconcile.Result{Requeue: true},
+		},
+		{
+			name:           "shorter requeue after",
+			duration:       time.Hour,
+			result:         reconcile.Result{RequeueAfter: time.Minute},
+			expectedResult: reconcile.Result{RequeueAfter: time.Minute},
+		},
+		{
+			name:           "longer requeue after",
+			duration:       time.Hour,
+			result:         reconcile.Result{RequeueAfter: 2 * time.Hour},
+			expectedResult: reconcile.Result{RequeueAfter: time.Hour, Requeue: true},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualResult, actualErr := EnsureRequeueAtLeastWithin(tc.duration, tc.result, tc.err)
+			assert.Equal(t, tc.expectedResult, actualResult, "unexpected reconcile result")
+			assert.Equal(t, tc.expectedErr, actualErr, "unexpected error")
 		})
 	}
 }

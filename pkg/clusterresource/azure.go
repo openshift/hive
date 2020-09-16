@@ -40,14 +40,14 @@ func NewAzureCloudBuilderFromSecret(credsSecret *corev1.Secret) *AzureCloudBuild
 	}
 }
 
-func (p *AzureCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
+func (p *AzureCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.credsSecretName(o),
+			Name:      p.CredsSecretName(o),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -61,11 +61,11 @@ func (p *AzureCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.
 	return nil
 }
 
-func (p *AzureCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
-	cd.Spec.Platform = hivev1.Platform{
+func (p *AzureCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
+	return hivev1.Platform{
 		Azure: &hivev1azure.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
-				Name: p.credsSecretName(o),
+				Name: p.CredsSecretName(o),
 			},
 			Region:                      p.Region,
 			BaseDomainResourceGroupName: p.BaseDomainResourceGroupName,
@@ -98,6 +98,6 @@ func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 	ic.Compute[0].Platform.Azure = mpp
 }
 
-func (p *AzureCloudBuilder) credsSecretName(o *Builder) string {
+func (p *AzureCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-azure-creds", o.Name)
 }

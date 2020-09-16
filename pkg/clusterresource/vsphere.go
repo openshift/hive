@@ -53,14 +53,14 @@ type VSphereCloudBuilder struct {
 	CACert []byte
 }
 
-func (p *VSphereCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
+func (p *VSphereCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.credsSecretName(o),
+			Name:      p.CredsSecretName(o),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -88,11 +88,11 @@ func (p *VSphereCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev
 	}
 }
 
-func (p *VSphereCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
-	cd.Spec.Platform = hivev1.Platform{
+func (p *VSphereCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
+	return hivev1.Platform{
 		VSphere: &hivev1vsphere.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
-				Name: p.credsSecretName(o),
+				Name: p.CredsSecretName(o),
 			},
 			CertificatesSecretRef: corev1.LocalObjectReference{
 				Name: p.certificatesSecretName(o),
@@ -135,7 +135,7 @@ func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 	}
 }
 
-func (p *VSphereCloudBuilder) credsSecretName(o *Builder) string {
+func (p *VSphereCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-vsphere-creds", o.Name)
 }
 

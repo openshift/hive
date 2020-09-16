@@ -9,6 +9,7 @@ import (
 
 	"github.com/openshift/hive/contrib/pkg/adm"
 	"github.com/openshift/hive/contrib/pkg/certificate"
+	"github.com/openshift/hive/contrib/pkg/clusterpool"
 	"github.com/openshift/hive/contrib/pkg/createcluster"
 	"github.com/openshift/hive/contrib/pkg/deprovision"
 	"github.com/openshift/hive/contrib/pkg/report"
@@ -52,6 +53,7 @@ func newHiveutilCommand() *cobra.Command {
 	cmd.AddCommand(certificate.NewCertificateCommand())
 	cmd.AddCommand(adm.NewAdmCommand())
 	cmd.AddCommand(version.NewVersionCommand())
+	cmd.AddCommand(clusterpool.NewClusterPoolCommand())
 
 	return cmd
 }

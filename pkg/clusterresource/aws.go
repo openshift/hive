@@ -44,14 +44,14 @@ func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
 	}
 }
 
-func (p *AWSCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
+func (p *AWSCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.credsSecretName(o),
+			Name:      p.CredsSecretName(o),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -66,11 +66,11 @@ func (p *AWSCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Se
 	return nil
 }
 
-func (p *AWSCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
-	cd.Spec.Platform = hivev1.Platform{
+func (p *AWSCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
+	return hivev1.Platform{
 		AWS: &hivev1aws.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
-				Name: p.credsSecretName(o),
+				Name: p.CredsSecretName(o),
 			},
 			Region:   p.Region,
 			UserTags: p.UserTags,
@@ -112,6 +112,6 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 
 }
 
-func (p *AWSCloudBuilder) credsSecretName(o *Builder) string {
+func (p *AWSCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-aws-creds", o.Name)
 }

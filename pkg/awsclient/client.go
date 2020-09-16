@@ -28,6 +28,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53/route53iface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -97,6 +99,9 @@ type Client interface {
 
 	// ResourceTagging
 	GetResourcesPages(input *resourcegroupstaggingapi.GetResourcesInput, fn func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) error
+
+	// STS
+	GetCallerIdentity(input *sts.GetCallerIdentityInput) (*sts.GetCallerIdentityOutput, error)
 }
 
 type awsClient struct {
@@ -105,6 +110,7 @@ type awsClient struct {
 	iamClient     iamiface.IAMAPI
 	route53Client route53iface.Route53API
 	s3Client      s3iface.S3API
+	stsClient     stsiface.STSAPI
 	tagClient     *resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 }
 
@@ -179,7 +185,7 @@ func (c *awsClient) DeleteAccessKey(input *iam.DeleteAccessKeyInput) (*iam.Delet
 }
 
 func (c *awsClient) DeleteUser(input *iam.DeleteUserInput) (*iam.DeleteUserOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DescribeUser").Inc()
+	metricAWSAPICalls.WithLabelValues("DeleteUser").Inc()
 	return c.iamClient.DeleteUser(input)
 }
 
@@ -271,8 +277,13 @@ func (c *awsClient) ListResourceRecordSets(input *route53.ListResourceRecordSets
 }
 
 func (c *awsClient) ChangeResourceRecordSets(input *route53.ChangeResourceRecordSetsInput) (*route53.ChangeResourceRecordSetsOutput, error) {
-	metricAWSAPICalls.WithLabelValues("ListResourceRecordSets").Inc()
+	metricAWSAPICalls.WithLabelValues("ChangeResourceRecordSets").Inc()
 	return c.route53Client.ChangeResourceRecordSets(input)
+}
+
+func (c *awsClient) GetCallerIdentity(input *sts.GetCallerIdentityInput) (*sts.GetCallerIdentityOutput, error) {
+	metricAWSAPICalls.WithLabelValues("GetCallerIdentity").Inc()
+	return c.stsClient.GetCallerIdentity(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
@@ -350,6 +361,7 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 		iamClient:     iam.New(s),
 		s3Client:      s3.New(s),
 		route53Client: route53.New(s),
+		stsClient:     sts.New(s),
 		tagClient:     resourcegroupstaggingapi.New(s),
 	}, nil
 }

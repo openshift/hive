@@ -12,6 +12,7 @@ import (
 	route53 "github.com/aws/aws-sdk-go/service/route53"
 	s3 "github.com/aws/aws-sdk-go/service/s3"
 	s3iface "github.com/aws/aws-sdk-go/service/s3/s3iface"
+	sts "github.com/aws/aws-sdk-go/service/sts"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -545,4 +546,19 @@ func (m *MockClient) GetResourcesPages(input *resourcegroupstaggingapi.GetResour
 func (mr *MockClientMockRecorder) GetResourcesPages(input, fn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourcesPages", reflect.TypeOf((*MockClient)(nil).GetResourcesPages), input, fn)
+}
+
+// GetCallerIdentity mocks base method
+func (m *MockClient) GetCallerIdentity(input *sts.GetCallerIdentityInput) (*sts.GetCallerIdentityOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCallerIdentity", input)
+	ret0, _ := ret[0].(*sts.GetCallerIdentityOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCallerIdentity indicates an expected call of GetCallerIdentity
+func (mr *MockClientMockRecorder) GetCallerIdentity(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCallerIdentity", reflect.TypeOf((*MockClient)(nil).GetCallerIdentity), input)
 }

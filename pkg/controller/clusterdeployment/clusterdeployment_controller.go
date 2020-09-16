@@ -1164,6 +1164,22 @@ func (r *ReconcileClusterDeployment) setInstallLaunchErrorCondition(cd *hivev1.C
 	return r.Status().Update(context.TODO(), cd)
 }
 
+func (r *ReconcileClusterDeployment) setDeprovisionLaunchErrorCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
+	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.DeprovisionLaunchErrorCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange)
+	if !changed {
+		return nil
+	}
+	cd.Status.Conditions = conditions
+	cdLog.WithField("status", status).Debug("setting DeprovisionLaunchErrorCondition")
+	return r.Status().Update(context.TODO(), cd)
+}
+
 func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) error {
 	status := corev1.ConditionFalse
 	reason := clusterImageSetFoundReason
@@ -1330,6 +1346,20 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 	case err != nil:
 		cdLog.WithError(err).Error("error getting deprovision request")
 		return false, err
+	}
+
+	authenticationFailureCondition := controllerutils.FindClusterDeprovisionCondition(existingRequest.Status.Conditions, hivev1.AuthenticationFailureClusterDeprovisionCondition)
+	if authenticationFailureCondition != nil {
+		err := r.setDeprovisionLaunchErrorCondition(cd,
+			authenticationFailureCondition.Status,
+			authenticationFailureCondition.Reason,
+			authenticationFailureCondition.Message,
+			cdLog)
+
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update deprovisionLaunchErrorCondition")
+			return false, err
+		}
 	}
 
 	if !existingRequest.Status.Completed {

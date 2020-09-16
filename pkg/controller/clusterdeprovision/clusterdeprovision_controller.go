@@ -13,6 +13,7 @@ import (
 
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,8 +38,10 @@ import (
 )
 
 const (
-	ControllerName    = hivev1.ClusterDeprovisionControllerName
-	jobHashAnnotation = "hive.openshift.io/jobhash"
+	ControllerName                = hivev1.ClusterDeprovisionControllerName
+	jobHashAnnotation             = "hive.openshift.io/jobhash"
+	authenticationFailedReason    = "AuthenticationFailed"
+	authenticationSucceededReason = "AuthenticationSucceeded"
 )
 
 var (
@@ -49,7 +52,18 @@ var (
 			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
 		},
 	)
+
+	// actuators is a list of available actuators for this controller
+	// It is populated via the registerActuator function
+	actuators []Actuator
 )
+
+// registerActuator registers an actuator with this controller. The actuator
+// determines whether it can handle a particular cluster deployment via the CanHandle
+// function.
+func registerActuator(a Actuator) {
+	actuators = append(actuators, a)
+}
 
 func init() {
 	metrics.Registry.MustRegister(metricUninstallJobDuration)
@@ -147,6 +161,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
 		rLog.WithField("elapsed", dur).Info("reconcile complete")
 	}()
+
 	// Fetch the ClusterDeprovision instance
 	instance := &hivev1.ClusterDeprovision{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
@@ -211,6 +226,52 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 	if r.deprovisionsDisabled {
 		rLog.Warn("deprovisions are currently disabled in HiveConfig, skipping")
 		return reconcile.Result{}, nil
+	}
+
+	actuator := r.getActuator(instance)
+	if actuator == nil {
+		rLog.Debug("No actuator found for this provider")
+	} else {
+		// actuator found, ensure creds work.
+		err := actuator.TestCredentials(instance, r.Client, rLog)
+		if err != nil {
+			rLog.WithError(err).Warn("Credential check failed")
+
+			conditions, changed := controllerutils.SetClusterDeprovisionConditionWithChangeCheck(
+				instance.Status.Conditions,
+				hivev1.AuthenticationFailureClusterDeprovisionCondition,
+				corev1.ConditionTrue,
+				authenticationFailedReason,
+				"Credential check failed",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+
+			if changed {
+				instance.Status.Conditions = conditions
+				if updateErr := r.Status().Update(context.Background(), instance); updateErr != nil {
+					return reconcile.Result{}, updateErr
+				}
+			}
+
+			return reconcile.Result{}, err
+		}
+
+		// Authentication succeeded. Make sure that's noted in status.
+		conditions, changed := controllerutils.SetClusterDeprovisionConditionWithChangeCheck(
+			instance.Status.Conditions,
+			hivev1.AuthenticationFailureClusterDeprovisionCondition,
+			corev1.ConditionFalse,
+			authenticationSucceededReason,
+			"Credential check succeeded",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+
+		if changed {
+			instance.Status.Conditions = conditions
+			if err := r.Status().Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
 	}
 
 	// Generate an uninstall job
@@ -312,4 +373,13 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			Controlled: true,
 		},
 	}
+}
+
+func (r *ReconcileClusterDeprovision) getActuator(cd *hivev1.ClusterDeprovision) Actuator {
+	for _, a := range actuators {
+		if a.CanHandle(cd) {
+			return a
+		}
+	}
+	return nil
 }

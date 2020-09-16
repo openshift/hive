@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -340,7 +341,7 @@ func (r *ReconcileSyncIdentityProviders) getRelatedSelectorSyncIdentityProviders
 	contextLogger := addClusterDeploymentLoggerFields(r.logger, cd)
 
 	cdLabelSet := labels.Set(cd.Labels)
-	idps := []openshiftapiv1.IdentityProvider{}
+	var idps []openshiftapiv1.IdentityProvider
 	for _, ssidp := range list.Items {
 		labelSelector, err := metav1.LabelSelectorAsSelector(&ssidp.Spec.ClusterDeploymentSelector)
 		if err != nil {
@@ -353,6 +354,9 @@ func (r *ReconcileSyncIdentityProviders) getRelatedSelectorSyncIdentityProviders
 		}
 	}
 
+	// Sort so that the patch is consistent
+	idps = sortIdentityProviders(idps)
+
 	return idps, err
 }
 
@@ -363,7 +367,7 @@ func (r *ReconcileSyncIdentityProviders) getRelatedSyncIdentityProviders(cd *hiv
 		return nil, err
 	}
 
-	idps := []openshiftapiv1.IdentityProvider{}
+	var idps []openshiftapiv1.IdentityProvider
 	for _, sip := range list.Items {
 		for _, cdRef := range sip.Spec.ClusterDeploymentRefs {
 			if cdRef.Name == cd.Name {
@@ -372,6 +376,9 @@ func (r *ReconcileSyncIdentityProviders) getRelatedSyncIdentityProviders(cd *hiv
 			}
 		}
 	}
+
+	// Sort so that the patch is consistent
+	idps = sortIdentityProviders(idps)
 
 	return idps, err
 }
@@ -407,4 +414,11 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			Controlled: true,
 		},
 	}
+}
+
+func sortIdentityProviders(idps []openshiftapiv1.IdentityProvider) []openshiftapiv1.IdentityProvider {
+	sort.Slice(idps, func(i, j int) bool {
+		return idps[i].Name < idps[j].Name
+	})
+	return idps
 }

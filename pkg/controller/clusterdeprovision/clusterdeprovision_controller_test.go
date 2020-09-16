@@ -2,8 +2,11 @@ package clusterdeprovision
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,11 +21,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -41,13 +44,15 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name                 string
-		deployment           *hivev1.ClusterDeployment
-		deprovision          *hivev1.ClusterDeprovision
-		existing             []runtime.Object
-		validate             func(t *testing.T, c client.Client)
-		expectErr            bool
-		deprovisionsDisabled bool
+		name                           string
+		deployment                     *hivev1.ClusterDeployment
+		deprovision                    *hivev1.ClusterDeprovision
+		mockGetCallerIdentity          bool
+		expectedGetCallerIdentityError error
+		existing                       []runtime.Object
+		validate                       func(t *testing.T, c client.Client)
+		expectErr                      bool
+		deprovisionsDisabled           bool
 	}{
 		{
 			name: "no-op deleting",
@@ -100,21 +105,22 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name:        "create uninstall job",
-			deprovision: testClusterDeprovision(),
-			deployment:  testDeletedClusterDeployment(),
+			name:                  "create uninstall job",
+			deprovision:           testClusterDeprovision(),
+			deployment:            testDeletedClusterDeployment(),
+			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
 				validateJobExists(t, c)
 			},
 		},
 		{
-			name:        "do not create uninstall job when deprovisions are disabled",
-			deprovision: testClusterDeprovision(),
-			deployment:  testDeletedClusterDeployment(),
+			name:                 "do not create uninstall job when deprovisions are disabled",
+			deprovision:          testClusterDeprovision(),
+			deployment:           testDeletedClusterDeployment(),
+			deprovisionsDisabled: true,
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
-			deprovisionsDisabled: true,
 		},
 		{
 			name:        "no-op when job in progress",
@@ -123,6 +129,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testUninstallJob(),
 			},
+			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
 				validateNotCompleted(t, c)
 			},
@@ -146,9 +153,42 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 					return job
 				}(),
 			},
+			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
 				validateCompleted(t, c)
 			},
+		},
+		{
+			name:        "credentials test fails",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
+			existing: []runtime.Object{
+				func() runtime.Object {
+					job := testUninstallJob()
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						},
+					}
+					now := metav1.Now()
+					job.Status.CompletionTime = &now
+					job.Status.StartTime = &now
+					return job
+				}(),
+			},
+			mockGetCallerIdentity:          true,
+			expectedGetCallerIdentityError: awserr.New("InvalidClientTokenId", "", fmt.Errorf("")),
+			validate: func(t *testing.T, c client.Client) {
+				validateCondition(t, c, []hivev1.ClusterDeprovisionCondition{
+					{
+						Type:   hivev1.AuthenticationFailureClusterDeprovisionCondition,
+						Reason: "AuthenticationFailed",
+						Status: corev1.ConditionTrue,
+					},
+				})
+			},
+			expectErr: true,
 		},
 		{
 			name:        "regenerate job when hash missing",
@@ -161,6 +201,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 					return job
 				}(),
 			},
+			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
@@ -176,6 +217,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 					return job
 				}(),
 			},
+			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
@@ -195,12 +237,28 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			}
 			existing := append(test.existing, test.deprovision, test.deployment)
 
-			fakeClient := fake.NewFakeClient(existing...)
+			mocks := setupDefaultMocks(t, existing...)
+
+			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
+			defer mocks.mockCtrl.Finish()
+
+			if test.mockGetCallerIdentity {
+				mocks.mockAWSClient.EXPECT().
+					GetCallerIdentity(gomock.Any()).
+					Return(nil, test.expectedGetCallerIdentityError)
+			}
+
 			r := &ReconcileClusterDeprovision{
-				Client:               fakeClient,
+				Client:               mocks.fakeKubeClient,
 				scheme:               scheme.Scheme,
 				deprovisionsDisabled: test.deprovisionsDisabled,
 			}
+
+			// Save the list of actuators so that it can be restored at the end of this test
+			actuatorsSaved := actuators
+			actuators = []Actuator{&awsActuator{awsClientFn: func(clusterDeprovision *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
+				return mocks.mockAWSClient, nil
+			}}}
 
 			_, err := r.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -209,8 +267,11 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				},
 			})
 
+			// Restore the actuators list back to what it was before this test
+			actuators = actuatorsSaved
+
 			if test.validate != nil {
-				test.validate(t, fakeClient)
+				test.validate(t, mocks.fakeKubeClient)
 			}
 
 			if !test.expectErr && err != nil {
@@ -303,6 +364,26 @@ func validateNotCompleted(t *testing.T, c client.Client) {
 	}
 	if req.Status.Completed {
 		t.Errorf("request is not expected to be in completed state")
+	}
+}
+
+func validateCondition(t *testing.T, c client.Client, expectedConditions []hivev1.ClusterDeprovisionCondition) {
+	req := &hivev1.ClusterDeprovision{}
+	err := c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testName}, req)
+	assert.NoError(t, err, "unexpected error getting ClusterDeprovision")
+
+	if len(req.Status.Conditions) != len(expectedConditions) {
+		t.Errorf("request is expected to have specific")
+	}
+
+	for i, expectedCondition := range expectedConditions {
+		actualCondition := req.Status.Conditions[i]
+
+		if actualCondition.Status != expectedCondition.Status ||
+			actualCondition.Type != expectedCondition.Type ||
+			actualCondition.Reason != expectedCondition.Reason {
+			t.Errorf("request is expected to have specific condition %v", expectedCondition)
+		}
 	}
 }
 

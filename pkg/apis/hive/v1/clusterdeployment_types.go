@@ -308,6 +308,9 @@ const (
 
 	// InstallLaunchErrorCondition is set when a cluster provision fails to launch an install pod
 	InstallLaunchErrorCondition ClusterDeploymentConditionType = "InstallLaunchError"
+
+	// DeprovisionLaunchErrorCondition is set when a cluster deprovision fails to launch.
+	DeprovisionLaunchErrorCondition ClusterDeploymentConditionType = "DeprovisionLaunchError"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with

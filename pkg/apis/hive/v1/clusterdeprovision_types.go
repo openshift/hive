@@ -21,6 +21,10 @@ type ClusterDeprovisionSpec struct {
 type ClusterDeprovisionStatus struct {
 	// Completed is true when the uninstall has completed successfully
 	Completed bool `json:"completed,omitempty"`
+
+	// Conditions includes more detailed status for the cluster deprovision
+	// +optional
+	Conditions []ClusterDeprovisionCondition `json:"conditions,omitempty"`
 }
 
 // ClusterDeprovisionPlatform contains platform-specific configuration for the
@@ -112,6 +116,34 @@ type ClusterDeprovision struct {
 	Spec   ClusterDeprovisionSpec   `json:"spec,omitempty"`
 	Status ClusterDeprovisionStatus `json:"status,omitempty"`
 }
+
+// ClusterDeprovisionCondition contains details for the current condition of a ClusterDeprovision
+type ClusterDeprovisionCondition struct {
+	// Type is the type of the condition.
+	Type ClusterDeprovisionConditionType `json:"type"`
+	// Status is the status of the condition.
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// ClusterDeprovisionConditionType is a valid value for ClusterDeprovisionCondition.Type
+type ClusterDeprovisionConditionType string
+
+const (
+	// AuthenticationFailureClusterDeprovisionCondition is true when credentials cannot be used because of authentication failure
+	AuthenticationFailureClusterDeprovisionCondition ClusterDeprovisionConditionType = "AuthenticationFailure"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

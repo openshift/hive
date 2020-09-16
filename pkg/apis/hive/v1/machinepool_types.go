@@ -145,6 +145,10 @@ const (
 
 	// InvalidSubnetsMachinePoolCondition is true when there are missing or invalid entries in the subnet field
 	InvalidSubnetsMachinePoolCondition MachinePoolConditionType = "InvalidSubnets"
+
+	// UnsupportedConfigurationMachinePoolCondition is true when the configuration of the MachinePool is unsupported
+	// by the cluster.
+	UnsupportedConfigurationMachinePoolCondition MachinePoolConditionType = "UnsupportedConfiguration"
 )
 
 // +genclient

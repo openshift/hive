@@ -71,6 +71,13 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	computePool := baseMachinePool(pool)
 	computePool.Platform.OpenStack = &installertypesosp.MachinePool{
 		FlavorName: pool.Spec.Platform.OpenStack.Flavor,
+		// The installer's MachinePool-to-MachineSet function will distribute the generated
+		// MachineSets across the list of Zones. As we don't presently support defining zones
+		// in Hive MachinePools, make sure we send at least a list of one zone so that we
+		// get back a MachineSet.
+		// Providing the empty string will give back a MachineSet running on the default
+		// OpenStack Nova availability zone.
+		Zones: []string{""},
 	}
 
 	if pool.Spec.Platform.OpenStack.RootVolume != nil {

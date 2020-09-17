@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -181,25 +180,6 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconc
 		return err
 	}
 
-	// Watch for creates of ClusterSyncs. The controller only watches creates because there is not spec and no benefit
-	// to requeueing when the status changes.
-	if err := c.Watch(
-		&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}},
-		handler.Funcs{
-			CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
-				clusterSync, ok := e.Object.(*hiveintv1alpha1.ClusterSync)
-				if !ok {
-					return
-				}
-				// ClusterSync has the same name as the ClusterDeployment
-				cdKey := client.ObjectKey{Namespace: clusterSync.Namespace, Name: clusterSync.Name}.String()
-				q.Add(cdKey)
-			},
-		},
-	); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -317,7 +297,8 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, nil
+		// requeue immediately so that we reconcile soon after the ClusterSync is created
+		return reconcile.Result{Requeue: true}, nil
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return reconcile.Result{}, err

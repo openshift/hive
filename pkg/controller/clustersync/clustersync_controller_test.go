@@ -248,7 +248,7 @@ func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
 	}
 	result, err := rt.r.Reconcile(reconcileRequest)
 	require.NoError(t, err, "unexpected error from Reconcile")
-	assert.Equal(t, result, reconcile.Result{}, "unexpected result from reconcile")
+	assert.Equal(t, result, reconcile.Result{Requeue: true}, "unexpected result from reconcile")
 	err = rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeaseName}, &hiveintv1alpha1.ClusterSyncLease{})
 	assert.True(t, apierrors.IsNotFound(err), "expected no lease")
 	err = rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testClusterSyncName}, &hiveintv1alpha1.ClusterSync{})

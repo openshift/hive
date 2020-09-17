@@ -13,9 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -23,8 +22,11 @@ import (
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	awshivev1 "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 )
 
@@ -185,6 +187,72 @@ func TestAWSActuator(t *testing.T) {
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
 				Status: corev1.ConditionTrue,
 				Reason: "NoSubnetForAvailabilityZone",
+			},
+		},
+		{
+			name:              "supported spot market options",
+			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				withSpotMarketOptions(testMachinePool()),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeAvailabilityZones(client, []string{"zone1"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 3,
+			},
+		},
+		{
+			name:              "unsupported spot market options",
+			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.4.0"),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				withSpotMarketOptions(testMachinePool()),
+			},
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+				Status: corev1.ConditionTrue,
+				Reason: "UnsupportedSpotMarketOptions",
+			},
+		},
+		{
+			name:              "unsupported configuration condition cleared",
+			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.4.0"),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				func() runtime.Object {
+					mp := testMachinePool()
+					mp.Status.Conditions = []hivev1.MachinePoolCondition{{
+						Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+						Status: corev1.ConditionTrue,
+					}}
+					return mp
+				}(),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeAvailabilityZones(client, []string{"zone1"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 3,
+			},
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+				Status: corev1.ConditionFalse,
+				Reason: "ConfigurationSupported",
+			},
+		},
+		{
+			name:              "malformed cluster version",
+			clusterDeployment: withClusterVersion(testClusterDeployment(), "bad-version"),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				withSpotMarketOptions(testMachinePool()),
+			},
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+				Status: corev1.ConditionTrue,
+				Reason: "UnsupportedSpotMarketOptions",
 			},
 		},
 	}
@@ -364,4 +432,9 @@ func encodeAWSMachineProviderSpec(awsProviderSpec *awsprovider.AWSMachineProvide
 	return &runtime.RawExtension{
 		Raw: buffer.Bytes(),
 	}, nil
+}
+
+func withSpotMarketOptions(pool *hivev1.MachinePool) *hivev1.MachinePool {
+	pool.Spec.Platform.AWS.SpotMarketOptions = &awshivev1.SpotMarketOptions{}
+	return pool
 }

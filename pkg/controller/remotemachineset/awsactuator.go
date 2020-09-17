@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -43,6 +44,8 @@ var (
 
 	// reg is a regex used to fetch condition message from error when subnets specified in the MachinePool are invalid
 	reg = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
+
+	versionsSupportingSpotInstances = semver.MustParseRange(">=4.5.0")
 )
 
 func addAWSProviderToScheme(scheme *runtime.Scheme) error {
@@ -101,6 +104,34 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
 	}
 
+	if isUsingUnsupportedSpotMarketOptions(pool, clusterVersion, logger) {
+		logger.WithField("clusterVersion", clusterVersion).Debug("cluster does not support spot instances")
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.UnsupportedConfigurationMachinePoolCondition,
+			corev1.ConditionTrue,
+			"UnsupportedSpotMarketOptions",
+			"The version of the cluster does not support using spot instances",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			if err := a.client.Status().Update(context.Background(), pool); err != nil {
+				return nil, false, errors.Wrap(err, "could not update MachinePool status")
+			}
+		}
+		return nil, false, nil
+	}
+	statusChanged := false
+	pool.Status.Conditions, statusChanged = controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.UnsupportedConfigurationMachinePoolCondition,
+		corev1.ConditionFalse,
+		"ConfigurationSupported",
+		"The configuration is supported",
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
 	computePool := baseMachinePool(pool)
 	computePool.Platform.AWS = &installertypesaws.MachinePool{
 		AMIID:        a.amiID,
@@ -157,7 +188,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 				err.Error(),
 				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
-			if changed {
+			if statusChanged || changed {
 				pool.Status.Conditions = conds
 				if err := a.client.Status().Update(context.Background(), pool); err != nil {
 					return nil, false, err
@@ -176,7 +207,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		"Subnets are valid",
 		controllerutils.UpdateConditionNever,
 	)
-	if changed {
+	if statusChanged || changed {
 		pool.Status.Conditions = conds
 		if err := a.client.Status().Update(context.Background(), pool); err != nil {
 			return nil, false, err
@@ -348,4 +379,22 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ma
 	}
 
 	return subnetsByAvailabilityZone, nil
+}
+
+func isUsingUnsupportedSpotMarketOptions(pool *hivev1.MachinePool, clusterVersion string, logger log.FieldLogger) bool {
+	if pool.Spec.Platform.AWS.SpotMarketOptions == nil {
+		return false
+	}
+	parsedVersion, err := semver.ParseTolerant(clusterVersion)
+	if err != nil {
+		logger.WithError(err).WithField("clusterVersion", clusterVersion).Warn("could not parse the cluster version")
+		return true
+	}
+	// Use only major, minor, and patch so that pre-release versions of 4.5.0 are within the >=4.5.0 range.
+	parsedVersion = semver.Version{
+		Major: parsedVersion.Major,
+		Minor: parsedVersion.Minor,
+		Patch: parsedVersion.Patch,
+	}
+	return !versionsSupportingSpotInstances(parsedVersion)
 }

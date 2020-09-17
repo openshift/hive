@@ -966,3 +966,12 @@ func printAWSMachineProviderConfig(cfg *awsprovider.AWSMachineProviderConfig) st
 	}
 	return string(b)
 }
+
+func withClusterVersion(cd *hivev1.ClusterDeployment, version string) *hivev1.ClusterDeployment {
+	cd.Status.ClusterVersionStatus = &openshiftapiv1.ClusterVersionStatus{
+		Desired: openshiftapiv1.Update{
+			Version: version,
+		},
+	}
+	return cd
+}

@@ -1,6 +1,6 @@
 module github.com/openshift/hive
 
-go 1.13
+go 1.15
 
 require (
 	github.com/Azure/azure-sdk-for-go v43.2.0+incompatible
@@ -24,14 +24,14 @@ require (
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
-	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
+	github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7
 	github.com/openshift/cluster-api v0.0.0-20191129101638-b09907ac6668
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200120152131-1b09fd9e7156
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 	github.com/openshift/installer v0.9.0-master.0.20200817183917-ab4e753ff30b
-	github.com/openshift/library-go v0.0.0-20200429122220-9e6c27e916a0
+	github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
 	github.com/openshift/machine-api-operator v0.2.1-0.20200429102619-d36974451290
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1

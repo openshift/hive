@@ -1,4 +1,4 @@
-FROM openshift/origin-release:golang-1.13 as builder
+FROM openshift/origin-release:golang-1.15 as builder
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .

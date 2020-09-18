@@ -1,4 +1,4 @@
-FROM openshift/origin-release:golang-1.13
+FROM openshift/origin-release:golang-1.15
 
 # setting Git username and email for workaround of
 # https://github.com/jenkinsci/docker/issues/519

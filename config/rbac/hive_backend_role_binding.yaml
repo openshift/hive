@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: hive-backend
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hive-backend
+subjects:
+- kind: ServiceAccount
+  name: hive-backend
+  namespace: hive
+- kind: Group
+  name: hive-backend

@@ -206,6 +206,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	namespacedAssets := []string{
 		"config/controllers/service.yaml",
 		"config/configmaps/install-log-regexes-configmap.yaml",
+		"config/rbac/hive_backend_serviceaccount.yaml",
 		"config/rbac/hive_frontend_serviceaccount.yaml",
 		"config/controllers/hive_controllers_serviceaccount.yaml",
 	}
@@ -219,6 +220,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	// Apply global non-namespaced assets:
 	applyAssets := []string{
+		"config/rbac/hive_backend_role.yaml",
 		"config/rbac/hive_frontend_role.yaml",
 		"config/controllers/hive_controllers_role.yaml",
 	}
@@ -231,6 +233,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	// Apply global ClusterRoleBindings which may need Subject namespace overrides for their ServiceAccounts.
 	clusterRoleBindingAssets := []string{
+		"config/rbac/hive_backend_role_binding.yaml",
 		"config/rbac/hive_frontend_role_binding.yaml",
 		"config/controllers/hive_controllers_role_binding.yaml",
 	}

@@ -20,6 +20,9 @@
 // config/controllers/service.yaml
 // config/rbac/hive_admin_role.yaml
 // config/rbac/hive_admin_role_binding.yaml
+// config/rbac/hive_backend_role.yaml
+// config/rbac/hive_backend_role_binding.yaml
+// config/rbac/hive_backend_serviceaccount.yaml
 // config/rbac/hive_frontend_role.yaml
 // config/rbac/hive_frontend_role_binding.yaml
 // config/rbac/hive_frontend_serviceaccount.yaml
@@ -1043,6 +1046,101 @@ func configRbacHive_admin_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configRbacHive_backend_roleYaml = []byte(`# hive-backend is a role intended to enable groups running hive to have
+# debug access when investigating issues (whether the issue is with
+# hive or with the cluster(s) being managed).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hive-backend
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  verbs:
+  - get
+  - list
+  - watch
+`)
+
+func configRbacHive_backend_roleYamlBytes() ([]byte, error) {
+	return _configRbacHive_backend_roleYaml, nil
+}
+
+func configRbacHive_backend_roleYaml() (*asset, error) {
+	bytes, err := configRbacHive_backend_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_backend_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacHive_backend_role_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: hive-backend
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hive-backend
+subjects:
+- kind: ServiceAccount
+  name: hive-backend
+  namespace: hive
+- kind: Group
+  name: hive-backend
+`)
+
+func configRbacHive_backend_role_bindingYamlBytes() ([]byte, error) {
+	return _configRbacHive_backend_role_bindingYaml, nil
+}
+
+func configRbacHive_backend_role_bindingYaml() (*asset, error) {
+	bytes, err := configRbacHive_backend_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_backend_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacHive_backend_serviceaccountYaml = []byte(`apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hive-backend
+  namespace: hive
+`)
+
+func configRbacHive_backend_serviceaccountYamlBytes() ([]byte, error) {
+	return _configRbacHive_backend_serviceaccountYaml, nil
+}
+
+func configRbacHive_backend_serviceaccountYaml() (*asset, error) {
+	bytes, err := configRbacHive_backend_serviceaccountYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_backend_serviceaccount.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configRbacHive_frontend_roleYaml = []byte(`# hive-frontend is a role intended for integrating applications acting as a frontend
 # to Hive. These applications will need quite powerful permissions in the Hive cluster
 # to create namespaces to organize clusters, as well as all the required objects in those
@@ -1471,6 +1569,9 @@ var _bindata = map[string]func() (*asset, error){
 	"config/controllers/service.yaml":                           configControllersServiceYaml,
 	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
 	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
+	"config/rbac/hive_backend_role.yaml":                        configRbacHive_backend_roleYaml,
+	"config/rbac/hive_backend_role_binding.yaml":                configRbacHive_backend_role_bindingYaml,
+	"config/rbac/hive_backend_serviceaccount.yaml":              configRbacHive_backend_serviceaccountYaml,
 	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
 	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
 	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
@@ -1549,6 +1650,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"rbac": {nil, map[string]*bintree{
 			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},
 			"hive_admin_role_binding.yaml":      {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
+			"hive_backend_role.yaml":            {configRbacHive_backend_roleYaml, map[string]*bintree{}},
+			"hive_backend_role_binding.yaml":    {configRbacHive_backend_role_bindingYaml, map[string]*bintree{}},
+			"hive_backend_serviceaccount.yaml":  {configRbacHive_backend_serviceaccountYaml, map[string]*bintree{}},
 			"hive_frontend_role.yaml":           {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
 			"hive_frontend_role_binding.yaml":   {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
 			"hive_frontend_serviceaccount.yaml": {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},

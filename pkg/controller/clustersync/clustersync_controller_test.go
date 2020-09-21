@@ -278,6 +278,10 @@ func TestReconcileClusterSync_NoWorkToDo(t *testing.T) {
 				}),
 			),
 		},
+		{
+			name: "syncset pause",
+			cd:   cdBuilder(scheme).GenericOptions(testgeneric.WithAnnotation(constants.SyncsetPauseAnnotation, "true")).Build(),
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

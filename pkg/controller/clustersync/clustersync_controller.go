@@ -282,6 +282,11 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	// Is syncing paused?
+	if !controllerutils.ShouldSyncCluster(cd, logger) {
+		return reconcile.Result{}, nil
+	}
+
 	if cd.DeletionTimestamp != nil {
 		logger.Debug("cluster is being deleted")
 		return reconcile.Result{}, nil

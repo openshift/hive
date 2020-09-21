@@ -1729,6 +1729,38 @@ func TestReconcileClusterSync_ConditionNotMutatedWhenMessageNotChanged(t *testin
 	assert.Equal(t, timeInThePast, cond.LastProbeTime, "expected no change in last probe time")
 }
 
+func TestReconcileClusterSync_FirstSyncSetsSuccessTime(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	cd := cdBuilder(scheme).Options(testcd.WithInstalledTimestamp(metav1.NewTime(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second)))).Build()
+	resourceToApply := testConfigMap("dest-namespace", "dest-name")
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(resourceToApply),
+	)
+	existingSyncStatus := buildSyncStatus("test-syncset",
+		withTransitionInThePast(),
+		withFirstSuccessTimeInThePast(),
+	)
+	clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
+	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, syncSet, clusterSync, syncLease)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
+	}
+	rt.expectUnchangedLeaseRenewTime = true
+	rt.run(t)
+	updatedClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.TODO(), client.ObjectKey{Name: testCDName, Namespace: testNamespace}, updatedClusterSync)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	assert.Equal(t, *updatedClusterSync.Status.FirstSyncSetsSuccessTime, timeInThePast)
+}
+
 func newScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)
@@ -1748,6 +1780,7 @@ func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 				Type:   hivev1.UnreachableCondition,
 				Status: corev1.ConditionFalse,
 			}),
+			testcd.WithInstalledTimestamp(metav1.Now()),
 		)
 }
 

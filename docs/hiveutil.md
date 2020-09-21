@@ -72,6 +72,7 @@ ovirt_ca_bundle: |-
 
 ```bash
 bin/hiveutil create-cluster --cloud=ovirt --ovirt-api-vip=192.168.1.10  --ovirt-ingress-vip=192.168.1.11 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id storage-domain-UUID --ovirt-cluster-id ovirt-cluster-UUID --ovirt-ca-certs ~/ovirt-ca.pem --base-domain ovirt.hive.example.com mycluster
+```
 
 #### Create Cluster on vSphere
 
@@ -79,6 +80,28 @@ Set credentials/connection information in the following environment variables. `
 
 ```bash
 bin/hiveutil create-cluster --cloud=vsphere --vsphere-vcenter=vcenter.example.com --vsphere-datacenter=dc1 --vsphere-default-datastore=ds1 --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-folder=/dc1/vm/mycluster --base-domain vmware.hive.example.com mycluster
+```
+
+#### Create Cluster on OpenStack
+
+Credentials will be read from `~/.config/openstack/clouds.yaml` or `/etc/openstack/clouds.yaml`. An example file looks like:
+```yaml
+clouds:
+  mycloud:
+    auth:
+      auth_url: https://test.auth.url.example.com:13000/v3
+      username: "test-user"
+      password: "secret-password"
+      project_id: 97aa533a6f094222ae76f097e2eb1df4
+      project_name: "openshift"
+      user_domain_name: "example.com"
+    region_name: "regionOne"
+    interface: "public"
+    identity_api_version: 3
+```
+
+```bash
+bin/hiveutil create-cluster --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud mycluster
 ```
 
 ### Other Commands

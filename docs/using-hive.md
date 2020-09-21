@@ -174,6 +174,20 @@ metadata:
   namespace: mynamespace
 type: Opaque
 ```
+#### OpenStack
+
+Create a `secret` containing your OpenStack clouds.yaml file:
+
+```yaml
+apiVersion: v1
+data:
+  clouds.yaml: REDACTED
+kind: Secret
+metadata:
+  name: mycluster-openstack-creds
+  namespace: mynamespace
+type: Opaque
+```
 
 ### SSH Key Pair
 
@@ -311,6 +325,29 @@ platform:
     vCenter: vcenter.example.com
 ```
 
+For Openstack, replace the contents of `compute.platform` with:
+```yaml
+  openstack:
+    type: m1.large
+```
+Note: Use an instance type that meets the minimum requirement for the version of OpenShift being installed.
+
+and replace the contents of `controlPlane.platform` with:
+```yaml
+  openstack:
+    type: ci.m4.xlarge
+```
+Note: Use an instance type that meets the minimum requirement for the version of OpenShift being installed.
+
+and replace the contents of `platform` with:
+```yaml
+  openstack:
+    cloud: mycloud
+    computeFlavor: m1.large
+    externalNetwork: openstack_network_name
+    lbFloatingIP: 10.0.111.158
+```
+
 ### ClusterDeployment
 
 Cluster provisioning begins when a `ClusterDeployment` is created.
@@ -378,6 +415,7 @@ ovirt:
 And create a Secret that holds the CA certificate data for the oVirt environment:
 ```bash
 oc create secret generic mycluster-ovirt-certs -n mynamespace --from-file=.cacert=$OVIRT_CA_CERT_FILENAME
+```
 
 For vSphere, replace the contents of `spec.platform` with:
 ```yaml
@@ -392,6 +430,14 @@ vsphere:
   folder: /dc1/vm/CLUSTER_NAME
   network: "VM Network"
   vCenter: vsphere.example.com
+```
+
+For OpenStack, replace the contents of `spec.platform` with:
+```yaml
+openstack:
+  cloud: mycloud
+  credentialsSecretRef:
+    name: mycluster-openstack-creds
 ```
 
 ### Machine Pools
@@ -457,6 +503,15 @@ vsphere:
   memoryMB: 8192
   osDisk:
     diskSizeGB: 120
+```
+
+For OpenStack, replace the contents of `spec.platform` with the settings you want for the instances:
+```yaml
+openstack:
+  rootVolume:
+    size: 10
+    type: ceph
+  flavor: m1.large
 ```
 
 #### Create Cluster on Bare Metal

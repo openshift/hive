@@ -383,34 +383,33 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 		},
-		// TEST BROKEN: This test is broken because it assumes an ordering of the syncindentityproviders that is not guaranteed.
-		// {
-		// 	name: "Multiple SyncIdentityProvider and Multiple SelectorSyncIdentityProvider",
-		// 	existing: []runtime.Object{
-		// 		clusterDeploymentWithLabels(labelMap),
-		// 		syncIdentityProvidersThatReferencesEmptyClusterDeployment(sidpName, githubIdentityProvider(sidpName)),
-		// 		syncIdentityProvidersThatReferencesEmptyClusterDeployment(sidpName2, githubIdentityProvider(sidpName2)),
-		// 		selectorSyncIdentityProviders(ssidpName, githubIdentityProvider(ssidpName)),
-		// 		selectorSyncIdentityProviders(ssidpName2, githubIdentityProvider(ssidpName2)),
-		// 	},
-		// 	watchedObjectName:      "someclusterdeployment",
-		// 	watchedObjectNamespace: "default",
-		// 	expectedResult: reconcile.Result{
-		// 		Requeue:      false,
-		// 		RequeueAfter: 0,
-		// 	},
-		// 	expectedError: nil,
-		// 	expectedSyncSetList: hivev1.SyncSetList{
-		// 		Items: []hivev1.SyncSet{
-		// 			syncSetWithIdentityProviders(
-		// 				githubIdentityProvider(ssidpName),
-		// 				githubIdentityProvider(ssidpName2),
-		// 				githubIdentityProvider(sidpName),
-		// 				githubIdentityProvider(sidpName2),
-		// 			),
-		// 		},
-		// 	},
-		// },
+		{
+			name: "Multiple SyncIdentityProvider and Multiple SelectorSyncIdentityProvider",
+			existing: []runtime.Object{
+				clusterDeploymentWithLabels(labelMap),
+				syncIdentityProvidersThatReferencesEmptyClusterDeployment(sidpName, githubIdentityProvider(sidpName)),
+				syncIdentityProvidersThatReferencesEmptyClusterDeployment(sidpName2, githubIdentityProvider(sidpName2)),
+				selectorSyncIdentityProviders(ssidpName, githubIdentityProvider(ssidpName)),
+				selectorSyncIdentityProviders(ssidpName2, githubIdentityProvider(ssidpName2)),
+			},
+			watchedObjectName:      "someclusterdeployment",
+			watchedObjectNamespace: "default",
+			expectedResult: reconcile.Result{
+				Requeue:      false,
+				RequeueAfter: 0,
+			},
+			expectedError: nil,
+			expectedSyncSetList: hivev1.SyncSetList{
+				Items: []hivev1.SyncSet{
+					syncSetWithIdentityProviders(
+						githubIdentityProvider(ssidpName),
+						githubIdentityProvider(ssidpName2),
+						githubIdentityProvider(sidpName),
+						githubIdentityProvider(sidpName2),
+					),
+				},
+			},
+		},
 		{
 			name: "Existing SyncSet, no update",
 			existing: []runtime.Object{

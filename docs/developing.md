@@ -35,7 +35,7 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.13)
+- A recent Go distribution (>=1.15)
 
 ### External tools
 

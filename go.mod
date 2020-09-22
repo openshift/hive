@@ -83,3 +83,7 @@ replace (
 
 // needed because otherwise v12.0.0 is picked up as a more recent version
 replace k8s.io/client-go => k8s.io/client-go v0.19.0
+
+// needed because otherwise installer fetches a library-go version that requires bitbucket.com/ww/goautoneg which is dead
+// Tagged version fetches github.com/munnerz/goautoneg instead
+replace github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe

@@ -573,7 +573,7 @@ github.com/openshift/installer/pkg/types/ovirt/validation
 github.com/openshift/installer/pkg/types/vsphere
 github.com/openshift/installer/pkg/validate
 github.com/openshift/installer/pkg/version
-# github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
+# github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe => github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
 ## explicit
 github.com/openshift/library-go/pkg/controller
 github.com/openshift/library-go/pkg/controller/fileobserver
@@ -1775,3 +1775,4 @@ sourcegraph.com/sqs/pbtypes
 # sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20200120114645-8a9592f1f87b
 # sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20200526112135-319a35b2e38e
 # k8s.io/client-go => k8s.io/client-go v0.19.0
+# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe

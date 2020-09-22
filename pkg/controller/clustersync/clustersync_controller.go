@@ -503,8 +503,10 @@ func (r *ReconcileClusterSync) applySyncSets(
 			}
 			applyTime := now.Sub(startTime).Seconds()
 			if syncSet.AsMetaObject().GetNamespace() == "" {
+				logger.WithField("applyTime", applyTime).Debug("observed first successful apply of SelectorSyncSet for cluster")
 				metricTimeToApplySelectorSyncSet.WithLabelValues(syncSet.AsMetaObject().GetName()).Observe(applyTime)
 			} else {
+				logger.WithField("applyTime", applyTime).Debug("observed first successful apply of SyncSet for cluster")
 				metricTimeToApplySyncSet.Observe(applyTime)
 			}
 		}

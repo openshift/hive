@@ -2,6 +2,7 @@ package clusterresource
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/openshift/installer/pkg/ipnet"
@@ -64,6 +65,9 @@ type Builder struct {
 	// DeleteAfter is the duration after which the cluster should be automatically destroyed, relative to
 	// creationTimestamp. Stored as an annotation on the ClusterDeployment.
 	DeleteAfter string
+
+	// HibernateAfter is the duration after which a running cluster should be automatically hibernated.
+	HibernateAfter *time.Duration
 
 	// ServingCert is the contents of a serving certificate to be used for the cluster.
 	ServingCert string
@@ -268,6 +272,10 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 
 	if o.DeleteAfter != "" {
 		cd.ObjectMeta.Annotations[deleteAfterAnnotation] = o.DeleteAfter
+	}
+
+	if o.HibernateAfter != nil {
+		cd.Spec.HibernateAfter = &metav1.Duration{Duration: *o.HibernateAfter}
 	}
 
 	if o.Adopt {

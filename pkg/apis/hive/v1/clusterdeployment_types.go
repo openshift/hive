@@ -123,6 +123,12 @@ type ClusterDeploymentSpec struct {
 	// PowerState defaults to the Running state.
 	// +optional
 	PowerState ClusterPowerState `json:"powerState,omitempty"`
+
+	// HibernateAfter will transition a cluster to hibernating power state after it has been running for the
+	// given duration. The time that a cluster has been running is the time since the cluster was installed or the
+	// time since the cluster last came out of hibernation.
+	// +optional
+	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.

@@ -563,6 +563,11 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 		*out = new(ClusterPoolReference)
 		**out = **in
 	}
+	if in.HibernateAfter != nil {
+		in, out := &in.HibernateAfter, &out.HibernateAfter
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 

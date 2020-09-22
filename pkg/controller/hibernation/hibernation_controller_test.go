@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	fakekubeclient "k8s.io/client-go/kubernetes/fake"
@@ -22,6 +24,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/hibernation/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -83,7 +86,7 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "start hibernating, older version",
-			cd:   cdBuilder.Options(o.shouldHibernate, o.olderVersion).Build(),
+			cd:   cdBuilder.Options(o.shouldHibernate, testcd.WithClusterVersion("4.3.11")).Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
@@ -289,6 +292,155 @@ func TestReconcile(t *testing.T) {
 
 }
 
+func TestHibernateAfter(t *testing.T) {
+	logger := log.New()
+	logger.SetLevel(log.DebugLevel)
+
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+	hivev1.AddToScheme(scheme)
+
+	cdBuilder := testcd.FullBuilder(namespace, cdName, scheme).Options(
+		testcd.Installed(),
+		func(cd *hivev1.ClusterDeployment) {
+			cd.Status.ClusterVersionStatus = &configv1.ClusterVersionStatus{
+				Desired: configv1.Update{
+					Version: "4.4.9",
+				},
+			}
+		},
+	)
+	o := clusterDeploymentOptions{}
+
+	tests := []struct {
+		name          string
+		setupActuator func(actuator *mock.MockHibernationActuator)
+		cd            *hivev1.ClusterDeployment
+
+		expectRequeueAfter      time.Duration
+		expectedPowerState      hivev1.ClusterPowerState
+		expectedConditionReason string
+	}{
+		{
+			name: "cluster due for hibernate no condition", // cluster that has never been hibernated and thus has no running condition
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			expectedPowerState: hivev1.HibernatingClusterPowerState,
+		},
+		{
+			name: "cluster due for hibernate older version", // cluster that has never been hibernated and thus has no running condition
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.WithClusterVersion("4.3.11"),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			expectedPowerState:      "",
+			expectedConditionReason: hivev1.UnsupportedHibernationReason,
+		},
+		{
+			name: "cluster not yet due for hibernate older version", // cluster that has never been hibernated and thus has no running condition
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.WithClusterVersion("4.3.11"),
+				testcd.InstalledTimestamp(time.Now().Add(-3*time.Hour))),
+			expectedPowerState:      "",
+			expectedConditionReason: hivev1.UnsupportedHibernationReason,
+		},
+		{
+			name: "cluster not yet due for hibernate no condition", // cluster that has never been hibernated and thus has no running condition
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(12*time.Hour),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			expectRequeueAfter: 2 * time.Hour,
+			expectedPowerState: "",
+		},
+		{
+			name: "cluster with running condition due for hibernate",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 9*time.Hour)),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			expectedPowerState: hivev1.HibernatingClusterPowerState,
+		},
+		{
+			name: "cluster with running condition not due for hibernate",
+			cd: cdBuilder.Build(
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 6*time.Hour)),
+				testcd.WithHibernateAfter(20*time.Hour),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			expectRequeueAfter: 14 * time.Hour,
+			expectedPowerState: "",
+		},
+		{
+			name: "cluster waking from hibernate",
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(false, nil)
+			},
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionTrue, hivev1.ResumingHibernationReason, 8*time.Hour)),
+				o.shouldRun),
+			expectedPowerState: hivev1.RunningClusterPowerState,
+			expectRequeueAfter: stateCheckInterval,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockActuator := mock.NewMockHibernationActuator(ctrl)
+			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
+			if test.setupActuator != nil {
+				test.setupActuator(mockActuator)
+			}
+			mockBuilder := remoteclientmock.NewMockBuilder(ctrl)
+			mockCSRHelper := mock.NewMockcsrHelper(ctrl)
+			actuators = []HibernationActuator{mockActuator}
+			c := fake.NewFakeClientWithScheme(scheme, test.cd)
+
+			reconciler := hibernationReconciler{
+				Client: c,
+				logger: log.WithField("controller", "hibernation"),
+				remoteClientBuilder: func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
+					return mockBuilder
+				},
+				csrUtil: mockCSRHelper,
+			}
+			result, err := reconciler.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: namespace, Name: cdName},
+			})
+
+			// Need to do fuzzy requeue after matching
+			if assert.NoError(t, err, "error reconciling") {
+				if test.expectRequeueAfter == 0 {
+					assert.Zero(t, result.RequeueAfter)
+				} else {
+					assert.GreaterOrEqual(t, result.RequeueAfter.Seconds(), (test.expectRequeueAfter - 10*time.Second).Seconds(), "requeue after too small")
+					assert.LessOrEqual(t, result.RequeueAfter.Seconds(), (test.expectRequeueAfter + 10*time.Second).Seconds(), "request after too large")
+				}
+			}
+
+			cd := &hivev1.ClusterDeployment{}
+			err = c.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: cdName}, cd)
+			require.NoError(t, err, "error looking up ClusterDeployment")
+			assert.Equal(t, test.expectedPowerState, cd.Spec.PowerState, "unexpected PowerState")
+
+		})
+	}
+}
+
+func hibernatingCondition(status corev1.ConditionStatus, reason string, lastTransitionAgo time.Duration) hivev1.ClusterDeploymentCondition {
+	return hivev1.ClusterDeploymentCondition{
+		Type:               hivev1.ClusterHibernatingCondition,
+		Status:             status,
+		Message:            "unused",
+		Reason:             reason,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-lastTransitionAgo)),
+	}
+}
+
 type clusterDeploymentOptions struct{}
 
 func (*clusterDeploymentOptions) notInstalled(cd *hivev1.ClusterDeployment) {
@@ -297,13 +449,8 @@ func (*clusterDeploymentOptions) notInstalled(cd *hivev1.ClusterDeployment) {
 func (*clusterDeploymentOptions) shouldHibernate(cd *hivev1.ClusterDeployment) {
 	cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
 }
-func (*clusterDeploymentOptions) olderVersion(cd *hivev1.ClusterDeployment) {
-	cd.Status.ClusterVersionStatus = &configv1.ClusterVersionStatus{
-		Desired: configv1.Update{
-			Version: "4.3.11",
-		},
-	}
-
+func (*clusterDeploymentOptions) shouldRun(cd *hivev1.ClusterDeployment) {
+	cd.Spec.PowerState = hivev1.RunningClusterPowerState
 }
 func (*clusterDeploymentOptions) stopping(cd *hivev1.ClusterDeployment) {
 	cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{

@@ -1,6 +1,10 @@
 package clusterdeployment
 
 import (
+	"time"
+
+	configv1 "github.com/openshift/api/config/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -119,8 +123,31 @@ func Installed() Option {
 	}
 }
 
+func InstalledTimestamp(instTime time.Time) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Installed = true
+		clusterDeployment.Status.InstalledTimestamp = &metav1.Time{Time: instTime}
+	}
+}
+
+func WithClusterVersion(version string) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Status.ClusterVersionStatus = &configv1.ClusterVersionStatus{
+			Desired: configv1.Update{
+				Version: version,
+			},
+		}
+	}
+}
+
 func WithPowerState(powerState hivev1.ClusterPowerState) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.PowerState = powerState
+	}
+}
+
+func WithHibernateAfter(dur time.Duration) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.HibernateAfter = &metav1.Duration{Duration: dur}
 	}
 }

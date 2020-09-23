@@ -91,6 +91,8 @@ crd: ensure-controller-gen ensure-yq
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 update: crd
 
+verify: vendor
+
 .PHONY: verify-crd
 verify-crd: ensure-controller-gen ensure-yq
 	./hack/verify-crd.sh

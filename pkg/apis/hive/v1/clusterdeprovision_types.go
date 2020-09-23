@@ -57,6 +57,10 @@ type AWSClusterDeprovision struct {
 type AzureClusterDeprovision struct {
 	// CredentialsSecretRef is the Azure account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	// ResourceGroupName is used to indicate that the cluster was installed into an already-existing
+	// Azure resource group (instead of having the installer create the resource group based on the
+	// cluster name). This will be used to indicate to the uninstall process where it should clean up.
+	ResourceGroupName string `json:"resourceGroupName,omitempty"`
 }
 
 // GCPClusterDeprovision contains GCP-specific configuration for a ClusterDeprovision

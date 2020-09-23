@@ -379,6 +379,13 @@ spec:
                       description: Region specifies the Azure region where the cluster
                         will be created.
                       type: string
+                    resourceGroupName:
+                      description: ResourceGroupName specifies the name of the Azure
+                        resource group containing the custer. This must match the
+                        name of the Azure resource group specified in the InstallConfig.
+                        If the name of the Azure resource group is omitted from the
+                        InstallConfig, then it must be omitted here as well.
+                      type: string
                   required:
                   - credentialsSecretRef
                   - region

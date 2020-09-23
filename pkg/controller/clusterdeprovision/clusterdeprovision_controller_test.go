@@ -222,6 +222,28 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				validateNoJobExists(t, c)
 			},
 		},
+		{
+			name: "create uninstall job with Azure resource group param",
+			deprovision: func() *hivev1.ClusterDeprovision {
+				deprov := testClusterDeprovision()
+				deprov.Spec.Platform.AWS = nil
+				deprov.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
+					CredentialsSecretRef: &corev1.LocalObjectReference{
+						Name: "azure-creds",
+					},
+					ResourceGroupName: "manual-resourcegroup",
+				}
+				return deprov
+			}(),
+			deployment: testDeletedClusterDeployment(),
+			validate: func(t *testing.T, c client.Client) {
+				job := validateJobExists(t, c)
+				cliArgs := job.Spec.Template.Spec.Containers[0].Args
+
+				assert.Contains(t, cliArgs, "--resource-group", "expected the --resource-group param to be included in the deprovision")
+				assert.Contains(t, cliArgs, "manual-resourcegroup", "expected name of the Azure resource group to be included in the params")
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -344,7 +366,7 @@ func validateNoJobExists(t *testing.T, c client.Client) {
 	}
 }
 
-func validateJobExists(t *testing.T, c client.Client) {
+func validateJobExists(t *testing.T, c client.Client) *batchv1.Job {
 	job := &batchv1.Job{}
 	err := c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testName + "-uninstall"}, job)
 	if err != nil {
@@ -354,6 +376,8 @@ func validateJobExists(t *testing.T, c client.Client) {
 	require.NotNil(t, job, "expected job")
 	assert.Equal(t, testClusterDeprovision().Name, job.Labels[constants.ClusterDeprovisionNameLabel], "incorrect cluster deprovision name label")
 	assert.Equal(t, constants.JobTypeDeprovision, job.Labels[constants.JobTypeLabel], "incorrect job type label")
+
+	return job
 }
 
 func validateNotCompleted(t *testing.T, c client.Client) {

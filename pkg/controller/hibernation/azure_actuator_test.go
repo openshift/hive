@@ -27,6 +27,12 @@ const (
 	azureTestResourceGroup = "test-infra-id-rg"
 )
 
+type azureInstanceGroup struct {
+	state             string
+	count             int
+	resourceGroupName string
+}
+
 func TestAzureCanHandle(t *testing.T) {
 	cd := testcd.BasicBuilder().Options(func(cd *hivev1.ClusterDeployment) {
 		cd.Spec.Platform.Azure = &hivev1azure.Platform{}
@@ -40,60 +46,140 @@ func TestAzureCanHandle(t *testing.T) {
 
 func TestAzureStopAndStartMachines(t *testing.T) {
 	tests := []struct {
-		name        string
-		testFunc    string
-		instances   map[string]int
-		setupClient func(*testing.T, *mockazureclient.MockClient)
+		name              string
+		testFunc          string
+		instances         []azureInstanceGroup
+		setupClient       func(*testing.T, *mockazureclient.MockClient)
+		clusterDeployment *hivev1.ClusterDeployment
 	}{
 		{
-			name:      "stop no running instances",
-			testFunc:  "StopMachines",
-			instances: map[string]int{"deallocated": 2, "deallocating": 2, "stopped": 1},
-		},
-		{
-			name:      "stop running instances",
-			testFunc:  "StopMachines",
-			instances: map[string]int{"deallocated": 2, "running": 2},
-			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
-				setupAzureDeallocateCalls(c, map[string]int{"running": 2})
+			name:     "stop no running instances",
+			testFunc: "StopMachines",
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocated", 2),
+				newDefaultAzureInstanceGroup("deallocating", 2),
+				newDefaultAzureInstanceGroup("stopped", 2),
 			},
 		},
 		{
-			name:      "stop pending and running instances",
-			testFunc:  "StopMachines",
-			instances: map[string]int{"deallocating": 3, "deallocated": 4, "starting": 1, "running": 3},
+			name:     "stop running instances",
+			testFunc: "StopMachines",
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocated", 2),
+				newDefaultAzureInstanceGroup("running", 2),
+			},
 			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
-				setupAzureDeallocateCalls(c, map[string]int{"starting": 1, "running": 3})
+				setupAzureDeallocateCalls(c, []azureInstanceGroup{
+					newDefaultAzureInstanceGroup("running", 2),
+				})
 			},
 		},
 		{
-			name:      "start no stopped instances",
-			testFunc:  "StartMachines",
-			instances: map[string]int{"starting": 4, "running": 3},
-		},
-		{
-			name:      "start stopped instances",
-			testFunc:  "StartMachines",
-			instances: map[string]int{"deallocated": 3, "running": 3},
+			name:     "stop pending and running instances",
+			testFunc: "StopMachines",
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocating", 3),
+				newDefaultAzureInstanceGroup("deallocated", 4),
+				newDefaultAzureInstanceGroup("starting", 1),
+				newDefaultAzureInstanceGroup("running", 3),
+			},
 			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
-				setupAzureStartCalls(c, map[string]int{"deallocated": 3})
+				setupAzureDeallocateCalls(c, []azureInstanceGroup{
+					newDefaultAzureInstanceGroup("starting", 1),
+					newDefaultAzureInstanceGroup("running", 3),
+				})
 			},
 		},
 		{
-			name:      "start stopped and stopping instances",
-			testFunc:  "StartMachines",
-			instances: map[string]int{"deallocated": 3, "deallocating": 1, "starting": 3},
-			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
-				setupAzureStartCalls(c, map[string]int{"deallocated": 3, "deallocating": 1})
+			name:     "start no stopped instances",
+			testFunc: "StartMachines",
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("starting", 4),
+				newDefaultAzureInstanceGroup("running", 3),
 			},
+		},
+		{
+			name:     "start stopped instances",
+			testFunc: "StartMachines",
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocated", 3),
+				newDefaultAzureInstanceGroup("running", 3),
+			},
+			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
+				setupAzureStartCalls(c, []azureInstanceGroup{
+					newDefaultAzureInstanceGroup("deallocated", 3),
+				})
+			},
+		},
+		{
+			name:     "start stopped and stopping instances",
+			testFunc: "StartMachines",
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocated", 3),
+				newDefaultAzureInstanceGroup("deallocating", 1),
+				newDefaultAzureInstanceGroup("starting", 3),
+			},
+			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
+				setupAzureStartCalls(c, []azureInstanceGroup{
+					newDefaultAzureInstanceGroup("deallocated", 3),
+					newDefaultAzureInstanceGroup("deallocating", 1),
+				})
+			},
+		},
+		{
+			name:     "use resource group name on start",
+			testFunc: "StartMachines",
+			instances: []azureInstanceGroup{
+				newAzureInstanceGroup("stopped", 3, "manual-resourcegroup"),
+			},
+			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
+				setupAzureStartCalls(c, []azureInstanceGroup{
+					newAzureInstanceGroup("stopped", 3, "manual-resourcegroup"),
+				})
+			},
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testAzureClusterDeployment()
+				cd.Spec.Platform.Azure = &hivev1azure.Platform{
+					ResourceGroupName: "manual-resourcegroup",
+				}
+				return cd
+			}(),
+		},
+		{
+			name:     "use resource group name on stop",
+			testFunc: "StopMachines",
+			instances: []azureInstanceGroup{
+				newAzureInstanceGroup("running", 3, "manual-resourcegroup"),
+			},
+			setupClient: func(t *testing.T, c *mockazureclient.MockClient) {
+				setupAzureDeallocateCalls(c, []azureInstanceGroup{
+					newAzureInstanceGroup("running", 3, "manual-resourcegroup"),
+				})
+			},
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testAzureClusterDeployment()
+				cd.Spec.Platform.Azure = &hivev1azure.Platform{
+					ResourceGroupName: "manual-resourcegroup",
+				}
+				return cd
+			}(),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
 			azureClient := mockazureclient.NewMockClient(ctrl)
+
+			cd := testAzureClusterDeployment()
+			if test.clusterDeployment != nil {
+				cd = test.clusterDeployment
+			}
+
 			setupAzureClientInstances(azureClient, test.instances)
+
 			if test.setupClient != nil {
 				test.setupClient(t, azureClient)
 			}
@@ -101,9 +187,9 @@ func TestAzureStopAndStartMachines(t *testing.T) {
 			var err error
 			switch test.testFunc {
 			case "StopMachines":
-				err = actuator.StopMachines(testAzureClusterDeployment(), nil, log.New())
+				err = actuator.StopMachines(cd, nil, log.New())
 			case "StartMachines":
-				err = actuator.StartMachines(testAzureClusterDeployment(), nil, log.New())
+				err = actuator.StartMachines(cd, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -114,55 +200,139 @@ func TestAzureStopAndStartMachines(t *testing.T) {
 
 func TestAzureMachinesStoppedAndRunning(t *testing.T) {
 	tests := []struct {
-		name        string
-		testFunc    string
-		expected    bool
-		instances   map[string]int
-		setupClient func(*testing.T, *mockazureclient.MockClient)
+		name              string
+		testFunc          string
+		expected          bool
+		instances         []azureInstanceGroup
+		instanceSetup     func(*mockazureclient.MockClient, []azureInstanceGroup)
+		setupClient       func(*testing.T, *mockazureclient.MockClient)
+		clusterDeployment *hivev1.ClusterDeployment
 	}{
 		{
-			name:      "Stopped - All machines stopped",
-			testFunc:  "MachinesStopped",
-			expected:  true,
-			instances: map[string]int{"deallocated": 3, "stopped": 2},
+			name:     "Stopped - All machines stopped",
+			testFunc: "MachinesStopped",
+			expected: true,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocated", 3),
+				newDefaultAzureInstanceGroup("stopped", 2),
+			},
 		},
 		{
-			name:      "Stopped - Some machines starting",
-			testFunc:  "MachinesStopped",
-			expected:  false,
-			instances: map[string]int{"deallocated": 3, "stopped": 2, "starting": 2},
+			name:     "Stopped - Some machines starting",
+			testFunc: "MachinesStopped",
+			expected: false,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("deallocated", 3),
+				newDefaultAzureInstanceGroup("stopped", 2),
+				newDefaultAzureInstanceGroup("starting", 2),
+			},
 		},
 		{
-			name:      "Stopped - machines running",
-			testFunc:  "MachinesStopped",
-			expected:  false,
-			instances: map[string]int{"running": 3, "deallocated": 2},
+			name:     "Stopped - machines running",
+			testFunc: "MachinesStopped",
+			expected: false,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+				newDefaultAzureInstanceGroup("deallocated", 2),
+			},
 		},
 		{
-			name:      "Running - All machines running",
-			testFunc:  "MachinesRunning",
-			expected:  true,
-			instances: map[string]int{"running": 3},
+			name:     "Running - All machines running",
+			testFunc: "MachinesRunning",
+			expected: true,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+			},
 		},
 		{
-			name:      "Running - Some machines starting",
-			testFunc:  "MachinesRunning",
-			expected:  false,
-			instances: map[string]int{"running": 3, "starting": 1},
+			name:     "Running - Some machines starting",
+			testFunc: "MachinesRunning",
+			expected: false,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+				newDefaultAzureInstanceGroup("starting", 1),
+			},
 		},
 		{
-			name:      "Running - Some machines deallocated or deallocating",
-			testFunc:  "MachinesRunning",
-			expected:  false,
-			instances: map[string]int{"running": 3, "deallocated": 2, "stopped": 1, "deallocating": 3},
+			name:     "Running - Some machines deallocated or deallocating",
+			testFunc: "MachinesRunning",
+			expected: false,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+				newDefaultAzureInstanceGroup("deallocated", 2),
+				newDefaultAzureInstanceGroup("stopped", 1),
+				newDefaultAzureInstanceGroup("deallocating", 3),
+			},
+		},
+		{
+			name:     "Stopped - mixed with other resource groups",
+			testFunc: "MachinesRunning",
+			expected: false,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+				newAzureInstanceGroup("stopped", 4, "manual-resourcegroup"),
+			},
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform.Azure = &hivev1azure.Platform{
+					ResourceGroupName: "manual-resourcegroup",
+				}
+				return cd
+			}(),
+		},
+		{
+			name:     "Half Running - mixed with other resource groups",
+			testFunc: "MachinesRunning",
+			expected: false,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+				newAzureInstanceGroup("stopped", 4, "manual-resourcegroup"),
+				newAzureInstanceGroup("running", 3, "manual-resourcegroup"),
+			},
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform.Azure = &hivev1azure.Platform{
+					ResourceGroupName: "manual-resourcegroup",
+				}
+				return cd
+			}(),
+		},
+		{
+			name:     "Fully Running - mixed with other resource groups",
+			testFunc: "MachinesRunning",
+			expected: true,
+			instances: []azureInstanceGroup{
+				newDefaultAzureInstanceGroup("running", 3),
+				newAzureInstanceGroup("running", 4, "manual-resourcegroup"),
+				newAzureInstanceGroup("stopped", 3, "other-resourcegroup"),
+			},
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform.Azure = &hivev1azure.Platform{
+					ResourceGroupName: "manual-resourcegroup",
+				}
+				return cd
+			}(),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			cd := testAzureClusterDeployment()
+			if test.clusterDeployment != nil {
+				cd = test.clusterDeployment
+			}
+
 			azureClient := mockazureclient.NewMockClient(ctrl)
-			setupAzureClientInstances(azureClient, test.instances)
+			if test.instanceSetup != nil {
+				test.instanceSetup(azureClient, test.instances)
+			} else {
+				setupAzureClientInstances(azureClient, test.instances)
+			}
+
 			if test.setupClient != nil {
 				test.setupClient(t, azureClient)
 			}
@@ -171,9 +341,9 @@ func TestAzureMachinesStoppedAndRunning(t *testing.T) {
 			var result bool
 			switch test.testFunc {
 			case "MachinesStopped":
-				result, err = actuator.MachinesStopped(testAzureClusterDeployment(), nil, log.New())
+				result, err = actuator.MachinesStopped(cd, nil, log.New())
 			case "MachinesRunning":
-				result, err = actuator.MachinesRunning(testAzureClusterDeployment(), nil, log.New())
+				result, err = actuator.MachinesRunning(cd, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -201,19 +371,21 @@ func testAzureActuator(azureClient azureclient.Client) *azureActuator {
 	}
 }
 
-func setupAzureClientInstances(client *mockazureclient.MockClient, instances map[string]int) {
+func setupAzureClientInstances(client *mockazureclient.MockClient, instances []azureInstanceGroup) {
 	vms := []compute.VirtualMachine{}
-	for state, count := range instances {
-		for i := 0; i < count; i++ {
-			name := fmt.Sprintf("%s-%d", state, i)
+
+	for _, azInstance := range instances {
+		for i := 0; i < azInstance.count; i++ {
+			name := fmt.Sprintf("%s-%d", azInstance.state, i)
 			instanceViewStatus := []compute.InstanceViewStatus{
 				{
-					Code: pointer.StringPtr("PowerState/" + state),
+					Code: pointer.StringPtr("PowerState/" + azInstance.state),
 				},
 			}
+
 			vms = append(vms, compute.VirtualMachine{
 				Name: pointer.StringPtr(name),
-				ID:   pointer.StringPtr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", azureTestSubscription, azureTestResourceGroup, name)),
+				ID:   pointer.StringPtr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", azureTestSubscription, azInstance.resourceGroupName, name)),
 				VirtualMachineProperties: &compute.VirtualMachineProperties{
 					InstanceView: &compute.VirtualMachineInstanceView{
 						Statuses: &instanceViewStatus,
@@ -232,18 +404,26 @@ func setupAzureClientInstances(client *mockazureclient.MockClient, instances map
 	client.EXPECT().ListAllVirtualMachines(gomock.Any(), "true").Times(1).Return(result, nil)
 }
 
-func setupAzureDeallocateCalls(client *mockazureclient.MockClient, instances map[string]int) {
-	for state, count := range instances {
-		for i := 0; i < count; i++ {
-			client.EXPECT().DeallocateVirtualMachine(gomock.Any(), azureTestResourceGroup, fmt.Sprintf("%s-%d", state, i)).Times(1)
+func setupAzureDeallocateCalls(client *mockazureclient.MockClient, instances []azureInstanceGroup) {
+	for _, azInstances := range instances {
+		for i := 0; i < azInstances.count; i++ {
+			client.EXPECT().DeallocateVirtualMachine(gomock.Any(), azInstances.resourceGroupName, fmt.Sprintf("%s-%d", azInstances.state, i)).Times(1)
 		}
 	}
 }
 
-func setupAzureStartCalls(client *mockazureclient.MockClient, instances map[string]int) {
-	for state, count := range instances {
-		for i := 0; i < count; i++ {
-			client.EXPECT().StartVirtualMachine(gomock.Any(), azureTestResourceGroup, fmt.Sprintf("%s-%d", state, i)).Times(1)
+func setupAzureStartCalls(client *mockazureclient.MockClient, instances []azureInstanceGroup) {
+	for _, azInstances := range instances {
+		for i := 0; i < azInstances.count; i++ {
+			client.EXPECT().StartVirtualMachine(gomock.Any(), azInstances.resourceGroupName, fmt.Sprintf("%s-%d", azInstances.state, i)).Times(1)
 		}
 	}
+}
+
+func newDefaultAzureInstanceGroup(state string, count int) azureInstanceGroup {
+	return newAzureInstanceGroup(state, count, azureTestResourceGroup)
+}
+
+func newAzureInstanceGroup(state string, count int, resourceGroupName string) azureInstanceGroup {
+	return azureInstanceGroup{state: state, count: count, resourceGroupName: resourceGroupName}
 }

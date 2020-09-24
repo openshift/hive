@@ -76,15 +76,17 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedMissingDependenciesMessage string
 		expectedAssignedClaims             int
 		expectedUnassignedClaims           int
+		expectedLabels                     map[string]string // Tested on all clusters, so will not work if your test has pre-existing cds in the pool.
 	}{
 		{
 			name: "create all clusters",
 			existing: []runtime.Object{
-				poolBuilder.Build(testcp.WithSize(5)),
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithClusterDeploymentLabels(map[string]string{"foo": "bar"})),
 			},
 			expectedTotalClusters: 5,
 			expectedObservedSize:  0,
 			expectedObservedReady: 0,
+			expectedLabels:        map[string]string{"foo": "bar"},
 		},
 		{
 			name: "scale up",
@@ -468,6 +470,11 @@ func TestReconcileClusterPool(t *testing.T) {
 
 			for _, cd := range cds.Items {
 				assert.Equal(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected cluster to be hibernating")
+				if test.expectedLabels != nil {
+					for k, v := range test.expectedLabels {
+						assert.Equal(t, v, cd.Labels[k])
+					}
+				}
 			}
 
 			pool := &hivev1.ClusterPool{}

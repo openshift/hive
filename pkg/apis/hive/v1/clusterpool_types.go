@@ -28,6 +28,11 @@ type ClusterPoolSpec struct {
 	// ImageSetRef is a reference to a ClusterImageSet. The release image specified in the ClusterImageSet will be used
 	// by clusters created for this cluster pool.
 	ImageSetRef ClusterImageSetReference `json:"imageSetRef"`
+
+	// Labels to be applied to new ClusterDeployments created for the pool. ClusterDeployments that have already been
+	// claimed will not be affected when this value is modified.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

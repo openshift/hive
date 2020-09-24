@@ -94,6 +94,12 @@ func WithSize(size int) Option {
 	}
 }
 
+func WithClusterDeploymentLabels(labels map[string]string) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.Labels = labels
+	}
+}
+
 func WithBaseDomain(baseDomain string) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
 		clusterPool.Spec.BaseDomain = baseDomain

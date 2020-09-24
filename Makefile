@@ -1,6 +1,11 @@
 .PHONY: all
 all: vendor update test build
 
+# Force build-machinery-go to grab an earlier version of controller-gen. The newer version adds annotations on pod
+# specs that will cause the CRDs to fail validation. The fix for that requires the CRDs to use v1, but we still need
+# to support users that are running kube versions that only have v1beta1.
+CONTROLLER_GEN_VERSION ?=v0.2.1-37-ga3cca5d
+
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \

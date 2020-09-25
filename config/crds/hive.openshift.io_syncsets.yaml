@@ -13,6 +13,8 @@ spec:
     - ss
     singular: syncset
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: SyncSet is the Schema for the SyncSet API

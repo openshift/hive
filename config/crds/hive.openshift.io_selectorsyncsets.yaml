@@ -13,6 +13,8 @@ spec:
     - sss
     singular: selectorsyncset
   scope: Cluster
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: SelectorSyncSet is the Schema for the SelectorSyncSet API

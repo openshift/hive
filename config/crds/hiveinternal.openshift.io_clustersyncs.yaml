@@ -75,9 +75,9 @@ spec:
                 - type
                 type: object
               type: array
-            firstSyncSetsSuccessTime:
-              description: FirstSyncSetsSuccessTime is the time we first successfully
-                applied all (selector)syncsets to a cluster.
+            firstSuccessTime:
+              description: FirstSuccessTime is the time we first successfully applied
+                all (selector)syncsets to a cluster.
               format: date-time
               type: string
             selectorSyncSets:

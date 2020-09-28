@@ -531,8 +531,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	if cd.Spec.Installed {
 		// set installedTimestamp for adopted clusters
 		if cd.Status.InstalledTimestamp == nil {
-			now := metav1.Now()
-			cd.Status.InstalledTimestamp = &now
+			cd.Status.InstalledTimestamp = &cd.ObjectMeta.CreationTimestamp
 			if err := r.Status().Update(context.TODO(), cd); err != nil {
 				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster installed timestamp")
 				return reconcile.Result{Requeue: true}, nil

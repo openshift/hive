@@ -91,7 +91,7 @@ var (
 
 	metricTimeToApplySyncSets = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name:    "hive_clustersync_time_to_apply_all_syncsets_seconds",
+			Name:    "hive_clustersync_first_success_duration_seconds",
 			Help:    "Time between cluster install complete and all syncsets applied.",
 			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
 		},
@@ -373,8 +373,8 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 
 	// Set clusterSync.Status.FirstSyncSetsSuccessTime
 	syncStatuses := append(syncStatusesForSyncSets, syncStatusesForSelectorSyncSets...)
-	if len(syncStatuses) > 0 && clusterSync.Status.FirstSyncSetsSuccessTime == nil {
-		r.setFirstSyncSetsSuccessTime(syncStatuses, cd, clusterSync, logger)
+	if len(syncStatuses) > 0 && clusterSync.Status.FirstSuccessTime == nil && !selectorSyncSetsNeedRequeue && !syncSetsNeedRequeue {
+		r.setFirstSuccessTime(syncStatuses, cd, clusterSync, logger)
 	}
 
 	// Update the ClusterSync
@@ -918,7 +918,7 @@ func getFailingSyncSets(syncStatuses []hiveintv1alpha1.SyncStatus) []string {
 	return failures
 }
 
-func (r *ReconcileClusterSync) setFirstSyncSetsSuccessTime(syncStatuses []hiveintv1alpha1.SyncStatus, cd *hivev1.ClusterDeployment, clusterSync *hiveintv1alpha1.ClusterSync, logger log.FieldLogger) {
+func (r *ReconcileClusterSync) setFirstSuccessTime(syncStatuses []hiveintv1alpha1.SyncStatus, cd *hivev1.ClusterDeployment, clusterSync *hiveintv1alpha1.ClusterSync, logger log.FieldLogger) {
 	lastSuccessTime := &metav1.Time{}
 	for _, status := range syncStatuses {
 		if status.FirstSuccessTime == nil {
@@ -928,8 +928,9 @@ func (r *ReconcileClusterSync) setFirstSyncSetsSuccessTime(syncStatuses []hivein
 			lastSuccessTime = status.FirstSuccessTime
 		}
 	}
-	clusterSync.Status.FirstSyncSetsSuccessTime = lastSuccessTime
+	clusterSync.Status.FirstSuccessTime = lastSuccessTime
 	allSyncSetsAppliedDuration := lastSuccessTime.Time.Sub(cd.Status.InstalledTimestamp.Time)
+	logger.Debugf("observed syncsets applied duration: %v seconds", allSyncSetsAppliedDuration.Seconds())
 	metricTimeToApplySyncSets.Observe(float64(allSyncSetsAppliedDuration.Seconds()))
 	return
 }

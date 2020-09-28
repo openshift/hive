@@ -18,6 +18,8 @@ spec:
       controller-tools.k8s.io: "1.0"
   replicas: 1
   revisionHistoryLimit: 4
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:

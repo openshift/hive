@@ -6,8 +6,6 @@ import (
 	golog "log"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,6 +100,10 @@ func newRootCommand() *cobra.Command {
 			log.Info("Starting /healthz and /readyz endpoints")
 			go http.ListenAndServe(":8080", nil)
 
+			// use a Go context so we can tell the leaderelection code when we want to step down
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
@@ -142,27 +144,17 @@ func newRootCommand() *cobra.Command {
 				log.Info("Starting the Cmd.")
 
 				// Start the Cmd
-				log.Fatal(mgr.Start(signals.SetupSignalHandler()))
+				err = mgr.Start(signals.SetupSignalHandler())
+				if err != nil {
+					log.WithError(err).Error("error running manager")
+				}
+				// Canceling the leader election context
+				cancel()
 			}
 
 			// Leader election code based on:
 			// https://github.com/kubernetes/kubernetes/blob/f7e3bcdec2e090b7361a61e21c20b3dbbb41b7f0/staging/src/k8s.io/client-go/examples/leader-election/main.go#L92-L154
 			// This gives us ReleaseOnCancel which is not presently exposed in controller-runtime.
-
-			// use a Go context so we can tell the leaderelection code when we want to step down
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			// listen for interrupts or the Linux SIGTERM signal and cancel
-			// our context, which the leader election code will observe and
-			// step down
-			ch := make(chan os.Signal, 1)
-			signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-			go func() {
-				<-ch
-				log.Info("received termination, signaling shutdown")
-				cancel()
-			}()
 
 			id := uuid.New().String()
 			leLog := log.WithField("id", id)

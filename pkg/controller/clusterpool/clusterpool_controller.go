@@ -306,6 +306,7 @@ func (r *ReconcileClusterPool) createCluster(
 		MachineNetwork:   "10.0.0.0/16",
 		PullSecret:       pullSecret,
 		CloudBuilder:     cloudBuilder,
+		Labels:           clp.Spec.Labels,
 	}
 
 	objs, err := builder.Build()

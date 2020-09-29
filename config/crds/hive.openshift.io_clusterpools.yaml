@@ -68,6 +68,13 @@ spec:
               required:
               - name
               type: object
+            labels:
+              additionalProperties:
+                type: string
+              description: Labels to be applied to new ClusterDeployments created
+                for the pool. ClusterDeployments that have already been claimed will
+                not be affected when this value is modified.
+              type: object
             platform:
               description: Platform encompasses the desired platform for the cluster.
               properties:

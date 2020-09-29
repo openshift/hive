@@ -103,13 +103,6 @@ func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 	}
 }
 
-// WithInstalledTimestamp adds the specified InstalledTimestamp to ClusterDeployment.Status
-func WithInstalledTimestamp(timestamp metav1.Time) Option {
-	return func(clusterDeployment *hivev1.ClusterDeployment) {
-		clusterDeployment.Status.InstalledTimestamp = &timestamp
-	}
-}
-
 func WithUnclaimedClusterPoolReference(namespace, poolName string) Option {
 	return WithClusterPoolReference(namespace, poolName, "")
 }

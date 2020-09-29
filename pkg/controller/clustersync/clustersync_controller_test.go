@@ -1733,7 +1733,7 @@ func TestReconcileClusterSync_FirstSuccessTime(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	scheme := newScheme()
-	cd := cdBuilder(scheme).Options(testcd.WithInstalledTimestamp(metav1.NewTime(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second)))).Build()
+	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
 	resourceToApply := testConfigMap("dest-namespace", "dest-name")
 	syncSetNew := testsyncset.FullBuilder(testNamespace, "test-syncset-new", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -1780,7 +1780,7 @@ func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	scheme := newScheme()
-	cd := cdBuilder(scheme).Options(testcd.WithInstalledTimestamp(metav1.NewTime(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second)))).Build()
+	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
 		testsyncset.WithGeneration(1),
@@ -1836,7 +1836,7 @@ func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 				Type:   hivev1.UnreachableCondition,
 				Status: corev1.ConditionFalse,
 			}),
-			testcd.WithInstalledTimestamp(metav1.Now()),
+			testcd.InstalledTimestamp(time.Now()),
 		)
 }
 

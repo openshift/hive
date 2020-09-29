@@ -373,7 +373,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 
 	// Set clusterSync.Status.FirstSyncSetsSuccessTime
 	syncStatuses := append(syncStatusesForSyncSets, syncStatusesForSelectorSyncSets...)
-	if len(syncStatuses) > 0 && clusterSync.Status.FirstSuccessTime == nil && !selectorSyncSetsNeedRequeue && !syncSetsNeedRequeue {
+	if len(syncStatuses) > 0 && clusterSync.Status.FirstSuccessTime == nil {
 		r.setFirstSuccessTime(syncStatuses, cd, clusterSync, logger)
 	}
 
@@ -919,6 +919,9 @@ func getFailingSyncSets(syncStatuses []hiveintv1alpha1.SyncStatus) []string {
 }
 
 func (r *ReconcileClusterSync) setFirstSuccessTime(syncStatuses []hiveintv1alpha1.SyncStatus, cd *hivev1.ClusterDeployment, clusterSync *hiveintv1alpha1.ClusterSync, logger log.FieldLogger) {
+	if reflect.ValueOf(cd.Status.InstalledTimestamp).IsNil() {
+		return
+	}
 	lastSuccessTime := &metav1.Time{}
 	for _, status := range syncStatuses {
 		if status.FirstSuccessTime == nil {

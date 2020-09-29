@@ -919,7 +919,7 @@ func getFailingSyncSets(syncStatuses []hiveintv1alpha1.SyncStatus) []string {
 }
 
 func (r *ReconcileClusterSync) setFirstSuccessTime(syncStatuses []hiveintv1alpha1.SyncStatus, cd *hivev1.ClusterDeployment, clusterSync *hiveintv1alpha1.ClusterSync, logger log.FieldLogger) {
-	if reflect.ValueOf(cd.Status.InstalledTimestamp).IsNil() {
+	if cd.Status.InstalledTimestamp == nil {
 		return
 	}
 	lastSuccessTime := &metav1.Time{}

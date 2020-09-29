@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -49,14 +48,8 @@ func TestReconcile(t *testing.T) {
 	machineapi.AddToScheme(scheme)
 
 	cdBuilder := testcd.FullBuilder(namespace, cdName, scheme).Options(
-		func(cd *hivev1.ClusterDeployment) {
-			cd.Spec.Installed = true
-			cd.Status.ClusterVersionStatus = &configv1.ClusterVersionStatus{
-				Desired: configv1.Update{
-					Version: "4.4.9",
-				},
-			}
-		},
+		testcd.Installed(),
+		testcd.WithClusterVersion("4.4.9"),
 	)
 	o := clusterDeploymentOptions{}
 
@@ -302,13 +295,7 @@ func TestHibernateAfter(t *testing.T) {
 
 	cdBuilder := testcd.FullBuilder(namespace, cdName, scheme).Options(
 		testcd.Installed(),
-		func(cd *hivev1.ClusterDeployment) {
-			cd.Status.ClusterVersionStatus = &configv1.ClusterVersionStatus{
-				Desired: configv1.Update{
-					Version: "4.4.9",
-				},
-			}
-		},
+		testcd.WithClusterVersion("4.4.9"),
 	)
 	o := clusterDeploymentOptions{}
 

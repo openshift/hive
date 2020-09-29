@@ -27,6 +27,7 @@ import (
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -424,7 +425,8 @@ func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, e
 	// GCP clusters running an OpenShift version earlier than 4.4.8 require leases for machine pool names because the
 	// pool name is limited to a single character.
 	if p := cd.Spec.Platform; p.GCP != nil {
-		if cd.Status.ClusterVersionStatus != nil && semver.Compare("v4.4.8", "v"+cd.Status.ClusterVersionStatus.Desired.Version) > 0 {
+		version, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
+		if versionPresent && semver.Compare("v4.4.8", "v"+version) > 0 {
 			return common.WaitForMachinePoolNameLease(
 				common.MustGetConfig(),
 				cd.Namespace,

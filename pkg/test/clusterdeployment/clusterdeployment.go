@@ -3,11 +3,11 @@ package clusterdeployment
 import (
 	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
 )
 
@@ -131,13 +131,7 @@ func InstalledTimestamp(instTime time.Time) Option {
 }
 
 func WithClusterVersion(version string) Option {
-	return func(clusterDeployment *hivev1.ClusterDeployment) {
-		clusterDeployment.Status.ClusterVersionStatus = &configv1.ClusterVersionStatus{
-			Desired: configv1.Update{
-				Version: version,
-			},
-		}
-	}
+	return Generic(generic.WithLabel(constants.VersionMajorMinorPatchLabel, version))
 }
 
 func WithPowerState(powerState hivev1.ClusterPowerState) Option {

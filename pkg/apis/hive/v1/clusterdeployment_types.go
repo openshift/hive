@@ -4,7 +4,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
@@ -208,9 +207,6 @@ type ClusterDeploymentStatus struct {
 
 	// InstallRestarts is the total count of container restarts on the clusters install job.
 	InstallRestarts int `json:"installRestarts,omitempty"`
-
-	// ClusterVersionStatus will hold a copy of the remote cluster's ClusterVersion.Status
-	ClusterVersionStatus *openshiftapiv1.ClusterVersionStatus `json:"clusterVersionStatus,omitempty"`
 
 	// APIURL is the URL where the cluster's API can be accessed.
 	APIURL string `json:"apiURL,omitempty"`

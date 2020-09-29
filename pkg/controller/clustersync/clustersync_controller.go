@@ -930,7 +930,7 @@ func (r *ReconcileClusterSync) setFirstSuccessTime(syncStatuses []hiveintv1alpha
 	}
 	clusterSync.Status.FirstSuccessTime = lastSuccessTime
 	allSyncSetsAppliedDuration := lastSuccessTime.Time.Sub(cd.Status.InstalledTimestamp.Time)
-	logger.Debugf("observed syncsets applied duration: %v seconds", allSyncSetsAppliedDuration.Seconds())
+	logger.Infof("observed syncsets applied duration: %v seconds", allSyncSetsAppliedDuration.Seconds())
 	metricTimeToApplySyncSets.Observe(float64(allSyncSetsAppliedDuration.Seconds()))
 	return
 }

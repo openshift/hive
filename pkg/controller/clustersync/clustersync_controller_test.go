@@ -1729,6 +1729,94 @@ func TestReconcileClusterSync_ConditionNotMutatedWhenMessageNotChanged(t *testin
 	assert.Equal(t, timeInThePast, cond.LastProbeTime, "expected no change in last probe time")
 }
 
+func TestReconcileClusterSync_FirstSuccessTime(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
+	resourceToApply := testConfigMap("dest-namespace", "dest-name")
+	syncSetNew := testsyncset.FullBuilder(testNamespace, "test-syncset-new", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(resourceToApply),
+	)
+	syncSetOld := testsyncset.FullBuilder(testNamespace, "test-syncset-old", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(resourceToApply),
+	)
+	oldFirstSuccessTime := metav1.NewTime(timeInThePast.Time.Add(time.Minute * 10).Truncate(time.Second))
+	existingOldSyncStatus := buildSyncStatus("test-syncset-old",
+		withTransitionInThePast(),
+		withFirstSuccessTime(oldFirstSuccessTime),
+	)
+	existingNewSyncStatus := buildSyncStatus("test-syncset-new",
+		withTransitionInThePast(),
+		withFirstSuccessTimeInThePast(),
+	)
+	clusterSync := clusterSyncBuilder(scheme).Build(
+		testcs.WithSyncSetStatus(existingOldSyncStatus),
+		testcs.WithSyncSetStatus(existingNewSyncStatus),
+	)
+	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, syncSetOld, syncSetNew, clusterSync, syncLease)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset-new", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
+		buildSyncStatus("test-syncset-old", withTransitionInThePast(), withFirstSuccessTime(oldFirstSuccessTime)),
+	}
+	rt.expectUnchangedLeaseRenewTime = true
+	rt.run(t)
+	updatedClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.TODO(), client.ObjectKey{Name: testCDName, Namespace: testNamespace}, updatedClusterSync)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	// ClusterSync.Status.FirstSuccessTime is the oldest SyncStatus.FirstSuccessTime
+	assert.Equal(t, oldFirstSuccessTime, *updatedClusterSync.Status.FirstSuccessTime)
+}
+
+func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithResources(testConfigMap("dest-namespace", "dest-name")),
+	)
+	existingSyncStatus := buildSyncStatus("test-syncset",
+		withTransitionInThePast(),
+		withFailureResult("test apply error"),
+		withNoFirstSuccessTime(),
+	)
+	clusterSync := clusterSyncBuilder(scheme).Build(
+		testcs.WithSyncSetStatus(existingSyncStatus),
+	)
+	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, syncSet, clusterSync, syncLease)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset",
+			withNoFirstSuccessTime(),
+			withFailureResult("failed to apply resource 0: test apply error")),
+	}
+	rt.mockResourceHelper.EXPECT().Apply(gomock.Any()).
+		Return(resource.ApplyResult(""), errors.New("test apply error")).Times(1)
+	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
+	rt.expectUnchangedLeaseRenewTime = true
+	rt.expectRequeue = true
+	rt.run(t)
+	updatedClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.TODO(), client.ObjectKey{Name: testCDName, Namespace: testNamespace}, updatedClusterSync)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	// ClusterSync.Status.FirstSuccessTime remains unset
+	assert.Nil(t, updatedClusterSync.Status.FirstSuccessTime)
+}
+
 func newScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)
@@ -1748,6 +1836,7 @@ func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 				Type:   hivev1.UnreachableCondition,
 				Status: corev1.ConditionFalse,
 			}),
+			testcd.InstalledTimestamp(time.Now()),
 		)
 }
 
@@ -1957,5 +2046,11 @@ func withNoFirstSuccessTime() syncStatusOption {
 func withFirstSuccessTimeInThePast() syncStatusOption {
 	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
 		syncStatus.FirstSuccessTime = &timeInThePast
+	}
+}
+
+func withFirstSuccessTime(firstSuccessTime metav1.Time) syncStatusOption {
+	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
+		syncStatus.FirstSuccessTime = &firstSuccessTime
 	}
 }

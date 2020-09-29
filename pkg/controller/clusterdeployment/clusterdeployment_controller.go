@@ -529,6 +529,15 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Spec.Installed {
+		// set installedTimestamp for adopted clusters
+		if cd.Status.InstalledTimestamp == nil {
+			cd.Status.InstalledTimestamp = &cd.ObjectMeta.CreationTimestamp
+			if err := r.Status().Update(context.TODO(), cd); err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster installed timestamp")
+				return reconcile.Result{Requeue: true}, nil
+			}
+		}
+
 		// update SyncSetFailedCondition status condition
 		cdLog.Info("Check if any syncsets Failed")
 		if err := r.setSyncSetFailedCondition(cd, cdLog); err != nil {

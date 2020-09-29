@@ -204,6 +204,10 @@ func (in *ClusterSyncStatus) DeepCopyInto(out *ClusterSyncStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.FirstSuccessTime != nil {
+		in, out := &in.FirstSuccessTime, &out.FirstSuccessTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

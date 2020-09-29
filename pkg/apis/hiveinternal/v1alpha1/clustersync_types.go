@@ -36,6 +36,10 @@ type ClusterSyncStatus struct {
 	// Conditions is a list of conditions associated with syncing to the cluster.
 	// +optional
 	Conditions []ClusterSyncCondition `json:"conditions,omitempty"`
+
+	// FirstSuccessTime is the time we first successfully applied all (selector)syncsets to a cluster.
+	// +optional
+	FirstSuccessTime *metav1.Time `json:"firstSuccessTime,omitempty"`
 }
 
 // SyncStatus is the status of applying a specific SyncSet or SelectorSyncSet to the cluster.

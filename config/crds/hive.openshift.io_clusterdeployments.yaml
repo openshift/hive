@@ -5,20 +5,26 @@ metadata:
   name: clusterdeployments.hive.openshift.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.clusterName
-    name: ClusterName
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-platform
+    name: Platform
+    type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-region
+    name: Region
     type: string
   - JSONPath: .metadata.labels.hive\.openshift\.io/cluster-type
     name: ClusterType
-    type: string
-  - JSONPath: .spec.baseDomain
-    name: BaseDomain
     type: string
   - JSONPath: .spec.installed
     name: Installed
     type: boolean
   - JSONPath: .spec.clusterMetadata.infraID
     name: InfraID
+    type: string
+  - JSONPath: .metadata.labels.hive\.openshift\.io/version-major-minor-patch
+    name: Version
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='Hibernating')].reason
+    name: PowerState
     type: string
   - JSONPath: .metadata.creationTimestamp
     name: Age

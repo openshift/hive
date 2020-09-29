@@ -97,7 +97,7 @@ function teardown() {
         fi
 
         # This is here for backup. The test-e2e-destroycluster test
-        # should normally delete the clusterdeployemnt. Only if the 
+        # should normally delete the clusterdeployemnt. Only if the
         # test fails before then, this will ensure we at least attempt
         # to delete the cluster.
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
@@ -193,7 +193,7 @@ while [ $i -le ${max_tries} ]; do
 
   GET_BY_SHORT_NAME=$(oc get cd)
 
-  if echo "${GET_BY_SHORT_NAME}" | grep 'BASEDOMAIN' ; then
+  if echo "${GET_BY_SHORT_NAME}" | grep 'INFRAID' ; then
     echo "Success"
     break
   else

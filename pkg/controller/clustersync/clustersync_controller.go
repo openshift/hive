@@ -67,7 +67,7 @@ var (
 	metricTimeToApplySelectorSyncSet = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "hive_selectorsyncset_apply_duration_seconds",
-			Help:    "Time to first successfully apply selector syncset to a cluster",
+			Help:    "Time to first successfully apply each SelectorSyncSet to a new cluster. Does not include results when cluster labels change post-install and new syncsets match.",
 			Buckets: []float64{5, 10, 30, 60, 300, 600, 1800, 3600},
 		},
 		[]string{"name"},
@@ -352,6 +352,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		syncSets,
 		clusterSync.Status.SyncSets,
 		needToDoFullReapply,
+		false, // no need to report SelectorSyncSet metrics if we're reconciling non-selector SyncSets
 		resourceHelper,
 		logger,
 	)
@@ -364,6 +365,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		selectorSyncSets,
 		clusterSync.Status.SelectorSyncSets,
 		needToDoFullReapply,
+		clusterSync.Status.FirstSuccessTime == nil, // only report SelectorSyncSet metrics if we haven't reached first success
 		resourceHelper,
 		logger,
 	)
@@ -422,6 +424,7 @@ func (r *ReconcileClusterSync) applySyncSets(
 	syncSets []CommonSyncSet,
 	syncStatuses []hiveintv1alpha1.SyncStatus,
 	needToDoFullReapply bool,
+	reportSelectorSyncSetMetrics bool,
 	resourceHelper resource.Helper,
 	logger log.FieldLogger,
 ) (newSyncStatuses []hiveintv1alpha1.SyncStatus, requeue bool) {
@@ -517,10 +520,22 @@ func (r *ReconcileClusterSync) applySyncSets(
 				startTime = cond.LastTransitionTime.Time
 			}
 			applyTime := now.Sub(startTime).Seconds()
+
 			if syncSet.AsMetaObject().GetNamespace() == "" {
-				logger.WithField("applyTime", applyTime).Debug("observed first successful apply of SelectorSyncSet for cluster")
-				metricTimeToApplySelectorSyncSet.WithLabelValues(syncSet.AsMetaObject().GetName()).Observe(applyTime)
+				if reportSelectorSyncSetMetrics {
+					// Report SelectorSyncSet metric *only if* we have not yet reached our "everything has applied successfully for the first time"
+					// state. This is to handle situations where a clusters labels change long after it was installed, resulting
+					// in a new SelectorSyncSet matching, and a metric showing days/weeks/months time to first apply. In this scenario
+					// we have no idea when the label was added, and thus it is not currently possible to report the time from
+					// label added to SyncSet successfully applied.
+					logger.WithField("applyTime", applyTime).Debug("observed first successful apply of SelectorSyncSet for cluster")
+					metricTimeToApplySelectorSyncSet.WithLabelValues(syncSet.AsMetaObject().GetName()).Observe(applyTime)
+				} else {
+					logger.Info("skipped observing first successful apply of SelectorSyncSet metric because ClusterSync has a FirstSuccessTime")
+				}
 			} else {
+				// For non-selector SyncSets we have a more accurate startTime, either ClusterDeployment installedTimestamp
+				// or SyncSet creationTimestamp.
 				logger.WithField("applyTime", applyTime).Debug("observed first successful apply of SyncSet for cluster")
 				metricTimeToApplySyncSet.Observe(applyTime)
 			}

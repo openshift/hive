@@ -15,9 +15,15 @@ import (
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 )
 
+type azureParams struct {
+	logLevel      string
+	resourceGroup string
+}
+
 // NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
 func NewDeprovisionAzureCommand() *cobra.Command {
-	var logLevel string
+	var params azureParams
+
 	cmd := &cobra.Command{
 		Use:   "azure INFRAID",
 		Short: "Deprovision Azure assets (as created by openshift-installer)",
@@ -26,7 +32,7 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 			if err := validate(); err != nil {
 				log.WithError(err).Fatal("Failed validating Azure credentials")
 			}
-			uninstaller, err := completeAzureUninstaller(logLevel, args)
+			uninstaller, err := completeAzureUninstaller(args, params)
 			if err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
@@ -36,8 +42,12 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 			}
 		},
 	}
+
 	flags := cmd.Flags()
-	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	flags.StringVar(&params.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	// default of empty string for the resource group means the uninstall will look for a resource group
+	// matching the infra id.
+	flags.StringVar(&params.resourceGroup, "resource-group", "", "name of Azure resource group (if the installer didn't create one)")
 	return cmd
 }
 
@@ -50,10 +60,10 @@ func validate() error {
 	return nil
 }
 
-func completeAzureUninstaller(logLevel string, args []string) (providers.Destroyer, error) {
+func completeAzureUninstaller(args []string, params azureParams) (providers.Destroyer, error) {
 
 	// Set log level
-	level, err := log.ParseLevel(logLevel)
+	level, err := log.ParseLevel(params.logLevel)
 	if err != nil {
 		log.WithError(err).Error("cannot parse log level")
 		return nil, err
@@ -72,7 +82,8 @@ func completeAzureUninstaller(logLevel string, args []string) (providers.Destroy
 		InfraID: args[0],
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			Azure: &installertypesazure.Metadata{
-				CloudName: installertypesazure.PublicCloud,
+				CloudName:         installertypesazure.PublicCloud,
+				ResourceGroupName: params.resourceGroup,
 			},
 		},
 	}

@@ -187,8 +187,12 @@ func azureMachinePowerState(vm compute.VirtualMachine) string {
 }
 
 func clusterDeploymentResourceGroup(cd *hivev1.ClusterDeployment) string {
-	// TODO: Fix this to use explicit resource group name when we
-	// collect that from the installer.
+	// For the case where a specific resource group is specified (eg the cluster was installed
+	// into a pre-existing resource group), use it.
+	if cd.Spec.Platform.Azure != nil && cd.Spec.Platform.Azure.ResourceGroupName != "" {
+		return cd.Spec.Platform.Azure.ResourceGroupName
+	}
+
 	if cd.Spec.ClusterMetadata == nil {
 		return ""
 	}

@@ -1161,7 +1161,7 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.19.0
+# k8s.io/apiserver v0.19.0 => github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/admission/configuration
 k8s.io/apiserver/pkg/admission/initializer
@@ -1776,3 +1776,4 @@ sourcegraph.com/sqs/pbtypes
 # sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20200526112135-319a35b2e38e
 # k8s.io/client-go => k8s.io/client-go v0.19.0
 # github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
+# k8s.io/apiserver => github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df

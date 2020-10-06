@@ -30,7 +30,7 @@ require (
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
-	github.com/openshift/installer v0.9.0-master.0.20200817183917-ab4e753ff30b
+	github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9
 	github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
 	github.com/openshift/machine-api-operator v0.2.1-0.20200429102619-d36974451290
 	github.com/pkg/errors v0.9.1

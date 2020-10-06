@@ -309,7 +309,7 @@ github.com/googleapis/gax-go/v2
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
 github.com/googleapis/gnostic/openapiv2
-# github.com/gophercloud/gophercloud v0.12.0
+# github.com/gophercloud/gophercloud v0.12.1-0.20200821143728-362eb785d617
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/internal
 github.com/gophercloud/gophercloud/openstack
@@ -345,8 +345,9 @@ github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers
 github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
-# github.com/gophercloud/utils v0.0.0-20200508015959-b0167b94122c
+# github.com/gophercloud/utils v0.0.0-20200918191848-da0e919a012a
 github.com/gophercloud/utils/env
+github.com/gophercloud/utils/gnocchi
 github.com/gophercloud/utils/openstack/clientconfig
 # github.com/gostaticanalysis/analysisutil v0.0.0-20190318220348-4088753ea4d3
 github.com/gostaticanalysis/analysisutil
@@ -537,7 +538,7 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
-# github.com/openshift/installer v0.9.0-master.0.20200817183917-ab4e753ff30b
+# github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9
 ## explicit
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/aws

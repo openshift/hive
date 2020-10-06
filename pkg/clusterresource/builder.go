@@ -187,7 +187,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 
 	// TODO: maintain "include secrets" flag functionality? possible this should just be removed
 	if len(o.PullSecret) != 0 {
-		allObjects = append(allObjects, o.generatePullSecretSecret())
+		allObjects = append(allObjects, o.GeneratePullSecretSecret())
 	}
 	if o.SSHPrivateKey != "" {
 		allObjects = append(allObjects, o.generateSSHPrivateKeySecret())
@@ -195,7 +195,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	if o.ServingCertKey != "" && o.ServingCert != "" {
 		allObjects = append(allObjects, o.generateServingCertSecret())
 	}
-	cloudCredsSecret := o.CloudBuilder.generateCredentialsSecret(o)
+	cloudCredsSecret := o.CloudBuilder.GenerateCredentialsSecret(o)
 	if cloudCredsSecret != nil {
 		allObjects = append(allObjects, cloudCredsSecret)
 	}
@@ -248,7 +248,7 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	if o.PullSecret != "" {
-		cd.Spec.PullSecretRef = &corev1.LocalObjectReference{Name: o.getPullSecretSecretName()}
+		cd.Spec.PullSecretRef = &corev1.LocalObjectReference{Name: o.GetPullSecretSecretName()}
 	}
 
 	if len(o.ServingCert) > 0 {
@@ -305,7 +305,7 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	cd.Spec.Provisioning.InstallConfigSecretRef = corev1.LocalObjectReference{Name: o.getInstallConfigSecretName()}
-	o.CloudBuilder.addClusterDeploymentPlatform(o, cd)
+	cd.Spec.Platform = o.CloudBuilder.GetCloudPlatform(o)
 
 	return cd
 }
@@ -396,16 +396,16 @@ func (o *Builder) getInstallConfigSecretName() string {
 	return fmt.Sprintf("%s-install-config", o.Name)
 }
 
-// generatePullSecretSecret returns a Kubernetes Secret containing the pull secret to be
+// GeneratePullSecretSecret returns a Kubernetes Secret containing the pull secret to be
 // used for pulling images.
-func (o *Builder) generatePullSecretSecret() *corev1.Secret {
+func (o *Builder) GeneratePullSecretSecret() *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      o.getPullSecretSecretName(),
+			Name:      o.GetPullSecretSecretName(),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeDockerConfigJson,
@@ -517,15 +517,17 @@ func (o *Builder) getSSHPrivateKeySecretName() string {
 }
 
 // TODO: handle long cluster names.
-func (o *Builder) getPullSecretSecretName() string {
+func (o *Builder) GetPullSecretSecretName() string {
 	return fmt.Sprintf("%s-pull-secret", o.Name)
 }
 
 // CloudBuilder interface exposes the functions we will use to set cloud specific portions of the cluster's resources.
 type CloudBuilder interface {
-	addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment)
 	addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool)
 	addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig)
-	generateCredentialsSecret(o *Builder) *corev1.Secret
 	generateCloudCertificatesSecret(o *Builder) *corev1.Secret
+
+	GetCloudPlatform(o *Builder) hivev1.Platform
+	CredsSecretName(o *Builder) string
+	GenerateCredentialsSecret(o *Builder) *corev1.Secret
 }

@@ -2,10 +2,8 @@ package createcluster
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -21,9 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	"github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azurecredutil "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
@@ -34,7 +31,6 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
-	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -191,11 +187,12 @@ type Options struct {
 	OvirtCACerts         string
 
 	homeDir string
+	log     log.FieldLogger
 }
 
 // NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
 func NewCreateClusterCommand() *cobra.Command {
-	opt := &Options{}
+	opt := &Options{log: log.WithField("command", "create-cluster")}
 
 	opt.homeDir = "."
 
@@ -208,7 +205,7 @@ func NewCreateClusterCommand() *cobra.Command {
 	if _, err := os.Stat(defaultPullSecretFile); os.IsNotExist(err) {
 		defaultPullSecretFile = ""
 	} else if err != nil {
-		log.WithError(err).Errorf("%v can not be used", defaultPullSecretFile)
+		opt.log.WithError(err).Errorf("%v can not be used", defaultPullSecretFile)
 	}
 
 	cmd := &cobra.Command{
@@ -225,14 +222,14 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetLevel(log.InfoLevel)
 			if err := opt.Complete(cmd, args); err != nil {
-				log.WithError(err).Fatal("Error")
+				opt.log.WithError(err).Fatal("Error")
 			}
 			if err := opt.Validate(cmd); err != nil {
-				log.WithError(err).Fatal("Error")
+				opt.log.WithError(err).Fatal("Error")
 			}
 			err := opt.Run()
 			if err != nil {
-				log.WithError(err).Fatal("Error")
+				opt.log.WithError(err).Fatal("Error")
 			}
 		},
 	}
@@ -345,31 +342,31 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 func (o *Options) Validate(cmd *cobra.Command) error {
 	if len(o.Output) > 0 && o.Output != "yaml" && o.Output != "json" {
 		cmd.Usage()
-		log.Info("Invalid value for output. Valid values are: yaml, json.")
+		o.log.Info("Invalid value for output. Valid values are: yaml, json.")
 		return fmt.Errorf("invalid output")
 	}
 	if !o.UseClusterImageSet && len(o.ClusterImageSet) > 0 {
 		cmd.Usage()
-		log.Info("If not using cluster image sets, do not specify the name of one")
+		o.log.Info("If not using cluster image sets, do not specify the name of one")
 		return fmt.Errorf("invalid option")
 	}
 	if len(o.ServingCert) > 0 && len(o.ServingCertKey) == 0 {
 		cmd.Usage()
-		log.Info("If specifying a serving certificate, specify a valid serving certificate key")
+		o.log.Info("If specifying a serving certificate, specify a valid serving certificate key")
 		return fmt.Errorf("invalid serving cert")
 	}
 	if !validClouds[o.Cloud] {
 		cmd.Usage()
-		log.Infof("Unsupported cloud: %s", o.Cloud)
+		o.log.Infof("Unsupported cloud: %s", o.Cloud)
 		return fmt.Errorf("unsupported cloud: %s", o.Cloud)
 	}
 	if o.Cloud == cloudOpenStack {
 		if o.OpenStackAPIFloatingIP == "" {
-			log.Info("Missing openstack-api-floating-ip parameter")
+			o.log.Info("Missing openstack-api-floating-ip parameter")
 			return fmt.Errorf("Missing openstack-api-floating-ip parameter")
 		}
 		if o.OpenStackCloud == "" {
-			log.Info("Missing openstack-cloud parameter")
+			o.log.Info("Missing openstack-cloud parameter")
 			return fmt.Errorf("Missing openstack-cloud parameter")
 		}
 	}
@@ -430,21 +427,21 @@ func (o *Options) Run() error {
 		printObjects(objs, scheme.Scheme, printer)
 		return err
 	}
-	rh, err := o.getResourceHelper()
+	rh, err := utils.GetResourceHelper(o.log)
 	if err != nil {
 		return err
 	}
 	if len(o.Namespace) == 0 {
-		o.Namespace, err = o.defaultNamespace()
+		o.Namespace, err = utils.DefaultNamespace()
 		if err != nil {
-			log.Error("Cannot determine default namespace")
+			o.log.Error("Cannot determine default namespace")
 			return err
 		}
 	}
 	for _, obj := range objs {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
-			log.WithError(err).Errorf("Cannot create accessor for object of type %T", obj)
+			o.log.WithError(err).Errorf("Cannot create accessor for object of type %T", obj)
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)
@@ -456,27 +453,10 @@ func (o *Options) Run() error {
 	return nil
 }
 
-func (o *Options) defaultNamespace() (string, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-	ns, _, err := kubeconfig.Namespace()
-	return ns, err
-}
-
-func (o *Options) getResourceHelper() (resource.Helper, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		log.WithError(err).Error("Cannot get client config")
-		return nil, err
-	}
-	helper := resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "create-cluster"))
-	return helper, nil
-}
-
 // GenerateObjects generates resources for a new cluster deployment
 func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 
-	pullSecret, err := o.getPullSecret()
+	pullSecret, err := utils.GetPullSecret(o.log, o.PullSecret, o.PullSecretFile)
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +549,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	case cloudAzure:
 		creds, err := azurecredutil.GetCreds(o.CredsFile)
 		if err != nil {
-			log.WithError(err).Error("Failed to read in Azure credentials")
+			o.log.WithError(err).Error("Failed to read in Azure credentials")
 			return nil, err
 		}
 
@@ -743,26 +723,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	return result, nil
 }
 
-func (o *Options) getPullSecret() (string, error) {
-	pullSecret := os.Getenv("PULL_SECRET")
-	if len(pullSecret) > 0 {
-		return pullSecret, nil
-	}
-	if len(o.PullSecret) > 0 {
-		return o.PullSecret, nil
-	}
-	if len(o.PullSecretFile) > 0 {
-		data, err := ioutil.ReadFile(o.PullSecretFile)
-		if err != nil {
-			log.Error("Cannot read pull secret file")
-			return "", err
-		}
-		pullSecret = strings.TrimSpace(string(data))
-		return pullSecret, nil
-	}
-	return "", nil
-}
-
 func (o *Options) getSSHPublicKey() (string, error) {
 	sshPublicKey := os.Getenv("PUBLIC_SSH_KEY")
 	if len(sshPublicKey) > 0 {
@@ -774,14 +734,14 @@ func (o *Options) getSSHPublicKey() (string, error) {
 	if len(o.SSHPublicKeyFile) > 0 {
 		data, err := ioutil.ReadFile(o.SSHPublicKeyFile)
 		if err != nil {
-			log.Error("Cannot read SSH public key file")
+			o.log.Error("Cannot read SSH public key file")
 			return "", err
 		}
 		sshPublicKey = strings.TrimSpace(string(data))
 		return sshPublicKey, nil
 	}
 
-	log.Error("Cannot determine SSH key to use")
+	o.log.Error("Cannot determine SSH key to use")
 	return "", nil
 }
 
@@ -789,13 +749,13 @@ func (o *Options) getSSHPrivateKey() (string, error) {
 	if len(o.SSHPrivateKeyFile) > 0 {
 		data, err := ioutil.ReadFile(o.SSHPrivateKeyFile)
 		if err != nil {
-			log.Error("Cannot read SSH private key file")
+			o.log.Error("Cannot read SSH private key file")
 			return "", err
 		}
 		sshPrivateKey := strings.TrimSpace(string(data))
 		return sshPrivateKey, nil
 	}
-	log.Debug("No private SSH key file provided")
+	o.log.Debug("No private SSH key file provided")
 	return "", nil
 }
 
@@ -803,17 +763,17 @@ func (o *Options) getAdditionalTrustBundle() (string, error) {
 	if len(o.AdditionalTrustBundle) > 0 {
 		data, err := ioutil.ReadFile(o.AdditionalTrustBundle)
 		if err != nil {
-			log.Error("Cannot read AdditionalTrustBundle file")
+			o.log.Error("Cannot read AdditionalTrustBundle file")
 			return "", err
 		}
 		if err := validate.CABundle(string(data)); err != nil {
-			log.Error("AdditionalTrustBundle is not valid")
+			o.log.Error("AdditionalTrustBundle is not valid")
 			return "", err
 		}
 		additionalTrustBundle := string(data)
 		return additionalTrustBundle, nil
 	}
-	log.Debug("No AdditionalTrustBundle provided")
+	o.log.Debug("No AdditionalTrustBundle provided")
 	return "", nil
 }
 
@@ -855,7 +815,7 @@ func (o *Options) configureImages(generator *clusterresource.Builder) (*hivev1.C
 			return nil, fmt.Errorf("specify either a release image or a release image source")
 		}
 		var err error
-		o.ReleaseImage, err = determineReleaseImageFromSource(o.ReleaseImageSource)
+		o.ReleaseImage, err = utils.DetermineReleaseImageFromSource(o.ReleaseImageSource)
 		if err != nil {
 			return nil, fmt.Errorf("cannot determine release image: %v", err)
 		}
@@ -977,26 +937,4 @@ func printObjects(objects []runtime.Object, scheme *runtime.Scheme, printer prin
 		meta.SetList(list, objects)
 		typeSetterPrinter.PrintObj(list, os.Stdout)
 	}
-}
-
-type releasePayload struct {
-	PullSpec string `json:"pullSpec"`
-}
-
-func determineReleaseImageFromSource(sourceURL string) (string, error) {
-	resp, err := http.Get(sourceURL)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	payload := &releasePayload{}
-	err = json.Unmarshal(data, payload)
-	if err != nil {
-		return "", err
-	}
-	return payload.PullSpec, nil
 }

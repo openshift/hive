@@ -37,14 +37,14 @@ type OvirtCloudBuilder struct {
 	CACert []byte
 }
 
-func (p *OvirtCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
+func (p *OvirtCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.credsSecretName(o),
+			Name:      p.CredsSecretName(o),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -71,12 +71,12 @@ func (p *OvirtCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.
 	}
 }
 
-func (p *OvirtCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
-	cd.Spec.Platform = hivev1.Platform{
+func (p *OvirtCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
+	return hivev1.Platform{
 		Ovirt: &hivev1ovirt.Platform{
 			ClusterID: p.ClusterID,
 			CredentialsSecretRef: corev1.LocalObjectReference{
-				Name: p.credsSecretName(o),
+				Name: p.CredsSecretName(o),
 			},
 			CertificatesSecretRef: corev1.LocalObjectReference{
 				Name: p.certificatesSecretName(o),
@@ -113,7 +113,7 @@ func (p *OvirtCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 	}
 }
 
-func (p *OvirtCloudBuilder) credsSecretName(o *Builder) string {
+func (p *OvirtCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-ovirt-creds", o.Name)
 }
 

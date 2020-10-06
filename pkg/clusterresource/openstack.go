@@ -39,14 +39,14 @@ type OpenStackCloudBuilder struct {
 	MasterFlavor string
 }
 
-func (p *OpenStackCloudBuilder) generateCredentialsSecret(o *Builder) *corev1.Secret {
+func (p *OpenStackCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.credsSecretName(o),
+			Name:      p.CredsSecretName(o),
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -60,12 +60,12 @@ func (p *OpenStackCloudBuilder) generateCloudCertificatesSecret(o *Builder) *cor
 	return nil
 }
 
-func (p *OpenStackCloudBuilder) addClusterDeploymentPlatform(o *Builder, cd *hivev1.ClusterDeployment) {
-	cd.Spec.Platform = hivev1.Platform{
+func (p *OpenStackCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
+	return hivev1.Platform{
 		OpenStack: &hivev1openstack.Platform{
 			Cloud: p.Cloud,
 			CredentialsSecretRef: corev1.LocalObjectReference{
-				Name: p.credsSecretName(o),
+				Name: p.CredsSecretName(o),
 			},
 		},
 	}
@@ -95,6 +95,6 @@ func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *install
 	}
 }
 
-func (p *OpenStackCloudBuilder) credsSecretName(o *Builder) string {
+func (p *OpenStackCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-openstack-creds", o.Name)
 }

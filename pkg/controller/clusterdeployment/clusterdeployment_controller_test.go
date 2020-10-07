@@ -1443,6 +1443,63 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assertConditionReason(t, cd, hivev1.InstallLaunchErrorCondition, "PodInPendingPhase")
 			},
 		},
+		{
+			name: "install attempts is less than the limit",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Status.InstallRestarts = 1
+					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.NotContains(t, cd.Status.Conditions, hivev1.ProvisionStoppedCondition, "ClusterDeployment should not have ProvisionStopped condition")
+			},
+		},
+		{
+			name: "install attempts is equal to the limit",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Status.InstallRestarts = 2
+					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.ProvisionStoppedCondition, "InstallAttemptsLimitReached")
+			},
+		},
+		{
+			name: "install attempts is greater than the limit",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeployment()
+					cd.Status.InstallRestarts = 3
+					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.ProvisionStoppedCondition, "InstallAttemptsLimitReached")
+			},
+		},
 	}
 
 	for _, test := range tests {

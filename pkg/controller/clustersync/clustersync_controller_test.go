@@ -1817,6 +1817,97 @@ func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
 	assert.Nil(t, updatedClusterSync.Status.FirstSuccessTime)
 }
 
+func TestReconcileClusterSync_SyncToUpsertResourceApplyMode(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	resourcesToApply := testConfigMap("dest-namespace", "dest-name")
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		// ResourceApplyMode is Upsert
+		testsyncset.WithApplyMode(hivev1.UpsertResourceApplyMode),
+		testsyncset.WithGeneration(2),
+		testsyncset.WithResources(resourcesToApply),
+	)
+	existingSyncStatus := buildSyncStatus("test-syncset",
+		withTransitionInThePast(),
+		withFirstSuccessTimeInThePast(),
+		// Existing SyncStatus has ResourcesToDelete
+		withResourcesToDelete(
+			testConfigMapRef("dest-namespace", "dest-name"),
+			// Status contains a resource no longer in SyncSet resources which will not be deleted on the remote cluster
+			testConfigMapRef("deleted-namespace", "deleted-name"),
+		),
+	)
+	clusterSync := clusterSyncBuilder(scheme).Build(
+		testcs.WithSyncSetStatus(existingSyncStatus),
+	)
+	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, clusterSync, syncLease)
+	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourcesToApply)).Return(resource.CreatedApplyResult, nil)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset",
+			withFirstSuccessTimeInThePast(),
+			withObservedGeneration(2),
+		),
+	}
+	rt.expectUnchangedLeaseRenewTime = true
+	rt.run(t)
+
+	updatedClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.TODO(), client.ObjectKey{Name: testCDName, Namespace: testNamespace}, updatedClusterSync)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	// ClusterSync Status for SyncSet has no ResourcesToDelete
+	assert.Empty(t, updatedClusterSync.Status.SyncSets[0].ResourcesToDelete, "expected no resources to delete")
+}
+
+func TestReconcileClusterSync_UpsertToSyncResourceApplyMode(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	resourcesToApply := testConfigMap("dest-namespace", "dest-name")
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		// ResourceApplyMode is Sync
+		testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
+		testsyncset.WithGeneration(2),
+		testsyncset.WithResources(resourcesToApply),
+	)
+	// Existing SyncStatus has no ResourcesToDelete
+	existingSyncStatus := buildSyncStatus("test-syncset",
+		withTransitionInThePast(),
+		withFirstSuccessTimeInThePast(),
+	)
+	clusterSync := clusterSyncBuilder(scheme).Build(
+		testcs.WithSyncSetStatus(existingSyncStatus),
+	)
+	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme, cdBuilder(scheme).Build(), syncSet, clusterSync, syncLease)
+	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourcesToApply)).Return(resource.CreatedApplyResult, nil)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset",
+			withFirstSuccessTimeInThePast(),
+			withObservedGeneration(2),
+			// Expected SyncStatus has ResourcesToDelete
+			withResourcesToDelete(
+				testConfigMapRef("dest-namespace", "dest-name"),
+			),
+		),
+	}
+	rt.expectUnchangedLeaseRenewTime = true
+	rt.run(t)
+
+	updatedClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.TODO(), client.ObjectKey{Name: testCDName, Namespace: testNamespace}, updatedClusterSync)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+}
+
 func newScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)

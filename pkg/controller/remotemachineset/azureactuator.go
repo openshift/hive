@@ -55,10 +55,6 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	if pool.Spec.Platform.Azure == nil {
 		return nil, false, errors.New("MachinePool is not for Azure")
 	}
-	clusterVersion, err := getClusterVersion(cd)
-	if err != nil {
-		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
-	}
 
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
@@ -97,7 +93,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		computePool,
 		imageID,
 		workerRole,
-		workerUserData(clusterVersion),
+		workerUserDataName,
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }

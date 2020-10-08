@@ -96,8 +96,12 @@ Hive requires credentials to the cloud account into which it will install OpenSh
 
 #### AWS
 
-Create a `secret` containing your AWS access key and secret access key:
+Create a `secret` containing your AWS access key and secret access key:  
 
+```bash
+oc create secret generic <mycluster>-aws-creds -n hive --from-literal=aws_access_key_id=<AWS_ACCESS_KEY_ID> --from-literal=aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
+```
+Take care when using the yaml below, you need to use base64 to encode the data values.
 ```yaml
 apiVersion: v1
 data:

@@ -240,6 +240,16 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
 			},
 		},
+		{
+			name: "previously unsupported hibernation, now supported",
+			cd:   cdBuilder.Options(o.unsupported, testcd.WithHibernateAfter(8*time.Hour)).Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
+				assert.Equal(t, "Hibernation capable", cond.Message)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -458,6 +468,13 @@ func (*clusterDeploymentOptions) resuming(cd *hivev1.ClusterDeployment) {
 		Type:   hivev1.ClusterHibernatingCondition,
 		Reason: hivev1.ResumingHibernationReason,
 		Status: corev1.ConditionTrue,
+	})
+}
+func (*clusterDeploymentOptions) unsupported(cd *hivev1.ClusterDeployment) {
+	cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+		Type:   hivev1.ClusterHibernatingCondition,
+		Status: corev1.ConditionFalse,
+		Reason: hivev1.UnsupportedHibernationReason,
 	})
 }
 

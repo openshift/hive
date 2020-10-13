@@ -57,6 +57,7 @@ func TestInstallerPodSpec(t *testing.T) {
 		serviceAccountName string
 		pvcName            string
 		skipGatherLogs     bool
+		extraEnvVars       []corev1.EnvVar
 		validate           func(*testing.T, *corev1.PodSpec, error)
 	}{
 		{
@@ -72,11 +73,21 @@ func TestInstallerPodSpec(t *testing.T) {
 			},
 			provisionName:  "testprovision",
 			skipGatherLogs: true,
+			extraEnvVars: []corev1.EnvVar{
+				{
+					Name:  "TESTVAR",
+					Value: "TESTVAL",
+				},
+			},
 			validate: func(t *testing.T, actualPodSpec *corev1.PodSpec, actualError error) {
 				expectedPodMemoryRequest := resource.MustParse("800Mi")
 				actualPodMemoryRequest := actualPodSpec.Containers[2].Resources.Requests[corev1.ResourceMemory]
 
 				assert.Equal(t, expectedPodMemoryRequest, actualPodMemoryRequest, "Incorrect pod memory request")
+
+				for _, container := range actualPodSpec.Containers {
+					assert.Contains(t, container.Env, corev1.EnvVar{Name: "TESTVAR", Value: "TESTVAL"})
+				}
 				assert.NoError(t, actualError)
 			},
 		},
@@ -92,7 +103,8 @@ func TestInstallerPodSpec(t *testing.T) {
 				test.releaseImage,
 				test.serviceAccountName,
 				test.pvcName,
-				test.skipGatherLogs)
+				test.skipGatherLogs,
+				test.extraEnvVars)
 
 			// Assert
 			test.validate(t, actualPodSpec, actualError)

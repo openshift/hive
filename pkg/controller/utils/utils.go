@@ -5,17 +5,20 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/time/rate"
 	"os"
 	"strconv"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -294,4 +297,26 @@ func EnsureRequeueAtLeastWithin(duration time.Duration, result reconcile.Result,
 		return result, err
 	}
 	return reconcile.Result{RequeueAfter: duration, Requeue: true}, nil
+}
+
+// CopySecret copies the secret defined by src to dest.
+func CopySecret(c client.Client, src, dest types.NamespacedName) error {
+	srcSecret := &corev1.Secret{}
+	if err := c.Get(context.Background(), src, srcSecret); err != nil {
+		return err
+	}
+
+	destSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dest.Name,
+			Namespace: dest.Namespace,
+		},
+		Data: srcSecret.DeepCopy().Data,
+	}
+
+	if err := c.Create(context.Background(), destSecret); err != nil {
+		return err
+	}
+
+	return nil
 }

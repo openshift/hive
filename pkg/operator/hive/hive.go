@@ -110,6 +110,35 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 	hiveContainer.Env = append(hiveContainer.Env, logsEnvVar)
 
+	if instance.Spec.FailedProvisionConfig.AWS != nil {
+		awsSpec := instance.Spec.FailedProvisionConfig.AWS
+
+		// By default we will try to gather logs on failed installs:
+		awsLogsEnvVars := []corev1.EnvVar{
+			{
+				Name:  constants.InstallLogsUploadProviderEnvVar,
+				Value: constants.InstallLogsUploadProviderAWS,
+			},
+			{
+				Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
+				Value: awsSpec.CredentialsSecretRef.Name,
+			},
+			{
+				Name:  constants.InstallLogsAWSRegionEnvVar,
+				Value: awsSpec.Region,
+			},
+			{
+				Name:  constants.InstallLogsAWSServiceEndpointEnvVar,
+				Value: awsSpec.ServiceEndpoint,
+			},
+			{
+				Name:  constants.InstallLogsAWSS3BucketEnvVar,
+				Value: awsSpec.Bucket,
+			},
+		}
+		hiveContainer.Env = append(hiveContainer.Env, awsLogsEnvVars...)
+	}
+
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{
 			Name:  dnsServersEnvVar,

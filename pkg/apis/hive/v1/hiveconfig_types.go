@@ -127,7 +127,8 @@ type FailedProvisionConfig struct {
 
 	// SkipGatherLogs disables functionality that attempts to gather full logs from the cluster if an installation
 	// fails for any reason. The logs will be stored in a persistent volume for up to 7 days.
-	SkipGatherLogs bool `json:"skipGatherLogs,omitempty"`
+	SkipGatherLogs bool                      `json:"skipGatherLogs,omitempty"`
+	AWS            *FailedProvisionAWSConfig `json:"aws,omitempty"`
 }
 
 // ManageDNSConfig contains the domain being managed, and the cloud-specific
@@ -152,6 +153,30 @@ type ManageDNSConfig struct {
 	// As other cloud providers are supported, additional fields will be
 	// added for each of those cloud providers. Only a single cloud provider
 	// may be configured at a time.
+}
+
+// FailedProvisionAWSConfig contains AWS-specific info to upload log files.
+type FailedProvisionAWSConfig struct {
+	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
+	// AWS S3. It will need permission to upload logs to S3.
+	// Secret should have key named "cloud" that contains an AWS credentials formatted file.
+	// Example:
+	//   [default]
+	//   aws_access_key_id = minio
+	//   aws_secret_access_key = minio123
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// Region is the AWS region to use for S3 operations.
+	// This defaults to us-east-1.
+	// For AWS China, use cn-northwest-1.
+	// +optional
+	Region string `json:"region,omitempty"`
+
+	// ServiceEndpoint is the url to connect to an S3 compatible provider.
+	ServiceEndpoint string `json:"serviceEndpoint,omitempty"`
+
+	// Bucket is the S3 bucket to store the logs in.
+	Bucket string `json:"bucket,omitempty"`
 }
 
 // ManageDNSAWSConfig contains AWS-specific info to manage a given domain.

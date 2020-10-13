@@ -56,6 +56,7 @@ const (
 	testSyncsetInstanceName = "testSSI"
 	metadataName            = "foo-lqmsh-metadata"
 	pullSecretSecret        = "pull-secret"
+	installLogSecret        = "install-log-secret"
 	globalPullSecret        = "global-pull-secret"
 	adminKubeconfigSecret   = "foo-lqmsh-admin-kubeconfig"
 	adminKubeconfig         = `clusters:
@@ -1959,11 +1960,15 @@ func testMetadataConfigMap() *corev1.ConfigMap {
 }
 
 func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.Secret {
+	return testSecretWithNamespace(secretType, name, testNamespace, key, value)
+}
+
+func testSecretWithNamespace(secretType corev1.SecretType, name, namespace, key, value string) *corev1.Secret {
 	s := &corev1.Secret{
 		Type: secretType,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: testNamespace,
+			Namespace: namespace,
 		},
 		Data: map[string][]byte{
 			key: []byte(value),
@@ -2317,6 +2322,82 @@ func TestMergePullSecrets(t *testing.T) {
 			if test.mergedPullSecret != "" {
 				assert.Equal(t, test.mergedPullSecret, expetedPullSecret)
 			}
+		})
+	}
+}
+
+func TestCopyInstallLogSecret(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name                    string
+		existingObjs            []runtime.Object
+		existingEnvVars         []corev1.EnvVar
+		expectedErr             bool
+		expectedNumberOfSecrets int
+	}{
+		{
+			name: "copies secret",
+			existingObjs: []runtime.Object{
+				testSecretWithNamespace(corev1.SecretTypeOpaque, installLogSecret, "hive", "cloud", "cloudsecret"),
+			},
+			expectedNumberOfSecrets: 1,
+			existingEnvVars: []corev1.EnvVar{
+				{
+					Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
+					Value: installLogSecret,
+				},
+			},
+		},
+		{
+			name:        "missing secret",
+			expectedErr: true,
+			existingEnvVars: []corev1.EnvVar{
+				{
+					Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
+					Value: installLogSecret,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			rcd := &ReconcileClusterDeployment{
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+			}
+
+			for _, envVar := range test.existingEnvVars {
+				if err := os.Setenv(envVar.Name, envVar.Value); err == nil {
+					defer func() {
+						if err := os.Unsetenv(envVar.Name); err != nil {
+							t.Error(err)
+						}
+					}()
+				} else {
+					t.Error(err)
+				}
+			}
+
+			err := rcd.copyInstallLogSecret(testNamespace, test.existingEnvVars)
+			secretList := &corev1.SecretList{}
+			listErr := rcd.List(context.TODO(), secretList, client.InNamespace(testNamespace))
+
+			if test.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.NoError(t, listErr, "Listing secrets returned an unexpected error")
+			assert.Equal(t, test.expectedNumberOfSecrets, len(secretList.Items), "Number of secrets different than expected")
 		})
 	}
 }

@@ -89,13 +89,6 @@ spec:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
-                    resourceGroupName:
-                      description: ResourceGroupName is used to indicate that the
-                        cluster was installed into an already-existing Azure resource
-                        group (instead of having the installer create the resource
-                        group based on the cluster name). This will be used to indicate
-                        to the uninstall process where it should clean up.
-                      type: string
                   type: object
                 gcp:
                   description: GCP contains GCP-specific deprovision settings

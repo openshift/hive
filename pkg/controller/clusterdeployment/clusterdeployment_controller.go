@@ -1811,7 +1811,6 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 	case cd.Spec.Platform.Azure != nil:
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
 			CredentialsSecretRef: &cd.Spec.Platform.Azure.CredentialsSecretRef,
-			ResourceGroupName:    cd.Spec.Platform.Azure.ResourceGroupName,
 		}
 	case cd.Spec.Platform.GCP != nil:
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{

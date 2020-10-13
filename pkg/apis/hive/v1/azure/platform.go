@@ -18,12 +18,6 @@ type Platform struct {
 
 	// BaseDomainResourceGroupName specifies the resource group where the azure DNS zone for the base domain is found
 	BaseDomainResourceGroupName string `json:"baseDomainResourceGroupName,omitempty"`
-
-	// ResourceGroupName specifies the name of the Azure resource group containing the custer.
-	// This must match the name of the Azure resource group specified in the InstallConfig.
-	// If the name of the Azure resource group is omitted from the InstallConfig, then it must be
-	// omitted here as well.
-	ResourceGroupName string `json:"resourceGroupName,omitempty"`
 }
 
 //SetBaseDomain parses the baseDomainID and sets the related fields on azure.Platform

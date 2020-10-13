@@ -35,7 +35,6 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
-	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
 	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
@@ -129,7 +128,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		validate                func(client.Client, *testing.T)
 		reconcilerSetup         func(*ReconcileClusterDeployment)
 	}{
-
 		{
 			name: "Add finalizer",
 			existing: []runtime.Object{
@@ -1443,44 +1441,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 				assertConditionStatus(t, cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionTrue)
 				assertConditionReason(t, cd, hivev1.InstallLaunchErrorCondition, "PodInPendingPhase")
-			},
-		},
-		{
-			name: "set resourcegroupname for Azure deprovision",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeploymentWithProvision()
-					cd.Spec.Platform.AWS = nil
-					cd.Spec.Platform.Azure = &hivev1azure.Platform{
-						CredentialsSecretRef: corev1.LocalObjectReference{
-							Name: "azure-credentials",
-						},
-						Region:            "centralus",
-						ResourceGroupName: "manual-resourcegroup",
-					}
-					cd.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
-					cd.Labels[hivev1.HiveClusterRegionLabel] = "centralus"
-
-					now := metav1.Now()
-					cd.DeletionTimestamp = &now
-
-					return cd
-				}(),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				require.NotNil(t, cd, "could not get ClusterDeployment")
-
-				deprovisionKey := types.NamespacedName{
-					Name:      cd.Name,
-					Namespace: cd.Namespace,
-				}
-				deprovision := &hivev1.ClusterDeprovision{}
-				err := c.Get(context.TODO(), deprovisionKey, deprovision)
-				require.NoError(t, err, "failed to get ClusterDeprovision")
-
-				assert.Equal(t, "manual-resourcegroup", deprovision.Spec.Platform.Azure.ResourceGroupName)
 			},
 		},
 	}

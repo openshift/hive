@@ -1317,8 +1317,6 @@ github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba
 github.com/openshift/cluster-version-operator v3.11.1-0.20190629164025-08cac1c02538+incompatible/go.mod h1:0BbpR1mrN0F2ZRae5N1XHcytmkvVPaeKgSQwRRBWugc=
 github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480 h1:y47BAJFepK8Xls1c+quIOyc46OXiT9LRiqGVjIaMlSA=
 github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480/go.mod h1:OAHL5WnZphlhVEf5fTdeGLvNwMu1B2zCWpmxJpCA35o=
-github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9 h1:sW+qISOi7iHyXrAdl/lUANiCc4CNrYqjTmyshUyZKMs=
-github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9/go.mod h1:gj5hubG057ciWCCBUq2+BK29ELoySn5H1vSP842n/uU=
 github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe h1:MJqGN0NVONnTLDYPVIEH4uo6i3gAK7LAkhLnyFO8Je0=
 github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe/go.mod h1:NI6xOQGuTnLXeHW8Z2glKSFhF7X+YxlAlqlBMaK0zEM=
 github.com/openshift/machine-api-operator v0.0.0-20190312153711-9650e16c9880/go.mod h1:7HeAh0v04zQn1L+4ItUjvpBQYsm2Nf81WaZLiXTcnkc=
@@ -1589,6 +1587,8 @@ github.com/spf13/viper v1.6.1 h1:VPZzIkznI1YhVMRi6vNFLHSwhnhReBfgTxIPccpfdZk=
 github.com/spf13/viper v1.6.1/go.mod h1:t3iDnF5Jlj76alVNuyFBk5oUMCvsrkbvZK0WQdfDi5k=
 github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df h1:tOLmJyPkBiNtX5vm5bMRIsCwjEljkNeeoB0IBi5V6VU=
 github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df/go.mod h1:XvzqavYj73931x7FLtyagh8WibHpePJ1QwWrSJs2CLk=
+github.com/staebler/installer v0.9.0-master.0.20201010200101-5a09a63bb753 h1:qG3ZoJqMVTCf22CCvxtEGrQ/SrwxuIzzMrrcEQBCFZE=
+github.com/staebler/installer v0.9.0-master.0.20201010200101-5a09a63bb753/go.mod h1:gj5hubG057ciWCCBUq2+BK29ELoySn5H1vSP842n/uU=
 github.com/stoewer/go-strcase v1.0.2/go.mod h1:eLfe5bL3qbL7ep/KafHzthxejrOF5J3xmt03uL5tzek=
 github.com/stoewer/go-strcase v1.1.0/go.mod h1:G7YglbHPK5jX3JcWljxVXRXPh90/dtxfy6xWqxu5b90=
 github.com/streadway/amqp v0.0.0-20190404075320-75d898a42a94/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=

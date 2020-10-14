@@ -202,6 +202,37 @@ spec:
               description: FailedProvisionConfig is used to configure settings related
                 to handling provision failures.
               properties:
+                aws:
+                  description: FailedProvisionAWSConfig contains AWS-specific info
+                    to upload log files.
+                  properties:
+                    bucket:
+                      description: Bucket is the S3 bucket to store the logs in.
+                      type: string
+                    credentialsSecretRef:
+                      description: 'CredentialsSecretRef references a secret in the
+                        TargetNamespace that will be used to authenticate with AWS
+                        S3. It will need permission to upload logs to S3. Secret should
+                        have key named "cloud" that contains an AWS credentials formatted
+                        file. Example:   [default]   aws_access_key_id = minio   aws_secret_access_key
+                        = minio123'
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    region:
+                      description: Region is the AWS region to use for S3 operations.
+                        This defaults to us-east-1. For AWS China, use cn-northwest-1.
+                      type: string
+                    serviceEndpoint:
+                      description: ServiceEndpoint is the url to connect to an S3
+                        compatible provider.
+                      type: string
+                  required:
+                  - credentialsSecretRef
+                  type: object
                 skipGatherLogs:
                   description: SkipGatherLogs disables functionality that attempts
                     to gather full logs from the cluster if an installation fails

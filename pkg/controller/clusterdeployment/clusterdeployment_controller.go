@@ -701,6 +701,8 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		}
 	}
 
+	extraEnvVars := getInstallLogEnvVars(cd.Name)
+
 	podSpec, err := install.InstallerPodSpec(
 		cd,
 		provisionName,
@@ -708,6 +710,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		controllerutils.ServiceAccountName,
 		GetInstallLogsPVCName(cd),
 		skipGatherLogs,
+		extraEnvVars,
 	)
 	if err != nil {
 		cdLog.WithError(err).Error("could not generate installer pod spec")
@@ -743,6 +746,15 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		return reconcile.Result{}, err
 	}
 
+	if err := r.copyInstallLogSecret(provision.Namespace, extraEnvVars); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			// Couldn't copy the install log secret for a reason other than it already exists.
+			// If the secret already exists, then we should just use that secret.
+			cdLog.WithError(err).Error("could not copy install log secret")
+			return reconcile.Result{}, err
+		}
+	}
+
 	r.expectations.ExpectCreations(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(), 1)
 	if err := r.Create(context.TODO(), provision); err != nil {
 		cdLog.WithError(err).Error("could not create provision")
@@ -759,6 +771,78 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, extraEnvVars []corev1.EnvVar) error {
+	hiveNS := controllerutils.GetHiveNamespace()
+
+	srcSecretName, foundSrc := os.LookupEnv(constants.InstallLogsCredentialsSecretRefEnvVar)
+	if !foundSrc {
+		// If the src secret reference wasn't found, then don't attempt to copy the secret.
+		return nil
+	}
+
+	foundDest := false
+	var destSecretName string
+	for _, envVar := range extraEnvVars {
+		if envVar.Name == constants.InstallLogsCredentialsSecretRefEnvVar {
+			destSecretName = envVar.Value
+			foundDest = true
+		}
+	}
+
+	if !foundDest {
+		// If the dest secret reference wasn't found, then don't attempt to copy the secret.
+		return nil
+	}
+
+	src := types.NamespacedName{Name: srcSecretName, Namespace: hiveNS}
+	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
+	return controllerutils.CopySecret(r, src, dest)
+}
+
+func getInstallLogEnvVars(secretPrefix string) []corev1.EnvVar {
+	extraEnvVars := []corev1.EnvVar{}
+
+	cloudProvider, found := os.LookupEnv(constants.InstallLogsUploadProviderEnvVar)
+	if !found {
+		return extraEnvVars
+	}
+
+	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
+		Name:  constants.InstallLogsUploadProviderEnvVar,
+		Value: cloudProvider,
+	})
+
+	if cloudProvider == constants.InstallLogsUploadProviderAWS {
+		secretName, foundSrc := os.LookupEnv(constants.InstallLogsCredentialsSecretRefEnvVar)
+		if foundSrc {
+			extraEnvVars = append(extraEnvVars, corev1.EnvVar{
+				Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
+				Value: secretPrefix + "-" + secretName,
+			})
+		}
+
+		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSRegionEnvVar, extraEnvVars)
+		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSServiceEndpointEnvVar, extraEnvVars)
+		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSS3BucketEnvVar, extraEnvVars)
+	}
+
+	return extraEnvVars
+}
+
+func addEnvVarIfFound(name string, envVars []corev1.EnvVar) []corev1.EnvVar {
+	value, found := os.LookupEnv(name)
+	if !found {
+		return envVars
+	}
+
+	tmp := corev1.EnvVar{
+		Name:  name,
+		Value: value,
+	}
+
+	return append(envVars, tmp)
 }
 
 func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnedErr error) {

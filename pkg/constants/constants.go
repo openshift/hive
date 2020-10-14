@@ -275,6 +275,24 @@ const (
 
 	// AWSCredsMount is the location where the AWS credentials secret is mounted for uninstall pods.
 	AWSCredsMount = "/etc/aws-creds"
+
+	// InstallLogsUploadProviderEnvVar is used to specify which object store provider is being used.
+	InstallLogsUploadProviderEnvVar = "HIVE_INSTALL_LOGS_UPLOAD_PROVIDER"
+
+	// InstallLogsCredentialsSecretRefEnvVar is the environment variable specifying what secret to use for storing logs.
+	InstallLogsCredentialsSecretRefEnvVar = "HIVE_INSTALL_LOGS_CREDENTIALS_SECRET"
+
+	// InstallLogsUploadProviderAWS is used to specify that AWS is the cloud provider to upload logs to.
+	InstallLogsUploadProviderAWS = "aws"
+
+	// InstallLogsAWSRegionEnvVar is the environment variable specifying the region to use with S3
+	InstallLogsAWSRegionEnvVar = "HIVE_INSTALL_LOGS_AWS_REGION"
+
+	// InstallLogsAWSServiceEndpointEnvVar is the environment variable specifying the S3 endpoint to use.
+	InstallLogsAWSServiceEndpointEnvVar = "HIVE_INSTALL_LOGS_AWS_S3_URL"
+
+	// InstallLogsAWSS3BucketEnvVar is the environment variable specifying the S3 bucket to use.
+	InstallLogsAWSS3BucketEnvVar = "HIVE_INSTALL_LOGS_AWS_S3_BUCKET"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

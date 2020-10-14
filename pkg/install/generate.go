@@ -51,6 +51,7 @@ func InstallerPodSpec(
 	serviceAccountName string,
 	pvcName string,
 	skipGatherLogs bool,
+	extraEnvVars []corev1.EnvVar,
 ) (*corev1.PodSpec, error) {
 
 	if cd.Spec.Provisioning == nil {
@@ -72,6 +73,9 @@ func InstallerPodSpec(
 			Value: "hive",
 		},
 	}
+
+	env = append(env, extraEnvVars...)
+
 	volumes := []corev1.Volume{
 		{
 			Name: "output",

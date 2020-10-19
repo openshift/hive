@@ -450,11 +450,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
-	// Clear any provision underway metrics if we're installed or deleted.
-	if cd.Spec.Installed || cd.DeletionTimestamp != nil {
-		clearProvisionUnderwaySecondsMetric(cd, cdLog)
-	}
-
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			// Make sure we have no deprovision underway metric even though this was probably cleared when we
@@ -582,13 +577,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 		return *result, err
 	}
-
-	// Indicate that the cluster is still installing:
-	hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-		cd.Name,
-		cd.Namespace,
-		hivemetrics.GetClusterDeploymentType(cd)).Set(
-		time.Since(cd.CreationTimestamp.Time).Seconds())
 
 	imageSet, err := r.getClusterImageSet(cd, cdLog)
 	if err != nil {
@@ -1866,17 +1854,6 @@ func clearDeprovisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog l
 	})
 	if cleared {
 		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds)
-	}
-}
-
-func clearProvisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
-	cleared := hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds.Delete(map[string]string{
-		"cluster_deployment": cd.Name,
-		"namespace":          cd.Namespace,
-		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd),
-	})
-	if cleared {
-		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentProvisionUnderwaySeconds)
 	}
 }
 

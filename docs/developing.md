@@ -9,6 +9,7 @@
   - [Setting up the development environment](#setting-up-the-development-environment)
     - [Cloning the repository](#cloning-the-repository)
   - [Deploying with Kubernetes In Docker (kind)](#deploying-with-kubernetes-in-docker-kind)
+  - [Deploying with kind and Podman (EXPERIMENTAL)](#deploying-with-kind-and-podman-experimental)
   - [Adopting ClusterDeployments](#adopting-clusterdeployments)
   - [Writing/Testing Code](#writingtesting-code)
     - [Run Hive Operator](#run-hive-operator)
@@ -26,6 +27,7 @@
     - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
   - [Running the e2e test locally](#running-the-e2e-test-locally)
   - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
+  - [Hive Controllers CPU Profiling](#hive-controllers-cpu-profiling)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -70,7 +72,7 @@ git clone https://github.com/openshift/hive.git
 
 [Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. Currently, we support 0.8.1 version of Kind. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
 
-This approach requires [Docker](https://docs.docker.com/install). At present we do not have kind working with podman.
+This approach requires [Docker](https://docs.docker.com/install).
 
 If you encounter ImagePullErrors, and your kind container cannot reach your registry container, you may be experiencing problems with Fedora (at least 32, possibly earlier as well) and Docker. You can attempt to work around this by changing the FirewallBackend in the /etc/firewalld/firewalld.conf file from nftables to iptables and restarting docker. (see [this comment](https://github.com/kubernetes-sigs/kind/issues/1547#issuecomment-623756313)
 
@@ -121,6 +123,44 @@ You can leave your registry container running indefinitely. The kind cluster can
 kind delete cluster --name hive
 ./hack/create-kind-cluster.sh hive
 ```
+
+## Deploying with kind and Podman (EXPERIMENTAL)
+
+The process for running kind with Podman is similar to the Docker environment with some key differences. You will of course need Podman installed and Buildah as well. Last tested with kind v0.9.0.
+
+Create the kind cluster and deploy a local container registry.
+
+```bash
+./hack/create-kind-podman-cluster.sh hive
+```
+
+This will start up a kind cluster and a container registry under the root user (running rootless does not currently work). You should now have a kubeconfig in ~/.kube/hive.kube that can be used to interact with the kind cluster.
+
+You should now see a kind cluster and a container registry running under Podman under root.
+
+```bash
+$ sudo podman ps -a
+CONTAINER ID  IMAGE                                                                                           COMMAND               CREATED     STATUS         PORTS                      NAMES
+7a7ef66cdc70  docker.io/kindest/node@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600                        3 days ago  Up 3 days ago  127.0.0.1:38191->6443/tcp  hive-control-plane
+148e174d9634  docker.io/library/registry:2                                                                    /etc/docker/regis...  3 days ago  Up 3 days ago  0.0.0.0:5000->5000/tcp     kind-podman-registry
+```
+
+Build hive and push to the local container registry.
+
+```bash
+IMG=localhost:5000/hive:latest make buildah-dev-push
+```
+
+Reference the docs above for running kind with Docker to see how to install `cfssl`, how to deploy with `make deploy`, and how to sign certifcates for the admission webhooks.
+
+To bring down the kind cluster:
+
+```bash
+$ sudo KIND_EXPERIMENTAL_PROVIER="podman" kind delete cluster --name hive
+```
+
+You can stop/rm the container registry as you would any podman container (eg `sudo podman stop CONTAINER-ID`).
+
 
 ## Adopting ClusterDeployments
 

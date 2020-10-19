@@ -150,6 +150,11 @@ deploy: install
 	# Create a default basic HiveConfig so the operator will deploy Hive
 	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -
 
+deployfromtemplates: install
+	oc create namespace ${HIVE_OPERATOR_NS} || true
+	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -p DEPLOY_IMAGE=${DEPLOY_IMAGE} -f config/templates/hive-deploy-template.yaml | oc apply -f -
+	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -
+
 verify-codegen:
 	bash -x hack/verify-codegen.sh
 verify: verify-codegen

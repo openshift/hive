@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
@@ -250,7 +251,10 @@ type ReconcileClusterSync struct {
 // applied or re-applied.
 func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
-	logger := r.logger.WithField("ClusterDeployment", request.NamespacedName)
+	logger := r.logger.WithFields(log.Fields{
+		"clusterDeployment": request.NamespacedName,
+		"reconcileID":       utilrand.String(8), // not a true UUID, just a short random string to help us search logs
+	})
 
 	logger.Infof("reconciling ClusterDeployment")
 	defer func() {

@@ -1,10 +1,10 @@
-FROM openshift/origin-release:golang-1.15 as builder
+FROM registry.svc.ci.openshift.org/openshift/release:golang-1.15 as builder
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN make build
 
-FROM centos:7
+FROM quay.io/app-sre/centos:7
 
 # CentOS images do not get updates as they are meant to mirror ISO content, and thus this update
 # is strongly recommended for security updates.

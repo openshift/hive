@@ -123,9 +123,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, cdLog)
 	}()
 
 	cd := &hivev1.ClusterDeployment{}

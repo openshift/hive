@@ -108,9 +108,7 @@ func (r *ReconcileClusterPoolNamespace) Reconcile(request reconcile.Request) (re
 
 	logger.Info("reconciling namespace")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, logger)
 	}()
 
 	// Fetch the Namespace instance

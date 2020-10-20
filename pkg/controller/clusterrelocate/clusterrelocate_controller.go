@@ -162,9 +162,7 @@ func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconci
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	logger.Info("reconciling cluster deployment")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, logger)
 	}()
 
 	// Fetch the ClusterDeployment instance

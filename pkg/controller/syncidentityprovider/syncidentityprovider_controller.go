@@ -179,9 +179,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	contextLogger.Info("reconciling syncidentityproviders and clusterdeployments")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		contextLogger.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, contextLogger)
 	}()
 
 	// Fetch the ClusterDeployment instance

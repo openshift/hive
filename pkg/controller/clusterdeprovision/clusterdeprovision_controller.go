@@ -157,9 +157,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	rLog.Info("reconciling cluster deprovision request")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		rLog.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, rLog)
 	}()
 
 	// Fetch the ClusterDeprovision instance

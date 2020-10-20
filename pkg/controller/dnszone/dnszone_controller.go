@@ -137,9 +137,7 @@ func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Resul
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	dnsLog.Info("reconciling dns zone")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		dnsLog.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, dnsLog)
 	}()
 
 	// Fetch the DNSZone object

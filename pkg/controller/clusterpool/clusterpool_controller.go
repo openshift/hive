@@ -133,9 +133,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 
 	logger.Infof("reconciling cluster pool")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, logger)
 	}()
 
 	// Fetch the ClusterPool instance

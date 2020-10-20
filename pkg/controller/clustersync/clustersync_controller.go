@@ -256,11 +256,12 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		"reconcileID":       utilrand.String(8), // not a true UUID, just a short random string to help us search logs
 	})
 
+	// action will be logged to help identify the type of action taken during a reconcile loop:
+	outcome := hivemetrics.ReconcileOutcomeNoOp
+
 	logger.Infof("reconciling ClusterDeployment")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, outcome, logger)
 	}()
 
 	// Fetch the ClusterDeployment instance
@@ -316,6 +317,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 			return reconcile.Result{}, err
 		}
 		// requeue immediately so that we reconcile soon after the ClusterSync is created
+		outcome = hivemetrics.ReconcileClusterSyncCreated
 		return reconcile.Result{Requeue: true}, nil
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
@@ -348,6 +350,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	if needToDoFullReapply {
 		logger.Info("need to reapply all syncsets")
 	}
+	outcome = hivemetrics.ReconcileOutcomeFullSync
 
 	// Apply SyncSets
 	syncStatusesForSyncSets, syncSetsNeedRequeue := r.applySyncSets(

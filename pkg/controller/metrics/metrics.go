@@ -96,17 +96,30 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
-	// MetricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
+	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
-	MetricControllerReconcileTime = prometheus.NewHistogramVec(
+	metricControllerReconcileTime = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "hive_controller_reconcile_seconds",
 			Help:    "Distribution of the length of time each controllers reconcile loop takes.",
 			Buckets: []float64{0.001, 0.01, 0.1, 1, 10, 30, 60, 120},
 		},
-		[]string{"controller"},
+		[]string{"controller", "outcome"},
 	)
+)
+
+// ReconcileOutcome is used in controller "reconcile complete" log entries, and the metricControllerReconcileTime
+// above for controllers where we would like to monitor performance for different types of Reconcile outcomes. To help with
+// prometheus cardinality this set of outcomes should be kept small and only used for coarse and very high value
+// categories. Controllers must report an outcome but can report unspecified if this categorization is not needed.
+type ReconcileOutcome string
+
+const (
+	ReconcileOutcomeUnspecified ReconcileOutcome = "unspecified"
+	ReconcileOutcomeNoOp        ReconcileOutcome = "no-op"
+	ReconcileOutcomeFullSync    ReconcileOutcome = "full-sync"
+	ReconcileClusterSyncCreated ReconcileOutcome = "clustersync-created"
 )
 
 func init() {
@@ -122,7 +135,7 @@ func init() {
 	metrics.Registry.MustRegister(metricSelectorSyncSetClustersUnappliedTotal)
 	metrics.Registry.MustRegister(metricSyncSetsTotal)
 	metrics.Registry.MustRegister(metricSyncSetsUnappliedTotal)
-	metrics.Registry.MustRegister(MetricControllerReconcileTime)
+	metrics.Registry.MustRegister(metricControllerReconcileTime)
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentProvisionUnderwaySeconds)
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
@@ -164,9 +177,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		start := time.Now()
 		mcLog := log.WithField("controller", "metrics")
 		defer func() {
-			dur := time.Since(start)
-			MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-			mcLog.WithField("elapsed", dur).Info("reconcile complete")
+			ObserveControllerReconcileTime(ControllerName.String(), start, ReconcileOutcomeUnspecified, mcLog)
 		}()
 
 		mcLog.Info("calculating metrics across all ClusterDeployments")
@@ -580,4 +591,12 @@ func GetClusterDeploymentType(obj metav1.Object) string {
 		return typeStr
 	}
 	return hivev1.DefaultClusterType
+}
+
+// ObserveControllerReconcileTime is used by all controllers in a defer block to log and report their elapsed time and
+// optionally an outcome in a consistent fashion.
+func ObserveControllerReconcileTime(controller string, start time.Time, outcome ReconcileOutcome, logger log.FieldLogger) {
+	dur := time.Since(start)
+	metricControllerReconcileTime.WithLabelValues(controller, string(outcome)).Observe(dur.Seconds())
+	logger.WithFields(log.Fields{"elapsed": dur, "outcome": outcome}).Info("reconcile complete")
 }

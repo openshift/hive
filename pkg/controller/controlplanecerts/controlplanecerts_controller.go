@@ -127,9 +127,7 @@ func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (recon
 
 	cdLog.Info("reconciling cluster deployment")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		cdLog.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, cdLog)
 	}()
 
 	// Fetch the ClusterDeployment instance

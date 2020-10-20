@@ -164,9 +164,7 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result rec
 
 	logger.Infof("reconciling cluster claim")
 	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
+		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, logger)
 	}()
 
 	// Fetch the ClusterClaim instance

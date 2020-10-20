@@ -305,9 +305,6 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		}
 
 		mc.calculateSelectorSyncSetMetrics(mcLog)
-
-		elapsed := time.Since(start)
-		mcLog.WithField("elapsed", elapsed).Info("metrics calculation complete")
 	}, mc.Interval, stopCh)
 
 	return nil
@@ -598,5 +595,5 @@ func GetClusterDeploymentType(obj metav1.Object) string {
 func ObserveControllerReconcileTime(controller string, start time.Time, outcome ReconcileOutcome, logger log.FieldLogger) {
 	dur := time.Since(start)
 	metricControllerReconcileTime.WithLabelValues(controller, string(outcome)).Observe(dur.Seconds())
-	logger.WithFields(log.Fields{"elapsed": dur, "outcome": outcome}).Info("reconcile complete")
+	logger.WithFields(log.Fields{"elapsedMillis": dur.Milliseconds(), "outcome": outcome}).Info("reconcile complete")
 }

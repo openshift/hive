@@ -117,6 +117,15 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	if err == nil && pathErr == nil {
 		metricKubeClientRequests.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Inc()
 		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Observe(applyTime)
+		if applyTime >= 5.0 {
+			log.WithFields(log.Fields{
+				"controller": cmt.Controller.String(),
+				"method":     req.Method,
+				"path":       path,
+				"remote":     remoteStr,
+				"status":     resp.Status,
+			}).Warn("slow client request")
+		}
 	}
 
 	return resp, err

@@ -98,7 +98,7 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 		},
 	}
 
-	// Used for both control plane and workers.
+	// Default configuration
 	mpp := &awsinstallertypes.MachinePool{
 		InstanceType: awsInstanceType,
 		EC2RootVolume: awsinstallertypes.EC2RootVolume{
@@ -107,9 +107,19 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 			Type: volumeType,
 		},
 	}
-	ic.ControlPlane.Platform.AWS = mpp
-	ic.Compute[0].Platform.AWS = mpp
 
+	// Use supplied machinepool configuration if possible
+	if (o.ControlPlaneMachinePool != installertypes.MachinePoolPlatform{}) {
+		ic.ControlPlane.Platform.AWS = o.ControlPlaneMachinePool.AWS
+	} else {
+		ic.ControlPlane.Platform.AWS = mpp
+	}
+
+	if (o.WorkerMachinePool != installertypes.MachinePoolPlatform{}) {
+		ic.Compute[0].Platform.AWS = o.WorkerMachinePool.AWS
+	} else {
+		ic.Compute[0].Platform.AWS = mpp
+	}
 }
 
 func (p *AWSCloudBuilder) CredsSecretName(o *Builder) string {

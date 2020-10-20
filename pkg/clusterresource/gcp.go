@@ -93,12 +93,23 @@ func (p *GCPCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 		},
 	}
 
-	// Used for both control plane and workers.
+	// Default configuration
 	mpp := &installergcp.MachinePool{
 		InstanceType: gcpInstanceType,
 	}
-	ic.ControlPlane.Platform.GCP = mpp
-	ic.Compute[0].Platform.GCP = mpp
+
+	// Use supplied machinepool configuration if possible
+	if (o.ControlPlaneMachinePool != installertypes.MachinePoolPlatform{}) {
+		ic.ControlPlane.Platform.GCP = o.ControlPlaneMachinePool.GCP
+	} else {
+		ic.ControlPlane.Platform.GCP = mpp
+	}
+
+	if (o.WorkerMachinePool != installertypes.MachinePoolPlatform{}) {
+		ic.Compute[0].Platform.GCP = o.WorkerMachinePool.GCP
+	} else {
+		ic.Compute[0].Platform.GCP = mpp
+	}
 }
 
 func (p *GCPCloudBuilder) CredsSecretName(o *Builder) string {

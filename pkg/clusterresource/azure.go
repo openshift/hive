@@ -92,10 +92,22 @@ func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 		},
 	}
 
-	// Used for both control plane and workers.
+	// Default configuration
 	mpp := &azureinstallertypes.MachinePool{}
-	ic.ControlPlane.Platform.Azure = mpp
-	ic.Compute[0].Platform.Azure = mpp
+
+	// Use supplied machinepool configuration if possible
+	if (o.ControlPlaneMachinePool != installertypes.MachinePoolPlatform{}) {
+		ic.ControlPlane.Platform.Azure = o.ControlPlaneMachinePool.Azure
+	} else {
+		ic.ControlPlane.Platform.Azure = mpp
+	}
+
+	if (o.WorkerMachinePool != installertypes.MachinePoolPlatform{}) {
+		ic.Compute[0].Platform.Azure = o.WorkerMachinePool.Azure
+	} else {
+		ic.Compute[0].Platform.Azure = mpp
+	}
+
 }
 
 func (p *AzureCloudBuilder) CredsSecretName(o *Builder) string {

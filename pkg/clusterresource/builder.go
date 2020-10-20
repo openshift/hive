@@ -118,6 +118,12 @@ type Builder struct {
 	// AdditionalTrustBundle is a PEM-encoded X.509 certificate bundle
 	// that will be added to the nodes' trusted certificate store.
 	AdditionalTrustBundle string
+
+	// Allows passing in specifications for the machinepool that is created for the workers
+	WorkerMachinePool installertypes.MachinePoolPlatform
+
+	// Allows passing in specifications for the machinepool that is created for the control plane
+	ControlPlaneMachinePool installertypes.MachinePoolPlatform
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -371,6 +377,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 }
 
 func (o *Builder) generateMachinePool() *hivev1.MachinePool {
+	// HK TODO Handle machinepool input
 	mp := &hivev1.MachinePool{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "MachinePool",

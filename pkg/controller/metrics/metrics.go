@@ -595,5 +595,17 @@ func GetClusterDeploymentType(obj metav1.Object) string {
 func ObserveControllerReconcileTime(controller string, start time.Time, outcome ReconcileOutcome, logger log.FieldLogger) {
 	dur := time.Since(start)
 	metricControllerReconcileTime.WithLabelValues(controller, string(outcome)).Observe(dur.Seconds())
-	logger.WithFields(log.Fields{"elapsedMillis": dur.Milliseconds(), "outcome": outcome}).Info("reconcile complete")
+	fields := log.Fields{"elapsedMillis": dur.Milliseconds(), "outcome": outcome}
+	// Add a log field to categorize request duration into buckets. We can't easily query > in Kibana in
+	// OpenShift deployments due to logging limitations, so these constant buckets give us a small number of
+	// constant search strings we can use to identify slow reconcile loops.
+	for _, millis := range elapsedDurationBuckets {
+		if dur.Milliseconds() >= millis {
+			fields["elapsedMillisGT"] = millis
+			break
+		}
+	}
+	logger.WithFields(fields).Info("reconcile complete")
 }
+
+var elapsedDurationBuckets = []int64{120000, 60000, 30000, 10000, 5000, 1000, 0}

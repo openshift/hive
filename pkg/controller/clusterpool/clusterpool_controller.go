@@ -298,15 +298,17 @@ func (r *ReconcileClusterPool) createCluster(
 
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
-		Name:             ns.Name,
-		Namespace:        ns.Name,
-		BaseDomain:       clp.Spec.BaseDomain,
-		ImageSet:         clp.Spec.ImageSetRef.Name,
-		WorkerNodesCount: int64(3),
-		MachineNetwork:   "10.0.0.0/16",
-		PullSecret:       pullSecret,
-		CloudBuilder:     cloudBuilder,
-		Labels:           clp.Spec.Labels,
+		Name:                    ns.Name,
+		Namespace:               ns.Name,
+		BaseDomain:              clp.Spec.BaseDomain,
+		ImageSet:                clp.Spec.ImageSetRef.Name,
+		WorkerNodesCount:        int64(3),
+		MachineNetwork:          "10.0.0.0/16",
+		PullSecret:              pullSecret,
+		CloudBuilder:            cloudBuilder,
+		Labels:                  clp.Spec.Labels,
+		ControlPlaneMachinePool: clp.Spec.ControlPlaneMachinePool,
+		WorkerMachinePool:       clp.Spec.WorkerMachinePool,
 	}
 
 	objs, err := builder.Build()

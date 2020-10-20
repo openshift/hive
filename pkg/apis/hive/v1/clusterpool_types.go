@@ -1,6 +1,7 @@
 package v1
 
 import (
+	installertypes "github.com/openshift/installer/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,6 +34,14 @@ type ClusterPoolSpec struct {
 	// claimed will not be affected when this value is modified.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// WorkerMachinePool allows defining a machinepool declaration for new worker nodes
+	// +optional
+	WorkerMachinePool installertypes.MachinePoolPlatform `json:"workerMachinePool,omitempty"`
+
+	// ControlPlaneMachineConfig allows defining a machinepool declaration for control plane nodes
+	// +optional
+	ControlPlaneMachinePool installertypes.MachinePoolPlatform `json:"controlPlaneMachinePool,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

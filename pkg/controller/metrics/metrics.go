@@ -599,7 +599,7 @@ func ObserveControllerReconcileTime(controller string, start time.Time, outcome 
 	// Add a log field to categorize request duration into buckets. We can't easily query > in Kibana in
 	// OpenShift deployments due to logging limitations, so these constant buckets give us a small number of
 	// constant search strings we can use to identify slow reconcile loops.
-	for _, millis := range elapsedDurationBuckets {
+	for _, millis := range elapsedDurationMillisBuckets {
 		if dur.Milliseconds() >= millis {
 			fields["elapsedMillisGT"] = millis
 			break
@@ -608,4 +608,4 @@ func ObserveControllerReconcileTime(controller string, start time.Time, outcome 
 	logger.WithFields(fields).Info("reconcile complete")
 }
 
-var elapsedDurationBuckets = []int64{120000, 60000, 30000, 10000, 5000, 1000, 0}
+var elapsedDurationMillisBuckets = []int64{120_000, 60_000, 30_000, 10_000, 5_000, 1_000, 0}

@@ -307,8 +307,8 @@ func (r *ReconcileClusterPool) createCluster(
 		PullSecret:              pullSecret,
 		CloudBuilder:            cloudBuilder,
 		Labels:                  clp.Spec.Labels,
-		ControlPlaneMachinePool: clp.Spec.ControlPlaneMachinePool,
-		WorkerMachinePool:       clp.Spec.WorkerMachinePool,
+		ControlPlaneMachinePoolPlatform: clp.Spec.ControlPlaneMachinePoolPlatform,
+		WorkerMachinePoolPlatform:       clp.Spec.WorkerMachinePoolPlatform,
 	}
 
 	objs, err := builder.Build()

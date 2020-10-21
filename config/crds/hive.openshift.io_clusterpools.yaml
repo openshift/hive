@@ -52,12 +52,8 @@ spec:
         spec:
           description: ClusterPoolSpec defines the desired state of the ClusterPool.
           properties:
-            baseDomain:
-              description: BaseDomain is the base domain to use for all clusters created
-                in this pool.
-              type: string
-            controlPlaneMachinePool:
-              description: ControlPlaneMachineConfig allows defining a machinepool
+            ControlPlaneMachinePoolPlatform:
+              description: ControlPlaneMachinePoolPlatform allows defining a machinepool
                 declaration for control plane nodes
               properties:
                 aws:
@@ -311,6 +307,10 @@ spec:
                       type: object
                   type: object
               type: object
+            baseDomain:
+              description: BaseDomain is the base domain to use for all clusters created
+                in this pool.
+              type: string
             imageSetRef:
               description: ImageSetRef is a reference to a ClusterImageSet. The release
                 image specified in the ClusterImageSet will be used by clusters created
@@ -570,8 +570,8 @@ spec:
               minimum: 0
               type: integer
             workerMachinePool:
-              description: WorkerMachinePool allows defining a machinepool declaration
-                for new worker nodes
+              description: WorkerMachinePoolPlatform allows defining a machinepool
+                declaration for new worker nodes
               properties:
                 aws:
                   description: AWS is the configuration used when installing on AWS.

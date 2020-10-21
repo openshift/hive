@@ -35,13 +35,13 @@ type ClusterPoolSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// WorkerMachinePool allows defining a machinepool declaration for new worker nodes
+	// WorkerMachinePoolPlatform allows defining a machinepool declaration for new worker nodes
 	// +optional
-	WorkerMachinePool installertypes.MachinePoolPlatform `json:"workerMachinePool,omitempty"`
+	WorkerMachinePoolPlatform installertypes.MachinePoolPlatform `json:"workerMachinePool,omitempty"`
 
-	// ControlPlaneMachineConfig allows defining a machinepool declaration for control plane nodes
+	// ControlPlaneMachinePoolPlatform allows defining a machinepool declaration for control plane nodes
 	// +optional
-	ControlPlaneMachinePool installertypes.MachinePoolPlatform `json:"controlPlaneMachinePool,omitempty"`
+	ControlPlaneMachinePoolPlatform installertypes.MachinePoolPlatform `json:"ControlPlaneMachinePoolPlatform,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

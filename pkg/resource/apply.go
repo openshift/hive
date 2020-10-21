@@ -3,7 +3,11 @@ package resource
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"math/rand"
+	"net/http"
+	"os"
 
 	"github.com/jonboulle/clockwork"
 
@@ -55,6 +59,15 @@ func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 	if err != nil {
 		r.logger.WithError(err).Error("failed to setup apply command")
 		return "", err
+	}
+
+	// fakeApply mode (used in scale testing only) doesn't run the apply. Instead it will contact a dummy http server
+	// to simulate i/o wait
+	fakeApplyEnvVarKey := "HIVE_SYNCSETS_FAKE_APPLY_URL"
+	fakeApplyURL, exists := os.LookupEnv(fakeApplyEnvVarKey)
+	if exists {
+		r.fakeApply(fakeApplyURL)
+		return ConfiguredApplyResult, nil
 	}
 	err = applyOptions.Run()
 	if err != nil {
@@ -125,10 +138,32 @@ func (r *helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme)
 	return r.Create(data)
 }
 
+func (r *helper) fakeApply(fakeApplyURL string) {
+	// do a GET to http://httpwait-default.apps.gshereme-spoke-1.new-installer.openshift.com/?wait=3000
+	// use a random wait time
+	in := []int{100, 200, 300, 100, 200, 300, 100, 200, 300, 100, 200, 300, 500, 500, 3000, 100, 200, 300, 100, 200, 300, 100, 200, 300, 100, 200, 300, 500, 500, 3000, 100, 200, 300, 100, 200, 300, 100, 200, 300, 100, 200, 300, 500, 500, 30000}
+	randomIndex := rand.Intn(len(in))
+	wait := in[randomIndex]
+
+	r.logger.Debug("running fake apply for ", wait, "ms")
+	url := fmt.Sprintf("%s%d", fakeApplyURL, wait)
+	r.logger.Debug("getting ", url)
+	resp, err := http.Get(url)
+	if err != nil {
+		r.logger.Debug("err: ", err)
+	}
+	defer resp.Body.Close()
+
+	r.logger.Debug("Response status: ", resp.Status)
+}
+
 func (r *helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {
 	info, err := r.getResourceInternalInfo(f, obj)
 	if err != nil {
 		return "", err
+	}
+	if info == nil {
+		r.logger.Debug("err getting info")
 	}
 	c, err := f.DynamicClient()
 	if err != nil {

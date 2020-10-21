@@ -127,18 +127,10 @@ type ReconcileDNSZone struct {
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
 // and what is in the DNSZone.Spec
 func (r *ReconcileDNSZone) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	dnsLog := r.logger.WithFields(log.Fields{
-		"controller": ControllerName,
-		"dnszone":    request.Name,
-		"namespace":  request.Namespace,
-	})
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	dnsLog := controllerutils.BuildControllerLogger(ControllerName, "dnsZone", request.NamespacedName)
 	dnsLog.Info("reconciling dns zone")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, dnsLog)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, dnsLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the DNSZone object
 	desiredState := &hivev1.DNSZone{}

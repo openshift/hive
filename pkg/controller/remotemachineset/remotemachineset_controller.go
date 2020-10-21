@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -176,15 +175,10 @@ type ReconcileRemoteMachineSet struct {
 // Reconcile reads that state of the cluster for a MachinePool object and makes changes to the
 // remote cluster MachineSets based on the state read
 func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithFields(log.Fields{
-		"machinePool": request.Name,
-		"namespace":   request.Namespace,
-	})
+	logger := controllerutils.BuildControllerLogger(ControllerName, "machinePool", request.NamespacedName)
 	logger.Info("reconciling machine pool")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, logger)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the MachinePool instance
 	pool := &hivev1.MachinePool{}

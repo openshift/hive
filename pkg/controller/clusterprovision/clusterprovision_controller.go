@@ -8,8 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +31,7 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
 const (
@@ -145,14 +144,10 @@ type ReconcileClusterProvision struct {
 // Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read
 // and what is in the ClusterProvision.Spec
 func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	pLog := r.logger.WithField("name", request.NamespacedName)
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	pLog := controllerutils.BuildControllerLogger(ControllerName, "clusterProvision", request.NamespacedName)
 	pLog.Info("reconciling cluster provision")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, pLog)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, pLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterProvision instance
 	instance := &hivev1.ClusterProvision{}

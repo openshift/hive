@@ -280,18 +280,10 @@ type ReconcileClusterDeployment struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 //
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
-	start := time.Now()
-	cdLog := r.logger.WithFields(log.Fields{
-		"controller":        ControllerName,
-		"clusterDeployment": request.Name,
-		"namespace":         request.Namespace,
-	})
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, cdLog)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}

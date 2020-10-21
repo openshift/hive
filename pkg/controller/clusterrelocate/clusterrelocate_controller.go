@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -153,17 +151,10 @@ type ReconcileClusterRelocate struct {
 
 // Reconcile relocates ClusterDeployments matching with a ClusterRelocate to another Hive instance.
 func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithFields(log.Fields{
-		"controller":        ControllerName,
-		"clusterDeployment": request.NamespacedName.String(),
-	})
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Info("reconciling cluster deployment")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, logger)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}

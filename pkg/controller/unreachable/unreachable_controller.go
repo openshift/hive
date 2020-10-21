@@ -113,18 +113,10 @@ type ReconcileRemoteMachineSet struct {
 
 // Reconcile checks if we can establish an API client connection to the remote cluster and maintains the unreachable condition as a result.
 func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	cdLog := log.WithFields(log.Fields{
-		"clusterDeployment": request.Name,
-		"namespace":         request.Namespace,
-		"controller":        ControllerName,
-	})
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, cdLog)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)

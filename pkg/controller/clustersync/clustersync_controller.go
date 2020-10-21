@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
@@ -250,19 +249,12 @@ type ReconcileClusterSync struct {
 // Reconcile reads the state of the ClusterDeployment and applies any SyncSets or SelectorSyncSets that need to be
 // applied or re-applied.
 func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithFields(log.Fields{
-		"clusterDeployment": request.NamespacedName,
-		"reconcileID":       utilrand.String(8), // not a true UUID, just a short random string to help us search logs
-	})
-
-	// action will be logged to help identify the type of action taken during a reconcile loop:
-	outcome := hivemetrics.ReconcileOutcomeNoOp
-
+	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Infof("reconciling ClusterDeployment")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, outcome, logger)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
+
+	recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeNoOp)
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
@@ -316,8 +308,8 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
 			return reconcile.Result{}, err
 		}
+		recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeClusterSyncCreated)
 		// requeue immediately so that we reconcile soon after the ClusterSync is created
-		outcome = hivemetrics.ReconcileClusterSyncCreated
 		return reconcile.Result{Requeue: true}, nil
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
@@ -350,7 +342,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	if needToDoFullReapply {
 		logger.Info("need to reapply all syncsets")
 	}
-	outcome = hivemetrics.ReconcileOutcomeFullSync
+	recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeFullSync)
 
 	// Apply SyncSets
 	syncStatusesForSyncSets, syncSetsNeedRequeue := r.applySyncSets(

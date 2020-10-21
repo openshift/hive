@@ -116,10 +116,10 @@ var (
 type ReconcileOutcome string
 
 const (
-	ReconcileOutcomeUnspecified ReconcileOutcome = "unspecified"
-	ReconcileOutcomeNoOp        ReconcileOutcome = "no-op"
-	ReconcileOutcomeFullSync    ReconcileOutcome = "full-sync"
-	ReconcileClusterSyncCreated ReconcileOutcome = "clustersync-created"
+	ReconcileOutcomeUnspecified        ReconcileOutcome = "unspecified"
+	ReconcileOutcomeNoOp               ReconcileOutcome = "no-op"
+	ReconcileOutcomeFullSync           ReconcileOutcome = "full-sync"
+	ReconcileOutcomeClusterSyncCreated ReconcileOutcome = "clustersync-created"
 )
 
 func init() {
@@ -174,11 +174,9 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 
 	// Run forever, sleep at the end:
 	wait.Until(func() {
-		start := time.Now()
 		mcLog := log.WithField("controller", "metrics")
-		defer func() {
-			ObserveControllerReconcileTime(ControllerName.String(), start, ReconcileOutcomeUnspecified, mcLog)
-		}()
+		recobsrv := NewReconcileObserver(ControllerName, mcLog)
+		defer recobsrv.ObserveControllerReconcileTime()
 
 		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
@@ -590,12 +588,29 @@ func GetClusterDeploymentType(obj metav1.Object) string {
 	return hivev1.DefaultClusterType
 }
 
-// ObserveControllerReconcileTime is used by all controllers in a defer block to log and report their elapsed time and
-// optionally an outcome in a consistent fashion.
-func ObserveControllerReconcileTime(controller string, start time.Time, outcome ReconcileOutcome, logger log.FieldLogger) {
-	dur := time.Since(start)
-	metricControllerReconcileTime.WithLabelValues(controller, string(outcome)).Observe(dur.Seconds())
-	fields := log.Fields{"elapsedMillis": dur.Milliseconds(), "outcome": outcome}
+// ReconcileObserver is used to track, log, and report metrics for controller reconcile time and outcome. Each
+// controller should instantiate one near the start of the reconcile loop, and defer a call to
+// ObserveControllerReconcileTime.
+type ReconcileObserver struct {
+	startTime      time.Time
+	controllerName hivev1.ControllerName
+	logger         log.FieldLogger
+	outcome        ReconcileOutcome
+}
+
+func NewReconcileObserver(controllerName hivev1.ControllerName, logger log.FieldLogger) *ReconcileObserver {
+	return &ReconcileObserver{
+		startTime:      time.Now(),
+		controllerName: controllerName,
+		logger:         logger,
+		outcome:        ReconcileOutcomeUnspecified,
+	}
+}
+
+func (ro *ReconcileObserver) ObserveControllerReconcileTime() {
+	dur := time.Since(ro.startTime)
+	metricControllerReconcileTime.WithLabelValues(string(ro.controllerName), string(ro.outcome)).Observe(dur.Seconds())
+	fields := log.Fields{"elapsedMillis": dur.Milliseconds(), "outcome": ro.outcome}
 	// Add a log field to categorize request duration into buckets. We can't easily query > in Kibana in
 	// OpenShift deployments due to logging limitations, so these constant buckets give us a small number of
 	// constant search strings we can use to identify slow reconcile loops.
@@ -605,7 +620,11 @@ func ObserveControllerReconcileTime(controller string, start time.Time, outcome 
 			break
 		}
 	}
-	logger.WithFields(fields).Info("reconcile complete")
+	ro.logger.WithFields(fields).Info("reconcile complete")
+}
+
+func (ro *ReconcileObserver) SetOutcome(outcome ReconcileOutcome) {
+	ro.outcome = outcome
 }
 
 var elapsedDurationMillisBuckets = []int64{120_000, 60_000, 30_000, 10_000, 5_000, 1_000, 0}

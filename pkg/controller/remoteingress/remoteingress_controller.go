@@ -127,15 +127,10 @@ type ReconcileRemoteClusterIngress struct {
 // any needed ClusterIngress objects up for syncing to the remote cluster.
 //
 func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	cdLog := r.logger.WithFields(log.Fields{
-		"clusterDeployment": request.Name,
-		"namespace":         request.Namespace,
-	})
+	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, cdLog)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	rContext := &reconcileContext{}
 

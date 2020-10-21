@@ -118,17 +118,10 @@ type ReconcileControlPlaneCerts struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
 func (r *ReconcileControlPlaneCerts) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	cdLog := log.WithFields(log.Fields{
-		"clusterDeployment": request.Name,
-		"namespace":         request.Namespace,
-		"controller":        ControllerName,
-	})
-
+	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, cdLog)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}

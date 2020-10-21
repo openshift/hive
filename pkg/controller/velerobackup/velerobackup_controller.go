@@ -169,14 +169,10 @@ type ReconcileBackup struct {
 
 // Reconcile ensures that all Hive object changes have corresponding Velero backup objects.
 func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	nsLogger := r.logger.WithField("namespace", request.Namespace)
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	nsLogger := controllerutils.BuildControllerLogger(ControllerName, "namespace", request.NamespacedName)
 	nsLogger.Info("reconciling backups and Hive object changes")
-	defer func() {
-		hivemetrics.ObserveControllerReconcileTime(ControllerName.String(), start, hivemetrics.ReconcileOutcomeUnspecified, nsLogger)
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, nsLogger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	cp, checkpointFound, err := r.getNamespaceCheckpoint(request.Namespace, nsLogger)
 	if err != nil {

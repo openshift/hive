@@ -101,19 +101,10 @@ type ReconcileClusterState struct {
 
 // Reconcile ensures that a given ClusterState resource exists and reflects the state of cluster operators from its target cluster
 func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithFields(log.Fields{
-		"controller":        ControllerName,
-		"clusterDeployment": request.NamespacedName.String(),
-	})
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Info("reconciling cluster deployment")
-	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}

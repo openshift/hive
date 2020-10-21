@@ -159,15 +159,10 @@ type ReconcileClusterClaim struct {
 
 // Reconcile reconciles a ClusterClaim.
 func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
-	start := time.Now()
-	logger := r.logger.WithField("clusterClaim", request.NamespacedName)
-
+	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterClaim", request.NamespacedName)
 	logger.Infof("reconciling cluster claim")
-	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterClaim instance
 	claim := &hivev1.ClusterClaim{}

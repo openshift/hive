@@ -103,15 +103,10 @@ type ReconcileClusterPoolNamespace struct {
 
 // Reconcile deletes a Namespace if it no longer contains any ClusterDeployments.
 func (r *ReconcileClusterPoolNamespace) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithField("namespace", request.Name)
-
+	logger := controllerutils.BuildControllerLogger(ControllerName, "namespace", request.NamespacedName)
 	logger.Info("reconciling namespace")
-	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the Namespace instance
 	namespace := &corev1.Namespace{}

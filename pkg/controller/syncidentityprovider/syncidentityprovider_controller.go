@@ -6,15 +6,9 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	log "github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -31,7 +26,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
+	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
 const (
@@ -173,16 +175,10 @@ type identityProviderPatchSpec struct {
 // remote cluster MachineSets based on the state read and the worker machines defined in
 // ClusterDeployment.Spec.Config.Machines
 func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	contextLogger := addReconcileRequestLoggerFields(r.logger, request)
-
-	// For logging, we need to see when the reconciliation loop starts and ends.
+	contextLogger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	contextLogger.Info("reconciling syncidentityproviders and clusterdeployments")
-	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		contextLogger.WithField("elapsed", dur).Info("reconcile complete")
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, contextLogger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
@@ -211,9 +207,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (r
 		return reconcile.Result{}, nil
 	}
 
-	contextLogger = addClusterDeploymentLoggerFields(contextLogger, cd)
-
-	return reconcile.Result{}, r.syncIdentityProviders(cd)
+	return reconcile.Result{}, r.syncIdentityProviders(cd, contextLogger)
 }
 
 func (r *ReconcileSyncIdentityProviders) createSyncSetSpec(cd *hivev1.ClusterDeployment, idps []openshiftapiv1.IdentityProvider) (*hivev1.SyncSetSpec, error) {
@@ -253,10 +247,8 @@ func GenerateIdentityProviderSyncSetName(clusterDeploymentName string) string {
 	return apihelpers.GetResourceName(clusterDeploymentName, constants.IdentityProviderSuffix)
 }
 
-func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.ClusterDeployment) error {
-	contextLogger := addClusterDeploymentLoggerFields(r.logger, cd)
-
-	idpsFromSSIDP, err := r.getRelatedSelectorSyncIdentityProviders(cd)
+func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) error {
+	idpsFromSSIDP, err := r.getRelatedSelectorSyncIdentityProviders(cd, contextLogger)
 	if err != nil {
 		return err
 	}
@@ -331,14 +323,12 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviders(cd *hivev1.Cluste
 	return nil
 }
 
-func (r *ReconcileSyncIdentityProviders) getRelatedSelectorSyncIdentityProviders(cd *hivev1.ClusterDeployment) ([]openshiftapiv1.IdentityProvider, error) {
+func (r *ReconcileSyncIdentityProviders) getRelatedSelectorSyncIdentityProviders(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) ([]openshiftapiv1.IdentityProvider, error) {
 	list := &hivev1.SelectorSyncIdentityProviderList{}
 	err := r.Client.List(context.TODO(), list)
 	if err != nil {
 		return nil, err
 	}
-
-	contextLogger := addClusterDeploymentLoggerFields(r.logger, cd)
 
 	cdLabelSet := labels.Set(cd.Labels)
 	var idps []openshiftapiv1.IdentityProvider
@@ -381,19 +371,6 @@ func (r *ReconcileSyncIdentityProviders) getRelatedSyncIdentityProviders(cd *hiv
 	idps = sortIdentityProviders(idps)
 
 	return idps, err
-}
-
-func addReconcileRequestLoggerFields(logger log.FieldLogger, request reconcile.Request) *log.Entry {
-	return logger.WithFields(log.Fields{
-		"NamespacedName": request.NamespacedName,
-	})
-}
-
-func addClusterDeploymentLoggerFields(logger log.FieldLogger, cd *hivev1.ClusterDeployment) *log.Entry {
-	return logger.WithFields(log.Fields{
-		"clusterDeployment": cd.Name,
-		"namespace":         cd.Namespace,
-	})
 }
 
 func addSelectorSyncIdentityProviderLoggerFields(logger log.FieldLogger, ssidp *hivev1.SelectorSyncIdentityProvider) *log.Entry {

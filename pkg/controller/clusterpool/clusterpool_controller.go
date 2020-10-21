@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -128,15 +127,10 @@ type ReconcileClusterPool struct {
 // Reconcile reads the state of the ClusterPool, checks if we currently have enough ClusterDeployments waiting, and
 // attempts to reach the desired state if not.
 func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithField("clusterPool", request.Name)
-
+	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterPool", request.NamespacedName)
 	logger.Infof("reconciling cluster pool")
-	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the ClusterPool instance
 	clp := &hivev1.ClusterPool{}

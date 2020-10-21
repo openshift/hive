@@ -28,8 +28,9 @@ var (
 		[]string{"controller", "method", "resource", "remote", "status"},
 	)
 	metricKubeClientRequestSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "hive_kube_client_request_seconds",
-		Help: "Length of time for kubernetes client requests.",
+		Name:    "hive_kube_client_request_seconds",
+		Help:    "Length of time for kubernetes client requests.",
+		Buckets: []float64{0.05, 0.1, 0.5, 1, 5, 10, 30, 60, 120},
 	},
 		[]string{"controller", "method", "resource", "remote", "status"},
 	)
@@ -116,6 +117,15 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	if err == nil && pathErr == nil {
 		metricKubeClientRequests.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Inc()
 		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Observe(applyTime)
+		if applyTime >= 5.0 {
+			log.WithFields(log.Fields{
+				"controller": cmt.Controller.String(),
+				"method":     req.Method,
+				"path":       path,
+				"remote":     remoteStr,
+				"status":     resp.Status,
+			}).Warn("slow client request")
+		}
 	}
 
 	return resp, err

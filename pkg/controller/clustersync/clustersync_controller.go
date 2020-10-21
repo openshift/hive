@@ -249,15 +249,12 @@ type ReconcileClusterSync struct {
 // Reconcile reads the state of the ClusterDeployment and applies any SyncSets or SelectorSyncSets that need to be
 // applied or re-applied.
 func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	start := time.Now()
-	logger := r.logger.WithField("ClusterDeployment", request.NamespacedName)
-
+	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Infof("reconciling ClusterDeployment")
-	defer func() {
-		dur := time.Since(start)
-		hivemetrics.MetricControllerReconcileTime.WithLabelValues(ControllerName.String()).Observe(dur.Seconds())
-		logger.WithField("elapsed", dur).Info("reconcile complete")
-	}()
+	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
+	defer recobsrv.ObserveControllerReconcileTime()
+
+	recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeNoOp)
 
 	// Fetch the ClusterDeployment instance
 	cd := &hivev1.ClusterDeployment{}
@@ -311,6 +308,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
 			return reconcile.Result{}, err
 		}
+		recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeClusterSyncCreated)
 		// requeue immediately so that we reconcile soon after the ClusterSync is created
 		return reconcile.Result{Requeue: true}, nil
 	case err != nil:
@@ -344,6 +342,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	if needToDoFullReapply {
 		logger.Info("need to reapply all syncsets")
 	}
+	recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeFullSync)
 
 	// Apply SyncSets
 	syncStatusesForSyncSets, syncSetsNeedRequeue := r.applySyncSets(

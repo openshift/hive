@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -319,4 +320,13 @@ func CopySecret(c client.Client, src, dest types.NamespacedName) error {
 	}
 
 	return nil
+}
+
+// BuildControllerLogger returns a logger for controllers with consistent fields.
+func BuildControllerLogger(controller hivev1.ControllerName, resource string, nsName types.NamespacedName) *log.Entry {
+	return log.WithFields(log.Fields{
+		"controller":  controller,
+		resource:      nsName.String(),
+		"reconcileID": utilrand.String(constants.ReconcileIDLen),
+	})
 }

@@ -293,6 +293,10 @@ const (
 
 	// InstallLogsAWSS3BucketEnvVar is the environment variable specifying the S3 bucket to use.
 	InstallLogsAWSS3BucketEnvVar = "HIVE_INSTALL_LOGS_AWS_S3_BUCKET"
+
+	// ReconcileIDLen is the length of the random strings we generate for contextual loggers in controller
+	// Reconcile functions.
+	ReconcileIDLen = 8
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

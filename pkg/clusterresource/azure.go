@@ -96,13 +96,13 @@ func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 	mpp := &azureinstallertypes.MachinePool{}
 
 	// Use supplied machinepool configuration if possible
-	if (o.ControlPlaneMachinePoolPlatform != installertypes.MachinePoolPlatform{}) {
+	if (o.ControlPlaneMachinePoolPlatform != nil) {
 		ic.ControlPlane.Platform.Azure = o.ControlPlaneMachinePoolPlatform.Azure
 	} else {
 		ic.ControlPlane.Platform.Azure = mpp
 	}
 
-	if (o.WorkerMachinePoolPlatform != installertypes.MachinePoolPlatform{}) {
+	if (o.WorkerMachinePoolPlatform != nil) {
 		ic.Compute[0].Platform.Azure = o.WorkerMachinePoolPlatform.Azure
 	} else {
 		ic.Compute[0].Platform.Azure = mpp

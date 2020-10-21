@@ -109,13 +109,13 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	}
 
 	// Use supplied machinepool configuration if possible
-	if (o.ControlPlaneMachinePoolPlatform != installertypes.MachinePoolPlatform{}) {
+	if (o.ControlPlaneMachinePoolPlatform != nil) {
 		ic.ControlPlane.Platform.AWS = o.ControlPlaneMachinePoolPlatform.AWS
 	} else {
 		ic.ControlPlane.Platform.AWS = mpp
 	}
 
-	if (o.WorkerMachinePoolPlatform != installertypes.MachinePoolPlatform{}) {
+	if (o.WorkerMachinePoolPlatform != nil) {
 		ic.Compute[0].Platform.AWS = o.WorkerMachinePoolPlatform.AWS
 	} else {
 		ic.Compute[0].Platform.AWS = mpp

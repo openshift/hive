@@ -120,10 +120,10 @@ type Builder struct {
 	AdditionalTrustBundle string
 
 	// Allows passing in specifications for the machinepool that is created for the workers
-	WorkerMachinePoolPlatform installertypes.MachinePoolPlatform
+	WorkerMachinePoolPlatform *installertypes.MachinePoolPlatform
 
 	// Allows passing in specifications for the machinepool that is created for the control plane
-	ControlPlaneMachinePoolPlatform installertypes.MachinePoolPlatform
+	ControlPlaneMachinePoolPlatform *installertypes.MachinePoolPlatform
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.

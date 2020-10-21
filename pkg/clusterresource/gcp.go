@@ -99,13 +99,13 @@ func (p *GCPCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	}
 
 	// Use supplied machinepool configuration if possible
-	if (o.ControlPlaneMachinePoolPlatform != installertypes.MachinePoolPlatform{}) {
+	if (o.ControlPlaneMachinePoolPlatform != nil) {
 		ic.ControlPlane.Platform.GCP = o.ControlPlaneMachinePoolPlatform.GCP
 	} else {
 		ic.ControlPlane.Platform.GCP = mpp
 	}
 
-	if (o.WorkerMachinePoolPlatform != installertypes.MachinePoolPlatform{}) {
+	if (o.WorkerMachinePoolPlatform != nil) {
 		ic.Compute[0].Platform.GCP = o.WorkerMachinePoolPlatform.GCP
 	} else {
 		ic.Compute[0].Platform.GCP = mpp

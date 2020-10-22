@@ -196,6 +196,11 @@ docker-dev-build: build
 	@echo "*** DEPRECATED: Use the image-hive-dev target instead ***"
 	$(DOCKER_CMD) build -t ${IMG} -f Dockerfile.dev .
 
+# Build the dev image using builah
+.PHONY: buildah-dev-build
+buildah-dev-build:
+	buildah bud -f Dockerfile --tag ${IMG}
+
 # Push the image using docker
 .PHONY: docker-push
 docker-push:
@@ -204,6 +209,11 @@ docker-push:
 # Build and push the dev image
 .PHONY: docker-dev-push
 docker-dev-push: build image-hive-dev docker-push
+
+# Build and push the dev image with buildah
+.PHONY: buildah-dev-push
+buildah-dev-push: buildah-dev-build
+	buildah push --tls-verify=false ${IMG}
 
 # Push the image using buildah
 .PHONY: buildah-push

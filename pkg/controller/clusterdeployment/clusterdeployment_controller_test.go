@@ -118,15 +118,16 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		existing                []runtime.Object
-		pendingCreation         bool
-		expectErr               bool
-		expectedRequeueAfter    time.Duration
-		expectPendingCreation   bool
-		expectConsoleRouteFetch bool
-		validate                func(client.Client, *testing.T)
-		reconcilerSetup         func(*ReconcileClusterDeployment)
+		name                          string
+		existing                      []runtime.Object
+		pendingCreation               bool
+		expectErr                     bool
+		expectedRequeueAfter          time.Duration
+		expectPendingCreation         bool
+		expectConsoleRouteFetch       bool
+		validate                      func(client.Client, *testing.T)
+		reconcilerSetup               func(*ReconcileClusterDeployment)
+		platformCredentialsValidation func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error)
 	}{
 		{
 			name: "Add finalizer",
@@ -1500,6 +1501,51 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assertConditionReason(t, cd, hivev1.ProvisionStoppedCondition, "InstallAttemptsLimitReached")
 			},
 		},
+		{
+			name: "auth condition when platform creds are bad",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+			},
+			platformCredentialsValidation: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
+				return false, nil
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+
+				assertConditionStatus(t, cd, hivev1.AuthenticationFailureClusterDeploymentCondition, corev1.ConditionTrue)
+			},
+		},
+		{
+			name: "no ClusterProvision when platform creds are bad",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.Conditions = []hivev1.ClusterDeploymentCondition{
+						{
+							Status:  corev1.ConditionTrue,
+							Type:    hivev1.AuthenticationFailureClusterDeploymentCondition,
+							Reason:  platformAuthFailureResason,
+							Message: "Platform credentials failed authentication check",
+						},
+					}
+					return cd
+				}(),
+			},
+			platformCredentialsValidation: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
+				return false, nil
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+
+				provisionList := &hivev1.ClusterProvisionList{}
+				err := c.List(context.TODO(), provisionList, client.InNamespace(cd.Namespace))
+				require.NoError(t, err, "unexpected error listing ClusterProvisions")
+
+				assert.Zero(t, len(provisionList.Items), "expected no ClusterProvision objects when platform creds are bad")
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1509,13 +1555,21 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
+
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+
+			if test.platformCredentialsValidation == nil {
+				test.platformCredentialsValidation = func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
+					return true, nil
+				}
+			}
 			rcd := &ReconcileClusterDeployment{
-				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
-				logger:                        logger,
-				expectations:                  controllerExpectations,
-				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+				Client:                                  fakeClient,
+				scheme:                                  scheme.Scheme,
+				logger:                                  logger,
+				expectations:                            controllerExpectations,
+				remoteClusterAPIClientBuilder:           func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+				validateCredentialsForClusterDeployment: test.platformCredentialsValidation,
 			}
 
 			if test.reconcilerSetup != nil {
@@ -2161,6 +2215,9 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+				validateCredentialsForClusterDeployment: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
+					return true, nil
+				},
 			}
 
 			_, err := rcd.Reconcile(reconcile.Request{

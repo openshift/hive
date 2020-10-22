@@ -316,6 +316,9 @@ const (
 
 	// ProvisionStoppedCondition is set when cluster provisioning is stopped
 	ProvisionStoppedCondition ClusterDeploymentConditionType = "ProvisionStopped"
+
+	// AuthenticationFailureCondition is true when platform credentials cannot be used because of authentication failure
+	AuthenticationFailureClusterDeploymentCondition ClusterDeploymentConditionType = "AuthenticationFailure"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with

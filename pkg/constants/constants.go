@@ -6,6 +6,14 @@ import (
 )
 
 const (
+	PlatformAWS       = "aws"
+	PlatformAzure     = "azure"
+	PlatformBaremetal = "baremetal"
+	PlatformGCP       = "gcp"
+	PlatformOpenStack = "openstack"
+	PlatformUnknown   = "unknown"
+	PlatformVSphere   = "vsphere"
+
 	mergedPullSecretSuffix = "merged-pull-secret"
 
 	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.

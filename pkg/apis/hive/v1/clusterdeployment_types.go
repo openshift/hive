@@ -128,6 +128,10 @@ type ClusterDeploymentSpec struct {
 	// time since the cluster last came out of hibernation.
 	// +optional
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
+
+	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
+	// +optional
+	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.
@@ -309,6 +313,9 @@ const (
 
 	// DeprovisionLaunchErrorCondition is set when a cluster deprovision fails to launch.
 	DeprovisionLaunchErrorCondition ClusterDeploymentConditionType = "DeprovisionLaunchError"
+
+	// ProvisionStoppedCondition is set when cluster provisioning is stopped
+	ProvisionStoppedCondition ClusterDeploymentConditionType = "ProvisionStopped"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with

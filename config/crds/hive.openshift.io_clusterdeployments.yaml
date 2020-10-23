@@ -327,6 +327,11 @@ spec:
                 - name
                 type: object
               type: array
+            installAttemptsLimit:
+              description: InstallAttemptsLimit is the maximum number of times Hive
+                will attempt to install the cluster.
+              format: int32
+              type: integer
             installed:
               description: Installed is true if the cluster has been installed
               type: boolean

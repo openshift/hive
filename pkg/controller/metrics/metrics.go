@@ -77,15 +77,6 @@ var (
 		Help: "Total number of SyncSetsInstances referencing non-selector SyncSets that have not successfully applied all resources/patches/secrets.",
 	})
 
-	// MetricClusterDeploymentProvisionUnderwaySeconds is a prometheus metric for the number of seconds
-	// between when a still provisioning cluster was created and now.
-	MetricClusterDeploymentProvisionUnderwaySeconds = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "hive_cluster_deployment_provision_underway_seconds",
-			Help: "Length of time a cluster has been provisioning.",
-		},
-		[]string{"cluster_deployment", "namespace", "cluster_type"},
-	)
 	// MetricClusterDeploymentDeprovisioningUnderwaySeconds is a prometheus metric for the number of seconds
 	// between when a still deprovisioning cluster was created and now.
 	MetricClusterDeploymentDeprovisioningUnderwaySeconds = prometheus.NewGaugeVec(
@@ -137,7 +128,6 @@ func init() {
 	metrics.Registry.MustRegister(metricSyncSetsUnappliedTotal)
 	metrics.Registry.MustRegister(metricControllerReconcileTime)
 
-	metrics.Registry.MustRegister(MetricClusterDeploymentProvisionUnderwaySeconds)
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
 }
 
@@ -147,11 +137,11 @@ func Add(mgr manager.Manager) error {
 		Client:   mgr.GetClient(),
 		Interval: 2 * time.Minute,
 	}
+	metrics.Registry.MustRegister(newProvisioningUnderwayCollector(mgr.GetClient()))
 	err := mgr.Add(mc)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -193,18 +183,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 			for _, cd := range clusterDeployments.Items {
 				accumulator.processCluster(&cd)
 
-				if cd.DeletionTimestamp == nil {
-					if !cd.Spec.Installed {
-						// For installing clusters we report the seconds since
-						// cluster was created. clusterdeployment_controller should delete this for any cluster
-						// that is installed or deleted.
-						MetricClusterDeploymentProvisionUnderwaySeconds.WithLabelValues(
-							cd.Name,
-							cd.Namespace,
-							GetClusterDeploymentType(&cd)).Set(
-							time.Since(cd.CreationTimestamp.Time).Seconds())
-					}
-				} else {
+				if cd.DeletionTimestamp != nil {
 
 					// For deprovisioning clusters we report the seconds since
 					// cluster was deleted. clusterdeployment_controller should delete this

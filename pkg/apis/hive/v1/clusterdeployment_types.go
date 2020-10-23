@@ -287,10 +287,6 @@ const (
 	// API URL override.
 	ActiveAPIURLOverrideCondition ClusterDeploymentConditionType = "ActiveAPIURLOverride"
 
-	// InstallFailingCondition indicates that a failure has been detected and we will attempt to offer some
-	// information as to why in the reason.
-	InstallFailingCondition ClusterDeploymentConditionType = "InstallFailing"
-
 	// DNSNotReadyCondition indicates that the the DNSZone object created for the clusterDeployment
 	// (ie manageDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
 	DNSNotReadyCondition ClusterDeploymentConditionType = "DNSNotReady"
@@ -324,7 +320,6 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	IngressCertificateNotFoundCondition,
 	UnreachableCondition,
 	ActiveAPIURLOverrideCondition,
-	InstallFailingCondition,
 	DNSNotReadyCondition,
 	ProvisionFailedCondition,
 	SyncSetFailedCondition,

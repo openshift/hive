@@ -164,6 +164,13 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result rec
 		}
 	}
 
+	// Clear any lingering unsupported hibernation condition
+	if hibernatingCondition != nil && hibernatingCondition.Reason == hivev1.UnsupportedHibernationReason {
+		if supported, msg := r.canHibernate(cd); supported {
+			return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, msg, corev1.ConditionFalse, cdLog)
+		}
+	}
+
 	// Check if HibernateAfter is set, and if the cluster has been in running state for longer than this duration, put it to sleep.
 	if cd.Spec.HibernateAfter != nil && cd.Spec.PowerState != hivev1.HibernatingClusterPowerState {
 		hibernateAfterDur := cd.Spec.HibernateAfter.Duration
@@ -373,7 +380,7 @@ func (r *hibernationReconciler) canHibernate(cd *hivev1.ClusterDeployment) (bool
 	if version.LT(minimumClusterVersion) {
 		return false, fmt.Sprintf("Unsupported version, need version %s or greater", minimumClusterVersion.String())
 	}
-	return true, ""
+	return true, "Hibernation capable"
 }
 
 func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (bool, error) {

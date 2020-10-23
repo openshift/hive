@@ -113,17 +113,18 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 	path, pathErr := parsePath(req.URL.Path)
 	// Call the nested RoundTripper.
 	resp, err := cmt.RoundTripper.RoundTrip(req)
-	applyTime := metav1.Now().Sub(startTime).Seconds()
+	applyTime := metav1.Now().Sub(startTime)
 	if err == nil && pathErr == nil {
 		metricKubeClientRequests.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Inc()
-		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Observe(applyTime)
-		if applyTime >= 5.0 {
+		metricKubeClientRequestSeconds.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr, resp.Status).Observe(applyTime.Seconds())
+		if applyTime >= 5*time.Second {
 			log.WithFields(log.Fields{
-				"controller": cmt.Controller.String(),
-				"method":     req.Method,
-				"path":       path,
-				"remote":     remoteStr,
-				"status":     resp.Status,
+				"controller":    cmt.Controller.String(),
+				"method":        req.Method,
+				"path":          path,
+				"remote":        remoteStr,
+				"status":        resp.Status,
+				"elapsedMillis": applyTime.Milliseconds(), // millis for consistency with how we log controller reconcile time
 			}).Warn("slow client request")
 		}
 	}

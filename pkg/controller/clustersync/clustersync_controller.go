@@ -470,6 +470,10 @@ func (r *ReconcileClusterSync) applySyncSets(
 		if syncSet.GetSpec().ResourceApplyMode == hivev1.SyncResourceApplyMode {
 			newSyncStatus.ResourcesToDelete = resourcesApplied
 		}
+		if syncSet.GetSpec().ResourceApplyMode == hivev1.UpsertResourceApplyMode && len(oldSyncStatus.ResourcesToDelete) > 0 {
+			logger.Infof("resource apply mode is %v but there are resources to delete in clustersync status", hivev1.UpsertResourceApplyMode)
+			oldSyncStatus.ResourcesToDelete = nil
+		}
 		if err != nil {
 			newSyncStatus.Result = hiveintv1alpha1.FailureSyncSetResult
 			newSyncStatus.FailureMessage = err.Error()

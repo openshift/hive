@@ -154,3 +154,9 @@ To see details, run as below.
 ```sh
 oc get syncsetinstances <synsetinstance name> -o yaml
 ```
+
+## Changing ResourceApplyMode
+
+Changing the `resourceApplyMode` from `"Sync"` to `"Upsert"` will remove `SyncSet` resources tracked for deletion within the corresponding `ClusterSync` object. It is possible that the `ClusterSync` controller could process a resource removal and a `resourceApplyMode` change simultaneously and when this occurs resources no longer tracked in the `SyncSet` will be orphaned rather than deleted.
+
+Likewise, changing the `resourceApplyMode` from `"Upsert"` to `"Sync"` will add `SyncSet` resources to resources tracked for deletion within the corresponding `ClusterSync` object. When the `ClusterSync` controller processes a resource removal and a `resourceApplyMode` change simultaneously, resources removed will be orphaned rather than deleted.

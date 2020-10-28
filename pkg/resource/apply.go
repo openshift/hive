@@ -3,11 +3,11 @@ package resource
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"math/rand"
-	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 
@@ -21,6 +21,8 @@ import (
 	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
+	"github.com/openshift/hive/pkg/constants"
 )
 
 // ApplyResult indicates what type of change was performed
@@ -61,12 +63,11 @@ func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 		return "", err
 	}
 
-	// fakeApply mode (used in scale testing only) doesn't run the apply. Instead it will contact a dummy http server
-	// to simulate i/o wait
-	fakeApplyEnvVarKey := "HIVE_SYNCSETS_FAKE_APPLY_URL"
-	fakeApplyURL, exists := os.LookupEnv(fakeApplyEnvVarKey)
-	if exists {
-		r.fakeApply(fakeApplyURL)
+	// fakeApply mode (used in scale testing only) doesn't run the apply. Instead it will Sleep for a period of time
+	// that matches our request time metrics in real hive environments to simulate i/o wait.
+	fakeAppliesEnvVar, _ := os.LookupEnv(constants.HiveSyncSetsFakeApplyEnvVar)
+	if fakeApplies, err := strconv.ParseBool(fakeAppliesEnvVar); fakeApplies && err == nil {
+		r.fakeApply()
 		return ConfiguredApplyResult, nil
 	}
 	err = applyOptions.Run()
@@ -138,23 +139,19 @@ func (r *helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme)
 	return r.Create(data)
 }
 
-func (r *helper) fakeApply(fakeApplyURL string) {
-	// do a GET to http://httpwait-default.apps.gshereme-spoke-1.new-installer.openshift.com/?wait=3000
-	// use a random wait time
-	in := []int{100, 200, 300, 100, 200, 300, 100, 200, 300, 100, 200, 300, 500, 500, 3000, 100, 200, 300, 100, 200, 300, 100, 200, 300, 100, 200, 300, 500, 500, 3000, 100, 200, 300, 100, 200, 300, 100, 200, 300, 100, 200, 300, 500, 500, 30000}
+func (r *helper) fakeApply() {
+	// real world data indicates that for our slowest non-delete request type (POST):
+	// histogram_quantile(0.9, (sum without(controller,endpoint,instance,job,namespace,pod,resource,service,status)(rate(hive_kube_client_request_seconds_bucket{remote="true",controller="clustersync"}[2h]))))
+	//
+	// 50% of requests are under 0.027s
+	// 80% of requests are under 0.045s
+	// 90% of requests are under 0.053s
+	// 99% of requests are under 0.230s
+	in := []int{27, 27, 27, 27, 27, 45, 45, 45, 53, 230} // milliseconds
 	randomIndex := rand.Intn(len(in))
-	wait := in[randomIndex]
-
-	r.logger.Debug("running fake apply for ", wait, "ms")
-	url := fmt.Sprintf("%s%d", fakeApplyURL, wait)
-	r.logger.Debug("getting ", url)
-	resp, err := http.Get(url)
-	if err != nil {
-		r.logger.Debug("err: ", err)
-	}
-	defer resp.Body.Close()
-
-	r.logger.Debug("Response status: ", resp.Status)
+	wait := time.Duration(in[randomIndex] * 1000000) // nanoseconds to match the duration unit
+	r.logger.WithField("sleepMillis", wait.Milliseconds()).Debug("sleeping to simulate an apply")
+	time.Sleep(wait)
 }
 
 func (r *helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {

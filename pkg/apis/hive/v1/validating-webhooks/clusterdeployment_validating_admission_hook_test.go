@@ -767,6 +767,26 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name: "OpenStack create without secret reference for certificates",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validOpenStackClusterDeployment()
+				cd.Spec.Platform.OpenStack.CertificatesSecretRef = &corev1.LocalObjectReference{Name: ""}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "OpenStack create with valid secret reference for certificates",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validOpenStackClusterDeployment()
+				cd.Spec.Platform.OpenStack.CertificatesSecretRef = &corev1.LocalObjectReference{Name: "openstack-certificates"}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name:            "Test valid delete",
 			oldObject:       validAWSClusterDeployment(),
 			operation:       admissionv1beta1.Delete,

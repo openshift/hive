@@ -568,6 +568,11 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.InstallAttemptsLimit != nil {
+		in, out := &in.InstallAttemptsLimit, &out.InstallAttemptsLimit
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 
@@ -2437,6 +2442,11 @@ func (in *OpenStackClusterDeprovision) DeepCopyInto(out *OpenStackClusterDeprovi
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.CertificatesSecretRef != nil {
+		in, out := &in.CertificatesSecretRef, &out.CertificatesSecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	return
 }
 
@@ -2494,7 +2504,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.OpenStack != nil {
 		in, out := &in.OpenStack, &out.OpenStack
 		*out = new(openstack.Platform)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.VSphere != nil {
 		in, out := &in.VSphere, &out.VSphere

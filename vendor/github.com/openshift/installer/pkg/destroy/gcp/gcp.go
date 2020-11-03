@@ -173,15 +173,6 @@ func (o *ClusterUninstaller) getZoneName(zoneURL string) string {
 	return ""
 }
 
-func (o *ClusterUninstaller) areAllClusterInstances(instances []cloudResource) bool {
-	for _, instance := range instances {
-		if !o.isClusterResource(instance.name) {
-			return false
-		}
-	}
-	return true
-}
-
 func (o *ClusterUninstaller) isClusterResource(name string) bool {
 	return strings.HasPrefix(name, o.ClusterID+"-")
 }
@@ -200,14 +191,6 @@ func isNoOp(err error) bool {
 	}
 	ae, ok := err.(*googleapi.Error)
 	return ok && (ae.Code == http.StatusNotFound || ae.Code == http.StatusNotModified)
-}
-
-func isNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	ae, ok := err.(*googleapi.Error)
-	return ok && ae.Code == http.StatusNotFound
 }
 
 // aggregateError is a utility function that takes a slice of errors and an
@@ -256,9 +239,7 @@ func (t requestIDTracker) requestID(identifier ...string) string {
 // sent.
 func (t requestIDTracker) resetRequestID(identifier ...string) {
 	key := strings.Join(identifier, "/")
-	if _, exists := t.requestIDs[key]; exists {
-		delete(t.requestIDs, key)
-	}
+	delete(t.requestIDs, key)
 }
 
 // pendingItemTracker tracks a set of pending item names for a given type of resource

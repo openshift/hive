@@ -268,6 +268,7 @@ Prerequisites:
 1. Ensure that the `hiveutil` binary is available (`make hiveutil`)
 2. Run: `hiveutil certificate create ${CLUSTER_NAME} --base-domain ${BASE_DOMAIN}`
    where CLUSTER_NAME is the name of your cluster and BASE_DOMAIN is the public DNS domain for your cluster (Defaults to `new-installer.openshift.com`)
+3. Follow the instructions in the output of the hiveutil certificate command. You will need to setup the letsencrypt CA as trusted one time only for your cluster.
 
 ### Using Generated Certificate
 
@@ -277,7 +278,7 @@ create a cluster that uses the certificate.
 NOTE: The cluster name and domain used to create the certificate must match the name and base domain of the cluster you create.
 
 Example:
-`hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key`
+`hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key` 
 
 
 ## Dependency management

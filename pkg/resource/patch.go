@@ -43,6 +43,9 @@ func (r *helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 			WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Warn("running the patch command failed")
 		return err
 	}
+	r.logger.
+		WithField("stdout", ioStreams.Out.(*bytes.Buffer).String()).
+		WithField("stderr", ioStreams.ErrOut.(*bytes.Buffer).String()).Info("patch command successful")
 	return nil
 }
 

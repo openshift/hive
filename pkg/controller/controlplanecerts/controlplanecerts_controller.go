@@ -7,12 +7,12 @@ import (
 	"io"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	configv1 "github.com/openshift/api/config/v1"
 	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -38,6 +37,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	"github.com/openshift/hive/pkg/resource"
+	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
 const (
@@ -264,7 +264,7 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 		},
 		Spec: hivev1.SyncSetSpec{
 			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
-				ResourceApplyMode: hivev1.SyncResourceApplyMode,
+				ResourceApplyMode: hivev1.UpsertResourceApplyMode,
 			},
 			ClusterDeploymentRefs: []corev1.LocalObjectReference{
 				{
@@ -292,46 +292,20 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	}
 	syncSet.Spec.Secrets = secretMappings
 
-	resources := []runtime.RawExtension{}
-	apiServerConfig := &configv1.APIServer{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "cluster",
-		},
-	}
-	additionalCerts := cd.Spec.ControlPlaneConfig.ServingCertificates.Additional
-	if cd.Spec.ControlPlaneConfig.ServingCertificates.Default != "" {
-		cdLog.Debug("setting default serving certificate for control plane")
-
-		apidomain, err := r.defaultControlPlaneDomain(cd)
-		if err != nil {
-			cdLog.WithError(err).Error("failed to get control plane domain")
-			return nil, err
-		}
-
-		cpCert := hivev1.ControlPlaneAdditionalCertificate{
-			Name:   cd.Spec.ControlPlaneConfig.ServingCertificates.Default,
-			Domain: apidomain,
-		}
-		additionalCerts = append([]hivev1.ControlPlaneAdditionalCertificate{cpCert}, additionalCerts...)
-	}
-	for _, additional := range additionalCerts {
-		cdLog.WithField("name", additional.Name).Debug("adding named certificate to control plane config")
-		bundle := certificateBundle(cd, additional.Name)
-		apiServerConfig.Spec.ServingCerts.NamedCertificates = append(apiServerConfig.Spec.ServingCerts.NamedCertificates, configv1.APIServerNamedServingCert{
-			Names: []string{additional.Domain},
-			ServingCertificate: configv1.SecretNameReference{
-				Name: remoteSecretName(bundle.CertificateSecretRef.Name, cd),
-			},
-		})
-	}
-	resources = append(resources, runtime.RawExtension{Object: apiServerConfig})
-
-	var err error
-	resources, err = controllerutils.AddTypeMeta(resources, r.scheme)
+	servingCertsPatchStr, err := r.getServingCertificatesJSONPatch(cd, cdLog)
 	if err != nil {
-		cdLog.WithError(err).Error("cannot add typemeta to syncset resources")
+		cdLog.WithError(err).Error("error building serving certificates JSON patch")
 		return nil, err
 	}
+	cdLog.Debugf("build serving certs patch: %s", servingCertsPatchStr)
+	servingCertsPatch := hivev1.SyncObjectPatch{
+		APIVersion: "config.openshift.io/v1",
+		Kind:       "APIServer",
+		Name:       "cluster",
+		Patch:      servingCertsPatchStr,
+		PatchType:  "json",
+	}
+
 	// kubeAPIServerPatch sets the forceRedeploymentField on the kube API server cluster operator
 	// to a hash of all the cert secrets. If the content of the certs secrets changes, then the new
 	// hash value will force the kube API server to redeploy and apply the new certs.
@@ -342,8 +316,7 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 		Patch:      fmt.Sprintf(kubeAPIServerPatchTemplate, secretsHash(secrets)),
 		PatchType:  "json",
 	}
-	syncSet.Spec.Resources = resources
-	syncSet.Spec.Patches = []hivev1.SyncObjectPatch{kubeAPIServerPatch}
+	syncSet.Spec.Patches = []hivev1.SyncObjectPatch{servingCertsPatch, kubeAPIServerPatch}
 
 	// ensure the syncset gets cleaned up when the clusterdeployment is deleted
 	cdLog.WithField("derivedObject", syncSet.Name).Debug("Setting labels on derived object")
@@ -355,6 +328,41 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	}
 
 	return syncSet, nil
+}
+
+func (r *ReconcileControlPlaneCerts) getServingCertificatesJSONPatch(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (string, error) {
+	var buf strings.Builder
+
+	additionalCerts := cd.Spec.ControlPlaneConfig.ServingCertificates.Additional
+	if cd.Spec.ControlPlaneConfig.ServingCertificates.Default != "" {
+		cdLog.Debug("setting default serving certificate for control plane")
+
+		apidomain, err := r.defaultControlPlaneDomain(cd)
+		if err != nil {
+			cdLog.WithError(err).Error("failed to get control plane domain")
+			return "", err
+		}
+
+		cpCert := hivev1.ControlPlaneAdditionalCertificate{
+			Name:   cd.Spec.ControlPlaneConfig.ServingCertificates.Default,
+			Domain: apidomain,
+		}
+		additionalCerts = append([]hivev1.ControlPlaneAdditionalCertificate{cpCert}, additionalCerts...)
+	}
+	for i, additional := range additionalCerts {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+		bundle := certificateBundle(cd, additional.Name)
+		cdLog.WithField("name", additional.Name).Debug("adding named certificate to control plane config")
+		buf.WriteString(fmt.Sprintf(` { "names": [ "%s" ], "servingCertificate": { "name": "%s" } }`,
+			additional.Domain, remoteSecretName(bundle.CertificateSecretRef.Name, cd)))
+	}
+
+	var kubeAPIServerNamedCertsTemplate = `[ { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [ %s ] } ]`
+	namedCerts := buf.String()
+	return fmt.Sprintf(kubeAPIServerNamedCertsTemplate, namedCerts), nil
+
 }
 
 func (r *ReconcileControlPlaneCerts) setCertsNotFoundCondition(cd *hivev1.ClusterDeployment, notFound bool, cdLog log.FieldLogger) (bool, error) {

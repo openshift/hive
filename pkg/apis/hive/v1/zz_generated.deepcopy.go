@@ -568,11 +568,6 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
-	if in.InstallAttemptsLimit != nil {
-		in, out := &in.InstallAttemptsLimit, &out.InstallAttemptsLimit
-		*out = new(int32)
-		**out = **in
-	}
 	return
 }
 

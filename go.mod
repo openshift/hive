@@ -12,7 +12,7 @@ require (
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6
+	github.com/go-logr/logr v0.2.1
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.26.0
 	github.com/google/uuid v1.1.1
@@ -30,7 +30,7 @@ require (
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
-	github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9
+	github.com/openshift/installer v0.9.0-master.0.20201103204150-888dc5bab60c
 	github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
 	github.com/openshift/machine-api-operator v0.2.1-0.20200429102619-d36974451290
 	github.com/pkg/errors v0.9.1
@@ -38,7 +38,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.1
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/mod v0.3.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381

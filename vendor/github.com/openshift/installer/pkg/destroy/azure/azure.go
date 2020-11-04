@@ -121,6 +121,7 @@ func (o *ClusterUninstaller) Run() error {
 				o.Logger.Debug(err)
 				if isAuthError(err) {
 					cancel()
+					errs = append(errs, errors.Wrap(err, "unable to authenticate when deleting public DNS records"))
 				}
 				return
 			}
@@ -135,7 +136,7 @@ func (o *ClusterUninstaller) Run() error {
 	}
 
 	deadline, _ := waitCtx.Deadline()
-	diff := deadline.Sub(time.Now())
+	diff := time.Until(deadline)
 	if diff > 0 {
 		waitCtx, cancel = context.WithTimeout(context.Background(), diff)
 	}
@@ -149,6 +150,7 @@ func (o *ClusterUninstaller) Run() error {
 				o.Logger.Debug(err)
 				if isAuthError(err) {
 					cancel()
+					errs = append(errs, errors.Wrap(err, "unable to authenticate when deleting resource group"))
 				}
 				return
 			}
@@ -163,7 +165,7 @@ func (o *ClusterUninstaller) Run() error {
 	}
 
 	deadline, _ = waitCtx.Deadline()
-	diff = deadline.Sub(time.Now())
+	diff = time.Until(deadline)
 	if diff > 0 {
 		waitCtx, cancel = context.WithTimeout(context.Background(), diff)
 	}
@@ -177,6 +179,7 @@ func (o *ClusterUninstaller) Run() error {
 				o.Logger.Debug(err)
 				if isAuthError(err) {
 					cancel()
+					errs = append(errs, errors.Wrap(err, "unable to authenticate when deleting application registrations and their service principals"))
 				}
 				return
 			}
@@ -202,6 +205,10 @@ func deletePublicRecords(ctx context.Context, dnsClient dns.ZonesClient, records
 
 	zonesPage, err := dnsClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100))
 	if err != nil {
+		if zonesPage.Response().IsHTTPStatus(http.StatusNotFound) {
+			logger.Debug("already deleted")
+			return utilerrors.NewAggregate(errs)
+		}
 		errs = append(errs, errors.Wrap(err, "failed to list dns zone"))
 		if isAuthError(err) {
 			return err
@@ -229,6 +236,10 @@ func deletePublicRecords(ctx context.Context, dnsClient dns.ZonesClient, records
 
 	privateZonesPage, err := privateDNSClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100))
 	if err != nil {
+		if privateZonesPage.Response().IsHTTPStatus(http.StatusNotFound) {
+			logger.Debug("already deleted")
+			return utilerrors.NewAggregate(errs)
+		}
 		errs = append(errs, errors.Wrap(err, "failed to list private dns zone"))
 		if isAuthError(err) {
 			return err

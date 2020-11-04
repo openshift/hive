@@ -83,7 +83,7 @@ func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *install
 			Cloud:           p.Cloud,
 			ExternalNetwork: p.ExternalNetwork,
 			FlavorName:      p.ComputeFlavor,
-			LbFloatingIP:    p.APIFloatingIP,
+			APIFloatingIP:   p.APIFloatingIP,
 		},
 	}
 

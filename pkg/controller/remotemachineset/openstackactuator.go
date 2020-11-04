@@ -89,6 +89,7 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		a.osImage,
 		workerRole,
 		workerUserDataName,
+		nil,
 	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")

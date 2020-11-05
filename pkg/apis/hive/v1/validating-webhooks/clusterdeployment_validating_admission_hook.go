@@ -319,6 +319,9 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		if openstack.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(openstackPath.Child("credentialsSecretRef", "name"), "must specify secrets for OpenStack access"))
 		}
+		if openstack.CertificatesSecretRef != nil && openstack.CertificatesSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(openstackPath.Child("certificatesSecretRef", "name"), "must specify name of the secret for OpenStack access"))
+		}
 		if openstack.Cloud == "" {
 			allErrs = append(allErrs, field.Required(openstackPath.Child("cloud"), "must specify cloud section of credentials secret to use"))
 		}

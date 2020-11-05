@@ -73,6 +73,11 @@ type OpenStackClusterDeprovision struct {
 	Cloud string `json:"cloud"`
 	// CredentialsSecretRef is the OpenStack account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	// CertificatesSecretRef refers to a secret that contains CA certificates
+	// necessary for communicating with the OpenStack.
+	//
+	// +optional
+	CertificatesSecretRef *corev1.LocalObjectReference `json:"certificatesSecretRef"`
 }
 
 // VSphereClusterDeprovision contains VMware vSphere-specific configuration for a ClusterDeprovision

@@ -1849,8 +1849,9 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 		}
 	case cd.Spec.Platform.OpenStack != nil:
 		req.Spec.Platform.OpenStack = &hivev1.OpenStackClusterDeprovision{
-			Cloud:                cd.Spec.Platform.OpenStack.Cloud,
-			CredentialsSecretRef: &cd.Spec.Platform.OpenStack.CredentialsSecretRef,
+			Cloud:                 cd.Spec.Platform.OpenStack.Cloud,
+			CredentialsSecretRef:  &cd.Spec.Platform.OpenStack.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.OpenStack.CertificatesSecretRef,
 		}
 	case cd.Spec.Platform.VSphere != nil:
 		req.Spec.Platform.VSphere = &hivev1.VSphereClusterDeprovision{

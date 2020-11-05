@@ -2,6 +2,7 @@ package install
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -24,6 +25,7 @@ const (
 	gcpAuthDir         = "/.gcp"
 	gcpAuthFile        = gcpAuthDir + "/" + constants.GCPCredentialsName
 	openStackCloudsDir = "/etc/openstack"
+	openStackCADir     = "/etc/openstack-ca"
 	vsphereCloudsDir   = "/vsphere"
 	ovirtCloudsDir     = "/.ovirt"
 	ovirtCADir         = "/.ovirt-ca"
@@ -185,6 +187,20 @@ func InstallerPodSpec(
 			Name:      "openstack",
 			MountPath: openStackCloudsDir,
 		})
+		if cd.Spec.Platform.OpenStack.CertificatesSecretRef != nil && cd.Spec.Platform.OpenStack.CertificatesSecretRef.Name != "" {
+			volumes = append(volumes, corev1.Volume{
+				Name: "openstack-certificates",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.Platform.OpenStack.CertificatesSecretRef.Name,
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "openstack-certificates",
+				MountPath: openStackCADir,
+			})
+		}
 	case cd.Spec.Platform.VSphere != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "vsphere-certificates",
@@ -342,6 +358,10 @@ func InstallerPodSpec(
 	if cd.Spec.Platform.Ovirt != nil {
 		// Add oVirt certificates to CA trust.
 		hiveArg = fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", ovirtCADir, hiveArg)
+	}
+	if cd.Spec.Platform.OpenStack != nil && cd.Spec.Platform.OpenStack.CertificatesSecretRef != nil && cd.Spec.Platform.OpenStack.CertificatesSecretRef.Name != "" {
+		// Add OpenStack certificates to CA trust.
+		hiveArg = fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", openStackCADir, hiveArg)
 	}
 
 	// This is used when scheduling the installer pod. It ensures that installer pods don't overwhelm
@@ -652,25 +672,45 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 		Name:      "openstack",
 		MountPath: openStackCloudsDir,
 	})
+	if req.Spec.Platform.OpenStack.CertificatesSecretRef != nil && req.Spec.Platform.OpenStack.CertificatesSecretRef.Name != "" {
+		volumes = append(volumes, corev1.Volume{
+			Name: "openstack-certificates",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: req.Spec.Platform.OpenStack.CertificatesSecretRef.Name,
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "openstack-certificates",
+			MountPath: openStackCADir,
+		})
+	}
+	cmd := []string{"/usr/bin/hiveutil"}
+	args := []string{
+		"deprovision",
+		"openstack",
+		"--loglevel",
+		"debug",
+		"--creds-dir",
+		openStackCloudsDir,
+		"--cloud",
+		req.Spec.Platform.OpenStack.Cloud,
+		req.Spec.InfraID,
+	}
+	if req.Spec.Platform.OpenStack.CertificatesSecretRef != nil && req.Spec.Platform.OpenStack.CertificatesSecretRef.Name != "" {
+		cmd = []string{"/bin/sh", "-c"}
+		args = []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", openStackCADir, strings.Join(args, " "))}
+	}
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
-			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision",
-				"openstack",
-				"--loglevel",
-				"debug",
-				"--creds-dir",
-				openStackCloudsDir,
-				"--cloud",
-				req.Spec.Platform.OpenStack.Cloud,
-				req.Spec.InfraID,
-			},
-			VolumeMounts: volumeMounts,
+			Command:         cmd,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
 		},
 	}
 	job.Spec.Template.Spec.Containers = containers

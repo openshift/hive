@@ -111,6 +111,15 @@ spec:
                 openstack:
                   description: OpenStack contains OpenStack-specific deprovision settings
                   properties:
+                    certificatesSecretRef:
+                      description: CertificatesSecretRef refers to a secret that contains
+                        CA certificates necessary for communicating with the OpenStack.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
                     cloud:
                       description: Cloud is the secion in the clouds.yaml secret below
                         to use for auth/connectivity.

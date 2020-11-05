@@ -13,6 +13,13 @@ Hive can automate the process of stopping/starting clusters via its API by allow
 set a the desired state of the cluster in the ClusterDeployment spec. Both API and controller
 changes are required to support this feature.
 
+## Example Commands
+
+```bash
+$ oc patch cd mycluster --type='merge' -p $'spec:\n powerState: Hibernating'
+$ oc patch cd mycluster --type='merge' -p $'spec:\n powerState: Running'
+```
+
 ## API Changes
 
 The ClusterDeploymentSpec should allow setting whether machines are in a running state or in

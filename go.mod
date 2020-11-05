@@ -90,3 +90,6 @@ replace github.com/openshift/library-go => github.com/openshift/library-go v0.0.
 
 // temporary hack fix for https://github.com/kubernetes/kubernetes/issues/95300
 replace k8s.io/apiserver => github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df
+
+// Point installer to forked ocm-2.1 branch
+replace github.com/openshift/installer => github.com/openshift-hive/installer v0.9.0-master.0.20201104220119-fe1fc8fdbd2c

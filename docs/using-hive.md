@@ -1,3 +1,39 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Using Hive](#using-hive)
+  - [Cluster Provisioning](#cluster-provisioning)
+    - [DNS](#dns)
+    - [Native](#native)
+      - [Managed DNS](#managed-dns)
+    - [Non-native](#non-native)
+      - [oVirt](#ovirt)
+    - [Pull Secret](#pull-secret)
+    - [OpenShift Version](#openshift-version)
+    - [Cloud credentials](#cloud-credentials)
+      - [AWS](#aws)
+      - [Azure](#azure)
+      - [GCP](#gcp)
+      - [oVirt](#ovirt-1)
+      - [vSphere](#vsphere)
+      - [OpenStack](#openstack)
+    - [SSH Key Pair](#ssh-key-pair)
+    - [InstallConfig](#installconfig)
+    - [ClusterDeployment](#clusterdeployment)
+    - [Machine Pools](#machine-pools)
+      - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
+  - [Monitor the Install Job](#monitor-the-install-job)
+    - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
+    - [Access the Web Console](#access-the-web-console)
+  - [Managed DNS](#managed-dns-1)
+  - [Configuration Management](#configuration-management)
+    - [SyncSet](#syncset)
+    - [Identity Provider Management](#identity-provider-management)
+  - [Cluster Deprovisioning](#cluster-deprovisioning)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Using Hive
 
 ## Cluster Provisioning

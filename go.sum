@@ -1276,6 +1276,8 @@ github.com/opencontainers/runc v0.0.0-20191031171055-b133feaeeb2e/go.mod h1:qT5X
 github.com/opencontainers/runc v0.1.1/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
 github.com/opencontainers/runtime-spec v0.1.2-0.20190507144316-5b71a03e2700/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/runtime-tools v0.0.0-20181011054405-1d69bd0f9c39/go.mod h1:r3f7wjNzSs2extwzU3Y+6pKfobzPh+kKFJ3ofN+3nfs=
+github.com/openshift-hive/installer v0.9.0-master.0.20201104220119-fe1fc8fdbd2c h1:nKb9tMsH8Vnwbi0lxAqUKpEVS9RE/x1OP6+qSZOAt9w=
+github.com/openshift-hive/installer v0.9.0-master.0.20201104220119-fe1fc8fdbd2c/go.mod h1:gj5hubG057ciWCCBUq2+BK29ELoySn5H1vSP842n/uU=
 github.com/openshift-metal3/terraform-provider-ironic v0.2.3/go.mod h1:ux2W6gsCIYsY/fX5N0V0ZgwFEBNN7P8g6RlH6ACi97k=
 github.com/openshift/api v0.0.0-20200205133042-34f0ec8dab87/go.mod h1:fT6U/JfG8uZzemTRwZA2kBDJP5nWz7v05UHnty/D+pk=
 github.com/openshift/api v0.0.0-20200320142426-0de0d539b0c3/go.mod h1:7k3+uZYOir97walbYUqApHUA2OPhkQpVJHt0n7GJ6P4=
@@ -1317,8 +1319,6 @@ github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba
 github.com/openshift/cluster-version-operator v3.11.1-0.20190629164025-08cac1c02538+incompatible/go.mod h1:0BbpR1mrN0F2ZRae5N1XHcytmkvVPaeKgSQwRRBWugc=
 github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480 h1:y47BAJFepK8Xls1c+quIOyc46OXiT9LRiqGVjIaMlSA=
 github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480/go.mod h1:OAHL5WnZphlhVEf5fTdeGLvNwMu1B2zCWpmxJpCA35o=
-github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9 h1:sW+qISOi7iHyXrAdl/lUANiCc4CNrYqjTmyshUyZKMs=
-github.com/openshift/installer v0.9.0-master.0.20201006081509-887875ea9cf9/go.mod h1:gj5hubG057ciWCCBUq2+BK29ELoySn5H1vSP842n/uU=
 github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe h1:MJqGN0NVONnTLDYPVIEH4uo6i3gAK7LAkhLnyFO8Je0=
 github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe/go.mod h1:NI6xOQGuTnLXeHW8Z2glKSFhF7X+YxlAlqlBMaK0zEM=
 github.com/openshift/machine-api-operator v0.0.0-20190312153711-9650e16c9880/go.mod h1:7HeAh0v04zQn1L+4ItUjvpBQYsm2Nf81WaZLiXTcnkc=

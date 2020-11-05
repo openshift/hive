@@ -104,6 +104,20 @@ clouds:
 bin/hiveutil create-cluster --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud mycluster
 ```
 
+### Cluster Pools
+
+Create a [ClusterPool](./clusterpools.md):
+
+```bash
+bin/hiveutil clusterpool create-pool -n hive --cloud=aws --creds-file ~/.aws/credentials --image-set openshift-46 --pull-secret-file ~/.pull-secret --region us-east-1 --size 5 test-pool
+```
+
+Claim a ClusterDeployment from a [ClusterPool](./clusterpools.md):
+
+```bash
+bin/hiveutil clusterpool claim -n hive test-pool username-claim
+```
+
 ### Other Commands
 
 To see other commands offered by `hiveutil`, run `hiveutil --help`.

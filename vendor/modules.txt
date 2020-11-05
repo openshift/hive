@@ -489,7 +489,7 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
-# github.com/openshift/installer v0.9.0-master.0.20200603112517-20e472f69982
+# github.com/openshift/installer v0.9.0-master.0.20200603112517-20e472f69982 => github.com/openshift-hive/installer v0.9.0-master.0.20201105141806-0f6c9c7c1fcf
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure

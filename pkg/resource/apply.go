@@ -235,7 +235,8 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 		return nil, nil, err
 	}
 	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
-	o.OpenAPISchema, _ = f.OpenAPISchema()
+	// Re-use the openAPISchema that should have been initialized in the constructor.
+	o.OpenAPISchema = r.openAPISchema
 	o.Validator, err = f.Validator(false)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain schema to validate objects from factory")

@@ -21,7 +21,8 @@ func TestInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	h := resource.NewHelper(kubeconfig, logger)
+	h, err := resource.NewHelper(kubeconfig, logger)
+	require.NoError(t, err)
 	i, err := h.Info([]byte(`apiVersion: v1
 kind: ConfigMap
 metadata:

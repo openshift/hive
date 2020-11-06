@@ -75,7 +75,11 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	logger := log.WithField("controller", ControllerName)
-	helper := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
+	helper, err := resource.NewHelperWithMetricsFromRESTConfig(mgr.GetConfig(), ControllerName, logger)
+	if err != nil {
+		// Hard exit if we can't create this controller
+		logger.WithError(err).Fatal("unable to create resource helper")
+	}
 	r := &ReconcileControlPlaneCerts{
 		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:  mgr.GetScheme(),

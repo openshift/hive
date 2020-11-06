@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,11 +35,18 @@ var (
 	},
 		[]string{"controller", "method", "resource", "remote", "status"},
 	)
+	metricKubeClientRequestsCancelled = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_kube_client_requests_cancelled_total",
+		Help: "Counter incremented for each kube client request cancelled.",
+	},
+		[]string{"controller", "method", "resource", "remote"},
+	)
 )
 
 func init() {
 	metrics.Registry.MustRegister(metricKubeClientRequests)
 	metrics.Registry.MustRegister(metricKubeClientRequestSeconds)
+	metrics.Registry.MustRegister(metricKubeClientRequestsCancelled)
 }
 
 // NewClientWithMetricsOrDie creates a new controller-runtime client with a wrapper which increments
@@ -103,6 +111,21 @@ type ControllerMetricsTripper struct {
 	Remote     bool
 }
 
+func (cmt *ControllerMetricsTripper) CancelRequest(req *http.Request) {
+	// "CancelRequest not implemented by *utils.ControllerMetricsTripper" was seen during simulated scale
+	// testing as the cluster was falling over. We will now implement this and track a metric for requests
+	// being cancelled as this could prove valuable in tracking when we have a performance issue.
+	remoteStr := strconv.FormatBool(cmt.Remote)
+	path, _ := parsePath(req.URL.Path)
+	metricKubeClientRequestsCancelled.WithLabelValues(cmt.Controller.String(), req.Method, path, remoteStr).Inc()
+	log.WithFields(log.Fields{
+		"controller": cmt.Controller.String(),
+		"method":     req.Method,
+		"path":       path,
+		"remote":     remoteStr,
+	}).Warn("cancelled request")
+}
+
 // RoundTrip implements the http RoundTripper interface.
 func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	startTime := time.Now()
@@ -111,6 +134,7 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 		remoteStr = "true"
 	}
 	path, pathErr := parsePath(req.URL.Path)
+
 	// Call the nested RoundTripper.
 	resp, err := cmt.RoundTripper.RoundTrip(req)
 	applyTime := metav1.Now().Sub(startTime)

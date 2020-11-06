@@ -56,7 +56,11 @@ func newApplyCommand() *cobra.Command {
 			}
 			content := mustRead(args[0])
 			kubeconfig := mustRead(kubeconfigPath)
-			helper := resource.NewHelper(kubeconfig, log.WithField("cmd", "apply"))
+			helper, err := resource.NewHelper(kubeconfig, log.WithField("cmd", "apply"))
+			if err != nil {
+				fmt.Printf("Error creating resource helper: %v\n", err)
+				return
+			}
 			info, err := helper.Info(content)
 			if err != nil {
 				fmt.Printf("Error obtaining info: %v\n", err)
@@ -124,8 +128,12 @@ func newPatchCommand() *cobra.Command {
 			}
 			content := mustRead(args[0])
 			kubeconfig := mustRead(kubeconfigPath)
-			helper := resource.NewHelper(kubeconfig, log.WithField("cmd", "patch"))
-			err := helper.Patch(types.NamespacedName{Name: name, Namespace: namespace}, kind, apiVersion, content, patchTypeStr)
+			helper, err := resource.NewHelper(kubeconfig, log.WithField("cmd", "patch"))
+			if err != nil {
+				fmt.Printf("Error creating resource helper: %v\n", err)
+				return
+			}
+			err = helper.Patch(types.NamespacedName{Name: name, Namespace: namespace}, kind, apiVersion, content, patchTypeStr)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				return

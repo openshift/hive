@@ -37,8 +37,6 @@ func (r *inMemoryEventRecorder) ComponentName() string {
 	return r.source
 }
 
-func (r *inMemoryEventRecorder) Shutdown() {}
-
 func (r *inMemoryEventRecorder) ForComponent(component string) Recorder {
 	r.Lock()
 	defer r.Unlock()

@@ -26,8 +26,6 @@ func (r *LoggingEventRecorder) ForComponent(component string) Recorder {
 	return &newRecorder
 }
 
-func (r *LoggingEventRecorder) Shutdown() {}
-
 func (r *LoggingEventRecorder) WithComponentSuffix(suffix string) Recorder {
 	return r.ForComponent(fmt.Sprintf("%s-%s", r.ComponentName(), suffix))
 }

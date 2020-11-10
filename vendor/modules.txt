@@ -489,7 +489,7 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
-# github.com/openshift/installer v0.9.0-master.0.20200603112517-20e472f69982
+# github.com/openshift/installer v0.9.0-master.0.20200603112517-20e472f69982 => github.com/openshift-hive/installer v0.9.0-master.0.20201105141806-0f6c9c7c1fcf
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure
@@ -519,7 +519,7 @@ github.com/openshift/installer/pkg/types/openstack
 github.com/openshift/installer/pkg/types/ovirt
 github.com/openshift/installer/pkg/types/vsphere
 github.com/openshift/installer/pkg/version
-# github.com/openshift/library-go v0.0.0-20200429122220-9e6c27e916a0
+# github.com/openshift/library-go v0.0.0-20200429122220-9e6c27e916a0 => github.com/openshift/library-go v0.0.0-20200421122923-c1de486c7d47
 github.com/openshift/library-go/pkg/controller
 github.com/openshift/library-go/pkg/controller/fileobserver
 github.com/openshift/library-go/pkg/operator/events

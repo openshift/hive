@@ -113,7 +113,14 @@ func deletePublicRecords(ctx context.Context, dnsClient dns.ZonesClient, records
 
 	// collect records from private zones in rgName
 	var errs []error
-	for zonesPage, err := dnsClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100)); zonesPage.NotDone(); err = zonesPage.NextWithContext(ctx) {
+	zonesPage, err := dnsClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100))
+	if err != nil {
+		if zonesPage.Response().IsHTTPStatus(http.StatusNotFound) {
+			logger.Debug("already deleted")
+			return utilerrors.NewAggregate(errs)
+		}
+	}
+	for ; zonesPage.NotDone(); err = zonesPage.NextWithContext(ctx) {
 		if err != nil {
 			errs = append(errs, errors.Wrap(err, "failed to list dns zone"))
 			continue
@@ -127,12 +134,19 @@ func deletePublicRecords(ctx context.Context, dnsClient dns.ZonesClient, records
 			}
 		}
 	}
-	for zonesPage, err := privateDNSClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100)); zonesPage.NotDone(); err = zonesPage.NextWithContext(ctx) {
+	privateZonesPage, err := privateDNSClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100))
+	if err != nil {
+		if privateZonesPage.Response().IsHTTPStatus(http.StatusNotFound) {
+			logger.Debug("already deleted")
+			return utilerrors.NewAggregate(errs)
+		}
+	}
+	for ; privateZonesPage.NotDone(); err = privateZonesPage.NextWithContext(ctx) {
 		if err != nil {
 			errs = append(errs, errors.Wrap(err, "failed to list private dns zone"))
 			continue
 		}
-		for _, zone := range zonesPage.Values() {
+		for _, zone := range privateZonesPage.Values() {
 			if err := deletePublicRecordsForPrivateZone(ctx, privateRecordsClient, dnsClient, recordsClient, logger, rgName, to.String(zone.Name)); err != nil {
 				errs = append(errs, errors.Wrapf(err, "failed to delete public records for %s", to.String(zone.Name)))
 				continue

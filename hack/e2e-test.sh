@@ -72,15 +72,14 @@ if [ $i -ge ${max_tries} ] ; then
   exit 10
 fi
 
-
-CLOUD_CREDS_DIR="${CLOUD_CREDS_DIR:-/tmp/cluster}"
+CLUSTER_PROFILE_DIR="${CLUSTER_PROFILE_DIR:-/tmp/cluster}"
 
 # Create a new cluster deployment
 export CLOUD="${CLOUD:-aws}"
 export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 export ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp}"
-export SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLOUD_CREDS_DIR}/ssh-publickey}"
-export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLOUD_CREDS_DIR}/pull-secret}"
+export SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLUSTER_PROFILE_DIR}/ssh-publickey}"
+export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLUSTER_PROFILE_DIR}/pull-secret}"
 export HIVE_NS="hive-e2e"
 export HIVE_OPERATOR_NS="hive-operator"
 
@@ -132,16 +131,16 @@ USE_MANAGED_DNS=true
 
 case "${CLOUD}" in
 "aws")
-	CREDS_FILE="${CLOUD_CREDS_DIR}/.awscred"
+	CREDS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 	;;
 "azure")
-	CREDS_FILE="${CLOUD_CREDS_DIR}/osServicePrincipal.json"
+	CREDS_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
 	;;
 "gcp")
-	CREDS_FILE="${CLOUD_CREDS_DIR}/gce.json"
+	CREDS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
 	;;
 *)

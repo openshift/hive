@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -15,9 +16,11 @@ import (
 
 var (
 	// ClusterDeployment conditions that could indicate provisioning problems with a cluster
+	// First condition appearing True will be used in the metric labels.
 	provisioningDelayCondition = [...]hivev1.ClusterDeploymentConditionType{
-		hivev1.ProvisionFailedCondition,
+		hivev1.DNSNotReadyCondition,
 		hivev1.InstallLaunchErrorCondition,
+		hivev1.ProvisionFailedCondition,
 	}
 )
 
@@ -56,7 +59,7 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			if cdCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
 				delayCondition); cdCondition != nil {
 				condition = string(delayCondition)
-				if cdCondition.Reason != "" {
+				if cdCondition.Status == corev1.ConditionTrue && cdCondition.Reason != "" {
 					reason = cdCondition.Reason
 				}
 				break

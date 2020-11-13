@@ -32,13 +32,21 @@ to keep the clusters in the pool always running so they can instantly be used
 may be added in the future.
 
 When done with a cluster, users can just delete their `ClusterClaim` and the
-`ClusterDeployment` will be automatically deprovisioned. An optional 
-`ClusterClaim.Spec.Lifetime` can be specified after which a cluster claim will 
+`ClusterDeployment` will be automatically deprovisioned. An optional
+`ClusterClaim.Spec.Lifetime` can be specified after which a cluster claim will
 automatically be deleted. The namespace created
 for each cluster will eventually be cleaned up once deprovision has finished.
 
 Note that at present, the shared credentials used for a pool will be visible
 in-cluster. This may improve in the future for some clouds.
+
+## Supported Cloud Platforms
+
+`ClusterPool` currently supports the following cloud platforms:
+
+  * AWS
+  * Azure
+  * GCP
 
 ## Sample Cluster Pool
 

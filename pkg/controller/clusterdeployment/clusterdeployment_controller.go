@@ -64,6 +64,10 @@ const (
 	dnsReadyReason     = "DNSReady"
 	dnsReadyAnnotation = "hive.openshift.io/dnsready"
 
+	installAttemptsLimitReachedReason = "InstallAttemptsLimitReached"
+	installOnlyOnceSetReason          = "InstallOnlyOnceSet"
+	provisionNotStoppedReason         = "ProvisionNotStopped"
+
 	deleteAfterAnnotation    = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
 	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
 
@@ -616,62 +620,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Status.ProvisionRef == nil {
-		if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
-			cdLog.Debug("not creating new provision since the deployment is set to try install only once")
-			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-				cd.Status.Conditions,
-				hivev1.ProvisionStoppedCondition,
-				corev1.ConditionTrue,
-				"InstallOnlyOnceSet",
-				"Deployment is set to try install only once",
-				controllerutils.UpdateConditionIfReasonOrMessageChange)
-			if changed {
-				cd.Status.Conditions = conditions
-				cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
-				if err := r.Status().Update(context.TODO(), cd); err != nil {
-					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-					return reconcile.Result{}, err
-				}
-			}
-			return reconcile.Result{}, nil
-		}
-		if cd.Spec.InstallAttemptsLimit != nil && cd.Status.InstallRestarts >= int(*cd.Spec.InstallAttemptsLimit) {
-			cdLog.Debug("not creating new provision since the install attempts limit has been reached")
-			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-				cd.Status.Conditions,
-				hivev1.ProvisionStoppedCondition,
-				corev1.ConditionTrue,
-				"InstallAttemptsLimitReached",
-				"Install attempts limit reached",
-				controllerutils.UpdateConditionIfReasonOrMessageChange)
-			if changed {
-				cd.Status.Conditions = conditions
-				cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
-				if err := r.Status().Update(context.TODO(), cd); err != nil {
-					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-					return reconcile.Result{}, err
-				}
-			}
-			return reconcile.Result{}, nil
-		}
-
-		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.ProvisionStoppedCondition,
-			corev1.ConditionFalse,
-			"ProvisionNotStopped",
-			"Provision is not stopped",
-			controllerutils.UpdateConditionNever)
-		if changed {
-			cd.Status.Conditions = conditions
-			cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionFalse)
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-				return reconcile.Result{}, err
-			}
-			return reconcile.Result{}, nil
-		}
-
 		return r.startNewProvision(cd, releaseImage, cdLog)
 	}
 
@@ -709,6 +657,62 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		if updated || err != nil {
 			return reconcile.Result{}, err
 		}
+	}
+
+	if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
+		cdLog.Debug("not creating new provision since the deployment is set to try install only once")
+		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.ProvisionStoppedCondition,
+			corev1.ConditionTrue,
+			installOnlyOnceSetReason,
+			"Deployment is set to try install only once",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed {
+			cd.Status.Conditions = conditions
+			cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
+			if err := r.Status().Update(context.TODO(), cd); err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+				return reconcile.Result{}, err
+			}
+		}
+		return reconcile.Result{}, nil
+	}
+	if cd.Spec.InstallAttemptsLimit != nil && cd.Status.InstallRestarts >= int(*cd.Spec.InstallAttemptsLimit) {
+		cdLog.Debug("not creating new provision since the install attempts limit has been reached")
+		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.ProvisionStoppedCondition,
+			corev1.ConditionTrue,
+			installAttemptsLimitReachedReason,
+			"Install attempts limit reached",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed {
+			cd.Status.Conditions = conditions
+			cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
+			if err := r.Status().Update(context.TODO(), cd); err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+				return reconcile.Result{}, err
+			}
+		}
+		return reconcile.Result{}, nil
+	}
+
+	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.ProvisionStoppedCondition,
+		corev1.ConditionFalse,
+		provisionNotStoppedReason,
+		"Provision is not stopped",
+		controllerutils.UpdateConditionNever)
+	if changed {
+		cd.Status.Conditions = conditions
+		cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionFalse)
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	if err := controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog); err != nil {

@@ -10,10 +10,6 @@ FROM quay.io/app-sre/centos:7
 # is strongly recommended for security updates.
 RUN yum -y update && yum clean all
 
-# Install EPEL for certbot
-RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-RUN yum install -y certbot && yum clean all
-
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clean all && rm -rf /var/cache/yum/*; fi
 

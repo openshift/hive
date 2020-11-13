@@ -8,6 +8,10 @@ ENV GIT_COMMITTER_EMAIL hive-team@redhat.com
 # Basic Debug Tools
 RUN yum -y install strace tcping && yum clean all
 
+# Install EPEL for certbot to generate letsencrypt certs in e2e tests
+RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+RUN yum install -y certbot && yum clean all
+
 # Install kubebuilder 1.0.8
 RUN export version=1.0.8 && \
     cd /tmp && \

@@ -33,6 +33,16 @@ if ! which kustomize > /dev/null; then
   popd
 fi
 
+if ! which certbot > /dev/null; then
+  wget https://dl.eff.org/certbot-auto
+  # Renaming to just certbot, certbot-auto is a wrapper around certbot and accepts same args, but will setup the
+  # the tool and always use latest version.
+  sudo mv certbot-auto /usr/local/bin/certbot
+  sudo chown root /usr/local/bin/certbot
+  sudo chmod 0755 /usr/local/bin/certbot
+  #/usr/local/bin/certbot --help # will configure certbot on the system
+fi
+
 i=1
 while [ $i -le ${max_tries} ]; do
   if [ $i -gt 1 ]; then

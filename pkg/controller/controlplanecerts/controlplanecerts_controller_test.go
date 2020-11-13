@@ -81,7 +81,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeClusterDeployment().defaultCert("default-cert", "default-secret").obj(),
 				fakeCertSecret("default-secret"),
 			},
-			expectedPatch:   `[ { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "test-api-url" ], "servingCertificate": { "name": "fake-cluster-default-secret" } } ] } ]`,
+			expectedPatch:   `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "test-api-url" ], "servingCertificate": { "name": "fake-cluster-default-secret" } } ] } ]`,
 			expectedSecrets: []string{"default-secret"},
 		},
 		{
@@ -93,7 +93,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeCertSecret("secret1"),
 				fakeCertSecret("secret2"),
 			},
-			expectedPatch:   `[ { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "foo.com" ], "servingCertificate": { "name": "fake-cluster-secret1" } }, { "names": [ "bar.com" ], "servingCertificate": { "name": "fake-cluster-secret2" } } ] } ]`,
+			expectedPatch:   `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "foo.com" ], "servingCertificate": { "name": "fake-cluster-secret1" } }, { "names": [ "bar.com" ], "servingCertificate": { "name": "fake-cluster-secret2" } } ] } ]`,
 			expectedSecrets: []string{"secret1", "secret2"},
 		},
 		{
@@ -108,7 +108,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeCertSecret("secret1"),
 				fakeCertSecret("secret2"),
 			},
-			expectedPatch:   `[ { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "test-api-url" ], "servingCertificate": { "name": "fake-cluster-secret0" } }, { "names": [ "foo.com" ], "servingCertificate": { "name": "fake-cluster-secret1" } }, { "names": [ "bar.com" ], "servingCertificate": { "name": "fake-cluster-secret2" } } ] } ]`,
+			expectedPatch:   `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "test-api-url" ], "servingCertificate": { "name": "fake-cluster-secret0" } }, { "names": [ "foo.com" ], "servingCertificate": { "name": "fake-cluster-secret1" } }, { "names": [ "bar.com" ], "servingCertificate": { "name": "fake-cluster-secret2" } } ] } ]`,
 			expectedSecrets: []string{"secret0", "secret1", "secret2"},
 		},
 		{
@@ -130,7 +130,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				fakeClusterDeployment().obj(),
 				fakeSyncSet(),
 			},
-			expectedPatch: `[ { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  ] } ]`,
+			expectedPatch: `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  ] } ]`,
 		},
 		{
 			name: "existing not found condition changed to false",

@@ -363,7 +363,7 @@ func (r *ReconcileControlPlaneCerts) getServingCertificatesJSONPatch(cd *hivev1.
 			additional.Domain, remoteSecretName(bundle.CertificateSecretRef.Name, cd)))
 	}
 
-	var kubeAPIServerNamedCertsTemplate = `[ { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [ %s ] } ]`
+	var kubeAPIServerNamedCertsTemplate = `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [ %s ] } ]`
 	namedCerts := buf.String()
 	return fmt.Sprintf(kubeAPIServerNamedCertsTemplate, namedCerts), nil
 

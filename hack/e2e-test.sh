@@ -34,13 +34,17 @@ if ! which kustomize > /dev/null; then
 fi
 
 if ! which certbot > /dev/null; then
+  certbot_dir="$(mktemp -d)"
+  export PATH="$PATH:${certbot_dir}"
+  pushd "${certbot_dir}"
   wget https://dl.eff.org/certbot-auto
   # Renaming to just certbot, certbot-auto is a wrapper around certbot and accepts same args, but will setup the
   # the tool and always use latest version.
-  mv certbot-auto /usr/local/bin/certbot
-  chown root /usr/local/bin/certbot
-  chmod 0755 /usr/local/bin/certbot
+  mv certbot-auto certbot
+  chown root certbot
+  chmod 0755 certbot
   #/usr/local/bin/certbot --help # will configure certbot on the system
+  popd
 fi
 
 i=1

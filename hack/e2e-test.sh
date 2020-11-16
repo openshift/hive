@@ -41,7 +41,6 @@ if ! which certbot > /dev/null; then
   # Renaming to just certbot, certbot-auto is a wrapper around certbot and accepts same args, but will setup the
   # the tool and always use latest version.
   mv certbot-auto certbot
-  chown root certbot
   chmod 0755 certbot
   #/usr/local/bin/certbot --help # will configure certbot on the system
   popd

@@ -58,8 +58,8 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 		for _, delayCondition := range provisioningDelayCondition {
 			if cdCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
 				delayCondition); cdCondition != nil {
-				condition = string(delayCondition)
 				if cdCondition.Status == corev1.ConditionTrue && cdCondition.Reason != "" {
+					condition = string(delayCondition)
 					reason = cdCondition.Reason
 				}
 				break

@@ -1,6 +1,9 @@
 package clusterSync
 
 import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hiveinternalv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
@@ -93,5 +96,17 @@ func WithCondition(cond hiveinternalv1alpha1.ClusterSyncCondition) Option {
 			}
 		}
 		clusterSync.Status.Conditions = append(clusterSync.Status.Conditions, cond)
+	}
+}
+
+func WithFirstSuccessTime(firstSuccessTime time.Time) Option {
+	return func(clusterSync *hiveinternalv1alpha1.ClusterSync) {
+		clusterSync.Status.FirstSuccessTime = &metav1.Time{Time: firstSuccessTime}
+	}
+}
+
+func WithNoFirstSuccessTime() Option {
+	return func(clusterSync *hiveinternalv1alpha1.ClusterSync) {
+		clusterSync.Status.FirstSuccessTime = nil
 	}
 }

@@ -366,6 +366,38 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 	}, nil
 }
 
+// NewClientFromAccessKey creates our client wrapper object for the actual AWS clients we use, using the given
+// access key ID and secret access key.
+func NewClientFromAccessKey(accessKeyID, secretAccessKey, region string) (Client, error) {
+	awsConfig := &aws.Config{
+		Region:           aws.String(region),
+		EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
+	}
+
+	awsConfig.Credentials = credentials.NewStaticCredentials(
+		accessKeyID, secretAccessKey, "")
+
+	s, err := session.NewSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	s.Handlers.Build.PushBackNamed(request.NamedHandler{
+		Name: "openshift.io/hive",
+		Fn:   request.MakeAddToUserAgentHandler("openshift.io hive", "v1"),
+	})
+
+	return &awsClient{
+		ec2Client:     ec2.New(s),
+		elbClient:     elb.New(s),
+		iamClient:     iam.New(s),
+		s3Client:      s3.New(s),
+		route53Client: route53.New(s),
+		stsClient:     sts.New(s),
+		tagClient:     resourcegroupstaggingapi.New(s),
+	}, nil
+}
+
 func awsChinaEndpointResolver(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 	if service != route53.EndpointsID || region != constants.AWSChinaRoute53Region {
 		return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)

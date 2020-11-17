@@ -33,9 +33,9 @@ type Options struct {
 	homeDir    string
 }
 
-// NewCreateCertifcateCommand returns a command that will create a letsencrypt serving cert
+// NewCreateCertificateCommand returns a command that will create a letsencrypt serving cert
 // for OpenShift clusters on AWS.
-func NewCreateCertifcateCommand() *cobra.Command {
+func NewCreateCertificateCommand() *cobra.Command {
 	username := "user"
 	homeDir := "/tmp"
 	user, err := user.Current()
@@ -146,12 +146,13 @@ func (o *Options) getBaseDomainID() (string, error) {
 	if credsFile == "" {
 		credsFile = filepath.Join(o.homeDir, ".aws", "credentials")
 	}
-	credsSecret, err := awsutils.GenerateAWSCredentialsSecretFromCredsFile(credsFile)
+	log.WithField("credsFile", credsFile).Info("loading AWS credentials from file")
+	accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(credsFile, "")
 	if err != nil {
-		log.WithError(err).Fatal("error generating manageDNS credentials secret")
+		return "", err
 	}
 
-	client, err := awsclient.NewClientFromSecret(credsSecret, o.Region)
+	client, err := awsclient.NewClientFromAccessKey(accessKeyID, secretAccessKey, o.Region)
 	if err != nil {
 		return "", errors.Wrap(err, "cannot create AWS client; make sure your environment is setup to communicate with AWS")
 	}

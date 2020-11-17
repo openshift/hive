@@ -14,7 +14,7 @@ func NewCertificateCommand() *cobra.Command {
 			cmd.Usage()
 		},
 	}
-	cmd.AddCommand(NewCreateCertifcateCommand())
+	cmd.AddCommand(NewCreateCertificateCommand())
 	cmd.AddCommand(NewAuthHookCommand())
 	cmd.AddCommand(NewCleanupHookCommand())
 	return cmd

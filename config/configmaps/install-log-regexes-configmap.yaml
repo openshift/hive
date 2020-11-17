@@ -32,16 +32,6 @@ data:
       - "data.aws_route53_zone.public: no matching Route53Zone found"
       installFailingReason: NoMatchingRoute53Zone
       installFailingMessage: No matching Route53Zone found
-    - name: KubeAPIWaitTimeout
-      searchRegexStrings:
-      - "waiting for Kubernetes API: context deadline exceeded"
-      installFailingReason: KubeAPIWaitTimeout
-      installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
-    - name: MonitoringOperatorStillUpdating
-      searchRegexStrings:
-      - "failed to initialize the cluster: Cluster operator monitoring is still updating"
-      installFailingReason: MonitoringOperatorStillUpdating
-      installFailingMessage: Timeout waiting for the monitoring operator to become ready
     - name: SimulatorThrottling
       searchRegexStrings:
       - "validate AWS credentials: checking install permissions: error simulating policy: Throttling: Rate exceeded"
@@ -52,12 +42,34 @@ data:
       - "Throttling: Rate exceeded"
       installFailingReason: AWSAPIRateLimitExceeded
       installFailingMessage: AWS API rate limit exceeded
+    # GCP Specific
+    - name: GCPInvalidProjectID
+      searchRegexStrings:
+      - "platform\.gcp\.project.* invalid project ID"
+      installFailingReason: GCPInvalidProjectID
+      installFailingMessage: Invalid GCP project ID
+    - name: GCPInstanceTypeNotFound
+      searchRegexStrings:
+      - "platform.gcp.type: Invalid value:.* instance type.* not found]"
+      installFailingReason: GCPInstanceTypeNotFound
+      installFailingMessage: GCP instance type not found
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:
       - "platform.baremetal.libvirtURI: Internal error: could not connect to libvirt: virError.Code=38, Domain=7, Message=.Cannot recv data: Permission denied"
       installFailingReason: LibvirtSSHKeyPermissionDenied
       installFailingMessage: "Permission denied connecting to libvirt host, check SSH key configuration and pass phrase"
+    # Generic OpenShift Install
+    - name: KubeAPIWaitTimeout
+      searchRegexStrings:
+      - "waiting for Kubernetes API: context deadline exceeded"
+      installFailingReason: KubeAPIWaitTimeout
+      installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+    - name: MonitoringOperatorStillUpdating
+      searchRegexStrings:
+      - "failed to initialize the cluster: Cluster operator monitoring is still updating"
+      installFailingReason: MonitoringOperatorStillUpdating
+      installFailingMessage: Timeout waiting for the monitoring operator to become ready
     # Processing stops at the first match, so this more generic
     # message about the connection failure must always come after the
     # more specific message for LibvirtSSHKeyPermissionDenied.

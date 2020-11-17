@@ -175,10 +175,16 @@ else
 	CLUSTER_DOMAIN="${BASE_DOMAIN}"
 fi
 
-echo "Generating letsencrypt certificates for cluster"
-go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" certificate create "${CLUSTER_NAME}" --base-domain "${CLUSTER_DOMAIN}" --output-dir "${SRC_DIR}"
-# This will cause a hive-controllers pod restart:
-${SRC_ROOT}/hack/set-additional-ca.sh "${SRC_DIR}/${CLUSTER_NAME}.ca"
+# Our certificates command only works against AWS today, but this gives us the coverage we need to ensure
+# control plane certs get deployed.
+if [ "$CLOUD" = "aws" ]; then
+	echo "Generating letsencrypt certificates for AWS cluster"
+	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" certificate create "${CLUSTER_NAME}" \
+		--base-domain "${CLUSTER_DOMAIN}" --output-dir "${SRC_DIR}" --creds-file="${CREDS_FILE}"
+	# This will cause a hive-controllers pod restart:
+	${SRC_ROOT}/hack/set-additional-ca.sh "${SRC_DIR}/${CLUSTER_NAME}.ca"
+	SERVING_CERT_ARGS=" --serving-cert=${SRC_ROOT}/${CLUSTER_NAME}.crt --serving-cert-key=${SRC_ROOT}/${CLUSTER_NAME}.key"
+fi
 
 echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
 echo "Creating cluster deployment"
@@ -191,8 +197,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true \
-	--serving-cert="${SRC_ROOT}/${CLUSTER_NAME}.crt" \
-	--serving-cert-key="${SRC_ROOT}/${CLUSTER_NAME}.key" \
+	${SERVING_CERT_ARGS} \
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS}
 

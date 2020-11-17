@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/route53"
-
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 )
 
@@ -29,6 +29,8 @@ type Options struct {
 	Region     string
 	OutputDir  string
 	WaitTime   time.Duration
+	CredsFile  string
+	homeDir    string
 }
 
 // NewCreateCertifcateCommand returns a command that will create a letsencrypt serving cert
@@ -42,7 +44,7 @@ func NewCreateCertifcateCommand() *cobra.Command {
 		homeDir = user.HomeDir
 	}
 
-	opt := &Options{}
+	opt := &Options{homeDir: homeDir}
 	cmd := &cobra.Command{
 		Use:   "create CLUSTER_NAME",
 		Short: "Creates a new serving certificate for the given cluster",
@@ -60,6 +62,7 @@ func NewCreateCertifcateCommand() *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opt.BaseDomain, "base-domain", "new-installer.openshift.com", "Base domain for the cluster")
+	flags.StringVar(&opt.CredsFile, "creds-file", "", "AWS credentials file") // TODO: update description if we ever support GCP/Azure here
 	flags.StringVar(&opt.Email, "email", fmt.Sprintf("%s@redhat.com", username), "email address to use for certificate")
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region for certificate hosted zone")
 	flags.StringVar(&opt.OutputDir, "output-dir", homeDir, "Output directory for certs. Defaults to home directory")
@@ -139,7 +142,16 @@ func (o *Options) Run() error {
 }
 
 func (o *Options) getBaseDomainID() (string, error) {
-	client, err := awsclient.NewClient(nil, "", "", o.Region)
+	credsFile := o.CredsFile
+	if credsFile == "" {
+		credsFile = filepath.Join(o.homeDir, ".aws", "credentials")
+	}
+	credsSecret, err := awsutils.GenerateAWSCredentialsSecretFromCredsFile(credsFile)
+	if err != nil {
+		log.WithError(err).Fatal("error generating manageDNS credentials secret")
+	}
+
+	client, err := awsclient.NewClientFromSecret(credsSecret, o.Region)
 	if err != nil {
 		return "", errors.Wrap(err, "cannot create AWS client; make sure your environment is setup to communicate with AWS")
 	}

@@ -144,8 +144,12 @@ func (o *Options) Run(args []string) error {
 
 	switch o.Cloud {
 	case cloudAWS:
+		credsFile := o.CredsFile
+		if credsFile == "" {
+			credsFile = filepath.Join(o.homeDir, ".aws", "credentials")
+		}
 		// Apply a secret for credentials to manage the root domain:
-		credsSecret, err = o.generateAWSCredentialsSecret()
+		credsSecret, err := awsutils.GenerateAWSCredentialsSecretFromCredsFile(credsFile)
 		if err != nil {
 			log.WithError(err).Fatal("error generating manageDNS credentials secret")
 		}
@@ -304,28 +308,6 @@ func waitForHiveConfigToBeProcessed(hiveClient *hiveclient.Clientset) error {
 
 	log.Debug("done waiting for hiveconfig to be processed")
 	return err
-}
-
-func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
-	defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-	accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("aws-dns-creds-%s", uuid.New().String()[:5]),
-		},
-		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			"aws_access_key_id":     accessKeyID,
-			"aws_secret_access_key": secretAccessKey,
-		},
-	}, nil
 }
 
 func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {

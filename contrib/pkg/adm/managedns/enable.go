@@ -149,7 +149,7 @@ func (o *Options) Run(args []string) error {
 			credsFile = filepath.Join(o.homeDir, ".aws", "credentials")
 		}
 		// Apply a secret for credentials to manage the root domain:
-		credsSecret, err := awsutils.GenerateAWSCredentialsSecretFromCredsFile(credsFile)
+		credsSecret, err = awsutils.GenerateAWSCredentialsSecretFromCredsFile(credsFile)
 		if err != nil {
 			log.WithError(err).Fatal("error generating manageDNS credentials secret")
 		}

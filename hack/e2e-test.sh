@@ -175,17 +175,6 @@ else
 	CLUSTER_DOMAIN="${BASE_DOMAIN}"
 fi
 
-# Our certificates command only works against AWS today, but this gives us the coverage we need to ensure
-# control plane certs get deployed.
-if [ "$CLOUD" = "aws" ]; then
-	echo "Generating letsencrypt certificates for AWS cluster"
-	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" certificate create "${CLUSTER_NAME}" \
-		--base-domain "${CLUSTER_DOMAIN}" --output-dir "${SRC_DIR}" --creds-file="${CREDS_FILE}"
-	# This will cause a hive-controllers pod restart:
-	${SRC_ROOT}/hack/set-additional-ca.sh "${SRC_DIR}/${CLUSTER_NAME}.ca"
-	SERVING_CERT_ARGS=" --serving-cert=${SRC_ROOT}/${CLUSTER_NAME}.crt --serving-cert-key=${SRC_ROOT}/${CLUSTER_NAME}.key"
-fi
-
 echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
 echo "Creating cluster deployment"
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
@@ -197,7 +186,6 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true \
-	${SERVING_CERT_ARGS} \
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS}
 
@@ -249,6 +237,59 @@ oc get events -n ${HIVE_NS}
 echo ""
 echo "Events in cluster namespace"
 oc get events -n ${CLUSTER_NAMESPACE}
+
+# When using manageDNS, we cannot run the certificate command until our hosted zone is created.
+# Wait for the DNSNotReady condition to be False, then generate certs, and patch the ClusterDeployment.
+# Our certificates command only works against AWS today, but this gives us the coverage we need to ensure
+# control plane certs get deployed.
+if [ "$CLOUD" = "aws" ]; then
+	if $USE_MANAGED_DNS; then
+		echo "Waiting for managed DNS hosted zone to be ready"
+		i=1
+		dns_ready=0
+		while [ $i -le 10 ]; do
+		  DNS_NOT_READY=$(oc get cd ${CLUSTER_NAME} -n ${CLUSTER_NAMESPACE} -o json | jq '.status.conditions[] | select(.type == "DNSNotReady") | .status' )
+		  if [[ "${DNS_NOT_READY}" == "False" ]] ; then
+		  	echo "DNS hosted zone ready"
+			dns_ready=1
+			break
+		  fi
+		  sleep 20
+		  echo "Still waiting for the ClusterDeployment ${CLUSTER_NAME} DNS hosted zone to be ready. Status check #${i}/20... "
+		  i=$((i + 1))
+		done
+		if [ dns_ready == 0 ]; then
+			echo "DNS hosted zone not ready within allotted time"
+			exit 11
+		fi
+	fi
+
+	echo "Generating letsencrypt certificate for AWS cluster"
+	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" certificate create "${CLUSTER_NAME}" \
+		--base-domain "${CLUSTER_DOMAIN}" --output-dir "${SRC_DIR}" --creds-file="${CREDS_FILE}"
+	# This will cause a hive-controllers pod restart:
+	${SRC_ROOT}/hack/set-additional-ca.sh "${SRC_DIR}/${CLUSTER_NAME}.ca"
+	oc create secret generic "${CLUSTER_NAME}-serving-cert" --from-file=tls.crt="${SRC_ROOT}/${CLUSTER_NAME}.crt" \
+		--from-file=tls.key="${SRC_ROOT}/${CLUSTER_NAME}.key"
+
+	echo "Patching ClusterDeployment for serving certificate"
+	CD_PATCH="spec:
+  certificateBundles:
+  - certificateSecretRef:
+      name: ${CLUSTER_NAME}-serving-cert
+    name: serving-cert
+  controlPlaneConfig:
+    servingCertificates:
+      default: serving-cert
+  ingress:
+  - domain: apps.${CLUSTER_DOMAIN}
+    name: default
+    servingCertificate: serving-cert
+"
+	echo "${CD_PATCH}"
+	kubectl patch clusterdeployment dgood-cert-old --patch="${CD_PATCH}"
+fi
+
 
 echo "Waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
 INSTALL_RESULT=""

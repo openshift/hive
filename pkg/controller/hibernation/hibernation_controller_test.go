@@ -67,6 +67,7 @@ func TestReconcile(t *testing.T) {
 		setupCSRHelper func(helper *mock.MockcsrHelper)
 		setupRemote    func(builder *remoteclientmock.MockBuilder)
 		validate       func(t *testing.T, cd *hivev1.ClusterDeployment)
+		expectError    bool
 	}{
 		{
 			name: "cluster deleted",
@@ -107,6 +108,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cond.Reason)
 			},
+			expectError: true,
 		},
 		{
 			name: "start hibernating, syncsets not applied but 10 minutes have passed since cd install",
@@ -328,7 +330,12 @@ func TestReconcile(t *testing.T) {
 			_, err := reconciler.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{Namespace: namespace, Name: cdName},
 			})
-			assert.Nil(t, err)
+
+			if test.expectError {
+				assert.Error(t, err, "expected error from reconcile")
+			} else {
+				assert.NoError(t, err, "expected no error from reconcile")
+			}
 			if test.validate != nil {
 				cd := &hivev1.ClusterDeployment{}
 				err := c.Get(context.TODO(), client.ObjectKey{Namespace: namespace, Name: cdName}, cd)
@@ -365,6 +372,7 @@ func TestHibernateAfter(t *testing.T) {
 		cd            *hivev1.ClusterDeployment
 		cs            *hiveintv1alpha1.ClusterSync
 
+		expectError             bool
 		expectRequeueAfter      time.Duration
 		expectedPowerState      hivev1.ClusterPowerState
 		expectedConditionReason string
@@ -450,6 +458,7 @@ func TestHibernateAfter(t *testing.T) {
 			cs: csBuilder.Options(
 				testcs.WithNoFirstSuccessTime(),
 			).Build(),
+			expectError:        true,
 			expectedPowerState: "",
 			expectRequeueAfter: time.Duration(time.Minute * 2),
 		},
@@ -503,14 +512,18 @@ func TestHibernateAfter(t *testing.T) {
 				NamespacedName: types.NamespacedName{Namespace: namespace, Name: cdName},
 			})
 
+			if test.expectError {
+				assert.Error(t, err, "expected error from reconcile")
+			} else {
+				assert.NoError(t, err, "expected no error from reconcile")
+			}
+
 			// Need to do fuzzy requeue after matching
-			if assert.NoError(t, err, "error reconciling") {
-				if test.expectRequeueAfter == 0 {
-					assert.Zero(t, result.RequeueAfter)
-				} else {
-					assert.GreaterOrEqual(t, result.RequeueAfter.Seconds(), (test.expectRequeueAfter - 10*time.Second).Seconds(), "requeue after too small")
-					assert.LessOrEqual(t, result.RequeueAfter.Seconds(), (test.expectRequeueAfter + 10*time.Second).Seconds(), "request after too large")
-				}
+			if test.expectRequeueAfter == 0 {
+				assert.Zero(t, result.RequeueAfter)
+			} else {
+				assert.GreaterOrEqual(t, result.RequeueAfter.Seconds(), (test.expectRequeueAfter - 10*time.Second).Seconds(), "requeue after too small")
+				assert.LessOrEqual(t, result.RequeueAfter.Seconds(), (test.expectRequeueAfter + 10*time.Second).Seconds(), "request after too large")
 			}
 
 			cd := &hivev1.ClusterDeployment{}

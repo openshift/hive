@@ -169,10 +169,19 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result rec
 		if supported, msg := r.hibernationSupported(cd); !supported {
 			return r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
 		}
-		if syncSetsApplied, msg := r.syncSetsApplied(cd); !syncSetsApplied {
-			// Allow hibernation if hibernateAfterSyncSetsNotApplied duration has passed since cluster installed and syncsets still not applied
+
+		// Determine if SyncSets have been applied
+		clusterSync := &hiveintv1alpha1.ClusterSync{}
+		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
+		}
+		// SyncSets have not been applied
+		if clusterSync.Status.FirstSuccessTime == nil {
+			// Allow hibernation (do not set condition) if hibernateAfterSyncSetsNotApplied duration has passed since cluster
+			// installed and syncsets still not applied
 			if cd.Status.InstalledTimestamp != nil && time.Now().Sub(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {
-				return r.setHibernatingCondition(cd, hivev1.SyncSetsNotAppliedReason, msg, corev1.ConditionFalse, cdLog)
+				return r.setHibernatingCondition(cd, hivev1.SyncSetsNotAppliedReason, "Cluster SyncSets have not been applied", corev1.ConditionFalse, cdLog)
 			}
 		}
 	}
@@ -367,6 +376,7 @@ func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeploy
 			logger.Infof("cluster will reconcile due to syncsets not applied in: %v", requeueAfter)
 			result.RequeueAfter = requeueAfter
 			result.Requeue = true
+			returnErr = errors.New(message)
 		}()
 	}
 
@@ -405,18 +415,6 @@ func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeploymen
 		return false, fmt.Sprintf("Unsupported version, need version %s or greater", minimumClusterVersion.String())
 	}
 	return true, "Hibernation capable"
-}
-
-func (r *hibernationReconciler) syncSetsApplied(cd *hivev1.ClusterDeployment) (bool, string) {
-	clusterSync := &hiveintv1alpha1.ClusterSync{}
-	err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
-	if err != nil {
-		return false, fmt.Sprintf("could not get ClusterSync: %v", err)
-	}
-	if clusterSync.Status.FirstSuccessTime == nil {
-		return false, "Cluster SyncSets have not been applied"
-	}
-	return true, ""
 }
 
 func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (bool, error) {

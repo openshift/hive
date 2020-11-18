@@ -464,6 +464,17 @@ func TestHibernateAfter(t *testing.T) {
 			).Build(),
 			expectedPowerState: hivev1.HibernatingClusterPowerState,
 		},
+		{
+			name: "cluster due for hibernate, syncsets successfully applied",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 9*time.Hour)),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			cs: csBuilder.Options(
+				testcs.WithFirstSuccessTime(time.Now()),
+			).Build(),
+			expectedPowerState: hivev1.HibernatingClusterPowerState,
+		},
 	}
 
 	for _, test := range tests {

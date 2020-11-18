@@ -26,6 +26,7 @@ func init() {
 const (
 	dnsAlreadyExistsLog    = "blahblah\naws_route53_record.api_external: [ERR]: Error building changeset: InvalidChangeBatch: [Tried to create resource record set [name='api.jh-stg-2405-2.n6b3.s1.devshift.org.'type='A'] but it already exists]\n\nblahblah"
 	pendingVerificationLog = "blahblah\naws_instance.master.2: Error launching source instance: PendingVerification: Your request for accessing resources in this region is being validated, and you will not be able to launch additional resources in this region until the validation is complete. We will notify you by email once your request has been validated. While normally resolved within minutes, please allow up to 4 hours for this process to complete. If the issue still persists, please let us know by writing to awsa\n\nblahblah"
+	gcpInvalidProjectIDLog = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -47,6 +48,12 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(pendingVerificationLog),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "PendingVerification",
+		},
+		{
+			name:           "Wildcard",
+			log:            pointer.StringPtr(gcpInvalidProjectIDLog),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "GCPInvalidProjectID",
 		},
 		{
 			name:           "no log",
@@ -163,6 +170,11 @@ func buildRegexConfigMap() *corev1.ConfigMap {
   - "PendingVerification: Your request for accessing resources in this region is being validated"
   installFailingReason: PendingVerification
   installFailingMessage: Account pending verification for region
+- name: GCPInvalidProjectID
+  searchRegexStrings:
+  - "platform.gcp.project.* invalid project ID"
+  installFailingReason: GCPInvalidProjectID
+  installFailingMessage: Invalid GCP project ID
 `,
 		},
 	}

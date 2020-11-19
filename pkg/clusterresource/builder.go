@@ -118,6 +118,9 @@ type Builder struct {
 	// AdditionalTrustBundle is a PEM-encoded X.509 certificate bundle
 	// that will be added to the nodes' trusted certificate store.
 	AdditionalTrustBundle string
+
+	// InstallConfig Secret to be used as template for deployment install-config
+	InstallConfigTemplate string
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -179,11 +182,19 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 		allObjects = append(allObjects, o.generateMachinePool())
 	}
 
-	installConfigSecret, err := o.generateInstallConfigSecret()
-	if err != nil {
-		return nil, err
+	if o.InstallConfigTemplate != "" {
+		installConfigSecret, err := o.mergeInstallConfigTemplate()
+		if err != nil {
+			return nil, fmt.Errorf("Encountered problems mering InstallConfigTemplate: %s", err.Error())
+		}
+		allObjects = append(allObjects, installConfigSecret)
+	} else {
+		installConfigSecret, err := o.generateInstallConfigSecret()
+		if err != nil {
+			return nil, err
+		}
+		allObjects = append(allObjects, installConfigSecret)
 	}
-	allObjects = append(allObjects, installConfigSecret)
 
 	// TODO: maintain "include secrets" flag functionality? possible this should just be removed
 	if len(o.PullSecret) != 0 {
@@ -354,6 +365,36 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      o.getInstallConfigSecretName(),
+			Namespace: o.Namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		StringData: map[string]string{
+			"install-config.yaml": string(d),
+		},
+	}, nil
+}
+
+func (o *Builder) mergeInstallConfigTemplate() (*corev1.Secret, error) {
+	ic := new(InstallConfigTemplate)
+	err := yaml.Unmarshal([]byte(o.InstallConfigTemplate), ic)
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing installconfigtemplate: %s", err.Error())
+	}
+	ic.BaseDomain = o.BaseDomain
+	ic.MetaData.Name = o.Name
+
+	d, err := yaml.Marshal(ic)
+	if err != nil {
+		return nil, err
+	}
+
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",

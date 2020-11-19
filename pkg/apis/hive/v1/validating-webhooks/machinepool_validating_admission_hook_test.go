@@ -502,6 +502,16 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 			}(),
 		},
 		{
+			name: "replicas changed",
+			old:  testMachinePool(),
+			new: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Replicas = pointer.Int64Ptr(5)
+				return pool
+			}(),
+			expectAllowed: true,
+		},
+		{
 			name: "labels changed",
 			old:  testMachinePool(),
 			new: func() *hivev1.MachinePool {
@@ -509,6 +519,7 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 				pool.Spec.Labels = map[string]string{"new-label-key": "new-label-value"}
 				return pool
 			}(),
+			expectAllowed: true,
 		},
 		{
 			name: "taints changed",
@@ -522,6 +533,7 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 				}}
 				return pool
 			}(),
+			expectAllowed: true,
 		},
 		{
 			name: "platform changed",

@@ -102,8 +102,6 @@ func TestInstallerPodSpec(t *testing.T) {
 				test.provisionName,
 				test.releaseImage,
 				test.serviceAccountName,
-				test.pvcName,
-				test.skipGatherLogs,
 				test.extraEnvVars)
 
 			// Assert

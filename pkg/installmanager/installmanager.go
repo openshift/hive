@@ -108,14 +108,16 @@ type InstallManager struct {
 	uploadAdminPassword              func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
 	readInstallerLog                 func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
 	waitForProvisioningStage         func(*hivev1.ClusterProvision, *InstallManager) error
-	isGatherLogsEnabled              func() bool
 	waitForInstallCompleteExecutions int
 	binaryDir                        string
+	actuator                         LogUploaderActuator
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
 func NewInstallManagerCommand() *cobra.Command {
-	im := &InstallManager{}
+	im := &InstallManager{
+		actuator: getActuator(),
+	}
 	cmd := &cobra.Command{
 		Use:   "install-manager NAMESPACE CLUSTER_PROVISION_NAME",
 		Short: "Executes and oversees the openshift-installer.",
@@ -168,7 +170,6 @@ func (m *InstallManager) Complete(args []string) error {
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
 	m.uploadAdminPassword = uploadAdminPassword
 	m.readInstallerLog = readInstallerLog
-	m.isGatherLogsEnabled = isGatherLogsEnabled
 	m.cleanupFailedProvision = cleanupFailedProvision
 	m.waitForProvisioningStage = waitForProvisioningStage
 
@@ -328,6 +329,7 @@ func (m *InstallManager) Run() error {
 			m.log.WithError(readErr).Error("error reading asset generation log")
 			return err
 		}
+
 		m.log.Info("updating clusterprovision")
 		if err := m.updateClusterProvision(
 			provision,
@@ -415,8 +417,10 @@ func (m *InstallManager) Run() error {
 		}
 
 		// Fetch logs from all cluster machines:
-		if m.isGatherLogsEnabled() {
-			m.gatherLogs(cd, sshKeyPath, sshAgentSetupErr)
+		if m.actuator == nil {
+			m.log.Debug("Unable to find log storage actuator. Disabling gathering logs.")
+		} else {
+			m.gatherLogs(provision, cd, sshKeyPath, sshAgentSetupErr)
 		}
 
 		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
@@ -450,6 +454,20 @@ func (m *InstallManager) Run() error {
 
 	m.log.Info("install completed successfully")
 
+	return nil
+}
+
+func getActuator() LogUploaderActuator {
+	// As we add more LogUploaderActuators, add them here
+	actuators := []LogUploaderActuator{
+		&s3LogUploaderActuator{awsClientFn: getAWSClient},
+	}
+
+	for _, a := range actuators {
+		if a.IsConfigured() {
+			return a
+		}
+	}
 	return nil
 }
 
@@ -642,7 +660,6 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 // generateAssets runs openshift-install commands to generate on-disk assets we need to
 // upload or modify prior to provisioning resources in the cloud.
 func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) error {
-
 	m.log.Info("running openshift-install create manifests")
 	err := m.runOpenShiftInstallCommand("create", "manifests")
 	if err != nil {
@@ -667,6 +684,7 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
 	}
+
 	m.log.Info("assets generated successfully")
 	return nil
 }
@@ -690,6 +708,7 @@ func (m *InstallManager) provisionCluster() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -826,12 +845,6 @@ func (m *InstallManager) loadClusterDeployment(provision *hivev1.ClusterProvisio
 	return cd, nil
 }
 
-func isGatherLogsEnabled() bool {
-	// By default we assume to gather logs, only disable if explicitly told to via HiveConfig.
-	envVarValue := os.Getenv(constants.SkipGatherLogsEnvVar)
-	return envVarValue != "true"
-}
-
 // gatherLogs will attempt to gather logs after a failed install. First we attempt
 // to gather logs from the bootstrap node. If this fails, we may have made it far enough
 // to teardown the bootstrap node, in which case we then attempt to gather with
@@ -839,7 +852,7 @@ func isGatherLogsEnabled() bool {
 // If neither succeeds we do not consider this a fatal error,
 // we're just gathering as much information as we can and then proceeding with cleanup
 // so we can re-try.
-func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath string, sshAgentSetupErr error) {
+func (m *InstallManager) gatherLogs(provision *hivev1.ClusterProvision, cd *hivev1.ClusterDeployment, sshPrivKeyPath string, sshAgentSetupErr error) {
 	if !m.isBootstrapComplete() {
 		if sshAgentSetupErr != nil {
 			m.log.Warn("unable to fetch logs from bootstrap node as SSH agent was not configured")
@@ -849,13 +862,38 @@ func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath
 			m.log.WithError(err).Warn("error fetching logs from bootstrap node")
 			return
 		}
+
 		m.log.Info("successfully gathered logs from bootstrap node")
 	} else {
 		if err := m.gatherClusterLogs(cd); err != nil {
 			m.log.WithError(err).Warn("error fetching logs with oc adm must-gather")
 			return
 		}
+
 		m.log.Info("successfully ran oc adm must-gather")
+	}
+
+	// At this point, all log files are in m.LogsDir
+	// Gather the filenames
+	files, err := ioutil.ReadDir(m.LogsDir)
+	if err != nil {
+		m.log.WithError(err).WithField("clusterprovision", types.NamespacedName{Name: provision.Name, Namespace: provision.Namespace}).Error("error reading Logsdir")
+		return
+	}
+
+	filepaths := []string{}
+	for _, file := range files {
+		if file.IsDir() {
+			m.log.WithField("directory", file.Name()).Debug("not uploading directory")
+			continue
+		}
+
+		filepaths = append(filepaths, filepath.Join(m.LogsDir, file.Name()))
+	}
+
+	uploadErr := m.actuator.UploadLogs(cd.Spec.ClusterName, provision, m.DynamicClient, m.log, filepaths...)
+	if uploadErr != nil {
+		m.log.WithError(uploadErr).Error("error uploading logs")
 	}
 }
 

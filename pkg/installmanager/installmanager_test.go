@@ -24,10 +24,10 @@ import (
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -160,7 +160,10 @@ func TestInstallManager(t *testing.T) {
 			existing := test.existing
 			existing = append(existing, pullSecret)
 
-			fakeClient := fake.NewFakeClient(existing...)
+			mocks := setupDefaultMocks(t, existing...)
+
+			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
+			defer mocks.mockCtrl.Finish()
 
 			// create a fake install-config
 			mountedInstallConfigFile := filepath.Join(tempDir, "mounted-install-config.yaml")
@@ -179,7 +182,7 @@ func TestInstallManager(t *testing.T) {
 				WorkDir:                tempDir,
 				ClusterProvisionName:   testProvisionName,
 				Namespace:              testNamespace,
-				DynamicClient:          fakeClient,
+				DynamicClient:          mocks.fakeKubeClient,
 				InstallConfigMountPath: mountedInstallConfigFile,
 				PullSecretMountPath:    mountedPullSecretFile,
 				binaryDir:              binaryTempDir,
@@ -218,7 +221,7 @@ func TestInstallManager(t *testing.T) {
 
 			if test.failedInstallerLogRead {
 				im.readInstallerLog = func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error) {
-					return "", fmt.Errorf("faiiled to save install log")
+					return "", fmt.Errorf("failed to save install log")
 				}
 			}
 
@@ -237,6 +240,11 @@ func TestInstallManager(t *testing.T) {
 			// We don't want to run the uninstaller, so stub it out
 			im.cleanupFailedProvision = alwaysSucceedCleanupFailedProvision
 
+			// Save the list of actuators so that it can be restored at the end of this test
+			im.actuator = &s3LogUploaderActuator{awsClientFn: func(c client.Client, secretName, namespace, region string, logger log.FieldLogger) (awsclient.Client, error) {
+				return mocks.mockAWSClient, nil
+			}}
+
 			err = im.Run()
 
 			if test.expectError {
@@ -246,7 +254,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			adminKubeconfig := &corev1.Secret{}
-			err = fakeClient.Get(context.Background(),
+			err = mocks.fakeKubeClient.Get(context.Background(),
 				types.NamespacedName{
 					Namespace: testNamespace,
 					Name:      fmt.Sprintf("%s-admin-kubeconfig", testProvisionName),
@@ -267,7 +275,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			adminPassword := &corev1.Secret{}
-			err = fakeClient.Get(context.Background(),
+			err = mocks.fakeKubeClient.Get(context.Background(),
 				types.NamespacedName{
 					Namespace: testNamespace,
 					Name:      fmt.Sprintf("%s-admin-password", testProvisionName),
@@ -292,7 +300,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			provision := &hivev1.ClusterProvision{}
-			if err := fakeClient.Get(context.Background(),
+			if err := mocks.fakeKubeClient.Get(context.Background(),
 				types.NamespacedName{
 					Namespace: testNamespace,
 					Name:      testProvisionName,
@@ -341,21 +349,6 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			Provisioning: &hivev1.Provisioning{},
-		},
-	}
-}
-
-func testClusterProvision() *hivev1.ClusterProvision {
-	return &hivev1.ClusterProvision{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testProvisionName,
-			Namespace: testNamespace,
-		},
-		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeploymentRef: corev1.LocalObjectReference{
-				Name: testDeploymentName,
-			},
-			Stage: hivev1.ClusterProvisionStageProvisioning,
 		},
 	}
 }

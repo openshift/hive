@@ -43,8 +43,10 @@ spec:
               type: string
             namespace:
               description: Namespace is the namespace containing the ClusterDeployment
-                of the claimed cluster. This field will be set by the ClusterPool
-                when the claim is assigned a cluster.
+                (name will match the namespace) of the claimed cluster. This field
+                will be set as soon as a suitable cluster can be found, however that
+                cluster may still be resuming and not yet ready for use. Wait for
+                the ClusterRunning condition to be true to avoid this issue.
               type: string
             subjects:
               description: Subjects hold references to which to authorize access to

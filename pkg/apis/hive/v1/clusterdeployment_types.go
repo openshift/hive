@@ -360,6 +360,9 @@ const (
 	// FailedToStartHibernationReason is used when there was an error starting machines
 	// to leave hibernation
 	FailedToStartHibernationReason = "FailedToStart"
+	// SyncSetsNotAppliedReason is used as the reason when SyncSets have not yet been applied
+	// for the cluster based on ClusterSync.Status.FirstSucessTime
+	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
 )
 
 // +genclient

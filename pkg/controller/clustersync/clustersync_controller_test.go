@@ -1817,6 +1817,27 @@ func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
 	assert.Nil(t, updatedClusterSync.Status.FirstSuccessTime)
 }
 
+func TestReconcileClusterSync_FirstSuccessTimeSetWithNoSyncSets(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
+	clusterSync := clusterSyncBuilder(scheme).Build()
+	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme, cd, clusterSync, syncLease)
+	rt.expectUnchangedLeaseRenewTime = true
+	rt.expectRequeue = false
+	rt.run(t)
+	updatedClusterSync := &hiveintv1alpha1.ClusterSync{}
+	err := rt.c.Get(context.TODO(), client.ObjectKey{Name: testCDName, Namespace: testNamespace}, updatedClusterSync)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	// ClusterSync.Status.FirstSuccessTime set when there are no syncsets for clustersync
+	assert.NotNil(t, updatedClusterSync.Status.FirstSuccessTime)
+}
+
 func TestReconcileClusterSync_SyncToUpsertResourceApplyMode(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

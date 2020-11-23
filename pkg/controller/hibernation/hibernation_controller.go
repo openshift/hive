@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 
@@ -25,6 +26,7 @@ import (
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -48,6 +50,10 @@ const (
 	// avoid a false positive when the node status is checked too
 	// soon after the cluster is ready
 	nodeCheckWaitTime = 4 * time.Minute
+
+	// hibernateAfterSyncSetsNotApplied is the amount of time to wait
+	// before hibernating when SyncSets have not been applied
+	hibernateAfterSyncSetsNotApplied = 10 * time.Minute
 )
 
 var (
@@ -157,16 +163,32 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result rec
 	shouldHibernate := cd.Spec.PowerState == hivev1.HibernatingClusterPowerState
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 
-	// Signal a problem if we should be hibernating or have requested hibernate after and the cluster does not support it.
+	// Signal a problem if we should be hibernating or have requested hibernate after and the cluster does not support it or
+	// SyncSets have not yet been applied.
 	if shouldHibernate || cd.Spec.HibernateAfter != nil {
-		if supported, msg := r.canHibernate(cd); !supported {
+		if supported, msg := r.hibernationSupported(cd); !supported {
 			return r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
+		}
+
+		// Determine if SyncSets have been applied
+		clusterSync := &hiveintv1alpha1.ClusterSync{}
+		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
+		}
+		// SyncSets have not been applied
+		if clusterSync.Status.FirstSuccessTime == nil {
+			// Allow hibernation (do not set condition) if hibernateAfterSyncSetsNotApplied duration has passed since cluster
+			// installed and syncsets still not applied
+			if cd.Status.InstalledTimestamp != nil && time.Now().Sub(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {
+				return r.setHibernatingCondition(cd, hivev1.SyncSetsNotAppliedReason, "Cluster SyncSets have not been applied", corev1.ConditionFalse, cdLog)
+			}
 		}
 	}
 
 	// Clear any lingering unsupported hibernation condition
 	if hibernatingCondition != nil && hibernatingCondition.Reason == hivev1.UnsupportedHibernationReason {
-		if supported, msg := r.canHibernate(cd); supported {
+		if supported, msg := r.hibernationSupported(cd); supported {
 			return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, msg, corev1.ConditionFalse, cdLog)
 		}
 	}
@@ -323,7 +345,7 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 	return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, "All machines are started and nodes are ready", corev1.ConditionFalse, logger)
 }
 
-func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeployment, reason, message string, status corev1.ConditionStatus, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeployment, reason, message string, status corev1.ConditionStatus, logger log.FieldLogger) (result reconcile.Result, returnErr error) {
 	changed := false
 	if status == corev1.ConditionFalse && controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition) == nil {
 		now := metav1.Now()
@@ -346,12 +368,24 @@ func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeploy
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
 	}
+
+	if reason == hivev1.SyncSetsNotAppliedReason {
+		defer func() {
+			expiry := cd.Status.InstalledTimestamp.Time.Add(hibernateAfterSyncSetsNotApplied)
+			requeueAfter := time.Until(expiry)
+			logger.Infof("cluster will reconcile due to syncsets not applied in: %v", requeueAfter)
+			result.RequeueAfter = requeueAfter
+			result.Requeue = true
+			returnErr = errors.New(message)
+		}()
+	}
+
 	if changed {
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to update hibernating condition")
 			return reconcile.Result{}, errors.Wrap(err, "failed to update hibernating condition")
 		}
-		logger.Info("Hibernating condition updated on cluster deployment.")
+		logger.WithField("reason", reason).Info("Hibernating condition updated on cluster deployment.")
 	}
 	return reconcile.Result{}, nil
 }
@@ -365,7 +399,7 @@ func (r *hibernationReconciler) getActuator(cd *hivev1.ClusterDeployment) Hibern
 	return nil
 }
 
-func (r *hibernationReconciler) canHibernate(cd *hivev1.ClusterDeployment) (bool, string) {
+func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeployment) (bool, string) {
 	if r.getActuator(cd) == nil {
 		return false, "Unsupported platform: no actuator to handle it"
 	}

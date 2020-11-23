@@ -1,15 +1,21 @@
 package remotemachineset
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/gophercloud/utils/openstack/clientconfig"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	openstackprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis"
 	openstackproviderv1alpha1 "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installosp "github.com/openshift/installer/pkg/asset/machines/openstack"
@@ -17,13 +23,15 @@ import (
 	installertypesosp "github.com/openshift/installer/pkg/types/openstack"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 // OpenStackActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type OpenStackActuator struct {
-	logger  log.FieldLogger
-	osImage string
+	logger     log.FieldLogger
+	osImage    string
+	kubeClient client.Client
 }
 
 var _ Actuator = &OpenStackActuator{}
@@ -33,15 +41,16 @@ func addOpenStackProviderToScheme(scheme *runtime.Scheme) error {
 }
 
 // NewOpenStackActuator is the constructor for building a OpenStackActuator
-func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*OpenStackActuator, error) {
+func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {
 	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting os image from master machine")
 		return nil, err
 	}
 	actuator := &OpenStackActuator{
-		logger:  logger,
-		osImage: osImage,
+		logger:     logger,
+		osImage:    osImage,
+		kubeClient: kubeClient,
 	}
 	return actuator, nil
 }
@@ -62,6 +71,13 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	computePool := baseMachinePool(pool)
 	computePool.Platform.OpenStack = &installertypesosp.MachinePool{
 		FlavorName: pool.Spec.Platform.OpenStack.Flavor,
+		// The installer's MachinePool-to-MachineSet function will distribute the generated
+		// MachineSets across the list of Zones. As we don't presently support defining zones
+		// in Hive MachinePools, make sure we send at least a list of one zone so that we
+		// get back a MachineSet.
+		// Providing the empty string will give back a MachineSet running on the default
+		// OpenStack Nova availability zone.
+		Zones: []string{""},
 	}
 
 	if pool.Spec.Platform.OpenStack.RootVolume != nil {
@@ -82,6 +98,17 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		},
 	}
 
+	credsSecretKey := types.NamespacedName{
+		Name:      cd.Spec.Platform.OpenStack.CredentialsSecretRef.Name,
+		Namespace: cd.Namespace,
+	}
+	yamlOpts, err := newYamlOptsBuilder(a.kubeClient, credsSecretKey)
+
+	clientOptions := &clientconfig.ClientOpts{
+		Cloud:    cd.Spec.Platform.OpenStack.Cloud,
+		YAMLOpts: yamlOpts,
+	}
+
 	installerMachineSets, err := installosp.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
@@ -89,7 +116,7 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		a.osImage,
 		workerRole,
 		workerUserDataName,
-		nil,
+		clientOptions,
 	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
@@ -130,4 +157,46 @@ func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *ru
 		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
 	}
 	return spec, nil
+}
+
+// yamlOptsBuilder lets us provide our own functions to return a 'clouds.yaml' file that has been
+// unmarshaled into the format expected by the OpenStack clients.
+type yamlOptsBuilder struct {
+	cloudYaml map[string]clientconfig.Cloud
+}
+
+func newYamlOptsBuilder(kubeClient client.Client, credsSecretKey types.NamespacedName) (*yamlOptsBuilder, error) {
+
+	credsSecret := &corev1.Secret{}
+	if err := kubeClient.Get(context.TODO(), credsSecretKey, credsSecret); err != nil {
+		return nil, errors.Wrap(err, "failed to get OpenStack credentials")
+	}
+
+	cloudsYaml, ok := credsSecret.Data[constants.OpenStackCredentialsName]
+	if !ok {
+		return nil, errors.New("did not find credentials in the OpenStack credentials secret")
+	}
+
+	var clouds clientconfig.Clouds
+	if err := yaml.Unmarshal(cloudsYaml, &clouds); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal yaml stored in secret")
+	}
+
+	optsBuilder := &yamlOptsBuilder{
+		cloudYaml: clouds.Clouds,
+	}
+	return optsBuilder, nil
+}
+
+func (opts *yamlOptsBuilder) LoadCloudsYAML() (map[string]clientconfig.Cloud, error) {
+	return opts.cloudYaml, nil
+}
+
+func (opts *yamlOptsBuilder) LoadSecureCloudsYAML() (map[string]clientconfig.Cloud, error) {
+	// secure.yaml is optional so just pretend it doesn't exist
+	return nil, nil
+}
+
+func (opts *yamlOptsBuilder) LoadPublicCloudsYAML() (map[string]clientconfig.Cloud, error) {
+	return nil, fmt.Errorf("LoadPublicCloudsYAML() not implemented")
 }

@@ -11,6 +11,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,11 +34,13 @@ import (
 )
 
 const (
-	ControllerName             = hivev1.ClusterpoolControllerName
-	finalizer                  = "hive.openshift.io/clusters"
-	imageSetDependent          = "cluster image set"
-	pullSecretDependent        = "pull secret"
-	credentialsSecretDependent = "credentials secret"
+	ControllerName                  = hivev1.ClusterpoolControllerName
+	finalizer                       = "hive.openshift.io/clusters"
+	imageSetDependent               = "cluster image set"
+	pullSecretDependent             = "pull secret"
+	credentialsSecretDependent      = "credentials secret"
+	clusterPoolAdminRoleName        = "hive-cluster-pool-admin"
+	clusterPoolAdminRoleBindingName = "hive-cluster-pool-admin-binding"
 )
 
 var (
@@ -111,7 +114,74 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		return err
 	}
 
+	// Watch for changes to the hive cluster pool admin RoleBindings
+	if err := c.Watch(
+		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: requestsForRBACResources(r.Client, r.logger),
+		},
+	); err != nil {
+		return err
+	}
+
+	// Watch for changes to the hive-cluster-pool-admin-binding RoleBinding
+	if err := c.Watch(
+		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger),
+		},
+	); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.ToRequestsFunc {
+	return func(o handler.MapObject) []reconcile.Request {
+		if o.Meta.GetName() != resourceName {
+			return nil
+		}
+		clusterName := o.Meta.GetNamespace()
+		cd := &hivev1.ClusterDeployment{}
+		if err := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to get ClusterDeployment for RBAC resource")
+			return nil
+		}
+		cpKey := clusterPoolKey(cd)
+		if cpKey == nil {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: *cpKey}}
+	}
+}
+
+func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.ToRequestsFunc {
+	return func(o handler.MapObject) []reconcile.Request {
+		binding, ok := o.Object.(*rbacv1.RoleBinding)
+		if !ok {
+			return nil
+		}
+		if binding.RoleRef.Kind != "ClusterRole" || binding.RoleRef.Name != clusterPoolAdminRoleName {
+			return nil
+		}
+
+		cpList := &hivev1.ClusterPoolList{}
+		if err := c.List(context.Background(), cpList, client.InNamespace(o.Meta.GetNamespace())); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to list cluster pools for RBAC resource")
+			return nil
+		}
+		var requests []reconcile.Request
+		for _, cpl := range cpList.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cpl.Namespace,
+					Name:      cpl.Name,
+				},
+			})
+		}
+		return requests
+	}
 }
 
 var _ reconcile.Reconciler = &ReconcileClusterPool{}
@@ -231,7 +301,110 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		}
 	}
 
+	if err := r.reconcileRBAC(clp, logger); err != nil {
+		log.WithError(err).Error("error reconciling RBAC")
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterPool) reconcileRBAC(
+	clp *hivev1.ClusterPool,
+	logger log.FieldLogger,
+) error {
+	rbList := &rbacv1.RoleBindingList{}
+	if err := r.Client.List(context.Background(), rbList, client.InNamespace(clp.GetNamespace())); err != nil {
+		log.WithError(err).Error("error listing rolebindings")
+		return err
+	}
+	var subs []rbacv1.Subject
+	var roleRef rbacv1.RoleRef
+	for _, rb := range rbList.Items {
+		if rb.RoleRef.Kind != "ClusterRole" ||
+			rb.RoleRef.Name != clusterPoolAdminRoleName {
+			continue
+		}
+		roleRef = rb.RoleRef
+		subs = append(subs, rb.Subjects...)
+	}
+
+	if len(subs) == 0 {
+		// nothing to do here.
+		return nil
+	}
+
+	// get namespaces where role needs to be bound.
+	cdNSList := &corev1.NamespaceList{}
+	if err := r.Client.List(context.Background(), cdNSList,
+		client.MatchingLabels{constants.ClusterPoolNameLabel: clp.GetName()}); err != nil {
+		log.WithError(err).Error("error listing namespaces for cluster pool")
+		return err
+	}
+
+	// create role bindings.
+	var errs []error
+	for _, ns := range cdNSList.Items {
+		if ns.DeletionTimestamp != nil {
+			logger.WithField("namespace", ns.GetName()).
+				Debug("skipping syncing the rolebindings as the namespace is marked for deletion")
+			continue
+		}
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.GetName(),
+				Name:      clusterPoolAdminRoleBindingName,
+			},
+			Subjects: subs,
+			RoleRef:  roleRef,
+		}
+		orb := &rbacv1.RoleBinding{}
+		if err := r.applyRoleBinding(rb, orb, logger); err != nil {
+			errs = append(errs, errors.Wrapf(err, "failed to apply rolebinding in namespace %s", ns.GetNamespace()))
+			continue
+		}
+	}
+	if err := utilerrors.NewAggregate(errs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterPool) applyRoleBinding(desired, observed *rbacv1.RoleBinding, logger log.FieldLogger) error {
+	key := client.ObjectKey{Namespace: desired.GetNamespace(), Name: desired.GetName()}
+	logger = logger.WithField("rolebinding", key)
+
+	switch err := r.Client.Get(context.Background(), key, observed); {
+	case apierrors.IsNotFound(err):
+		logger.Info("creating rolebinding")
+		if err := r.Create(context.Background(), desired); err != nil {
+			logger.WithError(err).Error("could not create rolebinding")
+			return err
+		}
+		return nil
+	case err != nil:
+		logger.WithError(err).Error("error getting rolebinding")
+		return errors.Wrap(err, "could not get rolebinding")
+	}
+
+	if reflect.DeepEqual(observed.Subjects, desired.Subjects) && reflect.DeepEqual(observed.RoleRef, desired.RoleRef) {
+		return nil
+	}
+	obsrvdSubs := observed.Subjects
+	observed.Subjects = desired.Subjects
+	observed.RoleRef = desired.RoleRef
+
+	logger.WithFields(log.Fields{
+		"observedSubjects": obsrvdSubs,
+		"desiredSubjects":  desired.Subjects,
+		"desiredRoleRef":   desired.RoleRef,
+	}).Info("updating rolebinding")
+	if err := r.Update(context.Background(), observed); err != nil {
+		logger.WithError(err).Error("could not update rolebinding")
+		return err
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterPool) addClusters(

@@ -57,12 +57,13 @@ const (
 )
 
 var (
-	metricTimeToApplySyncSet = prometheus.NewHistogram(
+	metricTimeToApplySyncSet = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "hive_syncset_apply_duration_seconds",
 			Help:    "Time to first successfully apply syncset to a cluster",
 			Buckets: []float64{5, 10, 30, 60, 300, 600, 1800, 3600},
 		},
+		[]string{"group"},
 	)
 	metricTimeToApplySelectorSyncSet = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -540,7 +541,11 @@ func (r *ReconcileClusterSync) applySyncSets(
 				// For non-selector SyncSets we have a more accurate startTime, either ClusterDeployment installedTimestamp
 				// or SyncSet creationTimestamp.
 				logger.WithField("applyTime", applyTime).Debug("observed first successful apply of SyncSet for cluster")
-				metricTimeToApplySyncSet.Observe(applyTime)
+				if syncSetGroup, ok := syncSet.AsMetaObject().GetAnnotations()[constants.SyncSetMetricsGroupAnnotation]; ok && syncSetGroup != "" {
+					metricTimeToApplySyncSet.WithLabelValues(syncSetGroup).Observe(applyTime)
+				} else {
+					metricTimeToApplySyncSet.WithLabelValues("none").Observe(applyTime)
+				}
 			}
 		}
 

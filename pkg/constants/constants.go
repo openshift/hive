@@ -301,6 +301,10 @@ const (
 	// ReconcileIDLen is the length of the random strings we generate for contextual loggers in controller
 	// Reconcile functions.
 	ReconcileIDLen = 8
+
+	// SyncSetMetricsGroupAnnotation can be applied to non-selector SyncSets to make them part of a
+	// group for which first applied metrics can be reported
+	SyncSetMetricsGroupAnnotation = "hive.openshift.io/syncset-metrics-group"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

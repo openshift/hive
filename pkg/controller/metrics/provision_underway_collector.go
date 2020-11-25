@@ -66,6 +66,12 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 
+		platform := cd.Labels[hivev1.HiveClusterPlatformLabel]
+		imageSet := "none"
+		if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.ImageSetRef != nil {
+			imageSet = cd.Spec.Provisioning.ImageSetRef.Name
+		}
+
 		// For installing clusters we report the seconds since the cluster was created.
 		ch <- prometheus.MustNewConstMetric(
 			cc.metricClusterDeploymentProvisionUnderwaySeconds,
@@ -76,6 +82,8 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			GetClusterDeploymentType(&cd),
 			condition,
 			reason,
+			platform,
+			imageSet,
 		)
 
 	}
@@ -92,7 +100,7 @@ func newProvisioningUnderwayCollector(client client.Client) prometheus.Collector
 		metricClusterDeploymentProvisionUnderwaySeconds: prometheus.NewDesc(
 			"hive_cluster_deployment_provision_underway_seconds",
 			"Length of time a cluster has been provisioning.",
-			[]string{"cluster_deployment", "namespace", "cluster_type", "condition", "reason"},
+			[]string{"cluster_deployment", "namespace", "cluster_type", "condition", "reason", "platform", "image_set"},
 			nil,
 		),
 	}

@@ -263,8 +263,9 @@ func (r *ReconcileControlPlaneCerts) generateControlPlaneCertsSyncSet(cd *hivev1
 	cdLog.Debug("generating syncset for control plane secrets")
 	syncSet := &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      GenerateControlPlaneCertsSyncSetName(cd.Name),
-			Namespace: cd.Namespace,
+			Name:        GenerateControlPlaneCertsSyncSetName(cd.Name),
+			Namespace:   cd.Namespace,
+			Annotations: map[string]string{constants.SyncSetMetricsGroupAnnotation: "cp-certs"},
 		},
 		Spec: hivev1.SyncSetSpec{
 			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{

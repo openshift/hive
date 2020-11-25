@@ -279,8 +279,9 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 	newSyncSetSpec := newSyncSetSpec(rContext.clusterDeployment, rawExtensions, secretMappings)
 	syncSet := &hivev1.SyncSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ssName,
-			Namespace: rContext.clusterDeployment.Namespace,
+			Name:        ssName,
+			Namespace:   rContext.clusterDeployment.Namespace,
+			Annotations: map[string]string{constants.SyncSetMetricsGroupAnnotation: "ingress"},
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "SyncSet",

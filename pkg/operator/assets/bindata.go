@@ -1363,7 +1363,7 @@ data:
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:
-      - "platform\.gcp\.project.* invalid project ID"
+      - "platform.gcp.project.* invalid project ID"
       installFailingReason: GCPInvalidProjectID
       installFailingMessage: Invalid GCP project ID
     - name: GCPInstanceTypeNotFound

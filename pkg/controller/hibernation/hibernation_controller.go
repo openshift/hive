@@ -249,7 +249,7 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result rec
 			return reconcile.Result{}, nil
 		}
 		switch hibernatingCondition.Reason {
-		case hivev1.StoppingHibernationReason, hivev1.HibernatingHibernationReason:
+		case hivev1.StoppingHibernationReason, hivev1.HibernatingHibernationReason, hivev1.FailedToStartHibernationReason:
 			return r.startMachines(cd, cdLog)
 		case hivev1.ResumingHibernationReason:
 			return r.checkClusterResumed(cd, cdLog)
@@ -257,13 +257,14 @@ func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result rec
 		return reconcile.Result{}, nil
 	}
 
-	if hibernatingCondition == nil || hibernatingCondition.Status == corev1.ConditionFalse || hibernatingCondition.Reason == hivev1.ResumingHibernationReason {
+	if hibernatingCondition == nil || hibernatingCondition.Status == corev1.ConditionFalse ||
+		hibernatingCondition.Reason == hivev1.ResumingHibernationReason ||
+		(cd.Spec.PowerState == hivev1.HibernatingClusterPowerState && hibernatingCondition.Reason == hivev1.FailedToStartHibernationReason) {
 		return r.stopMachines(cd, cdLog)
 	}
 	if hibernatingCondition.Reason == hivev1.StoppingHibernationReason {
 		return r.checkClusterStopped(cd, false, cdLog)
 	}
-
 	return reconcile.Result{}, nil
 }
 
@@ -276,7 +277,12 @@ func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logg
 	logger.Info("Resuming cluster")
 	if err := actuator.StartMachines(cd, r.Client, logger); err != nil {
 		msg := fmt.Sprintf("Failed to start machines: %v", err)
-		return r.setHibernatingCondition(cd, hivev1.FailedToStartHibernationReason, msg, corev1.ConditionTrue, logger)
+		result, condErr := r.setHibernatingCondition(cd, hivev1.FailedToStartHibernationReason, msg, corev1.ConditionTrue, logger)
+		if condErr != nil {
+			return reconcile.Result{}, condErr
+		}
+		// Return the error starting machines so we get requeue + backoff
+		return result, err
 	}
 	return r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, "Starting cluster machines", corev1.ConditionTrue, logger)
 }

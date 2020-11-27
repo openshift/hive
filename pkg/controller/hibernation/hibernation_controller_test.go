@@ -181,6 +181,27 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "stopping after MachinesFailedToStart",
+			cd: cdBuilder.Options(o.shouldHibernate).Build(
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+					Reason: hivev1.FailedToStartHibernationReason,
+				},
+				)),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				// Ensure we try to stop machines in this state (bugfix)
+				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+			},
+		},
+		{
 			name: "start resuming",
 			cd:   cdBuilder.Options(o.hibernating).Build(),
 			cs:   csBuilder.Build(),
@@ -201,11 +222,33 @@ func TestReconcile(t *testing.T) {
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(fmt.Errorf("error"))
 			},
+			expectError: true,
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.FailedToStartHibernationReason, cond.Reason)
+			},
+		},
+		{
+			name: "starting machines have already failed to start",
+			cd: cdBuilder.Options(o.resuming).Build(
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+					Reason: hivev1.FailedToStartHibernationReason,
+				},
+				)),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				// Call will succeed which should clear the FailedToStart reason:
+				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
 			},
 		},
 		{

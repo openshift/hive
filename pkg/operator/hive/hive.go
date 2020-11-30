@@ -300,6 +300,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	openshiftSpecificAssets := []string{
 		"config/rbac/hive_admin_role.yaml",
 		"config/rbac/hive_reader_role.yaml",
+		"config/rbac/hive_clusterpool_admin.yaml",
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role_binding.yaml",
 	}

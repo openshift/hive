@@ -20,6 +20,7 @@
 // config/controllers/service.yaml
 // config/rbac/hive_admin_role.yaml
 // config/rbac/hive_admin_role_binding.yaml
+// config/rbac/hive_clusterpool_admin.yaml
 // config/rbac/hive_frontend_role.yaml
 // config/rbac/hive_frontend_role_binding.yaml
 // config/rbac/hive_frontend_serviceaccount.yaml
@@ -756,6 +757,7 @@ rules:
   - ""
   resources:
   - pods
+  - pods/log
   verbs:
   - get
   - list
@@ -1041,6 +1043,71 @@ func configRbacHive_admin_role_bindingYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/rbac/hive_admin_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacHive_clusterpool_adminYaml = []byte(`# hive-cluster-pool-admin is a role intended for cluster pool administrators who need to be able to debug
+# cluster installations for the pool.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hive-cluster-pool-admin
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  - configmaps
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterdeployments
+  - clusterprovisions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterpools
+  - clusterclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+`)
+
+func configRbacHive_clusterpool_adminYamlBytes() ([]byte, error) {
+	return _configRbacHive_clusterpool_adminYaml, nil
+}
+
+func configRbacHive_clusterpool_adminYaml() (*asset, error) {
+	bytes, err := configRbacHive_clusterpool_adminYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_clusterpool_admin.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -1485,6 +1552,7 @@ var _bindata = map[string]func() (*asset, error){
 	"config/controllers/service.yaml":                           configControllersServiceYaml,
 	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
 	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
+	"config/rbac/hive_clusterpool_admin.yaml":                   configRbacHive_clusterpool_adminYaml,
 	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
 	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
 	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
@@ -1563,6 +1631,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"rbac": {nil, map[string]*bintree{
 			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},
 			"hive_admin_role_binding.yaml":      {configRbacHive_admin_role_bindingYaml, map[string]*bintree{}},
+			"hive_clusterpool_admin.yaml":       {configRbacHive_clusterpool_adminYaml, map[string]*bintree{}},
 			"hive_frontend_role.yaml":           {configRbacHive_frontend_roleYaml, map[string]*bintree{}},
 			"hive_frontend_role_binding.yaml":   {configRbacHive_frontend_role_bindingYaml, map[string]*bintree{}},
 			"hive_frontend_serviceaccount.yaml": {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},

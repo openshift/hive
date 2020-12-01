@@ -4,7 +4,21 @@ Simulate 1000 clusters in Hive and observe performance. Because we do not have t
 
 # Setup
 
-Hive running on a standard 3 master 3 node OpenShift 4.4 cluster. (instance types for workers changed later)
+Configure HiveConfig:
+
+```yaml
+apiVersion: hive.openshift.io/v1                                                                                                                                                                                                   │
+kind: HiveConfig                                                                                                                                                                                                                   │
+  metadata:                                                                                                                                                                                                                          │
+    annotations:                                                                                                                                                                                                                     │
+      hive.openshift.io/fake-applies: "true"   
+spec:                                                                                                                                                                                                                              │
+  controllersConfig:                                                                                                                                                                                                               │
+    controllers:                                                                                                                                                                                                                   │
+    - config:                                                                                                                                                                                                                      │
+        concurrentReconciles: 25           
+      name: clustersync
+```
 
 Create 60 SelectorSyncSets, each will contain 10 unique ConfigMaps with a little data, in the default namespace:
 
@@ -12,7 +26,7 @@ Create 60 SelectorSyncSets, each will contain 10 unique ConfigMaps with a little
 hack/scaletest/setup-selectorsyncsets.sh
 ```
 
-Provision a real spoke cluster from the Hive hub cluster:
+Provision a real spoke cluster from the Hive hub cluster, or just use a hiveconfig from a spoke you provisioned elsewhere:
 
 ```bash
 bin/hiveutil create-cluster --base-domain=new-installer.openshift.com --use-image-set=false scaletest-spoke

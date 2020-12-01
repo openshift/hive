@@ -92,3 +92,23 @@ status:
     type: Pending
 ```
 
+## Managing admins for Cluster Pools
+
+Role bindings in the **namespace** of a `ClusterPool` that bind to the Cluster Role `hive-cluster-pool-admin`
+are used to provide the **subjects** same permission in the namespaces created for various clusterprovisions for the cluster pool.
+This allows operators to define adminstrators for a `ClusterPool` allowing them visibility to all the resources created for it. This is
+most useful to debug `ClusterProvisions` associated with the pool that have failed and therefore cannot be claimed.
+
+NOTE: You can only define such administrators for the entire namespace and not a specific `ClusterPool`.
+
+To make any `User` or `Group` `hive-cluster-pool-admin` for a namespace you can,
+
+```sh
+oc -n <namespace> adm policy add-role-to-group hive-cluster-pool-admin <user>
+```
+
+or,
+
+```sh
+oc -n <namespace> adm policy add-role-to-group hive-cluster-pool-admin <group>
+```

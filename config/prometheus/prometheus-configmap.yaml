@@ -14,7 +14,24 @@ data:
         static_configs:
           - targets: ['localhost:9090']
 
-      - job_name: 'hive'
-        static_configs:
-          - targets: ['hive-controllers:2112']
+      - job_name: 'hive-controllers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_endpoints_name
+              - __meta_kubernetes_endpoint_port_name
+            action: keep
+            regex: hive;hive-controllers;metrics
 
+      - job_name: 'hive-clustersync'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_endpoints_name
+              - __meta_kubernetes_endpoint_port_name
+            action: keep
+            regex: hive;hive-clustersync;metrics

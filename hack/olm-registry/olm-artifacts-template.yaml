@@ -24,6 +24,8 @@ parameters:
   value: "false"
 - name: BACKUP_VELERO_NAMESPACE
   value: openshift-velero
+- name: FAILED_PROVISION_CONFIG
+  value: "{}"
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -70,3 +72,4 @@ objects:
       velero:
         enabled: "${{BACKUP_VELERO_ENABLED}}"
         namespace: ${BACKUP_VELERO_NAMESPACE}
+    failedProvisionConfig: "${{FAILED_PROVISION_CONFIG}}"

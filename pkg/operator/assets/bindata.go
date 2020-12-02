@@ -1,5 +1,7 @@
 // Code generated for package assets by go-bindata DO NOT EDIT. (@generated)
 // sources:
+// config/clustersync/service.yaml
+// config/clustersync/statefulset.yaml
 // config/hiveadmission/apiservice.yaml
 // config/hiveadmission/clusterdeployment-webhook.yaml
 // config/hiveadmission/clusterimageset-webhook.yaml
@@ -77,6 +79,126 @@ func (fi bindataFileInfo) IsDir() bool {
 // Sys return file is sys mode
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
+}
+
+var _configClustersyncServiceYaml = []byte(`apiVersion: v1
+kind: Service
+metadata:
+  name: hive-clustersync
+  namespace: hive
+  labels:
+    app: hive-clustersync
+spec:
+  selector:
+    app: hive-clustersync
+  ports:
+  - name: metrics
+    port: 2112
+    protocol: TCP
+  # Expose 6060 for pprof data. Normally nothing listening here unless a developer has
+  # compiled in pprof support. See Hive developer documentation for how to use.
+  - name: profiling
+    port: 6060
+    protocol: TCP
+`)
+
+func configClustersyncServiceYamlBytes() ([]byte, error) {
+	return _configClustersyncServiceYaml, nil
+}
+
+func configClustersyncServiceYaml() (*asset, error) {
+	bytes, err := configClustersyncServiceYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/clustersync/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configClustersyncStatefulsetYaml = []byte(`apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hive-clustersync
+spec:
+  selector:
+    matchLabels:
+      app: hive-clustersync
+  template:
+    metadata:
+      labels:
+        app: hive-clustersync
+    spec:
+      topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: hive-clustersync
+      serviceAccount: hive-controllers
+      serviceAccountName: hive-controllers
+      containers:
+      - name: hive-clustersync
+        resources:
+          requests:
+            cpu: 50m
+            memory: 512Mi
+        command:
+        - "/opt/services/manager"
+        args:
+        - "--controllers"
+        - "clustersync"
+        envFrom:
+        - configMapRef:
+            name: hive-controllers-config
+        env:
+        - name: HIVE_NS
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: HIVE_CLUSTERSYNC_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: HIVE_SKIP_LEADER_ELECTION
+          value: "true"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+`)
+
+func configClustersyncStatefulsetYamlBytes() ([]byte, error) {
+	return _configClustersyncStatefulsetYaml, nil
+}
+
+func configClustersyncStatefulsetYaml() (*asset, error) {
+	bytes, err := configClustersyncStatefulsetYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/clustersync/statefulset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
 }
 
 var _configHiveadmissionApiserviceYaml = []byte(`---
@@ -752,6 +874,14 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -1465,6 +1595,8 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
+	"config/clustersync/service.yaml":                           configClustersyncServiceYaml,
+	"config/clustersync/statefulset.yaml":                       configClustersyncStatefulsetYaml,
 	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
 	"config/hiveadmission/clusterdeployment-webhook.yaml":       configHiveadmissionClusterdeploymentWebhookYaml,
 	"config/hiveadmission/clusterimageset-webhook.yaml":         configHiveadmissionClusterimagesetWebhookYaml,
@@ -1535,6 +1667,10 @@ type bintree struct {
 
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
+		"clustersync": {nil, map[string]*bintree{
+			"service.yaml":     {configClustersyncServiceYaml, map[string]*bintree{}},
+			"statefulset.yaml": {configClustersyncStatefulsetYaml, map[string]*bintree{}},
+		}},
 		"configmaps": {nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hive-clustersync
+spec:
+  selector:
+    matchLabels:
+      app: hive-clustersync
+  template:
+    metadata:
+      labels:
+        app: hive-clustersync
+    spec:
+      topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: hive-clustersync
+      serviceAccount: hive-controllers
+      serviceAccountName: hive-controllers
+      containers:
+      - name: hive-clustersync
+        resources:
+          requests:
+            cpu: 50m
+            memory: 512Mi
+        command:
+        - "/opt/services/manager"
+        args:
+        - "--controllers"
+        - "clustersync"
+        envFrom:
+        - configMapRef:
+            name: hive-controllers-config
+        env:
+        - name: HIVE_NS
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: HIVE_CLUSTERSYNC_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: HIVE_SKIP_LEADER_ELECTION
+          value: "true"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1

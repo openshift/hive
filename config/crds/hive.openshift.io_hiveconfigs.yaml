@@ -114,6 +114,13 @@ spec:
                               QPS for a controller
                             format: int32
                             type: integer
+                          replicas:
+                            description: Replicas specifies the number of replicas
+                              the specific controller pod should use. This is ONLY
+                              for controllers that have been split out into their
+                              own pods. This is ignored for all others.
+                            format: int32
+                            type: integer
                         type: object
                       name:
                         description: Name specifies the name of the controller
@@ -174,6 +181,13 @@ spec:
                     queueQPS:
                       description: QueueQPS specifies workqueue rate limiter QPS for
                         a controller
+                      format: int32
+                      type: integer
+                    replicas:
+                      description: Replicas specifies the number of replicas the specific
+                        controller pod should use. This is ONLY for controllers that
+                        have been split out into their own pods. This is ignored for
+                        all others.
                       format: int32
                       type: integer
                   type: object

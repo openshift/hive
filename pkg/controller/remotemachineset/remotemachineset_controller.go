@@ -219,7 +219,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	if !controllerutils.ShouldSyncCluster(cd, logger) {
+	if controllerutils.IsClusterPausedOrRelocating(cd, logger) {
 		return reconcile.Result{}, nil
 	}
 

@@ -334,9 +334,23 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap)
+	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying controllers configmap")
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap, confighash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	err = r.deployClusterSync(hLog, h, instance, confighash)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying ClusterSync")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}

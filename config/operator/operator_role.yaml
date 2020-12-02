@@ -70,6 +70,7 @@ rules:
   - deployments/finalizers
   - daemonsets
   - daemonsets/finalizers
+  - statefulsets
   verbs:
   - get
   - list

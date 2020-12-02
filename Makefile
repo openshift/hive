@@ -58,7 +58,7 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
-BINDATA_INPUTS :=./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
+BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
 $(call build-image,hive,$(IMG),./Dockerfile,.)

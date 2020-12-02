@@ -241,6 +241,10 @@ type ControllerConfig struct {
 	// QueueBurst specifies workqueue rate limiter burst for a controller
 	// +optional
 	QueueBurst *int32 `json:"queueBurst,omitempty"`
+	// Replicas specifies the number of replicas the specific controller pod should use.
+	// This is ONLY for controllers that have been split out into their own pods.
+	// This is ignored for all others.
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;syncidentityprovider;unreachable;velerobackup;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync
@@ -248,6 +252,20 @@ type ControllerName string
 
 func (controllerName ControllerName) String() string {
 	return string(controllerName)
+}
+
+// ControllerNames is a slice of controller names
+type ControllerNames []ControllerName
+
+// Contains says whether or not the controller name is in the slice of controller names.
+func (c ControllerNames) Contains(controllerName ControllerName) bool {
+	for _, curControllerName := range c {
+		if curControllerName == controllerName {
+			return true
+		}
+	}
+
+	return false
 }
 
 // WARNING: All the controller names below should also be added to the kubebuilder validation of the type ControllerName

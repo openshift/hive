@@ -7,16 +7,16 @@ Simulate 1000 clusters in Hive and observe performance. Because we do not have t
 Configure HiveConfig:
 
 ```yaml
-apiVersion: hive.openshift.io/v1                                                                                                                                                                                                   │
-kind: HiveConfig                                                                                                                                                                                                                   │
-  metadata:                                                                                                                                                                                                                          │
-    annotations:                                                                                                                                                                                                                     │
-      hive.openshift.io/fake-applies: "true"   
-spec:                                                                                                                                                                                                                              │
-  controllersConfig:                                                                                                                                                                                                               │
-    controllers:                                                                                                                                                                                                                   │
-    - config:                                                                                                                                                                                                                      │
-        concurrentReconciles: 25           
+apiVersion: hive.openshift.io/v1
+kind: HiveConfig
+  metadata:
+    annotations:
+      hive.openshift.io/fake-applies: "true"
+spec:
+  controllersConfig:
+    controllers:
+    - config:
+        concurrentReconciles: 25
       name: clustersync
 ```
 

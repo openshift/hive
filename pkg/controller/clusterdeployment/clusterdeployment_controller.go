@@ -57,8 +57,8 @@ const (
 	defaultRequeueTime = 10 * time.Second
 	maxProvisions      = 3
 
-	platformAuthFailureResason = "PlatformAuthError"
-	platformAuthSuccessReason  = "PlatformAuthWorking"
+	platformAuthFailureReason = "PlatformAuthError"
+	platformAuthSuccessReason = "PlatformAuthSuccess"
 
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
@@ -586,21 +586,22 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	// Sanity check the platform/cloud credentials.
 	validCreds, err := r.validatePlatformCreds(cd, cdLog)
 	if err != nil {
-		cdLog.WithError(err).Error("errored validating platform credentials")
+		cdLog.WithError(err).Error("unable to validate platform credentials")
 		return reconcile.Result{}, err
 	}
 	// Make sure the condition is set properly.
-	changed, err := r.setAuthenticationFailure(cd, validCreds, cdLog)
-	if changed || err != nil {
+	_, err = r.setAuthenticationFailure(cd, validCreds, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("unable to update clusterdeployment")
 		return reconcile.Result{}, err
 	}
 
-	// If the platform credentials are no good, do not bother with ClusterProvision objects
+	// If the platform credentials are no good, return error and go into backoff
 	authCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.AuthenticationFailureClusterDeploymentCondition)
 	if authCondition != nil && authCondition.Status == corev1.ConditionTrue {
-		cdLog.Info("Skipping provision while platform credentials authentication is failing.")
-		// Periodically retry???
-		return reconcile.Result{}, nil
+		authError := errors.New(authCondition.Message)
+		cdLog.WithError(authError).Error("cannot proceed with provision while platform credentials authentication is failing.")
+		return reconcile.Result{}, authError
 	}
 
 	imageSet, err := r.getClusterImageSet(cd, cdLog)
@@ -1293,18 +1294,18 @@ func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterD
 	return r.Status().Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authWorking bool, cdLog log.FieldLogger) (bool, error) {
+func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authSuccessful bool, cdLog log.FieldLogger) (bool, error) {
 
 	var status corev1.ConditionStatus
 	var reason, message string
 
-	if authWorking {
+	if authSuccessful {
 		status = corev1.ConditionFalse
 		reason = platformAuthSuccessReason
-		message = "Platform credentails passed authentication check"
+		message = "Platform credentials passed authentication check"
 	} else {
 		status = corev1.ConditionTrue
-		reason = platformAuthFailureResason
+		reason = platformAuthFailureReason
 		message = "Platform credentials failed authentication check"
 	}
 

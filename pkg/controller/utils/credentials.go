@@ -32,7 +32,8 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 		}
 		return validateVSphereCredentials(cd.Spec.Platform.VSphere.VCenter,
 			string(secret.Data[constants.UsernameSecretKey]),
-			string(secret.Data[constants.PasswordSecretKey]))
+			string(secret.Data[constants.PasswordSecretKey]),
+			logger)
 	default:
 		// If we have no platform-specific credentials verification
 		// assume the creds are valid.
@@ -41,9 +42,9 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 	}
 }
 
-func validateVSphereCredentials(vcenter, username, password string) (bool, error) {
-
+func validateVSphereCredentials(vcenter, username, password string, logger log.FieldLogger) (bool, error) {
 	_, _, err := vsphere.CreateVSphereClients(context.TODO(), vcenter, username, password)
+	logger.WithError(err).Warn("failed to validate VSphere credentials")
 	return err == nil, nil
 }
 

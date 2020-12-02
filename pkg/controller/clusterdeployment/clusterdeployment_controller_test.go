@@ -1509,6 +1509,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			platformCredentialsValidation: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
 				return false, nil
 			},
+			expectErr: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
@@ -1525,7 +1526,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						{
 							Status:  corev1.ConditionTrue,
 							Type:    hivev1.AuthenticationFailureClusterDeploymentCondition,
-							Reason:  platformAuthFailureResason,
+							Reason:  platformAuthFailureReason,
 							Message: "Platform credentials failed authentication check",
 						},
 					}
@@ -1535,6 +1536,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			platformCredentialsValidation: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
 				return false, nil
 			},
+			expectErr: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")

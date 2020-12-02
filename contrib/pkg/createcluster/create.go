@@ -151,6 +151,7 @@ type Options struct {
 	MachineNetwork           string
 	Region                   string
 	Labels                   []string
+	Annotations              []string
 	SkipMachinePools         bool
 	AdditionalTrustBundle    string
 
@@ -264,6 +265,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
 	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, and GCP.")
 	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val)")
+	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 
 	// Flags related to adoption.
@@ -404,6 +406,12 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("unable to parse key=value label: %s", ls)
 		}
 	}
+	for _, ls := range o.Annotations {
+		tokens := strings.Split(ls, "=")
+		if len(tokens) != 2 {
+			return fmt.Errorf("unable to parse key=value annotation: %s", ls)
+		}
+	}
 	return nil
 }
 
@@ -490,6 +498,12 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		labels[tokens[0]] = tokens[1]
 	}
 
+	annotations := map[string]string{}
+	for _, ls := range o.Annotations {
+		tokens := strings.Split(ls, "=")
+		annotations[tokens[0]] = tokens[1]
+	}
+
 	builder := &clusterresource.Builder{
 		Name:                  o.Name,
 		Namespace:             o.Namespace,
@@ -503,6 +517,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		DeleteAfter:           o.DeleteAfter,
 		HibernateAfter:        o.HibernateAfterDur,
 		Labels:                labels,
+		Annotations:           annotations,
 		InstallerManifests:    manifestFileData,
 		MachineNetwork:        o.MachineNetwork,
 		SkipMachinePools:      o.SkipMachinePools,

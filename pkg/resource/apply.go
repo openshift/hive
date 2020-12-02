@@ -66,7 +66,15 @@ func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 	// fakeApply mode (used in scale testing only) doesn't run the apply. Instead it will Sleep for a period of time
 	// that matches our request time metrics in real hive environments to simulate i/o wait.
 	fakeAppliesEnvVar, _ := os.LookupEnv(constants.HiveSyncSetsFakeApplyEnvVar)
-	if fakeApplies, err := strconv.ParseBool(fakeAppliesEnvVar); fakeApplies && err == nil {
+	if fakeApplies, err := strconv.ParseBool(fakeAppliesEnvVar); r.fake || (fakeApplies && err == nil) {
+		r.fakeApply()
+		return ConfiguredApplyResult, nil
+	}
+	// When scale testing we create many clusters all using the same kubeconfig. We do not want to overwhelm it with
+	// PATCH requests, so instead we fake that operation here and sleep for a period of time that roughly matches
+	// request times we see in the real world.
+	// This links up to the ClusterDeployment annotation hive.openshift.io/fake-install-kubeconfig-secret
+	if r.fake {
 		r.fakeApply()
 		return ConfiguredApplyResult, nil
 	}

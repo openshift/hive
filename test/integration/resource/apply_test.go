@@ -120,7 +120,7 @@ func TestApply(t *testing.T) {
 				if clientConfig == "kubeconfig" {
 					h, err = resource.NewHelper(kubeconfig, logger)
 				} else {
-					h, err = resource.NewHelperFromRESTConfig(cfg, logger)
+					h, err = resource.NewHelperFromRESTConfig(cfg, false, logger)
 				}
 				if err != nil {
 					t.Fatalf("unexpected err: %v", err)

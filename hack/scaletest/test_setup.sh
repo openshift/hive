@@ -3,7 +3,7 @@
 set -e
 
 usage(){
-	echo "Usage: $0 [KUBECONFIG] [STARTINDEX] [ENDINDEX]"
+	echo "Usage: $0 [KUBECONFIG_FILE] [STARTINDEX] [ENDINDEX]"
 	exit 1
 }
 
@@ -39,13 +39,11 @@ do
 	ns="ns${i}"
 	echo "Creating cluster: ${ns}/${cluster_name}"
 	oc create namespace ${ns} || true
+	echo "Creating kubeconfig secret from ${1}"
+	kubectl create secret -n ${ns} generic fake-install-kubeconfig --from-file=kubeconfig=${1} || true
 	bin/hiveutil create-cluster \
 		--namespace=${ns} \
-		--adopt \
-		--adopt-admin-kubeconfig=${1} \
-		--adopt-infra-id="fake-${cluster_name}" \
-		--adopt-cluster-id="fake-${cluster_name}" \
 		-l scaletest=true --skip-machine-pools \
+		-a "hive.openshift.io/fake-install-kubeconfig-secret=fake-install-kubeconfig" \
 		${cluster_name}
 done
-

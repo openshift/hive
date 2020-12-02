@@ -299,6 +299,14 @@ const (
 	// fake out all apply operations for simulated scale testing.
 	HiveSyncSetsFakeApplyEnvVar = "HIVE_SYNCSETS_FAKE_APPLY"
 
+	// HiveFakeInstallKubeconfigSecretAnnotation is set to the name of a Secret in the cluster namespace which
+	// contains an admin kubeconfig.
+	// When set, this will enable a number of changes that are useful for simulating scale testing in a Hive cluster.
+	// Hive will launch an install pod that does not actually run the openshift-installer. Instead if will fake out
+	// some data and re-use this admin kubeconfig. Additionally, this annotation will disable all resource applies
+	// to that cluster to avoid overloading the one cluster.
+	HiveFakeInstallKubeconfigSecretAnnotation = "hive.openshift.io/fake-install-kubeconfig-secret"
+
 	// ReconcileIDLen is the length of the random strings we generate for contextual loggers in controller
 	// Reconcile functions.
 	ReconcileIDLen = 8

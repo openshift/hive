@@ -50,6 +50,7 @@ type helper struct {
 	restConfig     *rest.Config
 	getFactory     func(namespace string) (cmdutil.Factory, error)
 	openAPISchema  openapi.Resources
+	fake           bool
 }
 
 // cacheOpenAPISchema builds the very expensive OpenAPISchema (>3s commonly) once, and stores
@@ -68,11 +69,12 @@ func (r *helper) cacheOpenAPISchema() error {
 }
 
 // NewHelperFromRESTConfig returns a new object that allows apply and patch operations
-func NewHelperFromRESTConfig(restConfig *rest.Config, logger log.FieldLogger) (Helper, error) {
+func NewHelperFromRESTConfig(restConfig *rest.Config, fake bool, logger log.FieldLogger) (Helper, error) {
 	r := &helper{
 		logger:     logger,
 		cacheDir:   getCacheDir(logger),
 		restConfig: restConfig,
+		fake:       fake,
 	}
 	r.getFactory = r.getRESTConfigFactory
 	err := r.cacheOpenAPISchema()

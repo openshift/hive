@@ -320,7 +320,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 
-	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
+	h, err := resource.NewHelperFromRESTConfig(r.restConfig, false, hLog)
 	if err != nil {
 		hLog.WithError(err).Error("error creating resource helper")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)

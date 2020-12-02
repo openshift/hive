@@ -172,8 +172,8 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 	}, nil
 }
 
-func resourceHelperBuilderFunc(restConfig *rest.Config, logger log.FieldLogger) (resource.Helper, error) {
-	return resource.NewHelperFromRESTConfig(restConfig, logger)
+func resourceHelperBuilderFunc(restConfig *rest.Config, fake bool, logger log.FieldLogger) (resource.Helper, error) {
+	return resource.NewHelperFromRESTConfig(restConfig, fake, logger)
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -263,7 +263,7 @@ type ReconcileClusterSync struct {
 	logger          log.FieldLogger
 	reapplyInterval time.Duration
 
-	resourceHelperBuilder func(*rest.Config, log.FieldLogger) (resource.Helper, error)
+	resourceHelperBuilder func(*rest.Config, bool, log.FieldLogger) (resource.Helper, error)
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
@@ -388,7 +388,11 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		logger.WithError(err).Error("unable to get REST config")
 		return reconcile.Result{}, err
 	}
-	resourceHelper, err := r.resourceHelperBuilder(restConfig, logger)
+
+	// If this cluster carries the fake annotation we will fake out all helper communication with it.
+	fakeApplies := cd.Annotations[constants.HiveFakeInstallKubeconfigSecretAnnotation]
+
+	resourceHelper, err := r.resourceHelperBuilder(restConfig, fakeApplies != "", logger)
 	if err != nil {
 		log.WithError(err).Error("cannot create helper")
 		return reconcile.Result{}, err

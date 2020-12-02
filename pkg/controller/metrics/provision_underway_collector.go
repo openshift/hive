@@ -21,6 +21,7 @@ var (
 		hivev1.DNSNotReadyCondition,
 		hivev1.InstallLaunchErrorCondition,
 		hivev1.ProvisionFailedCondition,
+		hivev1.AuthenticationFailureClusterDeploymentCondition,
 	}
 )
 

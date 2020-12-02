@@ -353,15 +353,45 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 	if err := r.createRBAC(claim, cd, logger); err != nil {
 		return reconcile.Result{}, err
 	}
-	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
-		claim.Status.Conditions,
+	var statusChanged bool
+	var changed bool
+	conds := claim.Status.Conditions
+
+	conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
+		conds,
 		hivev1.ClusterClaimPendingCondition,
 		corev1.ConditionFalse,
 		"ClusterClaimed",
 		"Cluster claimed",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
-	if changed {
+	statusChanged = statusChanged || changed
+
+	hc := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	if hc == nil || hc.Status == corev1.ConditionFalse {
+		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
+			conds,
+			hivev1.ClusterRunningCondition,
+			corev1.ConditionTrue,
+			"Running",
+			"Cluster is running",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		statusChanged = statusChanged || changed
+	} else {
+		log.Debug("waiting for cluster to be running")
+		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
+			conds,
+			hivev1.ClusterRunningCondition,
+			corev1.ConditionFalse,
+			"Resuming",
+			"Waiting for cluster to be running",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		statusChanged = statusChanged || changed
+	}
+	if statusChanged {
+		log.Debug("conditions changed, updating claim status")
 		claim.Status.Conditions = conds
 		if err := r.Status().Update(context.Background(), claim); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")

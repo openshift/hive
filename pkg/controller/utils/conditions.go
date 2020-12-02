@@ -144,20 +144,22 @@ func SetClusterClaimConditionWithChangeCheck(
 	now := metav1.Now()
 	existingCondition := FindClusterClaimCondition(conditions, conditionType)
 	if existingCondition == nil {
-		if status == corev1.ConditionTrue {
-			conditions = append(
-				conditions,
-				hivev1.ClusterClaimCondition{
-					Type:               conditionType,
-					Status:             status,
-					Reason:             reason,
-					Message:            message,
-					LastTransitionTime: now,
-					LastProbeTime:      now,
-				},
-			)
-			changed = true
-		}
+		// Deviating from other setter methods we use due to latest API conventions in Kube. They clarify that a
+		// True condition is not necessarily an abnormal state, and that conditions should be set asap even if Unknown.
+		// Previously we would not bother setting the condition if the status was false. With ClusterClaim we are
+		// beginning to adhere to these guidelines.
+		conditions = append(
+			conditions,
+			hivev1.ClusterClaimCondition{
+				Type:               conditionType,
+				Status:             status,
+				Reason:             reason,
+				Message:            message,
+				LastTransitionTime: now,
+				LastProbeTime:      now,
+			},
+		)
+		changed = true
 	} else {
 		if shouldUpdateCondition(
 			existingCondition.Status, existingCondition.Reason, existingCondition.Message,

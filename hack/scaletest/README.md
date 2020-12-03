@@ -9,9 +9,6 @@ Configure HiveConfig:
 ```yaml
 apiVersion: hive.openshift.io/v1
 kind: HiveConfig
-  metadata:
-    annotations:
-      hive.openshift.io/fake-applies: "true"
 spec:
   controllersConfig:
     controllers:

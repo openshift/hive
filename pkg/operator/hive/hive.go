@@ -41,11 +41,9 @@ const (
 	// secrets specified in HiveConfig
 	hiveAdditionalCASecret = "hive-additional-ca"
 
-	// fakeAppliesAnnotation is an annotation which can be added to HiveConfig indicating that
-	// Hive should be configured to completely fake all "apply" operations to target clusters.
-	// This is used for scale testing simulations where we want to adopt one cluster thousands
-	// of times, but not overwhelm it with requests.
-	fakeAppliesAnnotation = "hive.openshift.io/fake-applies"
+	// hiveConfigHashAnnotation is annotation on hivedeployment that contains
+	// the hash of the contents of the hive-controllers-config configmap
+	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
 )
 
 var (
@@ -155,21 +153,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 				Value: instance.Spec.Backup.Velero.Namespace,
 			}
 			hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
-		}
-	}
-
-	if _, ok := instance.Annotations[fakeAppliesAnnotation]; ok {
-		fakeApplies, err := strconv.ParseBool(instance.Annotations[fakeAppliesAnnotation])
-		if err != nil {
-			hLog.WithError(err).Errorf("unable to parse %s as a boolean", fakeAppliesAnnotation)
-			return err
-		}
-		if fakeApplies {
-			hLog.Warnf("%s specified, configuring hive to fake all resource helper apply/delete operations", fakeAppliesAnnotation)
-			hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
-				Name:  hiveconstants.HiveSyncSetsFakeApplyEnvVar,
-				Value: "true",
-			})
 		}
 	}
 

@@ -295,10 +295,6 @@ const (
 	// InstallLogsAWSS3BucketEnvVar is the environment variable specifying the S3 bucket to use.
 	InstallLogsAWSS3BucketEnvVar = "HIVE_INSTALL_LOGS_AWS_S3_BUCKET"
 
-	// HiveSyncSetsFakeApplyEnvVar is set to true by the hive-operator when a developer has configured HiveConfig to
-	// fake out all apply operations for simulated scale testing.
-	HiveSyncSetsFakeApplyEnvVar = "HIVE_SYNCSETS_FAKE_APPLY"
-
 	// HiveFakeInstallKubeconfigSecretAnnotation is set to the name of a Secret in the cluster namespace which
 	// contains an admin kubeconfig.
 	// When set, this will enable a number of changes that are useful for simulating scale testing in a Hive cluster.

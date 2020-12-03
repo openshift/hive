@@ -2,6 +2,7 @@ package clusterpool
 
 import (
 	"context"
+	"sort"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -21,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
@@ -40,6 +43,7 @@ func TestReconcileClusterPool(t *testing.T) {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
+	rbacv1.AddToScheme(scheme)
 
 	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
 		GenericOptions(
@@ -516,6 +520,758 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 			assert.Equal(t, test.expectedAssignedClaims, actualAssignedClaims, "unexpected number of assigned claims")
 			assert.Equal(t, test.expectedUnassignedClaims, actualUnassignedClaims, "unexpected number of unassigned claims")
+		})
+	}
+}
+
+func TestReconcileRBAC(t *testing.T) {
+	scheme := runtime.NewScheme()
+	hivev1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+	rbacv1.AddToScheme(scheme)
+
+	tests := []struct {
+		name string
+
+		existing []runtime.Object
+
+		expectedBindings []rbacv1.RoleBinding
+		expectedErr      string
+	}{{
+		name:     "no binding referring to cluster role 1",
+		existing: []runtime.Object{},
+	}, {
+		name: "no binding referring to cluster role 2",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "admin"},
+			},
+		},
+	}, {
+		name: "binding referring to cluster role but no namespace for pool 1",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "binding referring to cluster role but no namespace for pool 2",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-namespace-1",
+				},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "binding referring to cluster role but no namespace for pool 3",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "some-namespace-1",
+				},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "some-namespace-2",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: "some-other-pool"},
+				},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "binding referring to cluster role with one namespace for pool 4",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "binding referring to cluster role with multiple namespace for pool",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-2",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-2",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "multiple binding referring to cluster role with one namespace for pool",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "multiple binding referring to cluster role with multiple namespace for pool",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-2",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-2",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role binding that is same",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role bindings that are same",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role binding that are different 1",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role binding that are different 2",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role bindings that are different 3",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role bindings that are different 4",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}, {Kind: "Group", Name: "test-admin-group-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}, {
+		name: "pre existing role bindings that are different 5",
+		existing: []runtime.Object{
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			&corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-cluster-1",
+					Labels: map[string]string{constants.ClusterPoolNameLabel: testLeasePoolName},
+				},
+			},
+			&rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-1"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+
+		expectedBindings: []rbacv1.RoleBinding{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-cluster-1",
+					Name:      "hive-cluster-pool-admin-binding",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}, {Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-admin-another"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testNamespace,
+					Name:      "test-2",
+				},
+				Subjects: []rbacv1.Subject{{Kind: "Group", Name: "test-admin-group-1"}},
+				RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "hive-cluster-pool-admin"},
+			},
+		},
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			logger := log.New()
+			logger.SetLevel(log.DebugLevel)
+			controllerExpectations := controllerutils.NewExpectations(logger)
+			rcp := &ReconcileClusterPool{
+				Client:       fakeClient,
+				logger:       logger,
+				expectations: controllerExpectations,
+			}
+
+			err := rcp.reconcileRBAC(&hivev1.ClusterPool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testLeasePoolName,
+					Namespace: testNamespace,
+				},
+			}, logger)
+			if test.expectedErr == "" {
+				require.NoError(t, err)
+
+				rbs := &rbacv1.RoleBindingList{}
+				err = fakeClient.List(context.Background(), rbs)
+				require.NoError(t, err)
+				sort.Slice(rbs.Items, func(i, j int) bool {
+					return rbs.Items[i].Namespace < rbs.Items[j].Namespace && rbs.Items[i].Name < rbs.Items[j].Name
+				})
+				for idx := range rbs.Items {
+					rbs.Items[idx].TypeMeta = metav1.TypeMeta{}
+					rbs.Items[idx].ResourceVersion = ""
+				}
+
+				assert.Equal(t, test.expectedBindings, rbs.Items)
+			} else {
+				require.Regexp(t, err, test.expectedErr)
+			}
 		})
 	}
 }

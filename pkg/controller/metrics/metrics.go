@@ -109,6 +109,7 @@ type ReconcileOutcome string
 const (
 	ReconcileOutcomeUnspecified        ReconcileOutcome = "unspecified"
 	ReconcileOutcomeNoOp               ReconcileOutcome = "no-op"
+	ReconcileOutcomeSkippedSync        ReconcileOutcome = "skipped-sync"
 	ReconcileOutcomeFullSync           ReconcileOutcome = "full-sync"
 	ReconcileOutcomeClusterSyncCreated ReconcileOutcome = "clustersync-created"
 )

@@ -57,7 +57,7 @@ func TestIsDeleteProtected(t *testing.T) {
 	}
 }
 
-func TestShouldSyncCluster(t *testing.T) {
+func TestIsClusterPausedOrRelocating(t *testing.T) {
 	cases := []struct {
 		name     string
 		cd       *hivev1.ClusterDeployment
@@ -66,39 +66,40 @@ func TestShouldSyncCluster(t *testing.T) {
 		{
 			name:     "no annotation",
 			cd:       clusterdeployment.Build(),
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "syncset annotation true",
 			cd: clusterdeployment.Build(
 				clusterdeployment.Generic(generic.WithAnnotation(constants.SyncsetPauseAnnotation, "true")),
 			),
+			expected: true,
 		},
 		{
 			name: "syncset annotation false",
 			cd: clusterdeployment.Build(
 				clusterdeployment.Generic(generic.WithAnnotation(constants.SyncsetPauseAnnotation, "false")),
 			),
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "syncset annotation not parsable",
 			cd: clusterdeployment.Build(
 				clusterdeployment.Generic(generic.WithAnnotation(constants.SyncsetPauseAnnotation, "other")),
 			),
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "relocate annotation",
 			cd: clusterdeployment.Build(
 				clusterdeployment.Generic(generic.WithAnnotation(constants.RelocateAnnotation, "some-relocate/outgoing")),
 			),
-			expected: false,
+			expected: true,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := ShouldSyncCluster(tc.cd, logrus.StandardLogger())
+			actual := IsClusterPausedOrRelocating(tc.cd, logrus.StandardLogger())
 			assert.Equal(t, tc.expected, actual)
 		})
 	}

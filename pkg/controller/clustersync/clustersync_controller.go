@@ -3,16 +3,19 @@ package clustersync
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +57,7 @@ const (
 	labelCreateOnly        = "createOnly"
 	metricResultSuccess    = "success"
 	metricResultError      = "error"
+	stsName                = "hive-clustersync"
 )
 
 var (
@@ -121,6 +125,25 @@ func Add(mgr manager.Manager) error {
 	if err != nil {
 		return err
 	}
+
+	logger.Debug("Getting HIVE_CLUSTERSYNC_POD_NAME")
+	podname, found := os.LookupEnv("HIVE_CLUSTERSYNC_POD_NAME")
+
+	if !found {
+		return errors.New("environment variable HIVE_CLUSTERSYNC_POD_NAME not set")
+	}
+
+	logger.Debug("Setting ordinalID")
+	parts := strings.Split(podname, "-")
+	ordinalIDStr := parts[len(parts)-1]
+	ordinalID32, err := strconv.Atoi(ordinalIDStr)
+	if err != nil {
+		return errors.Wrap(err, "error converting ordinalID to int")
+	}
+
+	r.ordinalID = int64(ordinalID32)
+	logger.WithField("ordinalID", r.ordinalID).Debug("ordinalID set")
+
 	return AddToManager(mgr, r, concurrentReconciles, queueRateLimiter)
 }
 
@@ -245,6 +268,66 @@ type ReconcileClusterSync struct {
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
+
+	ordinalID int64
+}
+
+func (r *ReconcileClusterSync) getAndCheckClusterSyncStatefulSet(logger log.FieldLogger) (*appsv1.StatefulSet, error) {
+	hiveNS := controllerutils.GetHiveNamespace()
+
+	logger.Debug("Getting statefulset")
+	sts := &appsv1.StatefulSet{}
+	err := r.Get(context.Background(), types.NamespacedName{Namespace: hiveNS, Name: stsName}, sts)
+	if err != nil {
+		logger.WithError(err).WithField("hiveNS", hiveNS).Error("error getting statefulset.")
+		return nil, err
+	}
+
+	logger.Debug("Ensuring replicas is set")
+	if sts.Spec.Replicas == nil {
+		return nil, errors.New("sts.Spec.Replicas not set")
+	}
+
+	if sts.Status.CurrentReplicas != *sts.Spec.Replicas {
+		// This ensures that we don't have partial syncing which may make it seem like things are working.
+		// TODO: Remove this once https://issues.redhat.com/browse/CO-1268 is completed as this should no longer be needed.
+		return nil, fmt.Errorf("statefulset replica count is off. current: %v  expected: %v", sts.Status.CurrentReplicas, *sts.Spec.Replicas)
+	}
+
+	// All checks passed
+	return sts, nil
+}
+
+// isSyncAssignedToMe determines if this instance of the controller is assigned to the resource being sync'd
+func (r *ReconcileClusterSync) isSyncAssignedToMe(sts *appsv1.StatefulSet, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, error) {
+	logger.Debug("Getting uid for hashing")
+	var uidAsBigInt big.Int
+
+	// There are a couple of assumptions here:
+	// * the clusterdeployment uid has 4 sections separated by hyphens
+	// * the 4 sections are hex numbers
+	// These assumptions are based on the fact that Kubernetes says UIDs are actually
+	// ISO/IEC 9834-8 UUIDs. If this changes, this code may fail and may need to be updated.
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+	hexUID := strings.Replace(string(cd.UID), "-", "", 4)
+	logger.Debugf("hexUID: %+v", hexUID)
+	uidAsBigInt.SetString(hexUID, 16)
+
+	logger.Debug("calculating replicas")
+	replicas := int64(*sts.Spec.Replicas)
+
+	logger.Debug("determining who is assigned to sync this cluster")
+	ordinalIDOfAssignee := uidAsBigInt.Mod(&uidAsBigInt, big.NewInt(replicas)).Int64()
+	assignedToMe := ordinalIDOfAssignee == r.ordinalID
+
+	logger.WithFields(log.Fields{
+		"replicas":            replicas,
+		"ordinalIDOfAssignee": ordinalIDOfAssignee,
+		"ordinalID":           r.ordinalID,
+		"assignedToMe":        assignedToMe,
+	}).Debug("computed values")
+
+	return assignedToMe, nil
 }
 
 // Reconcile reads the state of the ClusterDeployment and applies any SyncSets or SelectorSyncSets that need to be
@@ -269,8 +352,24 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	// Is syncing paused?
-	if !controllerutils.ShouldSyncCluster(cd, logger) {
+	sts, err := r.getAndCheckClusterSyncStatefulSet(logger)
+	if err != nil {
+		log.WithError(err).Error("failed getting clustersync statefulset")
+		return reconcile.Result{}, err
+	}
+
+	if me, err := r.isSyncAssignedToMe(sts, cd, logger); !me || err != nil {
+		if err != nil {
+			logger.WithError(err).Error("failed determining which instance is assigned to sync this cluster")
+			return reconcile.Result{}, err
+		}
+
+		logger.Debug("not syncing because isSyncAssignedToMe returned false")
+		recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeSkippedSync)
+		return reconcile.Result{}, nil
+	}
+
+	if controllerutils.IsClusterPausedOrRelocating(cd, logger) {
 		return reconcile.Result{}, nil
 	}
 

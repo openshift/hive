@@ -18,16 +18,18 @@ func IsDeleteProtected(cd *hivev1.ClusterDeployment) bool {
 	return protectedDelete && err == nil
 }
 
-func ShouldSyncCluster(cd *hivev1.ClusterDeployment, logger log.FieldLogger) bool {
+// IsClusterPausedOrRelocating checks if the syncing to the cluster is paused or if the cluster is relocating
+func IsClusterPausedOrRelocating(cd *hivev1.ClusterDeployment, logger log.FieldLogger) bool {
 	if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {
 		logger.WithField("annotation", constants.SyncsetPauseAnnotation).Warn("syncing to cluster is disabled by annotation")
-		return false
+		return true
 	}
 	if _, relocating := cd.Annotations[constants.RelocateAnnotation]; relocating {
 		logger.WithField("annotation", constants.RelocateAnnotation).Info("syncing to cluster is disabled by annotation")
-		return false
+		return true
 	}
-	return true
+
+	return false
 }
 
 func IsRelocating(obj metav1.Object) (relocateName string, status hivev1.RelocateStatus, err error) {

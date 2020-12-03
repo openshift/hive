@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hive-clustersync
+  namespace: hive
+  labels:
+    app: hive-clustersync
+spec:
+  selector:
+    app: hive-clustersync
+  ports:
+  - name: metrics
+    port: 2112
+    protocol: TCP
+  # Expose 6060 for pprof data. Normally nothing listening here unless a developer has
+  # compiled in pprof support. See Hive developer documentation for how to use.
+  - name: profiling
+    port: 6060
+    protocol: TCP

@@ -57,6 +57,9 @@ const (
 	defaultRequeueTime = 10 * time.Second
 	maxProvisions      = 3
 
+	platformAuthFailureReason = "PlatformAuthError"
+	platformAuthSuccessReason = "PlatformAuthSuccess"
+
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
 
@@ -71,14 +74,7 @@ const (
 	deleteAfterAnnotation    = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
 	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
 
-	platformAWS       = "aws"
-	platformAzure     = "azure"
-	platformGCP       = "gcp"
-	platformOpenStack = "openstack"
-	platformVSphere   = "vsphere"
-	platformBaremetal = "baremetal"
-	platformUnknown   = "unknown"
-	regionUnknown     = "unknown"
+	regionUnknown = "unknown"
 )
 
 var (
@@ -163,10 +159,11 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterDeployment{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
-		scheme:       mgr.GetScheme(),
-		logger:       logger,
-		expectations: controllerutils.NewExpectations(logger),
+		Client:                                  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+		scheme:                                  mgr.GetScheme(),
+		logger:                                  logger,
+		expectations:                            controllerutils.NewExpectations(logger),
+		validateCredentialsForClusterDeployment: controllerutils.ValidateCredentialsForClusterDeployment,
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
@@ -274,6 +271,10 @@ type ReconcileClusterDeployment struct {
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
+
+	// validateCredentialsForClusterDeployment is what this controller will call to validate
+	// that the platform creds are good (used for testing)
+	validateCredentialsForClusterDeployment func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error)
 
 	protectedDelete bool
 }
@@ -580,6 +581,27 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			result = &reconcile.Result{}
 		}
 		return *result, err
+	}
+
+	// Sanity check the platform/cloud credentials.
+	validCreds, err := r.validatePlatformCreds(cd, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("unable to validate platform credentials")
+		return reconcile.Result{}, err
+	}
+	// Make sure the condition is set properly.
+	_, err = r.setAuthenticationFailure(cd, validCreds, cdLog)
+	if err != nil {
+		cdLog.WithError(err).Error("unable to update clusterdeployment")
+		return reconcile.Result{}, err
+	}
+
+	// If the platform credentials are no good, return error and go into backoff
+	authCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.AuthenticationFailureClusterDeploymentCondition)
+	if authCondition != nil && authCondition.Status == corev1.ConditionTrue {
+		authError := errors.New(authCondition.Message)
+		cdLog.WithError(authError).Error("cannot proceed with provision while platform credentials authentication is failing.")
+		return reconcile.Result{}, authError
 	}
 
 	imageSet, err := r.getClusterImageSet(cd, cdLog)
@@ -1270,6 +1292,36 @@ func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterD
 	cd.Status.Conditions = conditions
 	cdLog.Debugf("setting DNSNotReadyCondition to %v", status)
 	return r.Status().Update(context.TODO(), cd)
+}
+
+func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authSuccessful bool, cdLog log.FieldLogger) (bool, error) {
+
+	var status corev1.ConditionStatus
+	var reason, message string
+
+	if authSuccessful {
+		status = corev1.ConditionFalse
+		reason = platformAuthSuccessReason
+		message = "Platform credentials passed authentication check"
+	} else {
+		status = corev1.ConditionTrue
+		reason = platformAuthFailureReason
+		message = "Platform credentials failed authentication check"
+	}
+
+	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.AuthenticationFailureClusterDeploymentCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange)
+	if !changed {
+		return false, nil
+	}
+	cd.Status.Conditions = conditions
+
+	return changed, r.Status().Update(context.TODO(), cd)
 }
 
 func (r *ReconcileClusterDeployment) setInstallLaunchErrorCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
@@ -2113,6 +2165,11 @@ func (r *ReconcileClusterDeployment) deleteOldFailedProvisions(provs []*hivev1.C
 	}
 }
 
+// validatePlatformCreds ensure the platform/cloud credentials are at least good enough to authenticate with
+func (r *ReconcileClusterDeployment) validatePlatformCreds(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, error) {
+	return r.validateCredentialsForClusterDeployment(r.Client, cd, logger)
+}
+
 // checkForFailedSync returns true if it finds that the ClusterSync has the Failed condition set
 func checkForFailedSync(clusterSync *hiveintv1alpha1.ClusterSync) bool {
 	for _, cond := range clusterSync.Status.Conditions {
@@ -2213,19 +2270,19 @@ func (r *ReconcileClusterDeployment) addOwnershipToSecret(cd *hivev1.ClusterDepl
 func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		return platformAWS
+		return constants.PlatformAWS
 	case cd.Spec.Platform.Azure != nil:
-		return platformAzure
+		return constants.PlatformAzure
 	case cd.Spec.Platform.GCP != nil:
-		return platformGCP
+		return constants.PlatformGCP
 	case cd.Spec.Platform.OpenStack != nil:
-		return platformOpenStack
+		return constants.PlatformOpenStack
 	case cd.Spec.Platform.VSphere != nil:
-		return platformVSphere
+		return constants.PlatformVSphere
 	case cd.Spec.Platform.BareMetal != nil:
-		return platformBaremetal
+		return constants.PlatformBaremetal
 	}
-	return platformUnknown
+	return constants.PlatformUnknown
 }
 
 // getClusterRegion returns the region of a given ClusterDeployment

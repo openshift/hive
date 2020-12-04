@@ -3,6 +3,7 @@ package clusterpool
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
@@ -109,6 +110,18 @@ func WithBaseDomain(baseDomain string) Option {
 func WithImageSet(clusterImageSetName string) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
 		clusterPool.Spec.ImageSetRef = hivev1.ClusterImageSetReference{Name: clusterImageSetName}
+	}
+}
+
+func WithMaxSize(size int) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.MaxSize = pointer.Int32Ptr(int32(size))
+	}
+}
+
+func WithMaxConcurrent(size int) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.MaxConcurrent = pointer.Int32Ptr(int32(size))
 	}
 }
 

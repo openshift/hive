@@ -89,7 +89,7 @@ func InstallerPodSpec(
 			Name: "installconfig",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: cd.Spec.Provisioning.InstallConfigSecretRef.Name,
+					SecretName: cd.Spec.Provisioning.InstallConfigSecretTemplateRef.Name,
 				},
 			},
 		},

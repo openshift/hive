@@ -234,7 +234,7 @@ func TestBuildClusterResources(t *testing.T) {
 
 			installConfigSecret := findSecret(allObjects, fmt.Sprintf("%s-install-config", clusterName))
 			require.NotNil(t, installConfigSecret)
-			assert.Equal(t, installConfigSecret.Name, cd.Spec.Provisioning.InstallConfigSecretRef.Name)
+			assert.Equal(t, installConfigSecret.Name, cd.Spec.Provisioning.InstallConfigSecretTemplateRef.Name)
 
 			pullSecretSecret := findSecret(allObjects, fmt.Sprintf("%s-pull-secret", clusterName))
 			require.NotNil(t, pullSecretSecret)

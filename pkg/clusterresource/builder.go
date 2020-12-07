@@ -315,7 +315,7 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: o.ImageSet}
 	}
 
-	cd.Spec.Provisioning.InstallConfigSecretRef = corev1.LocalObjectReference{Name: o.getInstallConfigSecretName()}
+	cd.Spec.Provisioning.InstallConfigSecretTemplateRef = corev1.LocalObjectReference{Name: o.getInstallConfigSecretName()}
 	cd.Spec.Platform = o.CloudBuilder.GetCloudPlatform(o)
 
 	return cd

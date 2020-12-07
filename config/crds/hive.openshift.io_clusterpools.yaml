@@ -68,9 +68,10 @@ spec:
               required:
               - name
               type: object
-            installConfigSecretRef:
-              description: InstallConfigSecretRef is the install-config.yaml loaded
-                as a secret to be used as a template for all clusters in this pool.
+            installConfigSecretTemplateRef:
+              description: InstallConfigSecretTemplateRef is the install-config.yaml
+                loaded as a secret to be used as a template for all clusters in this
+                pool.
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names

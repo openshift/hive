@@ -34,9 +34,9 @@ type ClusterPoolSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// InstallConfigSecretRef is the install-config.yaml loaded as a secret to be used as a template for all clusters in this pool.
+	// InstallConfigSecretTemplateRef is the install-config.yaml loaded as a secret to be used as a template for all clusters in this pool.
 	// +optional
-	InstallConfigSecretRef *corev1.LocalObjectReference `json:"installConfigSecretRef"`
+	InstallConfigSecretTemplateRef *corev1.LocalObjectReference `json:"installConfigSecretTemplateRef"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

@@ -676,13 +676,13 @@ func (r *ReconcileClusterPool) verifyClusterImageSet(pool *hivev1.ClusterPool, l
 }
 
 func (r *ReconcileClusterPool) getInstallConfigTemplate(pool *hivev1.ClusterPool, logger log.FieldLogger) (string, error) {
-	if pool.Spec.InstallConfigSecretRef == nil {
+	if pool.Spec.InstallConfigSecretTemplateRef == nil {
 		return "", nil
 	}
 	installConfigSecret := &corev1.Secret{}
 	err := r.Client.Get(
 		context.Background(),
-		types.NamespacedName{Namespace: pool.Namespace, Name: pool.Spec.InstallConfigSecretRef.Name},
+		types.NamespacedName{Namespace: pool.Namespace, Name: pool.Spec.InstallConfigSecretTemplateRef.Name},
 		installConfigSecret,
 	)
 	if err != nil {

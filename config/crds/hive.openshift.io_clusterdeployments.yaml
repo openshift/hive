@@ -605,12 +605,12 @@ spec:
                   required:
                   - name
                   type: object
-                installConfigSecretRef:
-                  description: InstallConfigSecretRef is the reference to a secret
-                    that contains an openshift-install InstallConfig. This file will
-                    be passed through directly to the installer. Any version of InstallConfig
-                    can be used, provided it can be parsed by the openshift-install
-                    version for the release you are provisioning.
+                installConfigSecretTemplateRef:
+                  description: InstallConfigSecretTemplateRef is the reference to
+                    a secret that contains an openshift-install InstallConfig. This
+                    file will be passed through directly to the installer. Any version
+                    of InstallConfig can be used, provided it can be parsed by the
+                    openshift-install version for the release you are provisioning.
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -761,7 +761,7 @@ spec:
                       type: string
                   type: object
               required:
-              - installConfigSecretRef
+              - installConfigSecretTemplateRef
               type: object
             pullSecretRef:
               description: PullSecretRef is the reference to the secret to use when

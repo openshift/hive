@@ -38,6 +38,9 @@ func DeleteAnyExistingObject(c client.Client, key client.ObjectKey, obj hivev1.M
 }
 
 func (r *helper) Delete(apiVersion, kind, namespace, name string) error {
+	if r.fake {
+		return nil
+	}
 	f, err := r.getFactory(namespace)
 	if err != nil {
 		return errors.Wrap(err, "could not get factory")

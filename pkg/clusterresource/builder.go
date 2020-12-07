@@ -185,7 +185,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	if o.InstallConfigTemplate != "" {
 		installConfigSecret, err := o.mergeInstallConfigTemplate()
 		if err != nil {
-			return nil, fmt.Errorf("Encountered problems mering InstallConfigTemplate: %s", err.Error())
+			return nil, fmt.Errorf("Encountered problems merging InstallConfigTemplate: %s", err.Error())
 		}
 		allObjects = append(allObjects, installConfigSecret)
 	} else {

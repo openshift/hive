@@ -28,6 +28,7 @@ import (
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
+	"github.com/openshift/hive/pkg/test/generic"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsecret "github.com/openshift/hive/pkg/test/secret"
 )
@@ -77,6 +78,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedDeletedClusters            []string
 		expectFinalizerRemoved             bool
 		expectedMissingDependenciesStatus  *bool
+		expectedCapacityStatus             *bool
 		expectedMissingDependenciesMessage string
 		expectedAssignedClaims             int
 		expectedUnassignedClaims           int
@@ -105,6 +107,145 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedReady: 2,
 		},
 		{
+			name: "scale up with no more capacity",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:  3,
+			expectedObservedSize:   3,
+			expectedObservedReady:  2,
+			expectedCapacityStatus: pointer.BoolPtr(false),
+		},
+		{
+			name: "scale up with some capacity",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(4)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:  4,
+			expectedObservedSize:   3,
+			expectedObservedReady:  2,
+			expectedCapacityStatus: pointer.BoolPtr(true),
+		},
+		{
+			name: "scale up with no more capacity including claimed",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(3)),
+				cdBuilder("c1").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test")),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:  3,
+			expectedObservedSize:   2,
+			expectedObservedReady:  1,
+			expectedCapacityStatus: pointer.BoolPtr(false),
+		},
+		{
+			name: "scale up with some capacity including claimed",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(4)),
+				cdBuilder("c1").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test")),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:  4,
+			expectedObservedSize:   2,
+			expectedObservedReady:  1,
+			expectedCapacityStatus: pointer.BoolPtr(true),
+		},
+		{
+			name: "scale up with no more max concurrent",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(1)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters: 3,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
+		},
+		{
+			name: "scale up with one more max concurrent",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
+		},
+		{
+			name: "scale up with max concurrent and max size",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(6), testcp.WithMaxSize(5), testcp.WithMaxConcurrent(1)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:  3,
+			expectedObservedSize:   3,
+			expectedObservedReady:  2,
+			expectedCapacityStatus: pointer.BoolPtr(true),
+		},
+		{
+			name: "scale up with max concurrent and max size 2",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(6), testcp.WithMaxSize(5), testcp.WithMaxConcurrent(1)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+			},
+			expectedTotalClusters:  4,
+			expectedObservedSize:   3,
+			expectedObservedReady:  3,
+			expectedCapacityStatus: pointer.BoolPtr(true),
+		},
+		{
+			name: "scale up with max concurrent and max size 3",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(6), testcp.WithMaxSize(4), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters:  4,
+			expectedObservedSize:   3,
+			expectedObservedReady:  2,
+			expectedCapacityStatus: pointer.BoolPtr(true),
+		},
+		{
+			name: "no scale up with max concurrent and some deleting",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters: 3,
+			expectedObservedSize:  2,
+			expectedObservedReady: 1,
+		},
+		{
+			name: "scale up with max concurrent and some deleting",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(3)),
+				unclaimedCDBuilder("c1").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  2,
+			expectedObservedReady: 1,
+		},
+		{
 			name: "scale down",
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithSize(3)),
@@ -116,6 +257,36 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c6").Build(testcd.Installed()),
 			},
 			expectedTotalClusters: 3,
+			expectedObservedSize:  6,
+			expectedObservedReady: 6,
+		},
+		{
+			name: "scale down with max concurrent enough",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				unclaimedCDBuilder("c5").Build(testcd.Installed()),
+				unclaimedCDBuilder("c6").Build(testcd.Installed()),
+			},
+			expectedTotalClusters: 3,
+			expectedObservedSize:  6,
+			expectedObservedReady: 6,
+		},
+		{
+			name: "scale down with max concurrent not enough",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				unclaimedCDBuilder("c5").Build(testcd.Installed()),
+				unclaimedCDBuilder("c6").Build(testcd.Installed()),
+			},
+			expectedTotalClusters: 4,
 			expectedObservedSize:  6,
 			expectedObservedReady: 6,
 		},
@@ -300,6 +471,26 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:              1,
 			expectedObservedSize:               0,
 			expectedObservedReady:              0,
+		},
+		{
+			name: "max capacity resolved",
+			existing: []runtime.Object{
+				poolBuilder.Build(
+					testcp.WithSize(2),
+					testcp.WithMaxSize(3),
+					testcp.WithCondition(hivev1.ClusterPoolCondition{
+						Type:   hivev1.ClusterPoolCapacityAvailableCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
+			},
+			expectedTotalClusters:  3,
+			expectedObservedSize:   2,
+			expectedObservedReady:  2,
+			expectedCapacityStatus: pointer.BoolPtr(true),
 		},
 		{
 			name: "with pull secret",
@@ -494,9 +685,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 
 			missingDependentsCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolMissingDependenciesCondition)
-			if test.expectedMissingDependenciesStatus == nil {
-				assert.Nil(t, missingDependentsCondition, "expected no MissingDependencies condition")
-			} else {
+			if test.expectedMissingDependenciesStatus != nil {
+				require.NotNil(t, missingDependentsCondition)
 				expectedStatus := corev1.ConditionFalse
 				if *test.expectedMissingDependenciesStatus {
 					expectedStatus = corev1.ConditionTrue
@@ -505,6 +695,15 @@ func TestReconcileClusterPool(t *testing.T) {
 				assert.Equal(t, test.expectedMissingDependenciesMessage, missingDependentsCondition.Message, "unexpected MissingDependencies conditon message")
 			}
 
+			capacityAvailableCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolCapacityAvailableCondition)
+			if test.expectedCapacityStatus != nil {
+				require.NotNil(t, capacityAvailableCondition)
+				expectedStatus := corev1.ConditionFalse
+				if *test.expectedCapacityStatus {
+					expectedStatus = corev1.ConditionTrue
+				}
+				assert.Equal(t, expectedStatus, capacityAvailableCondition.Status, "expected CapacityAvailable condition to be true")
+			}
 			claims := &hivev1.ClusterClaimList{}
 			err = fakeClient.List(context.Background(), claims)
 			require.NoError(t, err)

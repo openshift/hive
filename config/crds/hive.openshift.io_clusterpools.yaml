@@ -75,6 +75,18 @@ spec:
                 for the pool. ClusterDeployments that have already been claimed will
                 not be affected when this value is modified.
               type: object
+            maxConcurrent:
+              description: MaxConcurrent is the maximum number of clusters that will
+                be provisioned or deprovisioned at an time. By default there is no
+                limit.
+              format: int32
+              type: integer
+            maxSize:
+              description: MaxSize is the maximum number of clusters that will be
+                provisioned including clusters that have been claimed and ones waiting
+                to be used. By default there is no limit.
+              format: int32
+              type: integer
             platform:
               description: Platform encompasses the desired platform for the cluster.
               properties:

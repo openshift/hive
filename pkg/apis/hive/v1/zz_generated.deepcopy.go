@@ -1078,6 +1078,16 @@ func (in *ClusterPoolSpec) DeepCopyInto(out *ClusterPoolSpec) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.MaxSize != nil {
+		in, out := &in.MaxSize, &out.MaxSize
+		*out = new(int32)
+		**out = **in
+	}
+	if in.MaxConcurrent != nil {
+		in, out := &in.MaxConcurrent, &out.MaxConcurrent
+		*out = new(int32)
+		**out = **in
+	}
 	out.ImageSetRef = in.ImageSetRef
 	if in.Labels != nil {
 		in, out := &in.Labels, &out.Labels

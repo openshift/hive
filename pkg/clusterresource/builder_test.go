@@ -36,6 +36,35 @@ const (
 	adoptInfraID                     = "adopted-infra-id"
 	machineNetwork                   = "10.0.0.0/16"
 	fakeOpenStackCloudsYAML          = "fakeYAML"
+	fakeInstallConfigYaml            = `apiVersion: v1
+baseDomain: template.domain
+metadata:
+  name: template-cluster-name
+compute:
+- hyperthreading: Enabled
+  name: worker
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  platform:
+    aws:
+      type: m5.xlarge
+      rootVolume:
+        size: 128
+      zones:
+      - eu-west-1a
+      - eu-west-1b
+      - eu-west-1c
+  replicas: 3
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineCIDR: 10.0.0.0/16
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+`
 )
 
 func createTestBuilder() *Builder {
@@ -213,6 +242,75 @@ func TestBuildClusterResources(t *testing.T) {
 				require.NotNil(t, certSecret)
 				assert.Equal(t, certSecret.Name, cd.Spec.Platform.VSphere.CertificatesSecretRef.Name)
 			},
+		}, {
+			name: "merge InstallConfigTemplate",
+			builder: func() *Builder {
+				b := createAWSClusterBuilder()
+				b.InstallConfigTemplate = fakeInstallConfigYaml
+				return b
+				// 	Name =  clusterName,
+				// 	Namespace =        namespace,
+				// 	WorkerNodesCount = workerNodeCount,
+				// 	PullSecret =       pullSecret,
+				// 	SSHPrivateKey =    sshPrivateKey,
+				// 	SSHPublicKey =     sshPublicKey,
+				// 	BaseDomain =       baseDomain,
+				// 	Labels: map[string]string{
+				// 		"foo": "bar",
+				// 	},
+				// 	InstallConfigTemplate: map[string]string{
+				// 		"baseDomain": "template.domain",
+				// 	},
+				// 	DeleteAfter:    deleteAfter,
+				// 	ImageSet:       imageSetName,
+				// 	MachineNetwork: machineNetwork,
+				// }
+				// awsBuilder := createAWSClusterBuilder()
+				// awsBuilder.Adopt = true
+				// awsBuilder.AdoptInfraID = adoptInfraID
+				// awsBuilder.AdoptClusterID = adoptClusterID
+				// awsBuilder.AdoptAdminKubeconfig = []byte(adoptAdminKubeconfig)
+				// return awsBuilder
+			}(),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+				//cd := findClusterDeployment(allObjects, clusterName)
+
+				installConfigSecret := findSecret(allObjects, fmt.Sprintf("%s-install-config", clusterName))
+
+				newContent := `apiVersion: v1
+baseDomain: example.com
+metadata:
+    name: mycluster
+compute:
+- hyperthreading: Enabled
+    name: worker
+controlPlane:
+    hyperthreading: Enabled
+    name: master
+    platform:
+    aws:
+        type: m5.xlarge
+        rootVolume:
+        size: 128
+        zones:
+        - eu-west-1a
+        - eu-west-1b
+        - eu-west-1c
+    replicas: 3
+networking:
+    clusterNetwork:
+    - cidr: 10.128.0.0/14
+    hostPrefix: 23
+    machineCIDR: 10.0.0.0/16
+    networkType: OpenShiftSDN
+    serviceNetwork:
+    - 172.30.0.0/16
+`
+
+				assert.Equal(t, newContent, installConfigSecret.StringData["install-config.yaml"])
+
+				assert.Equal(t, 1, 1)
+			},
 		},
 	}
 
@@ -310,3 +408,32 @@ func findConfigMap(allObjects []runtime.Object, name string) *corev1.ConfigMap {
 	}
 	return nil
 }
+
+// func TestMergeInstallConfigTemplate(t *testing.T) {
+// 	// When merging with InstallConfigTemplate, we should only
+// 	// override cluster name and baseDomain
+
+// 	//builder := createTestBuilder()
+// 	builder := &Builder{
+// 		Name:             clusterName,
+// 		Namespace:        namespace,
+// 		WorkerNodesCount: workerNodeCount,
+// 		PullSecret:       pullSecret,
+// 		SSHPrivateKey:    sshPrivateKey,
+// 		SSHPublicKey:     sshPublicKey,
+// 		BaseDomain:       baseDomain,
+// 		Labels: map[string]string{
+// 			"foo": "bar",
+// 		},
+// 		InstallConfigTemplate: map[string]string{
+// 			"baseDomain": "template.domain",
+// 		},
+// 		DeleteAfter:    deleteAfter,
+// 		ImageSet:       imageSetName,
+// 		MachineNetwork: machineNetwork,
+// 	}
+
+// 	mergedSecret, error := builder.mergeInstallConfigTemplate()
+
+// 	t.Run("Test mergeInstallConfigTemplate", func(t *testing.T))
+// }

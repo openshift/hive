@@ -71,7 +71,8 @@ spec:
             installConfigSecretTemplateRef:
               description: InstallConfigSecretTemplateRef is the install-config.yaml
                 loaded as a secret to be used as a template for all clusters in this
-                pool.
+                pool. Cluster specific settings (name, basedomain) will be injected
+                dynamically when the ClusterDeployment install-config Secret is generated.
               properties:
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names

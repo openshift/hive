@@ -37,7 +37,7 @@ func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",
 			Provisioning: &hivev1.Provisioning{
-				InstallConfigSecretTemplateRef: corev1.LocalObjectReference{
+				InstallConfigSecretRef: corev1.LocalObjectReference{
 					Name: "test-install-config",
 				},
 			},
@@ -738,7 +738,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name: "InstallConfig is missing",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
-				cd.Spec.Provisioning.InstallConfigSecretTemplateRef.Name = ""
+				cd.Spec.Provisioning.InstallConfigSecretRef.Name = ""
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

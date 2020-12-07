@@ -242,8 +242,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if newObject.Spec.Provisioning == nil {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "provisioning is required if not installed"))
 
-		} else if newObject.Spec.Provisioning.InstallConfigSecretTemplateRef.Name == "" {
-			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretTemplateRef", "name"), "must specify an InstallConfig"))
+		} else if newObject.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
 		}
 	}
 

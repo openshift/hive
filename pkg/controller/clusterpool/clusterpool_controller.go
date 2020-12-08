@@ -522,6 +522,10 @@ func (r *ReconcileClusterPool) createCluster(
 		Labels:           clp.Spec.Labels,
 	}
 
+	if clp.Spec.HibernateAfter != nil {
+		builder.HibernateAfter = &clp.Spec.HibernateAfter.Duration
+	}
+
 	objs, err := builder.Build()
 	if err != nil {
 		return errors.Wrap(err, "error building resources")

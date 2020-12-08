@@ -2,9 +2,11 @@ package clusterpool
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -13,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/homedir"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
@@ -74,12 +77,15 @@ type ClusterPoolOptions struct {
 	ReleaseImageSource string
 	Region             string
 	Size               int32
+	HibernateAfter     string
+	HibernateAfterDur  *time.Duration
 
 	AzureBaseDomainResourceGroupName string
 
 	createCloudSecret bool
 	homeDir           string
 	log               log.FieldLogger
+	Output            string
 }
 
 func NewCreateClusterPoolCommand() *cobra.Command {
@@ -131,6 +137,9 @@ create-pool CLUSTER_POOL_NAME --cloud=gcp`,
 	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster pool.")
 	flags.Int32Var(&opt.Size, "size", 1, "Size of cluster pool")
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
+	flags.StringVar(&opt.HibernateAfter, "hibernate-after", "", "Automatically hibernate clusterpool clusters when they have been running for the given duration")
+	flags.StringVarP(&opt.Output, "output", "o", "", "Output of this command (nothing will be created on cluster). Valid values: yaml,json")
+
 	return cmd
 }
 
@@ -153,11 +162,25 @@ func (o *ClusterPoolOptions) complete(args []string) error {
 		o.createCloudSecret = true
 	}
 
+	if o.HibernateAfter != "" {
+		dur, err := time.ParseDuration(o.HibernateAfter)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse HibernateAfter duration")
+		}
+		o.HibernateAfterDur = &dur
+	}
+
 	return nil
 }
 
 // validate ensures that option values make sense
 func (o *ClusterPoolOptions) validate(cmd *cobra.Command) error {
+	if len(o.Output) > 0 && o.Output != "yaml" && o.Output != "json" {
+		cmd.Usage()
+		o.log.Info("Invalid value for output. Valid values are: yaml, json.")
+		return fmt.Errorf("invalid output")
+	}
+
 	if len(o.BaseDomain) == 0 {
 		return fmt.Errorf("base domain is required")
 	}
@@ -197,6 +220,17 @@ func (o *ClusterPoolOptions) run() error {
 
 	objs, err := o.generateObjects()
 	if err != nil {
+		return err
+	}
+
+	if len(o.Output) > 0 {
+		var printer printers.ResourcePrinter
+		if o.Output == "yaml" {
+			printer = &printers.YAMLPrinter{}
+		} else {
+			printer = &printers.JSONPrinter{}
+		}
+		printObjects(objs, scheme, printer)
 		return err
 	}
 
@@ -359,7 +393,30 @@ func (o *ClusterPoolOptions) generateClusterPool(builder *clusterresource.Builde
 	if o.ClusterImageSet != "" {
 		cp.Spec.ImageSetRef = hivev1.ClusterImageSetReference{Name: o.ClusterImageSet}
 	}
+	if o.HibernateAfterDur != nil {
+		cp.Spec.HibernateAfter = &metav1.Duration{Duration: *o.HibernateAfterDur}
+	}
 	cp.Spec.Platform = builder.CloudBuilder.GetCloudPlatform(builder)
 
 	return cp
+}
+
+func printObjects(objects []runtime.Object, scheme *runtime.Scheme, printer printers.ResourcePrinter) {
+	typeSetterPrinter := printers.NewTypeSetter(scheme).ToPrinter(printer)
+	switch len(objects) {
+	case 0:
+		return
+	case 1:
+		typeSetterPrinter.PrintObj(objects[0], os.Stdout)
+	default:
+		list := &metav1.List{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "List",
+				APIVersion: corev1.SchemeGroupVersion.String(),
+			},
+			ListMeta: metav1.ListMeta{},
+		}
+		meta.SetList(list, objects)
+		typeSetterPrinter.PrintObj(list, os.Stdout)
+	}
 }

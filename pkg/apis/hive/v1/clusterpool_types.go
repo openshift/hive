@@ -44,6 +44,13 @@ type ClusterPoolSpec struct {
 	// claimed will not be affected when this value is modified.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// HibernateAfter will be applied to new ClusterDeployments created for the pool. HibernateAfter will transition
+	// clusters in the clusterpool to hibernating power state after it has been running for the given duration. The time
+	// that a cluster has been running is the time since the cluster was installed or the time since the cluster last came
+	// out of hibernation.
+	// +optional
+	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

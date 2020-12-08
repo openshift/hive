@@ -373,16 +373,18 @@ func (m *InstallManager) Run() error {
 		m,
 		func(provision *hivev1.ClusterProvision) {
 			provision.Spec.Metadata = &runtime.RawExtension{Raw: metadataBytes}
-			if fakeCluster {
+
+			if !fakeCluster {
+				provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
+				provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
+			} else {
 				// If we're faking this install, it's safer to put an ID in that will never match any
 				// resource tags in the real world.
 				fakeClusterString := "fake cluster"
 				provision.Spec.InfraID = pointer.StringPtr(fakeClusterString)
 				provision.Spec.ClusterID = pointer.StringPtr(fakeClusterString)
-			} else {
-				provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
-				provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
 			}
+
 			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
 			}
@@ -411,10 +413,7 @@ func (m *InstallManager) Run() error {
 		}
 	}
 
-	if fakeCluster {
-		m.log.Warnf("skipping openshift-install create cluster due to %s annotation on ClusterDeployment",
-			constants.HiveFakeInstallKubeconfigSecretAnnotation)
-	} else {
+	if !fakeCluster {
 		installErr := m.provisionCluster()
 		if installErr != nil {
 			m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
@@ -457,6 +456,9 @@ func (m *InstallManager) Run() error {
 				return installErr
 			}
 		}
+	} else {
+		m.log.Warnf("skipping openshift-install create cluster due to %s annotation on ClusterDeployment",
+			constants.HiveFakeInstallKubeconfigSecretAnnotation)
 	}
 
 	m.log.Info("install completed successfully")
@@ -1170,9 +1172,7 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, fakeCluster bool, m
 	m.log.Infoln("uploading admin username/password")
 
 	var password string
-	if fakeCluster {
-		password = "fake-password"
-	} else {
+	if !fakeCluster {
 		fullPath := filepath.Join(m.WorkDir, adminPasswordRelativePath)
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			m.log.WithField("path", fullPath).Error("admin password file does not exist")
@@ -1187,6 +1187,8 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, fakeCluster bool, m
 
 		// Need to trim trailing newlines from the password
 		password = strings.TrimSpace(string(passwordBytes))
+	} else {
+		password = "fake-password"
 	}
 
 	s := &corev1.Secret{

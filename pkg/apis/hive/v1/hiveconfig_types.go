@@ -125,8 +125,9 @@ type VeleroBackupConfig struct {
 // FailedProvisionConfig contains settings to control behavior undertaken by Hive when an installation attempt fails.
 type FailedProvisionConfig struct {
 
-	// SkipGatherLogs disables functionality that attempts to gather full logs from the cluster if an installation
-	// fails for any reason. The logs will be stored in a persistent volume for up to 7 days.
+	// TODO: Figure out how to mark SkipGatherLogs as deprecated (more than just a comment)
+
+	// DEPRECATED: This flag is no longer respected and will be removed in the future.
 	SkipGatherLogs bool                      `json:"skipGatherLogs,omitempty"`
 	AWS            *FailedProvisionAWSConfig `json:"aws,omitempty"`
 }
@@ -159,11 +160,11 @@ type ManageDNSConfig struct {
 type FailedProvisionAWSConfig struct {
 	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
 	// AWS S3. It will need permission to upload logs to S3.
-	// Secret should have key named "cloud" that contains an AWS credentials formatted file.
-	// Example:
-	//   [default]
-	//   aws_access_key_id = minio
-	//   aws_secret_access_key = minio123
+	// Secret should have keys named aws_access_key_id and aws_secret_access_key that contain the AWS credentials.
+	// Example Secret:
+	//   data:
+	//     aws_access_key_id: minio
+	//     aws_secret_access_key: minio123
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
 	// Region is the AWS region to use for S3 operations.

@@ -51,8 +51,6 @@ func InstallerPodSpec(
 	provisionName string,
 	releaseImage string,
 	serviceAccountName string,
-	pvcName string,
-	skipGatherLogs bool,
 	extraEnvVars []corev1.EnvVar,
 ) (*corev1.PodSpec, error) {
 
@@ -86,6 +84,12 @@ func InstallerPodSpec(
 			},
 		},
 		{
+			Name: "logs",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
 			Name: "installconfig",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -106,6 +110,10 @@ func InstallerPodSpec(
 		{
 			Name:      "output",
 			MountPath: "/output",
+		},
+		{
+			Name:      "logs",
+			MountPath: "/logs",
 		},
 		{
 			Name:      "installconfig",
@@ -278,28 +286,6 @@ func InstallerPodSpec(
 				MountPath: "/manifests",
 			},
 		)
-	}
-
-	if !skipGatherLogs {
-		// Add a volume where we will store full logs from both the installer, and the
-		// cluster itself (assuming we made it far enough).
-		volumes = append(volumes, corev1.Volume{
-			Name: "logs",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "logs",
-			MountPath: "/logs",
-		})
-	} else {
-		env = append(env, corev1.EnvVar{
-			Name:  constants.SkipGatherLogsEnvVar,
-			Value: "true",
-		})
 	}
 
 	if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {

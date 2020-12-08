@@ -12,6 +12,7 @@ import (
 	route53 "github.com/aws/aws-sdk-go/service/route53"
 	s3 "github.com/aws/aws-sdk-go/service/s3"
 	s3iface "github.com/aws/aws-sdk-go/service/s3/s3iface"
+	s3manager "github.com/aws/aws-sdk-go/service/s3/s3manager"
 	sts "github.com/aws/aws-sdk-go/service/sts"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -383,6 +384,36 @@ func (m *MockClient) ListBuckets(arg0 *s3.ListBucketsInput) (*s3.ListBucketsOutp
 func (mr *MockClientMockRecorder) ListBuckets(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBuckets", reflect.TypeOf((*MockClient)(nil).ListBuckets), arg0)
+}
+
+// PutObject mocks base method
+func (m *MockClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutObject", input)
+	ret0, _ := ret[0].(*s3.PutObjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutObject indicates an expected call of PutObject
+func (mr *MockClientMockRecorder) PutObject(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), input)
+}
+
+// Upload mocks base method
+func (m *MockClient) Upload(arg0 *s3manager.UploadInput) (*s3manager.UploadOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Upload", arg0)
+	ret0, _ := ret[0].(*s3manager.UploadOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Upload indicates an expected call of Upload
+func (mr *MockClientMockRecorder) Upload(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockClient)(nil).Upload), arg0)
 }
 
 // GetS3API mocks base method

@@ -15,7 +15,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -153,12 +153,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Len(t, provisions, 1, "expected provision to exist")
-
-				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallLogPVC().Name, Namespace: testNamespace}, pvc)
-				assert.NoError(t, err)
-				assert.Equal(t, testClusterDeployment().Name, pvc.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
-				assert.Equal(t, constants.PVCTypeInstallLogs, pvc.Labels[constants.PVCTypeLabel], "incorrect pvc type label")
 			},
 		},
 		{
@@ -312,69 +306,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
 					assert.Equal(t, "true", cd.Annotations[constants.ProtectedDeleteAnnotation], "unexpected protected delete annotation")
-				}
-			},
-		},
-		{
-			name: "PVC cleanup for successful install",
-			existing: []runtime.Object{
-				testInstalledClusterDeployment(time.Now()),
-				testInstallLogPVC(),
-				testMetadataConfigMap(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: GetInstallLogsPVCName(testClusterDeployment()), Namespace: testNamespace}, pvc)
-				if assert.Error(t, err) {
-					assert.True(t, errors.IsNotFound(err))
-				}
-			},
-		},
-		{
-			name: "PVC preserved for install with restarts",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testInstalledClusterDeployment(time.Now())
-					cd.Status.InstallRestarts = 5
-					return cd
-				}(),
-				testInstallLogPVC(),
-				testMetadataConfigMap(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: testInstallLogPVC().Name, Namespace: testNamespace}, pvc)
-				assert.NoError(t, err)
-			},
-		},
-		{
-			name: "PVC cleanup for install with restarts after 7 days",
-			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testInstalledClusterDeployment(time.Now().Add(-8 * 24 * time.Hour))
-					cd.Status.InstallRestarts = 5
-					return cd
-				}(),
-				testInstallLogPVC(),
-				testMetadataConfigMap(),
-				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
-				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				pvc := &corev1.PersistentVolumeClaim{}
-				err := c.Get(context.TODO(), client.ObjectKey{Name: GetInstallLogsPVCName(testClusterDeployment()), Namespace: testNamespace}, pvc)
-				if assert.Error(t, err) {
-					assert.True(t, errors.IsNotFound(err))
 				}
 			},
 		},
@@ -2010,13 +1941,6 @@ func testOldFailedProvision(time time.Time, attempt int) *hivev1.ClusterProvisio
 	provision.CreationTimestamp.Time = time
 	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
 	return provision
-}
-
-func testInstallLogPVC() *corev1.PersistentVolumeClaim {
-	pvc := &corev1.PersistentVolumeClaim{}
-	pvc.Name = GetInstallLogsPVCName(testClusterDeployment())
-	pvc.Namespace = testNamespace
-	return pvc
 }
 
 func testMetadataConfigMap() *corev1.ConfigMap {

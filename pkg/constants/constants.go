@@ -29,13 +29,6 @@ const (
 	// MinBackupPeriodSecondsEnvVar is the name of the environment variable used to tell the controller manager the minimum period of time between backups.
 	MinBackupPeriodSecondsEnvVar = "HIVE_MIN_BACKUP_PERIOD_SECONDS"
 
-	// SkipGatherLogsEnvVar is the environment variable which passes the configuration to disable
-	// log gathering on failed cluster installs. The value will be either "true" or "false".
-	// If unset "false" should be assumed. This variable is set by the operator depending on the
-	// value of the setting in HiveConfig, passed to the controllers deployment, as well as to
-	// install pods which do the actual log gathering.
-	SkipGatherLogsEnvVar = "SKIP_GATHER_LOGS"
-
 	// InstallJobLabel is the label used for artifacts specific to Hive cluster installations.
 	InstallJobLabel = "hive.openshift.io/install"
 
@@ -287,11 +280,11 @@ const (
 	// InstallLogsUploadProviderEnvVar is used to specify which object store provider is being used.
 	InstallLogsUploadProviderEnvVar = "HIVE_INSTALL_LOGS_UPLOAD_PROVIDER"
 
-	// InstallLogsCredentialsSecretRefEnvVar is the environment variable specifying what secret to use for storing logs.
-	InstallLogsCredentialsSecretRefEnvVar = "HIVE_INSTALL_LOGS_CREDENTIALS_SECRET"
-
 	// InstallLogsUploadProviderAWS is used to specify that AWS is the cloud provider to upload logs to.
 	InstallLogsUploadProviderAWS = "aws"
+
+	// InstallLogsCredentialsSecretRefEnvVar is the environment variable specifying what secret to use for storing logs.
+	InstallLogsCredentialsSecretRefEnvVar = "HIVE_INSTALL_LOGS_CREDENTIALS_SECRET"
 
 	// InstallLogsAWSRegionEnvVar is the environment variable specifying the region to use with S3
 	InstallLogsAWSRegionEnvVar = "HIVE_INSTALL_LOGS_AWS_REGION"

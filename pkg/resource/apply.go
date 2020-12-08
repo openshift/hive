@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"math/rand"
-	"time"
 
 	"github.com/jonboulle/clockwork"
 
@@ -59,14 +57,6 @@ func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 		return "", err
 	}
 
-	// When scale testing we create many clusters all using the same kubeconfig. We do not want to overwhelm it with
-	// PATCH requests, so instead we fake that operation here and sleep for a period of time that roughly matches
-	// request times we see in the real world.
-	// This links up to the ClusterDeployment annotation hive.openshift.io/fake-install-kubeconfig-secret
-	if r.fake {
-		r.fakeApply()
-		return ConfiguredApplyResult, nil
-	}
 	err = applyOptions.Run()
 	if err != nil {
 		r.logger.WithError(err).
@@ -134,21 +124,6 @@ func (r *helper) CreateRuntimeObject(obj runtime.Object, scheme *runtime.Scheme)
 		return "", err
 	}
 	return r.Create(data)
-}
-
-func (r *helper) fakeApply() {
-	// real world data indicates that for our slowest non-delete request type (POST):
-	// histogram_quantile(0.9, (sum without(controller,endpoint,instance,job,namespace,pod,resource,service,status)(rate(hive_kube_client_request_seconds_bucket{remote="true",controller="clustersync"}[2h]))))
-	//
-	// 50% of requests are under 0.027s
-	// 80% of requests are under 0.045s
-	// 90% of requests are under 0.053s
-	// 99% of requests are under 0.230s
-	in := []int{27, 27, 27, 27, 27, 45, 45, 45, 53, 230} // milliseconds
-	randomIndex := rand.Intn(len(in))
-	wait := time.Duration(in[randomIndex] * 1000000) // nanoseconds to match the duration unit
-	r.logger.WithField("sleepMillis", wait.Milliseconds()).Debug("sleeping to simulate an apply")
-	time.Sleep(wait)
 }
 
 func (r *helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) {

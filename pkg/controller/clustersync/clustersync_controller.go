@@ -172,8 +172,11 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 	}, nil
 }
 
-func resourceHelperBuilderFunc(restConfig *rest.Config, fake bool, logger log.FieldLogger) (resource.Helper, error) {
-	return resource.NewHelperFromRESTConfig(restConfig, fake, logger)
+func resourceHelperBuilderFunc(restConfig *rest.Config, fakeCluster bool, logger log.FieldLogger) (resource.Helper, error) {
+	if fakeCluster {
+		return resource.NewFakeHelper(logger), nil
+	}
+	return resource.NewHelperFromRESTConfig(restConfig, logger)
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler

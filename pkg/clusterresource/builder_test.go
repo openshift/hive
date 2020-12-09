@@ -2,8 +2,10 @@ package clusterresource
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/ghodss/yaml"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +42,7 @@ const (
 baseDomain: template.domain
 metadata:
   name: template-cluster-name
+  creationTimestamp: null
 compute:
 - hyperthreading: Enabled
   name: worker
@@ -246,70 +249,23 @@ func TestBuildClusterResources(t *testing.T) {
 			name: "merge InstallConfigTemplate",
 			builder: func() *Builder {
 				b := createAWSClusterBuilder()
+
+				b.Name = clusterName
+				b.BaseDomain = baseDomain
+				b.Namespace = namespace
+
 				b.InstallConfigTemplate = fakeInstallConfigYaml
+				yaml.Unmarshal([]byte(fakeInstallConfigYaml), b.InstallConfigTemplate)
 				return b
-				// 	Name =  clusterName,
-				// 	Namespace =        namespace,
-				// 	WorkerNodesCount = workerNodeCount,
-				// 	PullSecret =       pullSecret,
-				// 	SSHPrivateKey =    sshPrivateKey,
-				// 	SSHPublicKey =     sshPublicKey,
-				// 	BaseDomain =       baseDomain,
-				// 	Labels: map[string]string{
-				// 		"foo": "bar",
-				// 	},
-				// 	InstallConfigTemplate: map[string]string{
-				// 		"baseDomain": "template.domain",
-				// 	},
-				// 	DeleteAfter:    deleteAfter,
-				// 	ImageSet:       imageSetName,
-				// 	MachineNetwork: machineNetwork,
-				// }
-				// awsBuilder := createAWSClusterBuilder()
-				// awsBuilder.Adopt = true
-				// awsBuilder.AdoptInfraID = adoptInfraID
-				// awsBuilder.AdoptClusterID = adoptClusterID
-				// awsBuilder.AdoptAdminKubeconfig = []byte(adoptAdminKubeconfig)
-				// return awsBuilder
 			}(),
 			validate: func(t *testing.T, allObjects []runtime.Object) {
-				//cd := findClusterDeployment(allObjects, clusterName)
 
 				installConfigSecret := findSecret(allObjects, fmt.Sprintf("%s-install-config", clusterName))
 
-				newContent := `apiVersion: v1
-baseDomain: example.com
-metadata:
-    name: mycluster
-compute:
-- hyperthreading: Enabled
-    name: worker
-controlPlane:
-    hyperthreading: Enabled
-    name: master
-    platform:
-    aws:
-        type: m5.xlarge
-        rootVolume:
-        size: 128
-        zones:
-        - eu-west-1a
-        - eu-west-1b
-        - eu-west-1c
-    replicas: 3
-networking:
-    clusterNetwork:
-    - cidr: 10.128.0.0/14
-    hostPrefix: 23
-    machineCIDR: 10.0.0.0/16
-    networkType: OpenShiftSDN
-    serviceNetwork:
-    - 172.30.0.0/16
-`
+				re := strings.NewReplacer("template.domain", baseDomain, "template-cluster-name", clusterName)
+				updatedYaml := re.Replace(fakeInstallConfigYaml)
 
-				assert.Equal(t, newContent, installConfigSecret.StringData["install-config.yaml"])
-
-				assert.Equal(t, 1, 1)
+				assert.YAMLEq(t, updatedYaml, installConfigSecret.StringData["install-config.yaml"])
 			},
 		},
 	}

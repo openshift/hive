@@ -208,7 +208,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.failedKubeconfigSave {
-				im.uploadAdminKubeconfig = func(*hivev1.ClusterProvision, string, *InstallManager) (*corev1.Secret, error) {
+				im.uploadAdminKubeconfig = func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error) {
 					return nil, fmt.Errorf("failed to save admin kubeconfig")
 				}
 			}

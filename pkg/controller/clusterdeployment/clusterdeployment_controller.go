@@ -562,7 +562,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			}
 
 			if cd.Status.WebConsoleURL == "" || cd.Status.APIURL == "" {
-				return r.setClusterStatusURLs(cd, cdLog)
+				if !controllerutils.IsFakeCluster(cd) {
+					return r.setClusterStatusURLs(cd, cdLog)
+				} else {
+					return r.setFakeClusterStatusURLs(cd, cdLog)
+				}
 			}
 
 		}
@@ -1343,6 +1347,19 @@ func (r *ReconcileClusterDeployment) setClusterStatusURLs(cd *hivev1.ClusterDepl
 	}
 	cdLog.Debugf("read remote route object: %s", routeObject)
 	cd.Status.WebConsoleURL = "https://" + routeObject.Spec.Host
+
+	if err := r.Status().Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster status URLs")
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	return reconcile.Result{}, nil
+}
+
+// setFakeClusterStatusURLs skips cluster communication and sets fake cluster URLs in status.
+func (r *ReconcileClusterDeployment) setFakeClusterStatusURLs(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+	cd.Status.APIURL = "https://example.com/veryfakeapi"
+	cd.Status.WebConsoleURL = "https://example.com/veryfakeconsole"
 
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster status URLs")

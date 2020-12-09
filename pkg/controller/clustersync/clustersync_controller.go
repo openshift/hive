@@ -393,7 +393,7 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	// If this cluster carries the fake annotation we will fake out all helper communication with it.
-	fakeApplies := cd.Annotations[constants.HiveFakeInstallKubeconfigSecretAnnotation]
+	fakeApplies := cd.Annotations[constants.HiveFakeClusterAnnotation]
 
 	resourceHelper, err := r.resourceHelperBuilder(restConfig, fakeApplies != "", logger)
 	if err != nil {

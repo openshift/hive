@@ -188,21 +188,26 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 
-	remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
-		cd,
-		r.remoteClusterAPIClientBuilder(cd),
-		r.Client,
-		logger,
-	)
-	if unreachable {
-		return reconcile.Result{Requeue: requeue}, nil
-	}
-
 	clusterOperators := &configv1.ClusterOperatorList{}
-	err = remoteClient.List(context.TODO(), clusterOperators)
-	if err != nil {
-		logger.WithError(err).Error("failed to list target cluster operators")
-		return reconcile.Result{}, err
+
+	if !controllerutils.IsFakeCluster(cd) {
+		remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
+			cd,
+			r.remoteClusterAPIClientBuilder(cd),
+			r.Client,
+			logger,
+		)
+		if unreachable {
+			return reconcile.Result{Requeue: requeue}, nil
+		}
+
+		err = remoteClient.List(context.TODO(), clusterOperators)
+		if err != nil {
+			logger.WithError(err).Error("failed to list target cluster operators")
+			return reconcile.Result{}, err
+		}
+	} else {
+		clusterOperators = buildFakeClusterOperators()
 	}
 	return r.syncOperatorStates(clusterOperators.Items, st, logger)
 }
@@ -342,4 +347,47 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			Controlled: true,
 		},
 	}
+}
+
+// buildFakeClusterOperators returns a fake set of results to simulate what we would get from a real cluster, to
+// help ensure we're storing about as much data in etcd as we would for real clusters when simulating scale testing.
+func buildFakeClusterOperators() *configv1.ClusterOperatorList {
+	clusterOperators := &configv1.ClusterOperatorList{Items: []configv1.ClusterOperator{}}
+	items := make([]configv1.ClusterOperator, 30)
+	for i := 0; i < 30; i++ {
+		items[i] = configv1.ClusterOperator{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("fake-operator-%d", i),
+			},
+			Status: configv1.ClusterOperatorStatus{
+				Conditions: []configv1.ClusterOperatorStatusCondition{
+					{
+						Type:    configv1.OperatorAvailable,
+						Status:  configv1.ConditionTrue,
+						Reason:  "AsExpected",
+						Message: "everything's cool",
+					},
+					{
+						Type:    configv1.OperatorDegraded,
+						Status:  configv1.ConditionFalse,
+						Reason:  "AsExpected",
+						Message: "everything's cool",
+					},
+					{
+						Type:    configv1.OperatorUpgradeable,
+						Status:  configv1.ConditionTrue,
+						Reason:  "AsExpected",
+						Message: "everything's cool",
+					},
+					{
+						Type:    configv1.OperatorProgressing,
+						Status:  configv1.ConditionFalse,
+						Reason:  "AsExpected",
+						Message: "everything's cool",
+					},
+				},
+			},
+		}
+	}
+	return clusterOperators
 }

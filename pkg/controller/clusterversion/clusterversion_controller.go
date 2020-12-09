@@ -126,25 +126,31 @@ func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcil
 		return reconcile.Result{}, nil
 	}
 
-	remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
-		cd,
-		r.remoteClusterAPIClientBuilder(cd),
-		r.Client,
-		cdLog,
-	)
-	if unreachable {
-		return reconcile.Result{Requeue: requeue}, nil
-	}
+	if !controllerutils.IsFakeCluster(cd) {
+		remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
+			cd,
+			r.remoteClusterAPIClientBuilder(cd),
+			r.Client,
+			cdLog,
+		)
+		if unreachable {
+			return reconcile.Result{Requeue: requeue}, nil
+		}
 
-	clusterVersion := &openshiftapiv1.ClusterVersion{}
-	err = remoteClient.Get(context.Background(), types.NamespacedName{Name: clusterVersionObjectName}, clusterVersion)
-	if err != nil {
-		cdLog.WithError(err).Error("error fetching remote clusterversion object")
-		return reconcile.Result{}, err
-	}
+		clusterVersion := &openshiftapiv1.ClusterVersion{}
+		err = remoteClient.Get(context.Background(), types.NamespacedName{Name: clusterVersionObjectName}, clusterVersion)
+		if err != nil {
+			cdLog.WithError(err).Error("error fetching remote clusterversion object")
+			return reconcile.Result{}, err
+		}
 
-	if err := r.updateClusterVersionLabels(cd, clusterVersion, cdLog); err != nil {
-		return reconcile.Result{}, err
+		if err := r.updateClusterVersionLabels(cd, clusterVersion, cdLog); err != nil {
+			return reconcile.Result{}, err
+		}
+	} else {
+		if err := r.updateFakeClusterVersionLabels(cd, cdLog); err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	cdLog.Debug("reconcile complete")
@@ -174,6 +180,33 @@ func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterD
 		delete(cd.Labels, constants.VersionMajorMinorPatchLabel)
 		changed = origLen != len(cd.Labels)
 	}
+
+	if !changed {
+		cdLog.Debug("labels have not changed, nothing to update")
+		return nil
+	}
+
+	if err := r.Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error update cluster deployment labels")
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterVersion) updateFakeClusterVersionLabels(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	changed := false
+	if cd.Labels == nil {
+		cd.Labels = make(map[string]string, 3)
+	}
+	major := "4"
+	majorMinor := "4.6"
+	majorMinorPatch := "4.6.5"
+	changed = cd.Labels[constants.VersionMajorLabel] != major ||
+		cd.Labels[constants.VersionMajorMinorLabel] != majorMinor ||
+		cd.Labels[constants.VersionMajorMinorPatchLabel] != majorMinorPatch
+	cd.Labels[constants.VersionMajorLabel] = major
+	cd.Labels[constants.VersionMajorMinorLabel] = majorMinor
+	cd.Labels[constants.VersionMajorMinorPatchLabel] = majorMinorPatch
 
 	if !changed {
 		cdLog.Debug("labels have not changed, nothing to update")

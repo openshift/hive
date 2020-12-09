@@ -56,6 +56,7 @@ import (
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -104,7 +105,7 @@ type InstallManager struct {
 	cleanupFailedProvision           func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision           func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
 	readClusterMetadata              func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
-	uploadAdminKubeconfig            func(*hivev1.ClusterProvision, string, *InstallManager) (*corev1.Secret, error)
+	uploadAdminKubeconfig            func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword              func(*hivev1.ClusterProvision, bool, *InstallManager) (*corev1.Secret, error)
 	readInstallerLog                 func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
 	waitForProvisioningStage         func(*hivev1.ClusterProvision, *InstallManager) error
@@ -236,8 +237,7 @@ func (m *InstallManager) Run() error {
 		os.Exit(0)
 	}
 
-	fakeInstallKubeconfigSecret := cd.Annotations[constants.HiveFakeInstallKubeconfigSecretAnnotation]
-	fakeCluster := fakeInstallKubeconfigSecret != ""
+	fakeCluster := utils.IsFakeCluster(cd)
 
 	// sshKeyPaths will contain paths to all ssh keys in use
 	var sshKeyPaths []string
@@ -357,7 +357,7 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading cluster metadata")
 		return errors.Wrap(err, "error reading cluster metadata")
 	}
-	kubeconfigSecret, err := m.uploadAdminKubeconfig(provision, fakeInstallKubeconfigSecret, m)
+	kubeconfigSecret, err := m.uploadAdminKubeconfig(provision, m)
 	if err != nil {
 		m.log.WithError(err).Error("error uploading admin kubeconfig")
 		return errors.Wrap(err, "error trying to save admin kubeconfig")
@@ -436,29 +436,29 @@ func (m *InstallManager) Run() error {
 			} else {
 				m.gatherLogs(provision, cd, sshKeyPath, sshAgentSetupErr)
 			}
+		}
 
-			if installLog, err := m.readInstallerLog(provision, m, scrubInstallLog); err == nil {
-				if err := m.updateClusterProvision(
-					provision,
-					m,
-					func(provision *hivev1.ClusterProvision) {
-						provision.Spec.InstallLog = pointer.StringPtr(installLog)
-					},
-				); err != nil {
-					m.log.WithError(err).Warning("error updating cluster provision with installer log")
-				}
-			} else {
-				m.log.WithError(err).Error("error reading installer log")
+		if installLog, err := m.readInstallerLog(provision, m, scrubInstallLog); err == nil {
+			if err := m.updateClusterProvision(
+				provision,
+				m,
+				func(provision *hivev1.ClusterProvision) {
+					provision.Spec.InstallLog = pointer.StringPtr(installLog)
+				},
+			); err != nil {
+				m.log.WithError(err).Warning("error updating cluster provision with installer log")
 			}
+		} else {
+			m.log.WithError(err).Error("error reading installer log")
+		}
 
-			if installErr != nil {
-				m.log.WithError(installErr).Error("failed due to install error")
-				return installErr
-			}
+		if installErr != nil {
+			m.log.WithError(installErr).Error("failed due to install error")
+			return installErr
 		}
 	} else {
 		m.log.Warnf("skipping openshift-install create cluster due to %s annotation on ClusterDeployment",
-			constants.HiveFakeInstallKubeconfigSecretAnnotation)
+			constants.HiveFakeClusterAnnotation)
 	}
 
 	m.log.Info("install completed successfully")
@@ -1092,55 +1092,31 @@ func (m *InstallManager) isBootstrapComplete() bool {
 	return cmd.Run() == nil
 }
 
-func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, copyKubeconfigSecretName string, m *InstallManager) (*corev1.Secret, error) {
+func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager) (*corev1.Secret, error) {
 	m.log.Infoln("uploading admin kubeconfig")
 
 	var kubeconfigSecret *corev1.Secret
 
-	// If we're given a kubeconfig to copy, load it, and create a new secret with the same contents.
-	// This is primarily used for scale testing where simulating a real install and want to return a kubeconfig
-	// for one cluster being used multiple times.
-	if copyKubeconfigSecretName != "" {
-		secretNSName := types.NamespacedName{Namespace: provision.Namespace, Name: copyKubeconfigSecretName}
-		log.WithField("secret", copyKubeconfigSecretName).Info("copying admin kubeconfig from secret for fake install")
+	fullPath := filepath.Join(m.WorkDir, adminKubeConfigRelativePath)
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		m.log.WithField("path", fullPath).Error("admin kubeconfig file does not exist")
+		return nil, err
+	}
 
-		copyAdminKubeconfigSecret := &corev1.Secret{}
-		err := m.DynamicClient.Get(context.TODO(), secretNSName, copyAdminKubeconfigSecret)
-		if err != nil {
-			return nil, errors.Wrap(err, "error loading admin kubeconfig to duplicate for fake cluster")
-		}
+	kubeconfigBytes, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin kubeconfig file")
+		return nil, err
+	}
 
-		kubeconfigSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterProvisionName),
-				Namespace: m.Namespace,
-			},
-			Data: map[string][]byte{
-				"kubeconfig": copyAdminKubeconfigSecret.Data["kubeconfig"],
-			},
-		}
-	} else {
-		fullPath := filepath.Join(m.WorkDir, adminKubeConfigRelativePath)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			m.log.WithField("path", fullPath).Error("admin kubeconfig file does not exist")
-			return nil, err
-		}
-
-		kubeconfigBytes, err := ioutil.ReadFile(fullPath)
-		if err != nil {
-			m.log.WithError(err).WithField("path", fullPath).Error("error reading admin kubeconfig file")
-			return nil, err
-		}
-
-		kubeconfigSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterProvisionName),
-				Namespace: m.Namespace,
-			},
-			Data: map[string][]byte{
-				"kubeconfig": kubeconfigBytes,
-			},
-		}
+	kubeconfigSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterProvisionName),
+			Namespace: m.Namespace,
+		},
+		Data: map[string][]byte{
+			"kubeconfig": kubeconfigBytes,
+		},
 	}
 
 	m.log.WithField("derivedObject", kubeconfigSecret.Name).Debug("Setting labels on derived object")

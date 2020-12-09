@@ -295,13 +295,9 @@ const (
 	// InstallLogsAWSS3BucketEnvVar is the environment variable specifying the S3 bucket to use.
 	InstallLogsAWSS3BucketEnvVar = "HIVE_INSTALL_LOGS_AWS_S3_BUCKET"
 
-	// HiveFakeInstallKubeconfigSecretAnnotation is set to the name of a Secret in the cluster namespace which
-	// contains an admin kubeconfig.
-	// When set, this will enable a number of changes that are useful for simulating scale testing in a Hive cluster.
-	// Hive will launch an install pod that does not actually run the openshift-installer. Instead if will fake out
-	// some data and re-use this admin kubeconfig. Additionally, this annotation will disable all resource applies
-	// to that cluster to avoid overloading the one cluster.
-	HiveFakeInstallKubeconfigSecretAnnotation = "hive.openshift.io/fake-install-kubeconfig-secret"
+	// HiveFakeClusterAnnotation can be set to true on a cluster deployment to create a fake cluster that never
+	// provisions resources, and all communication with the cluster will be faked.
+	HiveFakeClusterAnnotation = "hive.openshift.io/fake-cluster"
 
 	// ReconcileIDLen is the length of the random strings we generate for contextual loggers in controller
 	// Reconcile functions.

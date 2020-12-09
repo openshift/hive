@@ -169,29 +169,35 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
 	var unreachableError error
 	updateUnreachable := true
-	// Attempt to connect to the remote cluster using the preferred API URL.
-	_, primaryErr := remoteClientBuilder.UsePrimaryAPIURL().Build()
-	if primaryErr != nil {
-		// If the remote cluster is not accessible via the preferred API URL, check if there is a fallback API URL to use.
-		if hasOverride(cd) {
-			cdLog.WithError(primaryErr).Info("unable to create remote API client using API URL override")
-			// If a connectivity recheck is needed or the remote cluster was reachable via the preferred API URL prior
-			// to this reconciliation, then attempt to connect to the remote cluster using the fallback API URL.
-			// Even when the controller continues to reconcile a ClusterDeployment waiting for the preferred API URL to
-			// become accessible, the controller should not recheck connectivity via the fallback API URL more often
-			// than once every 2 hours.
-			if connectivityRecheckNeeded || wasPrimaryActive {
-				if _, secondaryErr := remoteClientBuilder.UseSecondaryAPIURL().Build(); secondaryErr != nil {
-					cdLog.WithError(secondaryErr).Warn("unable to create remote API client with either the initial API URL or the API URL override, marking cluster unreachable")
-					unreachableError = utilerrors.NewAggregate([]error{primaryErr, secondaryErr})
+	var primaryErr error
+	fakeCluster := controllerutils.IsFakeCluster(cd)
+	if !fakeCluster {
+		// Attempt to connect to the remote cluster using the preferred API URL.
+		_, primaryErr = remoteClientBuilder.UsePrimaryAPIURL().Build()
+		if primaryErr != nil {
+			// If the remote cluster is not accessible via the preferred API URL, check if there is a fallback API URL to use.
+			if hasOverride(cd) {
+				cdLog.WithError(primaryErr).Info("unable to create remote API client using API URL override")
+				// If a connectivity recheck is needed or the remote cluster was reachable via the preferred API URL prior
+				// to this reconciliation, then attempt to connect to the remote cluster using the fallback API URL.
+				// Even when the controller continues to reconcile a ClusterDeployment waiting for the preferred API URL to
+				// become accessible, the controller should not recheck connectivity via the fallback API URL more often
+				// than once every 2 hours.
+				if connectivityRecheckNeeded || wasPrimaryActive {
+					if _, secondaryErr := remoteClientBuilder.UseSecondaryAPIURL().Build(); secondaryErr != nil {
+						cdLog.WithError(secondaryErr).Warn("unable to create remote API client with either the initial API URL or the API URL override, marking cluster unreachable")
+						unreachableError = utilerrors.NewAggregate([]error{primaryErr, secondaryErr})
+					}
+				} else {
+					updateUnreachable = false
 				}
 			} else {
-				updateUnreachable = false
+				cdLog.WithError(primaryErr).Warn("unable to create remote API client, marking cluster unreachable")
+				unreachableError = primaryErr
 			}
-		} else {
-			cdLog.WithError(primaryErr).Warn("unable to create remote API client, marking cluster unreachable")
-			unreachableError = primaryErr
 		}
+	} else {
+		cdLog.Info("skipping unreachable check for fake cluster")
 	}
 
 	// Update conditions to reflect the current state of connectivity to the remote cluster.

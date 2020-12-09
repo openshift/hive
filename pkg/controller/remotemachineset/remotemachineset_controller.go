@@ -248,6 +248,11 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
+	if controllerutils.IsFakeCluster(cd) {
+		logger.Info("skipping reconcile for fake cluster")
+		return reconcile.Result{}, nil
+	}
+
 	remoteClusterAPIClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
 		cd,
 		r.remoteClusterAPIClientBuilder(cd),

@@ -479,7 +479,6 @@ func (r *ReconcileClusterPool) addClusters(
 		errs = append(errs, fmt.Errorf("%s: %w", icSecretDependent, err))
 	}
 
-	// Not sure if we still need a cloudbuilder if we're getting a fully spec'ed install-config.yaml
 	cloudBuilder, err := r.createCloudBuilder(clp, logger)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", credentialsSecretDependent, err))

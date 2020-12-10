@@ -517,11 +517,6 @@ func (r *ReconcileClusterPool) createCluster(
 	}
 	logger.WithField("cluster", ns.Name).Info("Creating new cluster")
 
-	// Skip machinepools if we're provided a complete installConfigTemplate
-	// as the machinepool will replace the workers specified in the
-	// installconfigtemplate
-	skipMachinePools := installConfigTemplate != ""
-
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
 		Name:                  ns.Name,
@@ -534,7 +529,7 @@ func (r *ReconcileClusterPool) createCluster(
 		CloudBuilder:          cloudBuilder,
 		Labels:                clp.Spec.Labels,
 		InstallConfigTemplate: installConfigTemplate,
-		SkipMachinePools:      skipMachinePools,
+		SkipMachinePools:      clp.Spec.SkipMachinePools,
 	}
 
 	if clp.Spec.HibernateAfter != nil {

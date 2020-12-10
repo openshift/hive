@@ -359,6 +359,10 @@ spec:
               format: int32
               minimum: 0
               type: integer
+            skipMachinePools:
+              description: SkipMachinePools allows creating clusterpools where the
+                machinepools are not managed by hive after cluster creation
+              type: boolean
           required:
           - baseDomain
           - imageSetRef

@@ -58,6 +58,9 @@ type ClusterPoolSpec struct {
 	// +optional
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 
+	// SkipMachinePools allows creating clusterpools where the machinepools are not managed by hive after cluster creation
+	// +optional
+	SkipMachinePools bool `json:"skipMachinePools,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

@@ -137,6 +137,7 @@ spec:
     name: openshift-v4.5.13
   installConfigSecretTemplateRef: 
     name: my-install-config-template
+  skipMachinePools: true
   platform:
     aws:
       credentialsSecretRef:
@@ -145,4 +146,4 @@ spec:
   size: 1
 ```
 
-**Note** When you use installConfigSecretTemplate Hive managed machinepools are disabled
+**Note** When you use installConfigSecretTemplate you will most likely want to disable MachinePools, so that Hive does not reconcile away from the machine config specified in install-config.yaml

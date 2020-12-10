@@ -56,6 +56,14 @@ spec:
               description: BaseDomain is the base domain to use for all clusters created
                 in this pool.
               type: string
+            hibernateAfter:
+              description: HibernateAfter will be applied to new ClusterDeployments
+                created for the pool. HibernateAfter will transition clusters in the
+                clusterpool to hibernating power state after it has been running for
+                the given duration. The time that a cluster has been running is the
+                time since the cluster was installed or the time since the cluster
+                last came out of hibernation.
+              type: string
             imageSetRef:
               description: ImageSetRef is a reference to a ClusterImageSet. The release
                 image specified in the ClusterImageSet will be used by clusters created
@@ -87,6 +95,18 @@ spec:
                 for the pool. ClusterDeployments that have already been claimed will
                 not be affected when this value is modified.
               type: object
+            maxConcurrent:
+              description: MaxConcurrent is the maximum number of clusters that will
+                be provisioned or deprovisioned at an time. By default there is no
+                limit.
+              format: int32
+              type: integer
+            maxSize:
+              description: MaxSize is the maximum number of clusters that will be
+                provisioned including clusters that have been claimed and ones waiting
+                to be used. By default there is no limit.
+              format: int32
+              type: integer
             platform:
               description: Platform encompasses the desired platform for the cluster.
               properties:

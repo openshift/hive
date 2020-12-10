@@ -238,7 +238,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	// Find all ClusterDeployments from this pool:
-	poolCDs, err := r.getAllUnclaimedClusterDeployments(clp, logger)
+	claimedCDs, unClaminedCDs, err := r.getAllClusterDeploymentsForPool(clp, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -246,7 +246,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	var installingCDs []*hivev1.ClusterDeployment
 	var readyCDs []*hivev1.ClusterDeployment
 	numberOfDeletingCDs := 0
-	for _, cd := range poolCDs {
+	for _, cd := range unClaminedCDs {
 		switch {
 		case cd.DeletionTimestamp != nil:
 			numberOfDeletingCDs++
@@ -260,7 +260,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	logger.WithFields(log.Fields{
 		"installing": len(installingCDs),
 		"deleting":   numberOfDeletingCDs,
-		"total":      len(poolCDs),
+		"total":      len(unClaminedCDs),
 		"ready":      len(readyCDs),
 	}).Debug("found clusters for ClusterPool")
 
@@ -272,6 +272,22 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool status")
 			return reconcile.Result{}, errors.Wrap(err, "could not update ClusterPool status")
 		}
+	}
+
+	hasAvailableCapacity := true
+	if clp.Spec.MaxSize != nil {
+		hasAvailableCapacity = clp.Status.Size+int32(len(claimedCDs)) < *clp.Spec.MaxSize
+		if !hasAvailableCapacity {
+			logger.WithFields(log.Fields{
+				"ClusterPoolSize": clp.Status.Size,
+				"ClaimedSize":     len(claimedCDs),
+				"Capacity":        *clp.Spec.MaxSize,
+			}).Info("Cannot add more clusters because no capacity available.")
+		}
+	}
+	if err := r.setAvailableCapacityCondition(clp, hasAvailableCapacity, logger); err != nil {
+		logger.WithError(err).Error("error setting CapacityAvailable condition")
+		return reconcile.Result{}, err
 	}
 
 	pendingClaims, err := r.getAllPendingClusterClaims(clp, logger)
@@ -289,14 +305,44 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	switch drift := reserveSize - int(clp.Spec.Size); {
+	// activity quota exceeded, so no action
+	case clp.Spec.MaxConcurrent != nil && int(*clp.Spec.MaxConcurrent)-len(installingCDs)-numberOfDeletingCDs <= 0:
+		logger.WithFields(log.Fields{
+			"MaxConcurrent": *clp.Spec.MaxConcurrent,
+			"Current":       len(installingCDs) + numberOfDeletingCDs,
+		}).Info("Cannot create/delete clusters as max concurrent quota exceeded.")
 	// If too many, delete some.
 	case drift > 0:
-		if err := r.deleteExcessClusters(installingCDs, readyCDs, drift, logger); err != nil {
+		toDel := drift
+		if clp.Spec.MaxConcurrent != nil {
+			availableActivity := int(*clp.Spec.MaxConcurrent) - len(installingCDs) - numberOfDeletingCDs
+			if toDel > availableActivity {
+				toDel = availableActivity
+			}
+		}
+		if err := r.deleteExcessClusters(installingCDs, readyCDs, toDel, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	// If too few, create new InstallConfig and ClusterDeployment.
 	case drift < 0:
-		if err := r.addClusters(clp, -drift, logger); err != nil {
+		toAdd := -drift
+		if !hasAvailableCapacity {
+			break
+		}
+		if clp.Spec.MaxSize != nil {
+			availableCapacity := int(*clp.Spec.MaxSize) - int(clp.Status.Size) - len(claimedCDs)
+			log.Info(availableCapacity)
+			if toAdd > availableCapacity {
+				toAdd = availableCapacity
+			}
+		}
+		if clp.Spec.MaxConcurrent != nil {
+			availableActivity := int(*clp.Spec.MaxConcurrent) - len(installingCDs) - numberOfDeletingCDs
+			if toAdd > availableActivity {
+				toAdd = availableActivity
+			}
+		}
+		if err := r.addClusters(clp, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
@@ -492,6 +538,10 @@ func (r *ReconcileClusterPool) createCluster(
 		SkipMachinePools:      skipMachinePools,
 	}
 
+	if clp.Spec.HibernateAfter != nil {
+		builder.HibernateAfter = &clp.Spec.HibernateAfter.Duration
+	}
+
 	objs, err := builder.Build()
 	if err != nil {
 		return errors.Wrap(err, "error building resources")
@@ -582,11 +632,11 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if !controllerutils.HasFinalizer(pool, finalizer) {
 		return nil
 	}
-	poolCDs, err := r.getAllUnclaimedClusterDeployments(pool, logger)
+	_, unClaimedCDs, err := r.getAllClusterDeploymentsForPool(pool, logger)
 	if err != nil {
 		return err
 	}
-	for _, cd := range poolCDs {
+	for _, cd := range unClaimedCDs {
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
@@ -603,19 +653,24 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	return nil
 }
 
-func (r *ReconcileClusterPool) getAllUnclaimedClusterDeployments(pool *hivev1.ClusterPool, logger log.FieldLogger) ([]*hivev1.ClusterDeployment, error) {
+func (r *ReconcileClusterPool) getAllClusterDeploymentsForPool(pool *hivev1.ClusterPool, logger log.FieldLogger) (claimed, unclaimed []*hivev1.ClusterDeployment, err error) {
 	cdList := &hivev1.ClusterDeploymentList{}
 	if err := r.Client.List(context.Background(), cdList); err != nil {
 		logger.WithError(err).Error("error listing ClusterDeployments")
-		return nil, err
+		return nil, nil, err
 	}
-	var poolCDs []*hivev1.ClusterDeployment
 	for i, cd := range cdList.Items {
-		if refInCD := cd.Spec.ClusterPoolRef; refInCD != nil && *refInCD == poolReference(pool) {
-			poolCDs = append(poolCDs, &cdList.Items[i])
+		if refInCD := cd.Spec.ClusterPoolRef; refInCD != nil {
+			if refInCD.Namespace == pool.Namespace && refInCD.PoolName == pool.Name {
+				if len(refInCD.ClaimName) > 0 {
+					claimed = append(claimed, &cdList.Items[i])
+				} else {
+					unclaimed = append(unclaimed, &cdList.Items[i])
+				}
+			}
 		}
 	}
-	return poolCDs, nil
+	return claimed, unclaimed, nil
 }
 
 func poolReference(pool *hivev1.ClusterPool) hivev1.ClusterPoolReference {
@@ -662,6 +717,35 @@ func (r *ReconcileClusterPool) setMissingDependenciesCondition(pool *hivev1.Clus
 		if err := r.Status().Update(context.Background(), pool); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool conditions")
 			return fmt.Errorf("could not update ClusterPool conditions: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileClusterPool) setAvailableCapacityCondition(pool *hivev1.ClusterPool, available bool, logger log.FieldLogger) error {
+	status := corev1.ConditionTrue
+	reason := "Available"
+	message := "There is capacity to add more clusters to the pool."
+	updateConditionCheck := controllerutils.UpdateConditionNever
+	if !available {
+		status = corev1.ConditionFalse
+		reason = "MaxCapacity"
+		message = fmt.Sprintf("Pool is at maximum capacity of %d waiting and claimed clusters.", *pool.Spec.MaxSize)
+		updateConditionCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
+	}
+	conds, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.ClusterPoolCapacityAvailableCondition,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), pool); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool conditions")
+			return errors.Wrap(err, "could not update ClusterPool conditions")
 		}
 	}
 	return nil

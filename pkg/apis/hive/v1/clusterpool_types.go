@@ -21,6 +21,17 @@ type ClusterPoolSpec struct {
 	// +required
 	Size int32 `json:"size"`
 
+	// MaxSize is the maximum number of clusters that will be provisioned including clusters that have been claimed
+	// and ones waiting to be used.
+	// By default there is no limit.
+	// +optional
+	MaxSize *int32 `json:"maxSize,omitempty"`
+
+	// MaxConcurrent is the maximum number of clusters that will be provisioned or deprovisioned at an time.
+	// By default there is no limit.
+	// +optional
+	MaxConcurrent *int32 `json:"maxConcurrent,omitempty"`
+
 	// BaseDomain is the base domain to use for all clusters created in this pool.
 	// +required
 	BaseDomain string `json:"baseDomain"`
@@ -39,6 +50,14 @@ type ClusterPoolSpec struct {
 	// Cluster specific settings (name, basedomain) will be injected dynamically when the ClusterDeployment install-config Secret is generated.
 	// +optional
 	InstallConfigSecretTemplateRef *corev1.LocalObjectReference `json:"installConfigSecretTemplateRef"`
+
+	// HibernateAfter will be applied to new ClusterDeployments created for the pool. HibernateAfter will transition
+	// clusters in the clusterpool to hibernating power state after it has been running for the given duration. The time
+	// that a cluster has been running is the time since the cluster was installed or the time since the cluster last came
+	// out of hibernation.
+	// +optional
+	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
+
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool
@@ -78,9 +97,12 @@ type ClusterPoolCondition struct {
 type ClusterPoolConditionType string
 
 const (
-	// ClusterPoolMissingDependentsCondition is set when a cluster pool is missing dependencies required to create a
+	// ClusterPoolMissingDependenciesCondition is set when a cluster pool is missing dependencies required to create a
 	// cluster. Dependencies include resources such as the ClusterImageSet and the credentials Secret.
 	ClusterPoolMissingDependenciesCondition ClusterPoolConditionType = "MissingDependencies"
+	// ClusterPoolCapacityAvailableCondition is set to provide information on whether the cluster pool has capacity
+	// available to create more clusters for the pool.
+	ClusterPoolCapacityAvailableCondition ClusterPoolConditionType = "CapacityAvailable"
 )
 
 // +genclient

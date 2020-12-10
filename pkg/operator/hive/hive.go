@@ -103,13 +103,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	hiveNSName := getHiveNamespace(instance)
 
-	// By default we will try to gather logs on failed installs:
-	logsEnvVar := corev1.EnvVar{
-		Name:  constants.SkipGatherLogsEnvVar,
-		Value: strconv.FormatBool(instance.Spec.FailedProvisionConfig.SkipGatherLogs),
-	}
-	hiveContainer.Env = append(hiveContainer.Env, logsEnvVar)
-
 	if instance.Spec.FailedProvisionConfig.AWS != nil {
 		awsSpec := instance.Spec.FailedProvisionConfig.AWS
 

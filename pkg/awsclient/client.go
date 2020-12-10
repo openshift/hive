@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53/route53iface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 
@@ -82,6 +83,10 @@ type Client interface {
 	CreateBucket(*s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
 	DeleteBucket(*s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
 	ListBuckets(*s3.ListBucketsInput) (*s3.ListBucketsOutput, error)
+	PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error)
+
+	// S3 Manager
+	Upload(*s3manager.UploadInput) (*s3manager.UploadOutput, error)
 
 	// Custom
 	GetS3API() s3iface.S3API
@@ -110,6 +115,7 @@ type awsClient struct {
 	iamClient     iamiface.IAMAPI
 	route53Client route53iface.Route53API
 	s3Client      s3iface.S3API
+	s3Uploader    *s3manager.Uploader
 	stsClient     stsiface.STSAPI
 	tagClient     *resourcegroupstaggingapi.ResourceGroupsTaggingAPI
 }
@@ -228,8 +234,17 @@ func (c *awsClient) ListBuckets(input *s3.ListBucketsInput) (*s3.ListBucketsOutp
 	return c.s3Client.ListBuckets(input)
 }
 
+func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	metricAWSAPICalls.WithLabelValues("PutObject").Inc()
+	return c.s3Client.PutObject(input)
+}
+
 func (c *awsClient) GetS3API() s3iface.S3API {
 	return c.s3Client
+}
+
+func (c *awsClient) Upload(input *s3manager.UploadInput) (*s3manager.UploadOutput, error) {
+	return c.s3Uploader.Upload(input)
 }
 
 func (c *awsClient) ListHostedZones(input *route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error) {
@@ -360,6 +375,7 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 		elbClient:     elb.New(s),
 		iamClient:     iam.New(s),
 		s3Client:      s3.New(s),
+		s3Uploader:    s3manager.NewUploader(s),
 		route53Client: route53.New(s),
 		stsClient:     sts.New(s),
 		tagClient:     resourcegroupstaggingapi.New(s),

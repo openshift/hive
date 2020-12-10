@@ -18,7 +18,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -750,13 +749,6 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 	labels[constants.ClusterDeploymentNameLabel] = cd.Name
 
-	skipGatherLogs := os.Getenv(constants.SkipGatherLogsEnvVar) == "true"
-	if !skipGatherLogs {
-		if err := r.createPVC(cd, cdLog); err != nil {
-			return reconcile.Result{}, err
-		}
-	}
-
 	extraEnvVars := getInstallLogEnvVars(cd.Name)
 
 	podSpec, err := install.InstallerPodSpec(
@@ -764,8 +756,6 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		provisionName,
 		releaseImage,
 		controllerutils.ServiceAccountName,
-		GetInstallLogsPVCName(cd),
-		skipGatherLogs,
 		extraEnvVars,
 	)
 	if err != nil {
@@ -1090,70 +1080,6 @@ func (r *ReconcileClusterDeployment) clearOutCurrentProvision(cd *hivev1.Cluster
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
-}
-
-// GetInstallLogsPVCName returns the expected name of the persistent volume claim for cluster install failure logs.
-func GetInstallLogsPVCName(cd *hivev1.ClusterDeployment) string {
-	return apihelpers.GetResourceName(cd.Name, "install-logs")
-}
-
-// createPVC will create the PVC for the install logs if it does not already exist.
-func (r *ReconcileClusterDeployment) createPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-
-	pvcName := GetInstallLogsPVCName(cd)
-
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: pvcName, Namespace: cd.Namespace}, &corev1.PersistentVolumeClaim{}); {
-	case err == nil:
-		cdLog.Debug("pvc already exists")
-		return nil
-	case !apierrors.IsNotFound(err):
-		cdLog.WithError(err).Error("error getting persistent volume claim")
-		return err
-	}
-
-	labels := map[string]string{
-		constants.InstallJobLabel:            "true",
-		constants.ClusterDeploymentNameLabel: cd.Name,
-	}
-	if cd.Labels != nil {
-		typeStr, ok := cd.Labels[hivev1.HiveClusterTypeLabel]
-		if ok {
-			labels[hivev1.HiveClusterTypeLabel] = typeStr
-		}
-	}
-
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
-			Namespace: cd.Namespace,
-			Labels:    labels,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
-			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		},
-	}
-
-	cdLog.WithField("pvc", pvc.Name).Info("creating persistent volume claim")
-
-	cdLog.WithField("derivedObject", pvc.Name).Debug("Setting labels on derived object")
-	pvc.Labels = k8slabels.AddLabel(pvc.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
-	pvc.Labels = k8slabels.AddLabel(pvc.Labels, constants.PVCTypeLabel, constants.PVCTypeInstallLogs)
-	if err := controllerutil.SetControllerReference(cd, pvc, r.scheme); err != nil {
-		cdLog.WithError(err).Error("error setting controller reference on pvc")
-		return err
-	}
-	err := r.Create(context.TODO(), pvc)
-	if err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating pvc")
-	}
-	return err
 }
 
 // getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
@@ -1831,8 +1757,15 @@ func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
 	return retval
 }
 
+// GetInstallLogsPVCName returns the expected name of the persistent volume claim for cluster install failure logs.
+// TODO: Remove this function and all calls to it. It's being left here for compatibility until the install log PVs are removed from all the installs.
+func GetInstallLogsPVCName(cd *hivev1.ClusterDeployment) string {
+	return apihelpers.GetResourceName(cd.Name, "install-logs")
+}
+
 // cleanupInstallLogPVC will immediately delete the PVC (should it exist) if the cluster was installed successfully, without retries.
 // If there were retries, it will delete the PVC if it has been more than 7 days since the job was completed.
+// TODO: Remove this function and all calls to it. It's being left here for compatibility until the install log PVs are removed from all the installs.
 func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	if !cd.Spec.Installed {
 		return nil

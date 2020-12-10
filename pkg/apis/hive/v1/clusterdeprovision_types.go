@@ -77,7 +77,7 @@ type OpenStackClusterDeprovision struct {
 	// necessary for communicating with the OpenStack.
 	//
 	// +optional
-	CertificatesSecretRef *corev1.LocalObjectReference `json:"certificatesSecretRef"`
+	CertificatesSecretRef *corev1.LocalObjectReference `json:"certificatesSecretRef,omitempty"`
 }
 
 // VSphereClusterDeprovision contains VMware vSphere-specific configuration for a ClusterDeprovision

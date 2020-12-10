@@ -364,32 +364,3 @@ func findConfigMap(allObjects []runtime.Object, name string) *corev1.ConfigMap {
 	}
 	return nil
 }
-
-// func TestMergeInstallConfigTemplate(t *testing.T) {
-// 	// When merging with InstallConfigTemplate, we should only
-// 	// override cluster name and baseDomain
-
-// 	//builder := createTestBuilder()
-// 	builder := &Builder{
-// 		Name:             clusterName,
-// 		Namespace:        namespace,
-// 		WorkerNodesCount: workerNodeCount,
-// 		PullSecret:       pullSecret,
-// 		SSHPrivateKey:    sshPrivateKey,
-// 		SSHPublicKey:     sshPublicKey,
-// 		BaseDomain:       baseDomain,
-// 		Labels: map[string]string{
-// 			"foo": "bar",
-// 		},
-// 		InstallConfigTemplate: map[string]string{
-// 			"baseDomain": "template.domain",
-// 		},
-// 		DeleteAfter:    deleteAfter,
-// 		ImageSet:       imageSetName,
-// 		MachineNetwork: machineNetwork,
-// 	}
-
-// 	mergedSecret, error := builder.mergeInstallConfigTemplate()
-
-// 	t.Run("Test mergeInstallConfigTemplate", func(t *testing.T))
-// }

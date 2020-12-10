@@ -85,8 +85,8 @@ spec:
               type: object
             maxConcurrent:
               description: MaxConcurrent is the maximum number of clusters that will
-                be provisioned or deprovisioned at an time. By default there is no
-                limit.
+                be provisioned or deprovisioned at an time. This includes the claimed
+                clusters being deprovisioned. By default there is no limit.
               format: int32
               type: integer
             maxSize:

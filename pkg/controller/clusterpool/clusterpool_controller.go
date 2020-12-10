@@ -3,6 +3,7 @@ package clusterpool
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 
@@ -242,6 +243,18 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	var toRemoveClaimedCDs []*hivev1.ClusterDeployment
+	numberOfDeletingClaimedCDs := 0
+	for _, cd := range claimedCDs {
+		_, toRemove := cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation]
+		switch {
+		case cd.DeletionTimestamp != nil:
+			numberOfDeletingClaimedCDs++
+		case toRemove:
+			toRemoveClaimedCDs = append(toRemoveClaimedCDs, cd)
+		}
+	}
+
 	var installingCDs []*hivev1.ClusterDeployment
 	var readyCDs []*hivev1.ClusterDeployment
 	numberOfDeletingCDs := 0
@@ -273,18 +286,18 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		}
 	}
 
-	hasAvailableCapacity := true
+	availableCapacity := math.MaxInt32
 	if clp.Spec.MaxSize != nil {
-		hasAvailableCapacity = clp.Status.Size+int32(len(claimedCDs)) < *clp.Spec.MaxSize
-		if !hasAvailableCapacity {
+		availableCapacity = int(*clp.Spec.MaxSize) - len(unClaminedCDs) - len(claimedCDs)
+		if availableCapacity <= 0 {
 			logger.WithFields(log.Fields{
-				"ClusterPoolSize": clp.Status.Size,
-				"ClaimedSize":     len(claimedCDs),
-				"Capacity":        *clp.Spec.MaxSize,
+				"lUnclaimedSize": len(unClaminedCDs),
+				"ClaimedSize":    len(claimedCDs),
+				"Capacity":       *clp.Spec.MaxSize,
 			}).Info("Cannot add more clusters because no capacity available.")
 		}
 	}
-	if err := r.setAvailableCapacityCondition(clp, hasAvailableCapacity, logger); err != nil {
+	if err := r.setAvailableCapacityCondition(clp, availableCapacity > 0, logger); err != nil {
 		logger.WithError(err).Error("error setting CapacityAvailable condition")
 		return reconcile.Result{}, err
 	}
@@ -303,44 +316,45 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	availableCurrent := math.MaxInt32
+	if clp.Spec.MaxConcurrent != nil {
+		availableCurrent = int(*clp.Spec.MaxConcurrent) - len(installingCDs) - numberOfDeletingCDs - numberOfDeletingClaimedCDs
+		if availableCurrent < 0 {
+			availableCurrent = 0
+		}
+	}
+
+	// remove clusters that were previously claimed but now not required.
+	toDel := minIntVarible(len(toRemoveClaimedCDs), availableCurrent)
+	for _, cd := range toRemoveClaimedCDs[:toDel] {
+		cdLog := logger.WithField("cluster", cd.Name)
+		cdLog.Info("deleting cluster deployment for previous claim")
+		if err := r.Client.Delete(context.Background(), cd); err != nil {
+			cdLog.WithError(err).Error("error deleting cluster deployment")
+			return reconcile.Result{}, err
+		}
+	}
+	availableCurrent -= toDel
+
 	switch drift := reserveSize - int(clp.Spec.Size); {
 	// activity quota exceeded, so no action
-	case clp.Spec.MaxConcurrent != nil && int(*clp.Spec.MaxConcurrent)-len(installingCDs)-numberOfDeletingCDs <= 0:
+	case availableCurrent <= 0:
 		logger.WithFields(log.Fields{
 			"MaxConcurrent": *clp.Spec.MaxConcurrent,
-			"Current":       len(installingCDs) + numberOfDeletingCDs,
+			"Available":     availableCurrent,
 		}).Info("Cannot create/delete clusters as max concurrent quota exceeded.")
 	// If too many, delete some.
 	case drift > 0:
-		toDel := drift
-		if clp.Spec.MaxConcurrent != nil {
-			availableActivity := int(*clp.Spec.MaxConcurrent) - len(installingCDs) - numberOfDeletingCDs
-			if toDel > availableActivity {
-				toDel = availableActivity
-			}
-		}
+		toDel := minIntVarible(drift, availableCurrent)
 		if err := r.deleteExcessClusters(installingCDs, readyCDs, toDel, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	// If too few, create new InstallConfig and ClusterDeployment.
 	case drift < 0:
-		toAdd := -drift
-		if !hasAvailableCapacity {
+		if availableCapacity <= 0 {
 			break
 		}
-		if clp.Spec.MaxSize != nil {
-			availableCapacity := int(*clp.Spec.MaxSize) - int(clp.Status.Size) - len(claimedCDs)
-			log.Info(availableCapacity)
-			if toAdd > availableCapacity {
-				toAdd = availableCapacity
-			}
-		}
-		if clp.Spec.MaxConcurrent != nil {
-			availableActivity := int(*clp.Spec.MaxConcurrent) - len(installingCDs) - numberOfDeletingCDs
-			if toAdd > availableActivity {
-				toAdd = availableActivity
-			}
-		}
+		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
 		if err := r.addClusters(clp, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
@@ -353,6 +367,16 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func minIntVarible(v1 int, vn ...int) (m int) {
+	m = v1
+	for i := 0; i < len(vn); i++ {
+		if vn[i] < m {
+			m = vn[i]
+		}
+	}
+	return
 }
 
 func (r *ReconcileClusterPool) reconcileRBAC(

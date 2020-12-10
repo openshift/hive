@@ -234,6 +234,20 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedReady: 1,
 		},
 		{
+			name: "no scale up with max concurrent and some deleting claimed clusters",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
+				cdBuilder("c1").GenericOptions(generic.Deleted()).Build(
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+				),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedTotalClusters: 3,
+			expectedObservedSize:  2,
+			expectedObservedReady: 1,
+		},
+		{
 			name: "scale up with max concurrent and some deleting",
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(3)),
@@ -473,7 +487,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedReady:              0,
 		},
 		{
-			name: "max capacity resolved",
+			name: "max size should include the deleting unclaimed clusters",
 			existing: []runtime.Object{
 				poolBuilder.Build(
 					testcp.WithSize(2),
@@ -488,6 +502,25 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
 			},
 			expectedTotalClusters:  3,
+			expectedObservedSize:   2,
+			expectedObservedReady:  2,
+			expectedCapacityStatus: pointer.BoolPtr(false),
+		},
+		{
+			name: "max capacity resolved",
+			existing: []runtime.Object{
+				poolBuilder.Build(
+					testcp.WithSize(2),
+					testcp.WithMaxSize(3),
+					testcp.WithCondition(hivev1.ClusterPoolCondition{
+						Type:   hivev1.ClusterPoolCapacityAvailableCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+			},
+			expectedTotalClusters:  2,
 			expectedObservedSize:   2,
 			expectedObservedReady:  2,
 			expectedCapacityStatus: pointer.BoolPtr(true),
@@ -607,6 +640,233 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedReady:    2,
 			expectedAssignedClaims:   0,
 			expectedUnassignedClaims: 1,
+		},
+		{
+			name: "do not delete previously claimed clusters",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").Build(
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+				),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
+		},
+		{
+			name: "do not delete previously claimed clusters 2",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 2,
+		},
+		{
+			name: "delete previously claimed clusters",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    3,
+			expectedObservedReady:   2,
+			expectedDeletedClusters: []string{"c4"},
+		},
+		{
+			name: "deleting previously claimed clusters should use max concurrent",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  3,
+			expectedObservedReady: 1,
+		},
+		{
+			name: "deleting previously claimed clusters should use max concurrent 2",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  2,
+			expectedObservedReady: 1,
+		},
+		{
+			name: "deleting previously claimed clusters should use max concurrent 3",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    2,
+			expectedObservedReady:   1,
+			expectedDeletedClusters: []string{"c4"},
+		},
+		{
+			name: "scale up should include previouly deleted in max concurrent",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(4), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   2,
+			expectedObservedSize:    2,
+			expectedObservedReady:   1,
+			expectedDeletedClusters: []string{"c4"},
+		},
+		{
+			name: "scale up should include previouly deleted in max concurrent all used by deleting previously claimed",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(4), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+				cdBuilder("c5").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   2,
+			expectedObservedSize:    2,
+			expectedObservedReady:   2,
+			expectedDeletedClusters: []string{"c4", "c5"},
+		},
+		{
+			name: "scale up should include previouly deleted in max concurrent all used by installing one cluster and deleting one previously claimed cluster",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(4), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+				cdBuilder("c5").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    2,
+			expectedObservedReady:   1,
+			expectedDeletedClusters: []string{"c4"},
+		},
+		{
+			name: "scale down should include previouly deleted in max concurrent",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(1), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    3,
+			expectedObservedReady:   2,
+			expectedDeletedClusters: []string{"c4"},
+		},
+		{
+			name: "scale down should include previouly deleted in max concurrent all used by deleting previously claimed clusters",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(1), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+				cdBuilder("c5").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    3,
+			expectedObservedReady:   3,
+			expectedDeletedClusters: []string{"c4", "c5"},
+		},
+		{
+			name: "scale down should include previouly deleted in max concurrent all used by one installing cluster and deleting one previously claimed cluster",
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithSize(1), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(),
+				cdBuilder("c4").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+				cdBuilder("c5").
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "")).
+					Build(
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					),
+			},
+			expectedTotalClusters:   4,
+			expectedObservedSize:    3,
+			expectedObservedReady:   2,
+			expectedDeletedClusters: []string{"c4"},
 		},
 	}
 

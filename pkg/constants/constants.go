@@ -306,6 +306,11 @@ const (
 	// SyncSetMetricsGroupAnnotation can be applied to non-selector SyncSets to make them part of a
 	// group for which first applied metrics can be reported
 	SyncSetMetricsGroupAnnotation = "hive.openshift.io/syncset-metrics-group"
+
+	// ClusterClaimRemoveClusterAnnotation is used by the cluster claim controller to mark that the cluster
+	// that are previously claimed is no longer required and therefore should be removed/deprovisioned and removed
+	// from the pool.
+	ClusterClaimRemoveClusterAnnotation = "hive.openshift.io/remove-claimed-cluster-from-pool"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -112,3 +112,38 @@ or,
 ```sh
 oc -n <namespace> adm policy add-role-to-group hive-cluster-pool-admin <group>
 ```
+
+## Install Config Template
+
+To control parts of the cluster deployments that are not directly supported by Hive, such as controlPlane Nodes and types, you can load a valid `install-config.yaml` which will be passed directly to the openshift-installer, only updating `metadata.name` and `baseDomain`
+
+Load the install-config.yaml template as a secret (assuming that the `install-config.yaml` you want to use as a template is in the active directory)
+
+```bash
+kubectl  -n hive create secret generic my-install-config-template --from-file=install-config.yaml=./install-config.yaml
+```
+
+With this secret created, you can create a pool that references the install config secret template
+
+```yaml
+apiVersion: hive.openshift.io/v1
+kind: ClusterPool
+metadata:
+  name: testpool
+  namespace: hive
+spec:
+  baseDomain: hive.mytests.io
+  imageSetRef:
+    name: openshift-v4.5.13
+  installConfigSecretTemplateRef: 
+    name: my-install-config-template
+  skipMachinePools: true
+  platform:
+    aws:
+      credentialsSecretRef:
+        name: global-aws-creds
+      region: eu-west-1
+  size: 1
+```
+
+**Note** When you use installConfigSecretTemplate you will most likely want to disable MachinePools, so that Hive does not reconcile away from the machine config specified in install-config.yaml

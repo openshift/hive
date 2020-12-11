@@ -45,12 +45,22 @@ type ClusterPoolSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// InstallConfigSecretTemplateRef is a secret with the key install-config.yaml consisting of the content of the install-config.yaml
+	// to be used as a template for all clusters in this pool.
+	// Cluster specific settings (name, basedomain) will be injected dynamically when the ClusterDeployment install-config Secret is generated.
+	// +optional
+	InstallConfigSecretTemplateRef *corev1.LocalObjectReference `json:"installConfigSecretTemplateRef"`
+
 	// HibernateAfter will be applied to new ClusterDeployments created for the pool. HibernateAfter will transition
 	// clusters in the clusterpool to hibernating power state after it has been running for the given duration. The time
 	// that a cluster has been running is the time since the cluster was installed or the time since the cluster last came
 	// out of hibernation.
 	// +optional
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
+
+	// SkipMachinePools allows creating clusterpools where the machinepools are not managed by hive after cluster creation
+	// +optional
+	SkipMachinePools bool `json:"skipMachinePools,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

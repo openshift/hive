@@ -41,6 +41,7 @@ const (
 	credentialsSecretDependent      = "credentials secret"
 	clusterPoolAdminRoleName        = "hive-cluster-pool-admin"
 	clusterPoolAdminRoleBindingName = "hive-cluster-pool-admin-binding"
+	icSecretDependent               = "install config template secret"
 )
 
 var (
@@ -472,6 +473,12 @@ func (r *ReconcileClusterPool) addClusters(
 		errs = append(errs, fmt.Errorf("%s: %w", pullSecretDependent, err))
 	}
 
+	// Load install config templates if specified
+	installConfigTemplate, err := r.getInstallConfigTemplate(clp, logger)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("%s: %w", icSecretDependent, err))
+	}
+
 	cloudBuilder, err := r.createCloudBuilder(clp, logger)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("%s: %w", credentialsSecretDependent, err))
@@ -488,7 +495,7 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		if err := r.createCluster(clp, cloudBuilder, pullSecret, logger); err != nil {
+		if err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, logger); err != nil {
 			return err
 		}
 	}
@@ -500,6 +507,7 @@ func (r *ReconcileClusterPool) createCluster(
 	clp *hivev1.ClusterPool,
 	cloudBuilder clusterresource.CloudBuilder,
 	pullSecret string,
+	installConfigTemplate string,
 	logger log.FieldLogger,
 ) error {
 	ns, err := r.createRandomNamespace(clp)
@@ -511,15 +519,17 @@ func (r *ReconcileClusterPool) createCluster(
 
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
-		Name:             ns.Name,
-		Namespace:        ns.Name,
-		BaseDomain:       clp.Spec.BaseDomain,
-		ImageSet:         clp.Spec.ImageSetRef.Name,
-		WorkerNodesCount: int64(3),
-		MachineNetwork:   "10.0.0.0/16",
-		PullSecret:       pullSecret,
-		CloudBuilder:     cloudBuilder,
-		Labels:           clp.Spec.Labels,
+		Name:                  ns.Name,
+		Namespace:             ns.Name,
+		BaseDomain:            clp.Spec.BaseDomain,
+		ImageSet:              clp.Spec.ImageSetRef.Name,
+		WorkerNodesCount:      int64(3),
+		MachineNetwork:        "10.0.0.0/16",
+		PullSecret:            pullSecret,
+		CloudBuilder:          cloudBuilder,
+		Labels:                clp.Spec.Labels,
+		InstallConfigTemplate: installConfigTemplate,
+		SkipMachinePools:      clp.Spec.SkipMachinePools,
 	}
 
 	if clp.Spec.HibernateAfter != nil {
@@ -530,6 +540,7 @@ func (r *ReconcileClusterPool) createCluster(
 	if err != nil {
 		return errors.Wrap(err, "error building resources")
 	}
+
 	poolKey := types.NamespacedName{Namespace: clp.Namespace, Name: clp.Name}.String()
 	r.expectations.ExpectCreations(poolKey, 1)
 	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
@@ -740,6 +751,29 @@ func (r *ReconcileClusterPool) verifyClusterImageSet(pool *hivev1.ClusterPool, l
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "error getting cluster image set")
 	}
 	return err
+}
+
+func (r *ReconcileClusterPool) getInstallConfigTemplate(pool *hivev1.ClusterPool, logger log.FieldLogger) (string, error) {
+	if pool.Spec.InstallConfigSecretTemplateRef == nil {
+		return "", nil
+	}
+	installConfigSecret := &corev1.Secret{}
+	err := r.Client.Get(
+		context.Background(),
+		types.NamespacedName{Namespace: pool.Namespace, Name: pool.Spec.InstallConfigSecretTemplateRef.Name},
+		installConfigSecret,
+	)
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error reading install-config secret")
+		return "", err
+	}
+	installConfig, ok := installConfigSecret.Data["install-config.yaml"]
+	if !ok {
+		logger.Info("install-config secret does not contain install-config.yaml data")
+		return "", errors.New("install-config secret does not contain install-config.yaml data")
+	}
+	return string(installConfig), nil
+
 }
 
 func (r *ReconcileClusterPool) getPullSecret(pool *hivev1.ClusterPool, logger log.FieldLogger) (string, error) {

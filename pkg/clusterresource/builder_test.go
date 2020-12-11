@@ -2,8 +2,10 @@ package clusterresource
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/ghodss/yaml"
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +38,36 @@ const (
 	adoptInfraID                     = "adopted-infra-id"
 	machineNetwork                   = "10.0.0.0/16"
 	fakeOpenStackCloudsYAML          = "fakeYAML"
+	fakeInstallConfigYaml            = `apiVersion: v1
+baseDomain: template.domain
+metadata:
+  name: template-cluster-name
+  creationTimestamp: null
+compute:
+- hyperthreading: Enabled
+  name: worker
+controlPlane:
+  hyperthreading: Enabled
+  name: master
+  platform:
+    aws:
+      type: m5.xlarge
+      rootVolume:
+        size: 128
+      zones:
+      - eu-west-1a
+      - eu-west-1b
+      - eu-west-1c
+  replicas: 3
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineCIDR: 10.0.0.0/16
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+`
 )
 
 func createTestBuilder() *Builder {
@@ -212,6 +244,28 @@ func TestBuildClusterResources(t *testing.T) {
 				certSecret := findSecret(allObjects, certSecretName)
 				require.NotNil(t, certSecret)
 				assert.Equal(t, certSecret.Name, cd.Spec.Platform.VSphere.CertificatesSecretRef.Name)
+			},
+		}, {
+			name: "merge InstallConfigTemplate",
+			builder: func() *Builder {
+				b := createAWSClusterBuilder()
+
+				b.Name = clusterName
+				b.BaseDomain = baseDomain
+				b.Namespace = namespace
+
+				b.InstallConfigTemplate = fakeInstallConfigYaml
+				yaml.Unmarshal([]byte(fakeInstallConfigYaml), b.InstallConfigTemplate)
+				return b
+			}(),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+
+				installConfigSecret := findSecret(allObjects, fmt.Sprintf("%s-install-config", clusterName))
+
+				re := strings.NewReplacer("template.domain", baseDomain, "template-cluster-name", clusterName)
+				updatedYaml := re.Replace(fakeInstallConfigYaml)
+
+				assert.YAMLEq(t, updatedYaml, installConfigSecret.StringData["install-config.yaml"])
 			},
 		},
 	}

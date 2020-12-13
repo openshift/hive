@@ -49,7 +49,7 @@ type ClusterPoolSpec struct {
 	// to be used as a template for all clusters in this pool.
 	// Cluster specific settings (name, basedomain) will be injected dynamically when the ClusterDeployment install-config Secret is generated.
 	// +optional
-	InstallConfigSecretTemplateRef *corev1.LocalObjectReference `json:"installConfigSecretTemplateRef"`
+	InstallConfigSecretTemplateRef *corev1.LocalObjectReference `json:"installConfigSecretTemplateRef,omitempty"`
 
 	// HibernateAfter will be applied to new ClusterDeployments created for the pool. HibernateAfter will transition
 	// clusters in the clusterpool to hibernating power state after it has been running for the given duration. The time

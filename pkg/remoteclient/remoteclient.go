@@ -29,7 +29,7 @@ import (
 
 // Builder is used to build API clients to the remote cluster
 type Builder interface {
-	// Build will return a static kubeclient for the remote cluster.
+	// Build will return a static controller-runtime client for the remote cluster.
 	Build() (client.Client, error)
 
 	// BuildDynamic will return a dynamic kubeclient for the remote cluster.
@@ -53,7 +53,14 @@ type Builder interface {
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
 // ClusterDeployment.
 // The controllerName is needed for metrics.
+// If the ClusterDeployment carries the fake cluster annotation, a fake client will be returned populated with
+// runtime.Objects we need to query for in all our controllers.
 func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
+	if utils.IsFakeCluster(cd) {
+		return &fakeBuilder{
+			urlToUse: activeURL,
+		}
+	}
 	return &builder{
 		c:              c,
 		cd:             cd,
@@ -115,6 +122,11 @@ func connectToRemoteCluster(
 
 // InitialURL returns the initial API URL for the ClusterDeployment.
 func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
+
+	if utils.IsFakeCluster(cd) {
+		return "https://example.com/veryfakeapi", nil
+	}
+
 	cfg, err := unadulteratedRESTConfig(c, cd)
 	if err != nil {
 		return "", err

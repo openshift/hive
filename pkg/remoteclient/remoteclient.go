@@ -10,9 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -86,67 +83,6 @@ func ConnectToRemoteCluster(
 		return
 	}
 	remoteClient = rawRemoteClient.(client.Client)
-	return
-}
-
-// ConnectToRemoteClusterWithDynamicClient connects to a remote cluster using the specified builder and builds a dynamic client.
-// If the ClusterDeployment is marked as unreachable, then no connection will be made.
-// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
-func ConnectToRemoteClusterWithDynamicClient(
-	cd *hivev1.ClusterDeployment,
-	remoteClientBuilder Builder,
-	localClient client.Client,
-	logger log.FieldLogger,
-) (remoteClient dynamic.Interface, unreachable, requeue bool) {
-	var rawRemoteClient interface{}
-	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
-		cd,
-		remoteClientBuilder,
-		localClient,
-		logger,
-		func(builder Builder) (interface{}, error) { return builder.BuildDynamic() },
-	)
-	if unreachable {
-		return
-	}
-	remoteClient = rawRemoteClient.(dynamic.Interface)
-
-	// The dynamic client creation does not include a discovery API call, and thus may not fail even though the
-	// cluster is down. To work around this we do a Get for a resource we expect and return unreachable if we see
-	// an unexpected error.
-	_, err := remoteClient.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "namespaces",
-	}).Get(context.Background(), "kube-system", metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.WithError(err).Info("error getting kube-system namespace, considering cluster unreachable")
-		unreachable = true
-	}
-	return
-}
-
-// ConnectToRemoteClusterWithKubeClient connects to a remote cluster using the specified builder and builds a kubernetes client.
-// If the ClusterDeployment is marked as unreachable, then no connection will be made.
-// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
-func ConnectToRemoteClusterWithKubeClient(
-	cd *hivev1.ClusterDeployment,
-	remoteClientBuilder Builder,
-	localClient client.Client,
-	logger log.FieldLogger,
-) (remoteClient kubeclient.Interface, unreachable, requeue bool) {
-	var rawRemoteClient interface{}
-	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
-		cd,
-		remoteClientBuilder,
-		localClient,
-		logger,
-		func(builder Builder) (interface{}, error) { return builder.BuildKubeClient() },
-	)
-	if unreachable {
-		return
-	}
-	remoteClient = rawRemoteClient.(kubeclient.Interface)
 	return
 }
 

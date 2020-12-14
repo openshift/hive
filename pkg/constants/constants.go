@@ -190,6 +190,10 @@ const (
 	// path where we mount in the SSH key for connecting to the bare metal libvirt provisioning host.
 	LibvirtSSHPrivKeyPathEnvVar = "LIBVIRT_SSH_PRIV_KEY_PATH"
 
+	// FakeClusterInstallEnvVar is the environment variable Hive will set for the installmanager pod to request
+	// a fake install.
+	FakeClusterInstallEnvVar = "FAKE_INSTALL"
+
 	// ControlPlaneCertificateSuffix is the suffix used when naming objects having to do control plane certificates.
 	ControlPlaneCertificateSuffix = "cp-certs"
 

@@ -56,7 +56,6 @@ import (
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -106,7 +105,9 @@ type InstallManager struct {
 	updateClusterProvision           func(*hivev1.ClusterProvision, *InstallManager, provisionMutation) error
 	readClusterMetadata              func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig            func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
-	uploadAdminPassword              func(*hivev1.ClusterProvision, bool, *InstallManager) (*corev1.Secret, error)
+	uploadAdminPassword              func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
+	loadAdminPassword                func(*InstallManager) (string, error)
+	provisionCluster                 func(*InstallManager) error
 	readInstallerLog                 func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
 	waitForProvisioningStage         func(*hivev1.ClusterProvision, *InstallManager) error
 	waitForInstallCompleteExecutions int
@@ -170,8 +171,10 @@ func (m *InstallManager) Complete(args []string) error {
 	m.readClusterMetadata = readClusterMetadata
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
 	m.uploadAdminPassword = uploadAdminPassword
+	m.loadAdminPassword = loadAdminPassword
 	m.readInstallerLog = readInstallerLog
 	m.cleanupFailedProvision = cleanupFailedProvision
+	m.provisionCluster = provisionCluster
 	m.waitForProvisioningStage = waitForProvisioningStage
 
 	// Set log level
@@ -200,6 +203,16 @@ func (m *InstallManager) Complete(args []string) error {
 	m.WorkDir = absPath
 	if _, err := os.Stat(m.WorkDir); os.IsNotExist(err) {
 		m.log.WithField("workdir", m.WorkDir).Fatalf("workdir does not exist")
+	}
+
+	// Swap some function implementations if this is flagged to be a fake install:
+	fakeInstall, err := strconv.ParseBool(os.Getenv(constants.FakeClusterInstallEnvVar))
+	if fakeInstall {
+		m.log.Warnf("%s set to true, swapping function implementations to fake an installation",
+			constants.FakeClusterInstallEnvVar)
+		m.loadAdminPassword = fakeLoadAdminPassword
+		m.readClusterMetadata = fakeReadClusterMetadata
+		m.provisionCluster = fakeProvisionCluster
 	}
 
 	return nil
@@ -236,8 +249,6 @@ func (m *InstallManager) Run() error {
 		m.log.Warn("cluster is already installed, exiting")
 		os.Exit(0)
 	}
-
-	fakeCluster := utils.IsFakeCluster(cd)
 
 	// sshKeyPaths will contain paths to all ssh keys in use
 	var sshKeyPaths []string
@@ -363,7 +374,7 @@ func (m *InstallManager) Run() error {
 		return errors.Wrap(err, "error trying to save admin kubeconfig")
 	}
 
-	passwordSecret, err := m.uploadAdminPassword(provision, fakeCluster, m)
+	passwordSecret, err := m.uploadAdminPassword(provision, m)
 	if err != nil {
 		m.log.WithError(err).Error("error uploading admin password")
 		return errors.Wrap(err, "error trying to save admin password")
@@ -373,17 +384,8 @@ func (m *InstallManager) Run() error {
 		m,
 		func(provision *hivev1.ClusterProvision) {
 			provision.Spec.Metadata = &runtime.RawExtension{Raw: metadataBytes}
-
-			if !fakeCluster {
-				provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
-				provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
-			} else {
-				// If we're faking this install, it's safer to put an ID in that will never match any
-				// resource tags in the real world.
-				fakeClusterString := "fake cluster"
-				provision.Spec.InfraID = pointer.StringPtr(fakeClusterString)
-				provision.Spec.ClusterID = pointer.StringPtr(fakeClusterString)
-			}
+			provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
+			provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
 
 			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
@@ -413,52 +415,47 @@ func (m *InstallManager) Run() error {
 		}
 	}
 
-	if !fakeCluster {
-		installErr := m.provisionCluster()
-		if installErr != nil {
-			m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
+	installErr := m.provisionCluster(m)
+	if installErr != nil {
+		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
 
-			if pauseDur, ok := cd.Annotations[constants.PauseOnInstallFailureAnnotation]; ok {
-				m.log.Infof("pausing on failure due to annotation %s=%s", constants.PauseOnInstallFailureAnnotation,
-					pauseDur)
-				dur, err := time.ParseDuration(pauseDur)
-				if err != nil {
-					// Not a fatal error.
-					m.log.WithError(err).WithField("pauseDuration", pauseDur).Warn("error parsing pause duration, skipping pause")
-				} else {
-					time.Sleep(dur)
-				}
-			}
-
-			// Fetch logs from all cluster machines:
-			if m.actuator == nil {
-				m.log.Debug("Unable to find log storage actuator. Disabling gathering logs.")
+		if pauseDur, ok := cd.Annotations[constants.PauseOnInstallFailureAnnotation]; ok {
+			m.log.Infof("pausing on failure due to annotation %s=%s", constants.PauseOnInstallFailureAnnotation,
+				pauseDur)
+			dur, err := time.ParseDuration(pauseDur)
+			if err != nil {
+				// Not a fatal error.
+				m.log.WithError(err).WithField("pauseDuration", pauseDur).Warn("error parsing pause duration, skipping pause")
 			} else {
-				m.gatherLogs(provision, cd, sshKeyPath, sshAgentSetupErr)
+				time.Sleep(dur)
 			}
 		}
 
-		if installLog, err := m.readInstallerLog(provision, m, scrubInstallLog); err == nil {
-			if err := m.updateClusterProvision(
-				provision,
-				m,
-				func(provision *hivev1.ClusterProvision) {
-					provision.Spec.InstallLog = pointer.StringPtr(installLog)
-				},
-			); err != nil {
-				m.log.WithError(err).Warning("error updating cluster provision with installer log")
-			}
+		// Fetch logs from all cluster machines:
+		if m.actuator == nil {
+			m.log.Debug("Unable to find log storage actuator. Disabling gathering logs.")
 		} else {
-			m.log.WithError(err).Error("error reading installer log")
+			m.gatherLogs(provision, cd, sshKeyPath, sshAgentSetupErr)
 		}
+	}
 
-		if installErr != nil {
-			m.log.WithError(installErr).Error("failed due to install error")
-			return installErr
+	if installLog, err := m.readInstallerLog(provision, m, scrubInstallLog); err == nil {
+		if err := m.updateClusterProvision(
+			provision,
+			m,
+			func(provision *hivev1.ClusterProvision) {
+				provision.Spec.InstallLog = pointer.StringPtr(installLog)
+			},
+		); err != nil {
+			m.log.WithError(err).Warning("error updating cluster provision with installer log")
 		}
 	} else {
-		m.log.Warnf("skipping openshift-install create cluster due to %s annotation on ClusterDeployment",
-			constants.HiveFakeClusterAnnotation)
+		m.log.WithError(err).Error("error reading installer log")
+	}
+
+	if installErr != nil {
+		m.log.WithError(installErr).Error("failed due to install error")
+		return installErr
 	}
 
 	m.log.Info("install completed successfully")
@@ -700,7 +697,7 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 
 // provisionCluster invokes the openshift-install create cluster command to provision resources
 // in the cloud.
-func (m *InstallManager) provisionCluster() error {
+func provisionCluster(m *InstallManager) error {
 
 	m.log.Info("running openshift-install create cluster")
 
@@ -1144,27 +1141,35 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 	return kubeconfigSecret, nil
 }
 
-func uploadAdminPassword(provision *hivev1.ClusterProvision, fakeCluster bool, m *InstallManager) (*corev1.Secret, error) {
-	m.log.Infoln("uploading admin username/password")
+func loadAdminPassword(m *InstallManager) (string, error) {
+	m.log.Infoln("loading admin password")
 
 	var password string
-	if !fakeCluster {
-		fullPath := filepath.Join(m.WorkDir, adminPasswordRelativePath)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			m.log.WithField("path", fullPath).Error("admin password file does not exist")
-			return nil, err
-		}
+	fullPath := filepath.Join(m.WorkDir, adminPasswordRelativePath)
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		m.log.WithField("path", fullPath).Error("admin password file does not exist")
+		return "", err
+	}
 
-		passwordBytes, err := ioutil.ReadFile(fullPath)
-		if err != nil {
-			m.log.WithError(err).WithField("path", fullPath).Error("error reading admin password file")
-			return nil, err
-		}
+	passwordBytes, err := ioutil.ReadFile(fullPath)
+	if err != nil {
+		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin password file")
+		return "", err
+	}
 
-		// Need to trim trailing newlines from the password
-		password = strings.TrimSpace(string(passwordBytes))
-	} else {
-		password = "fake-password"
+	// Need to trim trailing newlines from the password
+	password = strings.TrimSpace(string(passwordBytes))
+
+	return password, nil
+}
+
+func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) (*corev1.Secret, error) {
+	m.log.Infoln("uploading admin username/password")
+
+	// Need to trim trailing newlines from the password
+	password, err := m.loadAdminPassword(m)
+	if err != nil {
+		return nil, err
 	}
 
 	s := &corev1.Secret{

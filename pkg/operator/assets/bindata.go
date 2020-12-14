@@ -88,10 +88,12 @@ metadata:
   name: hive-clustersync
   namespace: hive
   labels:
-    app: hive-clustersync
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
 spec:
   selector:
-    app: hive-clustersync
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
   ports:
   - name: metrics
     port: 2112
@@ -122,14 +124,20 @@ var _configClustersyncStatefulsetYaml = []byte(`apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: hive-clustersync
+  namespace: hive
+  labels:
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
 spec:
   selector:
     matchLabels:
-      app: hive-clustersync
+      control-plane: clustersync
+      controller-tools.k8s.io: "1.0"
   template:
     metadata:
       labels:
-        app: hive-clustersync
+        control-plane: clustersync
+        controller-tools.k8s.io: "1.0"
     spec:
       topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
       - maxSkew: 1
@@ -137,11 +145,12 @@ spec:
         whenUnsatisfiable: DoNotSchedule
         labelSelector:
           matchLabels:
-            app: hive-clustersync
+            control-plane: clustersync
+            controller-tools.k8s.io: "1.0"
       serviceAccount: hive-controllers
       serviceAccountName: hive-controllers
       containers:
-      - name: hive-clustersync
+      - name: clustersync
         resources:
           requests:
             cpu: 50m

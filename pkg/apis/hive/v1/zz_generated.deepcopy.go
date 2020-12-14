@@ -1096,6 +1096,11 @@ func (in *ClusterPoolSpec) DeepCopyInto(out *ClusterPoolSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.InstallConfigSecretTemplateRef != nil {
+		in, out := &in.InstallConfigSecretTemplateRef, &out.InstallConfigSecretTemplateRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	if in.HibernateAfter != nil {
 		in, out := &in.HibernateAfter, &out.HibernateAfter
 		*out = new(metav1.Duration)

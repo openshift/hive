@@ -147,3 +147,105 @@ spec:
 ```
 
 **Note** When you use installConfigSecretTemplate you will most likely want to disable MachinePools, so that Hive does not reconcile away from the machine config specified in install-config.yaml
+
+## Time-based scaling of Cluster Pool
+
+You can use kubenetes cron jobs to scale clusterpools as per a defined schedule.
+
+The following are the yaml configurations for setting up the permissions: Role, RoleBinding and ServiceAccount. It sets up a role with permissions to get a clusterpool and patch clusterpool’s scale subresource.
+
+```yaml
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: hive
+  name: scale-clusterpool
+rules:
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterpools
+  verbs:
+  - get
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterpools/scale
+  verbs:
+  - patch
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: scale-clusterpool
+  namespace: hive
+subjects:
+- kind: ServiceAccount
+  name: sa-scale-clusterpool
+  namespace: hive
+roleRef:
+  kind: Role
+  name: scale-clusterpool
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-scale-clusterpool
+  namespace: hive
+```
+
+Below is the sample configuration for the CronJob to scale up a clusterpool to size 10 at 6:00 AM everyday. It uses the serviceAccountName `sa-scale-clusterpool` created above.  
+```yaml
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: scale-up-clusterpool
+  namespace: hive
+spec:
+  schedule: "0 6 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: sa-scale-clusterpool
+          containers:
+          - name: scale-clusterpool-size-10
+            image: quay.io/openshift/origin-cli:latest
+            command:
+            - /bin/sh 
+            - -c 
+            - oc scale clusterpool pool-1 -n hive --replicas=10
+          restartPolicy: OnFailure
+```
+
+Below is the sample configuration for the CronJob to scale down a clusterpool to size 0 at 20:00 (8:00 PM) everyday. It uses the serviceAccountName `sa-scale-clusterpool` created above.  
+```yaml
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: scale-down-clusterpool
+  namespace: hive
+spec:
+  schedule: "0 20 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: sa-scale-clusterpool
+          containers:
+          - name: scale-clusterpool-size-0
+            image: quay.io/openshift/origin-cli:latest
+            command:
+            - /bin/sh 
+            - -c 
+            - oc scale clusterpool pool-1 -n hive --replicas=0
+          restartPolicy: OnFailure
+```
+
+CronJob’s spec.schedule field can be used to set the exact time when you want to scale the clusterpool. The syntax of the schedule expects a [cron](https://en.wikipedia.org/wiki/Cron) expression made of five fields - minute (0 - 59), hour (0 - 23), day of the month (1 - 31), month (1 - 12) and day of the week (0 - 6) in that order. In our example CronJob to scale up a clusterpool, the schedule is set to `0 6 * * *` which is 6:00 AM everyday. The cron job controller uses the time set for the kube-controller-manager container.
+
+CronJob’s spec.containers[].image is the image with the `oc` binary. We have tested with the [quay.io/openshift/origin-cli](https://quay.io/repository/openshift/origin-cli) image. You can also create your own image.

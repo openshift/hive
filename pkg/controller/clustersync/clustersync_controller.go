@@ -393,9 +393,9 @@ func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	// If this cluster carries the fake annotation we will fake out all helper communication with it.
-	fakeApplies := cd.Annotations[constants.HiveFakeClusterAnnotation]
+	fakeCluster := controllerutils.IsFakeCluster(cd)
 
-	resourceHelper, err := r.resourceHelperBuilder(restConfig, fakeApplies != "", logger)
+	resourceHelper, err := r.resourceHelperBuilder(restConfig, fakeCluster, logger)
 	if err != nil {
 		log.WithError(err).Error("cannot create helper")
 		return reconcile.Result{}, err

@@ -246,7 +246,7 @@ func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.R
 	var toRemoveClaimedCDs []*hivev1.ClusterDeployment
 	numberOfDeletingClaimedCDs := 0
 	for _, cd := range claimedCDs {
-		_, toRemove := cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation]
+		toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(cd)
 		switch {
 		case cd.DeletionTimestamp != nil:
 			numberOfDeletingClaimedCDs++

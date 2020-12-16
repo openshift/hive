@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
@@ -553,7 +553,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					assert.NotEqual(t, claimName, cd.Spec.ClusterPoolRef.ClaimName, "expected ClusterDeployment to not be claimed by ClusterClaim")
 				}
 				if isAssignedCD {
-					_, toRemove := cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation]
+					toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(&cd)
 					assignedClusterDeploymentExists = !toRemove
 					if test.expectHibernating {
 						assert.Equal(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected ClusterDeployment to be hibernating")

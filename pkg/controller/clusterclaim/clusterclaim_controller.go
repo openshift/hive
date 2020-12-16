@@ -307,13 +307,13 @@ func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, log
 	}
 
 	// Delete ClusterDeployment
-	_, toRemove := cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation]
+	toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(cd)
 	if cd.DeletionTimestamp == nil && !toRemove {
 		logger.Info("deleting clusterDeployment")
 		if cd.Annotations == nil {
 			cd.Annotations = map[string]string{}
 		}
-		cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation] = ""
+		cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation] = "true"
 		if err := r.Update(context.Background(), cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating ClusterDeployment to mark it for deletion")
 			return err

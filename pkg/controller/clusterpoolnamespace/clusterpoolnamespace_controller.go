@@ -194,7 +194,7 @@ func (r *ReconcileClusterPoolNamespace) cleanupPreviouslyClaimedClusterDeploymen
 		if cdList.Items[idx].DeletionTimestamp != nil {
 			continue
 		}
-		if _, ok := cdList.Items[idx].Annotations[constants.ClusterClaimRemoveClusterAnnotation]; !ok {
+		if !controllerutils.IsClaimedClusterMarkedForRemoval(&cdList.Items[idx]) {
 			continue
 		}
 		someCleanupDone = true

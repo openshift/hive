@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
@@ -194,25 +195,39 @@ const (
 	secondaryURL
 )
 
-func (b *builder) Build() (client.Client, error) {
-	cfg, err := b.RESTConfig()
-	if err != nil {
+func buildScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+
+	if err := machineapi.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 
-	scheme, err := machineapi.SchemeBuilder.Build()
-	if err != nil {
+	if err := autoscalingv1.SchemeBuilder.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-
-	autoscalingv1.SchemeBuilder.AddToScheme(scheme)
-	autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme)
+	if err := autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 
 	if err := openshiftapiv1.Install(scheme); err != nil {
 		return nil, err
 	}
 
 	if err := routev1.Install(scheme); err != nil {
+		return nil, err
+	}
+
+	return scheme, nil
+}
+
+func (b *builder) Build() (client.Client, error) {
+	cfg, err := b.RESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	scheme, err := buildScheme()
+	if err != nil {
 		return nil, err
 	}
 

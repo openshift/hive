@@ -109,7 +109,7 @@ spec:
 * To see the syncset status, run as below.
 
 ```sh
-oc get syncsetinstances <synsetinstance name> -o yaml
+oc get clustersync <clusterdeployment name> -o yaml
 ```
 
 ## SelectorSyncSet Object Definition
@@ -143,16 +143,16 @@ spec:
 
 The failure logs for syncset is present in Hive controller POD logs.
 
-To find the status of the syncset, check the corresponding syncsetinstance object in the cluster deployment namespace.
+To find the status of the syncset, check the cluster deployment's `ClusterSync` object in the cluster deployment namespace. Every cluster deployment has an associated `ClusterSync` object that records status within `ClusterSync.Status.SyncSets`.
 
 ```sh
-oc get syncsetinstance -n <namespace>
+oc get clustersync -n <namespace>
 ```
 
 To see details, run as below.
 
 ```sh
-oc get syncsetinstances <synsetinstance name> -o yaml
+oc get clustersync <clusterdeployment name> -o yaml
 ```
 
 ## Changing ResourceApplyMode

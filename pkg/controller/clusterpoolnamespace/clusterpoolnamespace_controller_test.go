@@ -18,6 +18,7 @@ import (
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testcp "github.com/openshift/hive/pkg/test/clusterpool"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testnamespace "github.com/openshift/hive/pkg/test/namespace"
 )
@@ -40,6 +41,13 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 	namespaceBuilder := namespaceWithoutLabelBuilder.GenericOptions(
 		testgeneric.WithLabel(constants.ClusterPoolNameLabel, "test-cluster-pool"),
 	)
+
+	poolBuilder := testcp.FullBuilder("test-pool-namespace", "test-cluster-pool", scheme).
+		Options(
+			testcp.ForAWS("aws-creds", "us-east-1"),
+			testcp.WithBaseDomain("test-domain"),
+			testcp.WithImageSet("test-image-set"),
+		)
 
 	validateNoRequeueAfter := func(t *testing.T, requeueAfter time.Duration, startTime, endTime time.Time) {
 		assert.Zero(t, requeueAfter, "unexpected non-zero requeue after")
@@ -72,7 +80,70 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			validateRequeueAfter: validateNoRequeueAfter,
 		},
 		{
+			name:             "non-deleted clusterdeployment with existing pool",
+			namespaceBuilder: namespaceBuilder,
+			resources: []runtime.Object{
+				poolBuilder.Build(),
+				testcd.FullBuilder(namespaceName, "test-cd", scheme).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
+			},
+			expectDeleted:        false,
+			validateRequeueAfter: validateNoRequeueAfter,
+		},
+		{
+			name:             "non-deleted clusterdeployment with existing pool 2",
+			namespaceBuilder: namespaceBuilder,
+			resources: []runtime.Object{
+				poolBuilder.Build(),
+				testcd.FullBuilder(namespaceName, "test-cd", scheme).
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
+				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim-2")),
+			},
+			expectDeleted:        false,
+			validateRequeueAfter: validateNoRequeueAfter,
+		},
+		{
+			name:             "non-deleted clusterdeployment with no pool",
+			namespaceBuilder: namespaceBuilder,
+			resources: []runtime.Object{
+				testcd.FullBuilder(namespaceName, "test-cd", scheme).
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
+				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim-2")),
+			},
+			expectDeleted:        false,
+			validateRequeueAfter: validateWaitForCDGoneRequeueAfter,
+		},
+		{
 			name:             "deleted clusterdeployment",
+			namespaceBuilder: namespaceBuilder,
+			resources: []runtime.Object{
+				testcd.FullBuilder(namespaceName, "test-cd", scheme).
+					GenericOptions(testgeneric.Deleted()).
+					Build(),
+			},
+			expectDeleted:        false,
+			validateRequeueAfter: validateWaitForCDGoneRequeueAfter,
+		},
+		{
+			name:             "deleted clusterdeployment with no pool",
+			namespaceBuilder: namespaceBuilder,
+			resources: []runtime.Object{
+				testcd.FullBuilder(namespaceName, "test-cd", scheme).
+					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true"), testgeneric.Deleted()).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
+				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
+					GenericOptions(testgeneric.Deleted()).
+					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim-2")),
+			},
+			expectDeleted:        false,
+			validateRequeueAfter: validateWaitForCDGoneRequeueAfter,
+		},
+		{
+			name:             "deleted clusterdeployment with exist",
 			namespaceBuilder: namespaceBuilder,
 			resources: []runtime.Object{
 				testcd.FullBuilder(namespaceName, "test-cd", scheme).
@@ -150,6 +221,146 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			assert.Equal(t, tc.expectDeleted, apierrors.IsNotFound(err), "unexpected state of namespace existence")
 
 			tc.validateRequeueAfter(t, result.RequeueAfter, startTime, endTime)
+		})
+	}
+}
+
+func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
+	logger := log.New()
+	logger.SetLevel(log.DebugLevel)
+	scheme := runtime.NewScheme()
+	hivev1.AddToScheme(scheme)
+
+	poolBuilder := testcp.FullBuilder("test-namespace", "test-cluster-pool", scheme).
+		Options(
+			testcp.ForAWS("aws-creds", "us-east-1"),
+			testcp.WithBaseDomain("test-domain"),
+			testcp.WithImageSet("test-image-set"),
+		)
+	cdBuilder := func(name string) testcd.Builder {
+		return testcd.FullBuilder(name, name, scheme).Options(
+			testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+		)
+	}
+	cdBuilderWithPool := func(name, pool string) testcd.Builder {
+		return cdBuilder(name).Options(testcd.WithClusterPoolReference("test-namespace", pool, "test-claim"))
+	}
+
+	cases := []struct {
+		name             string
+		resources        []runtime.Object
+		expectedErr      string
+		expectedCleanup  bool
+		expectedClusters int
+	}{{
+		name: "no cleanup as clusterdeployment not for pool",
+		resources: []runtime.Object{
+			cdBuilder("cd1").Build(),
+			cdBuilder("cd2").Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  false,
+		expectedClusters: 2,
+	}, {
+		name: "no cleanup as cluster pool exists",
+		resources: []runtime.Object{
+			poolBuilder.Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  false,
+		expectedClusters: 2,
+	}, {
+		name: "no cleanup as cluster pool exists with marked for removal clusters",
+		resources: []runtime.Object{
+			poolBuilder.Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  false,
+		expectedClusters: 2,
+	}, {
+		name: "no cleanup as all clusters already deleted",
+		resources: []runtime.Object{
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted()).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted()).Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  false,
+		expectedClusters: 2,
+	}, {
+		name: "no cleanup as no clusters marked for removal",
+		resources: []runtime.Object{
+			cdBuilderWithPool("cd1", "test-cluster-pool").Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  false,
+		expectedClusters: 2,
+	}, {
+		name: "no cleanup as clusters marked for removal already deleted",
+		resources: []runtime.Object{
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  false,
+		expectedClusters: 2,
+	}, {
+		name: "some cleanup",
+		resources: []runtime.Object{
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  true,
+		expectedClusters: 1,
+	}, {
+		name: "some cleanup 2",
+		resources: []runtime.Object{
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  true,
+		expectedClusters: 1,
+	}, {
+		name: "some cleanup 3",
+		resources: []runtime.Object{
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
+			cdBuilderWithPool("cd3", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd4", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+		},
+		expectedErr:      "",
+		expectedCleanup:  true,
+		expectedClusters: 2,
+	}}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			c := fake.NewFakeClientWithScheme(scheme, test.resources...)
+			reconciler := &ReconcileClusterPoolNamespace{
+				Client: c,
+				logger: logger,
+			}
+			cds := &hivev1.ClusterDeploymentList{}
+			err := c.List(context.Background(), cds)
+			require.NoError(t, err)
+
+			cleanup, err := reconciler.cleanupPreviouslyClaimedClusterDeployments(cds, logger)
+			if test.expectedErr != "" {
+				assert.Regexp(t, test.expectedErr, err)
+			}
+			assert.Equal(t, test.expectedCleanup, cleanup)
+
+			cds = &hivev1.ClusterDeploymentList{}
+			err = c.List(context.Background(), cds)
+			require.NoError(t, err)
+
+			assert.Len(t, cds.Items, test.expectedClusters)
 		})
 	}
 }

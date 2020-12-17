@@ -158,7 +158,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	subnets := map[string]string{}
 	// Fetching private subnets from the machinepool and then mapping availability zones to subnets
 	if len(pool.Spec.Platform.AWS.Subnets) > 0 {
-		subnetsByAvailabilityZone, err := a.getSubnetsByAvailabilityZone(pool)
+		subnetsByAvailabilityZone, err := a.getPrivateSubnetsByAvailabilityZone(pool)
 		if err != nil {
 			return nil, false, errors.Wrap(err, "describing subnets")
 		}
@@ -313,15 +313,15 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 
 }
 
-// getSubnetsByAvailabilityZones maps availability zones to subnet
-func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (map[string]string, error) {
+// getPrivateSubnetsByAvailabilityZones maps availability zones to private subnet
+func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (map[string]string, error) {
 	idPointers := make([]*string, len(pool.Spec.Platform.AWS.Subnets))
 	for i, id := range pool.Spec.Platform.AWS.Subnets {
 		idPointers[i] = aws.String(id)
 	}
 
 	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
-	if err != nil {
+	if err != nil || len(results.Subnets) == 0 {
 		if strings.Contains(err.Error(), "InvalidSubnetID.NotFound") {
 			var conditionMessage string
 			if submatches := reg.FindStringSubmatch(err.Error()); submatches != nil {
@@ -348,9 +348,137 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ma
 		return nil, err
 	}
 
-	conflictingSubnets := sets.NewString()
-	subnetsByAvailabilityZone := make(map[string]string, len(pool.Spec.Platform.AWS.Subnets))
+	vpc := *results.Subnets[0].VpcId
+	if vpc == "" {
+		return nil, errors.Errorf("%s has no VPC", *results.Subnets[0].SubnetId)
+	}
+
+	routeTables, err := a.awsClient.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
+		Filters: []*ec2.Filter{{
+			Name:   aws.String("vpc-id"),
+			Values: []*string{aws.String(vpc)},
+		}},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error describing route tables")
+	}
+
+	var privateSubnets, publicSubnets = map[string]ec2.Subnet{}, map[string]ec2.Subnet{}
 	for _, subnet := range results.Subnets {
+		isPublic, err := isSubnetPublic(routeTables.RouteTables, *subnet.SubnetId, a.logger)
+		if err != nil {
+			return nil, errors.Wrap(err, "error describing route tables")
+		}
+		if isPublic {
+			publicSubnets[*subnet.SubnetId] = *subnet
+		} else {
+			privateSubnets[*subnet.SubnetId] = *subnet
+		}
+	}
+
+	if len(publicSubnets) > 0 {
+		_, err := a.validateSubnets(publicSubnets, pool)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	subnetsByAvailabilityZone, err := a.validateSubnets(privateSubnets, pool)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(publicSubnets) > 0 && len(publicSubnets) < len(privateSubnets) {
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.InvalidSubnetsMachinePoolCondition,
+			corev1.ConditionTrue,
+			"InsufficientPublicSubnets",
+			fmt.Sprintf("Public subnet does not exist for each zone with a private subnet"),
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			if err := a.client.Status().Update(context.Background(), pool); err != nil {
+				return nil, err
+			}
+			return nil, errors.Errorf("insufficient public subnets for availability zones and private subnets")
+		}
+	}
+
+	return subnetsByAvailabilityZone, nil
+}
+
+func isUsingUnsupportedSpotMarketOptions(pool *hivev1.MachinePool, clusterVersion string, logger log.FieldLogger) bool {
+	if pool.Spec.Platform.AWS.SpotMarketOptions == nil {
+		return false
+	}
+	parsedVersion, err := semver.ParseTolerant(clusterVersion)
+	if err != nil {
+		logger.WithError(err).WithField("clusterVersion", clusterVersion).Warn("could not parse the cluster version")
+		return true
+	}
+	// Use only major, minor, and patch so that pre-release versions of 4.5.0 are within the >=4.5.0 range.
+	parsedVersion = semver.Version{
+		Major: parsedVersion.Major,
+		Minor: parsedVersion.Minor,
+		Patch: parsedVersion.Patch,
+	}
+	return !versionsSupportingSpotInstances(parsedVersion)
+}
+
+// https://github.com/kubernetes/kubernetes/blob/9f036cd43d35a9c41d7ac4ca82398a6d0bef957b/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L3376-L3419
+func isSubnetPublic(rt []*ec2.RouteTable, subnetID string, logger log.FieldLogger) (bool, error) {
+	var subnetTable *ec2.RouteTable
+	for _, table := range rt {
+		for _, assoc := range table.Associations {
+			if aws.StringValue(assoc.SubnetId) == subnetID {
+				subnetTable = table
+				break
+			}
+		}
+	}
+
+	if subnetTable == nil {
+		// If there is no explicit association, the subnet will be implicitly
+		// associated with the VPC's main routing table.
+		for _, table := range rt {
+			for _, assoc := range table.Associations {
+				if aws.BoolValue(assoc.Main) {
+					logger.Debugf("Assuming implicit use of main routing table %s for %s",
+						aws.StringValue(table.RouteTableId), subnetID)
+					subnetTable = table
+					break
+				}
+			}
+		}
+	}
+
+	if subnetTable == nil {
+		return false, fmt.Errorf("could not locate routing table for %s", subnetID)
+	}
+
+	for _, route := range subnetTable.Routes {
+		// There is no direct way in the AWS API to determine if a subnet is public or private.
+		// A public subnet is one which has an internet gateway route
+		// we look for the gatewayId and make sure it has the prefix of igw to differentiate
+		// from the default in-subnet route which is called "local"
+		// or other virtual gateway (starting with vgv)
+		// or vpc peering connections (starting with pcx).
+		if strings.HasPrefix(aws.StringValue(route.GatewayId), "igw") {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// validateSubnets ensures there's only one public or private subnet per availability zone, and returns
+// the mapping of subnets by availability zone
+func (a *AWSActuator) validateSubnets(subnets map[string]ec2.Subnet, pool *hivev1.MachinePool) (map[string]string, error) {
+	conflictingSubnets := sets.NewString()
+	subnetsByAvailabilityZone := make(map[string]string, len(subnets))
+	for _, subnet := range subnets {
 		if subnetID, ok := subnetsByAvailabilityZone[*subnet.AvailabilityZone]; ok {
 			conflictingSubnets.Insert(*subnet.SubnetId)
 			conflictingSubnets.Insert(subnetID)
@@ -377,24 +505,5 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ma
 
 		return nil, errors.Errorf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", "))
 	}
-
 	return subnetsByAvailabilityZone, nil
-}
-
-func isUsingUnsupportedSpotMarketOptions(pool *hivev1.MachinePool, clusterVersion string, logger log.FieldLogger) bool {
-	if pool.Spec.Platform.AWS.SpotMarketOptions == nil {
-		return false
-	}
-	parsedVersion, err := semver.ParseTolerant(clusterVersion)
-	if err != nil {
-		logger.WithError(err).WithField("clusterVersion", clusterVersion).Warn("could not parse the cluster version")
-		return true
-	}
-	// Use only major, minor, and patch so that pre-release versions of 4.5.0 are within the >=4.5.0 range.
-	parsedVersion = semver.Version{
-		Major: parsedVersion.Major,
-		Minor: parsedVersion.Minor,
-		Patch: parsedVersion.Patch,
-	}
-	return !versionsSupportingSpotInstances(parsedVersion)
 }

@@ -121,6 +121,11 @@ spec:
                 - type
                 type: object
               type: array
+            lifetime:
+              description: Lifetime is the maximum lifetime of the claim after it
+                is assigned a cluster. If the claim still exists when the lifetime
+                has elapsed, the claim will be deleted by Hive.
+              type: string
           type: object
       required:
       - spec

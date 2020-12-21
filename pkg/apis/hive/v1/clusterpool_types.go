@@ -62,6 +62,23 @@ type ClusterPoolSpec struct {
 	// SkipMachinePools allows creating clusterpools where the machinepools are not managed by hive after cluster creation
 	// +optional
 	SkipMachinePools bool `json:"skipMachinePools,omitempty"`
+
+	// ClaimLifetime defines the lifetimes for claims for the cluster pool.
+	// +optional
+	ClaimLifetime *ClusterPoolClaimLifetime `json:"claimLifetime,omitempty"`
+}
+
+// ClusterPoolClaimLifetime defines the lifetimes for claims for the cluster pool.
+type ClusterPoolClaimLifetime struct {
+	// Default is the default lifetime of the claim when no lifetime is set on the claim itself.
+	// +optional
+	Default *metav1.Duration `json:"default,omitempty"`
+
+	// Maximum is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
+	// when the lifetime has elapsed, the claim will be deleted by Hive.
+	// The lifetime of a claim is the mimimum of the lifetimes set by the cluster pool and the claim itself.
+	// +optional
+	Maximum *metav1.Duration `json:"maximum,omitempty"`
 }
 
 // ClusterPoolStatus defines the observed state of ClusterPool

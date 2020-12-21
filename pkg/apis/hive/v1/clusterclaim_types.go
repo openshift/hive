@@ -32,6 +32,11 @@ type ClusterClaimStatus struct {
 	// Conditions includes more detailed status for the cluster pool.
 	// +optional
 	Conditions []ClusterClaimCondition `json:"conditions,omitempty"`
+
+	// Lifetime is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
+	// when the lifetime has elapsed, the claim will be deleted by Hive.
+	// +optional
+	Lifetime *metav1.Duration `json:"lifetime,omitempty"`
 }
 
 // ClusterClaimCondition contains details for the current condition of a cluster claim.

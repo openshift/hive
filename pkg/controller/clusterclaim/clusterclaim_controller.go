@@ -200,8 +200,24 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result rec
 
 	logger = logger.WithField("cluster", clusterName)
 
+	poolLifetime, err := r.clusterPoolLifetimeForClaim(claim, logger)
+	if err != nil {
+		logger.Log(controllerutils.LogLevel(err), "error getting cluster pool lifetime")
+		return reconcile.Result{}, err
+	}
+	lifetime := getClaimLifetime(poolLifetime, claim.Spec.Lifetime)
+
+	if (lifetime != nil) != (claim.Status.Lifetime != nil) ||
+		lifetime != nil && claim.Status.Lifetime != nil && lifetime.Duration != claim.Status.Lifetime.Duration {
+		claim.Status.Lifetime = lifetime
+		if err := r.Status().Update(context.Background(), claim); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterClaim lifetime")
+			return reconcile.Result{}, errors.Wrap(err, "could not update ClusterClaim lifetime")
+		}
+	}
+
 	// Delete ClusterClaim after its lifetime elapses
-	if lifetime := claim.Spec.Lifetime; lifetime != nil {
+	if lifetime != nil {
 		logger.WithField("lifetime", lifetime).Debug("checking whether lifetime of ClusterClaim has elapsed")
 		pendingCond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
 		if pendingCond != nil && pendingCond.Status == corev1.ConditionFalse {
@@ -217,7 +233,7 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result rec
 			}
 			defer func() {
 				result, returnErr = controllerutils.EnsureRequeueAtLeastWithin(
-					claim.Spec.Lifetime.Duration-time.Since(pendingCond.LastTransitionTime.Time),
+					lifetime.Duration-time.Since(pendingCond.LastTransitionTime.Time),
 					result,
 					returnErr,
 				)
@@ -242,6 +258,47 @@ func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result rec
 	default:
 		return r.reconcileForAssignmentConflict(claim, logger)
 	}
+}
+
+// getClaimLifetime returns the lifetime for a claim taking into account the lifetime set on the pool
+// and the claim.
+// if no lifetime is set on the claim, the default lifetime for the pool is used if set.
+// if maximum lifetime for the pool, the lifetime is minimum of this maximum and lifetime from above.
+func getClaimLifetime(poolLifetime *hivev1.ClusterPoolClaimLifetime, claimLifetime *metav1.Duration) *metav1.Duration {
+	var lifetime *metav1.Duration
+	if poolLifetime != nil && poolLifetime.Default != nil {
+		lifetime = poolLifetime.Default
+	}
+	if claimLifetime != nil {
+		lifetime = claimLifetime
+	}
+	if poolLifetime != nil && poolLifetime.Maximum != nil {
+		if lifetime == nil ||
+			(poolLifetime.Maximum.Duration < lifetime.Duration) {
+			lifetime = poolLifetime.Maximum
+		}
+
+	}
+	return lifetime
+}
+
+// clusterPoolLifetimeForClaim returns the default and max lifetimes for the cluster pool the claim belongs to.
+func (r *ReconcileClusterClaim) clusterPoolLifetimeForClaim(claim *hivev1.ClusterClaim, logger log.FieldLogger) (*hivev1.ClusterPoolClaimLifetime, error) {
+	// Fetch the ClusterPool instance
+	clp := &hivev1.ClusterPool{}
+	// claims exists in the same namespace as the pool
+	key := client.ObjectKey{Namespace: claim.Namespace, Name: claim.Spec.ClusterPoolName}
+	err := r.Get(context.TODO(), key, clp)
+	if apierrors.IsNotFound(err) {
+		logger.WithField("pool", key).WithField("claim", claim.Name).Info("cluster pool no longer exists")
+		// since there is no pool no lifetime can be extracted. this is a valid state.
+		return nil, nil
+	}
+	if err != nil {
+		log.WithError(err).Error("error reading cluster pool")
+		return nil, errors.Wrap(err, "failed to get the pool")
+	}
+	return clp.Spec.ClaimLifetime, nil
 }
 
 func (r *ReconcileClusterClaim) reconcileDeletedClaim(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {

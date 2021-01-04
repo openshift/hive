@@ -129,7 +129,7 @@ With this secret created, you can create a pool that references the install conf
 apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
-  name: testpool
+  name: openshift-46-aws-us-east-1
   namespace: hive
 spec:
   baseDomain: hive.mytests.io
@@ -150,7 +150,7 @@ spec:
 
 ## Time-based scaling of Cluster Pool
 
-You can use kubenetes cron jobs to scale clusterpools as per a defined schedule.
+You can use kubernetes cron jobs to scale clusterpools as per a defined schedule.
 
 The following are the yaml configurations for setting up the permissions: Role, RoleBinding and ServiceAccount. It sets up a role with permissions to get a clusterpool and patch clusterpool’s scale subresource.
 
@@ -177,7 +177,7 @@ rules:
 
 ---
 kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: scale-clusterpool
   namespace: hive
@@ -218,7 +218,7 @@ spec:
             command:
             - /bin/sh 
             - -c 
-            - oc scale clusterpool pool-1 -n hive --replicas=10
+            - oc scale clusterpool openshift-46-aws-us-east-1 -n hive --replicas=10
           restartPolicy: OnFailure
 ```
 
@@ -242,7 +242,7 @@ spec:
             command:
             - /bin/sh 
             - -c 
-            - oc scale clusterpool pool-1 -n hive --replicas=0
+            - oc scale clusterpool openshift-46-aws-us-east-1 -n hive --replicas=0
           restartPolicy: OnFailure
 ```
 

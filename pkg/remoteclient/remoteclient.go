@@ -8,11 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -32,7 +30,7 @@ import (
 
 // Builder is used to build API clients to the remote cluster
 type Builder interface {
-	// Build will return a static kubeclient for the remote cluster.
+	// Build will return a static controller-runtime client for the remote cluster.
 	Build() (client.Client, error)
 
 	// BuildDynamic will return a dynamic kubeclient for the remote cluster.
@@ -56,7 +54,14 @@ type Builder interface {
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
 // ClusterDeployment.
 // The controllerName is needed for metrics.
+// If the ClusterDeployment carries the fake cluster annotation, a fake client will be returned populated with
+// runtime.Objects we need to query for in all our controllers.
 func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
+	if utils.IsFakeCluster(cd) {
+		return &fakeBuilder{
+			urlToUse: activeURL,
+		}
+	}
 	return &builder{
 		c:              c,
 		cd:             cd,
@@ -89,67 +94,6 @@ func ConnectToRemoteCluster(
 	return
 }
 
-// ConnectToRemoteClusterWithDynamicClient connects to a remote cluster using the specified builder and builds a dynamic client.
-// If the ClusterDeployment is marked as unreachable, then no connection will be made.
-// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
-func ConnectToRemoteClusterWithDynamicClient(
-	cd *hivev1.ClusterDeployment,
-	remoteClientBuilder Builder,
-	localClient client.Client,
-	logger log.FieldLogger,
-) (remoteClient dynamic.Interface, unreachable, requeue bool) {
-	var rawRemoteClient interface{}
-	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
-		cd,
-		remoteClientBuilder,
-		localClient,
-		logger,
-		func(builder Builder) (interface{}, error) { return builder.BuildDynamic() },
-	)
-	if unreachable {
-		return
-	}
-	remoteClient = rawRemoteClient.(dynamic.Interface)
-
-	// The dynamic client creation does not include a discovery API call, and thus may not fail even though the
-	// cluster is down. To work around this we do a Get for a resource we expect and return unreachable if we see
-	// an unexpected error.
-	_, err := remoteClient.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "namespaces",
-	}).Get(context.Background(), "kube-system", metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		logger.WithError(err).Info("error getting kube-system namespace, considering cluster unreachable")
-		unreachable = true
-	}
-	return
-}
-
-// ConnectToRemoteClusterWithKubeClient connects to a remote cluster using the specified builder and builds a kubernetes client.
-// If the ClusterDeployment is marked as unreachable, then no connection will be made.
-// If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
-func ConnectToRemoteClusterWithKubeClient(
-	cd *hivev1.ClusterDeployment,
-	remoteClientBuilder Builder,
-	localClient client.Client,
-	logger log.FieldLogger,
-) (remoteClient kubeclient.Interface, unreachable, requeue bool) {
-	var rawRemoteClient interface{}
-	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
-		cd,
-		remoteClientBuilder,
-		localClient,
-		logger,
-		func(builder Builder) (interface{}, error) { return builder.BuildKubeClient() },
-	)
-	if unreachable {
-		return
-	}
-	remoteClient = rawRemoteClient.(kubeclient.Interface)
-	return
-}
-
 func connectToRemoteCluster(
 	cd *hivev1.ClusterDeployment,
 	remoteClientBuilder Builder,
@@ -179,6 +123,11 @@ func connectToRemoteCluster(
 
 // InitialURL returns the initial API URL for the ClusterDeployment.
 func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
+
+	if utils.IsFakeCluster(cd) {
+		return "https://example.com/veryfakeapi", nil
+	}
+
 	cfg, err := unadulteratedRESTConfig(c, cd)
 	if err != nil {
 		return "", err
@@ -246,25 +195,39 @@ const (
 	secondaryURL
 )
 
-func (b *builder) Build() (client.Client, error) {
-	cfg, err := b.RESTConfig()
-	if err != nil {
+func buildScheme() (*runtime.Scheme, error) {
+	scheme := runtime.NewScheme()
+
+	if err := machineapi.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 
-	scheme, err := machineapi.SchemeBuilder.Build()
-	if err != nil {
+	if err := autoscalingv1.SchemeBuilder.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-
-	autoscalingv1.SchemeBuilder.AddToScheme(scheme)
-	autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme)
+	if err := autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 
 	if err := openshiftapiv1.Install(scheme); err != nil {
 		return nil, err
 	}
 
 	if err := routev1.Install(scheme); err != nil {
+		return nil, err
+	}
+
+	return scheme, nil
+}
+
+func (b *builder) Build() (client.Client, error) {
+	cfg, err := b.RESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	scheme, err := buildScheme()
+	if err != nil {
 		return nil, err
 	}
 

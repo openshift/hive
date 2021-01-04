@@ -188,6 +188,8 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 
+	clusterOperators := &configv1.ClusterOperatorList{}
+
 	remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
 		cd,
 		r.remoteClusterAPIClientBuilder(cd),
@@ -198,7 +200,6 @@ func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{Requeue: requeue}, nil
 	}
 
-	clusterOperators := &configv1.ClusterOperatorList{}
 	err = remoteClient.List(context.TODO(), clusterOperators)
 	if err != nil {
 		logger.WithError(err).Error("failed to list target cluster operators")

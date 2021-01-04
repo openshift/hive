@@ -190,6 +190,10 @@ const (
 	// path where we mount in the SSH key for connecting to the bare metal libvirt provisioning host.
 	LibvirtSSHPrivKeyPathEnvVar = "LIBVIRT_SSH_PRIV_KEY_PATH"
 
+	// FakeClusterInstallEnvVar is the environment variable Hive will set for the installmanager pod to request
+	// a fake install.
+	FakeClusterInstallEnvVar = "FAKE_INSTALL"
+
 	// ControlPlaneCertificateSuffix is the suffix used when naming objects having to do control plane certificates.
 	ControlPlaneCertificateSuffix = "cp-certs"
 
@@ -295,9 +299,9 @@ const (
 	// InstallLogsAWSS3BucketEnvVar is the environment variable specifying the S3 bucket to use.
 	InstallLogsAWSS3BucketEnvVar = "HIVE_INSTALL_LOGS_AWS_S3_BUCKET"
 
-	// HiveSyncSetsFakeApplyEnvVar is set to true by the hive-operator when a developer has configured HiveConfig to
-	// fake out all apply operations for simulated scale testing.
-	HiveSyncSetsFakeApplyEnvVar = "HIVE_SYNCSETS_FAKE_APPLY"
+	// HiveFakeClusterAnnotation can be set to true on a cluster deployment to create a fake cluster that never
+	// provisions resources, and all communication with the cluster will be faked.
+	HiveFakeClusterAnnotation = "hive.openshift.io/fake-cluster"
 
 	// ReconcileIDLen is the length of the random strings we generate for contextual loggers in controller
 	// Reconcile functions.

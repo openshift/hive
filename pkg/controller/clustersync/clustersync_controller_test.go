@@ -91,7 +91,7 @@ func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime
 		Client:          c,
 		logger:          logger,
 		reapplyInterval: defaultReapplyInterval,
-		resourceHelperBuilder: func(rc *rest.Config, _ log.FieldLogger) (resource.Helper, error) {
+		resourceHelperBuilder: func(rc *rest.Config, fakeCluster bool, _ log.FieldLogger) (resource.Helper, error) {
 			return mockResourceHelper, nil
 		},
 		remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder {

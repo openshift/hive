@@ -35,6 +35,9 @@ type Builder struct {
 	// Labels are labels to be added to the ClusterDeployment.
 	Labels map[string]string
 
+	// Annotations are annotations to be added to the ClusterDeployment.
+	Annotations map[string]string
+
 	// CloudBuilder encapsulates logic for building the objects for a specific cloud.
 	CloudBuilder CloudBuilder
 
@@ -239,7 +242,7 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        o.Name,
 			Namespace:   o.Namespace,
-			Annotations: map[string]string{},
+			Annotations: o.Annotations,
 			Labels:      o.Labels,
 		},
 		Spec: hivev1.ClusterDeploymentSpec{

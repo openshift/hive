@@ -106,6 +106,8 @@ type InstallManager struct {
 	readClusterMetadata              func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig            func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword              func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error)
+	loadAdminPassword                func(*InstallManager) (string, error)
+	provisionCluster                 func(*InstallManager) error
 	readInstallerLog                 func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error)
 	waitForProvisioningStage         func(*hivev1.ClusterProvision, *InstallManager) error
 	waitForInstallCompleteExecutions int
@@ -169,8 +171,10 @@ func (m *InstallManager) Complete(args []string) error {
 	m.readClusterMetadata = readClusterMetadata
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
 	m.uploadAdminPassword = uploadAdminPassword
+	m.loadAdminPassword = loadAdminPassword
 	m.readInstallerLog = readInstallerLog
 	m.cleanupFailedProvision = cleanupFailedProvision
+	m.provisionCluster = provisionCluster
 	m.waitForProvisioningStage = waitForProvisioningStage
 
 	// Set log level
@@ -199,6 +203,16 @@ func (m *InstallManager) Complete(args []string) error {
 	m.WorkDir = absPath
 	if _, err := os.Stat(m.WorkDir); os.IsNotExist(err) {
 		m.log.WithField("workdir", m.WorkDir).Fatalf("workdir does not exist")
+	}
+
+	// Swap some function implementations if this is flagged to be a fake install:
+	fakeInstall, err := strconv.ParseBool(os.Getenv(constants.FakeClusterInstallEnvVar))
+	if fakeInstall {
+		m.log.Warnf("%s set to true, swapping function implementations to fake an installation",
+			constants.FakeClusterInstallEnvVar)
+		m.loadAdminPassword = fakeLoadAdminPassword
+		m.readClusterMetadata = fakeReadClusterMetadata
+		m.provisionCluster = fakeProvisionCluster
 	}
 
 	return nil
@@ -372,6 +386,7 @@ func (m *InstallManager) Run() error {
 			provision.Spec.Metadata = &runtime.RawExtension{Raw: metadataBytes}
 			provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
 			provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
+
 			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
 			}
@@ -400,7 +415,7 @@ func (m *InstallManager) Run() error {
 		}
 	}
 
-	installErr := m.provisionCluster()
+	installErr := m.provisionCluster(m)
 	if installErr != nil {
 		m.log.WithError(installErr).Error("error running openshift-install, running deprovision to clean up")
 
@@ -421,15 +436,6 @@ func (m *InstallManager) Run() error {
 			m.log.Debug("Unable to find log storage actuator. Disabling gathering logs.")
 		} else {
 			m.gatherLogs(provision, cd, sshKeyPath, sshAgentSetupErr)
-		}
-
-		// TODO: should we timebox this deprovision attempt in the event it gets stuck?
-		if err := m.cleanupFailedInstall(cd, provision); err != nil {
-			// Log the error but continue. It is possible we were not able to clear the infraID
-			// here, but we will attempt this again anyhow when the next job retries. The
-			// goal here is just to minimize running resources in the event of a long wait
-			// until the next retry.
-			m.log.WithError(err).Error("error while trying to deprovision after failed install")
 		}
 	}
 
@@ -691,7 +697,7 @@ func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) erro
 
 // provisionCluster invokes the openshift-install create cluster command to provision resources
 // in the cloud.
-func (m *InstallManager) provisionCluster() error {
+func provisionCluster(m *InstallManager) error {
 
 	m.log.Info("running openshift-install create cluster")
 
@@ -1085,8 +1091,10 @@ func (m *InstallManager) isBootstrapComplete() bool {
 
 func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager) (*corev1.Secret, error) {
 	m.log.Infoln("uploading admin kubeconfig")
-	fullPath := filepath.Join(m.WorkDir, adminKubeConfigRelativePath)
 
+	var kubeconfigSecret *corev1.Secret
+
+	fullPath := filepath.Join(m.WorkDir, adminKubeConfigRelativePath)
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		m.log.WithField("path", fullPath).Error("admin kubeconfig file does not exist")
 		return nil, err
@@ -1098,7 +1106,7 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 		return nil, err
 	}
 
-	kubeconfigSecret := &corev1.Secret{
+	kubeconfigSecret = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterProvisionName),
 			Namespace: m.Namespace,
@@ -1133,23 +1141,36 @@ func uploadAdminKubeconfig(provision *hivev1.ClusterProvision, m *InstallManager
 	return kubeconfigSecret, nil
 }
 
-func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) (*corev1.Secret, error) {
-	m.log.Infoln("uploading admin username/password")
-	fullPath := filepath.Join(m.WorkDir, adminPasswordRelativePath)
+func loadAdminPassword(m *InstallManager) (string, error) {
+	m.log.Infoln("loading admin password")
 
+	var password string
+	fullPath := filepath.Join(m.WorkDir, adminPasswordRelativePath)
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		m.log.WithField("path", fullPath).Error("admin password file does not exist")
-		return nil, err
+		return "", err
 	}
 
 	passwordBytes, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin password file")
-		return nil, err
+		return "", err
 	}
 
 	// Need to trim trailing newlines from the password
-	password := strings.TrimSpace(string(passwordBytes))
+	password = strings.TrimSpace(string(passwordBytes))
+
+	return password, nil
+}
+
+func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) (*corev1.Secret, error) {
+	m.log.Infoln("uploading admin username/password")
+
+	// Need to trim trailing newlines from the password
+	password, err := m.loadAdminPassword(m)
+	if err != nil {
+		return nil, err
+	}
 
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

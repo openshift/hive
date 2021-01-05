@@ -82,7 +82,13 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 	}
 
 	completions := int32(1)
-	deadline := int64((24 * time.Hour).Seconds())
+	// make sure the deadline is small enough so that the controller can
+	// react to job failing and provide appropiate status update to the
+	// user.
+	// The cluster version operator that pulls the release image similar to this
+	// job has active deadline of 2 minutes (https://github.com/openshift/cluster-version-operator/blob/84b3884e422739dbbfa33078e62349752b5afa18/pkg/cvo/updatepayload.go#L146)
+	// and that should be good to follow here too.
+	deadline := int64((2 * time.Minute).Seconds())
 	backoffLimit := int32(123456)
 	labels := map[string]string{
 		ImagesetJobLabel:                     "true",

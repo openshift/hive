@@ -32,7 +32,7 @@ spec:
         emptyDir: {}
       containers:
       # By default we will use the latest CI images published from hive master:
-      - image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+      - image: registry.ci.openshift.org/openshift/hive-v4.0:hive
         imagePullPolicy: Always
         name: hive-operator
         resources:

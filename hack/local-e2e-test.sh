@@ -5,10 +5,10 @@ set -e
 # Example script to launch a Hive e2e test on your own cluster
 
 # Image to use for hive operator and controllers
-export HIVE_IMAGE="registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+export HIVE_IMAGE="registry.ci.openshift.org/openshift/hive-v4.0:hive"
 
 # Release image to use. If using the one from CI, your pull secret must include valid creds for api.ci
-export RELEASE_IMAGE="registry.svc.ci.openshift.org/origin/release:4.2"
+export RELEASE_IMAGE="registry.ci.openshift.org/origin/release:4.2"
 
 # Namespace where e2e cluster will be created
 export CLUSTER_NAMESPACE="hive-e2e"

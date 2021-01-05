@@ -32,7 +32,7 @@ LOG_LEVEL ?= debug
 IMG ?= hive-controller:latest
 
 # Image to use when deploying
-DEPLOY_IMAGE ?= registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+DEPLOY_IMAGE ?= registry.ci.openshift.org/openshift/hive-v4.0:hive
 
 GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out vendor/,$(wildcard */))))
 GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
@@ -144,7 +144,7 @@ deploy: install
 	oc create namespace ${HIVE_OPERATOR_NS} || true
 	mkdir -p overlays/deploy
 	cp overlays/template/kustomization.yaml overlays/deploy
-	cd overlays/deploy && kustomize edit set image registry.svc.ci.openshift.org/openshift/hive-v4.0:hive=${DEPLOY_IMAGE} && kustomize edit set namespace ${HIVE_OPERATOR_NS}
+	cd overlays/deploy && kustomize edit set image registry.ci.openshift.org/openshift/hive-v4.0:hive=${DEPLOY_IMAGE} && kustomize edit set namespace ${HIVE_OPERATOR_NS}
 	kustomize build overlays/deploy | oc apply -f -
 	rm -rf overlays/deploy
 	# Create a default basic HiveConfig so the operator will deploy Hive

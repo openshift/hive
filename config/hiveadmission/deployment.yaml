@@ -28,7 +28,7 @@ spec:
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission
-        image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+        image: registry.ci.openshift.org/openshift/hive-v4.0:hive
         imagePullPolicy: Always
         command:
         - "/opt/services/hiveadmission"

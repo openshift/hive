@@ -1,4 +1,4 @@
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.15
+FROM registry.ci.openshift.org/openshift/release:golang-1.15
 
 # setting Git username and email for workaround of
 # https://github.com/jenkinsci/docker/issues/519

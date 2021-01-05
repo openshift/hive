@@ -37,7 +37,7 @@ parameters:
 - name: RELEASE_IMAGE
   displayName: Custom release image in custom ClusterImageSet
   description: Name of custom release image in custom ClusterImageSet. Defaults to latest in CI.
-  value: "registry.svc.ci.openshift.org/openshift/origin-release:v4.0"
+  value: "registry.ci.openshift.org/openshift/origin-release:v4.0"
 
 objects:
 - apiVersion: v1

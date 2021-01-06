@@ -27,6 +27,7 @@ const (
 	dnsAlreadyExistsLog    = "blahblah\naws_route53_record.api_external: [ERR]: Error building changeset: InvalidChangeBatch: [Tried to create resource record set [name='api.jh-stg-2405-2.n6b3.s1.devshift.org.'type='A'] but it already exists]\n\nblahblah"
 	pendingVerificationLog = "blahblah\naws_instance.master.2: Error launching source instance: PendingVerification: Your request for accessing resources in this region is being validated, and you will not be able to launch additional resources in this region until the validation is complete. We will notify you by email once your request has been validated. While normally resolved within minutes, please allow up to 4 hours for this process to complete. If the issue still persists, please let us know by writing to awsa\n\nblahblah"
 	gcpInvalidProjectIDLog = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
+	gcpSSDQUotaLog         = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error waiting for instance to create: Quota 'SSD_TOTAL_GB' exceeded. Limit: 500.0 in region asia-northeast2.\nblahblah"
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -54,6 +55,12 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(gcpInvalidProjectIDLog),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPInvalidProjectID",
+		},
+		{
+			name:           "Escaped single quotes",
+			log:            pointer.StringPtr(gcpSSDQUotaLog),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "GCPQuotaSSDTotalGBExceeded",
 		},
 		{
 			name:           "no log",
@@ -175,6 +182,11 @@ func buildRegexConfigMap() *corev1.ConfigMap {
   - "platform.gcp.project.* invalid project ID"
   installFailingReason: GCPInvalidProjectID
   installFailingMessage: Invalid GCP project ID
+- name: GCPQuotaSSDTotalGBExceeded
+  searchRegexStrings:
+  - "Quota \'SSD_TOTAL_GB\' exceeded"
+  installFailingReason: GCPQuotaSSDTotalGBExceeded
+  installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
 `,
 		},
 	}

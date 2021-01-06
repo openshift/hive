@@ -676,6 +676,7 @@ github.com/ultraware/whitespace
 # github.com/uudashr/gocognit v1.0.1
 github.com/uudashr/gocognit
 # github.com/vmware/govmomi v0.22.2
+## explicit
 github.com/vmware/govmomi
 github.com/vmware/govmomi/nfc
 github.com/vmware/govmomi/object

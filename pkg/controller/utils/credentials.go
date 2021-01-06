@@ -2,6 +2,11 @@ package utils
 
 import (
 	"context"
+	"io/ioutil"
+	"net/url"
+	"os"
+	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -10,7 +15,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift/installer/pkg/types/vsphere"
+	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/soap"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -30,9 +37,34 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 			logger.WithError(err).Error("failed to read in ClusterDeployment's platform creds")
 			return false, err
 		}
+
+		var rootCAFiles []string
+		if cd.Spec.Platform.VSphere.CertificatesSecretRef.Name != "" {
+			certificatesSecret := &corev1.Secret{}
+			certificatesKey := types.NamespacedName{Name: cd.Spec.Platform.VSphere.CertificatesSecretRef.Name, Namespace: cd.Namespace}
+			err := kubeClient.Get(context.TODO(), certificatesKey, certificatesSecret)
+			if err != nil {
+				logger.WithError(err).Error("failed to read in vSphere certificates")
+				return false, err
+			}
+
+			rootCAFiles, err = createRootCAFiles(certificatesSecret)
+			defer func() {
+				for _, filename := range rootCAFiles {
+					os.Remove(filename)
+				}
+			}()
+			if err != nil {
+				logger.WithError(err).Error("failed to create root CA files")
+				return false, err
+			}
+
+		}
+
 		return validateVSphereCredentials(cd.Spec.Platform.VSphere.VCenter,
 			string(secret.Data[constants.UsernameSecretKey]),
 			string(secret.Data[constants.PasswordSecretKey]),
+			rootCAFiles,
 			logger)
 	default:
 		// If we have no platform-specific credentials verification
@@ -42,9 +74,64 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 	}
 }
 
-func validateVSphereCredentials(vcenter, username, password string, logger log.FieldLogger) (bool, error) {
-	_, _, err := vsphere.CreateVSphereClients(context.TODO(), vcenter, username, password)
-	logger.WithError(err).Warn("failed to validate VSphere credentials")
+// createRootCAFiles creates a temporary file for each key/value pair in the Secret's Data.
+// Caller is responsible for cleaning up the created files.
+func createRootCAFiles(certificateSecret *corev1.Secret) ([]string, error) {
+	fileList := []string{}
+	for _, fileContent := range certificateSecret.Data {
+		tmpFile, err := ioutil.TempFile("", "rootcacerts")
+		if err != nil {
+			return fileList, err
+		}
+		defer tmpFile.Close()
+
+		fileList = append(fileList, tmpFile.Name())
+
+		if _, err := tmpFile.Write(fileContent); err != nil {
+			return fileList, err
+		}
+	}
+
+	return fileList, nil
+}
+
+func validateVSphereCredentials(vcenter, username, password string, rootCAFiles []string, logger log.FieldLogger) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// The high-level govmomi client doesn't allow us to set custom CAs early enough
+	// so we need to reproduce a lot of the logic to allow setting things up properly
+	// for the cases where a custom CA is needed.
+	u, err := soap.ParseURL(vcenter)
+	if err != nil {
+		return false, err
+	}
+
+	u.User = url.UserPassword(username, password)
+
+	soapClient := soap.NewClient(u, false)
+
+	if len(rootCAFiles) > 0 {
+		fileList := strings.Join(rootCAFiles, string(os.PathListSeparator))
+		if err := soapClient.SetRootCAs(fileList); err != nil {
+			logger.WithError(err).Error("failed to set vSphere root CAs")
+			return false, err
+		}
+	}
+
+	vimClient, err := vim25.NewClient(ctx, soapClient)
+	if err != nil {
+		logger.WithError(err).Error("failed to create vSphere client")
+		return false, err
+	}
+
+	restClient := rest.NewClient(vimClient)
+	err = restClient.Login(ctx, u.User)
+	if err != nil {
+		logger.WithError(err).Warn("failed to authenticate into vSphere")
+		return false, err
+	}
+
 	return err == nil, nil
 }
 

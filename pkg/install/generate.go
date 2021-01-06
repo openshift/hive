@@ -694,8 +694,8 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 		req.Spec.InfraID,
 	}
 	if req.Spec.Platform.OpenStack.CertificatesSecretRef != nil && req.Spec.Platform.OpenStack.CertificatesSecretRef.Name != "" {
+		args = []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", openStackCADir, strings.Join(append(cmd, args...), " "))}
 		cmd = []string{"/bin/sh", "-c"}
-		args = []string{fmt.Sprintf("cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && update-ca-trust && %s", openStackCADir, strings.Join(args, " "))}
 	}
 	containers := []corev1.Container{
 		{

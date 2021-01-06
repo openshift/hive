@@ -528,7 +528,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		// update SyncSetFailedCondition status condition
-		cdLog.Info("Check if any syncsets Failed")
+		cdLog.Debug("Check if any syncsets are failing")
 		if err := r.setSyncSetFailedCondition(cd, cdLog); err != nil {
 			cdLog.WithError(err).Error("Error updating SyncSetFailedCondition status condition")
 			return reconcile.Result{}, err
@@ -2093,6 +2093,10 @@ func (r *ReconcileClusterDeployment) getFirstProvision(cd *hivev1.ClusterDeploym
 func (r *ReconcileClusterDeployment) adoptProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) error {
 	pLog := cdLog.WithField("provision", provision.Name)
 	cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: provision.Name}
+	if cd.Status.InstallStartedTimestamp == nil {
+		n := metav1.Now()
+		cd.Status.InstallStartedTimestamp = &n
+	}
 	if err := r.Status().Update(context.TODO(), cd); err != nil {
 		pLog.WithError(err).Log(controllerutils.LogLevel(err), "could not adopt provision")
 		return err

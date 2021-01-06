@@ -53,6 +53,11 @@ data:
       - "platform.gcp.type: Invalid value:.* instance type.* not found]"
       installFailingReason: GCPInstanceTypeNotFound
       installFailingMessage: GCP instance type not found
+    - name: GCPPreconditionFailed
+      searchRegexStrings:
+      - "googleapi: Error 412"
+      installFailingReason: GCPPreconditionFailed
+      installFailingMessage: GCP Precondition Failed
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:

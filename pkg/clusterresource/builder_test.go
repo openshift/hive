@@ -82,6 +82,7 @@ func createTestBuilder() *Builder {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
+		Annotations: map[string]string{},
 		InstallerManifests: map[string][]byte{
 			fakeManifestFile: []byte(fakeManifestFileContents),
 		},

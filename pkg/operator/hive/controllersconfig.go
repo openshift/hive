@@ -18,10 +18,6 @@ const (
 	// hiveControllersConfigMapName is the name of the configmap to store the
 	// configurations like goroutines, qps, burst etc. for different hive controllers
 	hiveControllersConfigMapName = "hive-controllers-config"
-
-	// hiveConfigHashAnnotation is annotation on hivedeployment that contains
-	// the hash of the contents of the hive-controllers-config configmap
-	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
 )
 
 func (r *ReconcileHiveConfig) deployHiveControllersConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {

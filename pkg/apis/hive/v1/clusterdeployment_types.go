@@ -295,6 +295,10 @@ const (
 	// (ie manageDNS==true) has not yet indicated that the DNS zone is successfully responding to queries.
 	DNSNotReadyCondition ClusterDeploymentConditionType = "DNSNotReady"
 
+	// InstallImagesResolvedCondition indicates that the the install images for the clusterDeployment
+	// have been not been resolved. This usually includes the installer and OpenShift cli images.
+	InstallImagesNotResolvedCondition ClusterDeploymentConditionType = "InstallImagesNotResolved"
+
 	// ProvisionFailedCondition indicates that a provision failed
 	ProvisionFailedCondition ClusterDeploymentConditionType = "ProvisionFailed"
 

@@ -88,10 +88,12 @@ metadata:
   name: hive-clustersync
   namespace: hive
   labels:
-    app: hive-clustersync
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
 spec:
   selector:
-    app: hive-clustersync
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
   ports:
   - name: metrics
     port: 2112
@@ -122,14 +124,20 @@ var _configClustersyncStatefulsetYaml = []byte(`apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: hive-clustersync
+  namespace: hive
+  labels:
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
 spec:
   selector:
     matchLabels:
-      app: hive-clustersync
+      control-plane: clustersync
+      controller-tools.k8s.io: "1.0"
   template:
     metadata:
       labels:
-        app: hive-clustersync
+        control-plane: clustersync
+        controller-tools.k8s.io: "1.0"
     spec:
       topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
       - maxSkew: 1
@@ -137,11 +145,12 @@ spec:
         whenUnsatisfiable: DoNotSchedule
         labelSelector:
           matchLabels:
-            app: hive-clustersync
+            control-plane: clustersync
+            controller-tools.k8s.io: "1.0"
       serviceAccount: hive-controllers
       serviceAccountName: hive-controllers
       containers:
-      - name: hive-clustersync
+      - name: clustersync
         resources:
           requests:
             cpu: 50m
@@ -397,7 +406,7 @@ spec:
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission
-        image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+        image: registry.ci.openshift.org/openshift/hive-v4.0:hive
         imagePullPolicy: Always
         command:
         - "/opt/services/hiveadmission"
@@ -780,7 +789,7 @@ spec:
         emptyDir: {}
       containers:
       # By default we will use the latest CI images published from hive master:
-      - image: registry.svc.ci.openshift.org/openshift/hive-v4.0:hive
+      - image: registry.ci.openshift.org/openshift/hive-v4.0:hive
         imagePullPolicy: Always
         name: manager
         resources:
@@ -1568,6 +1577,11 @@ data:
       - "platform.gcp.type: Invalid value:.* instance type.* not found]"
       installFailingReason: GCPInstanceTypeNotFound
       installFailingMessage: GCP instance type not found
+    - name: GCPPreconditionFailed
+      searchRegexStrings:
+      - "googleapi: Error 412"
+      installFailingReason: GCPPreconditionFailed
+      installFailingMessage: GCP Precondition Failed
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:

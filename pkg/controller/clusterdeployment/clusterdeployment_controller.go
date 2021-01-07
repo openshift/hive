@@ -1125,6 +1125,11 @@ func (r *ReconcileClusterDeployment) statusUpdate(cd *hivev1.ClusterDeployment, 
 	return err
 }
 
+const (
+	imagesResolvedReason = "ImagesResolved"
+	imagesResolvedMsg    = "Images required for cluster deployment installations are resolved"
+)
+
 func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (*reconcile.Result, error) {
 	areImagesResolved := cd.Status.InstallerImage != nil && cd.Status.CLIImage != nil
 
@@ -1136,7 +1141,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	// The job does not exist. If the images have been resolved, continue reconciling. Otherwise, create the job.
 	case apierrors.IsNotFound(err):
 		if areImagesResolved {
-			return nil, nil
+			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName)
@@ -1175,7 +1180,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	// If the images were not resolved, requeue and wait for the delete to complete.
 	case !existingJob.DeletionTimestamp.IsZero():
 		if areImagesResolved {
-			return nil, nil
+			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 		jobLog.Debug("imageset job is being deleted. Will recreate once deleted")
 		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, err
@@ -1193,8 +1198,23 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			return nil, err
 		}
 		if areImagesResolved {
-			return nil, nil
+			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
+
+		// the job has failed to update the images and therefore
+		// we need to update the InstallImagesResolvedCondition to reflect why it failed.
+		for _, jcond := range existingJob.Status.Conditions {
+			if jcond.Type != batchv1.JobFailed {
+				continue
+			}
+
+			msg := fmt.Sprintf("The job %s/%s to resolve the image failed because of (%s) %s",
+				existingJob.Namespace, existingJob.Name,
+				jcond.Reason, jcond.Message,
+			)
+			return &reconcile.Result{}, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionTrue, "JobToResolveImagesFailed", msg, cdLog)
+		}
+
 		return &reconcile.Result{}, nil
 
 	// The job exists and is in progress. Wait for the job to finish before doing any more reconciliation.
@@ -1202,6 +1222,22 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		jobLog.Debug("job exists and is in progress")
 		return &reconcile.Result{}, nil
 	}
+}
+
+func (r *ReconcileClusterDeployment) setInstallImagesNotResolvedCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
+	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.InstallImagesNotResolvedCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange)
+	if !changed {
+		return nil
+	}
+	cd.Status.Conditions = conditions
+	cdLog.Debugf("setting InstallImagesNotResolvedCondition to %v", status)
+	return r.Status().Update(context.TODO(), cd)
 }
 
 func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {

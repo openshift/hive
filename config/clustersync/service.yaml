@@ -4,10 +4,12 @@ metadata:
   name: hive-clustersync
   namespace: hive
   labels:
-    app: hive-clustersync
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
 spec:
   selector:
-    app: hive-clustersync
+    control-plane: clustersync
+    controller-tools.k8s.io: "1.0"
   ports:
   - name: metrics
     port: 2112

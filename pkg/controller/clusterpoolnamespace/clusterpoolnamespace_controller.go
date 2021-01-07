@@ -147,6 +147,18 @@ func (r *ReconcileClusterPoolNamespace) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{}, nil
 	}
 
+	someCleanupDone, err := r.cleanupPreviouslyClaimedClusterDeployments(cdList, logger)
+	switch {
+	case someCleanupDone && err != nil:
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error cleaning up some clusters")
+		return reconcile.Result{RequeueAfter: durationBetweenDeletingClusterDeploymentChecks}, err
+	case err != nil:
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error cleaning up some clusters")
+		return reconcile.Result{}, err
+	case someCleanupDone:
+		return reconcile.Result{RequeueAfter: durationBetweenDeletingClusterDeploymentChecks}, nil
+	}
+
 	// If all of the ClusterDeployments have been deleted, then we need to due a Requeue After since the watch will
 	// not trigger when the ClusterDeployment is finally removed from storage.
 	for _, cd := range cdList.Items {
@@ -158,4 +170,48 @@ func (r *ReconcileClusterPoolNamespace) Reconcile(request reconcile.Request) (re
 
 	logger.Debug("all ClusterDeployments deleted; waiting longer for ClusterDeployments to be removed from storage")
 	return reconcile.Result{RequeueAfter: durationBetweenDeletingClusterDeploymentChecks}, nil
+}
+
+func (r *ReconcileClusterPoolNamespace) cleanupPreviouslyClaimedClusterDeployments(cdList *hivev1.ClusterDeploymentList, logger log.FieldLogger) (bool, error) {
+	poolKey := clusterPoolKey(&cdList.Items[0])
+	if poolKey == nil {
+		// since clusterpool creates a namespace for hosting clusterdeployments
+		// it is safe to assume that either all clusterdeployments are of a pool
+		// or none are.
+		return false, nil
+	}
+
+	clp := &hivev1.ClusterPool{}
+	err := r.Get(context.TODO(), *poolKey, clp)
+	if !apierrors.IsNotFound(err) {
+		// we only care about cleaning up when the pool no longer exists.
+		return false, nil
+	}
+
+	logger.Info("pool not found so start cleanup of previously claimed but not required anymore clusters.")
+	someCleanupDone := false
+	for idx := range cdList.Items {
+		if cdList.Items[idx].DeletionTimestamp != nil {
+			continue
+		}
+		if !controllerutils.IsClaimedClusterMarkedForRemoval(&cdList.Items[idx]) {
+			continue
+		}
+		someCleanupDone = true
+
+		logger := logger.WithField("cluster", cdList.Items[idx].Name)
+		logger.Info("deleting cluster deployment for previous claim")
+		if err := r.Client.Delete(context.Background(), &cdList.Items[idx]); err != nil {
+			logger.WithError(err).Error("error deleting cluster deployment")
+			return someCleanupDone, err
+		}
+	}
+	return someCleanupDone, nil
+}
+
+func clusterPoolKey(cd *hivev1.ClusterDeployment) *types.NamespacedName {
+	if cd.Spec.ClusterPoolRef == nil {
+		return nil
+	}
+	return &types.NamespacedName{Namespace: cd.Spec.ClusterPoolRef.Namespace, Name: cd.Spec.ClusterPoolRef.PoolName}
 }

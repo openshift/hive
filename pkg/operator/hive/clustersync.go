@@ -1,15 +1,12 @@
 package hive
 
 import (
-	"strconv"
-
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -80,21 +77,6 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 			return err
 		}
 		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
-	}
-
-	if _, ok := hiveconfig.Annotations[fakeAppliesAnnotation]; ok {
-		fakeApplies, err := strconv.ParseBool(hiveconfig.Annotations[fakeAppliesAnnotation])
-		if err != nil {
-			hLog.WithError(err).Errorf("unable to parse %s as a boolean", fakeAppliesAnnotation)
-			return err
-		}
-		if fakeApplies {
-			hLog.Warnf("%s specified, configuring hive to fake all resource helper apply/delete operations", fakeAppliesAnnotation)
-			hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
-				Name:  hiveconstants.HiveSyncSetsFakeApplyEnvVar,
-				Value: "true",
-			})
-		}
 	}
 
 	if hiveconfig.Spec.MaintenanceMode != nil && *hiveconfig.Spec.MaintenanceMode {

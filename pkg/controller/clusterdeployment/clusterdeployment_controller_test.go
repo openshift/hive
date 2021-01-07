@@ -479,6 +479,54 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "failed image should set InstallImagesNotResolved condition on clusterdeployment",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testCompletedFailedImageSetJob(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.InstallImagesNotResolvedCondition, "JobToResolveImagesFailed")
+
+			},
+		},
+		{
+			name: "clear InstallImagesNotResolved condition on success",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image")
+					cd.Status.CLIImage = pointer.StringPtr("test-cli-image")
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Status.Conditions = []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.InstallImagesNotResolvedCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  "test-reason",
+						Message: "test-message",
+					}}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testCompletedImageSetJob(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionFalse)
+			},
+		},
+		{
 			name: "Delete imageset job when complete",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -2424,6 +2472,23 @@ func testCompletedImageSetJob() *batchv1.Job {
 			Conditions: []batchv1.JobCondition{{
 				Type:   batchv1.JobComplete,
 				Status: corev1.ConditionTrue,
+			}},
+		},
+	}
+}
+
+func testCompletedFailedImageSetJob() *batchv1.Job {
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      imageSetJobName,
+			Namespace: testNamespace,
+		},
+		Status: batchv1.JobStatus{
+			Conditions: []batchv1.JobCondition{{
+				Type:    batchv1.JobFailed,
+				Status:  corev1.ConditionTrue,
+				Reason:  "ImagePullBackoff",
+				Message: "The pod failed to start because one the containers did not start",
 			}},
 		},
 	}

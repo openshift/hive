@@ -27,7 +27,8 @@ type ClusterPoolSpec struct {
 	// +optional
 	MaxSize *int32 `json:"maxSize,omitempty"`
 
-	// MaxConcurrent is the maximum number of clusters that will be provisioned or deprovisioned at an time.
+	// MaxConcurrent is the maximum number of clusters that will be provisioned or deprovisioned at an time. This includes the
+	// claimed clusters being deprovisioned.
 	// By default there is no limit.
 	// +optional
 	MaxConcurrent *int32 `json:"maxConcurrent,omitempty"`

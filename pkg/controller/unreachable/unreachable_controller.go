@@ -169,8 +169,9 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	remoteClientBuilder := r.remoteClusterAPIClientBuilder(cd)
 	var unreachableError error
 	updateUnreachable := true
+	var primaryErr error
 	// Attempt to connect to the remote cluster using the preferred API URL.
-	_, primaryErr := remoteClientBuilder.UsePrimaryAPIURL().Build()
+	_, primaryErr = remoteClientBuilder.UsePrimaryAPIURL().Build()
 	if primaryErr != nil {
 		// If the remote cluster is not accessible via the preferred API URL, check if there is a fallback API URL to use.
 		if hasOverride(cd) {

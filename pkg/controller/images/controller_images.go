@@ -14,7 +14,7 @@ const (
 
 	// DefaultHiveImage is the image to use for hive when an image is not specified via the
 	// environment variable
-	DefaultHiveImage = "registry.svc.ci.openshift.org/openshift/hive-v4.0:hive"
+	DefaultHiveImage = "registry.ci.openshift.org/openshift/hive-v4.0:hive"
 
 	// HiveImagePullPolicyEnvVar is the optional environment variable that overrides
 	// the pull policy to use for pulling the hive image. Typically this is the same

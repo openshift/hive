@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
@@ -306,10 +307,15 @@ func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, log
 	}
 
 	// Delete ClusterDeployment
-	if cd.DeletionTimestamp == nil {
+	toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(cd)
+	if cd.DeletionTimestamp == nil && !toRemove {
 		logger.Info("deleting clusterDeployment")
-		if err := r.Delete(context.Background(), cd); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "error deleting ClusterDeployment")
+		if cd.Annotations == nil {
+			cd.Annotations = map[string]string{}
+		}
+		cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation] = "true"
+		if err := r.Update(context.Background(), cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating ClusterDeployment to mark it for deletion")
 			return err
 		}
 	}

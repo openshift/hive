@@ -4,7 +4,7 @@ WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN make build
 
-FROM quay.io/app-sre/centos:7
+FROM quay.io/centos/centos:7
 
 # CentOS images do not get updates as they are meant to mirror ISO content, and thus this update
 # is strongly recommended for security updates.

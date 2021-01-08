@@ -279,6 +279,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 	if err != nil {
 		return reconcile.Result{}, err
 	} else if !proceed {
+		logger.Info("machineSets generator indicated not to proceed, returning")
 		return reconcile.Result{}, nil
 	}
 

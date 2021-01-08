@@ -15,12 +15,13 @@ import (
 )
 
 const (
-	regexConfigMapName = "install-log-regexes"
-	regexDataEntryName = "regexes"
-	unknownReason      = "UnknownError"
-	logMissingMessage  = "Cluster install failed but installer log was not captured"
-	regexBadMessage    = "Cluster install failed but regex configmap to parse for known reasons could not be used"
-	unknownMessage     = "Cluster install failed but no known errors found in logs"
+	regexConfigMapName           = "install-log-regexes"
+	regexDataEntryName           = "regexes"
+	additionalRegexDataEntryName = "additionalRegexes"
+	unknownReason                = "UnknownError"
+	logMissingMessage            = "Cluster install failed but installer log was not captured"
+	regexBadMessage              = "Cluster install failed but regex configmap to parse for known reasons could not be used"
+	unknownMessage               = "Cluster install failed but no known errors found in logs"
 )
 
 // parseInstallLog parses install log to monitor for known issues.
@@ -51,6 +52,16 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 		return unknownReason, regexBadMessage
 	}
 
+	additionalRegexesRaw, _ := regexCM.Data[additionalRegexDataEntryName]
+
+	additionalRegexes := []installLogRegex{}
+	if additionalRegexesRaw != "" {
+		if err := yaml.Unmarshal([]byte(additionalRegexesRaw), &additionalRegexes); err != nil {
+			pLog.WithError(err).Errorf("cannot unmarshal data from %s configmap", regexConfigMapName)
+			return unknownReason, regexBadMessage
+		}
+	}
+
 	pLog.Info("processing new install log")
 
 	// Log each line separately, this brings all our install logs from many namespaces into
@@ -60,7 +71,8 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 	}
 
 	// Scan log contents for known errors
-	for _, ilr := range regexes {
+	combinedRegexes := append(regexes, additionalRegexes...)
+	for _, ilr := range combinedRegexes {
 		ilrLog := pLog.WithField("regexName", ilr.Name)
 		ilrLog.Debug("parsing regex entry")
 		for _, ss := range ilr.SearchRegexStrings {

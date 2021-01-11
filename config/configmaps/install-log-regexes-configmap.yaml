@@ -58,6 +58,11 @@ data:
       - "googleapi: Error 412"
       installFailingReason: GCPPreconditionFailed
       installFailingMessage: GCP Precondition Failed
+    - name: GCPQuotaSSDTotalGBExceeded
+      searchRegexStrings:
+      - "Quota \'SSD_TOTAL_GB\' exceeded"
+      installFailingReason: GCPQuotaSSDTotalGBExceeded
+      installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:

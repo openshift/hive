@@ -103,6 +103,9 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		Namespace: cd.Namespace,
 	}
 	yamlOpts, err := newYamlOptsBuilder(a.kubeClient, credsSecretKey)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "failed to create yamlOpts for openstack client")
+	}
 
 	clientOptions := &clientconfig.ClientOpts{
 		Cloud:    cd.Spec.Platform.OpenStack.Cloud,

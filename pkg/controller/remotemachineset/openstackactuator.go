@@ -1,6 +1,7 @@
 package remotemachineset
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -24,6 +25,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 // OpenStackActuator encapsulates the pieces necessary to be able to generate
@@ -110,6 +112,17 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	clientOptions := &clientconfig.ClientOpts{
 		Cloud:    cd.Spec.Platform.OpenStack.Cloud,
 		YAMLOpts: yamlOpts,
+	}
+
+	if cd.Spec.Platform.OpenStack.CertificatesSecretRef != nil {
+		buf := &bytes.Buffer{}
+		if err := controllerutils.TrustBundleFromSecretToWriter(a.kubeClient, cd.Namespace, cd.Spec.Platform.OpenStack.CertificatesSecretRef.Name, buf); err != nil {
+			return nil, false, errors.Wrap(err, "failed to load trust bundle from CertificatesSecretRef")
+		}
+		if err := yamlOpts.updateTrust(clientOptions.Cloud, buf.Bytes()); err != nil {
+			return nil, false, errors.Wrap(err, "failed to update trust in the yamlOpts")
+		}
+		clientOptions.YAMLOpts = yamlOpts
 	}
 
 	installerMachineSets, err := installosp.MachineSets(
@@ -202,4 +215,14 @@ func (opts *yamlOptsBuilder) LoadSecureCloudsYAML() (map[string]clientconfig.Clo
 
 func (opts *yamlOptsBuilder) LoadPublicCloudsYAML() (map[string]clientconfig.Cloud, error) {
 	return nil, fmt.Errorf("LoadPublicCloudsYAML() not implemented")
+}
+
+func (opts *yamlOptsBuilder) updateTrust(cloud string, trust []byte) error {
+	conf, ok := opts.cloudYaml[cloud]
+	if !ok {
+		return errors.Errorf("no cloud %s found", cloud)
+	}
+	conf.CACertFile = string(trust)
+	opts.cloudYaml[cloud] = conf
+	return nil
 }

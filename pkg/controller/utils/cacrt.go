@@ -2,11 +2,16 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -48,4 +53,24 @@ func AddAdditionalKubeconfigCAs(data []byte) ([]byte, error) {
 		}
 	}
 	return clientcmd.Write(*cfg)
+}
+
+// TrustBundleFromSecretToWriter creates a trust bundle from keys in the secret writing it to a writer. It assumes all the keys
+// have trust bundles in PEM format and writes each one to writer with a newline between each key contents.
+func TrustBundleFromSecretToWriter(c client.Client, secretNamespace, secretName string, w io.Writer) error {
+	s := &corev1.Secret{}
+	err := c.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: secretNamespace}, s)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range s.Data {
+		if _, err := w.Write(v); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(w, "\n"); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -1749,7 +1749,8 @@ func TestDeleteStaleProvisions(t *testing.T) {
 				Client: fakeClient,
 				scheme: scheme.Scheme,
 			}
-			rcd.deleteStaleProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteStaleProvisions"))
+			cd := testClusterDeployment()
+			rcd.deleteStaleProvisions(getProvisions(fakeClient), cd, log.WithField("test", "TestDeleteStaleProvisions"))
 			actualAttempts := []int{}
 			for _, p := range getProvisions(fakeClient) {
 				actualAttempts = append(actualAttempts, p.Spec.Attempt)

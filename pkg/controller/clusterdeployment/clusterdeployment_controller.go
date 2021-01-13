@@ -663,7 +663,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		}
 	}
 
-	r.deleteStaleProvisions(existingProvisions, cdLog)
+	r.deleteStaleProvisions(existingProvisions, cd, cdLog)
 
 	if cd.Spec.ManageDNS {
 		dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
@@ -2101,12 +2101,18 @@ func (r *ReconcileClusterDeployment) adoptProvision(cd *hivev1.ClusterDeployment
 	return nil
 }
 
-func (r *ReconcileClusterDeployment) deleteStaleProvisions(provs []*hivev1.ClusterProvision, cdLog log.FieldLogger) {
+func (r *ReconcileClusterDeployment) deleteStaleProvisions(provs []*hivev1.ClusterProvision, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
 	// Cap the number of existing provisions. Always keep the earliest provision as
 	// it is used to determine the total time that it took to install. Take off
 	// one extra to make room for the new provision being started.
 	amountToDelete := len(provs) - maxProvisions
 	if amountToDelete <= 0 {
+		// Set the metric when all the retries failed, so that we could indicate the provision failed
+		// not only based on the time
+		hivemetrics.MetricClusterDeploymentProvisionOutOfRetries.WithLabelValues(
+			cd.Name,
+			cd.Namespace,
+			hivemetrics.GetClusterDeploymentType(cd)).Set(float64(1))
 		return
 	}
 	cdLog.Infof("Deleting %d old provisions", amountToDelete)

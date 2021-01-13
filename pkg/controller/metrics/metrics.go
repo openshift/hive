@@ -87,6 +87,15 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
+	// MetricClusterDeploymentProvisionOutOfRetries is a prometheus metric to indicate that
+	// all the cluster provision retries are failed.
+	MetricClusterDeploymentProvisionOutOfRetries = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_provision_out_of_retries",
+			Help: "Indicates that the cluster provision failed after the given retry times",
+		},
+		[]string{"cluster_deployment", "namespace", "cluster_type"},
+	)
 	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -130,6 +139,7 @@ func init() {
 	metrics.Registry.MustRegister(metricControllerReconcileTime)
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
+	metrics.Registry.MustRegister(MetricClusterDeploymentProvisionOutOfRetries)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.

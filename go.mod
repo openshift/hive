@@ -16,7 +16,7 @@ require (
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.26.0
 	github.com/google/uuid v1.1.1
-	github.com/gophercloud/utils v0.0.0-20200918191848-da0e919a012a
+	github.com/gophercloud/utils v0.0.0-20210113034859-6f548432055a
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.10

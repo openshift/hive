@@ -345,10 +345,11 @@ github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers
 github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
-# github.com/gophercloud/utils v0.0.0-20200918191848-da0e919a012a
+# github.com/gophercloud/utils v0.0.0-20210113034859-6f548432055a
 ## explicit
 github.com/gophercloud/utils/env
 github.com/gophercloud/utils/gnocchi
+github.com/gophercloud/utils/internal
 github.com/gophercloud/utils/openstack/clientconfig
 # github.com/gostaticanalysis/analysisutil v0.0.0-20190318220348-4088753ea4d3
 github.com/gostaticanalysis/analysisutil

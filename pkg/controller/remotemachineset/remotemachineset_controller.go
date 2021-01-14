@@ -272,11 +272,13 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	remoteMachineSets, err := r.getRemoteMachineSets(remoteClusterAPIClient, logger)
 	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not getRemoteMachineSets")
 		return reconcile.Result{}, err
 	}
 
 	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
 		return reconcile.Result{}, err
 	} else if !proceed {
 		logger.Info("machineSets generator indicated not to proceed, returning")
@@ -285,6 +287,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	switch result, err := r.ensureEnoughReplicas(pool, generatedMachineSets, logger); {
 	case err != nil:
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not ensureEnoughReplicas")
 		return reconcile.Result{}, err
 	case result != nil:
 		return *result, nil
@@ -292,14 +295,17 @@ func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconc
 
 	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger)
 	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
 		return reconcile.Result{}, err
 	}
 
 	if err := r.syncMachineAutoscalers(pool, cd, machineSets, remoteClusterAPIClient, logger); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineAutoscalers")
 		return reconcile.Result{}, err
 	}
 
 	if err := r.syncClusterAutoscaler(pool, cd, remoteClusterAPIClient, logger); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncClusterAutoscaler")
 		return reconcile.Result{}, err
 	}
 

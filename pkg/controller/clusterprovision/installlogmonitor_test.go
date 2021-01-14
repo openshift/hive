@@ -64,10 +64,58 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "GCPQuotaSSDTotalGBExceeded",
 		},
 		{
-			name:           "KubeAPIWaitTimeout from additional regex entries",
-			log:            pointer.StringPtr(kubeAPIWaitTimeoutLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
+			name: "KubeAPIWaitTimeout from additional regex entries",
+			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
+			existing: []runtime.Object{&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      regexConfigMapName,
+					Namespace: constants.DefaultHiveNamespace,
+				},
+				Data: map[string]string{
+					"regexes": `
+- name: DNSAlreadyExists
+  searchRegexStrings:
+  - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
+  installFailingReason: DNSAlreadyExists
+  installFailingMessage: DNS record already exists
+`,
+					"additionalRegexes": `
+- name: KubeAPIWaitTimeout
+  searchRegexStrings:
+  - "waiting for Kubernetes API: context deadline exceeded"
+  installFailingReason: KubeAPIWaitTimeout
+  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+`,
+				},
+			}},
 			expectedReason: "KubeAPIWaitTimeout",
+		},
+		{
+			name: "regexes take precedence over additionalRegexes",
+			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
+			existing: []runtime.Object{&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      regexConfigMapName,
+					Namespace: constants.DefaultHiveNamespace,
+				},
+				Data: map[string]string{
+					"regexes": `
+- name: KubeAPIWaitTimeout
+  searchRegexStrings:
+  - "waiting for Kubernetes API: context deadline exceeded"
+  installFailingReason: KubeAPIWaitTimeoutRegexes
+  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+`,
+					"additionalRegexes": `
+- name: KubeAPIWaitTimeout
+  searchRegexStrings:
+  - "waiting for Kubernetes API: context deadline exceeded"
+  installFailingReason: KubeAPIWaitTimeoutAdditional
+  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+`,
+				},
+			}},
+			expectedReason: "KubeAPIWaitTimeoutRegexes",
 		},
 		{
 			name:           "no log",
@@ -194,13 +242,6 @@ func buildRegexConfigMap() *corev1.ConfigMap {
   - "Quota \'SSD_TOTAL_GB\' exceeded"
   installFailingReason: GCPQuotaSSDTotalGBExceeded
   installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
-`,
-			"additionalRegexes": `
-- name: KubeAPIWaitTimeout
-  searchRegexStrings:
-  - "waiting for Kubernetes API: context deadline exceeded"
-  installFailingReason: KubeAPIWaitTimeout
-  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `,
 		},
 	}

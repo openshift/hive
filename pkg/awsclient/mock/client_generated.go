@@ -101,6 +101,21 @@ func (mr *MockClientMockRecorder) DescribeSubnets(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSubnets", reflect.TypeOf((*MockClient)(nil).DescribeSubnets), arg0)
 }
 
+// DescribeRouteTables mocks base method
+func (m *MockClient) DescribeRouteTables(arg0 *ec2.DescribeRouteTablesInput) (*ec2.DescribeRouteTablesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeRouteTables", arg0)
+	ret0, _ := ret[0].(*ec2.DescribeRouteTablesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeRouteTables indicates an expected call of DescribeRouteTables
+func (mr *MockClientMockRecorder) DescribeRouteTables(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeRouteTables", reflect.TypeOf((*MockClient)(nil).DescribeRouteTables), arg0)
+}
+
 // DescribeSecurityGroups mocks base method
 func (m *MockClient) DescribeSecurityGroups(arg0 *ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error) {
 	m.ctrl.T.Helper()

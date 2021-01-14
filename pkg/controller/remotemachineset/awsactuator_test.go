@@ -97,12 +97,23 @@ func TestAWSActuator(t *testing.T) {
 				func() *hivev1.MachinePool {
 					pool := testMachinePool()
 					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}
+					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "subnet-zone3",
+						"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}
 					return pool
 				}(),
 			},
 			mockAWSClient: func(client *mockaws.MockClient) {
-				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"}, []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"})
+				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"},
+					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"},
+					[]string{"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"subnet-zone2":    false,
+					"subnet-zone3":    false,
+					"pubSubnet-zone1": true,
+					"pubSubnet-zone2": true,
+					"pubSubnet-zone3": true,
+				}, "vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 1,
@@ -146,7 +157,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
-			name:              "more than one subnet for availability zone",
+			name:              "more than one private subnet for availability zone",
 			clusterDeployment: testClusterDeployment(),
 			poolName:          testMachinePool().Name,
 			existing: []runtime.Object{
@@ -158,7 +169,13 @@ func TestAWSActuator(t *testing.T) {
 				}(),
 			},
 			mockAWSClient: func(client *mockaws.MockClient) {
-				mockDescribeSubnets(client, []string{"zone1", "zone1", "zone2"}, []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"})
+				mockDescribeSubnets(client, []string{"zone1", "zone1", "zone2"},
+					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1": false,
+					"subnet-zone2": false,
+					"subnet-zone3": false,
+				}, "vpc-1")
 			},
 			expectedErr: true,
 			expectedCondition: &hivev1.MachinePoolCondition{
@@ -168,7 +185,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
-			name:              "no subnet for availability zone",
+			name:              "no private subnet for availability zone",
 			clusterDeployment: testClusterDeployment(),
 			poolName:          testMachinePool().Name,
 			existing: []runtime.Object{
@@ -180,13 +197,46 @@ func TestAWSActuator(t *testing.T) {
 				}(),
 			},
 			mockAWSClient: func(client *mockaws.MockClient) {
-				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"}, []string{"subnet-zone1", "subnet-zone2"})
+				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"},
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1": false,
+					"subnet-zone2": false,
+				}, "vpc-1")
 			},
 			expectedErr: true,
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
 				Status: corev1.ConditionTrue,
 				Reason: "NoSubnetForAvailabilityZone",
+			},
+		},
+		{
+			name:              "no public subnet for availability zone and private subnet",
+			clusterDeployment: testClusterDeployment(),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				func() *hivev1.MachinePool {
+					pool := testMachinePool()
+					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1"}
+					return pool
+				}(),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeSubnets(client, []string{"zone1", "zone2"},
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"subnet-zone2":    false,
+					"pubSubnet-zone1": true,
+				}, "vpc-1")
+			},
+			expectedErr: true,
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
+				Status: corev1.ConditionTrue,
+				Reason: "InsufficientPublicSubnets",
 			},
 		},
 		{
@@ -386,19 +436,30 @@ func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) {
 	client.EXPECT().DescribeAvailabilityZones(input).Return(output, nil)
 }
 
-func mockDescribeSubnets(client *mockaws.MockClient, zones []string, subnetIDs []string) {
-	idPointers := make([]*string, 0, len(subnetIDs))
-	for _, id := range subnetIDs {
+func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubnetIDs []string, pubSubnetIDs []string, vpcID string) {
+	idPointers := make([]*string, 0, len(privateSubnetIDs)+len(pubSubnetIDs))
+	for _, id := range privateSubnetIDs {
+		idPointers = append(idPointers, aws.String(id))
+	}
+	for _, id := range pubSubnetIDs {
 		idPointers = append(idPointers, aws.String(id))
 	}
 	input := &ec2.DescribeSubnetsInput{
 		SubnetIds: idPointers,
 	}
-	subnets := make([]*ec2.Subnet, len(subnetIDs))
-	for i := range subnetIDs {
+	subnets := make([]*ec2.Subnet, len(privateSubnetIDs)+len(pubSubnetIDs))
+	for i := range privateSubnetIDs {
 		subnets[i] = &ec2.Subnet{
-			SubnetId:         &subnetIDs[i],
+			SubnetId:         &privateSubnetIDs[i],
 			AvailabilityZone: &zones[i],
+			VpcId:            &vpcID,
+		}
+	}
+	for i := range pubSubnetIDs {
+		subnets[len(privateSubnetIDs)+i] = &ec2.Subnet{
+			SubnetId:         &pubSubnetIDs[i],
+			AvailabilityZone: &zones[i],
+			VpcId:            &vpcID,
 		}
 	}
 	output := &ec2.DescribeSubnetsOutput{
@@ -416,6 +477,60 @@ func mockDescribeMissingSubnets(client *mockaws.MockClient, subnetIDs []string) 
 		SubnetIds: idPointers,
 	}
 	client.EXPECT().DescribeSubnets(input).Return(nil, fmt.Errorf("InvalidSubnets"))
+}
+
+func mockDescribeRouteTables(client *mockaws.MockClient, subnets map[string]bool, vpc string) {
+	input := &ec2.DescribeRouteTablesInput{
+		Filters: []*ec2.Filter{{
+			Name:   aws.String("vpc-id"),
+			Values: []*string{aws.String(vpc)},
+		}},
+	}
+
+	output := &ec2.DescribeRouteTablesOutput{
+		RouteTables: constructRouteTables(subnets),
+	}
+
+	client.EXPECT().DescribeRouteTables(input).Return(output, nil)
+}
+
+// Takes a list of subnets with bool indicating if the corresponding subnet is public
+func constructRouteTables(subnets map[string]bool) (routeTablesOut []*ec2.RouteTable) {
+	routeTablesOut = append(routeTablesOut,
+		&ec2.RouteTable{
+			Associations: []*ec2.RouteTableAssociation{{Main: aws.Bool(true)}},
+			Routes: []*ec2.Route{{
+				DestinationCidrBlock: aws.String("0.0.0.0/0"),
+				GatewayId:            aws.String("igw-main"),
+			}},
+		})
+
+	for subnetID := range subnets {
+		routeTablesOut = append(
+			routeTablesOut,
+			constructRouteTable(
+				subnetID,
+				subnets[subnetID],
+			),
+		)
+	}
+	return
+}
+
+func constructRouteTable(subnetID string, public bool) *ec2.RouteTable {
+	var gatewayID string
+	if public {
+		gatewayID = "igw-" + subnetID[len(subnetID)-8:8]
+	} else {
+		gatewayID = "vgw-" + subnetID[len(subnetID)-8:8]
+	}
+	return &ec2.RouteTable{
+		Associations: []*ec2.RouteTableAssociation{{SubnetId: aws.String(subnetID)}},
+		Routes: []*ec2.Route{{
+			DestinationCidrBlock: aws.String("0.0.0.0/0"),
+			GatewayId:            aws.String(gatewayID),
+		}},
+	}
 }
 
 func generateAWSMachineSetName(zone string) string {

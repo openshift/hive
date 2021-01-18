@@ -1474,6 +1474,16 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - "configmaps"
+  resourceNames:
+  - "install-log-regexes"
+  verbs:
+  - get
+  - patch
+  - update
 `)
 
 func configRbacHive_reader_roleYamlBytes() ([]byte, error) {

@@ -22,6 +22,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testcp "github.com/openshift/hive/pkg/test/clusterpool"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 )
 
@@ -31,6 +32,7 @@ const (
 	clusterName          = "test-cluster"
 	kubeconfigSecretName = "kubeconfig-secret"
 	passwordSecretName   = "password-secret"
+	testLeasePoolName    = "test-cluster-pool"
 )
 
 func init() {
@@ -57,6 +59,15 @@ func TestReconcileClusterClaim(t *testing.T) {
 	hivev1.AddToScheme(scheme)
 	rbacv1.AddToScheme(scheme)
 
+	poolBuilder := testcp.FullBuilder(claimNamespace, testLeasePoolName, scheme).
+		GenericOptions(
+			testgeneric.WithFinalizer(finalizer),
+		).
+		Options(
+			testcp.ForAWS("secret", "us-east-1"),
+			testcp.WithBaseDomain("test-domain"),
+			testcp.WithImageSet("test-imageset"),
+		)
 	claimBuilder := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
 		testclaim.WithSubjects(subjects),
 	)
@@ -455,6 +466,193 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 		},
 		{
+			name: "claim with elapsed pool lifetime is deleted as set by pool default",
+			claim: claimBuilder.Build(
+				testclaim.WithPool(testLeasePoolName),
+				testclaim.WithCluster(clusterName),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+				}),
+			),
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithDefaultClaimLifetime(1 * time.Hour)),
+			},
+			expectDeleted: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:    hivev1.ClusterClaimPendingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "ClusterClaimed",
+					Message: "Cluster claimed",
+				},
+				{
+					Type:    hivev1.ClusterRunningCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "Resuming",
+					Message: "Waiting for cluster to be running",
+				},
+			},
+		},
+		{
+			name: "claim with elapsed pool lifetime is deleted as set by pool maximum",
+			claim: claimBuilder.Build(
+				testclaim.WithPool(testLeasePoolName),
+				testclaim.WithCluster(clusterName),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+				}),
+			),
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithMaximumClaimLifetime(1 * time.Hour)),
+			},
+			expectDeleted: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:    hivev1.ClusterClaimPendingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "ClusterClaimed",
+					Message: "Cluster claimed",
+				},
+				{
+					Type:    hivev1.ClusterRunningCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "Resuming",
+					Message: "Waiting for cluster to be running",
+				},
+			},
+		},
+		{
+			name: "claim with elapsed smaller lifetime is deleted, where pool maximum is smaller",
+			claim: claimBuilder.Build(
+				testclaim.WithPool(testLeasePoolName),
+				testclaim.WithCluster(clusterName),
+				testclaim.WithLifetime(2*time.Hour),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+				}),
+			),
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithMaximumClaimLifetime(1 * time.Hour)),
+			},
+			expectDeleted: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:    hivev1.ClusterClaimPendingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "ClusterClaimed",
+					Message: "Cluster claimed",
+				},
+				{
+					Type:    hivev1.ClusterRunningCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "Resuming",
+					Message: "Waiting for cluster to be running",
+				},
+			},
+		},
+		{
+			name: "claim with elapsed smaller lifetime is deleted, where pool maximum is smaller than default",
+			claim: claimBuilder.Build(
+				testclaim.WithPool(testLeasePoolName),
+				testclaim.WithCluster(clusterName),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+				}),
+			),
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithDefaultClaimLifetime(2*time.Hour), testcp.WithMaximumClaimLifetime(1*time.Hour)),
+			},
+			expectDeleted: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:    hivev1.ClusterClaimPendingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "ClusterClaimed",
+					Message: "Cluster claimed",
+				},
+				{
+					Type:    hivev1.ClusterRunningCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "Resuming",
+					Message: "Waiting for cluster to be running",
+				},
+			},
+		},
+		{
+			name: "claim with elapsed smaller lifetime is deleted, where claim is smaller",
+			claim: claimBuilder.Build(
+				testclaim.WithPool(testLeasePoolName),
+				testclaim.WithCluster(clusterName),
+				testclaim.WithLifetime(1*time.Hour),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Type:               hivev1.ClusterClaimPendingCondition,
+					Status:             corev1.ConditionFalse,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+				}),
+			),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionTrue,
+				}),
+			),
+			existing: []runtime.Object{
+				poolBuilder.Build(testcp.WithMaximumClaimLifetime(2 * time.Hour)),
+			},
+			expectDeleted: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:    hivev1.ClusterClaimPendingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "ClusterClaimed",
+					Message: "Cluster claimed",
+				},
+				{
+					Type:    hivev1.ClusterRunningCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  "Resuming",
+					Message: "Waiting for cluster to be running",
+				},
+			},
+		},
+		{
 			name: "claim with non-elapsed lifetime is not deleted",
 			claim: claimBuilder.Build(
 				testclaim.WithCluster(clusterName),
@@ -617,6 +815,88 @@ func TestReconcileClusterClaim(t *testing.T) {
 				assert.True(t, apierrors.IsNotFound(getRoleError), "expected no role")
 				assert.True(t, apierrors.IsNotFound(getRoleBindingError), "expected no role binding")
 			}
+		})
+	}
+}
+
+func Test_getClaimLifetime(t *testing.T) {
+	cases := []struct {
+		name string
+
+		defaultLifetime *metav1.Duration
+		maximumLifetime *metav1.Duration
+		claimLifetime   *metav1.Duration
+
+		expected *metav1.Duration
+	}{{
+		name: "no lifetime set",
+
+		expected: nil,
+	}, {
+		name:          "claim lifetime set",
+		claimLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}, {
+		name:            "no claim lifetime set, but default for pool",
+		defaultLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}, {
+		name:            "claim lifetime set, and default for pool",
+		defaultLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+		claimLifetime:   &metav1.Duration{Duration: 3 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 3 * time.Hour},
+	}, {
+		name:            "maximum pool lifetime set",
+		maximumLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}, {
+		name:            "claim lifetime set, and maximum pool lifetime set to higher",
+		maximumLifetime: &metav1.Duration{Duration: 2 * time.Hour},
+		claimLifetime:   &metav1.Duration{Duration: 1 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}, {
+		name:            "claim lifetime set, and maximum pool lifetime set to lower",
+		maximumLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+		claimLifetime:   &metav1.Duration{Duration: 2 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}, {
+		name:            "default lifetime set, and maximum pool lifetime set to lower",
+		defaultLifetime: &metav1.Duration{Duration: 2 * time.Hour},
+		maximumLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}, {
+		name:            "default lifetime set, and maximum pool lifetime set to higher",
+		defaultLifetime: &metav1.Duration{Duration: 1 * time.Hour},
+		maximumLifetime: &metav1.Duration{Duration: 2 * time.Hour},
+
+		expected: &metav1.Duration{Duration: 1 * time.Hour},
+	}}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			var poolLifetime *hivev1.ClusterPoolClaimLifetime
+			if test.defaultLifetime != nil {
+				if poolLifetime == nil {
+					poolLifetime = &hivev1.ClusterPoolClaimLifetime{}
+				}
+				poolLifetime.Default = test.defaultLifetime
+			}
+			if test.maximumLifetime != nil {
+				if poolLifetime == nil {
+					poolLifetime = &hivev1.ClusterPoolClaimLifetime{}
+				}
+				poolLifetime.Maximum = test.maximumLifetime
+			}
+
+			got := getClaimLifetime(poolLifetime, test.claimLifetime)
+			assert.Equal(t, test.expected, got, "expected the lifetimes to match")
 		})
 	}
 }

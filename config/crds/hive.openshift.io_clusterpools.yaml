@@ -56,6 +56,22 @@ spec:
               description: BaseDomain is the base domain to use for all clusters created
                 in this pool.
               type: string
+            claimLifetime:
+              description: ClaimLifetime defines the lifetimes for claims for the
+                cluster pool.
+              properties:
+                default:
+                  description: Default is the default lifetime of the claim when no
+                    lifetime is set on the claim itself.
+                  type: string
+                maximum:
+                  description: Maximum is the maximum lifetime of the claim after
+                    it is assigned a cluster. If the claim still exists when the lifetime
+                    has elapsed, the claim will be deleted by Hive. The lifetime of
+                    a claim is the mimimum of the lifetimes set by the cluster pool
+                    and the claim itself.
+                  type: string
+              type: object
             hibernateAfter:
               description: HibernateAfter will be applied to new ClusterDeployments
                 created for the pool. HibernateAfter will transition clusters in the

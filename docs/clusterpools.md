@@ -146,7 +146,7 @@ spec:
   size: 1
 ```
 
-**Note** When you use installConfigSecretTemplate you will most likely want to disable MachinePools, so that Hive does not reconcile away from the machine config specified in install-config.yaml
+**Note** When using ClusterPools, Hive will by default create a MachinePool for the worker nodes for any ClusterDeployments that are a child of a ClusterPool. When you use an installConfigSecretTemplate that deviates from the MachinePool defaults you will most likely want to disable MachinePools by setting spec.skipMachinePools on the ClusterPool, so that Hive does not reconcile away from the machine config specified in install-config.yaml
 
 ## Time-based scaling of Cluster Pool
 

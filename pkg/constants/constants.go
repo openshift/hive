@@ -315,6 +315,10 @@ const (
 	// that are previously claimed is no longer required and therefore should be removed/deprovisioned and removed
 	// from the pool.
 	ClusterClaimRemoveClusterAnnotation = "hive.openshift.io/remove-claimed-cluster-from-pool"
+
+	// HiveFeatureGatesEnabledEnvVar is the the environment variable specifying the comma separated list of
+	// feature gates that are enabled.
+	HiveFeatureGatesEnabledEnvVar = "HIVE_FEATURE_GATES_ENABLED"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

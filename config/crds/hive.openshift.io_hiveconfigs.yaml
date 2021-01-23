@@ -252,6 +252,33 @@ spec:
                     be removed in the future.'
                   type: boolean
               type: object
+            featureGates:
+              description: FeatureGateSelection allows selecting feature gates for
+                the controller.
+              properties:
+                custom:
+                  description: custom allows the enabling or disabling of any feature.
+                    Because of its nature, this setting cannot be validated.  If you
+                    have any typos or accidentally apply invalid combinations might
+                    cause unknown behavior. featureSet must equal "Custom" must be
+                    set to use this field.
+                  nullable: true
+                  properties:
+                    enabled:
+                      description: enabled is a list of all feature gates that you
+                        want to force on
+                      items:
+                        type: string
+                      type: array
+                  type: object
+                featureSet:
+                  description: featureSet changes the list of features in the cluster.  The
+                    default is empty.  Be very careful adjusting this setting.
+                  enum:
+                  - ""
+                  - Custom
+                  type: string
+              type: object
             globalPullSecretRef:
               description: GlobalPullSecretRef is used to specify a pull secret that
                 will be used globally by all of the cluster deployments. For each

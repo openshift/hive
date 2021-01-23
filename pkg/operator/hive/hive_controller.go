@@ -341,6 +341,13 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	fgConfigHash, err := r.deployFeatureGatesConfigMap(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying feature gates configmap")
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
 	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap, confighash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
@@ -360,7 +367,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap)
+	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)

@@ -40,6 +40,9 @@ spec:
         ports:
         - containerPort: 9443
           protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: hive-feature-gates
         volumeMounts:
         - mountPath: /var/serving-cert
           name: serving-cert

@@ -4,6 +4,19 @@ metadata:
   creationTimestamp: null
   name: clusterclaims.hive.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.clusterPoolName
+    name: Pool
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='Pending')].reason
+    name: Pending
+    type: string
+  - JSONPath: .spec.namespace
+    name: ClusterNamespace
+    type: string
+  - JSONPath: .status.conditions[?(@.type=='ClusterRunning')].reason
+    name: ClusterRunning
+    type: string
   group: hive.openshift.io
   names:
     kind: ClusterClaim

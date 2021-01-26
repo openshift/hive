@@ -14,11 +14,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
+
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -171,6 +173,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		"method":    "validateCreate",
 	})
 
+	if admResp := validatefeatureGates(a.decoder, admissionSpec, contextLogger); admResp != nil {
+		contextLogger.Errorf("object was rejected due to feature gate failures")
+		return admResp
+	}
+
 	newObject := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
@@ -275,6 +282,38 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
+}
+
+func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+	obj := &unstructured.Unstructured{}
+	if err := decoder.DecodeRaw(admissionSpec.Object, obj); err != nil {
+		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result: &metav1.Status{
+				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
+				Message: err.Error(),
+			},
+		}
+	}
+
+	fs := newFeatureSet()
+	contextLogger.WithField("enabled_feature_gates", fs.Enabled).Info("feature gates enabled")
+
+	errs := field.ErrorList{}
+	// To add validation for feature gates use these examples
+	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
+	// 		errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.platform.platformA", "AlphaPlatformAEnabled")...)
+
+	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
+		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &status,
+		}
+	}
+
+	return nil
 }
 
 func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.ErrorList {
@@ -400,6 +439,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		"resource":  admissionSpec.Resource.Resource,
 		"method":    "validateUpdate",
 	})
+
+	if admResp := validatefeatureGates(a.decoder, admissionSpec, contextLogger); admResp != nil {
+		contextLogger.Errorf("object was rejected due to feature gate failures")
+		return admResp
+	}
 
 	newObject := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {

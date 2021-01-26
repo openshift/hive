@@ -5,10 +5,12 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
@@ -37,6 +39,11 @@ const (
 	servingCertSecretHashAnnotation  = "hive.openshift.io/serving-cert-secret-hash"
 )
 
+const (
+	featureGateConfigMapName               = "hive-feature-gates"
+	featureGateConfigMapNameHashAnnotation = "hive.openshift.io/hive-feature-gates-hash"
+)
+
 var webhookAssets = []string{
 	"config/hiveadmission/clusterdeployment-webhook.yaml",
 	"config/hiveadmission/clusterimageset-webhook.yaml",
@@ -47,7 +54,7 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, featureGateConfigHash string) error {
 	hiveNSName := getHiveNamespace(instance)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
@@ -103,6 +110,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	}
 	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
+	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[featureGateConfigMapNameHashAnnotation] = featureGateConfigHash
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 
@@ -265,4 +273,37 @@ func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 		return false, err
 	}
 	return false, nil
+}
+
+func (r *ReconcileHiveConfig) deployFeatureGatesConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {
+	cm := &corev1.ConfigMap{}
+	cm.Name = featureGateConfigMapName
+	cm.Namespace = getHiveNamespace(instance)
+	cm.Data = make(map[string]string)
+
+	cm.Data[constants.HiveFeatureGatesEnabledEnvVar] = ""
+	if fg := instance.Spec.FeatureGates; fg != nil {
+		s, ok := hivev1.FeatureSets[fg.FeatureSet]
+		if ok && s != nil {
+			cm.Data[constants.HiveFeatureGatesEnabledEnvVar] = strings.Join(s.Enabled, ",")
+		}
+		if fg.FeatureSet == hivev1.CustomFeatureSet && fg.Custom != nil {
+			cm.Data[constants.HiveFeatureGatesEnabledEnvVar] = strings.Join(fg.Custom.Enabled, ",")
+		}
+	}
+
+	result, err := util.ApplyRuntimeObjectWithGC(h, cm, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error applying hive-feature-gates configmap")
+		return "", err
+	}
+	hLog.WithField("result", result).Info("hive-feature-gates configmap applied")
+
+	return computeConfigHash(cm), nil
+}
+
+func computeConfigHash(cm *corev1.ConfigMap) string {
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%v", cm.Data)))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

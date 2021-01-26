@@ -1,9 +1,13 @@
 package hive
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -21,8 +25,8 @@ const (
 func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash string) error {
 	asset := assets.MustAsset("config/clustersync/statefulset.yaml")
 	hLog.Debug("reading statefulset")
-	clusterSyncStatefulSet := controllerutils.ReadStatefulsetOrDie(asset)
-	hiveContainer := &clusterSyncStatefulSet.Spec.Template.Spec.Containers[0]
+	newClusterSyncStatefulSet := controllerutils.ReadStatefulsetOrDie(asset)
+	hiveContainer := &newClusterSyncStatefulSet.Spec.Template.Spec.Containers[0]
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {
@@ -62,10 +66,10 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 
 	hiveNSName := getHiveNamespace(hiveconfig)
 
-	if clusterSyncStatefulSet.Spec.Template.Annotations == nil {
-		clusterSyncStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)
+	if newClusterSyncStatefulSet.Spec.Template.Annotations == nil {
+		newClusterSyncStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)
 	}
-	clusterSyncStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
+	newClusterSyncStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	namespacedAssets := []string{
@@ -82,22 +86,59 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	if hiveconfig.Spec.MaintenanceMode != nil && *hiveconfig.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-clustersync replicas to 0")
 		replicas := int32(0)
-		clusterSyncStatefulSet.Spec.Replicas = &replicas
+		newClusterSyncStatefulSet.Spec.Replicas = &replicas
 	} else {
 		// Default replicas to defaultClustersyncReplicas and only change if they specify in hiveconfig.
-		clusterSyncStatefulSet.Spec.Replicas = pointer.Int32Ptr(defaultClustersyncReplicas)
+		newClusterSyncStatefulSet.Spec.Replicas = pointer.Int32Ptr(defaultClustersyncReplicas)
 
 		if hiveconfig.Spec.ControllersConfig != nil {
 			// Set the number of replicas that was given in the hiveconfig
 			clusterSyncControllerConfig, found := getHiveControllerConfig(hivev1.ClustersyncControllerName, hiveconfig.Spec.ControllersConfig.Controllers)
 			if found && clusterSyncControllerConfig.Replicas != nil {
-				clusterSyncStatefulSet.Spec.Replicas = clusterSyncControllerConfig.Replicas
+				newClusterSyncStatefulSet.Spec.Replicas = clusterSyncControllerConfig.Replicas
 			}
 		}
 	}
 
-	clusterSyncStatefulSet.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObjectWithGC(h, clusterSyncStatefulSet, hiveconfig)
+	newClusterSyncStatefulSetSpecHash, err := controllerutils.CalculateStatefulSetSpecHash(newClusterSyncStatefulSet)
+	if err != nil {
+		hLog.WithError(err).Error("error calculating new statefulset hash")
+		return err
+	}
+
+	if newClusterSyncStatefulSet.Annotations == nil {
+		newClusterSyncStatefulSet.Annotations = make(map[string]string, 1)
+	}
+	newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation] = newClusterSyncStatefulSetSpecHash
+
+	existingClusterSyncStatefulSet := &appsv1.StatefulSet{}
+	existingClusterSyncStatefulSetNamespacedName := apitypes.NamespacedName{Name: newClusterSyncStatefulSet.Name, Namespace: newClusterSyncStatefulSet.Namespace}
+	err = r.Get(context.TODO(), existingClusterSyncStatefulSetNamespacedName, existingClusterSyncStatefulSet)
+	if err == nil {
+		if existingClusterSyncStatefulSet.DeletionTimestamp != nil {
+			hLog.Info("clustersync statefulset is in a deleting state. Not reconciling the statefulset")
+			return nil
+		}
+
+		if hasStatefulSetSpecChanged(existingClusterSyncStatefulSet, newClusterSyncStatefulSet, hLog) {
+			// The statefulset spec.selector changed. Trying to apply this new statefulset will error with:
+			//     invalid: spec: Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
+			// The only fix is to delete the statefulset and have the apply below recreate it.
+			hLog.Info("deleting the existing clustersync statefulset because spec has changed")
+			err := r.Delete(context.TODO(), existingClusterSyncStatefulSet)
+			if err != nil {
+				hLog.WithError(err).Error("error deleting statefulset")
+			}
+
+			// No matter what, we want to return:
+			// * On success deleting the sts, we want to return as the delete will trigger another reconcile.
+			// * On error deleting the sts, we don't want to attempt the apply
+			return err
+		}
+	}
+
+	newClusterSyncStatefulSet.Namespace = hiveNSName
+	result, err := util.ApplyRuntimeObjectWithGC(h, newClusterSyncStatefulSet, hiveconfig)
 	if err != nil {
 		hLog.WithError(err).Error("error applying statefulset")
 		return err
@@ -106,4 +147,32 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 
 	hLog.Info("all clustersync components successfully reconciled")
 	return nil
+}
+
+func hasStatefulSetSpecChanged(existingClusterSyncStatefulSet, newClusterSyncStatefulSet *appsv1.StatefulSet, hLog log.FieldLogger) bool {
+	// hash doesn't exist, assume the spec has changed.
+	if existingClusterSyncStatefulSet == nil {
+		hLog.Debug("existing clustersync statefulset is nil, so the spec didn't change.")
+		return false
+	}
+
+	if existingClusterSyncStatefulSet.Annotations == nil {
+		hLog.Debug("existing clustersync statefulset Annotations is nil, assuming spec changed.")
+		return true
+	}
+
+	existingClusterSyncStatefulSetSpecHash, found := existingClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation]
+	if !found {
+		hLog.Debug("existing clustersync statefulset Annotations doesn't contain the spec hash, assuming spec changed.")
+		return true
+	}
+
+	newClusterSyncStatefulSetSpecHash := newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation]
+	if existingClusterSyncStatefulSetSpecHash != newClusterSyncStatefulSetSpecHash {
+		hLog.Debug("existing clustersync statefulset Spec changed")
+		return true
+	}
+
+	hLog.Debug("existing clustersync statefulset Spec hasn't changed")
+	return false
 }

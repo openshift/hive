@@ -155,8 +155,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Monitor changes to DaemonSets:
 	err = c.Watch(&source.Kind{Type: &appsv1.DaemonSet{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.HiveConfig{},
+		OwnerType: &hivev1.HiveConfig{},
 	})
 	if err != nil {
 		return err
@@ -164,8 +163,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Monitor changes to Deployments:
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.HiveConfig{},
+		OwnerType: &hivev1.HiveConfig{},
 	})
 	if err != nil {
 		return err
@@ -173,8 +171,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Monitor changes to Services:
 	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.HiveConfig{},
+		OwnerType: &hivev1.HiveConfig{},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Monitor changes to StatefulSets:
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
+		OwnerType: &hivev1.HiveConfig{},
 	})
 	if err != nil {
 		return err

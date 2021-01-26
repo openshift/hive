@@ -44,6 +44,8 @@ const (
 	// hiveConfigHashAnnotation is annotation on hivedeployment that contains
 	// the hash of the contents of the hive-controllers-config configmap
 	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
+
+	hiveClusterSyncStatefulSetSpecHashAnnotation = "hive.openshift.io/clustersync-statefulset-spec-hash"
 )
 
 var (

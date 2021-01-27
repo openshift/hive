@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1agent "github.com/openshift/hive/pkg/apis/hive/v1/agent"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
@@ -139,6 +140,29 @@ func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.AgentBareMetal = &hivev1agent.Platform{
+		APIVIP:        "127.0.0.1",
+		APIVIPDNSName: "foo.example.com",
+		IngressVIP:    "127.0.0.1",
+	}
+	cd.Spec.InstallStrategy = &hivev1.InstallStrategy{
+		Agent: &hivev1agent.InstallStrategy{
+			ProvisionRequirements: hivev1agent.ProvisionRequirements{
+				ControlPlaneAgents: 3,
+				WorkerAgents:       3,
+				AgentSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+		},
+	}
+	return cd
+}
+
 // Meant to be used to compare new and old as the same values.
 func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
 	return validAWSClusterDeployment()
@@ -187,14 +211,15 @@ func TestClusterDeploymentInitialize(t *testing.T) {
 
 func TestClusterDeploymentValidate(t *testing.T) {
 	cases := []struct {
-		name            string
-		newObject       *hivev1.ClusterDeployment
-		newObjectRaw    []byte
-		oldObject       *hivev1.ClusterDeployment
-		oldObjectRaw    []byte
-		operation       admissionv1beta1.Operation
-		expectedAllowed bool
-		gvr             *metav1.GroupVersionResource
+		name                string
+		newObject           *hivev1.ClusterDeployment
+		newObjectRaw        []byte
+		oldObject           *hivev1.ClusterDeployment
+		oldObjectRaw        []byte
+		operation           admissionv1beta1.Operation
+		expectedAllowed     bool
+		gvr                 *metav1.GroupVersionResource
+		enabledFeatureGates []string
 	}{
 		{
 			name:            "Test valid create",
@@ -836,6 +861,19 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
+		{
+			name:            "Test reject agent install strategy without feature gate enabled",
+			newObject:       validAgentBareMetalClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:                "Test accept agent install strategy with feature gate enabled",
+			newObject:           validAgentBareMetalClusterDeployment(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+		},
 	}
 
 	for _, tc := range cases {
@@ -844,6 +882,11 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			data := ClusterDeploymentValidatingAdmissionHook{
 				decoder:             createDecoder(t),
 				validManagedDomains: validTestManagedDomains,
+				fs: &featureSet{
+					FeatureGatesEnabled: &hivev1.FeatureGatesEnabled{
+						Enabled: tc.enabledFeatureGates,
+					},
+				},
 			}
 
 			if tc.gvr == nil {

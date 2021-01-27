@@ -438,7 +438,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	// Set region label on the ClusterDeployment
-	if region := getClusterRegion(cd); cd.Spec.Platform.BareMetal == nil && cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+	if region := getClusterRegion(cd); cd.Spec.Platform.BareMetal == nil && cd.Spec.Platform.AgentBareMetal == nil &&
+		cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+
 		if cd.Labels == nil {
 			cd.Labels = make(map[string]string)
 		}
@@ -452,6 +454,14 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster region label")
 		}
 		return reconcile.Result{}, err
+	}
+
+	// Return early and stop processing if Agent install strategy is in play. The controllers that
+	// handle this portion of the API currently live in the assisted service repo, rather than hive.
+	// This will hopefully change in the future.
+	if cd.Spec.InstallStrategy != nil && cd.Spec.InstallStrategy.Agent != nil {
+		cdLog.Info("skipping processing of agent install strategy cluster")
+		return reconcile.Result{}, nil
 	}
 
 	if cd.DeletionTimestamp != nil {

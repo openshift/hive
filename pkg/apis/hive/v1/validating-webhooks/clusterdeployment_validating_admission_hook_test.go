@@ -531,6 +531,22 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name: "Test allow modifying installAttemptsLimit",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.InstallAttemptsLimit = new(int32) // zero
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.InstallAttemptsLimit = new(int32) // zero
+				*cd.Spec.InstallAttemptsLimit = 1
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
 			name: "Test invalid wildcard ingress domain",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validClusterDeploymentWithIngress()

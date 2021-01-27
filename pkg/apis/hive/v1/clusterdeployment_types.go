@@ -146,7 +146,8 @@ type Provisioning struct {
 	// InstallConfig. This file will be passed through directly to the installer.
 	// Any version of InstallConfig can be used, provided it can be parsed by the openshift-install
 	// version for the release you are provisioning.
-	InstallConfigSecretRef corev1.LocalObjectReference `json:"installConfigSecretRef"`
+	// +optional
+	InstallConfigSecretRef *corev1.LocalObjectReference `json:"installConfigSecretRef,omitempty"`
 
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.

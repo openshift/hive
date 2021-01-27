@@ -38,7 +38,7 @@ func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",
 			Provisioning: &hivev1.Provisioning{
-				InstallConfigSecretRef: corev1.LocalObjectReference{
+				InstallConfigSecretRef: &corev1.LocalObjectReference{
 					Name: "test-install-config",
 				},
 			},
@@ -160,6 +160,7 @@ func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 	}
+	cd.Spec.Provisioning.InstallConfigSecretRef = nil
 	return cd
 }
 
@@ -247,6 +248,17 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject:       validClusterDeploymentDifferentMutableValue(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
+		},
+		{
+			name:      "Test reject missing InstallConfigSecretRef",
+			oldObject: validAWSClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning.InstallConfigSecretRef = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
 		},
 		{
 			name:      "Test setting installed flag",
@@ -448,9 +460,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name: "Test new clusterdeployment with missing SSH private key name",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validClusterDeploymentWithIngress()
-				cd.Spec.Provisioning = &hivev1.Provisioning{
-					SSHPrivateKeySecretRef: &corev1.LocalObjectReference{},
-				}
+				cd.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{Name: ""}
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
@@ -763,7 +773,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name: "InstallConfig is missing",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
-				cd.Spec.Provisioning.InstallConfigSecretRef.Name = ""
+				cd.Spec.Provisioning.InstallConfigSecretRef = nil
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

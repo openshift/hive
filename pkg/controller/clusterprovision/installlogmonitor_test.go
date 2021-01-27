@@ -66,55 +66,75 @@ func TestParseInstallLog(t *testing.T) {
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",
 			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
+			existing: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      regexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
 - name: DNSAlreadyExists
   searchRegexStrings:
   - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
   installFailingReason: DNSAlreadyExists
   installFailingMessage: DNS record already exists
 `,
-					"additionalRegexes": `
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      additionalRegexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
 - name: KubeAPIWaitTimeout
   searchRegexStrings:
   - "waiting for Kubernetes API: context deadline exceeded"
   installFailingReason: KubeAPIWaitTimeout
   installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `,
+					},
 				},
-			}},
+			},
 			expectedReason: "KubeAPIWaitTimeout",
 		},
 		{
 			name: "regexes take precedence over additionalRegexes",
 			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
+			existing: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      regexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
 - name: KubeAPIWaitTimeout
   searchRegexStrings:
   - "waiting for Kubernetes API: context deadline exceeded"
   installFailingReason: KubeAPIWaitTimeoutRegexes
   installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `,
-					"additionalRegexes": `
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      additionalRegexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
 - name: KubeAPIWaitTimeout
   searchRegexStrings:
   - "waiting for Kubernetes API: context deadline exceeded"
   installFailingReason: KubeAPIWaitTimeoutAdditional
   installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
 `,
+					},
 				},
-			}},
+			},
 			expectedReason: "KubeAPIWaitTimeoutRegexes",
 		},
 		{

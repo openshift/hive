@@ -28,6 +28,8 @@
 // config/rbac/hive_frontend_serviceaccount.yaml
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
+// config/rbac/hive_regex_role.yaml
+// config/rbac/hive_regex_role_binding.yaml
 // config/configmaps/install-log-regexes-configmap.yaml
 package assets
 
@@ -1532,6 +1534,71 @@ func configRbacHive_reader_role_bindingYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configRbacHive_regex_roleYaml = []byte(`# hive-regex is a role intended for hive administrators who need to be able to modify hive install log monitor configuration.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hive-regex
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "configmaps"
+  resourceNames:
+  - "additional-install-log-regexes"
+  verbs:
+  - get
+  - patch
+  - update
+`)
+
+func configRbacHive_regex_roleYamlBytes() ([]byte, error) {
+	return _configRbacHive_regex_roleYaml, nil
+}
+
+func configRbacHive_regex_roleYaml() (*asset, error) {
+	bytes, err := configRbacHive_regex_roleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_regex_role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configRbacHive_regex_role_bindingYaml = []byte(`# NOTE: This binding uses the openshift apigroup as it is the only way to link
+# to an openshift user group. This will not work if running hive on vanilla Kube,
+# but the Hive operator will detect this and skip creation of the binding.
+apiVersion: authorization.openshift.io/v1
+kind: RoleBinding
+metadata:
+  name: hive-regex
+  namespace: hive
+roleRef:
+  name: hive-regex
+groupNames:
+- hive-readers
+subjects:
+- kind: Group
+  name: hive-readers
+`)
+
+func configRbacHive_regex_role_bindingYamlBytes() ([]byte, error) {
+	return _configRbacHive_regex_role_bindingYaml, nil
+}
+
+func configRbacHive_regex_role_bindingYaml() (*asset, error) {
+	bytes, err := configRbacHive_regex_role_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/rbac/hive_regex_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configConfigmapsInstallLogRegexesConfigmapYaml = []byte(`apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -1719,6 +1786,8 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
 	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
 	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
+	"config/rbac/hive_regex_role.yaml":                          configRbacHive_regex_roleYaml,
+	"config/rbac/hive_regex_role_binding.yaml":                  configRbacHive_regex_role_bindingYaml,
 	"config/configmaps/install-log-regexes-configmap.yaml":      configConfigmapsInstallLogRegexesConfigmapYaml,
 }
 
@@ -1802,6 +1871,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_frontend_serviceaccount.yaml": {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},
 			"hive_reader_role.yaml":             {configRbacHive_reader_roleYaml, map[string]*bintree{}},
 			"hive_reader_role_binding.yaml":     {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
+			"hive_regex_role.yaml":              {configRbacHive_regex_roleYaml, map[string]*bintree{}},
+			"hive_regex_role_binding.yaml":      {configRbacHive_regex_role_bindingYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

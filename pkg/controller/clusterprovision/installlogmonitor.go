@@ -16,8 +16,8 @@ import (
 
 const (
 	regexConfigMapName           = "install-log-regexes"
+	additionalRegexConfigMapName = "additional-install-log-regexes"
 	regexDataEntryName           = "regexes"
-	additionalRegexDataEntryName = "additionalRegexes"
 	unknownReason                = "UnknownError"
 	logMissingMessage            = "Cluster install failed but installer log was not captured"
 	regexBadMessage              = "Cluster install failed but regex configmap to parse for known reasons could not be used"
@@ -52,13 +52,21 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 		return unknownReason, regexBadMessage
 	}
 
-	additionalRegexesRaw, _ := regexCM.Data[additionalRegexDataEntryName]
-
+	// Load additional regex configmap, continue anyway if configmap isn't present
 	additionalRegexes := []installLogRegex{}
-	if additionalRegexesRaw != "" {
-		if err := yaml.Unmarshal([]byte(additionalRegexesRaw), &additionalRegexes); err != nil {
-			pLog.WithError(err).Errorf("cannot unmarshal data from %s configmap", regexConfigMapName)
-			return unknownReason, regexBadMessage
+	additionalRegexCM := &corev1.ConfigMap{}
+	if additionalRegexCMErr := r.Get(context.TODO(), types.NamespacedName{Name: additionalRegexConfigMapName, Namespace: controllerutils.GetHiveNamespace()}, additionalRegexCM); additionalRegexCMErr != nil {
+		pLog.WithError(additionalRegexCMErr).Errorf("error loading %s configmap", additionalRegexConfigMapName)
+	} else {
+		additionalRegexesRaw, ok := additionalRegexCM.Data[regexDataEntryName]
+		if !ok {
+			pLog.Errorf("%s configmap does not have a %q data entry", additionalRegexConfigMapName, regexDataEntryName)
+		} else {
+			if additionalRegexesRaw != "" {
+				if err := yaml.Unmarshal([]byte(additionalRegexesRaw), &additionalRegexes); err != nil {
+					pLog.WithError(err).Errorf("cannot unmarshal data from %s configmap", regexConfigMapName)
+				}
+			}
 		}
 	}
 

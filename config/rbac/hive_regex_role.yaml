@@ -1,0 +1,16 @@
+# hive-regex is a role intended for hive administrators who need to be able to modify hive install log monitor configuration.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hive-regex
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "configmaps"
+  resourceNames:
+  - "additional-install-log-regexes"
+  verbs:
+  - get
+  - patch
+  - update

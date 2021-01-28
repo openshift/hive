@@ -147,7 +147,7 @@ func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
 		APIVIPDNSName: "foo.example.com",
 		IngressVIP:    "127.0.0.1",
 	}
-	cd.Spec.InstallStrategy = &hivev1.InstallStrategy{
+	cd.Spec.Provisioning.InstallStrategy = &hivev1.InstallStrategy{
 		Agent: &hivev1agent.InstallStrategy{
 			ProvisionRequirements: hivev1agent.ProvisionRequirements{
 				ControlPlaneAgents: 3,

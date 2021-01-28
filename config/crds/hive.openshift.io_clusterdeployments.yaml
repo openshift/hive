@@ -332,143 +332,6 @@ spec:
                 will attempt to install the cluster.
               format: int32
               type: integer
-            installStrategy:
-              description: InstallStrategy provides configuration for optional alternative
-                install strategies. If not specified openshift-install is the default.
-              properties:
-                agent:
-                  description: Agent is the install strategy configuration for provisioning
-                    a cluster with the Agent based assisted installer.
-                  properties:
-                    networking:
-                      description: Networking is the configuration for the pod network
-                        provider in the cluster.
-                      properties:
-                        clusterNetwork:
-                          description: ClusterNetwork is the list of IP address pools
-                            for pods. Default is 10.128.0.0/14 and a host prefix of
-                            /23.
-                          items:
-                            description: ClusterNetworkEntry is a single IP address
-                              block for pod IP blocks. IP blocks are allocated with
-                              size 2^HostSubnetLength.
-                            properties:
-                              cidr:
-                                description: CIDR is the IP block address pool.
-                                type: string
-                              hostPrefix:
-                                description: HostPrefix is the prefix size to allocate
-                                  to each node from the CIDR. For example, 24 would
-                                  allocate 2^8=256 adresses to each node. If this
-                                  field is not used by the plugin, it can be left
-                                  unset.
-                                format: int32
-                                type: integer
-                            required:
-                            - cidr
-                            type: object
-                          type: array
-                        machineNetwork:
-                          description: MachineNetwork is the list of IP address pools
-                            for machines. This field replaces MachineCIDR, and if
-                            set MachineCIDR must be empty or match the first entry
-                            in the list. Default is 10.0.0.0/16 for all platforms
-                            other than libvirt. For libvirt, the default is 192.168.126.0/24.
-                          items:
-                            description: MachineNetworkEntry is a single IP address
-                              block for node IP blocks.
-                            properties:
-                              cidr:
-                                description: CIDR is the IP block address pool for
-                                  machines within the cluster.
-                                type: string
-                            required:
-                            - cidr
-                            type: object
-                          type: array
-                        serviceNetwork:
-                          description: 'ServiceNetwork is the list of IP address pools
-                            for services. Default is 172.30.0.0/16. NOTE: currently
-                            only one entry is supported.'
-                          items:
-                            type: string
-                          maxItems: 1
-                          type: array
-                      type: object
-                    provisionRequirements:
-                      description: ProvisionRequirements defines configuration for
-                        when the installation is ready to be launched automatically.
-                      properties:
-                        agentSelector:
-                          description: AgentSelector is a label selector used for
-                            associating relevant custom resources with this cluster.
-                            (Agent, BareMetalHost, etc)
-                          properties:
-                            matchExpressions:
-                              description: matchExpressions is a list of label selector
-                                requirements. The requirements are ANDed.
-                              items:
-                                description: A label selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: key is the label key that the selector
-                                      applies to.
-                                    type: string
-                                  operator:
-                                    description: operator represents a key's relationship
-                                      to a set of values. Valid operators are In,
-                                      NotIn, Exists and DoesNotExist.
-                                    type: string
-                                  values:
-                                    description: values is an array of string values.
-                                      If the operator is In or NotIn, the values array
-                                      must be non-empty. If the operator is Exists
-                                      or DoesNotExist, the values array must be empty.
-                                      This array is replaced during a strategic merge
-                                      patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
-                            matchLabels:
-                              additionalProperties:
-                                type: string
-                              description: matchLabels is a map of {key,value} pairs.
-                                A single {key,value} in the matchLabels map is equivalent
-                                to an element of matchExpressions, whose key field
-                                is "key", the operator is "In", and the values array
-                                contains only "value". The requirements are ANDed.
-                              type: object
-                          type: object
-                        controlPlaneAgents:
-                          description: ControlPlaneAgents is the number of matching
-                            approved and ready Agents with the control plane role
-                            required to launch the install. Must be either 1 or 3.
-                          type: integer
-                        workerAgents:
-                          description: WorkerAgents is the minimum number of matching
-                            approved and ready Agents with the worker role required
-                            to launch the install.
-                          type: integer
-                      required:
-                      - agentSelector
-                      - controlPlaneAgents
-                      type: object
-                    sshPublicKey:
-                      description: SSHPublicKey will be added to all cluster hosts
-                        for use in debugging.
-                      type: string
-                  required:
-                  - networking
-                  - provisionRequirements
-                  type: object
-              type: object
             installed:
               description: Installed is true if the cluster has been installed
               type: boolean
@@ -505,7 +368,6 @@ spec:
                   - apiVIP
                   - apiVIPDNSName
                   - ingressVIP
-                  - vipDHCPAllocation
                   type: object
                 aws:
                   description: AWS is the configuration used when installing on AWS.
@@ -781,6 +643,147 @@ spec:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                installStrategy:
+                  description: InstallStrategy provides configuration for optional
+                    alternative install strategies. If not specified openshift-install
+                    is the default.
+                  properties:
+                    agent:
+                      description: Agent is the install strategy configuration for
+                        provisioning a cluster with the Agent based assisted installer.
+                      properties:
+                        networking:
+                          description: Networking is the configuration for the pod
+                            network provider in the cluster.
+                          properties:
+                            clusterNetwork:
+                              description: ClusterNetwork is the list of IP address
+                                pools for pods. Default is 10.128.0.0/14 and a host
+                                prefix of /23.
+                              items:
+                                description: ClusterNetworkEntry is a single IP address
+                                  block for pod IP blocks. IP blocks are allocated
+                                  with size 2^HostSubnetLength.
+                                properties:
+                                  cidr:
+                                    description: CIDR is the IP block address pool.
+                                    type: string
+                                  hostPrefix:
+                                    description: HostPrefix is the prefix size to
+                                      allocate to each node from the CIDR. For example,
+                                      24 would allocate 2^8=256 adresses to each node.
+                                      If this field is not used by the plugin, it
+                                      can be left unset.
+                                    format: int32
+                                    type: integer
+                                required:
+                                - cidr
+                                type: object
+                              type: array
+                            machineNetwork:
+                              description: MachineNetwork is the list of IP address
+                                pools for machines. This field replaces MachineCIDR,
+                                and if set MachineCIDR must be empty or match the
+                                first entry in the list. Default is 10.0.0.0/16 for
+                                all platforms other than libvirt. For libvirt, the
+                                default is 192.168.126.0/24.
+                              items:
+                                description: MachineNetworkEntry is a single IP address
+                                  block for node IP blocks.
+                                properties:
+                                  cidr:
+                                    description: CIDR is the IP block address pool
+                                      for machines within the cluster.
+                                    type: string
+                                required:
+                                - cidr
+                                type: object
+                              type: array
+                            serviceNetwork:
+                              description: 'ServiceNetwork is the list of IP address
+                                pools for services. Default is 172.30.0.0/16. NOTE:
+                                currently only one entry is supported.'
+                              items:
+                                type: string
+                              maxItems: 1
+                              type: array
+                          type: object
+                        provisionRequirements:
+                          description: ProvisionRequirements defines configuration
+                            for when the installation is ready to be launched automatically.
+                          properties:
+                            agentSelector:
+                              description: AgentSelector is a label selector used
+                                for associating relevant custom resources with this
+                                cluster. (Agent, BareMetalHost, etc)
+                              properties:
+                                matchExpressions:
+                                  description: matchExpressions is a list of label
+                                    selector requirements. The requirements are ANDed.
+                                  items:
+                                    description: A label selector requirement is a
+                                      selector that contains values, a key, and an
+                                      operator that relates the key and values.
+                                    properties:
+                                      key:
+                                        description: key is the label key that the
+                                          selector applies to.
+                                        type: string
+                                      operator:
+                                        description: operator represents a key's relationship
+                                          to a set of values. Valid operators are
+                                          In, NotIn, Exists and DoesNotExist.
+                                        type: string
+                                      values:
+                                        description: values is an array of string
+                                          values. If the operator is In or NotIn,
+                                          the values array must be non-empty. If the
+                                          operator is Exists or DoesNotExist, the
+                                          values array must be empty. This array is
+                                          replaced during a strategic merge patch.
+                                        items:
+                                          type: string
+                                        type: array
+                                    required:
+                                    - key
+                                    - operator
+                                    type: object
+                                  type: array
+                                matchLabels:
+                                  additionalProperties:
+                                    type: string
+                                  description: matchLabels is a map of {key,value}
+                                    pairs. A single {key,value} in the matchLabels
+                                    map is equivalent to an element of matchExpressions,
+                                    whose key field is "key", the operator is "In",
+                                    and the values array contains only "value". The
+                                    requirements are ANDed.
+                                  type: object
+                              type: object
+                            controlPlaneAgents:
+                              description: ControlPlaneAgents is the number of matching
+                                approved and ready Agents with the control plane role
+                                required to launch the install. Must be either 1 or
+                                3.
+                              type: integer
+                            workerAgents:
+                              description: WorkerAgents is the minimum number of matching
+                                approved and ready Agents with the worker role required
+                                to launch the install.
+                              type: integer
+                          required:
+                          - agentSelector
+                          - controlPlaneAgents
+                          type: object
+                        sshPublicKey:
+                          description: SSHPublicKey will be added to all cluster hosts
+                            for use in debugging.
+                          type: string
+                      required:
+                      - networking
+                      - provisionRequirements
+                      type: object
+                  type: object
                 installerEnv:
                   description: InstallerEnv are extra environment variables to pass
                     through to the installer. This may be used to enable additional
@@ -924,8 +927,6 @@ spec:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
-              required:
-              - installConfigSecretRef
               type: object
             pullSecretRef:
               description: PullSecretRef is the reference to the secret to use when

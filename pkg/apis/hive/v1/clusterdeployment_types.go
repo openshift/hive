@@ -80,11 +80,6 @@ type ClusterDeploymentSpec struct {
 	// +required
 	Platform Platform `json:"platform"`
 
-	// InstallStrategy provides configuration for optional alternative install strategies.
-	// If not specified openshift-install is the default.
-	// +optional
-	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
-
 	// PullSecretRef is the reference to the secret to use when pulling images.
 	// +optional
 	PullSecretRef *corev1.LocalObjectReference `json:"pullSecretRef,omitempty"`
@@ -178,6 +173,11 @@ type Provisioning struct {
 	// additional features of the installer.
 	// +optional
 	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
+
+	// InstallStrategy provides configuration for optional alternative install strategies.
+	// If not specified openshift-install is the default.
+	// +optional
+	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // ClusterImageSetReference is a reference to a ClusterImageSet

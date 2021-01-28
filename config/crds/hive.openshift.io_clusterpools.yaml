@@ -151,7 +151,6 @@ spec:
                   - apiVIP
                   - apiVIPDNSName
                   - ingressVIP
-                  - vipDHCPAllocation
                   type: object
                 aws:
                   description: AWS is the configuration used when installing on AWS.

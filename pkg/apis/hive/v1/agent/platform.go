@@ -9,5 +9,6 @@ type Platform struct {
 	// IngressVIP is the virtual IP used for cluster ingress traffic.
 	IngressVIP string `json:"ingressVIP"`
 	// VIPDHCPAllocation indicates if virtual IP DHCP allocation mode is enabled.
+	// +optional
 	VIPDHCPAllocation bool `json:"vipDHCPAllocation"`
 }

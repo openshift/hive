@@ -253,7 +253,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 
 		} else if newObject.Spec.Provisioning.InstallConfigSecretRef == nil || newObject.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
 			// InstallConfigSecretRef is not required for agent install strategy
-			if newObject.Spec.InstallStrategy == nil || newObject.Spec.InstallStrategy.Agent == nil {
+			if newObject.Spec.Provisioning.InstallStrategy == nil || newObject.Spec.Provisioning.InstallStrategy.Agent == nil {
 				allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
 			}
 		}
@@ -307,7 +307,7 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 	errs := field.ErrorList{}
 	// To add validation for feature gates use these examples
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
-	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
+	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.provisioning.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()

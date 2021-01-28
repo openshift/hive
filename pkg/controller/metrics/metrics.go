@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -98,6 +99,17 @@ var (
 		},
 		[]string{"controller", "outcome"},
 	)
+	// metricClusterDeploymentSyncsetPaused tracks ClusterDeployments which
+	// are NOT being synchronized by Hive.  This is achieved by the presence
+	// of a hive.openshift.io/syncset-pause="true" annotation.  The value is
+	// a boolean with "1" indicating the annotation is present.
+	metricClusterDeploymentSyncsetPaused = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_syncset_paused",
+			Help: "Whether Hive has paused syncing to the cluster",
+		},
+		[]string{"cluster_deployment", "namespace", "cluster_type"},
+	)
 )
 
 // ReconcileOutcome is used in controller "reconcile complete" log entries, and the metricControllerReconcileTime
@@ -130,6 +142,7 @@ func init() {
 	metrics.Registry.MustRegister(metricControllerReconcileTime)
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
+	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -182,6 +195,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 				return
 			}
 			for _, cd := range clusterDeployments.Items {
+				clusterType := GetClusterDeploymentType(&cd)
 				accumulator.processCluster(&cd)
 
 				if cd.DeletionTimestamp != nil {
@@ -192,8 +206,24 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 					MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
 						cd.Name,
 						cd.Namespace,
-						GetClusterDeploymentType(&cd)).Set(
+						clusterType).Set(
 						time.Since(cd.CreationTimestamp.Time).Seconds())
+				}
+
+				if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {
+					metricClusterDeploymentSyncsetPaused.WithLabelValues(
+						cd.Name,
+						cd.Namespace,
+						clusterType).Set(1.0)
+				} else {
+					cleared := metricClusterDeploymentSyncsetPaused.Delete(map[string]string{
+						"cluster_deployment": cd.Name,
+						"namespace":          cd.Namespace,
+						"cluster_type":       clusterType,
+					})
+					if cleared {
+						mcLog.Infof("cleared metric: %v", metricClusterDeploymentSyncsetPaused)
+					}
 				}
 			}
 

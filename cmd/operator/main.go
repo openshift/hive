@@ -33,6 +33,7 @@ import (
 	"github.com/openshift/hive/pkg/apis"
 	"github.com/openshift/hive/pkg/operator"
 	"github.com/openshift/hive/pkg/operator/hive"
+	utillogrus "github.com/openshift/hive/pkg/util/logrus"
 	"github.com/openshift/hive/pkg/version"
 )
 
@@ -108,6 +109,7 @@ func newRootCommand() *cobra.Command {
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: "0",
+					Logger:             utillogrus.NewLogr(log.StandardLogger()),
 				})
 				if err != nil {
 					log.Fatal(err)

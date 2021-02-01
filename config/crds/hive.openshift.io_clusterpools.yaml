@@ -149,7 +149,6 @@ spec:
                       type: string
                   required:
                   - apiVIP
-                  - apiVIPDNSName
                   - ingressVIP
                   type: object
                 aws:

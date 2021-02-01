@@ -380,7 +380,8 @@ func (o *ClusterPoolOptions) generateClusterPool(builder *clusterresource.Builde
 			APIVersion: hivev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: o.Name,
+			Name:      o.Name,
+			Namespace: o.Namespace,
 		},
 		Spec: hivev1.ClusterPoolSpec{
 			BaseDomain: o.BaseDomain,

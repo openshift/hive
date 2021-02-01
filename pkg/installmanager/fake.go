@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	installertypes "github.com/openshift/installer/pkg/types"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )
 
-const fakeMetadataFormatStr = `{"aws":{"identifier":[{"kubernetes.io/cluster/fake-infraid":"owned"},{"openshiftClusterID":"fake-cluster-id"}],"region":"us-east-1"},"clusterID":"fake-cluster-id","clusterName":"%s","infraID":"fake-infra-id"}`
+const fakeMetadataFormatStr = `{"aws":{"identifier":[{"kubernetes.io/cluster/fake-infraid":"owned"},{"openshiftClusterID":"%s"}],"region":"us-east-1"},"clusterID":"%s","clusterName":"%s","infraID":"fake-infra-id"}`
 
 func fakeLoadAdminPassword(m *InstallManager) (string, error) {
 	m.log.Warn("loading fake admin password")
@@ -18,7 +19,8 @@ func fakeLoadAdminPassword(m *InstallManager) (string, error) {
 
 func fakeReadClusterMetadata(provision *hivev1.ClusterProvision, m *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
 	m.log.Warn("returning fake cluster metadata")
-	metadataBytes := []byte(fmt.Sprintf(fakeMetadataFormatStr, provision.Spec.ClusterDeploymentRef.Name))
+	clusterID := uuid.New().String()
+	metadataBytes := []byte(fmt.Sprintf(fakeMetadataFormatStr, clusterID, clusterID, provision.Spec.ClusterDeploymentRef.Name))
 
 	// Extract and save the cluster ID, this step is critical and a failure here
 	// should abort the install. Note that this is run *before* we begin provisioning cloud

@@ -28,6 +28,7 @@ const (
 	pendingVerificationLog = "blahblah\naws_instance.master.2: Error launching source instance: PendingVerification: Your request for accessing resources in this region is being validated, and you will not be able to launch additional resources in this region until the validation is complete. We will notify you by email once your request has been validated. While normally resolved within minutes, please allow up to 4 hours for this process to complete. If the issue still persists, please let us know by writing to awsa\n\nblahblah"
 	gcpInvalidProjectIDLog = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
 	gcpSSDQUotaLog         = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error waiting for instance to create: Quota 'SSD_TOTAL_GB' exceeded. Limit: 500.0 in region asia-northeast2.\nblahblah"
+	kubeAPIWaitTimeoutLog  = "blahblah\ntime=\"2021-01-03T07:04:44Z\" level=fatal msg=\"waiting for Kubernetes API: context deadline exceeded\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -61,6 +62,80 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(gcpSSDQUotaLog),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPQuotaSSDTotalGBExceeded",
+		},
+		{
+			name: "KubeAPIWaitTimeout from additional regex entries",
+			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
+			existing: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      regexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
+- name: DNSAlreadyExists
+  searchRegexStrings:
+  - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
+  installFailingReason: DNSAlreadyExists
+  installFailingMessage: DNS record already exists
+`,
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      additionalRegexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
+- name: KubeAPIWaitTimeout
+  searchRegexStrings:
+  - "waiting for Kubernetes API: context deadline exceeded"
+  installFailingReason: KubeAPIWaitTimeout
+  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+`,
+					},
+				},
+			},
+			expectedReason: "KubeAPIWaitTimeout",
+		},
+		{
+			name: "regexes take precedence over additionalRegexes",
+			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
+			existing: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      regexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
+- name: KubeAPIWaitTimeout
+  searchRegexStrings:
+  - "waiting for Kubernetes API: context deadline exceeded"
+  installFailingReason: KubeAPIWaitTimeoutRegexes
+  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+`,
+					},
+				},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      additionalRegexConfigMapName,
+						Namespace: constants.DefaultHiveNamespace,
+					},
+					Data: map[string]string{
+						"regexes": `
+- name: KubeAPIWaitTimeout
+  searchRegexStrings:
+  - "waiting for Kubernetes API: context deadline exceeded"
+  installFailingReason: KubeAPIWaitTimeoutAdditional
+  installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+`,
+					},
+				},
+			},
+			expectedReason: "KubeAPIWaitTimeoutRegexes",
 		},
 		{
 			name:           "no log",

@@ -146,7 +146,7 @@ spec:
                     vipDHCPAllocation:
                       description: VIPDHCPAllocation indicates if virtual IP DHCP
                         allocation mode is enabled.
-                      type: boolean
+                      type: string
                   required:
                   - apiVIP
                   - apiVIPDNSName

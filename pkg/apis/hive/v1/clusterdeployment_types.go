@@ -174,8 +174,8 @@ type Provisioning struct {
 	// +optional
 	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
 
-	// InstallStrategy provides configuration for optional alternative install strategies.
-	// If not specified openshift-install is the default.
+	// InstallStrategy provides platform agnostic configuration for the use of alternate install strategies.
+	// Defaults to openshift-install if none specified.
 	// +optional
 	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
 }
@@ -457,7 +457,7 @@ type Platform struct {
 
 	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
 	// to bare metal. Can only be used with the Assisted InstallStrategy.
-	AgentBareMetal *agent.Platform `json:"agentBareMetal,omitempty"`
+	AgentBareMetal *agent.BareMetalPlatform `json:"agentBareMetal,omitempty"`
 }
 
 // InstallStrategy provides configuration for optional alternative install strategies.

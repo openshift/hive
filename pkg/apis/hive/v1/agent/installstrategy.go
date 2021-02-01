@@ -11,11 +11,13 @@ type InstallStrategy struct {
 	// the cluster.
 	Networking Networking `json:"networking"`
 
-	// TODO: consider moving higher into ClusterDeployment in future?
-
 	// SSHPublicKey will be added to all cluster hosts for use in debugging.
 	// +optional
 	SSHPublicKey string `json:"sshPublicKey,omitempty"`
+
+	// AgentSelector is a label selector used for associating relevant custom resources with this cluster.
+	// (Agent, BareMetalHost, etc)
+	AgentSelector metav1.LabelSelector `json:"agentSelector"`
 
 	// ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
 	ProvisionRequirements ProvisionRequirements `json:"provisionRequirements"`
@@ -32,19 +34,12 @@ type ProvisionRequirements struct {
 	// required to launch the install.
 	// +optional
 	WorkerAgents int `json:"workerAgents,omitempty"`
-
-	// AgentSelector is a label selector used for associating relevant custom resources with this cluster.
-	// (Agent, BareMetalHost, etc)
-	AgentSelector metav1.LabelSelector `json:"agentSelector"`
 }
 
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
 	// MachineNetwork is the list of IP address pools for machines.
-	// This field replaces MachineCIDR, and if set MachineCIDR must
-	// be empty or match the first entry in the list.
-	// Default is 10.0.0.0/16 for all platforms other than libvirt.
-	// For libvirt, the default is 192.168.126.0/24.
+	// Default is 10.0.0.0/16.
 	//
 	// +optional
 	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`

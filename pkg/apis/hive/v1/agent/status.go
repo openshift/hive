@@ -26,8 +26,8 @@ type InstallStrategyStatus struct {
 // AgentNetwork contains infromation about a detected host network on the agents for this cluster.
 type AgentNetwork struct {
 
-	// CIDR is the agent network CIDR.
-	CIDR string `json:"cidr,omitempty"`
+	// MachineNetwork contains the agent network CIDR.
+	MachineNetwork MachineNetworkEntry `json:"machineNetwork"`
 
 	// AgentRefs contains the namespace and name of each Agent resource associated with the cluster.
 	AgentRefs []AgentRef `json:"agentRefs"`

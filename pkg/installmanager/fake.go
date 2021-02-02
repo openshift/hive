@@ -19,7 +19,7 @@ func fakeLoadAdminPassword(m *InstallManager) (string, error) {
 
 func fakeReadClusterMetadata(provision *hivev1.ClusterProvision, m *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
 	m.log.Warn("returning fake cluster metadata")
-	clusterID := uuid.New().String()
+	clusterID := "fake-cluster-" + uuid.New().String()
 	metadataBytes := []byte(fmt.Sprintf(fakeMetadataFormatStr, clusterID, clusterID, provision.Spec.ClusterDeploymentRef.Name))
 
 	// Extract and save the cluster ID, this step is critical and a failure here

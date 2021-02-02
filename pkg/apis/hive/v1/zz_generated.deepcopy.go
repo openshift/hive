@@ -2176,7 +2176,7 @@ func (in *InstallStrategyStatus) DeepCopyInto(out *InstallStrategyStatus) {
 	if in.Agent != nil {
 		in, out := &in.Agent, &out.Agent
 		*out = new(agent.InstallStrategyStatus)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	return
 }

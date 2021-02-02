@@ -1017,49 +1017,6 @@ spec:
                   description: Agent defines the observed state of the Agent install
                     strategy for this cluster.
                   properties:
-                    agentNetworks:
-                      description: AgentNetworks provides an aggregate view of all
-                        network CIDRs detected across all Agents. It can be used to
-                        help select a valid machine network in spec if one is not
-                        known beforehand.
-                      items:
-                        description: AgentNetwork contains infromation about a detected
-                          host network on the agents for this cluster.
-                        properties:
-                          agentRefs:
-                            description: AgentRefs contains the namespace and name
-                              of each Agent resource associated with the cluster.
-                            items:
-                              description: AgentRef defines the namespace and name
-                                of an Agent resource.
-                              properties:
-                                name:
-                                  description: Name of the Agent resource.
-                                  type: string
-                                namespace:
-                                  description: Namespace of the Agent resource.
-                                  type: string
-                              required:
-                              - name
-                              - namespace
-                              type: object
-                            type: array
-                          machineNetwork:
-                            description: MachineNetwork contains the agent network
-                              CIDR.
-                            properties:
-                              cidr:
-                                description: CIDR is the IP block address pool for
-                                  machines within the cluster.
-                                type: string
-                            required:
-                            - cidr
-                            type: object
-                        required:
-                        - agentRefs
-                        - machineNetwork
-                        type: object
-                      type: array
                     connectivityMajorityGroups:
                       type: string
                     controlPlaneAgentsDiscovered:

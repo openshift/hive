@@ -40,9 +40,7 @@ type ProvisionRequirements struct {
 type Networking struct {
 	// MachineNetwork is the list of IP address pools for machines.
 	// Default is 10.0.0.0/16.
-	//
-	// +optional
-	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`
+	MachineNetwork []MachineNetworkEntry `json:"machineNetwork"`
 
 	// ClusterNetwork is the list of IP address pools for pods.
 	// Default is 10.128.0.0/14 and a host prefix of /23.

@@ -18,10 +18,10 @@ import (
 	openstackproviderv1alpha1 "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installosp "github.com/openshift/installer/pkg/asset/machines/openstack"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesosp "github.com/openshift/installer/pkg/types/openstack"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -132,7 +132,6 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		a.osImage,
 		workerRole,
 		workerUserDataName,
-		clientOptions,
 	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")

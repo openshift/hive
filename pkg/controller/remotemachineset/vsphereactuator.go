@@ -9,10 +9,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	vsphereprovider "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider"
 	vsphereproviderv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1"
 

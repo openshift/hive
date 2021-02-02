@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"

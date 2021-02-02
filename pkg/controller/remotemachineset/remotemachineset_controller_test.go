@@ -26,9 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	"github.com/openshift/hive/pkg/apis"
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
@@ -816,7 +816,7 @@ func testMachineSpec(machineType string) machineapi.MachineSpec {
 		log.WithError(err).Fatal("error encoding AWS machine provider spec")
 	}
 	return machineapi.MachineSpec{
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: machineapi.ObjectMeta{
 			Labels: map[string]string{
 				"machine.openshift.io/cluster-api-cluster":      testInfraID,
 				"machine.openshift.io/cluster-api-machine-role": machineType,

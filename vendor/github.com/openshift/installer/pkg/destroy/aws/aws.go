@@ -1096,11 +1096,6 @@ func deleteEC2SecurityGroup(ctx context.Context, client *ec2.EC2, id string, log
 }
 
 func deleteEC2SecurityGroupObject(ctx context.Context, client *ec2.EC2, group *ec2.SecurityGroup, logger logrus.FieldLogger) error {
-	if group.GroupName != nil && *group.GroupName == "default" {
-		logger.Debug("Skipping default security group")
-		return nil
-	}
-
 	if len(group.IpPermissions) > 0 {
 		_, err := client.RevokeSecurityGroupIngressWithContext(ctx, &ec2.RevokeSecurityGroupIngressInput{
 			GroupId:       group.GroupId,
@@ -1121,6 +1116,11 @@ func deleteEC2SecurityGroupObject(ctx context.Context, client *ec2.EC2, group *e
 			return errors.Wrap(err, "revoking egress permissions")
 		}
 		logger.Debug("Revoked egress permissions")
+	}
+
+	if group.GroupName != nil && *group.GroupName == "default" {
+		logger.Debug("Skipping default security group")
+		return nil
 	}
 
 	_, err := client.DeleteSecurityGroupWithContext(ctx, &ec2.DeleteSecurityGroupInput{
@@ -1896,6 +1896,9 @@ func deleteRoute53(ctx context.Context, session *session.Session, arn arn.ARN, l
 		Id: aws.String(id),
 	})
 	if err != nil {
+		if err.(awserr.Error).Code() == "NoSuchHostedZone" {
+			return nil
+		}
 		return err
 	}
 

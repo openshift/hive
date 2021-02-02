@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
+	"github.com/openshift/installer/pkg/types/kubevirt"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
@@ -41,6 +42,7 @@ var (
 	// to the user in the interactive wizard.
 	HiddenPlatformNames = []string{
 		baremetal.Name,
+		kubevirt.Name,
 		none.Name,
 	}
 )
@@ -184,6 +186,10 @@ type Platform struct {
 	// Ovirt is the configuration used when installing on oVirt.
 	// +optional
 	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
+
+	// Kubevirt is the configuration used when installing on kubevirt.
+	// +optional
+	Kubevirt *kubevirt.Platform `json:"kubevirt,omitempty"`
 }
 
 // Name returns a string representation of the platform (e.g. "aws" if
@@ -211,6 +217,8 @@ func (p *Platform) Name() string {
 		return vsphere.Name
 	case p.Ovirt != nil:
 		return ovirt.Name
+	case p.Kubevirt != nil:
+		return kubevirt.Name
 	default:
 		return ""
 	}
@@ -247,7 +255,7 @@ type Networking struct {
 	// +optional
 	ServiceNetwork []ipnet.IPNet `json:"serviceNetwork,omitempty"`
 
-	// Deprected types, scheduled to be removed
+	// Deprecated types, scheduled to be removed
 
 	// Deprecated name for MachineCIDRs. If set, MachineCIDRs must
 	// be empty or the first index must match.
@@ -258,7 +266,7 @@ type Networking struct {
 	// +optional
 	DeprecatedType string `json:"type,omitempty"`
 
-	// Depcreated name for ServiceNetwork
+	// Deprecated name for ServiceNetwork
 	// +optional
 	DeprecatedServiceCIDR *ipnet.IPNet `json:"serviceCIDR,omitempty"`
 

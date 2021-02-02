@@ -7,7 +7,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	netext "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions"
 	"github.com/gophercloud/utils/openstack/clientconfig"
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/openstack"
+	openstackdefaults "github.com/openshift/installer/pkg/types/openstack/defaults"
 )
 
 const (
@@ -40,7 +41,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 
 	mpool := pool.Platform.OpenStack
 	platform := config.Platform.OpenStack
-	trunkSupport, err := checkNetworkExtensionAvailability(platform.Cloud, "trunk", nil)
+	trunkSupport, err := checkNetworkExtensionAvailability(platform.Cloud, "trunk")
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +151,7 @@ func generateProvider(clusterID string, platform *openstack.Platform, mpool *ope
 		CloudsSecret:     &corev1.SecretReference{Name: cloudsSecret, Namespace: cloudsSecretNamespace},
 		UserDataSecret:   &corev1.SecretReference{Name: userDataSecret},
 		Networks:         networks,
+		PrimarySubnet:    platform.MachinesSubnet,
 		AvailabilityZone: az,
 		SecurityGroups:   securityGroups,
 		Trunk:            trunkSupport,
@@ -174,13 +176,8 @@ func generateProvider(clusterID string, platform *openstack.Platform, mpool *ope
 	return &spec, nil
 }
 
-func checkNetworkExtensionAvailability(cloud, alias string, opts *clientconfig.ClientOpts) (bool, error) {
-	if opts == nil {
-		opts = &clientconfig.ClientOpts{}
-	}
-	opts.Cloud = cloud
-
-	conn, err := clientconfig.NewServiceClient("network", opts)
+func checkNetworkExtensionAvailability(cloud, alias string) (bool, error) {
+	conn, err := clientconfig.NewServiceClient("network", openstackdefaults.DefaultClientOpts(cloud))
 	if err != nil {
 		return false, err
 	}

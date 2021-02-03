@@ -146,6 +146,9 @@ spec:
                     vipDHCPAllocation:
                       description: VIPDHCPAllocation indicates if virtual IP DHCP
                         allocation mode is enabled.
+                      enum:
+                      - ""
+                      - Enabled
                       type: string
                   required:
                   - apiVIP

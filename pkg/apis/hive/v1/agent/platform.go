@@ -19,6 +19,7 @@ type BareMetalPlatform struct {
 }
 
 // VIPDHCPAllocationType is a valid value for bareMetalPlatform.vipDHCPAllocation.
+// +kubebuilder:validation:Enum="";"Enabled"
 type VIPDHCPAllocationType string
 
 const (

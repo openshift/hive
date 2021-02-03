@@ -363,6 +363,9 @@ spec:
                     vipDHCPAllocation:
                       description: VIPDHCPAllocation indicates if virtual IP DHCP
                         allocation mode is enabled.
+                      enum:
+                      - ""
+                      - Enabled
                       type: string
                   required:
                   - apiVIP
@@ -728,7 +731,7 @@ spec:
                               type: array
                             machineNetwork:
                               description: MachineNetwork is the list of IP address
-                                pools for machines. Default is 10.0.0.0/16.
+                                pools for machines.
                               items:
                                 description: MachineNetworkEntry is a single IP address
                                   block for node IP blocks.

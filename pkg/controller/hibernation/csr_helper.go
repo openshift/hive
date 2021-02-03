@@ -6,7 +6,7 @@ import (
 	certsv1beta1 "k8s.io/api/certificates/v1beta1"
 	kubeclient "k8s.io/client-go/kubernetes"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 //go:generate mockgen -source=./csr_helper.go -destination=./mock/csr_helper_generated.go -package=mock

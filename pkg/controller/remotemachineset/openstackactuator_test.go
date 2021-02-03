@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ospprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1osp "github.com/openshift/hive/pkg/apis/hive/v1/openstack"

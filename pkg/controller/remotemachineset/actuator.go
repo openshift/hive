@@ -3,7 +3,7 @@ package remotemachineset
 import (
 	log "github.com/sirupsen/logrus"
 
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 )

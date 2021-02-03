@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1"
-	machineapi "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	hivev1ovirt "github.com/openshift/hive/pkg/apis/hive/v1/ovirt"

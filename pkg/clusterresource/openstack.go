@@ -80,10 +80,10 @@ func (p *OpenStackCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Ma
 func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
 	ic.Platform = installertypes.Platform{
 		OpenStack: &installeropenstack.Platform{
-			Cloud:           p.Cloud,
-			ExternalNetwork: p.ExternalNetwork,
-			FlavorName:      p.ComputeFlavor,
-			APIFloatingIP:   p.APIFloatingIP,
+			Cloud:                p.Cloud,
+			ExternalNetwork:      p.ExternalNetwork,
+			DeprecatedFlavorName: p.ComputeFlavor,
+			APIFloatingIP:        p.APIFloatingIP,
 		},
 	}
 

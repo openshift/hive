@@ -5,6 +5,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// FeatureGateAgentInstallStrategy enables the use of the alpha ClusterDeployment agent based
+	// install strategy and platforms.
+	FeatureGateAgentInstallStrategy = "AlphaAgentInstallStrategy"
+)
+
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
 

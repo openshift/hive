@@ -1834,7 +1834,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 		Provisioning: &hivev1.Provisioning{
-			InstallConfigSecretRef: corev1.LocalObjectReference{Name: "install-config-secret"},
+			InstallConfigSecretRef: &corev1.LocalObjectReference{Name: "install-config-secret"},
 		},
 		ClusterMetadata: &hivev1.ClusterMetadata{
 			ClusterID:                testClusterID,

@@ -45,11 +45,12 @@ var (
 type ClusterDeploymentValidatingAdmissionHook struct {
 	decoder             *admission.Decoder
 	validManagedDomains []string
+	fs                  *featureSet
 }
 
 // NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
 func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *ClusterDeploymentValidatingAdmissionHook {
-	logger := log.WithField("validating_webhook", "clusterdeployment")
+	logger := log.WithField("validatingWebhook", "clusterdeployment")
 	managedDomains, err := manageddns.ReadManagedDomainsFile()
 	if err != nil {
 		logger.WithError(err).Fatal("Unable to read managedDomains file")
@@ -62,6 +63,7 @@ func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *Cl
 	return &ClusterDeploymentValidatingAdmissionHook{
 		decoder:             decoder,
 		validManagedDomains: domains,
+		fs:                  newFeatureSet(),
 	}
 }
 
@@ -173,7 +175,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		"method":    "validateCreate",
 	})
 
-	if admResp := validatefeatureGates(a.decoder, admissionSpec, contextLogger); admResp != nil {
+	if admResp := validatefeatureGates(a.decoder, admissionSpec, a.fs, contextLogger); admResp != nil {
 		contextLogger.Errorf("object was rejected due to feature gate failures")
 		return admResp
 	}
@@ -249,8 +251,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if newObject.Spec.Provisioning == nil {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "provisioning is required if not installed"))
 
-		} else if newObject.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
+		} else if newObject.Spec.Provisioning.InstallConfigSecretRef == nil || newObject.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+			// InstallConfigSecretRef is not required for agent install strategy
+			if newObject.Spec.Provisioning.InstallStrategy == nil || newObject.Spec.Provisioning.InstallStrategy.Agent == nil {
+				allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
+			}
 		}
 	}
 
@@ -284,7 +289,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 }
 
-func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
 	obj := &unstructured.Unstructured{}
 	if err := decoder.DecodeRaw(admissionSpec.Object, obj); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
@@ -297,13 +302,12 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 		}
 	}
 
-	fs := newFeatureSet()
-	contextLogger.WithField("enabled_feature_gates", fs.Enabled).Info("feature gates enabled")
+	contextLogger.WithField("enabledFeatureGates", fs.Enabled).Info("feature gates enabled")
 
 	errs := field.ErrorList{}
 	// To add validation for feature gates use these examples
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
-	// 		errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.platform.platformA", "AlphaPlatformAEnabled")...)
+	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.provisioning.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()
@@ -403,6 +407,10 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 	if baremetal := platform.BareMetal; baremetal != nil {
 		numberOfPlatforms++
 	}
+	if agent := platform.AgentBareMetal; agent != nil {
+		numberOfPlatforms++
+		// TODO: add agent metal platform validation
+	}
 	switch {
 	case numberOfPlatforms == 0:
 		allErrs = append(allErrs, field.Required(path, "must specify a platform"))
@@ -440,7 +448,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		"method":    "validateUpdate",
 	})
 
-	if admResp := validatefeatureGates(a.decoder, admissionSpec, contextLogger); admResp != nil {
+	if admResp := validatefeatureGates(a.decoder, admissionSpec, a.fs, contextLogger); admResp != nil {
 		contextLogger.Errorf("object was rejected due to feature gate failures")
 		return admResp
 	}

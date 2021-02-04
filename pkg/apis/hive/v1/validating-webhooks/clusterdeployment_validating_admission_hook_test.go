@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1agent "github.com/openshift/hive/pkg/apis/hive/v1/agent"
 	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
@@ -37,7 +38,7 @@ func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",
 			Provisioning: &hivev1.Provisioning{
-				InstallConfigSecretRef: corev1.LocalObjectReference{
+				InstallConfigSecretRef: &corev1.LocalObjectReference{
 					Name: "test-install-config",
 				},
 			},
@@ -139,6 +140,30 @@ func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.AgentBareMetal = &hivev1agent.BareMetalPlatform{
+		APIVIP:        "127.0.0.1",
+		APIVIPDNSName: "foo.example.com",
+		IngressVIP:    "127.0.0.1",
+	}
+	cd.Spec.Provisioning.InstallStrategy = &hivev1.InstallStrategy{
+		Agent: &hivev1agent.InstallStrategy{
+			AgentSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			ProvisionRequirements: hivev1agent.ProvisionRequirements{
+				ControlPlaneAgents: 3,
+				WorkerAgents:       3,
+			},
+		},
+	}
+	cd.Spec.Provisioning.InstallConfigSecretRef = nil
+	return cd
+}
+
 // Meant to be used to compare new and old as the same values.
 func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
 	return validAWSClusterDeployment()
@@ -187,14 +212,15 @@ func TestClusterDeploymentInitialize(t *testing.T) {
 
 func TestClusterDeploymentValidate(t *testing.T) {
 	cases := []struct {
-		name            string
-		newObject       *hivev1.ClusterDeployment
-		newObjectRaw    []byte
-		oldObject       *hivev1.ClusterDeployment
-		oldObjectRaw    []byte
-		operation       admissionv1beta1.Operation
-		expectedAllowed bool
-		gvr             *metav1.GroupVersionResource
+		name                string
+		newObject           *hivev1.ClusterDeployment
+		newObjectRaw        []byte
+		oldObject           *hivev1.ClusterDeployment
+		oldObjectRaw        []byte
+		operation           admissionv1beta1.Operation
+		expectedAllowed     bool
+		gvr                 *metav1.GroupVersionResource
+		enabledFeatureGates []string
 	}{
 		{
 			name:            "Test valid create",
@@ -222,6 +248,17 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject:       validClusterDeploymentDifferentMutableValue(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
+		},
+		{
+			name:      "Test reject missing InstallConfigSecretRef",
+			oldObject: validAWSClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning.InstallConfigSecretRef = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
 		},
 		{
 			name:      "Test setting installed flag",
@@ -423,9 +460,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name: "Test new clusterdeployment with missing SSH private key name",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validClusterDeploymentWithIngress()
-				cd.Spec.Provisioning = &hivev1.Provisioning{
-					SSHPrivateKeySecretRef: &corev1.LocalObjectReference{},
-				}
+				cd.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{Name: ""}
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
@@ -754,7 +789,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name: "InstallConfig is missing",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
-				cd.Spec.Provisioning.InstallConfigSecretRef.Name = ""
+				cd.Spec.Provisioning.InstallConfigSecretRef = nil
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
@@ -852,6 +887,19 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
+		{
+			name:            "Test reject agent install strategy without feature gate enabled",
+			newObject:       validAgentBareMetalClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name:                "Test accept agent install strategy with feature gate enabled",
+			newObject:           validAgentBareMetalClusterDeployment(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+		},
 	}
 
 	for _, tc := range cases {
@@ -860,6 +908,11 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			data := ClusterDeploymentValidatingAdmissionHook{
 				decoder:             createDecoder(t),
 				validManagedDomains: validTestManagedDomains,
+				fs: &featureSet{
+					FeatureGatesEnabled: &hivev1.FeatureGatesEnabled{
+						Enabled: tc.enabledFeatureGates,
+					},
+				},
 			}
 
 			if tc.gvr == nil {

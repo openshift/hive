@@ -64,7 +64,9 @@ func TestInstallerPodSpec(t *testing.T) {
 			name: "Test Provision Pod Resource Requests",
 			clusterDeployment: &hivev1.ClusterDeployment{
 				Spec: hivev1.ClusterDeploymentSpec{
-					Provisioning: &hivev1.Provisioning{},
+					Provisioning: &hivev1.Provisioning{
+						InstallConfigSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+					},
 				},
 				Status: hivev1.ClusterDeploymentStatus{
 					InstallerImage: &installerImage,

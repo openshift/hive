@@ -126,6 +126,34 @@ spec:
             platform:
               description: Platform encompasses the desired platform for the cluster.
               properties:
+                agentBareMetal:
+                  description: AgentBareMetal is the configuration used when performing
+                    an Assisted Agent based installation to bare metal. Can only be
+                    used with the Assisted InstallStrategy.
+                  properties:
+                    apiVIP:
+                      description: APIVIP is the virtual IP used to reach the OpenShift
+                        cluster's API.
+                      type: string
+                    apiVIPDNSName:
+                      description: APIVIPDNSName is the domain name used to reach
+                        the OpenShift cluster API.
+                      type: string
+                    ingressVIP:
+                      description: IngressVIP is the virtual IP used for cluster ingress
+                        traffic.
+                      type: string
+                    vipDHCPAllocation:
+                      description: VIPDHCPAllocation indicates if virtual IP DHCP
+                        allocation mode is enabled.
+                      enum:
+                      - ""
+                      - Enabled
+                      type: string
+                  required:
+                  - apiVIP
+                  - ingressVIP
+                  type: object
                 aws:
                   description: AWS is the configuration used when installing on AWS.
                   properties:

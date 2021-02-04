@@ -4,6 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/openshift/hive/pkg/apis/hive/v1/agent"
 	"github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/apis/hive/v1/baremetal"
@@ -140,7 +141,8 @@ type Provisioning struct {
 	// InstallConfig. This file will be passed through directly to the installer.
 	// Any version of InstallConfig can be used, provided it can be parsed by the openshift-install
 	// version for the release you are provisioning.
-	InstallConfigSecretRef corev1.LocalObjectReference `json:"installConfigSecretRef"`
+	// +optional
+	InstallConfigSecretRef *corev1.LocalObjectReference `json:"installConfigSecretRef,omitempty"`
 
 	// ReleaseImage is the image containing metadata for all components that run in the cluster, and
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
@@ -171,6 +173,11 @@ type Provisioning struct {
 	// additional features of the installer.
 	// +optional
 	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
+
+	// InstallStrategy provides platform agnostic configuration for the use of alternate install strategies.
+	// Defaults to openshift-install if none specified.
+	// +optional
+	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // ClusterImageSetReference is a reference to a ClusterImageSet
@@ -234,12 +241,30 @@ type ClusterDeploymentStatus struct {
 	// +optional
 	CertificateBundles []CertificateBundleStatus `json:"certificateBundles,omitempty"`
 
+	// TODO: Use of *Timestamp fields here is slightly off from latest API conventions,
+	// should use InstalledTime instead if we ever get to a V2 of the API.
+
+	// InstallStartedTimestamp is the time when all pre-requisites were met and cluster installation was launched.
+	InstallStartedTimestamp *metav1.Time `json:"installStartedTimestamp,omitempty"`
+
 	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
 	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
 
 	// ProvisionRef is a reference to the last ClusterProvision created for the deployment
 	// +optional
 	ProvisionRef *corev1.LocalObjectReference `json:"provisionRef,omitempty"`
+
+	// InstallStrategy contains observed state from specific install strategies.
+	// +optional
+	InstallStrategy *InstallStrategyStatus `json:"installStrategy,omitempty"`
+}
+
+// InstallStrategyStatus contains observed state from specific install strategies.
+type InstallStrategyStatus struct {
+
+	// Agent defines the observed state of the Agent install strategy for this cluster.
+	// +optional
+	Agent *agent.InstallStrategyStatus `json:"agent,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment
@@ -429,6 +454,18 @@ type Platform struct {
 
 	// Ovirt is the configuration used when installing on oVirt
 	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
+
+	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
+	// to bare metal. Can only be used with the Assisted InstallStrategy.
+	AgentBareMetal *agent.BareMetalPlatform `json:"agentBareMetal,omitempty"`
+}
+
+// InstallStrategy provides configuration for optional alternative install strategies.
+type InstallStrategy struct {
+
+	// Agent is the install strategy configuration for provisioning a cluster with the
+	// Agent based assisted installer.
+	Agent *agent.InstallStrategy `json:"agent,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

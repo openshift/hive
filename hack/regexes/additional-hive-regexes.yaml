@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: additional-hive-regexes
+objects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: additional-install-log-regexes
+      namespace: hive
+    data:
+      regexes:

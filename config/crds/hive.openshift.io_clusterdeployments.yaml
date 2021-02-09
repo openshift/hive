@@ -752,8 +752,6 @@ spec:
                                 type: string
                               maxItems: 1
                               type: array
-                          required:
-                          - machineNetwork
                           type: object
                         provisionRequirements:
                           description: ProvisionRequirements defines configuration

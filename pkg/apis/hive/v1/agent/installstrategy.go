@@ -39,7 +39,8 @@ type ProvisionRequirements struct {
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
 	// MachineNetwork is the list of IP address pools for machines.
-	MachineNetwork []MachineNetworkEntry `json:"machineNetwork"`
+	// +optional
+	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`
 
 	// ClusterNetwork is the list of IP address pools for pods.
 	// Default is 10.128.0.0/14 and a host prefix of /23.

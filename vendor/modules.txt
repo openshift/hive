@@ -1780,3 +1780,4 @@ sourcegraph.com/sqs/pbtypes
 # k8s.io/client-go => k8s.io/client-go v0.19.0
 # github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200918101923-1e4c94603efe
 # k8s.io/apiserver => github.com/staebler/apiserver v0.19.1-0.20201005174924-a3ef0d1e45df
+# github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0

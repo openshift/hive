@@ -91,7 +91,7 @@ endef
 .PHONY: crd
 crd: ensure-controller-gen ensure-yq
 	rm -rf ./config/crds
-	'$(CONTROLLER_GEN)' crd paths=./pkg/apis/hive/v1 paths=./pkg/apis/hiveinternal/v1alpha1 output:dir=./config/crds
+	cd ./pkg/apis/; '../../$(CONTROLLER_GEN)' crd paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../../config/crds
 	@echo Stripping yaml breaks from CRD files
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 update: crd

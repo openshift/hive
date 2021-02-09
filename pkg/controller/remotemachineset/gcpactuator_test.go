@@ -124,6 +124,49 @@ func TestGCPActuator(t *testing.T) {
 			requireLeases:                   true,
 			setupPendingCreationExpectation: true,
 		},
+		{
+			name: "generate machinesets with explicit disk type and size",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.OSDisk = hivev1gcp.OSDisk{
+					DiskType:   "faketype",
+					DiskSizeGB: 2000,
+				}
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
+		{
+			name: "generate machinesets with KMS disk encryption",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.OSDisk = hivev1gcp.OSDisk{
+					DiskType:   "faketype",
+					DiskSizeGB: 2000,
+					EncryptionKey: &hivev1gcp.EncryptionKeyReference{
+						KMSKey: &hivev1gcp.KMSKeyReference{
+							Name:      "foo",
+							KeyRing:   "keyring",
+							ProjectID: "myproject",
+							Location:  "Canada",
+						},
+						KMSKeyServiceAccount: "kmssa",
+					},
+				}
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -168,7 +211,42 @@ func TestGCPActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateGCPMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+				assert.Equal(t, len(test.expectedMachineSetReplicas), len(generatedMachineSets), "different number of machine sets generated than expected")
+
+				for _, ms := range generatedMachineSets {
+					expectedReplicas, ok := test.expectedMachineSetReplicas[ms.Name]
+					if assert.True(t, ok, "unexpected machine set: ", ms.Name) {
+						assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
+					}
+
+					gcpProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*gcpprovider.GCPMachineProviderSpec)
+					assert.True(t, ok, "failed to convert to gcpProviderSpec")
+
+					assert.Equal(t, testInstanceType, gcpProvider.MachineType, "unexpected instance type")
+
+					// Ensure GCP disk type and size was correctly set or defaulted and made it to the resulting MachineSets:
+					expectedDiskType := test.pool.Spec.Platform.GCP.OSDisk.DiskType
+					expectedDiskSizeGB := test.pool.Spec.Platform.GCP.OSDisk.DiskSizeGB
+					if expectedDiskType == "" {
+						expectedDiskType = defaultGCPDiskType
+					}
+					if expectedDiskSizeGB == 0 {
+						expectedDiskSizeGB = defaultGCPDiskSizeGB
+					}
+					assert.Equal(t, expectedDiskType, gcpProvider.Disks[0].Type)
+					assert.Equal(t, expectedDiskSizeGB, gcpProvider.Disks[0].SizeGb)
+
+					// Ensure GCP disk encryption settings made it to the resulting MachineSet (if specified):
+					encKey := test.pool.Spec.Platform.GCP.OSDisk.EncryptionKey
+					if encKey != nil {
+						assert.Equal(t, encKey.KMSKeyServiceAccount, gcpProvider.Disks[0].EncryptionKey.KMSKeyServiceAccount)
+						assert.Equal(t, encKey.KMSKey.Name, gcpProvider.Disks[0].EncryptionKey.KMSKey.Name)
+						assert.Equal(t, encKey.KMSKey.KeyRing, gcpProvider.Disks[0].EncryptionKey.KMSKey.KeyRing)
+						assert.Equal(t, encKey.KMSKey.ProjectID, gcpProvider.Disks[0].EncryptionKey.KMSKey.ProjectID)
+						assert.Equal(t, encKey.KMSKey.Location, gcpProvider.Disks[0].EncryptionKey.KMSKey.Location)
+					}
+
+				}
 			}
 		})
 	}
@@ -595,22 +673,6 @@ func TestRequireLeases(t *testing.T) {
 			actualResult := requireLeases(tc.clusterVersion, machineSets, log.WithFields(nil))
 			assert.Equal(t, tc.expectedResult, actualResult)
 		})
-	}
-}
-
-func validateGCPMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
-	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
-
-	for _, ms := range mSets {
-		expectedReplicas, ok := expectedMSReplicas[ms.Name]
-		if assert.True(t, ok, "unexpected machine set: ", ms.Name) {
-			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
-		}
-
-		gcpProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*gcpprovider.GCPMachineProviderSpec)
-		assert.True(t, ok, "failed to convert to gcpProviderSpec")
-
-		assert.Equal(t, testInstanceType, gcpProvider.MachineType, "unexpected instance type")
 	}
 }
 

@@ -35,6 +35,9 @@ const (
 	// Omit m, the installer used this for the master machines. w is also removed as this is implicitly used
 	// by the installer for the original worker pool.
 	validLeaseChars = "abcdefghijklnopqrstuvxyz0123456789"
+
+	defaultGCPDiskType   = "pd-ssd"
+	defaultGCPDiskSizeGB = 128
 )
 
 var (
@@ -171,10 +174,34 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	computePool.Platform.GCP = &installertypesgcp.MachinePool{
 		Zones:        pool.Spec.Platform.GCP.Zones,
 		InstanceType: pool.Spec.Platform.GCP.InstanceType,
+		// May be overridden below:
 		OSDisk: installertypesgcp.OSDisk{
-			DiskType:   "pd-ssd",
-			DiskSizeGB: 128,
+			DiskType:   defaultGCPDiskType,
+			DiskSizeGB: defaultGCPDiskSizeGB,
 		},
+	}
+
+	poolGCP := pool.Spec.Platform.GCP
+	if pool.Spec.Platform.GCP.OSDisk.DiskType != "" {
+		computePool.Platform.GCP.OSDisk.DiskType = poolGCP.OSDisk.DiskType
+	}
+	if pool.Spec.Platform.GCP.OSDisk.DiskSizeGB != 0 {
+		computePool.Platform.GCP.OSDisk.DiskSizeGB = poolGCP.OSDisk.DiskSizeGB
+	}
+
+	poolEncRef := poolGCP.OSDisk.EncryptionKey
+	if poolEncRef != nil {
+		computePool.Platform.GCP.OSDisk.EncryptionKey = &installertypesgcp.EncryptionKeyReference{
+			KMSKeyServiceAccount: poolEncRef.KMSKeyServiceAccount,
+		}
+		if poolEncRef.KMSKey != nil {
+			computePool.Platform.GCP.OSDisk.EncryptionKey.KMSKey = &installertypesgcp.KMSKeyReference{
+				Name:      poolEncRef.KMSKey.Name,
+				KeyRing:   poolEncRef.KMSKey.KeyRing,
+				ProjectID: poolEncRef.KMSKey.ProjectID,
+				Location:  poolEncRef.KMSKey.Location,
+			}
+		}
 	}
 
 	if len(computePool.Platform.GCP.Zones) == 0 {

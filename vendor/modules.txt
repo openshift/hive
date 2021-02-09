@@ -567,6 +567,21 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
+# github.com/openshift/hive/pkg/apis v0.0.0 => ./pkg/apis
+## explicit
+github.com/openshift/hive/pkg/apis
+github.com/openshift/hive/pkg/apis/helpers
+github.com/openshift/hive/pkg/apis/hive/v1
+github.com/openshift/hive/pkg/apis/hive/v1/agent
+github.com/openshift/hive/pkg/apis/hive/v1/aws
+github.com/openshift/hive/pkg/apis/hive/v1/azure
+github.com/openshift/hive/pkg/apis/hive/v1/baremetal
+github.com/openshift/hive/pkg/apis/hive/v1/gcp
+github.com/openshift/hive/pkg/apis/hive/v1/openstack
+github.com/openshift/hive/pkg/apis/hive/v1/ovirt
+github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks
+github.com/openshift/hive/pkg/apis/hive/v1/vsphere
+github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1
 # github.com/openshift/installer v0.9.0-master.0.20210201172249-df32ad26dd6f
 ## explicit
 github.com/openshift/installer/data
@@ -1845,3 +1860,4 @@ sigs.k8s.io/yaml
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 # google.golang.org/grpc => google.golang.org/grpc v1.29.1
 # k8s.io/client-go => k8s.io/client-go v0.19.5
+# github.com/openshift/hive/pkg/apis => ./pkg/apis

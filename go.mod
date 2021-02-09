@@ -31,11 +31,12 @@ require (
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
-	github.com/openshift/installer v0.9.0-master.0.20210201172249-df32ad26dd6f
+	github.com/openshift/installer v0.9.0-master.0.20210211002944-d237b9dee575
 	github.com/openshift/library-go v0.0.0-20201109112824-093ad3cf6600
 	github.com/openshift/machine-api-operator v0.2.1-0.20201111151924-77300d0c997a
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_model v0.2.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
@@ -49,16 +50,16 @@ require (
 	google.golang.org/api v0.33.0
 	gopkg.in/ini.v1 v1.61.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.19.5
-	k8s.io/apiextensions-apiserver v0.19.5
-	k8s.io/apimachinery v0.19.5
-	k8s.io/cli-runtime v0.19.5
+	k8s.io/api v0.20.0
+	k8s.io/apiextensions-apiserver v0.20.0
+	k8s.io/apimachinery v0.20.0
+	k8s.io/cli-runtime v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
-	k8s.io/code-generator v0.19.5
+	k8s.io/code-generator v0.20.0
 	k8s.io/klog v1.0.0
-	k8s.io/kube-aggregator v0.19.5
-	k8s.io/kubectl v0.19.5
+	k8s.io/kube-aggregator v0.20.0
+	k8s.io/kubectl v0.20.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
@@ -101,7 +102,7 @@ replace (
 )
 
 // needed because otherwise v12.0.0 is picked up as a more recent version
-replace k8s.io/client-go => k8s.io/client-go v0.19.5
+replace k8s.io/client-go => k8s.io/client-go v0.20.0
 
 // needed for fixing CVE-2020-29529
 replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0

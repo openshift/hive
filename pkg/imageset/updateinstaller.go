@@ -2,6 +2,7 @@ package imageset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -33,6 +34,7 @@ const (
 	installerImageResolvedMessage        = "InstallerImage is resolved."
 	installerImageResolutionFailedReason = "InstallerImageResolutionFailed"
 	imageReferencesFilename              = "image-references"
+	releaseMetadataFilename              = "release-metadata"
 )
 
 // UpdateInstallerImageOptions contains options for running the command
@@ -185,8 +187,26 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 	}
 	o.log.WithField("cliImage", cliImage).Info("cli image found")
 
+	releaseMetadataRaw, err := ioutil.ReadFile(filepath.Join(o.WorkDir, releaseMetadataFilename))
+	if err != nil {
+		return errors.Wrapf(err, "could not read %s file", releaseMetadataFilename)
+	}
+	releaseMetadata := &cincinnatiMetadata{}
+	if err := json.Unmarshal(releaseMetadataRaw, releaseMetadata); err != nil {
+		return errors.Wrap(err, "unable to load release release-metadata")
+	}
+	if releaseMetadata.Kind != "cincinnati-metadata-v0" {
+		return errors.Wrap(err, "unrecognized release-metadata in release payload")
+	}
+
+	releaseVersion := getReleaseVersion(releaseMetadata, is)
+	if releaseVersion == "" {
+		return errors.New("no release version set in the release payload")
+	}
+
 	cd.Status.InstallerImage = &installerImage
 	cd.Status.CLIImage = &cliImage
+	cd.Status.InstallVersion = &releaseVersion
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
 		cd.Status.Conditions,
 		hivev1.InstallerImageResolutionFailedCondition,
@@ -249,4 +269,21 @@ func getClient(kubeConfig *rest.Config) (client.Client, error) {
 		return nil, fmt.Errorf("failed to create kube client: %v", err)
 	}
 	return kubeClient, nil
+}
+
+// cincinnatiMetadata is the compact version of the release metadata
+// as stored by the release-image generator in [1].
+//
+// [1]: https://github.com/openshift/oc/blob/c66c03f3012a10f16eb86fdce6330433adf6c9ee/pkg/cli/admin/release/new.go#L320-L327
+type cincinnatiMetadata struct {
+	Kind string `json:"kind"`
+
+	Version string `json:"version"`
+}
+
+func getReleaseVersion(releaseMetadata *cincinnatiMetadata, is *imageapi.ImageStream) string {
+	if len(releaseMetadata.Version) != 0 {
+		return releaseMetadata.Version
+	}
+	return is.Name
 }

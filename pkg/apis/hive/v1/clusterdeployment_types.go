@@ -229,6 +229,11 @@ type ClusterDeploymentStatus struct {
 	// +optional
 	InstallerImage *string `json:"installerImage,omitempty"`
 
+	// InstallVersion is the version of OpenShift as reported by the release image
+	// resolved for the installation.
+	// +optional
+	InstallVersion *string `json:"installVersion,omitempty"`
+
 	// CLIImage is the name of the oc cli image to use when installing the target cluster
 	// +optional
 	CLIImage *string `json:"cliImage,omitempty"`

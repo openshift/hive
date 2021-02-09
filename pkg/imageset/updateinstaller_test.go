@@ -2,6 +2,7 @@ package imageset
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -28,64 +29,69 @@ import (
 const (
 	testInstallerImage = "registry.io/test-installer-image:latest"
 	testCLIImage       = "registry.io/test-cli-image:latest"
+	testReleaseVersion = "v0.0.0-test-version"
 )
 
 func TestUpdateInstallerImageCommand(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name                      string
+		name    string
+		images  map[string]string
+		version string
+
 		existingClusterDeployment *hivev1.ClusterDeployment
 		expectError               bool
-		setupWorkDir              func(t *testing.T, dir string)
 		validateClusterDeployment func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment)
 	}{
 		{
 			name:                      "successful execution",
 			existingClusterDeployment: testClusterDeployment(),
-			setupWorkDir: writeImageReferencesFile(
-				map[string]string{
-					"installer": testInstallerImage,
-					"cli":       testCLIImage,
-				},
-			),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       testCLIImage,
+			},
 			validateClusterDeployment: validateSuccessfulExecution,
 		},
 		{
-			name:                      "failure execution",
+			name:                      "failure execution missing cli",
 			existingClusterDeployment: testClusterDeployment(),
-			setupWorkDir: writeImageReferencesFile(
-				map[string]string{
-					"installer": testInstallerImage,
-				},
-			),
+			images: map[string]string{
+				"installer": testInstallerImage,
+			},
 			validateClusterDeployment: validateFailureExecution,
 			expectError:               true,
 		},
 		{
 			name:                      "successful execution after failure",
 			existingClusterDeployment: testClusterDeploymentWithErrorCondition(),
-			setupWorkDir: writeImageReferencesFile(
-				map[string]string{
-					"installer": testInstallerImage,
-					"cli":       testCLIImage,
-				},
-			),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       testCLIImage,
+			},
 			validateClusterDeployment: validateSuccessfulExecutionAfterFailure,
 		},
 		{
-			name: "baremetal",
+			name: "successful execution baremetal platform",
 			existingClusterDeployment: func() *hivev1.ClusterDeployment {
 				cd := testClusterDeployment()
 				cd.Spec.Platform.BareMetal = &baremetal.Platform{}
 				return cd
 			}(),
-			setupWorkDir: writeImageReferencesFile(
-				map[string]string{
-					"baremetal-installer": testInstallerImage,
-					"cli":                 testCLIImage,
-				},
-			),
+			images: map[string]string{
+				"baremetal-installer": testInstallerImage,
+				"cli":                 testCLIImage,
+			},
+			validateClusterDeployment: validateSuccessfulExecution,
+		},
+		{
+			name:                      "successful execution with version in release metadata",
+			existingClusterDeployment: testClusterDeployment(),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       testCLIImage,
+			},
+			version:                   testReleaseVersion,
 			validateClusterDeployment: validateSuccessfulExecution,
 		},
 	}
@@ -105,7 +111,8 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				client:                     client,
 			}
 
-			test.setupWorkDir(t, workDir)
+			writeImageReferencesFile(t, workDir, test.images)
+			writeReleaseMetadataFile(t, workDir, test.version)
 
 			err = opt.Run()
 			if !test.expectError && err != nil {
@@ -183,29 +190,41 @@ func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDep
 	}
 }
 
-func writeImageReferencesFile(images map[string]string) func(*testing.T, string) {
-	return func(t *testing.T, dir string) {
-		imageStream := &imageapi.ImageStream{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ImageStream",
-				APIVersion: imageapi.GroupVersion.String(),
-			},
-		}
-		imageStream.Spec.Tags = make([]imageapi.TagReference, len(images))
-		for k, v := range images {
-			imageStream.Spec.Tags = append(imageStream.Spec.Tags,
-				imageapi.TagReference{
-					Name: k,
-					From: &corev1.ObjectReference{
-						Kind: "DockerImage",
-						Name: v,
-					},
-				},
-			)
-		}
-		imageStreamData, err := yaml.Marshal(imageStream)
-		require.NoError(t, err, "failed to marshal image stream")
-		err = ioutil.WriteFile(filepath.Join(dir, imageReferencesFilename), imageStreamData, 0644)
-		require.NoError(t, err, "failed to write image references file")
+func writeImageReferencesFile(t *testing.T, dir string, images map[string]string) {
+	imageStream := &imageapi.ImageStream{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ImageStream",
+			APIVersion: imageapi.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testReleaseVersion,
+		},
 	}
+	imageStream.Spec.Tags = make([]imageapi.TagReference, len(images))
+	for k, v := range images {
+		imageStream.Spec.Tags = append(imageStream.Spec.Tags,
+			imageapi.TagReference{
+				Name: k,
+				From: &corev1.ObjectReference{
+					Kind: "DockerImage",
+					Name: v,
+				},
+			},
+		)
+	}
+	imageStreamData, err := yaml.Marshal(imageStream)
+	require.NoError(t, err, "failed to marshal image stream")
+	err = ioutil.WriteFile(filepath.Join(dir, imageReferencesFilename), imageStreamData, 0644)
+	require.NoError(t, err, "failed to write image references file")
+}
+
+func writeReleaseMetadataFile(t *testing.T, dir string, version string) {
+	rm := &cincinnatiMetadata{
+		Kind:    "cincinnati-metadata-v0",
+		Version: version,
+	}
+	rmRaw, err := json.Marshal(rm)
+	require.NoError(t, err, "failed to marshal release metadata")
+	err = ioutil.WriteFile(filepath.Join(dir, releaseMetadataFilename), rmRaw, 0644)
+	require.NoError(t, err, "failed to write release metadata file")
 }

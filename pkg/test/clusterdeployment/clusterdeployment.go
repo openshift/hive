@@ -130,6 +130,12 @@ func InstalledTimestamp(instTime time.Time) Option {
 	}
 }
 
+func InstallRestarts(restarts int) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Status.InstallRestarts = restarts
+	}
+}
+
 func WithClusterVersion(version string) Option {
 	return Generic(generic.WithLabel(constants.VersionMajorMinorPatchLabel, version))
 }

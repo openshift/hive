@@ -151,7 +151,8 @@ func Add(mgr manager.Manager) error {
 		Client:   mgr.GetClient(),
 		Interval: 2 * time.Minute,
 	}
-	metrics.Registry.MustRegister(newProvisioningUnderwayCollector(mgr.GetClient()))
+	metrics.Registry.MustRegister(newProvisioningUnderwaySecondsCollector(mgr.GetClient(), 1*time.Hour))
+	metrics.Registry.MustRegister(newProvisioningUnderwayInstallRestartsCollector(mgr.GetClient(), 1))
 	err := mgr.Add(mc)
 	if err != nil {
 		return err

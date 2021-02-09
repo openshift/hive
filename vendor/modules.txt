@@ -1845,3 +1845,4 @@ sigs.k8s.io/yaml
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 # google.golang.org/grpc => google.golang.org/grpc v1.29.1
 # k8s.io/client-go => k8s.io/client-go v0.19.5
+# github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0

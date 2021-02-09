@@ -102,3 +102,6 @@ replace (
 
 // needed because otherwise v12.0.0 is picked up as a more recent version
 replace k8s.io/client-go => k8s.io/client-go v0.19.5
+
+// needed for fixing CVE-2020-29529
+replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0

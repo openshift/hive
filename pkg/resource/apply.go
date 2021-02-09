@@ -206,7 +206,11 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 		r.logger.WithError(err).Error("cannot obtain dynamic client from factory")
 		return nil, nil, err
 	}
-	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	o.DeleteOptions, err = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	if err != nil {
+		r.logger.WithError(err).Error("cannot create delete options")
+		return nil, nil, err
+	}
 	// Re-use the openAPISchema that should have been initialized in the constructor.
 	o.OpenAPISchema = r.openAPISchema
 	o.Validator, err = f.Validator(false)

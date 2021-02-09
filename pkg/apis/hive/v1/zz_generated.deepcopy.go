@@ -600,6 +600,11 @@ func (in *ClusterDeploymentStatus) DeepCopyInto(out *ClusterDeploymentStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.InstallVersion != nil {
+		in, out := &in.InstallVersion, &out.InstallVersion
+		*out = new(string)
+		**out = **in
+	}
 	if in.CLIImage != nil {
 		in, out := &in.CLIImage, &out.CLIImage
 		*out = new(string)

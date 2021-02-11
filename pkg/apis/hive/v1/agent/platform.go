@@ -23,6 +23,6 @@ type BareMetalPlatform struct {
 type VIPDHCPAllocationType string
 
 const (
-	Disabled VIPDHCPAllocationType = ""
-	Enabled  VIPDHCPAllocationType = "Enabled"
+	VIPDHCPAllocationDisabled VIPDHCPAllocationType = ""
+	VIPDHCPAllocationEnabled  VIPDHCPAllocationType = "Enabled"
 )

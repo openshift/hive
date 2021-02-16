@@ -26,6 +26,8 @@ parameters:
   value: openshift-velero
 - name: FAILED_PROVISION_CONFIG
   value: "{}"
+- name: CONTROLLERS_CONFIG
+  value: "{}"
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -73,3 +75,5 @@ objects:
         enabled: "${{BACKUP_VELERO_ENABLED}}"
         namespace: ${BACKUP_VELERO_NAMESPACE}
     failedProvisionConfig: "${{FAILED_PROVISION_CONFIG}}"
+    controllersConfig: "${{CONTROLLERS_CONFIG}}"
+

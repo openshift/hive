@@ -32,6 +32,7 @@ type ProvisionRequirements struct {
 
 	// WorkerAgents is the minimum number of matching approved and ready Agents with the worker role
 	// required to launch the install.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	WorkerAgents int `json:"workerAgents,omitempty"`
 }

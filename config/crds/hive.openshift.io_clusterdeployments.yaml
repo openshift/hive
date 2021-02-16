@@ -767,6 +767,7 @@ spec:
                               description: WorkerAgents is the minimum number of matching
                                 approved and ready Agents with the worker role required
                                 to launch the install.
+                              minimum: 0
                               type: integer
                           required:
                           - controlPlaneAgents

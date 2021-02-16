@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1agent "github.com/openshift/hive/pkg/apis/hive/v1/agent"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/manageddns"
 )
@@ -180,8 +181,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		return admResp
 	}
 
-	newObject := &hivev1.ClusterDeployment{}
-	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
+	cd := &hivev1.ClusterDeployment{}
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, cd); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -193,11 +194,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	// Add the new data to the contextLogger
-	contextLogger.Data["object.Name"] = newObject.Name
+	contextLogger.Data["object.Name"] = cd.Name
 
 	// TODO: Put Create Validation Here (or in openAPIV3Schema validation section of crd)
 
-	if len(newObject.Name) > validation.DNS1123LabelMaxLength {
+	if len(cd.Name) > validation.DNS1123LabelMaxLength {
 		message := fmt.Sprintf("Invalid cluster deployment name (.meta.name): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
 		contextLogger.Error(message)
 		return &admissionv1beta1.AdmissionResponse{
@@ -209,7 +210,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if len(newObject.Spec.ClusterName) > validation.DNS1123LabelMaxLength {
+	if len(cd.Spec.ClusterName) > validation.DNS1123LabelMaxLength {
 		message := fmt.Sprintf("Invalid cluster name (.spec.clusterName): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
 		contextLogger.Error(message)
 		return &admissionv1beta1.AdmissionResponse{
@@ -222,17 +223,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	// validate the ingress
-	if ingressValidationResult := validateIngress(newObject, contextLogger); ingressValidationResult != nil {
+	if ingressValidationResult := validateIngress(cd, contextLogger); ingressValidationResult != nil {
 		return ingressValidationResult
 	}
 
 	// validate the certificate bundles
-	if r := validateCertificateBundles(newObject, contextLogger); r != nil {
+	if r := validateCertificateBundles(cd, contextLogger); r != nil {
 		return r
 	}
 
-	if newObject.Spec.ManageDNS {
-		if !validateDomain(newObject.Spec.BaseDomain, a.validManagedDomains) {
+	if cd.Spec.ManageDNS {
+		if !validateDomain(cd.Spec.BaseDomain, a.validManagedDomains) {
 			message := "The base domain must be a child of one of the managed domains for ClusterDeployments with manageDNS set to true"
 			return &admissionv1beta1.AdmissionResponse{
 				Allowed: false,
@@ -247,28 +248,42 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
-	if !newObject.Spec.Installed {
-		if newObject.Spec.Provisioning == nil {
+	if !cd.Spec.Installed {
+		if cd.Spec.Provisioning == nil {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "provisioning is required if not installed"))
 
-		} else if newObject.Spec.Provisioning.InstallConfigSecretRef == nil || newObject.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
-			// InstallConfigSecretRef is not required for agent install strategy
-			if newObject.Spec.Provisioning.InstallStrategy == nil || newObject.Spec.Provisioning.InstallStrategy.Agent == nil {
-				allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
+		} else {
+
+			if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+				// InstallConfigSecretRef is not required for agent install strategy
+				if cd.Spec.Provisioning.InstallStrategy == nil || cd.Spec.Provisioning.InstallStrategy.Agent == nil {
+					allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
+				}
+			}
+
+			// validate the agent install strategy:
+			if cd.Spec.Provisioning.InstallStrategy != nil &&
+				cd.Spec.Provisioning.InstallStrategy.Agent != nil {
+				allErrs = append(allErrs, validateAgentInstallStrategy(specPath, cd)...)
+			} else if cd.Spec.Platform.AgentBareMetal != nil {
+				// agent bare metal platform can only be used with agent install strategy:
+				allErrs = append(allErrs,
+					field.Forbidden(specPath.Child("platform", "agentBareMetal"),
+						"agent bare metal platform can only be used with agent install strategy"))
 			}
 		}
 	}
 
-	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), newObject.Spec.Platform)...)
-	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, newObject.Spec)...)
+	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), cd.Spec.Platform)...)
+	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
-	if newObject.Spec.Provisioning != nil {
-		if newObject.Spec.Provisioning.SSHPrivateKeySecretRef != nil && newObject.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
+	if cd.Spec.Provisioning != nil {
+		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
 		}
 	}
 
-	if poolRef := newObject.Spec.ClusterPoolRef; poolRef != nil {
+	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
 		if claimName := poolRef.ClaimName; claimName != "" {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "claimName"), claimName, "cannot create a ClusterDeployment that is already claimed"))
 		}
@@ -287,6 +302,42 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
+}
+
+func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeployment) field.ErrorList {
+	ais := cd.Spec.Provisioning.InstallStrategy.Agent
+	allErrs := field.ErrorList{}
+	agentPath := specPath.Child("provisioning", "installStrategy", "agent")
+
+	// agent install strategy can only be used with agent bare metal platform today:
+	if cd.Spec.Platform.AgentBareMetal == nil {
+		allErrs = append(allErrs,
+			field.Forbidden(agentPath,
+				"agent install strategy can only be used with agent bare metal platform"))
+	} else if cd.Spec.Platform.AgentBareMetal.VIPDHCPAllocation == hivev1agent.VIPDHCPAllocationEnabled &&
+		len(ais.Networking.MachineNetwork) == 0 {
+		// a machine network is required if in vip dhcp mode:
+		allErrs = append(allErrs, field.Required(
+			agentPath.Child("networking", "machineNetwork"),
+			"must specify a machine network if vipDHCPAllocation is enabled"))
+	}
+
+	// must use either 1 or 3 control plane agents:
+	if ais.ProvisionRequirements.ControlPlaneAgents != 1 &&
+		ais.ProvisionRequirements.ControlPlaneAgents != 3 {
+		allErrs = append(allErrs, field.Invalid(
+			agentPath.Child("provisionRequirements", "controlPlaneAgents"),
+			ais.ProvisionRequirements.ControlPlaneAgents,
+			"cluster can only be formed with 1 or 3 control plane agents"))
+	}
+
+	// install config secret ref should not be set for agent installs:
+	if cd.Spec.Provisioning.InstallConfigSecretRef != nil {
+		allErrs = append(allErrs,
+			field.Forbidden(specPath.Child("provisioning", "installConfigSecretRef"),
+				"custom install config cannot be used with agent install strategy"))
+	}
+	return allErrs
 }
 
 func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
@@ -409,7 +460,6 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 	}
 	if agent := platform.AgentBareMetal; agent != nil {
 		numberOfPlatforms++
-		// TODO: add agent metal platform validation
 	}
 	switch {
 	case numberOfPlatforms == 0:
@@ -453,8 +503,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		return admResp
 	}
 
-	newObject := &hivev1.ClusterDeployment{}
-	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
+	cd := &hivev1.ClusterDeployment{}
+	if err := a.decoder.DecodeRaw(admissionSpec.Object, cd); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -466,7 +516,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	}
 
 	// Add the new data to the contextLogger
-	contextLogger.Data["object.Name"] = newObject.Name
+	contextLogger.Data["object.Name"] = cd.Name
 
 	oldObject := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
@@ -483,7 +533,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
-	hasChangedImmutableField, changedFieldName := hasChangedImmutableField(&oldObject.Spec, &newObject.Spec)
+	hasChangedImmutableField, changedFieldName := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {
 		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec.%v. ClusterDeployment.Spec is immutable except for %v", changedFieldName, mutableFields)
 		contextLogger.Infof("Failed validation: %v", message)
@@ -498,12 +548,12 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	}
 
 	// validate the newly incoming ingress
-	if ingressValidationResult := validateIngress(newObject, contextLogger); ingressValidationResult != nil {
+	if ingressValidationResult := validateIngress(cd, contextLogger); ingressValidationResult != nil {
 		return ingressValidationResult
 	}
 
 	// Now catch the case where there was a previously defined list and now it's being emptied
-	hasClearedOutPreviouslyDefinedIngressList := hasClearedOutPreviouslyDefinedIngressList(&oldObject.Spec, &newObject.Spec)
+	hasClearedOutPreviouslyDefinedIngressList := hasClearedOutPreviouslyDefinedIngressList(&oldObject.Spec, &cd.Spec)
 	if hasClearedOutPreviouslyDefinedIngressList {
 		message := fmt.Sprintf("Previously defined a list of ingress objects, must provide a default ingress object")
 		contextLogger.Infof("Failed validation: %v", message)
@@ -520,22 +570,22 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 
-	if newObject.Spec.Installed {
-		if newObject.Spec.ClusterMetadata != nil {
+	if cd.Spec.Installed {
+		if cd.Spec.ClusterMetadata != nil {
 			if oldObject.Spec.Installed {
-				allErrs = append(allErrs, apivalidation.ValidateImmutableField(newObject.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
+				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}
 		} else {
 			allErrs = append(allErrs, field.Required(specPath.Child("clusterMetadata"), "installed cluster must have cluster metadata"))
 		}
 	} else {
 		if oldObject.Spec.Installed {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("installed"), newObject.Spec.Installed, "cannot make uninstalled once installed"))
+			allErrs = append(allErrs, field.Invalid(specPath.Child("installed"), cd.Spec.Installed, "cannot make uninstalled once installed"))
 		}
 	}
 
 	// Validate the ClusterPoolRef:
-	switch oldPoolRef, newPoolRef := oldObject.Spec.ClusterPoolRef, newObject.Spec.ClusterPoolRef; {
+	switch oldPoolRef, newPoolRef := oldObject.Spec.ClusterPoolRef, cd.Spec.ClusterPoolRef; {
 	case oldPoolRef != nil && newPoolRef != nil:
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.Namespace, oldPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.PoolName, oldPoolRef.PoolName, specPath.Child("clusterPoolRef", "poolName"))...)
@@ -637,9 +687,9 @@ func isFieldMutable(value string) bool {
 }
 
 // hasChangedImmutableField determines if a ClusterDeployment.spec immutable field was changed.
-func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec) (bool, string) {
+func hasChangedImmutableField(oldObject, cd *hivev1.ClusterDeploymentSpec) (bool, string) {
 	ooElem := reflect.ValueOf(oldObject).Elem()
-	noElem := reflect.ValueOf(newObject).Elem()
+	noElem := reflect.ValueOf(cd).Elem()
 
 	for i := 0; i < ooElem.NumField(); i++ {
 		ooFieldName := ooElem.Type().Field(i).Name
@@ -655,34 +705,34 @@ func hasChangedImmutableField(oldObject, newObject *hivev1.ClusterDeploymentSpec
 	return false, ""
 }
 
-func hasClearedOutPreviouslyDefinedIngressList(oldObject, newObject *hivev1.ClusterDeploymentSpec) bool {
+func hasClearedOutPreviouslyDefinedIngressList(oldObject, cd *hivev1.ClusterDeploymentSpec) bool {
 	// We don't allow a ClusterDeployment which had previously defined a list of Ingress objects
 	// to then be cleared out. It either must be cleared from the beginning (ie just use default behavior),
 	// or the ClusterDeployment must continue to define at least the 'default' ingress object.
-	if len(oldObject.Ingress) > 0 && len(newObject.Ingress) == 0 {
+	if len(oldObject.Ingress) > 0 && len(cd.Ingress) == 0 {
 		return true
 	}
 
 	return false
 }
 
-func validateIngressDomainsShareClusterDomain(newObject *hivev1.ClusterDeploymentSpec) bool {
+func validateIngressDomainsShareClusterDomain(cd *hivev1.ClusterDeploymentSpec) bool {
 	// ingress entries must share the same domain as the cluster
 	// so watch for an ingress domain ending in: .<clusterName>.<baseDomain>
-	regexString := fmt.Sprintf(`(?i).*\.%s.%s$`, newObject.ClusterName, newObject.BaseDomain)
+	regexString := fmt.Sprintf(`(?i).*\.%s.%s$`, cd.ClusterName, cd.BaseDomain)
 	sharedSubdomain := regexp.MustCompile(regexString)
 
-	for _, ingress := range newObject.Ingress {
+	for _, ingress := range cd.Ingress {
 		if !sharedSubdomain.Match([]byte(ingress.Domain)) {
 			return false
 		}
 	}
 	return true
 }
-func validateIngressDomainsNotWildcard(newObject *hivev1.ClusterDeploymentSpec) bool {
+func validateIngressDomainsNotWildcard(cd *hivev1.ClusterDeploymentSpec) bool {
 	// check for domains with leading '*'
 	// the * is unnecessary as the ingress controller assumes a wildcard
-	for _, ingress := range newObject.Ingress {
+	for _, ingress := range cd.Ingress {
 		if ingress.Domain[0] == '*' {
 			return false
 		}
@@ -690,14 +740,14 @@ func validateIngressDomainsNotWildcard(newObject *hivev1.ClusterDeploymentSpec) 
 	return true
 }
 
-func validateIngressServingCertificateExists(newObject *hivev1.ClusterDeploymentSpec) bool {
+func validateIngressServingCertificateExists(cd *hivev1.ClusterDeploymentSpec) bool {
 	// Include the empty string in the set of certs so that an ingress with
 	// an empty serving certificate passes.
 	certs := sets.NewString("")
-	for _, cert := range newObject.CertificateBundles {
+	for _, cert := range cd.CertificateBundles {
 		certs.Insert(cert.Name)
 	}
-	for _, ingress := range newObject.Ingress {
+	for _, ingress := range cd.Ingress {
 		if !certs.Has(ingress.ServingCertificate) {
 			return false
 		}
@@ -707,13 +757,13 @@ func validateIngressServingCertificateExists(newObject *hivev1.ClusterDeployment
 
 // empty ingress is allowed (for create), but if it's non-zero
 // it must include an entry for 'default'
-func validateIngressList(newObject *hivev1.ClusterDeploymentSpec) bool {
-	if len(newObject.Ingress) == 0 {
+func validateIngressList(cd *hivev1.ClusterDeploymentSpec) bool {
+	if len(cd.Ingress) == 0 {
 		return true
 	}
 
 	defaultFound := false
-	for _, ingress := range newObject.Ingress {
+	for _, ingress := range cd.Ingress {
 		if ingress.Name == "default" {
 			defaultFound = true
 		}
@@ -744,8 +794,8 @@ func validateDomain(domain string, validDomains []string) bool {
 	return matchFound
 }
 
-func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
-	if !validateIngressList(&newObject.Spec) {
+func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+	if !validateIngressList(&cd.Spec) {
 		message := fmt.Sprintf("Ingress list must include a default entry")
 		contextLogger.Infof("Failed validation: %v", message)
 
@@ -758,7 +808,7 @@ func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Ent
 		}
 	}
 
-	if !validateIngressDomainsNotWildcard(&newObject.Spec) {
+	if !validateIngressDomainsNotWildcard(&cd.Spec) {
 		message := "Ingress domains must not lead with *"
 		contextLogger.Infof("Failed validation: %v", message)
 		return &admissionv1beta1.AdmissionResponse{
@@ -770,7 +820,7 @@ func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Ent
 		}
 	}
 
-	if !validateIngressDomainsShareClusterDomain(&newObject.Spec) {
+	if !validateIngressDomainsShareClusterDomain(&cd.Spec) {
 		message := "Ingress domains must share the same domain as the cluster"
 		contextLogger.Infof("Failed validation: %v", message)
 		return &admissionv1beta1.AdmissionResponse{
@@ -782,7 +832,7 @@ func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Ent
 		}
 	}
 
-	if !validateIngressServingCertificateExists(&newObject.Spec) {
+	if !validateIngressServingCertificateExists(&cd.Spec) {
 		message := "Ingress has serving certificate that does not exist in certificate bundle"
 		contextLogger.Infof("Failed validation: %v", message)
 		return &admissionv1beta1.AdmissionResponse{
@@ -798,8 +848,8 @@ func validateIngress(newObject *hivev1.ClusterDeployment, contextLogger *log.Ent
 	return nil
 }
 
-func validateCertificateBundles(newObject *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
-	for _, certBundle := range newObject.Spec.CertificateBundles {
+func validateCertificateBundles(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+	for _, certBundle := range cd.Spec.CertificateBundles {
 		if certBundle.Name == "" {
 			message := "Certificate bundle is missing a name"
 			contextLogger.Infof("Failed validation: %v", message)

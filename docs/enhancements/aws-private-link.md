@@ -11,7 +11,7 @@ Endpoint in Hub cluster to access the cluster's k8s API privately.
 
 ### Goals
 
-- Support creating private cluster with no access from Internet using Hive.
+- Support creating private cluster with no access from the public Internet using Hive.
 
 ### Non-Goals
 
@@ -20,20 +20,15 @@ Endpoint in Hub cluster to access the cluster's k8s API privately.
 ## Proposal
 
 Create a new controller that can identify a ClusterDeployment that requires
-AWS PrivateLink access to the k8s API. This controller uses the ClusterMetadata
-and credentials for the cluster to identify NLB for the cluster, setup an
-Endpoint Service to expose the NLB to *specific* AWS role in Hub account, setup
-and Endpoint to the customer's Service in Hub account and finally make the endpoint
-DNS names available for use.
+AWS PrivateLink access to the k8s API. The controller uses the ClusterMetadata
+and Credentials for the cluster to create a VPC Endpoint Service (AWS PrivateLink)
+for interface endpoints using the NLB created by the OpenShift Installer. The controller
+then creates an Interface Endpoint in a Hub AWS account so that Hive has access to the
+cluster's k8s API using PrivateLink.
 
-Hive users the OpenShift Installer to *ONLY* create infrastructure resources and
-then waits for the controller to report the private DNS names for the Endpoint
-service. After the private DNS names are available, continue the install to wait
-for API to come up, destroy the bootstrap resources and wait for install to complete
-using the pre-existing openshift-installer subcommands. 
-
-Hive also updates the manifests for API server to accept the connections from 
-the Endpoint service DNS names at installation.
+Hive configures the OpenShift installer to use new PrivateLink DNS address for the cluster's
+k8s API. Hive also configures the cluster's control plane serving certificates to allow
+serving requests for the PrivateLink DNS address.
 
 ### User Stories
 
@@ -49,11 +44,11 @@ doc: https://docs.aws.amazon.com/vpc/latest/userguide/verify-domains.html
 
 When you create a VPC endpoint service, AWS generates endpoint-specific DNS
 hostnames that you can use to communicate with the service. These names include
-the VPC endpoint ID, the Availability Zone name and Region Name, for example, 
+the VPC endpoint ID, the Availability Zone name and Region Name, for example,
 vpce-1234-abcdev-us-east-1.vpce-svc-123345.us-east-1.vpce.amazonaws.com.
 
 For successful communication with API using **this** DNS name, the apiserver must
-be configured to serve the appropriate ServerCertifcate and client-go clients
+be configured to serve the appropriate ServerCertificate and client-go clients
 must be configured with the corresponding TrustCertificate in form of the kubeconfig.
 This configuration must be modified day-1 (during installation) because we
 need a valid working SNI configuration to exist before we can communicate with the
@@ -65,7 +60,7 @@ This requires a **public** HostedZone to allow AWS to perform Domain ownership
 validations for the DNS name.
 
 For each such installation, we use the unique set of inputs like namespace, name,
-cluster name etc. and hash it to RFC 1034 DNS label space. We then use the hash 
+cluster name etc. and hash it to RFC 1034 DNS label space. We then use the hash
 to create the private DNS for cluster's endpoint service like,
 `api.<hash>.<hosted zone domain>`.
 
@@ -112,18 +107,20 @@ NOTE: This can be restricted to a specific user/role in the account too.
 ### Manual walk-through
 
 Here is a manual walk through of all the steps that need to be taken today
-to setup the required environment.
+to setup the required environment using just OpenShift installer.
 
 So let's assume we have a public Route53 HostedZone `hub01.osdprivate.io`. And
-the computes DNS name for the endpoint service is `api.hash123.hub01osdprivate.io`.
+the chosen DNS name for the endpoint service is `api.hash123.hub01osdprivate.io`.
 
 Create the manifests for install.
-```shell=bash
-$ openshift-install --dir install_dir01 create manifests
+
+```shell
+openshift-install --dir install_dir01 create manifests
 ```
 
 Add the APIServer and Secret object for setting up apiserver SNI.
-```shell=bash
+
+```shell
 $ cat > install_dir01/manifests/apiserver.yaml << EOF
 apiVersion: config.openshift.io/v1
 kind: APIServer
@@ -148,35 +145,63 @@ tls.crt: <the serving certificate here>
 EOF
 ```
 
-Create infrastructure resources only.
-```shell=bash
-$ openshift-install --dir install_dir01 create cluster --no-wait-only-infra
+Update the kubeconfig to point the insaller to use new apiserver address.
+
+```shell
+openshift-isntall --dir install_dir01 create ignition-configs
+# update clusters[0].server to http://api.hash123.hub01osdprivate.io:6443
+# and clusters[0].caCertificate to the server certificate
+# install_dir01/auth/kubeconfig
+# also load the infraID
+```
+
+Run the installer to create the cluster
+
+```shell
+openshift-install --dir install_dir01 create cluster
 ```
 
 At this stage the installer has created the NLB for the apiserver and the
 installation is already in progress in the bootstrap ec2instance. We can use
 the installer tags to figure out the apiserver's internal NLB for the cluster.
 
-Create an Endpoint service in AWS account of the cluster.
-```shell=bash
-$ AWS_PROFILE=customer aws ec2 create-vpc-endpoint-service-configuration \
+```shell
+AWS_PROFILE=customer aws elbv2 describe-load-balancers --names "{infra_id}-int"
+```
+
+Create an VPC Endpoint Service in AWS account of the cluster.
+
+```shell
+AWS_PROFILE=customer aws ec2 create-vpc-endpoint-service-configuration \
 --no-acceptance-required \
 --private-dns-name api.hash123.hub01osdprivate.io \
---network-load-balancer-arns <nlb arn here>
+--network-load-balancer-arns "{nlb_arn}"
 ```
-```shell=bash
-$ aws ec2 modify-vpc-endpoint-service-permissions \
---add-allowed-principals '["arn:aws:iam::123456789012:root"]' 
+
+Get the identity of the user in Hub AWS account so that we can use the VPC
+Endpoint Service.
+
+```shell
+AWS_PROFILE=hub01 aws sts get-caller-identity
+```
+
+Add the user to the allowed principals of the VPC Endpoint Service.
+
+```shell=
+AWS_PROFILE=customer aws ec2 modify-vpc-endpoint-service-permissions \
+--add-allowed-principals '["{hub_user_arn}"]' 
 ```
 
 Extract the DNS verification information from the create.
-```shell=bash
-$ DOMAIN_VERIFICATION_NAME=$(jq '.ServiceConfigurations[0].PrivateDnsNameConfiguration.Name')
-$ DOMAIN_VERIFICATION_VALUE=$(jq '.ServiceConfigurations[0].PrivateDnsNameConfiguration.Value')
+
+```shell
+DOMAIN_VERIFICATION_NAME=$(jq '.ServiceConfigurations[0].PrivateDnsNameConfiguration.Name')
+DOMAIN_VERIFICATION_VALUE=$(jq '.ServiceConfigurations[0].PrivateDnsNameConfiguration.Value')
 ```
 
-Let's create the TXT records in HostedZone to complete the verification.
+Create the TXT records in HostedZone to complete the verification.
 NOTE: This is happening in the hub AWS account.
+
 ```json
 {
   "HostedZoneId": "$HOSTED_ZONE_ID",
@@ -199,20 +224,23 @@ NOTE: This is happening in the hub AWS account.
 ```
 
 Now trigger the verifiation of the domain name manually.
-```shell=bash
-$ AWS_PROFILE=customer aws ec2 start-vpc-endpoint-service-private-dns-verification
+
+```shell
+AWS_PROFILE=customer aws ec2 start-vpc-endpoint-service-private-dns-verification
 ```
 
-At this point the Endpoint service is ready for use. Next create an Endpoint
-Interface in hub account.
+At this point the VPC Endpoint Service is ready for use. Next create an VPC Endpoint of
+type Interface in the AWS Hub account.
 
-Get the Endpoint Service details for availability zones.
-```shell=bash
+Get the VPC Endpoint Service details for availability zones.
+
+```shell
 $ AWS_PROFILE=hub01 aws ec2 describe-vpc-endpoint-services \
 --service-names <service name>
 $ SERVICE_AVAILABITY_ZONES=$(jq '.ServiceDetails[0].AvailabilityZones')
 ```
-```shell=bash
+
+```shell
 $ SUBNETS=$(subnetsForAZs SERVICE_AVAILABITY_ZONES)
 $ AWS_PROFILE=hub01 aws ec2 create-vpc-endpoint \
 --vpc-id <vpc-id> \
@@ -222,46 +250,33 @@ $ AWS_PROFILE=hub01 aws ec2 create-vpc-endpoint \
 --security-group-ids <security group that allows ingress> \
 --private-dns-enabled
 ```
-NOTE: To use private DNS, you must set the following VPC attributes 
+
+NOTE: To use private DNS, you must set the following VPC attributes
 to true: enableDnsHostnames and enableDnsSupport.
 
 Now the `api.hash123.hub01osdprivate.io:6443` from the hub01 VPC should use the
-setup Endpoint Interface and Endpoint Service to reach the private API of customer's
+the VPC Endpoint and the VPC Endpoint Service to reach the private API of customer's
 cluster.
 
-Update the kubeconfig used by the OpenShift installer to use new address.
-```shell=bash
-# modify the install_dir01/auth/kubeconfig
-# replace api.clustername.basedomain:6443 => api.hash123.hub01osdprivate.io:6443
-# replace the trust bundle to new trust
-```
-
-Now run the rest of the stages for the installer.
-```shell=bash
-$ openshift-install --dir install_dir01 wait-for bootstrap-complete
-$ openshift-install --dir install_dir01 destroy bootstrap
-$ openshift-install --dir install_dir01 wait-for install-complete
-# install complete
-```
-
-Update the ClusterDeployment's kubeconfig used for remote calls to use the
-new address and trust.
+The installer should now finally be able to communicate with the cluster's k8s API,
+and continue with the next stages of waiting for bootstrapping to complete etc.
 
 ### AWS Private Link Controller
 
 The goal of the controller to ensure a PrivateLink is established to the cluster
 that is being created by a ClusterDeployment. The controller watches for
-ClusterProvisioning and ClusterDeployments that require a PrivateLink and uses 
+ClusterProvisioning and ClusterDeployments that require a PrivateLink and uses
 the information in the aws platform to set it up.
 
 #### API change
 
 The ClusterDeployment needs to include additional information for the controller
 to create Privatelink. Some of the information that is required are,
+
 - infrastructure identifier for the cluster to discover the Network Load Balancer
-- private DNS name for the service
-- User/Role in AWS account (hub account) where the endpoint is to be created
-- subnets in AWS account (hub account) where the endpoint is to be created
+- private DNS name for the VPC Endpoint Service
+- User/Role in AWS account (hub account) where the VPC Endpoint is to be created
+- subnets in AWS account (hub account) where the VPC Endpoint is to be created
 - credentials to the AWS account (hub account)
 
 ```yaml=
@@ -269,7 +284,7 @@ to create Privatelink. Some of the information that is required are,
 spec:
   platform:
     aws:
-      privatLink:
+      privateLink:
         # this is the public r53 zone in hub account where the TXT records will be 
         # added for domain verification of endpoint service
         hostedZone: (string)
@@ -277,6 +292,7 @@ spec:
         # the subnets used for the endpoint depends on AZs supported by the
         # service (which depends on the AZs supported by the NLB)
         subnets: (list(string))
+       
         # this is reference to a secret that provide credentials to create
         # necessary resources in the hub account.
         # This role/user is only IAM entity that will be allowed to create endpoints
@@ -284,8 +300,8 @@ spec:
         credentialsSecretRef:
           name: (string)
         
-        # this allows the controller to store the information in spec
-        # so that these can survice recovery and adoption in some cases
+        # these next fields should probably be in status but since only the spec survives
+        # the recovery these are present in spec.
         
         endpointService:
           # this is ServiceName for the endpoint service
@@ -298,13 +314,13 @@ spec:
 
 #### Discovering NLB for cluster
 
-To create the endpoint service for the cluster, the controller requires the ARN
+To create the VPC Endpoint Service for the cluster, the controller requires the ARN
 to the Network Loadbalancer for the internal API. This load balancer is created
 by the installer with the name `{infra_id}-int`.
 
-The infrastructure ID should be available in the ClusterDeployment `.specclusterMetadata.infraID`.
+The infrastructure ID should be available in the ClusterDeployment `.spec.clusterMetadata.infraID`.
 
-So the discover the NLB Arn, following request can be made using the cluster
+So to discover the NLB Arn following request can be made using the cluster
 credentials and the following AWS API,
 
 https://docs.aws.amazon.com/elasticloadbalancing/2012-06-01/APIReference/API_DescribeLoadBalancers.html
@@ -314,23 +330,21 @@ elbv2.DescribeLoadBalancers
   - "{infra_id}-int"
 ```
 
-#### Creating Endpoint Service
+#### Creating VPC Endpoint Service
 
 Once we have the Arn for the NLB, we need
 
-- private DNS name for the service,
+- private DNS name for the VPC Endpoint Service,
 The DNS name for the service will be the apiserver override URL specified in the
 ClusterDeployment `.spec.controlPlaneConfig.apiURLOverride`
 
 - allowed IAM principals for the service
 The IAM pricipal that is allowed to access and create endpoints to the service
-will the entity specified in the `privateLink.credentialsSecretRef`.
+will be the entity specified in the `privateLink.credentialsSecretRef`.
+The controller can use [STS's GetCallerIdentity](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html)
+to figure out the Arn for the AWS entity.
 
-https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html
-The controller can use STS's GetCallerIdentity to figure out the Arn for
-the AWS entity.
-
-The controller continues to create the Endpoint service in cluster's account using
+The controller continues to create the VPC Endpoint Service in cluster's account using
 
 https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVpcEndpointServiceConfiguration.html
 ```
@@ -338,9 +352,13 @@ ec2.CreateVpcEndpointServiceConfiguration
   AcceptanceRequired: False
   NetworkLoadBalancerArn:
   - "{Arn for the cluster's loadbalancer}"
-  PrivateDnsName: "{apiOverrideURL}"
+  PrivateDnsName: "{spec.controlPlaneConfig.apiOverrideURL}"
 ```
-The controller stores the `serviceName` and `serviceID` to the ClusterDeployment.
+
+The controller stores the `serviceName` and `serviceID` from the response of CreateVpcEndpointServiceConfiguration
+to the ClusterDeployment `spec.platform.aws.privateLink.service.name` and `spec.platform.aws.privateLink.service.id`
+respectively.
+
 Next, the controller needs to add the IAM principals to the service configuration.
 This cannot be set during creation of the service but needs to be modified using
 
@@ -414,11 +432,11 @@ in the PrivateDnsConfiguration for the endpoint service.
 
 #### Creating VPC Endpoint
 
-For the controller to create the VPC endpoints it needs to compute the VPC and
-the subnets.
+For the controller to create the VPC endpoint of type Interface, it needs to compute
+the VPC and the subnets.
 
-The subnets that should be used depend on the AZs that are available for the endpoint
-service. To figure out which AZs are supported by the service, the controller
+The subnets that should be used depend on the AZs that are available for the VPC Endpoint
+Service. To figure out which AZs are supported by the service, the controller
 needs to describe the endpoint service from the context of the hub account.
 
 https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcEndpointServices.html
@@ -449,13 +467,14 @@ ec2.CreateVpcEndpoint
   VpcEndpointType: Interface
 ```
 
-The controller stores the VPC endpoint Id to the ClusterDeployment.
+The controller stores the `Id` for the response of CreateVpcEndpoint to the ClusterDeployment
+`spec.platform.aws.privateLink.endpoint`
 
 #### Waiting for VPC Endpoint approval
 
-The endpoint service is allowed to automatically approve any endpoint created by
-the allowed IAM principals. So the controller doesn't need to take additional
-steps but since approval can take some time, it needs to wait for approval.
+The VPC Endpoint Service is confiured to automatically approve any VPC Endpoint request
+created by the principals in allowed IAM Principals list. So the controller doesn't need to
+take additional steps but since approval can take some time, it needs to wait for approval.
 
 The controller can wait for approval using
 https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVpcEndpoints.html
@@ -465,7 +484,7 @@ ec2.DescribeVpcEndpoints
   - "{endpoint Id}"
 ```
 
-The controller ensures that the state of the VPC endpoint is `Available`.
+The controller ensures that the state of the VPC Endpoint is `Available`.
 
 #### Failed installations
 
@@ -473,7 +492,7 @@ Since the installations can fail, the endpoint service pointed to NLB will preve
 it's deletion and therefore to retry installation using the destroy the cluster and
 retry again requires deleting the endpoint, endpoint service and in that order.
 
-Currently when an installation fails, the new ClusterProvision uses the idenitfiers
+Currently when an installation fails, the new ClusterProvision uses the identifiers
 from the old provision to destroy the cluster and then continue with trying to
 install the cluster.
 
@@ -528,19 +547,25 @@ installer to use the Private Link without any modifications.
 Instructions for using non-default API server endpoint is described in RFE-438.
 
 Run ignition-configs target to create the kubeconfig
-```
+
+```shell
 openshift-install create ignition-configs
 ```
+
 make sure the admin kubeconfig is stored or updated on the ClusterDeployment so
 that user doesn't get the amended to include the override URL.
 Update the `clusters[0].cluster` entry to appropiate server ans trust bundle.
 
-```
+Now if the install manager creates a cluster, the installer will use this new
+address to talk to the cluster's k8s API to track bootstrap and install levels.
+
+```shell
 openshift-install create cluster
 ```
 
 ### Risks and Mitigations
 
+#### Rotating the serving certificates
 
 ### Test Plan
 
@@ -551,3 +576,5 @@ openshift-install create cluster
 ### installer that can create infrastructure without waiting
 
 ### New managed NLB instead of using installer created one
+
+### Common credentials for Hub AWS Account

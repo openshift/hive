@@ -41,10 +41,12 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
 	"github.com/openshift/hive/pkg/remoteclient"
+	k8sannotations "github.com/openshift/hive/pkg/util/annotations"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
@@ -458,6 +460,83 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster region label")
 		}
 		return reconcile.Result{}, err
+	}
+
+	if cd.Spec.MachineManagementStrategy != nil && cd.Spec.MachineManagementStrategy.Strategy == "Central" {
+		targetNamespace := cd.Status.TargetNamespace
+		if targetNamespace == "" {
+			targetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
+		}
+
+		cdLog.Info("Creating the target namespace ", targetNamespace)
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: targetNamespace},
+		}
+		if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
+			return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", ns.Name, err)
+		}
+
+		if cd.Status.TargetNamespace == "" {
+			cd.Status.TargetNamespace = targetNamespace
+			if err := r.Status().Update(context.TODO(), cd); err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster target namespace")
+				return reconcile.Result{Requeue: true}, nil
+			}
+		}
+
+		// Add cluster deployment as additional owner reference to namespace and set clusterName annotation
+		if err := r.addOwnershipToTargetNamespace(cd, cdLog, targetNamespace); err != nil {
+			return reconcile.Result{}, err
+		}
+
+		cdLog.Infof("Creating credentials secret in the target namespace %s", targetNamespace)
+		credentialsSecretName := utils.CredentialsSecretName(cd)
+		credentialsSecret := &corev1.Secret{}
+		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
+		}
+		credentialsSecret.Namespace = targetNamespace
+		credentialsSecret.ResourceVersion = ""
+		if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+			return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
+		}
+
+		cdLog.Infof("Creating pull secret in the target namespace %s", targetNamespace)
+		pullSecretName := cd.Spec.PullSecretRef.Name
+		pullSecret := &corev1.Secret{}
+		err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: pullSecretName}, pullSecret)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", pullSecretName, err)
+		}
+		pullSecret.Namespace = targetNamespace
+		pullSecret.ResourceVersion = ""
+		if err := r.Create(context.TODO(), pullSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+			return reconcile.Result{}, fmt.Errorf("failed to create pull secret: %v", err)
+		}
+
+		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+			cdLog.Infof("Creating ssh key secret in the target namespace %s", targetNamespace)
+			SSHKeySecretName := cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name
+			SSHKeySecret := &corev1.Secret{}
+			err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: SSHKeySecretName}, SSHKeySecret)
+			if err != nil {
+				return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", SSHKeySecretName, err)
+			}
+			SSHKeySecret.Namespace = targetNamespace
+			SSHKeySecret.ResourceVersion = ""
+			if err := r.Create(context.TODO(), SSHKeySecret); err != nil && !apierrors.IsAlreadyExists(err) {
+				return reconcile.Result{}, fmt.Errorf("failed to create ssh key secret: %v", err)
+			}
+		}
+	}
+
+	// Return early and stop processing if Agent install strategy is in play. The controllers that
+	// handle this portion of the API currently live in the assisted service repo, rather than hive.
+	// This will hopefully change in the future.
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallStrategy != nil && cd.Spec.Provisioning.InstallStrategy.Agent != nil {
+		cdLog.Info("skipping processing of agent install strategy cluster")
+		return reconcile.Result{}, nil
 	}
 
 	if cd.DeletionTimestamp != nil {
@@ -2236,6 +2315,46 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating syncset failed condition")
 		return err
 	}
+	return nil
+}
+
+// addOwnershipToTargetNamespace adds cluster deployment as an additional non-controlling owner to target namespace
+func (r *ReconcileClusterDeployment) addOwnershipToTargetNamespace(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger, name string) error {
+	cdLog = cdLog.WithField("namespace", name)
+
+	namespace := &corev1.Namespace{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: name}, namespace); err != nil {
+		cdLog.WithError(err).Error("failed to get namespace")
+		return err
+	}
+
+	annotationAdded := false
+	if namespace.Annotations[constants.CentralMachineManagementAnnotation] != cd.Name {
+		cdLog.Debug("Setting annotation on target namespace")
+		namespace.Annotations = k8sannotations.AddAnnotation(namespace.Annotations, constants.CentralMachineManagementAnnotation, cd.Name)
+		annotationAdded = true
+	}
+
+	cdRef := metav1.OwnerReference{
+		APIVersion:         cd.APIVersion,
+		Kind:               cd.Kind,
+		Name:               cd.Name,
+		UID:                cd.UID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}
+
+	cdRefChanged := librarygocontroller.EnsureOwnerRef(namespace, cdRef)
+	if cdRefChanged {
+		cdLog.Debug("ownership added for cluster deployment")
+	}
+	if cdRefChanged || annotationAdded {
+		cdLog.Info("namespace has been modified, updating")
+		if err := r.Update(context.TODO(), namespace); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating namespace")
+			return err
+		}
+	}
+
 	return nil
 }
 

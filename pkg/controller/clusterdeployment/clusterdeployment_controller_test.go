@@ -119,6 +119,24 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		return getJob(c, imageSetJobName)
 	}
 
+	getTargetNS := func(c client.Client, cd *hivev1.ClusterDeployment) *corev1.Namespace {
+		ns := &corev1.Namespace{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: cd.Status.TargetNamespace}, ns)
+		if err == nil {
+			return ns
+		}
+		return nil
+	}
+
+	getSecret := func(c client.Client, name string, namespace string) *corev1.Secret {
+		secret := &corev1.Secret{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: namespace}, secret)
+		if err == nil {
+			return secret
+		}
+		return nil
+	}
+
 	tests := []struct {
 		name                          string
 		existing                      []runtime.Object
@@ -1529,6 +1547,41 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NoError(t, err, "unexpected error listing ClusterProvisions")
 
 				assert.Zero(t, len(provisionList.Items), "expected no ClusterProvision objects when platform creds are bad")
+			},
+		},
+		{
+			name: "Central Machine Management",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.MachineManagementStrategy = &hivev1.MachineManagementStrategy{
+						Strategy: "Central",
+					}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testSuccessfulProvision(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, "aws-credentials", corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				ns := getTargetNS(c, cd)
+				assert.Equal(t, ns.Annotations[constants.CentralMachineManagementAnnotation], testName)
+				refs := ns.GetOwnerReferences()
+				cdAsOwnerRef := false
+				for _, ref := range refs {
+					if ref.Name == testName {
+						cdAsOwnerRef = true
+					}
+				}
+				assert.Truef(t, cdAsOwnerRef, "cluster deployment not owner of %s", ns.Name)
+
+				credsSecret := getSecret(c, cd.Spec.Platform.AWS.CredentialsSecretRef.Name, ns.Name)
+				assert.NotNil(t, credsSecret)
+				pullSecret := getSecret(c, cd.Spec.PullSecretRef.Name, ns.Name)
+				assert.NotNil(t, pullSecret)
 			},
 		},
 	}

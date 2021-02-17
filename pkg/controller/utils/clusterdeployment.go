@@ -75,3 +75,26 @@ func ClearRelocateAnnotation(obj metav1.Object) (changed bool) {
 	obj.SetAnnotations(annotations)
 	return true
 }
+
+// CredentialsSecretName returns the name of the credentials secret for platforms
+// that have a CredentialsSecretRef. An empty string is returned if platform has none.
+func CredentialsSecretName(cd *hivev1.ClusterDeployment) string {
+	switch p := cd.Spec.Platform; {
+	case p.AWS != nil:
+		return cd.Spec.Platform.AWS.CredentialsSecretRef.Name
+	case p.GCP != nil:
+		return cd.Spec.Platform.GCP.CredentialsSecretRef.Name
+	case p.Azure != nil:
+		return cd.Spec.Platform.Azure.CredentialsSecretRef.Name
+	case p.OpenStack != nil:
+		return cd.Spec.Platform.OpenStack.CredentialsSecretRef.Name
+	case p.Ovirt != nil:
+		return cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name
+	case p.BareMetal != nil:
+		return ""
+	case p.AgentBareMetal != nil:
+		return ""
+	default:
+		return ""
+	}
+}

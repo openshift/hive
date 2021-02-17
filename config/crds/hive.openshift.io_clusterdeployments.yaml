@@ -335,6 +335,15 @@ spec:
             installed:
               description: Installed is true if the cluster has been installed
               type: boolean
+            machineManagementStrategy:
+              description: MachineManagementStrategy is the machine management strategy
+                that will be used when provisioning workers.
+              properties:
+                strategy:
+                  description: Strategy is the strategy used for worker machine management.
+                    Options are "InCluster" (default) and "Central".
+                  type: string
+              type: object
             manageDNS:
               description: ManageDNS specifies whether a DNSZone should be created
                 and managed automatically for this ClusterDeployment
@@ -1065,6 +1074,11 @@ spec:
                     TODO: Add other useful fields. apiVersion, kind, uid?'
                   type: string
               type: object
+            targetNamespace:
+              description: TargetNamespace is the namespace in which we will create
+                worker machineset resources and the namespace where we will copy relevant
+                secrets.
+              type: string
             webConsoleURL:
               description: WebConsoleURL is the URL for the cluster's web console
                 UI.

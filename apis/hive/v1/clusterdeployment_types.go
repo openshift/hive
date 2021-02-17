@@ -133,6 +133,17 @@ type ClusterDeploymentSpec struct {
 	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
 	// +optional
 	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
+
+	// MachineManagementStrategy is the machine management strategy that will be used when provisioning workers.
+	// +optional
+	MachineManagementStrategy *MachineManagementStrategy `json:"machineManagementStrategy,omitempty"`
+}
+
+// MachineManagementStrategy contains settings used for central machine management.
+type MachineManagementStrategy struct {
+	// Strategy is the strategy used for worker machine management. Options are "InCluster" (default) and "Central".
+	// +optional
+	Strategy string `json:"strategy,omitempty"`
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.
@@ -262,6 +273,10 @@ type ClusterDeploymentStatus struct {
 	// InstallStrategy contains observed state from specific install strategies.
 	// +optional
 	InstallStrategy *InstallStrategyStatus `json:"installStrategy,omitempty"`
+
+	// TargetNamespace is the namespace in which we will create worker machineset resources and the namespace where we will copy relevant secrets.
+	// +optional
+	TargetNamespace string `json:"targetNamespace,omitempty"`
 }
 
 // InstallStrategyStatus contains observed state from specific install strategies.

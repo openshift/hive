@@ -320,6 +320,9 @@ const (
 	// HiveFeatureGatesEnabledEnvVar is the the environment variable specifying the comma separated list of
 	// feature gates that are enabled.
 	HiveFeatureGatesEnabledEnvVar = "HIVE_FEATURE_GATES_ENABLED"
+
+	// CentralMachineManagementAnnotation
+	CentralMachineManagementAnnotation = "hive.openshift.io/clusterName"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

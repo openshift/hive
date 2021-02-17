@@ -29,6 +29,7 @@
   - [Managed DNS](#managed-dns-1)
   - [Configuration Management](#configuration-management)
     - [SyncSet](#syncset)
+    - [Scaling ClusterSync](#scaling-clustersync)
     - [Identity Provider Management](#identity-provider-management)
   - [Cluster Deprovisioning](#cluster-deprovisioning)
 
@@ -779,6 +780,22 @@ Hive will then:
 Hive offers two CRDs for applying configuration in a cluster once it is installed: `SyncSet` for config destined for specific clusters in a specific namespace, and `SelectorSyncSet` for config destined for any cluster matching a label selector.
 
 For more information please see the [SyncSet](syncset.md) documentation.
+
+### Scaling ClusterSync
+The clustersync controller is designed to scale horizontally, so increasing the number of clustersync controller replicas will scale the number of clustersync pods running, thereby increasing the number of simultaneous clusters getting syncsets applied to them.
+
+In order to scale the clustersync controller, a section like the following should be added to HiveConfig:
+
+```yaml
+spec:
+  controllersConfig:
+    controllers:
+    - config:
+        replicas: 3
+      name: clustersync
+```
+
+
 
 ### Identity Provider Management
 

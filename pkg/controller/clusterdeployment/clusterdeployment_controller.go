@@ -2264,6 +2264,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformVSphere
 	case cd.Spec.Platform.BareMetal != nil:
 		return constants.PlatformBaremetal
+	case cd.Spec.Platform.AgentBareMetal != nil:
+		return constants.PlatformAgentBaremetal
 	}
 	return constants.PlatformUnknown
 }

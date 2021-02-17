@@ -6,13 +6,14 @@ import (
 )
 
 const (
-	PlatformAWS       = "aws"
-	PlatformAzure     = "azure"
-	PlatformBaremetal = "baremetal"
-	PlatformGCP       = "gcp"
-	PlatformOpenStack = "openstack"
-	PlatformUnknown   = "unknown"
-	PlatformVSphere   = "vsphere"
+	PlatformAWS            = "aws"
+	PlatformAzure          = "azure"
+	PlatformBaremetal      = "baremetal"
+	PlatformAgentBaremetal = "agent-baremetal"
+	PlatformGCP            = "gcp"
+	PlatformOpenStack      = "openstack"
+	PlatformUnknown        = "unknown"
+	PlatformVSphere        = "vsphere"
 
 	mergedPullSecretSuffix = "merged-pull-secret"
 

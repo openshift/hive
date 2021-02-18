@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 

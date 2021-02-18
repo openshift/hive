@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"

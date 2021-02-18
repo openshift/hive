@@ -6,7 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/sts"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 )
 

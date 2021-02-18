@@ -6,7 +6,7 @@ import (
 	"context"
 	time "time"
 
-	hiveinternalv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	hiveinternalv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	versioned "github.com/openshift/hive/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openshift/hive/pkg/client/informers/externalversions/internalinterfaces"
 	v1alpha1 "github.com/openshift/hive/pkg/client/listers/hiveinternal/v1alpha1"

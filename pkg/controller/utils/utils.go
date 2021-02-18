@@ -28,8 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	apihelpers "github.com/openshift/hive/apis/helpers"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 )
 

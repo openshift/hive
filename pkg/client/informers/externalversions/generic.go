@@ -5,8 +5,8 @@ package externalversions
 import (
 	"fmt"
 
-	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	v1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	v1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/apis"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"

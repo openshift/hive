@@ -24,8 +24,8 @@ import (
 
 	imageapi "github.com/openshift/api/image/v1"
 
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/apis"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 

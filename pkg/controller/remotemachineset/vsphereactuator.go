@@ -16,7 +16,7 @@ import (
 	vsphereprovider "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider"
 	vsphereproviderv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 // VSphereActuator encapsulates the pieces necessary to be able to generate

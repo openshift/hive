@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	ingresscontroller "github.com/openshift/api/operator/v1"
-	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	apihelpers "github.com/openshift/hive/apis/helpers"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"

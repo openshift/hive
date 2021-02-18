@@ -11,11 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
-	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
-	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 )
 
 func clusterPoolTemplate() *hivev1.ClusterPool {

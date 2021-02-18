@@ -20,9 +20,9 @@ import (
 	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	"github.com/openshift/hive/apis"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"

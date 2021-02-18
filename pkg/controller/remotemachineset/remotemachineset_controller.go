@@ -27,7 +27,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"

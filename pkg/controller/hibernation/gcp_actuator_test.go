@@ -12,8 +12,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/gcpclient"
 	mockgcpclient "github.com/openshift/hive/pkg/gcpclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"

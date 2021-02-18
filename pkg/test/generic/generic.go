@@ -8,7 +8,7 @@ import (
 
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 
 	"strconv"

@@ -567,6 +567,20 @@ github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
+# github.com/openshift/hive/apis v0.0.0 => ./apis
+## explicit
+github.com/openshift/hive/apis
+github.com/openshift/hive/apis/helpers
+github.com/openshift/hive/apis/hive/v1
+github.com/openshift/hive/apis/hive/v1/agent
+github.com/openshift/hive/apis/hive/v1/aws
+github.com/openshift/hive/apis/hive/v1/azure
+github.com/openshift/hive/apis/hive/v1/baremetal
+github.com/openshift/hive/apis/hive/v1/gcp
+github.com/openshift/hive/apis/hive/v1/openstack
+github.com/openshift/hive/apis/hive/v1/ovirt
+github.com/openshift/hive/apis/hive/v1/vsphere
+github.com/openshift/hive/apis/hiveinternal/v1alpha1
 # github.com/openshift/installer v0.9.0-master.0.20210211002944-d237b9dee575
 ## explicit
 github.com/openshift/installer/data
@@ -1839,6 +1853,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 ## explicit
 sigs.k8s.io/yaml
+# github.com/openshift/hive/apis => ./apis
 # github.com/kubevirt/terraform-provider-kubevirt => github.com/nirarg/terraform-provider-kubevirt v0.0.0-20201222125919-101cee051ed3
 # github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20200715132148-0f91f62a41fe
 # github.com/metal3-io/cluster-api-provider-baremetal => github.com/openshift/cluster-api-provider-baremetal v0.0.0-20190821174549-a2a477909c1d

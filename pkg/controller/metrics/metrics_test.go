@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 
 	batchv1 "k8s.io/api/batch/v1"

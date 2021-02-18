@@ -9,8 +9,8 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installerovirt "github.com/openshift/installer/pkg/types/ovirt"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1ovirt "github.com/openshift/hive/pkg/apis/hive/v1/ovirt"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/pkg/constants"
 )
 

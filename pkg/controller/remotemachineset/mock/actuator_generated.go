@@ -6,7 +6,7 @@ package mock
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	v1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
 	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	logrus "github.com/sirupsen/logrus"
 	reflect "reflect"

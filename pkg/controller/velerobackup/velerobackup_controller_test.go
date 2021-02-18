@@ -11,8 +11,8 @@ import (
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	"github.com/openshift/hive/apis"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"

@@ -14,8 +14,8 @@ import (
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	vsphereprovider "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 )
 
 func TestVSphereActuator(t *testing.T) {

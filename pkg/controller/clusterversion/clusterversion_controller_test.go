@@ -21,9 +21,9 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/apis"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"

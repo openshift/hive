@@ -1,7 +1,7 @@
 package resource
 
 import (
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"

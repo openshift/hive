@@ -16,8 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/imageset"
 )

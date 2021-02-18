@@ -25,7 +25,7 @@ import (
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/gcpclient"

@@ -14,8 +14,8 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/azureclient"
 	mockazureclient "github.com/openshift/hive/pkg/azureclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"

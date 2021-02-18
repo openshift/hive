@@ -36,9 +36,9 @@ import (
 
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 
-	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	apihelpers "github.com/openshift/hive/apis/helpers"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"

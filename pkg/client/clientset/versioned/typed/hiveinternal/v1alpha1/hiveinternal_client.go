@@ -3,7 +3,7 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	v1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )

@@ -30,7 +30,7 @@ import (
 	orbacv1 "github.com/openshift/api/authorization/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
-	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/apis"
 	"github.com/openshift/hive/pkg/operator"
 	"github.com/openshift/hive/pkg/operator/hive"
 	utillogrus "github.com/openshift/hive/pkg/util/logrus"

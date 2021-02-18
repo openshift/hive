@@ -17,13 +17,13 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
-	hivev1azure "github.com/openshift/hive/pkg/apis/hive/v1/azure"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
-	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
-	hivev1ovirt "github.com/openshift/hive/pkg/apis/hive/v1/ovirt"
-	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
+	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
+	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 )
 
 const (

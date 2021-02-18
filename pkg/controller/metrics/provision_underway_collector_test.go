@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 )

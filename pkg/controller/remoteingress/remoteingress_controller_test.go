@@ -19,9 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ingresscontroller "github.com/openshift/api/operator/v1"
-	"github.com/openshift/hive/pkg/apis"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
+	"github.com/openshift/hive/apis"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"

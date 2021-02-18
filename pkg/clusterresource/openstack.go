@@ -9,8 +9,8 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installeropenstack "github.com/openshift/installer/pkg/types/openstack"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1openstack "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/pkg/constants"
 )
 

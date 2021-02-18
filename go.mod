@@ -31,6 +31,7 @@ require (
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20200504092944-27473ea1ae43
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
+	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v0.9.0-master.0.20210211002944-d237b9dee575
 	github.com/openshift/library-go v0.0.0-20201109112824-093ad3cf6600
 	github.com/openshift/machine-api-operator v0.2.1-0.20201111151924-77300d0c997a
@@ -68,6 +69,9 @@ require (
 	sigs.k8s.io/controller-tools v0.4.1
 	sigs.k8s.io/yaml v1.2.0
 )
+
+// sub modules
+replace github.com/openshift/hive/apis => ./apis
 
 // from installer
 replace (

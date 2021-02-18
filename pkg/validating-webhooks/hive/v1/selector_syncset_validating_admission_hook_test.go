@@ -1,4 +1,4 @@
-package validatingwebhooks
+package v1
 
 import (
 	"encoding/json"

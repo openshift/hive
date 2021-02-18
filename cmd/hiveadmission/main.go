@@ -8,7 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivevalidatingwebhooks "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
+	hivevalidatingwebhooks "github.com/openshift/hive/pkg/validating-webhooks/hive/v1"
 	"github.com/openshift/hive/pkg/version"
 )
 

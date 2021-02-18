@@ -1,16 +1,14 @@
-package validatingwebhooks
+package v1
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	dnsvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -18,53 +16,53 @@ import (
 )
 
 const (
-	dnsZoneGroup    = "hive.openshift.io"
-	dnsZoneVersion  = "v1"
-	dnsZoneResource = "dnszones"
+	clusterImageSetGroup    = "hive.openshift.io"
+	clusterImageSetVersion  = "v1"
+	clusterImageSetResource = "clusterimagesets"
 )
 
-// DNSZoneValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-type DNSZoneValidatingAdmissionHook struct {
+// ClusterImageSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
+type ClusterImageSetValidatingAdmissionHook struct {
 	decoder *admission.Decoder
 }
 
-// NewDNSZoneValidatingAdmissionHook constructs a new DNSZoneValidatingAdmissionHook
-func NewDNSZoneValidatingAdmissionHook(decoder *admission.Decoder) *DNSZoneValidatingAdmissionHook {
-	return &DNSZoneValidatingAdmissionHook{decoder: decoder}
+// NewClusterImageSetValidatingAdmissionHook constructs a new ClusterImageSetValidatingAdmissionHook
+func NewClusterImageSetValidatingAdmissionHook(decoder *admission.Decoder) *ClusterImageSetValidatingAdmissionHook {
+	return &ClusterImageSetValidatingAdmissionHook{decoder: decoder}
 }
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
 //                    webhook is accessed by the kube apiserver.
-// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1/dnszonevalidators".
+// For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1/clusterimagesetvalidators".
 //              When the kube apiserver calls this registered REST resource, the generic-admission-server calls the Validate() method below.
-func (a *DNSZoneValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
+func (a *ClusterImageSetValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",
 		"version":  "v1",
-		"resource": "dnszonevalidator",
+		"resource": "clusterimagesetvalidator",
 	}).Info("Registering validation REST resource")
-	// NOTE: This GVR is meant to be different than the DNSZone CRD GVR which has group "hive.openshift.io".
+	// NOTE: This GVR is meant to be different than the ClusterImageSet CRD GVR which has group "hive.openshift.io".
 	return schema.GroupVersionResource{
 			Group:    "admission.hive.openshift.io",
 			Version:  "v1",
-			Resource: "dnszonevalidators",
+			Resource: "clusterimagesetvalidators",
 		},
-		"dnszonevalidator"
+		"clusterimagesetvalidator"
 }
 
 // Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-func (a *DNSZoneValidatingAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
+func (a *ClusterImageSetValidatingAdmissionHook) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",
 		"version":  "v1",
-		"resource": "dnszonevalidator",
+		"resource": "clusterimagesetvalidator",
 	}).Info("Initializing validation REST resource")
 	return nil // No initialization needed right now.
 }
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
 // Usually it's the kube apiserver that is making the admission validation request.
-func (a *DNSZoneValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterImageSetValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -101,7 +99,7 @@ func (a *DNSZoneValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta
 
 // shouldValidate explicitly checks if the request should validated. For example, this webhook may have accidentally been registered to check
 // the validity of some other type of object with a different GVR.
-func (a *DNSZoneValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1beta1.AdmissionRequest) bool {
+func (a *ClusterImageSetValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1beta1.AdmissionRequest) bool {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -110,17 +108,17 @@ func (a *DNSZoneValidatingAdmissionHook) shouldValidate(admissionSpec *admission
 		"method":    "shouldValidate",
 	})
 
-	if admissionSpec.Resource.Group != dnsZoneGroup {
+	if admissionSpec.Resource.Group != clusterImageSetGroup {
 		contextLogger.Debug("Returning False, not our group")
 		return false
 	}
 
-	if admissionSpec.Resource.Version != dnsZoneVersion {
+	if admissionSpec.Resource.Version != clusterImageSetVersion {
 		contextLogger.Debug("Returning False, it's our group, but not the right version")
 		return false
 	}
 
-	if admissionSpec.Resource.Resource != dnsZoneResource {
+	if admissionSpec.Resource.Resource != clusterImageSetResource {
 		contextLogger.Debug("Returning False, it's our group and version, but not the right resource")
 		return false
 	}
@@ -130,8 +128,8 @@ func (a *DNSZoneValidatingAdmissionHook) shouldValidate(admissionSpec *admission
 	return true
 }
 
-// validateCreate specifically validates create operations for DNSZone objects.
-func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+// validateCreate specifically validates create operations for ClusterImageSet objects.
+func (a *ClusterImageSetValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -140,7 +138,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admission
 		"method":    "validateCreate",
 	})
 
-	newObject := &hivev1.DNSZone{}
+	newObject := &hivev1.ClusterImageSet{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
@@ -155,9 +153,8 @@ func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
-	strErrs := dnsvalidation.IsDNS1123Subdomain(newObject.Spec.Zone)
-	if len(strErrs) != 0 {
-		message := fmt.Sprintf("Failed validation: %v", strings.Join(strErrs, ";"))
+	if newObject.Spec.ReleaseImage == "" {
+		message := "Failed validation: you must specify a release image"
 		contextLogger.Infof(message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
@@ -175,8 +172,8 @@ func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	}
 }
 
-// validateUpdate specifically validates update operations for DNSZone objects.
-func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+// validateUpdate specifically validates update operations for ClusterImageSet objects.
+func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -185,7 +182,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 		"method":    "validateUpdate",
 	})
 
-	newObject := &hivev1.DNSZone{}
+	newObject := &hivev1.ClusterImageSet{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
@@ -200,7 +197,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
-	oldObject := &hivev1.DNSZone{}
+	oldObject := &hivev1.ClusterImageSet{}
 	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling OldObject: %v", err.Error())
 		return &admissionv1beta1.AdmissionResponse{
@@ -215,8 +212,8 @@ func (a *DNSZoneValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
-	if oldObject.Spec.Zone != newObject.Spec.Zone {
-		message := "DNSZone.Spec.Zone is immutable"
+	if !reflect.DeepEqual(oldObject.Spec, newObject.Spec) {
+		message := "ClusterImageSet.Spec is immutable"
 		contextLogger.Infof("Failed validation: %v", message)
 
 		return &admissionv1beta1.AdmissionResponse{

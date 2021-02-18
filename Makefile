@@ -34,11 +34,13 @@ IMG ?= hive-controller:latest
 # Image to use when deploying
 DEPLOY_IMAGE ?= registry.ci.openshift.org/openshift/hive-v4.0:hive
 
-GO_PACKAGES :=$(addsuffix ...,$(addprefix ./,$(filter-out vendor/,$(wildcard */))))
+GO_PACKAGES :=./...
 GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
 GO_BUILD_BINDIR :=bin
 # Exclude e2e tests from unit testing
 GO_TEST_PACKAGES :=./pkg/... ./cmd/... ./contrib/...
+
+GO_SUB_MODULES :=./apis
 
 ifeq "$(GO_MOD_FLAGS)" "-mod=vendor"
 	ifeq "$(GOFLAGS)" ""
@@ -73,6 +75,20 @@ vendor:
 	go mod tidy
 	go mod vendor
 
+.PHONY: vendor-submodules
+vendor-submodules: $(addprefix vendor-submodules-,$(GO_SUB_MODULES))
+vendor: vendor-submodules
+
+.PHONY: $(addprefix vendor-submodules-,$(GO_SUB_MODULES))
+$(addprefix vendor-submodules-,$(GO_SUB_MODULES)):
+	# handle tidy for submodules
+	(cd $(subst vendor-submodules-,,$@); go mod tidy && go mod vendor)
+
+.PHONY: verify-vendor
+verify-vendor: vendor
+	git diff --exit-code vendor/
+verify: verify-vendor
+
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
 # the locations kubebuilder generates them.
 .PHONY: manifests
@@ -100,6 +116,15 @@ update: crd
 verify-crd: ensure-controller-gen ensure-yq
 	./hack/verify-crd.sh
 verify: verify-crd
+
+.PHONY: test-unit-submodules
+test-unit-submodules: $(addprefix test-unit-submodules-,$(GO_SUB_MODULES))
+test-unit: test-unit-submodules
+
+.PHONY: $(addprefix test-unit-submodules-,$(GO_SUB_MODULES))
+$(addprefix test-unit-submodules-,$(GO_SUB_MODULES)):
+	# hande unit test for submodule
+	(cd $(subst test-unit-submodules-,,$@); $(GO) test $(GO_MOD_FLAGS) $(GO_TEST_FLAGS) ./...)
 
 .PHONY: test-integration
 test-integration: generate
@@ -178,11 +203,32 @@ verify-lint: install-tools
 	   done'
 verify: verify-lint
 
+.PHONY: verify-govet-submodules
+verify-govet-submodules: $(addprefix verify-govet-submodules-,$(GO_SUB_MODULES))
+verify-govet: verify-govet-submodules
+
+.PHONY: $(addprefix verify-govet-submodules-,$(GO_SUB_MODULES))
+$(addprefix verify-govet-submodules-,$(GO_SUB_MODULES)):
+	# hande govet for submodule
+	(cd $(subst verify-govet-submodules-,,$@); $(GO) vet $(GO_MOD_FLAGS) ./...)
+
+
 # Generate code
 .PHONY: generate
 generate: install-tools
 	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
 update: generate
+
+.PHONY: generate-submodules
+generate-submodules: $(addprefix generate-submodules-,$(GO_SUB_MODULES))
+generate: generate-submodules
+
+
+.PHONY: $(addprefix generate-submodules-,$(GO_SUB_MODULES))
+$(addprefix generate-submodules-,$(GO_SUB_MODULES)):
+	# hande go generate for submodule
+	(cd $(subst generate-submodules-,,$@); $(GOFLAGS_FOR_GENERATE) $(GO) generate ./...)
+
 
 # Build the image using docker
 .PHONY: docker-build

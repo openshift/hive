@@ -456,14 +456,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
-	// Return early and stop processing if Agent install strategy is in play. The controllers that
-	// handle this portion of the API currently live in the assisted service repo, rather than hive.
-	// This will hopefully change in the future.
-	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallStrategy != nil && cd.Spec.Provisioning.InstallStrategy.Agent != nil {
-		cdLog.Info("skipping processing of agent install strategy cluster")
-		return reconcile.Result{}, nil
-	}
-
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			// Make sure we have no deprovision underway metric even though this was probably cleared when we
@@ -647,6 +639,14 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	if !r.expectations.SatisfiedExpectations(request.String()) {
 		cdLog.Debug("waiting for expectations to be satisfied")
+		return reconcile.Result{}, nil
+	}
+
+	// Return early and stop processing if Agent install strategy is in play. The controllers that
+	// handle this portion of the API currently live in the assisted service repo, rather than hive.
+	// This will hopefully change in the future.
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallStrategy != nil && cd.Spec.Provisioning.InstallStrategy.Agent != nil {
+		cdLog.Info("skipping processing of agent install strategy cluster")
 		return reconcile.Result{}, nil
 	}
 

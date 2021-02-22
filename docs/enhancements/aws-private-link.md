@@ -34,6 +34,10 @@ cluster's k8s API using PrivateLink.
 
 ## Design Details
 
+![Overall architecture for PrivateLink access](aws-private-link-arch.png)
+
+source available [here](https://excalidraw.com/#json=6566135793188864,82zIvHwgRTFv4tviGOWDLA) for modification.
+
 ### DNS resolution for installer pods to use PrivateLink
 
 see: https://aws.amazon.com/blogs/networking-and-content-delivery/integrating-aws-transit-gateway-with-aws-privatelink-and-amazon-route-53-resolver/

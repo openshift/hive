@@ -110,6 +110,19 @@ func WithLabelOwner(owner *hivev1.ClusterDeployment) Option {
 	}
 }
 
+// WithCondition adds the specified condition to the DNSZone
+func WithCondition(cond hivev1.DNSZoneCondition) Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		for i, c := range dnsZone.Status.Conditions {
+			if c.Type == cond.Type {
+				dnsZone.Status.Conditions[i] = cond
+				return
+			}
+		}
+		dnsZone.Status.Conditions = append(dnsZone.Status.Conditions, cond)
+	}
+}
+
 func WithZone(zone string) Option {
 	return func(dnsZone *hivev1.DNSZone) {
 		dnsZone.Spec.Zone = zone

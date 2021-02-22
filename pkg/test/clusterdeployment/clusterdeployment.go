@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/pkg/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -149,5 +150,12 @@ func WithPowerState(powerState hivev1.ClusterPowerState) Option {
 func WithHibernateAfter(dur time.Duration) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.HibernateAfter = &metav1.Duration{Duration: dur}
+	}
+}
+
+// WithAWSPlatform sets the specified aws platform on the supplied object.
+func WithAWSPlatform(platform *hivev1aws.Platform) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Platform.AWS = platform
 	}
 }

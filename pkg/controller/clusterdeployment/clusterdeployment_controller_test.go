@@ -41,7 +41,9 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testclusterdeprovision "github.com/openshift/hive/pkg/test/clusterdeprovision"
+	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 )
 
 const (
@@ -648,6 +650,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZone(),
 			},
+			expectedRequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime,
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Empty(t, provisions, "provision should not exist")
@@ -665,6 +668,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZone(),
 			},
+			expectedRequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue)
@@ -2450,6 +2454,140 @@ func TestCopyInstallLogSecret(t *testing.T) {
 	}
 }
 
+func TestEnsureManagedDNSZone(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name                         string
+		existingObjs                 []runtime.Object
+		existingEnvVars              []corev1.EnvVar
+		clusterDeployment            *hivev1.ClusterDeployment
+		expectedErr                  bool
+		expectedDNSZone              *hivev1.DNSZone
+		expectedDNSNotReadyCondition *hivev1.ClusterDeploymentCondition
+	}{
+		{
+			name: "unsupported platform",
+			clusterDeployment: testclusterdeployment.Build(
+				testclusterdeployment.WithNamespace(testNamespace),
+				testclusterdeployment.WithName(testName),
+			),
+			expectedErr: true,
+			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.DNSNotReadyCondition,
+				Status: corev1.ConditionTrue,
+				Reason: dnsUnsupportedPlatformReason,
+			},
+		},
+		{
+			name: "create zone",
+			clusterDeployment: testclusterdeployment.Build(
+				clusterDeploymentBase(),
+			),
+		},
+		{
+			name: "zone already exists and is owned by clusterdeployment",
+			existingObjs: []runtime.Object{
+				testdnszone.Build(
+					dnsZoneBase(),
+					testdnszone.WithControllerOwnerReference(testclusterdeployment.Build(
+						clusterDeploymentBase(),
+					)),
+				),
+			},
+			clusterDeployment: testclusterdeployment.Build(
+				clusterDeploymentBase(),
+			),
+			expectedErr: true,
+			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.DNSNotReadyCondition,
+				Status: corev1.ConditionTrue,
+				Reason: dnsNotReadyReason,
+			},
+		},
+		{
+			name: "zone already exists but is not owned by clusterdeployment",
+			existingObjs: []runtime.Object{
+				testdnszone.Build(
+					dnsZoneBase(),
+				),
+			},
+			clusterDeployment: testclusterdeployment.Build(
+				clusterDeploymentBase(),
+			),
+			expectedErr: true,
+			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.DNSNotReadyCondition,
+				Status: corev1.ConditionTrue,
+				Reason: dnsZoneResourceConflictReason,
+			},
+		},
+		{
+			name: "zone already exists and is owned by clusterdeployment, but has timed out",
+			existingObjs: []runtime.Object{
+				testdnszone.Build(
+					dnsZoneBase(),
+					testdnszone.WithControllerOwnerReference(testclusterdeployment.Build(
+						clusterDeploymentBase(),
+					)),
+				),
+			},
+			clusterDeployment: testclusterdeployment.Build(
+				clusterDeploymentBase(),
+				testclusterdeployment.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.DNSNotReadyCondition,
+					Status:             corev1.ConditionTrue,
+					Reason:             dnsNotReadyReason,
+					LastProbeTime:      metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+					LastTransitionTime: metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+				}),
+			),
+			expectedErr: true,
+			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.DNSNotReadyCondition,
+				Status: corev1.ConditionTrue,
+				Reason: dnsNotReadyTimedoutReason,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			rcd := &ReconcileClusterDeployment{
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				logger:                        log.WithField("controller", "clusterDeployment"),
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+			}
+
+			// act
+			actualDNSZone, err := rcd.ensureManagedDNSZone(test.clusterDeployment, rcd.logger)
+			actualDNSNotReadyCondition := controllerutils.FindClusterDeploymentCondition(test.clusterDeployment.Status.Conditions, hivev1.DNSNotReadyCondition)
+
+			// assert
+			if test.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedDNSZone, actualDNSZone, "Expected DNSZone doesn't match returned zone")
+
+			if actualDNSNotReadyCondition != nil {
+				actualDNSNotReadyCondition.LastProbeTime = metav1.Time{}      // zero out so it won't be checked.
+				actualDNSNotReadyCondition.LastTransitionTime = metav1.Time{} // zero out so it won't be checked.
+				actualDNSNotReadyCondition.Message = ""                       // zero out so it won't be checked.
+			}
+			assert.Equal(t, test.expectedDNSNotReadyCondition, actualDNSNotReadyCondition, "Expected DNSZone DNSNotReady condition doesn't match returned condition")
+		})
+	}
+}
+
 func getProvisions(c client.Client) []*hivev1.ClusterProvision {
 	provisionList := &hivev1.ClusterProvisionList{}
 	if err := c.List(context.TODO(), provisionList); err != nil {
@@ -2491,5 +2629,20 @@ func testCompletedFailedImageSetJob() *batchv1.Job {
 				Message: "The pod failed to start because one the containers did not start",
 			}},
 		},
+	}
+}
+
+func dnsZoneBase() testdnszone.Option {
+	return func(dnsZone *hivev1.DNSZone) {
+		dnsZone.Name = controllerutils.DNSZoneName(testName)
+		dnsZone.Namespace = testNamespace
+	}
+}
+
+func clusterDeploymentBase() testclusterdeployment.Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Namespace = testNamespace
+		clusterDeployment.Name = testName
+		clusterDeployment.Spec.Platform.AWS = &hivev1aws.Platform{}
 	}
 }

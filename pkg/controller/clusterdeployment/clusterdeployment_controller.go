@@ -62,9 +62,13 @@ const (
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
 
-	dnsNotReadyReason  = "DNSNotReady"
-	dnsReadyReason     = "DNSReady"
-	dnsReadyAnnotation = "hive.openshift.io/dnsready"
+	defaultDNSNotReadyTimeout     = 10 * time.Minute
+	dnsNotReadyReason             = "DNSNotReady"
+	dnsNotReadyTimedoutReason     = "DNSNotReadyTimedOut"
+	dnsUnsupportedPlatformReason  = "DNSUnsupportedPlatform"
+	dnsZoneResourceConflictReason = "DNSZoneResoucreConflict"
+	dnsReadyReason                = "DNSReady"
+	dnsReadyAnnotation            = "hive.openshift.io/dnsready"
 
 	installAttemptsLimitReachedReason = "InstallAttemptsLimitReached"
 	installOnlyOnceSetReason          = "InstallOnlyOnceSet"
@@ -657,6 +661,14 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	return r.reconcileExistingProvision(cd, cdLog)
 }
 
+func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.ClusterDeploymentCondition) {
+	dnsNotReadyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+	return dnsNotReadyCondition != nil &&
+			dnsNotReadyCondition.Status == corev1.ConditionTrue &&
+			(dnsNotReadyCondition.Reason == dnsNotReadyReason || dnsNotReadyCondition.Reason == dnsNotReadyTimedoutReason),
+		dnsNotReadyCondition
+}
+
 func (r *ReconcileClusterDeployment) startNewProvision(
 	cd *hivev1.ClusterDeployment,
 	releaseImage string,
@@ -681,6 +693,13 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			return reconcile.Result{}, err
 		}
 		if dnsZone == nil {
+			// dnsNotReady condition was set.
+			if isSet, _ := isDNSNotReadyConditionSet(cd); isSet {
+				// dnsNotReadyReason is why the dnsNotReady condition was set, therefore requeue so that we check to see if it times out.
+				// add defaultRequeueTime to avoid the race condition where the controller is reconciled at the exact time of the timeout (unlikely, but possible).
+				return reconcile.Result{RequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime}, nil
+			}
+
 			return reconcile.Result{}, nil
 		}
 
@@ -1660,8 +1679,8 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	case p.Azure != nil:
 	default:
 		cdLog.Error("cluster deployment platform does not support managed DNS")
-		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsNotReadyReason, "Managed DNS is not supported for platform", cdLog); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
+		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsUnsupportedPlatformReason, "Managed DNS is not supported on specified platform", cdLog); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition for DNSUnsupportedPlatform reason")
 			return nil, err
 		}
 		return nil, errors.New("managed DNS not supported on platform")
@@ -1682,7 +1701,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 
 	if !metav1.IsControlledBy(dnsZone, cd) {
 		cdLog.Error("DNS zone already exists but is not owned by cluster deployment")
-		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsNotReadyReason, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
+		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsZoneResourceConflictReason, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return nil, err
 		}
@@ -1713,6 +1732,18 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		status = corev1.ConditionTrue
 		reason = dnsNotReadyReason
 		message = "DNS Zone not yet available"
+
+		isDNSNotReadyConditionSet, dnsNotReadyCondition := isDNSNotReadyConditionSet(cd)
+		if isDNSNotReadyConditionSet {
+			// Timeout if it has been in this state for longer than allowed.
+			timeSinceLastTransition := time.Since(dnsNotReadyCondition.LastTransitionTime.Time)
+			if timeSinceLastTransition >= defaultDNSNotReadyTimeout {
+				// We've timed out, set the dnsNotReadyTimedoutReason for the DNSNotReady condition
+				cdLog.WithField("timeout", defaultDNSNotReadyTimeout).Warn("Timed out waiting on managed dns creation")
+				reason = dnsNotReadyTimedoutReason
+				message = "DNS Zone timed out in DNSNotReady state"
+			}
+		}
 	}
 	if err := r.setDNSNotReadyCondition(cd, status, reason, message, cdLog); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")

@@ -1569,6 +1569,11 @@ data:
       - "Throttling: Rate exceeded"
       installFailingReason: AWSAPIRateLimitExceeded
       installFailingMessage: AWS API rate limit exceeded
+    - name: AWSVPCLimitExceeded
+      searchRegexStrings:
+      - "VpcLimitExceeded"
+      installFailingReason: AWSVPCLimitExceeded
+      installFailingMessage: AWS VPC limit exceeded
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:

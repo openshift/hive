@@ -40,8 +40,8 @@ const (
 )
 
 const (
-	featureGateConfigMapName               = "hive-feature-gates"
-	featureGateConfigMapNameHashAnnotation = "hive.openshift.io/hive-feature-gates-hash"
+	featureGateConfigMapName = "hive-feature-gates"
+	inputHashAnnotation      = "hive.openshift.io/hive-admission-input-sources-hash"
 )
 
 var webhookAssets = []string{
@@ -54,7 +54,7 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, featureGateConfigHash string) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, additionalHashes ...string) error {
 	hiveNSName := getHiveNamespace(instance)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
@@ -110,9 +110,15 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	}
 	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
-	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[featureGateConfigMapNameHashAnnotation] = featureGateConfigHash
+
+	hasher := md5.New()
+	for _, v := range additionalHashes {
+		hasher.Write([]byte(v))
+	}
+	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = hex.EncodeToString(hasher.Sum(nil))
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
+	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
 
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {

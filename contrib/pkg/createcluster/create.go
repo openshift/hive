@@ -275,7 +275,8 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 	flags.BoolVar(&opt.CentralMachineManagement, "central-machine-mgmt", false, "Enable central machine management for cluster")
-	flags.BoolVar(&opt.Internal, "internal", false, "When set, configures the publishing strategy for the cluster to Internal")
+	flags.BoolVar(&opt.Internal, "internal", false, `When set, it configures the install-config.yaml's publish field to Internal.
+OpenShift Installer publishes all the services of the cluster like API server and ingress to internal network and not the Internet.`)
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")

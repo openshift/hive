@@ -204,6 +204,18 @@ spec:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                    privateLink:
+                      description: PrivateLink allows uses to enable access to the
+                        cluster's API server using AWS PrivateLink. AWS PrivateLink
+                        includes a pair of VPC Endpoint Service and VPC Endpoint accross
+                        AWS accounts and allows clients to connect to services using
+                        AWS's internal networking instead of the Internet.
+                      properties:
+                        enabled:
+                          type: boolean
+                      required:
+                      - enabled
+                      type: object
                     region:
                       description: Region specifies the AWS region where the cluster
                         will be created.

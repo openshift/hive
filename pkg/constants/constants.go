@@ -331,6 +331,10 @@ const (
 
 	// MachineManagementAnnotation
 	MachineManagementAnnotation = "hive.openshift.io/machine-management-cluster-name"
+
+	// AWSPrivateLinkControllerConfigFileEnvVar if present, points to a simple text
+	// file that includes configuration for aws-private-link-controller
+	AWSPrivateLinkControllerConfigFileEnvVar = "AWS_PRIVATELINK_CONTROLLER_CONFIG_FILE"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

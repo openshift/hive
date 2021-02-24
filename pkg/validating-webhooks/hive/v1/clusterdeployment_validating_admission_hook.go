@@ -24,8 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/awsprivatelink"
 	"github.com/openshift/hive/pkg/manageddns"
 )
 
@@ -44,9 +46,11 @@ var (
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterDeploymentValidatingAdmissionHook struct {
-	decoder             *admission.Decoder
-	validManagedDomains []string
-	fs                  *featureSet
+	decoder *admission.Decoder
+
+	validManagedDomains  []string
+	fs                   *featureSet
+	awsPrivateLinkConfig *hivev1.AWSPrivateLinkConfig
 }
 
 // NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
@@ -60,11 +64,18 @@ func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *Cl
 	for _, md := range managedDomains {
 		domains = append(domains, md.Domains...)
 	}
+
+	aplConfig, err := awsprivatelink.ReadAWSPrivateLinkControllerConfigFile()
+	if err != nil {
+		logger.WithError(err).Fatal("Unable to read AWS Private Link Config file")
+	}
+
 	logger.WithField("managedDomains", domains).Info("Read managed domains")
 	return &ClusterDeploymentValidatingAdmissionHook{
-		decoder:             decoder,
-		validManagedDomains: domains,
-		fs:                  newFeatureSet(),
+		decoder:              decoder,
+		validManagedDomains:  domains,
+		fs:                   newFeatureSet(),
+		awsPrivateLinkConfig: aplConfig,
 	}
 }
 
@@ -277,6 +288,10 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), cd.Spec.Platform)...)
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
+	if cd.Spec.Platform.AWS != nil {
+		allErrs = append(allErrs, validateAWSPrivateLink(specPath.Child("platform", "aws"), cd.Spec.Platform.AWS, a.awsPrivateLinkConfig)...)
+	}
+
 	if cd.Spec.Provisioning != nil {
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
@@ -308,6 +323,31 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
+}
+
+func validateAWSPrivateLink(path *field.Path, platform *hivev1aws.Platform, config *hivev1.AWSPrivateLinkConfig) field.ErrorList {
+	allErrs := field.ErrorList{}
+	pl := platform.PrivateLink
+
+	if pl == nil || !pl.Enabled {
+		return allErrs
+	}
+
+	if config == nil || len(config.EndpointVPCInventory) == 0 {
+		allErrs = append(allErrs, field.Forbidden(path.Child("privateLink", "enabled"), "AWS PrivateLink is not supported in the environment"))
+		return allErrs
+	}
+
+	supportedRegions := sets.NewString()
+	for _, inv := range config.EndpointVPCInventory {
+		supportedRegions.Insert(inv.Region)
+	}
+	if !supportedRegions.Has(platform.Region) {
+		allErrs = append(allErrs, field.Forbidden(path.Child("privateLink", "enabled"),
+			fmt.Sprintf("AWS Private Link is not supported in %s region", platform.Region)))
+	}
+
+	return allErrs
 }
 
 func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeployment) field.ErrorList {

@@ -526,14 +526,6 @@ func (m *InstallManager) copyFile(src, dst string) error {
 
 // cleanupFailedInstall allows recovering from an installation error and allows retries
 func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision) error {
-	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
-		return err
-	}
-
-	if err := m.cleanupAdminPasswordSecret(); err != nil {
-		return err
-	}
-
 	infraID := provision.Spec.InfraID
 	if infraID == nil {
 		infraID = provision.Spec.PrevInfraID
@@ -545,6 +537,14 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, prov
 		}
 	} else {
 		m.log.Warn("skipping cleanup as no infra ID set")
+	}
+
+	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
+		return err
+	}
+
+	if err := m.cleanupAdminPasswordSecret(); err != nil {
+		return err
 	}
 
 	return nil

@@ -160,7 +160,8 @@ type Options struct {
 	Internal                          bool
 
 	// AWS
-	AWSUserTags []string
+	AWSUserTags    []string
+	AWSPrivateLink bool
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -288,6 +289,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 
 	// AWS flags
 	flags.StringSliceVar(&opt.AWSUserTags, "aws-user-tags", nil, "Additional tags to add to resources. Must be in the form \"key=value\"")
+	flags.BoolVar(&opt.AWSPrivateLink, "aws-private-link", false, "Enables access to cluster using AWS PrivateLink")
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
@@ -387,6 +389,10 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		if o.ManifestsDir == "" {
 			return fmt.Errorf("--credentials-mode-manual requires --manifests-dir containing custom Secrets with manually provisioned credentials")
 		}
+	}
+
+	if o.AWSPrivateLink && o.Cloud != cloudAWS {
+		return fmt.Errorf("--aws-private-link can only be enabled for AWS cloud platform")
 	}
 
 	if o.Adopt {
@@ -583,6 +589,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			SecretAccessKey: secretAccessKey,
 			UserTags:        userTags,
 			Region:          o.Region,
+			PrivateLink:     o.AWSPrivateLink,
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:

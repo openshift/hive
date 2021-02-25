@@ -39,7 +39,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef", "PowerState", "HibernateAfter", "InstallAttemptsLimit"}
+	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef", "PowerState", "HibernateAfter", "InstallAttemptsLimit", "MachineManagement"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -359,6 +359,7 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 	// To add validation for feature gates use these examples
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
 	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.provisioning.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
+	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.machineManagement", hivev1.FeatureGateMachineManagement)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()

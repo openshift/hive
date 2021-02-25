@@ -9,6 +9,9 @@ const (
 	// FeatureGateAgentInstallStrategy enables the use of the alpha ClusterDeployment agent based
 	// install strategy and platforms.
 	FeatureGateAgentInstallStrategy = "AlphaAgentInstallStrategy"
+
+	// FeatureGateMachineManagement enables the use of the central machine management alpha.
+	FeatureGateMachineManagement = "AlphaMachineManagement"
 )
 
 // HiveConfigSpec defines the desired state of Hive

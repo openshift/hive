@@ -134,16 +134,27 @@ type ClusterDeploymentSpec struct {
 	// +optional
 	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
 
-	// MachineManagementStrategy is the machine management strategy that will be used when provisioning workers.
+	// MachineManagement contains machine management settings including the strategy that will be used when
+	// provisioning worker machines.
 	// +optional
-	MachineManagementStrategy *MachineManagementStrategy `json:"machineManagementStrategy,omitempty"`
+	MachineManagement *MachineManagement `json:"machineManagement,omitempty"`
 }
 
-// MachineManagementStrategy contains settings used for central machine management.
-type MachineManagementStrategy struct {
-	// Strategy is the strategy used for worker machine management. Options are "InCluster" (default) and "Central".
+// MachineManagement contains settings used for machine management.
+type MachineManagement struct {
+	// Central contains settings for central machine management. If set Central indicates that central machine
+	// management will be used as opposed to management on the spoke cluster.
 	// +optional
-	Strategy string `json:"strategy,omitempty"`
+	Central *CentralMachineManagement `json:"central,omitempty"`
+
+	// TargetNamespace is the namespace in which we will create worker machineset resources. Resources
+	// required to create machines will be copied to the TargetNamespace.
+	// +optional
+	TargetNamespace string `json:"targetNamespace,omitempty"`
+}
+
+// CentralMachineManagement contains settings used for central machine managemnt.
+type CentralMachineManagement struct {
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.
@@ -273,10 +284,6 @@ type ClusterDeploymentStatus struct {
 	// InstallStrategy contains observed state from specific install strategies.
 	// +optional
 	InstallStrategy *InstallStrategyStatus `json:"installStrategy,omitempty"`
-
-	// TargetNamespace is the namespace in which we will create worker machineset resources and the namespace where we will copy relevant secrets.
-	// +optional
-	TargetNamespace string `json:"targetNamespace,omitempty"`
 }
 
 // InstallStrategyStatus contains observed state from specific install strategies.

@@ -462,25 +462,26 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
-	if cd.Spec.MachineManagementStrategy != nil && cd.Spec.MachineManagementStrategy.Strategy == "Central" {
-		targetNamespace := cd.Status.TargetNamespace
+	if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.Central != nil {
+		targetNamespace := cd.Spec.MachineManagement.TargetNamespace
 		if targetNamespace == "" {
 			targetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
 		}
 
-		cdLog.Info("Creating the target namespace ", targetNamespace)
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: targetNamespace},
-		}
-		if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
-			return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", ns.Name, err)
-		}
-
-		if cd.Status.TargetNamespace == "" {
-			cd.Status.TargetNamespace = targetNamespace
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
+		if cd.Spec.MachineManagement.TargetNamespace == "" {
+			cd.Spec.MachineManagement.TargetNamespace = targetNamespace
+			if err := r.Update(context.TODO(), cd); err != nil {
 				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster target namespace")
 				return reconcile.Result{Requeue: true}, nil
+			}
+		}
+
+		ns := &corev1.Namespace{}
+		if err := r.Get(context.Background(), types.NamespacedName{Name: targetNamespace}, ns); err != nil && apierrors.IsNotFound(err) {
+			cdLog.Info("Creating the target namespace ", targetNamespace)
+			ns.Name = targetNamespace
+			if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
+				return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", targetNamespace, err)
 			}
 		}
 

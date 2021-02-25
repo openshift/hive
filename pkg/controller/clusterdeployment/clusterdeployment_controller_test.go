@@ -121,7 +121,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 
 	getTargetNS := func(c client.Client, cd *hivev1.ClusterDeployment) *corev1.Namespace {
 		ns := &corev1.Namespace{}
-		err := c.Get(context.TODO(), client.ObjectKey{Name: cd.Status.TargetNamespace}, ns)
+		err := c.Get(context.TODO(), client.ObjectKey{Name: cd.Spec.MachineManagement.TargetNamespace}, ns)
 		if err == nil {
 			return ns
 		}
@@ -1554,8 +1554,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
-					cd.Spec.MachineManagementStrategy = &hivev1.MachineManagementStrategy{
-						Strategy: "Central",
+					cd.Spec.MachineManagement = &hivev1.MachineManagement{
+						Central: &hivev1.CentralMachineManagement{},
 					}
 					return cd
 				}(),
@@ -1577,6 +1577,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					}
 				}
 				assert.Truef(t, cdAsOwnerRef, "cluster deployment not owner of %s", ns.Name)
+				assert.Equal(t, ns.Name, cd.Spec.MachineManagement.TargetNamespace)
 
 				credsSecret := getSecret(c, cd.Spec.Platform.AWS.CredentialsSecretRef.Name, ns.Name)
 				assert.NotNil(t, credsSecret)

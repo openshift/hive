@@ -322,8 +322,8 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	if o.CentralMachineManagement {
-		cd.Spec.MachineManagementStrategy = &hivev1.MachineManagementStrategy{
-			Strategy: "Central",
+		cd.Spec.MachineManagement = &hivev1.MachineManagement{
+			Central: &hivev1.CentralMachineManagement{},
 		}
 	}
 

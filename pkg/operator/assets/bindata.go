@@ -1612,6 +1612,21 @@ data:
       - "failed to initialize the cluster: Cluster operator monitoring is still updating"
       installFailingReason: MonitoringOperatorStillUpdating
       installFailingMessage: Timeout waiting for the monitoring operator to become ready
+    - name: AuthenticationOperatorDegraded
+      searchRegexStrings:
+      - "Cluster operator authentication Degraded is True"
+      installFailingReason: AuthenticationOperatorDegraded
+      installFailingMessage: Timeout waiting for the authentication operator to become ready
+    - name: GeneralOperatorDegraded
+      searchRegexStrings:
+      - "Cluster operator.*Degraded is True"
+      installFailingReason: GeneralOperatorDegraded
+      installFailingMessage: Timeout waiting for an operator to become ready
+    - name: GeneralClusterOperatorsStillUpdating
+      searchRegexStrings:
+      - "failed to initialize the cluster: Some cluster operators are still updating:"
+      installFailingReason: GeneralClusterOperatorsStillUpdating
+      installFailingMessage: Timeout waiting for all cluster operators to become ready
     # Processing stops at the first match, so this more generic
     # message about the connection failure must always come after the
     # more specific message for LibvirtSSHKeyPermissionDenied.
@@ -1620,6 +1635,11 @@ data:
       - "could not connect to libvirt"
       installFailingReason: LibvirtConnectionFailed
       installFailingMessage: "Could not connect to libvirt host"
+    - name: GeneralQuota
+      searchRegexStrings:
+      - "Quota '[A-Z_]*' exceeded"
+      installFailingReason: GeneralQuotaExceeded
+      installFailingMessage: Quota exceeded
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

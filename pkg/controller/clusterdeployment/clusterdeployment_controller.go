@@ -66,7 +66,7 @@ const (
 	dnsNotReadyReason             = "DNSNotReady"
 	dnsNotReadyTimedoutReason     = "DNSNotReadyTimedOut"
 	dnsUnsupportedPlatformReason  = "DNSUnsupportedPlatform"
-	dnsZoneResourceConflictReason = "DNSZoneResoucreConflict"
+	dnsZoneResourceConflictReason = "DNSZoneResourceConflict"
 	dnsReadyReason                = "DNSReady"
 	dnsReadyAnnotation            = "hive.openshift.io/dnsready"
 

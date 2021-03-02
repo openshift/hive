@@ -15,7 +15,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/apis"
 	"github.com/openshift/hive/pkg/constants"
 )
 

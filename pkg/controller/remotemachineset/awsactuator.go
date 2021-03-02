@@ -24,7 +24,7 @@ import (
 	installertypesaws "github.com/openshift/installer/pkg/types/aws"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )

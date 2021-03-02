@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	installertypes "github.com/openshift/installer/pkg/types"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 const fakeMetadataFormatStr = `{"aws":{"identifier":[{"kubernetes.io/cluster/fake-infraid":"owned"},{"openshiftClusterID":"%s"}],"region":"us-east-1"},"clusterID":"%s","clusterName":"%s","infraID":"fake-infra-id"}`

@@ -9,9 +9,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/azureclient"
 	dns "github.com/openshift/hive/pkg/controller/dnszone"

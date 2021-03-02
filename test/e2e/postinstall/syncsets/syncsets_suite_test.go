@@ -24,8 +24,8 @@ import (
 	clientwatch "k8s.io/client-go/tools/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hiveintv1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
 )

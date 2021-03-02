@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"

@@ -14,8 +14,8 @@ import (
 
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1osp "github.com/openshift/hive/pkg/apis/hive/v1/openstack"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1osp "github.com/openshift/hive/apis/hive/v1/openstack"
 )
 
 // This test is broken! The installer now checks for trunk support by querying the OpenStack service.

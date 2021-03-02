@@ -9,8 +9,8 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1vsphere "github.com/openshift/hive/pkg/apis/hive/v1/vsphere"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	"github.com/openshift/hive/pkg/constants"
 )
 

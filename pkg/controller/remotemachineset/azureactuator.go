@@ -16,7 +16,7 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/azureclient"
 )
 

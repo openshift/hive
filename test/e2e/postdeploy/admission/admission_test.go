@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	webhook "github.com/openshift/hive/pkg/apis/hive/v1/validating-webhooks"
+	webhook "github.com/openshift/hive/pkg/validating-webhooks/hive/v1"
 	"github.com/openshift/hive/test/e2e/common"
 )
 

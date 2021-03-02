@@ -21,9 +21,13 @@
   - [Using Serving Certificates](#using-serving-certificates)
     - [Generating a Certificate](#generating-a-certificate)
     - [Using Generated Certificate](#using-generated-certificate)
+  - [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
+  - [Updating Hive APIs](#updating-hive-apis)
+  - [Importing Hive APIs](#importing-hive-apis)
   - [Dependency management](#dependency-management)
     - [Updating Dependencies](#updating-dependencies)
     - [Re-creating vendor Directory](#re-creating-vendor-directory)
+    - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
     - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
   - [Running the e2e test locally](#running-the-e2e-test-locally)
   - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
@@ -280,6 +284,55 @@ NOTE: The cluster name and domain used to create the certificate must match the 
 Example:
 `hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key` 
 
+## Code editors and multi-module repositories
+
+Hive is a [multi-module repository](https://github.com/golang/go/wiki/Modules#faqs--multi-module-repositories) with
+the various submodules.
+
+`gopls` currently doesn't officially support multi-module repositories. There are current recommendations for some
+code editors to work around the current issue.
+
+See [gopls doc](https://github.com/golang/tools/blob/master/gopls/doc/workspace.md#multiple-modules) for next steps.
+
+## Updating Hive APIs
+
+Hive is a [multi-module repository](https://github.com/golang/go/wiki/Modules#faqs--multi-module-repositories) with
+the `github.com/openshift/hive/apis` go submodule.
+
+A separate `github.com/openshift/hive/apis` submodule allows other repositories to easily import the Hive APIs without
+having to deal with the complex vendoring introduced by dependencies of Hive controllers like the OpenShift Installer.
+
+Since Hive module `github.com/openshift/hive` or `root` module uses vendor directory for all it's dependencies, **ANY**
+change in `github.com/openshift/hive/apis` module requires updating the dependency in the `root` module for change to
+take effect.
+
+Therefore, these steps must be followed when updating the Hive APIs,
+
+1. Make necessary modifications to `github.com/openshift/hive/apis`.
+
+2. Follow the steps defined in [Updating Dependencies](#Updating-Dependencies) to update the dependecies of `root` module
+
+3. Now you can use various `make` targets or `go test` for testing your changes.
+
+**IMPORTANT**: go versions => 1.15 default to `-mod=vendor` for all the subcommands and therefore will
+only use the copy of modules in the `vendor/` directory. Anytime you make changes to apis submodule and
+not update the dependencies of the root module, all the builds, tests will continue to use old version of the
+submodule.
+
+## Importing Hive APIs
+
+External projects that want to import the Hive APIs can import `github.com/openshift/hive/apis` into their go.mod.
+The module uses the same versioning as the root Hive module.
+
+```
+go get -u github.com/openshift/hive/apis@{required version}
+```
+
+For getting the latest Hive APIS,
+
+```
+go get -u github.com/openshift/hive/apis@master
+```
 
 ## Dependency management
 
@@ -308,6 +361,24 @@ To recreate *_vendor_* directory, you can run the following command:
 ```
 make vendor
 ```
+
+### Updating the Kubernetes dependencies
+
+Hive is a [multi-module repository](https://github.com/golang/go/wiki/Modules#faqs--multi-module-repositories) with
+the various submodules like,
+
+- `github.com/openshift/hive/apis`
+
+These submodules define their own dependencies, most commonly from the Kubernetes ecosystem. All build artifacts are
+generated from the `root` module and therefore the version of all dependencies used is defined by the `go.mod` in the
+root module, but making sure the dependecies of the all the submodules match the root modules help reduce divergence
+and dependencies pain.
+
+So whenever the root module updates the Kubernetes ecosystem dependencies,
+
+1. Update the submodules to use the desired version of the Kubernetes ecosystem.
+
+2. Update the root mosdule dependencies to the desired version of the Kubernetes ecosystem.
 
 ### Vendoring the OpenShift Installer
 

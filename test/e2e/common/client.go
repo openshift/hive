@@ -16,7 +16,7 @@ import (
 
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 
-	hiveapis "github.com/openshift/hive/pkg/apis"
+	hiveapis "github.com/openshift/hive/apis"
 	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 )
 

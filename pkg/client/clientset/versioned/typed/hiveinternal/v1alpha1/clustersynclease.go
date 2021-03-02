@@ -6,7 +6,7 @@ import (
 	"context"
 	"time"
 
-	v1alpha1 "github.com/openshift/hive/pkg/apis/hiveinternal/v1alpha1"
+	v1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	scheme "github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"

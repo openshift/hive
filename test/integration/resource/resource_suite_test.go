@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/apis"
 )
 
 var cfg *rest.Config

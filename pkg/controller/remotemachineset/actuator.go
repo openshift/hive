@@ -5,7 +5,7 @@ import (
 
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 //go:generate mockgen -source=./actuator.go -destination=./mock/actuator_generated.go -package=mock

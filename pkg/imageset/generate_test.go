@@ -5,7 +5,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 func TestGenerateImageSetJob(t *testing.T) {

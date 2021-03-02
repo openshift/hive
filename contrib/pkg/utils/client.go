@@ -5,7 +5,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/openshift/hive/pkg/apis"
+	"github.com/openshift/hive/apis"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

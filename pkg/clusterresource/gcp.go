@@ -10,8 +10,8 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installergcp "github.com/openshift/installer/pkg/types/gcp"
 
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
-	hivev1gcp "github.com/openshift/hive/pkg/apis/hive/v1/gcp"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
 )

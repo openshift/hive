@@ -24,11 +24,14 @@ func init() {
 }
 
 const (
-	dnsAlreadyExistsLog    = "blahblah\naws_route53_record.api_external: [ERR]: Error building changeset: InvalidChangeBatch: [Tried to create resource record set [name='api.jh-stg-2405-2.n6b3.s1.devshift.org.'type='A'] but it already exists]\n\nblahblah"
-	pendingVerificationLog = "blahblah\naws_instance.master.2: Error launching source instance: PendingVerification: Your request for accessing resources in this region is being validated, and you will not be able to launch additional resources in this region until the validation is complete. We will notify you by email once your request has been validated. While normally resolved within minutes, please allow up to 4 hours for this process to complete. If the issue still persists, please let us know by writing to awsa\n\nblahblah"
-	gcpInvalidProjectIDLog = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
-	gcpSSDQUotaLog         = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error waiting for instance to create: Quota 'SSD_TOTAL_GB' exceeded. Limit: 500.0 in region asia-northeast2.\nblahblah"
-	kubeAPIWaitTimeoutLog  = "blahblah\ntime=\"2021-01-03T07:04:44Z\" level=fatal msg=\"waiting for Kubernetes API: context deadline exceeded\""
+	dnsAlreadyExistsLog     = "blahblah\naws_route53_record.api_external: [ERR]: Error building changeset: InvalidChangeBatch: [Tried to create resource record set [name='api.jh-stg-2405-2.n6b3.s1.devshift.org.'type='A'] but it already exists]\n\nblahblah"
+	pendingVerificationLog  = "blahblah\naws_instance.master.2: Error launching source instance: PendingVerification: Your request for accessing resources in this region is being validated, and you will not be able to launch additional resources in this region until the validation is complete. We will notify you by email once your request has been validated. While normally resolved within minutes, please allow up to 4 hours for this process to complete. If the issue still persists, please let us know by writing to awsa\n\nblahblah"
+	gcpInvalidProjectIDLog  = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
+	gcpSSDQUotaLog          = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error waiting for instance to create: Quota 'SSD_TOTAL_GB' exceeded. Limit: 500.0 in region asia-northeast2.\nblahblah"
+	kubeAPIWaitTimeoutLog   = "blahblah\ntime=\"2021-01-03T07:04:44Z\" level=fatal msg=\"waiting for Kubernetes API: context deadline exceeded\""
+	natGatewayLimitExceeded = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error creating NAT Gateway: NatGatewayLimitExceeded: The maximum number of NAT Gateways has been reached.\""
+	vpcLimitExceeded        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating VPC: VpcLimitExceeded: The maximum number of VPCs has been reached.\""
+	genericLimitExceeded    = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating Generic: GenericLimitExceeded: The maximum number of Generics has been reached.\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -62,6 +65,24 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(gcpSSDQUotaLog),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPQuotaSSDTotalGBExceeded",
+		},
+		{
+			name:           "AWSNATGatewayLimitExceeded",
+			log:            pointer.StringPtr(natGatewayLimitExceeded),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "AWSNATGatewayLimitExceeded",
+		},
+		{
+			name:           "AWSVPCLimitExceeded",
+			log:            pointer.StringPtr(vpcLimitExceeded),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "AWSVPCLimitExceeded",
+		},
+		{
+			name:           "Generic ResourceLimitExceeded",
+			log:            pointer.StringPtr(genericLimitExceeded),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "ResourceLimitExceeded",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",
@@ -262,6 +283,22 @@ func buildRegexConfigMap() *corev1.ConfigMap {
   - "Quota \'SSD_TOTAL_GB\' exceeded"
   installFailingReason: GCPQuotaSSDTotalGBExceeded
   installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
+# AWS Specific
+- name: AWSNATGatewayLimitExceeded
+  searchRegexStrings:
+  - "NatGatewayLimitExceeded"
+  installFailingReason: AWSNATGatewayLimitExceeded
+  installFailingMessage: AWS NAT gateway limit exceeded
+- name: AWSVPCLimitExceeded
+  searchRegexStrings:
+    - "VpcLimitExceeded"
+  installFailingReason: AWSVPCLimitExceeded
+  installFailingMessage: AWS VPC limit exceeded
+- name: ResourceLimitExceeded
+  searchRegexStrings:
+  - "LimitExceeded"
+  installFailingReason: ResourceLimitExceeded
+  installFailingMessage: Resource limit exceeded
 `,
 		},
 	}

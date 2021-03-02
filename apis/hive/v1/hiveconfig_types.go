@@ -348,6 +348,7 @@ const (
 	VeleroBackupControllerName         ControllerName = "velerobackup"
 	MetricsControllerName              ControllerName = "metrics"
 	ClustersyncControllerName          ControllerName = "clustersync"
+	MachineManagementControllerName    ControllerName = "machineManagement"
 )
 
 // SpecificControllerConfig contains the configuration for a specific controller

@@ -41,7 +41,6 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
@@ -460,76 +459,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster region label")
 		}
 		return reconcile.Result{}, err
-	}
-
-	if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.Central != nil {
-		targetNamespace := cd.Spec.MachineManagement.TargetNamespace
-		if targetNamespace == "" {
-			targetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
-		}
-
-		if cd.Spec.MachineManagement.TargetNamespace == "" {
-			cd.Spec.MachineManagement.TargetNamespace = targetNamespace
-			if err := r.Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster target namespace")
-				return reconcile.Result{Requeue: true}, nil
-			}
-		}
-
-		ns := &corev1.Namespace{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: targetNamespace}, ns); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Info("Creating the target namespace ", targetNamespace)
-			ns.Name = targetNamespace
-			if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", targetNamespace, err)
-			}
-		}
-
-		// Add cluster deployment as additional owner reference to namespace and set clusterName annotation
-		if err := r.addOwnershipToTargetNamespace(cd, cdLog, targetNamespace); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		cdLog.Infof("Creating credentials secret in the target namespace %s", targetNamespace)
-		credentialsSecretName := utils.CredentialsSecretName(cd)
-		credentialsSecret := &corev1.Secret{}
-		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
-		}
-		credentialsSecret.Namespace = targetNamespace
-		credentialsSecret.ResourceVersion = ""
-		if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
-		}
-
-		cdLog.Infof("Creating pull secret in the target namespace %s", targetNamespace)
-		pullSecretName := cd.Spec.PullSecretRef.Name
-		pullSecret := &corev1.Secret{}
-		err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: pullSecretName}, pullSecret)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", pullSecretName, err)
-		}
-		pullSecret.Namespace = targetNamespace
-		pullSecret.ResourceVersion = ""
-		if err := r.Create(context.TODO(), pullSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return reconcile.Result{}, fmt.Errorf("failed to create pull secret: %v", err)
-		}
-
-		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
-			cdLog.Infof("Creating ssh key secret in the target namespace %s", targetNamespace)
-			SSHKeySecretName := cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name
-			SSHKeySecret := &corev1.Secret{}
-			err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: SSHKeySecretName}, SSHKeySecret)
-			if err != nil {
-				return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", SSHKeySecretName, err)
-			}
-			SSHKeySecret.Namespace = targetNamespace
-			SSHKeySecret.ResourceVersion = ""
-			if err := r.Create(context.TODO(), SSHKeySecret); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create ssh key secret: %v", err)
-			}
-		}
 	}
 
 	// Return early and stop processing if Agent install strategy is in play. The controllers that

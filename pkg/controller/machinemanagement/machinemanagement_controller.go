@@ -158,44 +158,50 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
-		cdLog.Infof("Creating credentials secret in the target namespace %s", targetNamespace)
 		credentialsSecretName := utils.CredentialsSecretName(cd)
 		credentialsSecret := &corev1.Secret{}
-		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
-		}
-		credentialsSecret.Namespace = targetNamespace
-		credentialsSecret.ResourceVersion = ""
-		if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
+		if err := r.Get(context.Background(), types.NamespacedName{Name: credentialsSecretName, Namespace: targetNamespace}, credentialsSecret); err != nil && apierrors.IsNotFound(err) {
+			cdLog.Infof("Creating credentials secret in the target namespace %s", targetNamespace)
+			err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
+			if err != nil {
+				return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
+			}
+			credentialsSecret.Namespace = targetNamespace
+			credentialsSecret.ResourceVersion = ""
+			if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+				return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
+			}
 		}
 
-		cdLog.Infof("Creating pull secret in the target namespace %s", targetNamespace)
 		pullSecretName := cd.Spec.PullSecretRef.Name
 		pullSecret := &corev1.Secret{}
-		err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: pullSecretName}, pullSecret)
-		if err != nil {
-			return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", pullSecretName, err)
-		}
-		pullSecret.Namespace = targetNamespace
-		pullSecret.ResourceVersion = ""
-		if err := r.Create(context.TODO(), pullSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return reconcile.Result{}, fmt.Errorf("failed to create pull secret: %v", err)
+		if err := r.Get(context.Background(), types.NamespacedName{Name: pullSecretName, Namespace: targetNamespace}, pullSecret); err != nil && apierrors.IsNotFound(err) {
+			cdLog.Infof("Creating pull secret in the target namespace %s", targetNamespace)
+			err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: pullSecretName}, pullSecret)
+			if err != nil {
+				return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", pullSecretName, err)
+			}
+			pullSecret.Namespace = targetNamespace
+			pullSecret.ResourceVersion = ""
+			if err := r.Create(context.TODO(), pullSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+				return reconcile.Result{}, fmt.Errorf("failed to create pull secret: %v", err)
+			}
 		}
 
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
-			cdLog.Infof("Creating ssh key secret in the target namespace %s", targetNamespace)
 			SSHKeySecretName := cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name
 			SSHKeySecret := &corev1.Secret{}
-			err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: SSHKeySecretName}, SSHKeySecret)
-			if err != nil {
-				return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", SSHKeySecretName, err)
-			}
-			SSHKeySecret.Namespace = targetNamespace
-			SSHKeySecret.ResourceVersion = ""
-			if err := r.Create(context.TODO(), SSHKeySecret); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create ssh key secret: %v", err)
+			if err := r.Get(context.Background(), types.NamespacedName{Name: SSHKeySecretName, Namespace: targetNamespace}, SSHKeySecret); err != nil && apierrors.IsNotFound(err) {
+				cdLog.Infof("Creating ssh key secret in the target namespace %s", targetNamespace)
+				err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: SSHKeySecretName}, SSHKeySecret)
+				if err != nil {
+					return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", SSHKeySecretName, err)
+				}
+				SSHKeySecret.Namespace = targetNamespace
+				SSHKeySecret.ResourceVersion = ""
+				if err := r.Create(context.TODO(), SSHKeySecret); err != nil && !apierrors.IsAlreadyExists(err) {
+					return reconcile.Result{}, fmt.Errorf("failed to create ssh key secret: %v", err)
+				}
 			}
 		}
 	}

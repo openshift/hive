@@ -133,6 +133,28 @@ type ClusterDeploymentSpec struct {
 	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
 	// +optional
 	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
+
+	// MachineManagement contains machine management settings including the strategy that will be used when
+	// provisioning worker machines.
+	// +optional
+	MachineManagement *MachineManagement `json:"machineManagement,omitempty"`
+}
+
+// MachineManagement contains settings used for machine management.
+type MachineManagement struct {
+	// Central contains settings for central machine management. If set Central indicates that central machine
+	// management will be used as opposed to management on the spoke cluster.
+	// +optional
+	Central *CentralMachineManagement `json:"central,omitempty"`
+
+	// TargetNamespace is the namespace in which we will create worker machineset resources. Resources
+	// required to create machines will be copied to the TargetNamespace.
+	// +optional
+	TargetNamespace string `json:"targetNamespace,omitempty"`
+}
+
+// CentralMachineManagement contains settings used for central machine managemnt.
+type CentralMachineManagement struct {
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.

@@ -24,8 +24,8 @@ import (
 
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 
-	apihelpers "github.com/openshift/hive/pkg/apis/helpers"
-	hivev1 "github.com/openshift/hive/pkg/apis/hive/v1"
+	apihelpers "github.com/openshift/hive/apis/helpers"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/utils"

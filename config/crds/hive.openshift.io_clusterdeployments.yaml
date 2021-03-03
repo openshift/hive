@@ -366,6 +366,52 @@ spec:
                     an Assisted Agent based installation to bare metal. Can only be
                     used with the Assisted InstallStrategy.
                   properties:
+                    agentSelector:
+                      description: AgentSelector is a label selector used for associating
+                        relevant custom resources with this cluster. (Agent, BareMetalHost,
+                        etc)
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
                     apiVIP:
                       description: APIVIP is the virtual IP used to reach the OpenShift
                         cluster's API.
@@ -386,6 +432,7 @@ spec:
                       - Enabled
                       type: string
                   required:
+                  - agentSelector
                   - apiVIP
                   - ingressVIP
                   type: object
@@ -672,53 +719,6 @@ spec:
                       description: Agent is the install strategy configuration for
                         provisioning a cluster with the Agent based assisted installer.
                       properties:
-                        agentSelector:
-                          description: AgentSelector is a label selector used for
-                            associating relevant custom resources with this cluster.
-                            (Agent, BareMetalHost, etc)
-                          properties:
-                            matchExpressions:
-                              description: matchExpressions is a list of label selector
-                                requirements. The requirements are ANDed.
-                              items:
-                                description: A label selector requirement is a selector
-                                  that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: key is the label key that the selector
-                                      applies to.
-                                    type: string
-                                  operator:
-                                    description: operator represents a key's relationship
-                                      to a set of values. Valid operators are In,
-                                      NotIn, Exists and DoesNotExist.
-                                    type: string
-                                  values:
-                                    description: values is an array of string values.
-                                      If the operator is In or NotIn, the values array
-                                      must be non-empty. If the operator is Exists
-                                      or DoesNotExist, the values array must be empty.
-                                      This array is replaced during a strategic merge
-                                      patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
-                            matchLabels:
-                              additionalProperties:
-                                type: string
-                              description: matchLabels is a map of {key,value} pairs.
-                                A single {key,value} in the matchLabels map is equivalent
-                                to an element of matchExpressions, whose key field
-                                is "key", the operator is "In", and the values array
-                                contains only "value". The requirements are ANDed.
-                              type: object
-                          type: object
                         networking:
                           description: Networking is the configuration for the pod
                             network provider in the cluster.
@@ -795,7 +795,6 @@ spec:
                             for use in debugging.
                           type: string
                       required:
-                      - agentSelector
                       - networking
                       - provisionRequirements
                       type: object

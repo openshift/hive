@@ -1,9 +1,5 @@
 package agent
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
 // InstallStrategy is the install strategy configuration for provisioning a cluster with the
 // Agent based assisted installer.
 type InstallStrategy struct {
@@ -14,10 +10,6 @@ type InstallStrategy struct {
 	// SSHPublicKey will be added to all cluster hosts for use in debugging.
 	// +optional
 	SSHPublicKey string `json:"sshPublicKey,omitempty"`
-
-	// AgentSelector is a label selector used for associating relevant custom resources with this cluster.
-	// (Agent, BareMetalHost, etc)
-	AgentSelector metav1.LabelSelector `json:"agentSelector"`
 
 	// ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
 	ProvisionRequirements ProvisionRequirements `json:"provisionRequirements"`

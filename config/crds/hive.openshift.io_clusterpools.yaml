@@ -189,13 +189,6 @@ spec:
                       description: IngressVIP is the virtual IP used for cluster ingress
                         traffic.
                       type: string
-                    vipDHCPAllocation:
-                      description: VIPDHCPAllocation indicates if virtual IP DHCP
-                        allocation mode is enabled.
-                      enum:
-                      - ""
-                      - Enabled
-                      type: string
                   required:
                   - agentSelector
                   - apiVIP

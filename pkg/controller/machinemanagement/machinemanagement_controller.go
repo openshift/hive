@@ -14,15 +14,13 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -130,6 +128,28 @@ func (r *ReconcileMachineManagement) Reconcile(request reconcile.Request) (resul
 }
 
 func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnErr error) {
+	// Return early if cluster deployment was deleted
+	if !cd.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
+			if cd.Spec.MachineManagement.TargetNamespace != "" {
+				// Clean up namespace
+				cdLog.Info("Deleting target namespace ", cd.Spec.MachineManagement.TargetNamespace)
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: cd.Spec.MachineManagement.TargetNamespace},
+				}
+				if err := r.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+					return reconcile.Result{}, fmt.Errorf("failed to delete namespace: %w", err)
+				}
+			}
+			// Remove finalizer from cluster deployment
+			controllerutil.RemoveFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
+			if err := r.Update(context.TODO(), cd); err != nil {
+				return reconcile.Result{}, fmt.Errorf("failed to remove finalizer from cluster deployment: %w", err)
+			}
+		}
+		return reconcile.Result{}, nil
+	}
+
 	if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.Central != nil {
 		targetNamespace := cd.Spec.MachineManagement.TargetNamespace
 		if targetNamespace == "" {
@@ -138,8 +158,14 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 
 		if cd.Spec.MachineManagement.TargetNamespace == "" {
 			cd.Spec.MachineManagement.TargetNamespace = targetNamespace
+
+			// Ensure the cluster deployment has a finalizer for cleanup
+			if !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
+				controllerutil.AddFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
+			}
+
 			if err := r.Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster target namespace")
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment")
 				return reconcile.Result{Requeue: true}, nil
 			}
 		}
@@ -153,8 +179,8 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 			}
 		}
 
-		// Add cluster deployment as additional owner reference to namespace and set clusterName annotation
-		if err := r.addOwnershipToTargetNamespace(cd, cdLog, targetNamespace); err != nil {
+		// Ensure targetNamespace has machine management annotation
+		if err := r.addAnnotationToTargetNamespace(cd, cdLog, targetNamespace); err != nil {
 			return reconcile.Result{}, err
 		}
 
@@ -208,8 +234,8 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 	return reconcile.Result{}, nil
 }
 
-// addOwnershipToTargetNamespace adds cluster deployment as an additional non-controlling owner to target namespace
-func (r *ReconcileMachineManagement) addOwnershipToTargetNamespace(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger, name string) error {
+// addAnnotationToTargetNamespace adds annotation to cluster deployment
+func (r *ReconcileMachineManagement) addAnnotationToTargetNamespace(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger, name string) error {
 	cdLog = cdLog.WithField("namespace", name)
 
 	namespace := &corev1.Namespace{}
@@ -219,25 +245,13 @@ func (r *ReconcileMachineManagement) addOwnershipToTargetNamespace(cd *hivev1.Cl
 	}
 
 	annotationAdded := false
-	if namespace.Annotations[constants.CentralMachineManagementAnnotation] != cd.Name {
+	if namespace.Annotations[constants.MachineManagementAnnotation] != cd.Name {
 		cdLog.Debug("Setting annotation on target namespace")
-		namespace.Annotations = k8sannotations.AddAnnotation(namespace.Annotations, constants.CentralMachineManagementAnnotation, cd.Name)
+		namespace.Annotations = k8sannotations.AddAnnotation(namespace.Annotations, constants.MachineManagementAnnotation, cd.Name)
 		annotationAdded = true
 	}
 
-	cdRef := metav1.OwnerReference{
-		APIVersion:         cd.APIVersion,
-		Kind:               cd.Kind,
-		Name:               cd.Name,
-		UID:                cd.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
-	}
-
-	cdRefChanged := librarygocontroller.EnsureOwnerRef(namespace, cdRef)
-	if cdRefChanged {
-		cdLog.Debug("ownership added for cluster deployment")
-	}
-	if cdRefChanged || annotationAdded {
+	if annotationAdded {
 		cdLog.Info("namespace has been modified, updating")
 		if err := r.Update(context.TODO(), namespace); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating namespace")

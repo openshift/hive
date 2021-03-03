@@ -45,7 +45,6 @@ import (
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
 	"github.com/openshift/hive/pkg/remoteclient"
-	k8sannotations "github.com/openshift/hive/pkg/util/annotations"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
@@ -2245,46 +2244,6 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating syncset failed condition")
 		return err
 	}
-	return nil
-}
-
-// addOwnershipToTargetNamespace adds cluster deployment as an additional non-controlling owner to target namespace
-func (r *ReconcileClusterDeployment) addOwnershipToTargetNamespace(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger, name string) error {
-	cdLog = cdLog.WithField("namespace", name)
-
-	namespace := &corev1.Namespace{}
-	if err := r.Get(context.Background(), types.NamespacedName{Name: name}, namespace); err != nil {
-		cdLog.WithError(err).Error("failed to get namespace")
-		return err
-	}
-
-	annotationAdded := false
-	if namespace.Annotations[constants.CentralMachineManagementAnnotation] != cd.Name {
-		cdLog.Debug("Setting annotation on target namespace")
-		namespace.Annotations = k8sannotations.AddAnnotation(namespace.Annotations, constants.CentralMachineManagementAnnotation, cd.Name)
-		annotationAdded = true
-	}
-
-	cdRef := metav1.OwnerReference{
-		APIVersion:         cd.APIVersion,
-		Kind:               cd.Kind,
-		Name:               cd.Name,
-		UID:                cd.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
-	}
-
-	cdRefChanged := librarygocontroller.EnsureOwnerRef(namespace, cdRef)
-	if cdRefChanged {
-		cdLog.Debug("ownership added for cluster deployment")
-	}
-	if cdRefChanged || annotationAdded {
-		cdLog.Info("namespace has been modified, updating")
-		if err := r.Update(context.TODO(), namespace); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating namespace")
-			return err
-		}
-	}
-
 	return nil
 }
 

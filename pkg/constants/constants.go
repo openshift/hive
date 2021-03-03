@@ -321,8 +321,8 @@ const (
 	// feature gates that are enabled.
 	HiveFeatureGatesEnabledEnvVar = "HIVE_FEATURE_GATES_ENABLED"
 
-	// CentralMachineManagementAnnotation
-	CentralMachineManagementAnnotation = "hive.openshift.io/machine-management-cluster-name"
+	// MachineManagementAnnotation
+	MachineManagementAnnotation = "hive.openshift.io/machine-management-cluster-name"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -18,6 +18,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -66,7 +67,6 @@ func TestMachineManagementReconcile(t *testing.T) {
 	openshiftapiv1.Install(scheme.Scheme)
 	routev1.Install(scheme.Scheme)
 
-	// Utility function to get the test CD from the fake client
 	getCD := func(c client.Client) *hivev1.ClusterDeployment {
 		cd := &hivev1.ClusterDeployment{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, cd)
@@ -103,7 +103,7 @@ func TestMachineManagementReconcile(t *testing.T) {
 		reconcilerSetup      func(*ReconcileMachineManagement)
 	}{
 		{
-			name: "Central Machine Management",
+			name: "Create target namespace and add finalizer to cd",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeployment()
@@ -119,21 +119,38 @@ func TestMachineManagementReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				ns := getTargetNS(c, cd)
-				assert.Equal(t, ns.Annotations[constants.CentralMachineManagementAnnotation], testName)
-				refs := ns.GetOwnerReferences()
-				cdAsOwnerRef := false
-				for _, ref := range refs {
-					if ref.Name == testName {
-						cdAsOwnerRef = true
-					}
-				}
-				assert.Truef(t, cdAsOwnerRef, "cluster deployment not owner of %s", ns.Name)
+				assert.Equal(t, ns.Annotations[constants.MachineManagementAnnotation], testName)
 				assert.Equal(t, ns.Name, cd.Spec.MachineManagement.TargetNamespace)
+				assert.True(t, controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace))
 
 				credsSecret := getSecret(c, cd.Spec.Platform.AWS.CredentialsSecretRef.Name, ns.Name)
 				assert.NotNil(t, credsSecret)
 				pullSecret := getSecret(c, cd.Spec.PullSecretRef.Name, ns.Name)
 				assert.NotNil(t, pullSecret)
+			},
+		},
+		{
+			name: "Cleanup target namespace and remove finalizer from cd",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testDeletedClusterDeployment()
+					cd.Spec.MachineManagement = &hivev1.MachineManagement{
+						Central:         &hivev1.CentralMachineManagement{},
+						TargetNamespace: "foo-lqmsh-targetns-vxx6f",
+					}
+					controllerutil.AddFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, "aws-credentials", corev1.DockerConfigJsonKey, "{}"),
+				testNs("foo-lqmsh-targetns-vxx6f"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assert.True(t, !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace))
+				ns := getTargetNS(c, cd)
+				assert.Nil(t, ns)
 			},
 		},
 	}
@@ -244,6 +261,13 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func testDeletedClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	now := metav1.Now()
+	cd.DeletionTimestamp = &now
+	return cd
+}
+
 func testRemoteClusterAPIClient() client.Client {
 	remoteClusterRouteObject := &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,4 +296,13 @@ func testSecretWithNamespace(secretType corev1.SecretType, name, namespace, key,
 		},
 	}
 	return s
+}
+
+func testNs(name string) *corev1.Namespace {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	return ns
 }

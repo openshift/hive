@@ -45,6 +45,10 @@ const (
 	// searching and filtering clusters, as well as in SelectorSyncSets to only
 	// target specific regions of the cluster-platform.
 	HiveClusterRegionLabel = "hive.openshift.io/cluster-region"
+
+	// FinalizerMachineManagementTargetNamespace is used on ClusterDeployments to
+	// ensure we clean up the machine management target namespace before cleaning up the API object.
+	FinalizerMachineManagementTargetNamespace string = "hive.openshift.io/machine-management-targetnamespace"
 )
 
 // ClusterPowerState is used to indicate whether a cluster is running or in a

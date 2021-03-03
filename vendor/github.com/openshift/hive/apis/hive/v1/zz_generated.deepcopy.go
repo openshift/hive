@@ -2746,7 +2746,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.AgentBareMetal != nil {
 		in, out := &in.AgentBareMetal, &out.AgentBareMetal
 		*out = new(agent.BareMetalPlatform)
-		(*in).DeepCopyInto(*out)
+		**out = **in
 	}
 	return
 }

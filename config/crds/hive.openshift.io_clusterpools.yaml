@@ -191,8 +191,6 @@ spec:
                       type: string
                   required:
                   - agentSelector
-                  - apiVIP
-                  - ingressVIP
                   type: object
                 aws:
                   description: AWS is the configuration used when installing on AWS.

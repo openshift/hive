@@ -7,14 +7,16 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 type BareMetalPlatform struct {
 
 	// APIVIP is the virtual IP used to reach the OpenShift cluster's API.
-	APIVIP string `json:"apiVIP"`
+	// +optional
+	APIVIP string `json:"apiVIP,omitempty"`
 
 	// APIVIPDNSName is the domain name used to reach the OpenShift cluster API.
 	// +optional
 	APIVIPDNSName string `json:"apiVIPDNSName,omitempty"`
 
 	// IngressVIP is the virtual IP used for cluster ingress traffic.
-	IngressVIP string `json:"ingressVIP"`
+	// +optional
+	IngressVIP string `json:"ingressVIP,omitempty"`
 
 	// AgentSelector is a label selector used for associating relevant custom resources with this cluster.
 	// (Agent, BareMetalHost, etc)

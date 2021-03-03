@@ -1,6 +1,7 @@
 package remotemachineset
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -32,6 +34,8 @@ import (
 const (
 	gcpCredsSecretName = "gcp-credentials"
 	testProjectID      = "test-gcp-project-id"
+	testNetworkID      = "test-gcp-network-id"
+	testSubnetID       = "test-subnet-id"
 )
 
 func TestGCPActuator(t *testing.T) {
@@ -204,6 +208,8 @@ func TestGCPActuator(t *testing.T) {
 				expectations:   controllerExpectations,
 				projectID:      testProjectID,
 				leasesRequired: test.requireLeases,
+				network:        testNetworkID,
+				subnet:         testSubnetID,
 			}
 
 			generatedMachineSets, _, err := ga.GenerateMachineSets(clusterDeployment, test.pool, ga.logger)
@@ -223,6 +229,10 @@ func TestGCPActuator(t *testing.T) {
 					assert.True(t, ok, "failed to convert to gcpProviderSpec")
 
 					assert.Equal(t, testInstanceType, gcpProvider.MachineType, "unexpected instance type")
+
+					// Ensure network details are propagated correctly.
+					assert.Equal(t, ga.network, gcpProvider.NetworkInterfaces[0].Network)
+					assert.Equal(t, ga.subnet, gcpProvider.NetworkInterfaces[0].Subnetwork)
 
 					// Ensure GCP disk type and size was correctly set or defaulted and made it to the resulting MachineSets:
 					expectedDiskType := test.pool.Spec.Platform.GCP.OSDisk.DiskType
@@ -674,6 +684,132 @@ func TestRequireLeases(t *testing.T) {
 			assert.Equal(t, tc.expectedResult, actualResult)
 		})
 	}
+}
+
+func TestGetNetwork(t *testing.T) {
+	cases := []struct {
+		name              string
+		remoteMachineSets []machineapi.MachineSet
+		expectError       bool
+	}{
+		{
+			name:              "valid remote machinesets",
+			remoteMachineSets: []machineapi.MachineSet{mockMachineSet("worker1", "worker", false, 1, 0)},
+		},
+		{
+			name: "invalid remote machineset",
+			remoteMachineSets: func() []machineapi.MachineSet {
+				ms := []machineapi.MachineSet{mockMachineSet("worker1", "worker", false, 1, 0)}
+				ms[0].Spec.Template.Spec.ProviderSpec.Value = nil
+				return ms
+			}(),
+			expectError: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			machineapi.SchemeBuilder.AddToScheme(scheme)
+			gcpprovider.SchemeBuilder.AddToScheme(scheme)
+			network, subnet, actualErr := getNetwork(tc.remoteMachineSets, scheme, log.StandardLogger())
+			if tc.expectError {
+				assert.Error(t, actualErr, "expected an error")
+			} else {
+				if assert.NoError(t, actualErr, "unexpected error") {
+					assert.Equal(t, testNetworkID, network, "unexpected network ID")
+					assert.Equal(t, testSubnetID, subnet, "unexpected subnet ID")
+				}
+			}
+		})
+	}
+}
+
+func mockMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) machineapi.MachineSet {
+	msReplicas := int32(replicas)
+	ms := machineapi.MachineSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: machineapi.SchemeGroupVersion.String(),
+			Kind:       "MachineSet",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: machineAPINamespace,
+			Labels: map[string]string{
+				machinePoolNameLabel:                       machineType,
+				"machine.openshift.io/cluster-api-cluster": testInfraID,
+				constants.HiveManagedLabel:                 "true",
+			},
+			Generation: int64(generation),
+		},
+
+		Spec: machineapi.MachineSetSpec{
+			Replicas: &msReplicas,
+			Template: machineapi.MachineTemplateSpec{
+				Spec: mockMachineSpec(machineType),
+			},
+		},
+	}
+	// Add a pre-existing annotation which we will ensure remains in updated machinesets.
+	if unstompedAnnotation {
+		ms.Annotations = map[string]string{
+			"hive.openshift.io/unstomped": "true",
+		}
+	}
+	return ms
+}
+
+func mockMachineSpec(machineType string) machineapi.MachineSpec {
+	rawGCPProviderSpec, err := encodeGCPMachineProviderSpec(testGCPProviderSpec(), scheme.Scheme)
+	if err != nil {
+		log.WithError(err).Fatal("error encoding GCP machine provider spec")
+	}
+	return machineapi.MachineSpec{
+		ObjectMeta: machineapi.ObjectMeta{
+			Labels: map[string]string{
+				"machine.openshift.io/cluster-api-cluster":      testInfraID,
+				"machine.openshift.io/cluster-api-machine-role": machineType,
+				"machine.openshift.io/cluster-api-machine-type": machineType,
+			},
+		},
+		ProviderSpec: machineapi.ProviderSpec{
+			Value: rawGCPProviderSpec,
+		},
+
+		Taints: []corev1.Taint{
+			{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+}
+
+func testGCPProviderSpec() *gcpprovider.GCPMachineProviderSpec {
+	return &gcpprovider.GCPMachineProviderSpec{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GCPMachineProviderSpec",
+			APIVersion: gcpprovider.SchemeGroupVersion.String(),
+		},
+		NetworkInterfaces: []*gcpprovider.GCPNetworkInterface{
+			{
+				Network:    testNetworkID,
+				Subnetwork: testSubnetID,
+			},
+		},
+	}
+}
+
+func encodeGCPMachineProviderSpec(gcoProviderSpec *gcpprovider.GCPMachineProviderSpec, scheme *runtime.Scheme) (*runtime.RawExtension, error) {
+	serializer := jsonserializer.NewSerializer(jsonserializer.DefaultMetaFactory, scheme, scheme, false)
+	var buffer bytes.Buffer
+	err := serializer.Encode(gcoProviderSpec, &buffer)
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.RawExtension{
+		Raw: buffer.Bytes(),
+	}, nil
 }
 
 func mockListComputeZones(gClient *mockgcp.MockClient, zones []string, region string) {

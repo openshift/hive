@@ -53,6 +53,8 @@ type GCPActuator struct {
 	scheme    *runtime.Scheme
 	projectID string
 	imageID   string
+	network   string
+	subnet    string
 	// expectations is a reference to the reconciler's TTLCache of machinepoolnamelease creates each machinepool
 	// expects to see.
 	expectations   controllerutils.ExpectationsInterface
@@ -94,6 +96,12 @@ func NewGCPActuator(
 		return nil, err
 	}
 
+	network, subnet, err := getNetwork(remoteMachineSets, scheme, logger)
+	if err != nil {
+		logger.WithError(err).Error("error getting network information from remote machines")
+		return nil, err
+	}
+
 	actuator := &GCPActuator{
 		gcpClient:      gcpClient,
 		client:         client,
@@ -102,6 +110,8 @@ func NewGCPActuator(
 		expectations:   expectations,
 		projectID:      projectID,
 		imageID:        imageID,
+		network:        network,
+		subnet:         subnet,
 		leasesRequired: requireLeases(clusterVersion, remoteMachineSets, logger),
 	}
 	return actuator, nil
@@ -163,8 +173,10 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			GCP: &installertypesgcp.Platform{
-				Region:    cd.Spec.Platform.GCP.Region,
-				ProjectID: a.projectID,
+				Region:        cd.Spec.Platform.GCP.Region,
+				ProjectID:     a.projectID,
+				ComputeSubnet: a.subnet,
+				Network:       a.network,
 			},
 		},
 	}
@@ -449,6 +461,33 @@ func getGCPImageID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, lo
 	imageID := providerSpec.Disks[0].Image
 	logger.WithField("image", imageID).Debug("resolved image to use for new machinesets")
 	return imageID, nil
+}
+
+// getNetwork retrieves the network information (Network name and subnet)
+// from existing machines on the remote cluster.
+func getNetwork(remoteMachineSets []machineapi.MachineSet,
+	scheme *runtime.Scheme, logger log.FieldLogger) (string, string, error) {
+	if len(remoteMachineSets) == 0 {
+		return "", "", nil
+	}
+
+	remoteMachineProviderSpec, err := decodeGCPMachineProviderSpec(
+		remoteMachineSets[0].Spec.Template.Spec.ProviderSpec.Value,
+		scheme,
+	)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode GCPMachineProviderSpec from remote machinesets")
+		return "", "", errors.Wrap(err, "cannot decode GCPMachineProviderSpec from remote machinesets")
+	}
+
+	if len(remoteMachineProviderSpec.NetworkInterfaces) == 0 {
+		logger.Warn("remote machine do not have any network interfaces")
+		return "", "", errors.Wrap(err, "remote machine do not have any network interfaces")
+	}
+
+	network := remoteMachineProviderSpec.NetworkInterfaces[0].Network
+	subnet := remoteMachineProviderSpec.NetworkInterfaces[0].Subnetwork
+	return network, subnet, nil
 }
 
 func decodeGCPMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*gcpproviderv1beta1.GCPMachineProviderSpec, error) {

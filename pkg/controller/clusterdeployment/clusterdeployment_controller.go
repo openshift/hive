@@ -194,7 +194,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		RateLimiter:             rateLimiter,
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("could not create controller")
 		return err
 	}
 
@@ -284,9 +284,6 @@ type ReconcileClusterDeployment struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
-//
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-//
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
@@ -458,14 +455,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set cluster region label")
 		}
 		return reconcile.Result{}, err
-	}
-
-	// Return early and stop processing if Agent install strategy is in play. The controllers that
-	// handle this portion of the API currently live in the assisted service repo, rather than hive.
-	// This will hopefully change in the future.
-	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallStrategy != nil && cd.Spec.Provisioning.InstallStrategy.Agent != nil {
-		cdLog.Info("skipping processing of agent install strategy cluster")
-		return reconcile.Result{}, nil
 	}
 
 	if cd.DeletionTimestamp != nil {

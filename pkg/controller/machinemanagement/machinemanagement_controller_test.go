@@ -157,7 +157,7 @@ func TestMachineManagementReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger := log.WithField("controller", "clusterDeployment")
+			logger := log.WithField("controller", "machineManagement")
 			fakeClient := fake.NewFakeClient(test.existing...)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()

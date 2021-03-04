@@ -65,13 +65,13 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
-	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{
+	c, err := controller.New("machinemanagement-controller", mgr, controller.Options{
 		Reconciler:              r,
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("could not create controller")
 		return err
 	}
 
@@ -98,11 +98,8 @@ type ReconcileMachineManagement struct {
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 }
 
-// Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
-// and what is in the ClusterDeployment.Spec
-//
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-//
+// Reconcile reads settings within ClusterDeployment.Spec.MachineManagement and creates/copies resources necessary for
+// managing machines centrally when requested.
 func (r *ReconcileMachineManagement) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
@@ -131,7 +128,7 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 	// Return early if cluster deployment was deleted
 	if !cd.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
-			if cd.Spec.MachineManagement.TargetNamespace != "" {
+			if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.TargetNamespace != "" {
 				// Clean up namespace
 				cdLog.Info("Deleting target namespace ", cd.Spec.MachineManagement.TargetNamespace)
 				ns := &corev1.Namespace{
@@ -151,13 +148,8 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.Central != nil {
-		targetNamespace := cd.Spec.MachineManagement.TargetNamespace
-		if targetNamespace == "" {
-			targetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
-		}
-
 		if cd.Spec.MachineManagement.TargetNamespace == "" {
-			cd.Spec.MachineManagement.TargetNamespace = targetNamespace
+			cd.Spec.MachineManagement.TargetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
 
 			// Ensure the cluster deployment has a finalizer for cleanup
 			if !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
@@ -171,28 +163,29 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 		}
 
 		ns := &corev1.Namespace{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: targetNamespace}, ns); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Info("Creating the target namespace ", targetNamespace)
-			ns.Name = targetNamespace
+		if err := r.Get(context.Background(), types.NamespacedName{Name: cd.Spec.MachineManagement.TargetNamespace}, ns); err != nil && apierrors.IsNotFound(err) {
+			cdLog.Info("Creating the target namespace ", cd.Spec.MachineManagement.TargetNamespace)
+			ns.Name = cd.Spec.MachineManagement.TargetNamespace
 			if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", targetNamespace, err)
+				return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", cd.Spec.MachineManagement.TargetNamespace, err)
 			}
 		}
 
 		// Ensure targetNamespace has machine management annotation
-		if err := r.addAnnotationToTargetNamespace(cd, cdLog, targetNamespace); err != nil {
+		if err := r.addAnnotationToTargetNamespace(cd, cdLog, cd.Spec.MachineManagement.TargetNamespace); err != nil {
 			return reconcile.Result{}, err
 		}
 
+		// TODO: Secrets should be kept in sync with secrets in the cluster deployment namespace.
 		credentialsSecretName := utils.CredentialsSecretName(cd)
 		credentialsSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: credentialsSecretName, Namespace: targetNamespace}, credentialsSecret); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Infof("Creating credentials secret in the target namespace %s", targetNamespace)
+		if err := r.Get(context.Background(), types.NamespacedName{Name: credentialsSecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, credentialsSecret); err != nil && apierrors.IsNotFound(err) {
+			cdLog.Infof("Creating credentials secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
 			err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
 			if err != nil {
 				return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
 			}
-			credentialsSecret.Namespace = targetNamespace
+			credentialsSecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
 			credentialsSecret.ResourceVersion = ""
 			if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
 				return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
@@ -201,13 +194,13 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 
 		pullSecretName := cd.Spec.PullSecretRef.Name
 		pullSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: pullSecretName, Namespace: targetNamespace}, pullSecret); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Infof("Creating pull secret in the target namespace %s", targetNamespace)
+		if err := r.Get(context.Background(), types.NamespacedName{Name: pullSecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, pullSecret); err != nil && apierrors.IsNotFound(err) {
+			cdLog.Infof("Creating pull secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
 			err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: pullSecretName}, pullSecret)
 			if err != nil {
 				return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", pullSecretName, err)
 			}
-			pullSecret.Namespace = targetNamespace
+			pullSecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
 			pullSecret.ResourceVersion = ""
 			if err := r.Create(context.TODO(), pullSecret); err != nil && !apierrors.IsAlreadyExists(err) {
 				return reconcile.Result{}, fmt.Errorf("failed to create pull secret: %v", err)
@@ -217,13 +210,13 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
 			SSHKeySecretName := cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name
 			SSHKeySecret := &corev1.Secret{}
-			if err := r.Get(context.Background(), types.NamespacedName{Name: SSHKeySecretName, Namespace: targetNamespace}, SSHKeySecret); err != nil && apierrors.IsNotFound(err) {
-				cdLog.Infof("Creating ssh key secret in the target namespace %s", targetNamespace)
+			if err := r.Get(context.Background(), types.NamespacedName{Name: SSHKeySecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, SSHKeySecret); err != nil && apierrors.IsNotFound(err) {
+				cdLog.Infof("Creating ssh key secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
 				err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: SSHKeySecretName}, SSHKeySecret)
 				if err != nil {
 					return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", SSHKeySecretName, err)
 				}
-				SSHKeySecret.Namespace = targetNamespace
+				SSHKeySecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
 				SSHKeySecret.ResourceVersion = ""
 				if err := r.Create(context.TODO(), SSHKeySecret); err != nil && !apierrors.IsAlreadyExists(err) {
 					return reconcile.Result{}, fmt.Errorf("failed to create ssh key secret: %v", err)

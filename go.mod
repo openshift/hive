@@ -110,3 +110,6 @@ replace k8s.io/client-go => k8s.io/client-go v0.20.0
 
 // needed for fixing CVE-2020-29529
 replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0
+
+// point sigs.k8s.io/controller-runtime to forked version
+replace sigs.k8s.io/controller-runtime => github.com/openshift-hive/controller-runtime v0.6.2-openshift

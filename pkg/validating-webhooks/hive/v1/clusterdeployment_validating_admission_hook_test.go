@@ -996,6 +996,63 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
 		},
 		// TODO: is the inverse of the above test ok? no VIPDHCPAllocation set, and machine network is defined
+		{
+			name: "Block create with targetNamespace set",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "nope",
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "targetNamespace can be set if unset",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central: &hivev1.CentralMachineManagement{},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "okay",
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Update,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "targetNamespace is immutable once set",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "yes",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "nope",
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Update,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
 	}
 
 	for _, tc := range cases {

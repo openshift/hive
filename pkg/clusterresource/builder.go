@@ -124,6 +124,9 @@ type Builder struct {
 
 	// InstallConfig Secret to be used as template for deployment install-config
 	InstallConfigTemplate string
+
+	// CentralMachineManagement
+	CentralMachineManagement bool
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -316,6 +319,12 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
 	} else if o.ImageSet != "" {
 		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: o.ImageSet}
+	}
+
+	if o.CentralMachineManagement {
+		cd.Spec.MachineManagement = &hivev1.MachineManagement{
+			Central: &hivev1.CentralMachineManagement{},
+		}
 	}
 
 	cd.Spec.Provisioning.InstallConfigSecretRef = &corev1.LocalObjectReference{Name: o.getInstallConfigSecretName()}

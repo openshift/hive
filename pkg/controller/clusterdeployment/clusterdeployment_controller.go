@@ -194,7 +194,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		RateLimiter:             rateLimiter,
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new cluster deployment")
+		log.WithField("controller", ControllerName).WithError(err).Error("could not create controller")
 		return err
 	}
 
@@ -284,9 +284,6 @@ type ReconcileClusterDeployment struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
-//
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-//
 func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")

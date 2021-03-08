@@ -115,6 +115,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		}
 		return nil
 	}
+
 	getImageSetJob := func(c client.Client) *batchv1.Job {
 		return getJob(c, imageSetJobName)
 	}

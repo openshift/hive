@@ -49,6 +49,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/dnsendpoint"
 	"github.com/openshift/hive/pkg/controller/dnszone"
 	"github.com/openshift/hive/pkg/controller/hibernation"
+	"github.com/openshift/hive/pkg/controller/machinemanagement"
 	"github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/remoteingress"
 	"github.com/openshift/hive/pkg/controller/remotemachineset"
@@ -91,6 +92,7 @@ var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	velerobackup.ControllerName:         velerobackup.Add,
 	clusterpool.ControllerName:          clusterpool.Add,
 	hibernation.ControllerName:          hibernation.Add,
+	machinemanagement.ControllerName:    machinemanagement.Add,
 }
 
 type controllerManagerOptions struct {

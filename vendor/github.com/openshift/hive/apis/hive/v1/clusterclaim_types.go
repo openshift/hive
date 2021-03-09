@@ -82,6 +82,7 @@ const (
 // +kubebuilder:printcolumn:name="Pending",type="string",JSONPath=".status.conditions[?(@.type=='Pending')].reason"
 // +kubebuilder:printcolumn:name="ClusterNamespace",type="string",JSONPath=".spec.namespace"
 // +kubebuilder:printcolumn:name="ClusterRunning",type="string",JSONPath=".status.conditions[?(@.type=='ClusterRunning')].reason"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type ClusterClaim struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

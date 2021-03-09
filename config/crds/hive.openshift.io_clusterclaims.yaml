@@ -17,6 +17,9 @@ spec:
   - JSONPath: .status.conditions[?(@.type=='ClusterRunning')].reason
     name: ClusterRunning
     type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: hive.openshift.io
   names:
     kind: ClusterClaim

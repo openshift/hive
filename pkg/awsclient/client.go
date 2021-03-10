@@ -1,9 +1,13 @@
 package awsclient
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -442,31 +445,55 @@ func NewClient(kubeClient client.Client, secretName, namespace, region string) (
 //
 // Pass a nil secret to load credentials from the standard AWS environment variables.
 func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
-	awsConfig := &aws.Config{
-		Region:           aws.String(region),
-		EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
+	s, err := NewSessionFromSecret(secret, region)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create AWS session")
+	}
+	return newClientFromSession(s)
+}
+
+func newClientFromSession(s *session.Session, cfgs ...*aws.Config) (Client, error) {
+	return &awsClient{
+		ec2Client:     ec2.New(s, cfgs...),
+		elbClient:     elb.New(s, cfgs...),
+		iamClient:     iam.New(s, cfgs...),
+		s3Client:      s3.New(s, cfgs...),
+		s3Uploader:    s3manager.NewUploader(s),
+		route53Client: route53.New(s, cfgs...),
+		stsClient:     sts.New(s, cfgs...),
+		tagClient:     resourcegroupstaggingapi.New(s, cfgs...),
+	}, nil
+}
+
+// NewSessionFromSecret creates a new AWS session using the configuration in the secret. If the secret
+// was nil, it initializes a new session using configuration of the envionment.
+func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Session, error) {
+	options := session.Options{
+		Config: aws.Config{
+			Region:           aws.String(region),
+			EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
+		},
+		SharedConfigState: session.SharedConfigEnable,
 	}
 
 	// Special case to not use a secret to gather credentials.
 	if secret != nil {
-		accessKeyID, ok := secret.Data[constants.AWSAccessKeyIDSecretKey]
-		if !ok {
-			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secret.Name, constants.AWSAccessKeyIDSecretKey)
+		config := awsCLIConfigFromSecret(secret)
+		f, err := ioutil.TempFile("", "hive-aws-config")
+		if err != nil {
+			return nil, err
 		}
-		secretAccessKey, ok := secret.Data[constants.AWSSecretAccessKeySecretKey]
-		if !ok {
-			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secret.Name, constants.AWSSecretAccessKeySecretKey)
-
+		defer f.Close()
+		if _, err := f.Write(config); err != nil {
+			return nil, err
 		}
+		defer os.Remove(f.Name())
 
-		awsConfig.Credentials = credentials.NewStaticCredentials(
-			string(accessKeyID), string(secretAccessKey), "")
+		options.SharedConfigFiles = []string{f.Name()}
 	}
 
-	// Otherwise default to relying on the IAM role of the masters where the actuator is running:
-	s, err := session.NewSession(awsConfig)
+	// Otherwise default to relying on the environment where the actuator is running:
+	s, err := session.NewSessionWithOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -476,17 +503,21 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io hive", "v1"),
 	})
 
-	return &awsClient{
-		ec2Client:     ec2.New(s),
-		elbClient:     elb.New(s),
-		elbv2Client:   elbv2.New(s),
-		iamClient:     iam.New(s),
-		s3Client:      s3.New(s),
-		s3Uploader:    s3manager.NewUploader(s),
-		route53Client: route53.New(s),
-		stsClient:     sts.New(s),
-		tagClient:     resourcegroupstaggingapi.New(s),
-	}, nil
+	return s, nil
+}
+
+// awsCLIConfigFromSecret returns an AWS CLI config using the data available in the secret.
+func awsCLIConfigFromSecret(secret *corev1.Secret) []byte {
+	if config, ok := secret.Data[constants.AWSConfigSecretKey]; ok {
+		return config
+	}
+
+	buf := &bytes.Buffer{}
+	fmt.Fprint(buf, "[default]\n")
+	for k, v := range secret.Data {
+		fmt.Fprintf(buf, "%s = %s\n", k, v)
+	}
+	return buf.Bytes()
 }
 
 func awsChinaEndpointResolver(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {

@@ -19,3 +19,6 @@ GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
   "hive:v1/agent hive:v1/aws hive:v1/azure hive:v1/baremetal hive:v1/gcp hive:v1/openstack hive:v1/ovirt hive:v1/vsphere" \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
   ${verify}
+
+# deepcopy generators place the generated files in vendor directory, so move them back
+(cd ./vendor/github.com/openshift/hive/apis/; find . -name 'zz_generated.deepcopy.go' -exec cp --parents {} ../../../../../apis/ \;)

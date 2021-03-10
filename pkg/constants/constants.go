@@ -191,6 +191,14 @@ const (
 	// path where we mount in the SSH key for connecting to the bare metal libvirt provisioning host.
 	LibvirtSSHPrivKeyPathEnvVar = "LIBVIRT_SSH_PRIV_KEY_PATH"
 
+	// BoundServiceAccountSigningKeyEnvVar contains the path to the bound service account signing key and
+	// is set in the install pod for AWS STS clusters.
+	BoundServiceAccountSigningKeyEnvVar = "AWS_BOUND_SA_SIGNING_KEY"
+
+	// BoundServiceAccountSigningKeyFile is the Secret key and projected filename where an AWS STS
+	// SA signing key will be projected into the install pod.
+	BoundServiceAccountSigningKeyFile = "bound-service-account-signing-key.key"
+
 	// FakeClusterInstallEnvVar is the environment variable Hive will set for the installmanager pod to request
 	// a fake install.
 	FakeClusterInstallEnvVar = "FAKE_INSTALL"

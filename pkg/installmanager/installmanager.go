@@ -336,7 +336,7 @@ func (m *InstallManager) Run() error {
 
 	// Generate installer assets we need to modify or upload.
 	m.log.Info("generating assets")
-	if err := m.generateAssets(provision); err != nil {
+	if err := m.generateAssets(cd); err != nil {
 		m.log.Info("reading installer log")
 		installLog, readErr := m.readInstallerLog(provision, m, scrubInstallLog)
 		if readErr != nil {
@@ -665,12 +665,29 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 
 // generateAssets runs openshift-install commands to generate on-disk assets we need to
 // upload or modify prior to provisioning resources in the cloud.
-func (m *InstallManager) generateAssets(provision *hivev1.ClusterProvision) error {
+func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 	m.log.Info("running openshift-install create manifests")
 	err := m.runOpenShiftInstallCommand("create", "manifests")
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
 		return err
+	}
+
+	// Configure for install of an STS cluster if specified:
+	boundSASigningKey := os.Getenv(constants.BoundServiceAccountSigningKeyEnvVar)
+	if boundSASigningKey != "" {
+		tlsDir := filepath.Join(m.WorkDir, "tls")
+		dest := filepath.Join(tlsDir, constants.BoundServiceAccountSigningKeyFile)
+		m.log.WithField("src", boundSASigningKey).WithField("dest", dest).
+			Info("copying bound service account signing key")
+		if err := os.MkdirAll(tlsDir, 0700); err != nil {
+			m.log.WithError(err).Errorf("error creating %s directory", tlsDir)
+			return err
+		}
+		log.WithField("dest", dest).Info("copying bound SA signing key")
+		if err := m.copyFile(boundSASigningKey, dest); err != nil {
+			return err
+		}
 	}
 
 	if src := m.ManifestsMountPath; isDirNonEmpty(src) {

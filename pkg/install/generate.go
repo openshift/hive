@@ -2,6 +2,7 @@ package install
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -138,6 +139,7 @@ func InstallerPodSpec(
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
 						Key:                  constants.AWSAccessKeyIDSecretKey,
+						Optional:             pointer.BoolPtr(true),
 					},
 				},
 			},
@@ -147,37 +149,32 @@ func InstallerPodSpec(
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
 						Key:                  constants.AWSSecretAccessKeySecretKey,
+						Optional:             pointer.BoolPtr(true),
 					},
 				},
 			},
+			corev1.EnvVar{
+				Name:  "AWS_SDK_LOAD_CONFIG",
+				Value: "true",
+			},
+			corev1.EnvVar{
+				Name:  "AWS_CONFIG_FILE",
+				Value: filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey),
+			},
 		)
 
-		// If this is an STS cluster, mount volume for the bound service account signing key:
-		if cd.Spec.BoundServiceAccountSignkingKeySecretRef != nil {
-			volumes = append(volumes, corev1.Volume{
-				Name: "bound-token-signing-key",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.BoundServiceAccountSignkingKeySecretRef.Name,
-						Items: []corev1.KeyToPath{
-							{
-								Key:  constants.BoundServiceAccountSigningKeyFile,
-								Path: constants.BoundServiceAccountSigningKeyFile,
-							},
-						},
-					},
+		volumes = append(volumes, corev1.Volume{
+			Name: "aws",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.Platform.AWS.CredentialsSecretRef.Name,
 				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "bound-token-signing-key",
-				MountPath: boundSASigningKeyDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  constants.BoundServiceAccountSigningKeyEnvVar,
-				Value: boundSASigningKeyFile,
-			})
-
-		}
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "aws",
+			MountPath: constants.AWSCredsMount,
+		})
 	case cd.Spec.Platform.Azure != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "azure",
@@ -316,6 +313,33 @@ func InstallerPodSpec(
 				MountPath: "/manifests",
 			},
 		)
+	}
+
+	// If this is an STS cluster, mount volume for the bound service account signing key:
+	if cd.Spec.BoundServiceAccountSignkingKeySecretRef != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "bound-token-signing-key",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.BoundServiceAccountSignkingKeySecretRef.Name,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  constants.BoundServiceAccountSigningKeyFile,
+							Path: constants.BoundServiceAccountSigningKeyFile,
+						},
+					},
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "bound-token-signing-key",
+			MountPath: boundSASigningKeyDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  constants.BoundServiceAccountSigningKeyEnvVar,
+			Value: boundSASigningKeyFile,
+		})
+
 	}
 
 	if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
@@ -555,7 +579,32 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 			Name:            "deprovision",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Command:         []string{"/usr/bin/hiveutil"},
+			Env: []corev1.EnvVar{{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
+						Key:                  constants.AWSAccessKeyIDSecretKey,
+						Optional:             pointer.BoolPtr(true),
+					},
+				},
+			}, {
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecret},
+						Key:                  constants.AWSSecretAccessKeySecretKey,
+						Optional:             pointer.BoolPtr(true),
+					},
+				},
+			}, {
+				Name:  "AWS_SDK_LOAD_CONFIG",
+				Value: "true",
+			}, {
+				Name:  "AWS_CONFIG_FILE",
+				Value: filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey),
+			}},
+			Command: []string{"/usr/bin/hiveutil"},
 			Args: []string{
 				"aws-tag-deprovision",
 				"--loglevel",

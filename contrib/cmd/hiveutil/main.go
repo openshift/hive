@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	log.SetOutput(os.Stdout)
+	log.SetOutput(os.Stderr)
 	log.SetLevel(log.DebugLevel)
 
 	cmd := newHiveutilCommand()

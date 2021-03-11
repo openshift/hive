@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -43,7 +44,13 @@ type DNSZoneSpec struct {
 type AWSDNSZoneSpec struct {
 	// CredentialsSecretRef contains a reference to a secret that contains AWS credentials
 	// for CRUD operations
-	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	// +optional
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+
+	// CredentialsAssumeRole refers to the IAM role that must be assumed to obtain
+	// AWS account access for the DNS CRUD operations.
+	// +optional
+	CredentialsAssumeRole *aws.AssumeRole `json:"credentialsAssumeRole,omitempty"`
 
 	// AdditionalTags is a set of additional tags to set on the DNS hosted zone. In addition
 	// to these tags,the DNS Zone controller will set a hive.openhsift.io/hostedzone tag

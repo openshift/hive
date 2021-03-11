@@ -3,6 +3,7 @@ package remotemachineset
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -844,16 +846,18 @@ func (r *ReconcileRemoteMachineSet) createActuator(
 ) (Actuator, error) {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		creds := &corev1.Secret{}
-		if err := r.Get(
-			context.TODO(),
-			types.NamespacedName{
-				Name:      cd.Spec.Platform.AWS.CredentialsSecretRef.Name,
+		creds := awsclient.CredentialsSource{
+			Secret: &awsclient.SecretCredentialsSource{
+				Ref:       &cd.Spec.Platform.AWS.CredentialsSecretRef,
 				Namespace: cd.Namespace,
 			},
-			creds,
-		); err != nil {
-			return nil, err
+			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
+				SecretRef: corev1.SecretReference{
+					Namespace: controllerutils.GetHiveNamespace(),
+					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+				},
+				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+			},
 		}
 		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.GCP != nil:

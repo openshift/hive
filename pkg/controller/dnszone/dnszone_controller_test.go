@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/awsclient/mock"
 	awsmock "github.com/openshift/hive/pkg/awsclient/mock"
 	azuremock "github.com/openshift/hive/pkg/azureclient/mock"
@@ -174,7 +175,8 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
-				validAWSSecret(),
+				mocks.fakeKubeClient,
+				awsclient.CredentialsSource{},
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
 			)
@@ -554,7 +556,8 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
-				validAWSSecret(),
+				mocks.fakeKubeClient,
+				awsclient.CredentialsSource{},
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
 			)

@@ -178,17 +178,19 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 
 		// TODO: Secrets should be kept in sync with secrets in the cluster deployment namespace.
 		credentialsSecretName := utils.CredentialsSecretName(cd)
-		credentialsSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: credentialsSecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, credentialsSecret); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Infof("Creating credentials secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
-			err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
-			if err != nil {
-				return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
-			}
-			credentialsSecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
-			credentialsSecret.ResourceVersion = ""
-			if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
+		if credentialsSecretName != "" {
+			credentialsSecret := &corev1.Secret{}
+			if err := r.Get(context.Background(), types.NamespacedName{Name: credentialsSecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, credentialsSecret); err != nil && apierrors.IsNotFound(err) {
+				cdLog.Infof("Creating credentials secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
+				err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
+				if err != nil {
+					return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
+				}
+				credentialsSecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
+				credentialsSecret.ResourceVersion = ""
+				if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+					return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
+				}
 			}
 		}
 

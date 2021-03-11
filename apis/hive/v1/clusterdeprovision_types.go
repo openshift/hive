@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,7 +51,13 @@ type AWSClusterDeprovision struct {
 	Region string `json:"region"`
 
 	// CredentialsSecretRef is the AWS account credentials to use for deprovisioning the cluster
+	// +optional
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+
+	// CredentialsAssumeRole refers to the IAM role that must be assumed to obtain
+	// AWS account access for deprovisioning the cluster.
+	// +optional
+	CredentialsAssumeRole *aws.AssumeRole `json:"credentialsAssumeRole,omitempty"`
 }
 
 // AzureClusterDeprovision contains Azure-specific configuration for a ClusterDeprovision

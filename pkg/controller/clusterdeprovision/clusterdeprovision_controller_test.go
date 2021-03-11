@@ -322,7 +322,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 }
 
 func testUninstallJob() *batchv1.Job {
-	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision())
+	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision(), "someserviceaccount", nil)
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
 		panic("should never get error calculating job spec hash")

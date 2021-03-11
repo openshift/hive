@@ -133,6 +133,13 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, awsLogsEnvVars...)
 	}
 
+	if awssp := instance.Spec.ServiceProviderCredentialsConfig.AWS; awssp != nil && awssp.CredentialsSecretRef.Name != "" {
+		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
+			Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
+			Value: awssp.CredentialsSecretRef.Name,
+		})
+	}
+
 	if zoneCheckDNSServers := os.Getenv(dnsServersEnvVar); len(zoneCheckDNSServers) > 0 {
 		dnsServersEnvVar := corev1.EnvVar{
 			Name:  dnsServersEnvVar,

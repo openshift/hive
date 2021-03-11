@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
@@ -301,25 +303,43 @@ func EnsureRequeueAtLeastWithin(duration time.Duration, result reconcile.Result,
 }
 
 // CopySecret copies the secret defined by src to dest.
-func CopySecret(c client.Client, src, dest types.NamespacedName) error {
+func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) error {
 	srcSecret := &corev1.Secret{}
 	if err := c.Get(context.Background(), src, srcSecret); err != nil {
 		return err
 	}
 
-	destSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dest.Name,
-			Namespace: dest.Namespace,
-		},
-		Data: srcSecret.DeepCopy().Data,
-	}
+	destSecret := &corev1.Secret{}
+	err := c.Get(context.Background(), dest, destSecret)
+	if apierrors.IsNotFound(err) {
+		destSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      dest.Name,
+				Namespace: dest.Namespace,
+			},
+			Data:       srcSecret.DeepCopy().Data,
+			StringData: srcSecret.DeepCopy().StringData,
+			Type:       srcSecret.Type,
+		}
+		if owner != nil {
+			if err := controllerutil.SetOwnerReference(owner, destSecret, scheme); err != nil {
+				return nil
+			}
+		}
 
-	if err := c.Create(context.Background(), destSecret); err != nil {
+		return c.Create(context.Background(), destSecret)
+	}
+	if err != nil {
 		return err
 	}
 
-	return nil
+	if reflect.DeepEqual(destSecret.Data, srcSecret.Data) && reflect.DeepEqual(destSecret.StringData, srcSecret.StringData) {
+		return nil // no work as the dest and source data matches.
+	}
+
+	destSecret.Data = srcSecret.DeepCopy().Data
+	destSecret.StringData = srcSecret.DeepCopy().StringData
+	return c.Update(context.Background(), destSecret)
 }
 
 // BuildControllerLogger returns a logger for controllers with consistent fields.

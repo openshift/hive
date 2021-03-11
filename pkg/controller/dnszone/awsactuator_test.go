@@ -9,11 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/mock/gomock"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/awsclient/mock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/openshift/hive/apis"
@@ -29,12 +29,10 @@ func TestNewAWSActuator(t *testing.T) {
 	cases := []struct {
 		name    string
 		dnsZone *hivev1.DNSZone
-		secret  *corev1.Secret
 	}{
 		{
 			name:    "Successfully create new zone",
 			dnsZone: validDNSZone(),
-			secret:  validAWSSecret(),
 		},
 	}
 
@@ -50,7 +48,7 @@ func TestNewAWSActuator(t *testing.T) {
 			// Act
 			zr, err := NewAWSActuator(
 				expectedAWSActuator.logger,
-				tc.secret,
+				nil, awsclient.CredentialsSource{},
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
 			)

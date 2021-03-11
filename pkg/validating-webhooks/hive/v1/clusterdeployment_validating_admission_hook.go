@@ -426,8 +426,11 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 	if aws := platform.AWS; aws != nil {
 		numberOfPlatforms++
 		awsPath := path.Child("aws")
-		if aws.CredentialsSecretRef.Name == "" {
+		if aws.CredentialsSecretRef.Name == "" && aws.CredentialsAssumeRole == nil {
 			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsSecretRef", "name"), "must specify secrets for AWS access"))
+		}
+		if aws.CredentialsAssumeRole != nil && aws.CredentialsSecretRef.Name != "" {
+			allErrs = append(allErrs, field.Required(awsPath.Child("credentialsAssumeRole"), "cannot specify assume role when credentials secret is provided"))
 		}
 		if aws.Region == "" {
 			allErrs = append(allErrs, field.Required(awsPath.Child("region"), "must specify AWS region"))

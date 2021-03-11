@@ -55,14 +55,14 @@ func addAWSProviderToScheme(scheme *runtime.Scheme) error {
 // NewAWSActuator is the constructor for building a AWSActuator
 func NewAWSActuator(
 	client client.Client,
-	awsCreds *corev1.Secret,
+	credentials awsclient.CredentialsSource,
 	region string,
 	pool *hivev1.MachinePool,
 	masterMachine *machineapi.Machine,
 	scheme *runtime.Scheme,
 	logger log.FieldLogger,
 ) (*AWSActuator, error) {
-	awsClient, err := awsclient.NewClientFromSecret(awsCreds, region)
+	awsClient, err := awsclient.New(client, awsclient.Options{Region: region, CredentialsSource: credentials})
 	if err != nil {
 		logger.WithError(err).Warn("failed to create AWS client")
 		return nil, err

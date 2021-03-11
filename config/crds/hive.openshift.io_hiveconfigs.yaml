@@ -481,6 +481,28 @@ spec:
                 - domains
                 type: object
               type: array
+            serviceProviderCredentialsConfig:
+              description: ServiceProviderCredentialsConfig is used to configure credentials
+                related to being a service provider on various cloud platforms.
+              properties:
+                aws:
+                  description: AWS is used to configure credentials related to being
+                    a service provider on AWS.
+                  properties:
+                    credentialsSecretRef:
+                      description: CredentialsSecretRef references a secret in the
+                        TargetNamespace that will be used to authenticate with AWS
+                        to become the Service Provider. Being a Service Provider allows
+                        the controllers to assume the role in customer AWS accounts
+                        to manager clusters.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                  type: object
+              type: object
             syncSetReapplyInterval:
               description: SyncSetReapplyInterval is a string duration indicating
                 how much time must pass before SyncSet resources will be reapplied.

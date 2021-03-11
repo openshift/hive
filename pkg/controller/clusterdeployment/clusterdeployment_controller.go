@@ -776,12 +776,13 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	labels[constants.ClusterDeploymentNameLabel] = cd.Name
 
 	extraEnvVars := getInstallLogEnvVars(cd.Name)
+	extraEnvVars = append(extraEnvVars, getAWSServiceProviderEnvVars(cd, cd.Name)...)
 
 	podSpec, err := install.InstallerPodSpec(
 		cd,
 		provisionName,
 		releaseImage,
-		controllerutils.ServiceAccountName,
+		controllerutils.InstallServiceAccountName,
 		extraEnvVars,
 	)
 	if err != nil {
@@ -823,6 +824,20 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			// Couldn't copy the install log secret for a reason other than it already exists.
 			// If the secret already exists, then we should just use that secret.
 			cdLog.WithError(err).Error("could not copy install log secret")
+			return reconcile.Result{}, err
+		}
+	}
+
+	if err := install.CopyAWSServiceProviderSecret(r.Client, provision.Namespace, extraEnvVars, cd, r.scheme); err != nil {
+		cdLog.WithError(err).Error("could not copy AWS service provider secret")
+		return reconcile.Result{}, err
+	}
+
+	if err := r.setupAWSCredentialForAssumeRole(cd); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			// Couldn't create the assume role credential secret for a reason other than it already exists.
+			// If the secret already exists, then we should just use that secret.
+			cdLog.WithError(err).Error("could not create AWS assume role credential secret")
 			return reconcile.Result{}, err
 		}
 	}
@@ -870,7 +885,7 @@ func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, 
 
 	src := types.NamespacedName{Name: srcSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(r, src, dest)
+	return controllerutils.CopySecret(r, src, dest, nil, nil)
 }
 
 func getInstallLogEnvVars(secretPrefix string) []corev1.EnvVar {
@@ -901,6 +916,35 @@ func getInstallLogEnvVars(secretPrefix string) []corev1.EnvVar {
 	}
 
 	return extraEnvVars
+}
+
+func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeployment, secretPrefix string) []corev1.EnvVar {
+	var extraEnvVars []corev1.EnvVar
+	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
+	if spSecretName == "" {
+		return extraEnvVars
+	}
+
+	if cd.Spec.Platform.AWS == nil {
+		return extraEnvVars
+	}
+
+	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
+		Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
+		Value: secretPrefix + "-" + spSecretName,
+	})
+	return extraEnvVars
+}
+
+func (r *ReconcileClusterDeployment) setupAWSCredentialForAssumeRole(cd *hivev1.ClusterDeployment) error {
+	if cd.Spec.Platform.AWS == nil ||
+		cd.Spec.Platform.AWS.CredentialsSecretRef.Name != "" ||
+		cd.Spec.Platform.AWS.CredentialsAssumeRole == nil {
+		// no setup required
+		return nil
+	}
+
+	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
 }
 
 func addEnvVarIfFound(name string, envVars []corev1.EnvVar) []corev1.EnvVar {
@@ -1170,7 +1214,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 
-		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.ServiceAccountName)
+		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
@@ -1776,9 +1820,10 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 			region = constants.AWSChinaRoute53Region
 		}
 		dnsZone.Spec.AWS = &hivev1.AWSDNSZoneSpec{
-			CredentialsSecretRef: cd.Spec.Platform.AWS.CredentialsSecretRef,
-			AdditionalTags:       additionalTags,
-			Region:               region,
+			CredentialsSecretRef:  cd.Spec.Platform.AWS.CredentialsSecretRef,
+			CredentialsAssumeRole: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+			AdditionalTags:        additionalTags,
+			Region:                region,
 		}
 	case cd.Spec.Platform.GCP != nil:
 		dnsZone.Spec.GCP = &hivev1.GCPDNSZoneSpec{
@@ -1898,8 +1943,9 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovision{
-			Region:               cd.Spec.Platform.AWS.Region,
-			CredentialsSecretRef: &cd.Spec.Platform.AWS.CredentialsSecretRef,
+			Region:                cd.Spec.Platform.AWS.Region,
+			CredentialsSecretRef:  &cd.Spec.Platform.AWS.CredentialsSecretRef,
+			CredentialsAssumeRole: cd.Spec.Platform.AWS.CredentialsAssumeRole,
 		}
 	case cd.Spec.Platform.Azure != nil:
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{

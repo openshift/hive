@@ -825,11 +825,18 @@ func (r *ReconcileClusterPool) getPullSecret(pool *hivev1.ClusterPool, logger lo
 func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logger log.FieldLogger) (clusterresource.CloudBuilder, error) {
 	switch platform := pool.Spec.Platform; {
 	case platform.AWS != nil:
-		credsSecret, err := r.getCredentialsSecret(pool, platform.AWS.CredentialsSecretRef.Name, logger)
-		if err != nil {
-			return nil, err
+		var cloudBuilder *clusterresource.AWSCloudBuilder
+		switch {
+		case platform.AWS.CredentialsSecretRef.Name != "":
+			credsSecret, err := r.getCredentialsSecret(pool, platform.AWS.CredentialsSecretRef.Name, logger)
+			if err != nil {
+				return nil, err
+			}
+			cloudBuilder = clusterresource.NewAWSCloudBuilderFromSecret(credsSecret)
+		case platform.AWS.CredentialsAssumeRole != nil:
+			cloudBuilder = clusterresource.NewAWSCloudBuilderFromAssumeRole(platform.AWS.CredentialsAssumeRole)
 		}
-		cloudBuilder := clusterresource.NewAWSCloudBuilderFromSecret(credsSecret)
+
 		cloudBuilder.Region = platform.AWS.Region
 		return cloudBuilder, nil
 	case platform.GCP != nil:

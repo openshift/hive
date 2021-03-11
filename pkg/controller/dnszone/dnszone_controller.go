@@ -16,6 +16,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/azureclient"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
@@ -338,18 +339,21 @@ func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
 
 func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.FieldLogger) (Actuator, error) {
 	if dnsZone.Spec.AWS != nil {
-		secret := &corev1.Secret{}
-		err := r.Get(context.TODO(),
-			types.NamespacedName{
-				Name:      dnsZone.Spec.AWS.CredentialsSecretRef.Name,
+		credentials := awsclient.CredentialsSource{
+			Secret: &awsclient.SecretCredentialsSource{
+				Ref:       &dnsZone.Spec.AWS.CredentialsSecretRef,
 				Namespace: dnsZone.Namespace,
 			},
-			secret)
-		if err != nil {
-			return nil, err
+			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
+				SecretRef: corev1.SecretReference{
+					Namespace: controllerutils.GetHiveNamespace(),
+					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+				},
+				Role: dnsZone.Spec.AWS.CredentialsAssumeRole,
+			},
 		}
 
-		return NewAWSActuator(dnsLog, secret, dnsZone, awsclient.NewClientFromSecret)
+		return NewAWSActuator(dnsLog, r.Client, credentials, dnsZone, awsclient.New)
 	}
 
 	if dnsZone.Spec.GCP != nil {

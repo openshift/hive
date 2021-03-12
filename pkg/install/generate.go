@@ -607,6 +607,8 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 			Command: []string{"/usr/bin/hiveutil"},
 			Args: []string{
 				"aws-tag-deprovision",
+				"--creds-dir",
+				constants.AWSCredsMount,
 				"--loglevel",
 				"debug",
 				"--region",

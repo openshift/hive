@@ -22,6 +22,7 @@ import (
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
+
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -143,18 +144,17 @@ func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
 func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.AgentBareMetal = &hivev1agent.BareMetalPlatform{
-		APIVIP:            "127.0.0.1",
-		APIVIPDNSName:     "foo.example.com",
-		IngressVIP:        "127.0.0.1",
-		VIPDHCPAllocation: hivev1agent.VIPDHCPAllocationEnabled,
+		APIVIP:        "127.0.0.1",
+		APIVIPDNSName: "foo.example.com",
+		IngressVIP:    "127.0.0.1",
+		AgentSelector: metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"foo": "bar",
+			},
+		},
 	}
 	cd.Spec.Provisioning.InstallStrategy = &hivev1.InstallStrategy{
 		Agent: &hivev1agent.InstallStrategy{
-			AgentSelector: metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"foo": "bar",
-				},
-			},
 			ProvisionRequirements: hivev1agent.ProvisionRequirements{
 				ControlPlaneAgents: 3,
 				WorkerAgents:       3,
@@ -921,11 +921,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd := validAWSClusterDeployment()
 				cd.Spec.Provisioning.InstallStrategy = &hivev1.InstallStrategy{
 					Agent: &hivev1agent.InstallStrategy{
-						AgentSelector: metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"foo": "bar",
-							},
-						},
 						ProvisionRequirements: hivev1agent.ProvisionRequirements{
 							ControlPlaneAgents: 3,
 							WorkerAgents:       3,
@@ -984,18 +979,16 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
 		},
 		{
-			name: "Test reject agent install strategy with VIPDHCPAllocation enabled and no machine networks",
+			name: "Test reject agent install strategy with 1 required worker agents", // not valid in assisted service for some reason
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAgentBareMetalClusterDeployment()
-				cd.Spec.Provisioning.InstallStrategy.Agent.Networking.MachineNetwork = []hivev1agent.MachineNetworkEntry{}
-				cd.Spec.Platform.AgentBareMetal.VIPDHCPAllocation = hivev1agent.VIPDHCPAllocationEnabled
+				cd.Spec.Provisioning.InstallStrategy.Agent.ProvisionRequirements.WorkerAgents = 1
 				return cd
 			}(),
 			operation:           admissionv1beta1.Create,
 			expectedAllowed:     false,
 			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
 		},
-		// TODO: is the inverse of the above test ok? no VIPDHCPAllocation set, and machine network is defined
 		{
 			name: "Block create with targetNamespace set",
 			newObject: func() *hivev1.ClusterDeployment {

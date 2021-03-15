@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1agent "github.com/openshift/hive/apis/hive/v1/agent"
+
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/manageddns"
 )
@@ -320,12 +320,6 @@ func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeploy
 		allErrs = append(allErrs,
 			field.Forbidden(agentPath,
 				"agent install strategy can only be used with agent bare metal platform"))
-	} else if cd.Spec.Platform.AgentBareMetal.VIPDHCPAllocation == hivev1agent.VIPDHCPAllocationEnabled &&
-		len(ais.Networking.MachineNetwork) == 0 {
-		// a machine network is required if in vip dhcp mode:
-		allErrs = append(allErrs, field.Required(
-			agentPath.Child("networking", "machineNetwork"),
-			"must specify a machine network if vipDHCPAllocation is enabled"))
 	}
 
 	// must use either 1 or 3 control plane agents:
@@ -335,6 +329,14 @@ func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeploy
 			agentPath.Child("provisionRequirements", "controlPlaneAgents"),
 			ais.ProvisionRequirements.ControlPlaneAgents,
 			"cluster can only be formed with 1 or 3 control plane agents"))
+	}
+
+	// must use either 0 or >=2 worker agents due to limitations in assisted service:
+	if ais.ProvisionRequirements.WorkerAgents == 1 {
+		allErrs = append(allErrs, field.Invalid(
+			agentPath.Child("provisionRequirements", "workerAgents"),
+			ais.ProvisionRequirements.WorkerAgents,
+			"cluster can only be formed with 0 or >= 2 worker agents"))
 	}
 
 	// install config secret ref should not be set for agent installs:

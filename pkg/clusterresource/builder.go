@@ -78,6 +78,10 @@ type Builder struct {
 	// ServingCertKey is the contents of a key for the ServingCert.
 	ServingCertKey string
 
+	// CredentailsMode is the Cloud Credential Operator mode to force in the generated install-config.
+	// Typically left unset for the default ('Mint' mode), or set to 'Manual'.
+	CredentialsMode string
+
 	// Adopt is a flag indicating we're adopting a pre-existing cluster.
 	Adopt bool
 
@@ -217,10 +221,8 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 		allObjects = append(allObjects, cloudCredsSecret)
 	}
 
-	cloudCertificatesSecret := o.CloudBuilder.generateCloudCertificatesSecret(o)
-	if cloudCertificatesSecret != nil {
-		allObjects = append(allObjects, cloudCertificatesSecret)
-	}
+	additionalCloudObjects := o.CloudBuilder.GenerateCloudObjects(o)
+	allObjects = append(allObjects, additionalCloudObjects...)
 
 	if o.InstallerManifests != nil {
 		allObjects = append(allObjects, o.generateInstallerManifestsConfigMap())
@@ -578,9 +580,10 @@ func (o *Builder) GetPullSecretSecretName() string {
 type CloudBuilder interface {
 	addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool)
 	addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig)
-	generateCloudCertificatesSecret(o *Builder) *corev1.Secret
 
 	GetCloudPlatform(o *Builder) hivev1.Platform
 	CredsSecretName(o *Builder) string
 	GenerateCredentialsSecret(o *Builder) *corev1.Secret
+	// GenerateCloudObjects returns any additional resources needed for a particular cloud provider.
+	GenerateCloudObjects(o *Builder) []runtime.Object
 }

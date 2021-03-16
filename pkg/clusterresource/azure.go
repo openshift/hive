@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
@@ -57,10 +58,6 @@ func (p *AzureCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret
 	}
 }
 
-func (p *AzureCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
-	return nil
-}
-
 func (p *AzureCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	return hivev1.Platform{
 		Azure: &hivev1azure.Platform{
@@ -100,4 +97,8 @@ func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 
 func (p *AzureCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-azure-creds", o.Name)
+}
+
+func (p *AzureCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
+	return []runtime.Object{}
 }

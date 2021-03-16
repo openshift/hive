@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	installergcp "github.com/openshift/installer/pkg/types/gcp"
@@ -63,10 +64,6 @@ func (p *GCPCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	}
 }
 
-func (p *GCPCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
-	return nil
-}
-
 func (p *GCPCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	return hivev1.Platform{
 		GCP: &hivev1gcp.Platform{
@@ -103,4 +100,8 @@ func (p *GCPCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 
 func (p *GCPCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-gcp-creds", o.Name)
+}
+
+func (p *GCPCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
+	return []runtime.Object{}
 }

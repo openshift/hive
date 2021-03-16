@@ -114,47 +114,49 @@ var (
 
 // Options is the set of options to generate and apply a new cluster deployment
 type Options struct {
-	Name                     string
-	Namespace                string
-	SSHPublicKeyFile         string
-	SSHPublicKey             string
-	SSHPrivateKeyFile        string
-	BaseDomain               string
-	PullSecret               string
-	PullSecretFile           string
-	Cloud                    string
-	CredsFile                string
-	ClusterImageSet          string
-	ReleaseImage             string
-	ReleaseImageSource       string
-	DeleteAfter              string
-	HibernateAfter           string
-	HibernateAfterDur        *time.Duration
-	ServingCert              string
-	ServingCertKey           string
-	UseClusterImageSet       bool
-	ManageDNS                bool
-	Output                   string
-	IncludeSecrets           bool
-	InstallOnce              bool
-	UninstallOnce            bool
-	SimulateBootstrapFailure bool
-	WorkerNodesCount         int64
-	CreateSampleSyncsets     bool
-	ManifestsDir             string
-	Adopt                    bool
-	AdoptAdminKubeConfig     string
-	AdoptInfraID             string
-	AdoptClusterID           string
-	AdoptAdminUsername       string
-	AdoptAdminPassword       string
-	MachineNetwork           string
-	Region                   string
-	Labels                   []string
-	Annotations              []string
-	SkipMachinePools         bool
-	AdditionalTrustBundle    string
-	CentralMachineManagement bool
+	Name                              string
+	Namespace                         string
+	SSHPublicKeyFile                  string
+	SSHPublicKey                      string
+	SSHPrivateKeyFile                 string
+	BaseDomain                        string
+	PullSecret                        string
+	PullSecretFile                    string
+	BoundServiceAccountSigningKeyFile string
+	Cloud                             string
+	CredsFile                         string
+	CredentialsModeManual             bool
+	ClusterImageSet                   string
+	ReleaseImage                      string
+	ReleaseImageSource                string
+	DeleteAfter                       string
+	HibernateAfter                    string
+	HibernateAfterDur                 *time.Duration
+	ServingCert                       string
+	ServingCertKey                    string
+	UseClusterImageSet                bool
+	ManageDNS                         bool
+	Output                            string
+	IncludeSecrets                    bool
+	InstallOnce                       bool
+	UninstallOnce                     bool
+	SimulateBootstrapFailure          bool
+	WorkerNodesCount                  int64
+	CreateSampleSyncsets              bool
+	ManifestsDir                      string
+	Adopt                             bool
+	AdoptAdminKubeConfig              string
+	AdoptInfraID                      string
+	AdoptClusterID                    string
+	AdoptAdminUsername                string
+	AdoptAdminPassword                string
+	MachineNetwork                    string
+	Region                            string
+	Labels                            []string
+	Annotations                       []string
+	SkipMachinePools                  bool
+	AdditionalTrustBundle             string
+	CentralMachineManagement          bool
 
 	// AWS
 	AWSUserTags []string
@@ -247,6 +249,9 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.DeleteAfter, "delete-after", "", "Delete this cluster after the given duration. (i.e. 8h)")
 	flags.StringVar(&opt.HibernateAfter, "hibernate-after", "", "Automatically hibernate the cluster whenever it has been running for the given duration")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
+	flags.StringVar(&opt.BoundServiceAccountSigningKeyFile, "bound-service-account-signing-key-file", "", "Private signing key for AWS STS, often created with ccoutil create key-pair.")
+	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, "Configure the Cloud Credential Operator in the target cluster to Manual mode. Implies the use of --manifests-dir to inject custom Secrets for all CredentialsRequests in the cluster.")
+
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
@@ -372,6 +377,21 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		if o.OpenStackCloud == "" {
 			o.log.Info("Missing openstack-cloud parameter")
 			return fmt.Errorf("Missing openstack-cloud parameter")
+		}
+	}
+
+	if o.BoundServiceAccountSigningKeyFile != "" {
+		if o.Cloud != cloudAWS {
+			return fmt.Errorf("bound service account signing key can only be used for AWS clusters")
+		}
+		if !o.CredentialsModeManual {
+			return fmt.Errorf("STS clusters require both --bound-service-account-signing-key and --credentials-mode-manual")
+		}
+	}
+
+	if o.CredentialsModeManual {
+		if o.ManifestsDir == "" {
+			return fmt.Errorf("--credentials-mode-manual requires --manifests-dir containing custom Secrets with manually provisioned credentials")
 		}
 	}
 
@@ -563,6 +583,14 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			UserTags:        userTags,
 			Region:          o.Region,
 		}
+		if len(o.BoundServiceAccountSigningKeyFile) != 0 {
+			signingKey, err := ioutil.ReadFile(o.BoundServiceAccountSigningKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("error reading %s: %v", o.BoundServiceAccountSigningKeyFile, err)
+			}
+			awsProvider.BoundServiceAccountSigningKey = string(signingKey)
+		}
+
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
 		creds, err := azurecredutil.GetCreds(o.CredsFile)

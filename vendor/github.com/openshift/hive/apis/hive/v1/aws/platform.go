@@ -17,14 +17,4 @@ type Platform struct {
 	// UserTags specifies additional tags for AWS resources created for the cluster.
 	// +optional
 	UserTags map[string]string `json:"userTags,omitempty"`
-
-	// STS specifies configuration for deploying a cluster that uses the AWS Security Token Service, instead of long lived credentials.
-	// +optional
-	STS *STS `json:"sts,omitempty"`
-}
-
-// STS specifies configuration for deploying a cluster that uses the AWS Security Token Service, instead of long lived credentials.
-type STS struct {
-	// ServiceAccountIssuerKeySecretRef refers to a Secret that contains a 'bound-service-account-signing-key.key' data key pointing to the private key that will be used to sign ServiceAccount objects.
-	ServiceAccountIssuerKeySecretRef corev1.LocalObjectReference `json:"serviceAccountIssuerKeySecretRef"`
 }

@@ -131,6 +131,9 @@ type Builder struct {
 
 	// CentralMachineManagement
 	CentralMachineManagement bool
+
+	// BoundServiceAccountSigningKey is the private key used to sign ServiceAccounts. Primarily used for provisioning clusters that use AWS Security Token Service.
+	BoundServiceAccountSigningKey string
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -219,6 +222,23 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	cloudCredsSecret := o.CloudBuilder.GenerateCredentialsSecret(o)
 	if cloudCredsSecret != nil {
 		allObjects = append(allObjects, cloudCredsSecret)
+	}
+
+	if len(o.BoundServiceAccountSigningKey) > 0 {
+		allObjects = append(allObjects, &corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: corev1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      o.getBoundServiceAccountSigningKeySecretName(),
+				Namespace: o.Namespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			StringData: map[string]string{
+				constants.BoundServiceAccountSigningKeyFile: o.BoundServiceAccountSigningKey,
+			},
+		})
 	}
 
 	additionalCloudObjects := o.CloudBuilder.GenerateCloudObjects(o)
@@ -326,6 +346,12 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	if o.CentralMachineManagement {
 		cd.Spec.MachineManagement = &hivev1.MachineManagement{
 			Central: &hivev1.CentralMachineManagement{},
+		}
+	}
+
+	if len(o.BoundServiceAccountSigningKey) > 0 {
+		cd.Spec.Provisioning.ServiceAccountIssuerKeySecretRef = &corev1.LocalObjectReference{
+			Name: o.getBoundServiceAccountSigningKeySecretName(),
 		}
 	}
 
@@ -574,6 +600,10 @@ func (o *Builder) getSSHPrivateKeySecretName() string {
 // TODO: handle long cluster names.
 func (o *Builder) GetPullSecretSecretName() string {
 	return fmt.Sprintf("%s-pull-secret", o.Name)
+}
+
+func (o *Builder) getBoundServiceAccountSigningKeySecretName() string {
+	return o.Name + "-sa-signing-key"
 }
 
 // CloudBuilder interface exposes the functions we will use to set cloud specific portions of the cluster's resources.

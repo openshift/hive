@@ -2801,6 +2801,11 @@ func (in *Provisioning) DeepCopyInto(out *Provisioning) {
 		*out = new(InstallStrategy)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ServiceAccountIssuerKeySecretRef != nil {
+		in, out := &in.ServiceAccountIssuerKeySecretRef, &out.ServiceAccountIssuerKeySecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	return
 }
 

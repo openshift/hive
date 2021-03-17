@@ -34,8 +34,6 @@ type AWSCloudBuilder struct {
 	UserTags map[string]string
 	// Region is the AWS region to which to install the cluster
 	Region string
-	// BoundServiceAccountSigningKey is the private signing key for AWS STS clusters
-	BoundServiceAccountSigningKey string
 }
 
 func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
@@ -75,37 +73,11 @@ func (p *AWSCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			UserTags: p.UserTags,
 		},
 	}
-	if len(p.BoundServiceAccountSigningKey) > 0 {
-		plat.AWS.STS = &hivev1aws.STS{
-			ServiceAccountIssuerKeySecretRef: corev1.LocalObjectReference{
-				Name: p.getBoundServiceAccountSigningKeySecretName(o),
-			},
-		}
-	}
 	return plat
 }
 
-func (p *AWSCloudBuilder) getBoundServiceAccountSigningKeySecretName(o *Builder) string {
-	return o.Name + "-sa-signing-key"
-}
-
 func (p *AWSCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
-	return []runtime.Object{
-		&corev1.Secret{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Secret",
-				APIVersion: corev1.SchemeGroupVersion.String(),
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      p.getBoundServiceAccountSigningKeySecretName(o),
-				Namespace: o.Namespace,
-			},
-			Type: corev1.SecretTypeOpaque,
-			StringData: map[string]string{
-				constants.BoundServiceAccountSigningKeyFile: p.BoundServiceAccountSigningKey,
-			},
-		},
-	}
+	return []runtime.Object{}
 }
 
 func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
@@ -140,7 +112,7 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	ic.ControlPlane.Platform.AWS = mpp
 	ic.Compute[0].Platform.AWS = mpp
 
-	if len(p.BoundServiceAccountSigningKey) > 0 {
+	if len(o.BoundServiceAccountSigningKey) > 0 {
 		ic.CredentialsMode = installertypes.ManualCredentialsMode
 	}
 

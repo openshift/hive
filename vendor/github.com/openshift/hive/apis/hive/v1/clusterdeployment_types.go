@@ -206,6 +206,10 @@ type Provisioning struct {
 	// Defaults to openshift-install if none specified.
 	// +optional
 	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
+
+	// ServiceAccountIssuerKeySecretRef refers to a Secret that contains a 'bound-service-account-signing-key.key' data key pointing to the private key that will be used to sign ServiceAccount objects. Primarily used to provision AWS clusters to use Amazon's Security Token Service.
+	// +optional
+	ServiceAccountIssuerKeySecretRef *corev1.LocalObjectReference `json:"serviceAccountIssuerKeySecretRef,omitempty"`
 }
 
 // ClusterImageSetReference is a reference to a ClusterImageSet

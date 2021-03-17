@@ -558,6 +558,13 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		builder.AdoptAdminUsername = o.AdoptAdminUsername
 		builder.AdoptAdminPassword = o.AdoptAdminPassword
 	}
+	if len(o.BoundServiceAccountSigningKeyFile) != 0 {
+		signingKey, err := ioutil.ReadFile(o.BoundServiceAccountSigningKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %v", o.BoundServiceAccountSigningKeyFile, err)
+		}
+		builder.BoundServiceAccountSigningKey = string(signingKey)
+	}
 
 	switch o.Cloud {
 	case cloudAWS:
@@ -583,14 +590,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			UserTags:        userTags,
 			Region:          o.Region,
 		}
-		if len(o.BoundServiceAccountSigningKeyFile) != 0 {
-			signingKey, err := ioutil.ReadFile(o.BoundServiceAccountSigningKeyFile)
-			if err != nil {
-				return nil, fmt.Errorf("error reading %s: %v", o.BoundServiceAccountSigningKeyFile, err)
-			}
-			awsProvider.BoundServiceAccountSigningKey = string(signingKey)
-		}
-
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
 		creds, err := azurecredutil.GetCreds(o.CredsFile)

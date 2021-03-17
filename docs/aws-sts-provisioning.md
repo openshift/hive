@@ -69,6 +69,6 @@ Create a ClusterDeployment normally with the following changes:
   1. Create a Secret for your private service account signing key created with ccoctl key-pair above: `kubectl create secret generic bound-service-account-signing-key --from-file=bound-service-account-signing-key.key=serviceaccount-signer.private`
   1. Create a ConfigMap with keys for each IAM Role Secret. Each key will be the file name provided to the installer: `kubectl create configmap cluster-manifests --from-file=manifest1.yaml=manifests/secret1.yaml --from-file=manifest2.yaml=manifests/secret2.yaml`
   1. In your InstallConfig set `credentialsMode: Manual`
-  1. In your ClusterDeployment set `spec.platform.aws.sts.serviceAccountIssuerKeySecretRef.name` to point to the Secret created above. (bound-service-account-signing-key)
-  1. In your ClusterDeployment set `spec.spec.provisioning.manifestsConfigMapRef` to point to the ConfigMap created above. (cluster-manifests)
+  1. In your ClusterDeployment set `spec.provisioning.serviceAccountIssuerKeySecretRef.name` to point to the Secret created above. (bound-service-account-signing-key)
+  1. In your ClusterDeployment set `spec.provisioning.manifestsConfigMapRef` to point to the ConfigMap created above. (cluster-manifests)
   1. Create your ClusterDeployment + InstallConfig to provision your STS cluster.

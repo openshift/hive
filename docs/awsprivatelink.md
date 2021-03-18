@@ -154,4 +154,55 @@ spec:
 The controller provides progress and failure updates using `AWSPrivateLinkReady` and
 `AWSPrivateLinkFailed` conditions on the ClusterDeployment.
 
+## Permissions required for AWS Private Link
+
+There multiple credentials involved in the configuring AWS Private Link and there are different
+expectations of required permissions for these credentials.
+
+1. The credentials on ClusterDeployment
+
+    The following permissions are required:
+
+    ```txt
+    ec2.CreateVpcEndpointServiceConfiguration
+    ec2.DescribeVpcEndpointServiceConfigurations
+    ec2.ModifyVpcEndpointServiceConfiguration
+    ec2.DescribeVpcEndpointServicePermissions
+    ec2.ModifyVpcEndpointServicePermissions
+
+    ec2.DeleteVpcEndpointServiceConfigurations
+    ```
+
+2. The credentials specified in HiveConfig for endpoint VPCs account `.spec.awsPrivateLink.credentialsSecretRef`
+
+    The following permissions are required:
+
+    ```txt
+    ec2.DescribeVpcEndpointServices
+    ec2.DescribeVpcEndpoints
+    ec2.CreateVpcEndpoint
+
+    ec2.DeleteVpcEndpoints
+
+    route53.CreateHostedZone
+    route53.GetHostedZone
+    route53.ListHostedZonesByVPC
+    route53.AssociateVPCWithHostedZone
+    route53.DisassociateVPCFromHostedZone
+    route53.CreateVPCAssociationAuthorization
+    route53.DeleteVPCAssociationAuthorization
+
+    route53.DeleteHostedZone
+    ```
+
+3. The credentials specified in HiveConfig for associating VPCs to the Private Hosted Zone.
+  `.spec.awsPrivateLink.associatedVPCs[$idx].credentialsSecretRef`
+
+    The following permissions are required in the account where the VPC exists:
+
+    ```txt
+    route53.AssociateVPCWithHostedZone
+    route53.DisassociateVPCFromHostedZone
+    ```
+
 [aws-private-link-overview]: https://docs.aws.amazon.com/vpc/latest/privatelink/endpoint-services-overview.html

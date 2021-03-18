@@ -21,6 +21,9 @@ type OpenStackCloudBuilder struct {
 	// APIFloatingIP is the OpenStack Floating IP for the cluster to use for its API
 	APIFloatingIP string
 
+	// IngressFloatingIP is the OpenStack Floating IP for the cluster to use for its Ingress
+	IngressFloatingIP string
+
 	// Cloud is the named section from the clouds.yaml in the Secret containing the creds.
 	Cloud string
 
@@ -84,6 +87,7 @@ func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *install
 			ExternalNetwork:      p.ExternalNetwork,
 			DeprecatedFlavorName: p.ComputeFlavor,
 			APIFloatingIP:        p.APIFloatingIP,
+			IngressFloatingIP:    p.IngressFloatingIP,
 		},
 	}
 

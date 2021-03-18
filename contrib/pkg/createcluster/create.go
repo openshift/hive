@@ -163,11 +163,12 @@ type Options struct {
 	AzureBaseDomainResourceGroupName string
 
 	// OpenStack
-	OpenStackCloud           string
-	OpenStackExternalNetwork string
-	OpenStackMasterFlavor    string
-	OpenStackComputeFlavor   string
-	OpenStackAPIFloatingIP   string
+	OpenStackCloud             string
+	OpenStackExternalNetwork   string
+	OpenStackMasterFlavor      string
+	OpenStackComputeFlavor     string
+	OpenStackAPIFloatingIP     string
+	OpenStackIngressFloatingIP string
 
 	// VSphere
 	VSphereVCenter          string
@@ -290,6 +291,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.OpenStackMasterFlavor, "openstack-master-flavor", "ci.m4.xlarge", "Compute flavor to use for master nodes")
 	flags.StringVar(&opt.OpenStackComputeFlavor, "openstack-compute-flavor", "m1.large", "Compute flavor to use for worker nodes")
 	flags.StringVar(&opt.OpenStackAPIFloatingIP, "openstack-api-floating-ip", "", "Floating IP address to use for cluster's API")
+	flags.StringVar(&opt.OpenStackIngressFloatingIP, "openstack-ingress-floating-ip", "", "Floating IP address to use for cluster's Ingress service")
 
 	// vSphere flags
 	flags.StringVar(&opt.VSphereVCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
@@ -605,6 +607,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			ComputeFlavor:     o.OpenStackComputeFlavor,
 			MasterFlavor:      o.OpenStackMasterFlavor,
 			APIFloatingIP:     o.OpenStackAPIFloatingIP,
+			IngressFloatingIP: o.OpenStackIngressFloatingIP,
 		}
 		builder.CloudBuilder = openStackProvider
 	case cloudVSphere:

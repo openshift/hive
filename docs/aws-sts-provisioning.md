@@ -19,7 +19,7 @@ $ oc adm release extract quay.io/openshift-release-dev/ocp-release:4.7.1-x86_64 
 ```bash
 $ ccoctl create key-pair
 $ ccoctl create identity-provider --name-prefix mystsprefix --public-key-file serviceaccount-signer.public --region us-east-1
-$ ccoctl create iam-roles --credentials-requests-dir /home/dgoodwin/go/src/github.com/openshift/cloud-credential-operator/sts/credrequests/ --identity-provider-arn arn:aws:iam::125931421481:oidc-provider/dgoodsts2-oidc.s3.us-east-1.amazonaws.com --name-prefix dgoodsts2 --region us-east-1
+$ ccoctl create iam-roles --credentials-requests-dir credrequests/ --identity-provider-arn <IdentityProviderARN> --name-prefix mystsprefix --region us-east-1
 ```
 
 ## Create Credentials Secret Manifests
@@ -49,7 +49,7 @@ type: Opaque
 
 ### Create Authentication Manifest
 
-In the same directory as your Secret manifets, add another to configure the OpenShift Authentication operator to use the S3 OIDC provider created by `ccoctl create identity-provider`.
+In the same directory as your Secret manifets, add another file named `cluster-authentication-02-config.yaml` to configure the OpenShift Authentication operator to use the S3 OIDC provider created by `ccoctl create identity-provider`.
 
 ```yaml
 apiVersion: config.openshift.io/v1
@@ -67,7 +67,7 @@ May also soon be automated by ccoctl.
 Create a ClusterDeployment normally with the following changes:
 
   1. Create a Secret for your private service account signing key created with ccoctl key-pair above: `kubectl create secret generic bound-service-account-signing-key --from-file=bound-service-account-signing-key.key=serviceaccount-signer.private`
-  1. Create a ConfigMap with keys for each IAM Role Secret. Each key will be the file name provided to the installer: `kubectl create configmap cluster-manifests --from-file=manifest1.yaml=manifests/secret1.yaml --from-file=manifest2.yaml=manifests/secret2.yaml`
+  1. Create a ConfigMap for your installer manifets (credential role Secrets, Authentication config): `kubectl create configmap cluster-manifests --from-file=manifests/`
   1. In your InstallConfig set `credentialsMode: Manual`
   1. In your ClusterDeployment set `spec.provisioning.serviceAccountIssuerKeySecretRef.name` to point to the Secret created above. (bound-service-account-signing-key)
   1. In your ClusterDeployment set `spec.provisioning.manifestsConfigMapRef` to point to the ConfigMap created above. (cluster-manifests)

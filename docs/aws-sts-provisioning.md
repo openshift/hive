@@ -1,6 +1,6 @@
 # Provisioning AWS STS Clusters
 
-It is possible to use Hive to provision clusters configured to use Amazon's Security Token Service, where cluster components use short lived credentials that are rotated frequently, and the cluster does not have an admin level AWS credential. This feature was added to the in-cluster Cloud Credential Operator in 4.7, see documentation [here](https://docs.openshift.com/container-platform/4.7/authentication/managing_cloud_provider_credentials/cco-mode-sts.html).
+It is possible to use Hive to provision clusters configured to use Amazon's Security Token Service, where cluster components use short lived credentials that are rotated frequently, and the cluster does not have an admin level AWS credential. This feature was added to the in-cluster OpenShift components in 4.7, see documentation [here](https://docs.openshift.com/container-platform/4.7/authentication/managing_cloud_provider_credentials/cco-mode-sts.html).
 
 At present Hive does not automate the STS setup, rather we assume the user configures STS components manually and provides information to Hive. The following instructions refer to the 'ccoctl' tool coming in OpenShift 4.8 with the Cloud Credential Operator. This tool is not yet released but development is underway [here](https://github.com/openshift/cloud-credential-operator) and can be compiled from source, and used to prepare for provisioning 4.7 clusters.
 
@@ -19,7 +19,7 @@ $ oc adm release extract quay.io/openshift-release-dev/ocp-release:4.7.1-x86_64 
 ```bash
 $ ccoctl create key-pair
 $ ccoctl create identity-provider --name-prefix mystsprefix --public-key-file serviceaccount-signer.public --region us-east-1
-$ create iam-roles --credentials-requests-dir /home/dgoodwin/go/src/github.com/openshift/cloud-credential-operator/sts/credrequests/ --identity-provider-arn arn:aws:iam::125931421481:oidc-provider/dgoodsts2-oidc.s3.us-east-1.amazonaws.com --name-prefix dgoodsts2 --region us-east-1
+$ ccoctl create iam-roles --credentials-requests-dir /home/dgoodwin/go/src/github.com/openshift/cloud-credential-operator/sts/credrequests/ --identity-provider-arn arn:aws:iam::125931421481:oidc-provider/dgoodsts2-oidc.s3.us-east-1.amazonaws.com --name-prefix dgoodsts2 --region us-east-1
 ```
 
 ## Create Credentials Secret Manifests

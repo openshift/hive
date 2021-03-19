@@ -153,12 +153,12 @@ func InstallerPodSpec(
 		)
 
 		// If this is an STS cluster, mount volume for the bound service account signing key:
-		if cd.Spec.Provisioning.ServiceAccountIssuerKeySecretRef != nil {
+		if cd.Spec.BoundServiceAccountSignkingKeySecretRef != nil {
 			volumes = append(volumes, corev1.Volume{
 				Name: "bound-token-signing-key",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.Provisioning.ServiceAccountIssuerKeySecretRef.Name,
+						SecretName: cd.Spec.BoundServiceAccountSignkingKeySecretRef.Name,
 						Items: []corev1.KeyToPath{
 							{
 								Key:  constants.BoundServiceAccountSigningKeyFile,

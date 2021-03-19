@@ -350,7 +350,7 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	if len(o.BoundServiceAccountSigningKey) > 0 {
-		cd.Spec.Provisioning.ServiceAccountIssuerKeySecretRef = &corev1.LocalObjectReference{
+		cd.Spec.BoundServiceAccountSignkingKeySecretRef = &corev1.LocalObjectReference{
 			Name: o.getBoundServiceAccountSigningKeySecretName(),
 		}
 	}

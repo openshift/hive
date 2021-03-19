@@ -21,17 +21,17 @@ import (
 )
 
 const (
-	azureAuthDir             = "/.azure"
-	azureAuthFile            = azureAuthDir + "/osServicePrincipal.json"
-	gcpAuthDir               = "/.gcp"
-	gcpAuthFile              = gcpAuthDir + "/" + constants.GCPCredentialsName
-	awsDir                   = "/.aws"
-	awsBoundSASigningKeyFile = awsDir + "/" + constants.BoundServiceAccountSigningKeyFile
-	openStackCloudsDir       = "/etc/openstack"
-	openStackCADir           = "/etc/openstack-ca"
-	vsphereCloudsDir         = "/vsphere"
-	ovirtCloudsDir           = "/.ovirt"
-	ovirtCADir               = "/.ovirt-ca"
+	azureAuthDir          = "/.azure"
+	azureAuthFile         = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir            = "/.gcp"
+	gcpAuthFile           = gcpAuthDir + "/" + constants.GCPCredentialsName
+	boundSASigningKeyDir  = "/boundsasigningkey"
+	boundSASigningKeyFile = boundSASigningKeyDir + "/" + constants.BoundServiceAccountSigningKeyFile
+	openStackCloudsDir    = "/etc/openstack"
+	openStackCADir        = "/etc/openstack-ca"
+	vsphereCloudsDir      = "/vsphere"
+	ovirtCloudsDir        = "/.ovirt"
+	ovirtCADir            = "/.ovirt-ca"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -170,11 +170,11 @@ func InstallerPodSpec(
 			})
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{
 				Name:      "bound-token-signing-key",
-				MountPath: awsDir,
+				MountPath: boundSASigningKeyDir,
 			})
 			env = append(env, corev1.EnvVar{
 				Name:  constants.BoundServiceAccountSigningKeyEnvVar,
-				Value: awsBoundSASigningKeyFile,
+				Value: boundSASigningKeyFile,
 			})
 
 		}

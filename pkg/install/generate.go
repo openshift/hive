@@ -21,15 +21,17 @@ import (
 )
 
 const (
-	azureAuthDir       = "/.azure"
-	azureAuthFile      = azureAuthDir + "/osServicePrincipal.json"
-	gcpAuthDir         = "/.gcp"
-	gcpAuthFile        = gcpAuthDir + "/" + constants.GCPCredentialsName
-	openStackCloudsDir = "/etc/openstack"
-	openStackCADir     = "/etc/openstack-ca"
-	vsphereCloudsDir   = "/vsphere"
-	ovirtCloudsDir     = "/.ovirt"
-	ovirtCADir         = "/.ovirt-ca"
+	azureAuthDir          = "/.azure"
+	azureAuthFile         = azureAuthDir + "/osServicePrincipal.json"
+	gcpAuthDir            = "/.gcp"
+	gcpAuthFile           = gcpAuthDir + "/" + constants.GCPCredentialsName
+	boundSASigningKeyDir  = "/boundsasigningkey"
+	boundSASigningKeyFile = boundSASigningKeyDir + "/" + constants.BoundServiceAccountSigningKeyFile
+	openStackCloudsDir    = "/etc/openstack"
+	openStackCADir        = "/etc/openstack-ca"
+	vsphereCloudsDir      = "/vsphere"
+	ovirtCloudsDir        = "/.ovirt"
+	ovirtCADir            = "/.ovirt-ca"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -149,6 +151,33 @@ func InstallerPodSpec(
 				},
 			},
 		)
+
+		// If this is an STS cluster, mount volume for the bound service account signing key:
+		if cd.Spec.BoundServiceAccountSignkingKeySecretRef != nil {
+			volumes = append(volumes, corev1.Volume{
+				Name: "bound-token-signing-key",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cd.Spec.BoundServiceAccountSignkingKeySecretRef.Name,
+						Items: []corev1.KeyToPath{
+							{
+								Key:  constants.BoundServiceAccountSigningKeyFile,
+								Path: constants.BoundServiceAccountSigningKeyFile,
+							},
+						},
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "bound-token-signing-key",
+				MountPath: boundSASigningKeyDir,
+			})
+			env = append(env, corev1.EnvVar{
+				Name:  constants.BoundServiceAccountSigningKeyEnvVar,
+				Value: boundSASigningKeyFile,
+			})
+
+		}
 	case cd.Spec.Platform.Azure != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "azure",

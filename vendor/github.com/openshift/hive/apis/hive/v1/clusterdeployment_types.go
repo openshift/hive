@@ -142,6 +142,13 @@ type ClusterDeploymentSpec struct {
 	// provisioning worker machines.
 	// +optional
 	MachineManagement *MachineManagement `json:"machineManagement,omitempty"`
+
+	// BoundServiceAccountSignkingKeySecretRef refers to a Secret that contains a
+	// 'bound-service-account-signing-key.key' data key pointing to the private
+	// key that will be used to sign ServiceAccount objects. Primarily used to
+	// provision AWS clusters to use Amazon's Security Token Service.
+	// +optional
+	BoundServiceAccountSignkingKeySecretRef *corev1.LocalObjectReference `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
 }
 
 // MachineManagement contains settings used for machine management.

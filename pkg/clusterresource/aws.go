@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
@@ -62,12 +63,8 @@ func (p *AWSCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	}
 }
 
-func (p *AWSCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
-	return nil
-}
-
 func (p *AWSCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
-	return hivev1.Platform{
+	plat := hivev1.Platform{
 		AWS: &hivev1aws.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.CredsSecretName(o),
@@ -76,6 +73,11 @@ func (p *AWSCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			UserTags: p.UserTags,
 		},
 	}
+	return plat
+}
+
+func (p *AWSCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
+	return []runtime.Object{}
 }
 
 func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
@@ -109,6 +111,10 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	}
 	ic.ControlPlane.Platform.AWS = mpp
 	ic.Compute[0].Platform.AWS = mpp
+
+	if len(o.BoundServiceAccountSigningKey) > 0 {
+		ic.CredentialsMode = installertypes.ManualCredentialsMode
+	}
 
 }
 

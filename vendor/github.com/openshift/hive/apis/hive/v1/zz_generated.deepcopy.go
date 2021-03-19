@@ -600,6 +600,11 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 		*out = new(MachineManagement)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.BoundServiceAccountSignkingKeySecretRef != nil {
+		in, out := &in.BoundServiceAccountSignkingKeySecretRef, &out.BoundServiceAccountSignkingKeySecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	return
 }
 

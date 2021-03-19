@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
@@ -71,19 +72,21 @@ func (p *VSphereCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secr
 	}
 }
 
-func (p *VSphereCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
-	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: corev1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.certificatesSecretName(o),
-			Namespace: o.Namespace,
-		},
-		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			".cacert": p.CACert,
+func (p *VSphereCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
+	return []runtime.Object{
+		&corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: corev1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      p.certificatesSecretName(o),
+				Namespace: o.Namespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				".cacert": p.CACert,
+			},
 		},
 	}
 }

@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 	installeropenstack "github.com/openshift/installer/pkg/types/openstack"
@@ -56,10 +57,6 @@ func (p *OpenStackCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Se
 	}
 }
 
-func (p *OpenStackCloudBuilder) generateCloudCertificatesSecret(o *Builder) *corev1.Secret {
-	return nil
-}
-
 func (p *OpenStackCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	return hivev1.Platform{
 		OpenStack: &hivev1openstack.Platform{
@@ -97,4 +94,8 @@ func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *install
 
 func (p *OpenStackCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-openstack-creds", o.Name)
+}
+
+func (p *OpenStackCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
+	return []runtime.Object{}
 }

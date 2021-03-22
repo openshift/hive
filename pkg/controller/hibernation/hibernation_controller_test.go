@@ -256,6 +256,7 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.resuming).Build(),
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(false, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -481,6 +482,7 @@ func TestHibernateAfter(t *testing.T) {
 		{
 			name: "cluster waking from hibernate",
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(false, nil)
 			},
 			cd: cdBuilder.Build(

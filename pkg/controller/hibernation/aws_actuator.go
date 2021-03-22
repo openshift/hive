@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 )
 
@@ -76,7 +77,7 @@ func (a *awsActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Clien
 		return err
 	}
 	if len(instanceIDs) == 0 {
-		logger.Warning("No instances were found to start")
+		logger.Info("No instances were found to start")
 		return nil
 	}
 	logger.WithField("instanceIDs", instanceIDs).Info("Starting cluster instances")

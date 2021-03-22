@@ -90,7 +90,7 @@ func (a *azureActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Cli
 		return err
 	}
 	if len(machines) == 0 {
-		logger.Warning("No machines were found to start")
+		logger.Info("No machines were found to start")
 		return nil
 	}
 	var errs []error

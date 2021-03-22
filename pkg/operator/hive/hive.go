@@ -100,6 +100,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 
 	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, mdConfigMap.Name)
+	addAWSPrivateLinkConfigVolume(&hiveDeployment.Spec.Template.Spec)
 
 	hiveNSName := getHiveNamespace(instance)
 
@@ -199,6 +200,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if hiveDeployment.Spec.Template.Annotations == nil {
 		hiveDeployment.Spec.Template.Annotations = make(map[string]string, 1)
 	}
+	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:

@@ -35,6 +35,7 @@ import (
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/awsprivatelink"
 	"github.com/openshift/hive/pkg/controller/clusterclaim"
 	"github.com/openshift/hive/pkg/controller/clusterdeployment"
 	"github.com/openshift/hive/pkg/controller/clusterdeprovision"
@@ -93,6 +94,7 @@ var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	clusterpool.ControllerName:          clusterpool.Add,
 	hibernation.ControllerName:          hibernation.Add,
 	machinemanagement.ControllerName:    machinemanagement.Add,
+	awsprivatelink.ControllerName:       awsprivatelink.Add,
 }
 
 type controllerManagerOptions struct {

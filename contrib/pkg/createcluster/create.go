@@ -157,9 +157,11 @@ type Options struct {
 	SkipMachinePools                  bool
 	AdditionalTrustBundle             string
 	CentralMachineManagement          bool
+	Internal                          bool
 
 	// AWS
-	AWSUserTags []string
+	AWSUserTags    []string
+	AWSPrivateLink bool
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -274,6 +276,8 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 	flags.BoolVar(&opt.CentralMachineManagement, "central-machine-mgmt", false, "Enable central machine management for cluster")
+	flags.BoolVar(&opt.Internal, "internal", false, `When set, it configures the install-config.yaml's publish field to Internal.
+OpenShift Installer publishes all the services of the cluster like API server and ingress to internal network and not the Internet.`)
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -285,6 +289,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 
 	// AWS flags
 	flags.StringSliceVar(&opt.AWSUserTags, "aws-user-tags", nil, "Additional tags to add to resources. Must be in the form \"key=value\"")
+	flags.BoolVar(&opt.AWSPrivateLink, "aws-private-link", false, "Enables access to cluster using AWS PrivateLink")
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
@@ -384,6 +389,10 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		if o.ManifestsDir == "" {
 			return fmt.Errorf("--credentials-mode-manual requires --manifests-dir containing custom Secrets with manually provisioned credentials")
 		}
+	}
+
+	if o.AWSPrivateLink && o.Cloud != cloudAWS {
+		return fmt.Errorf("--aws-private-link can only be enabled for AWS cloud platform")
 	}
 
 	if o.Adopt {
@@ -580,6 +589,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			SecretAccessKey: secretAccessKey,
 			UserTags:        userTags,
 			Region:          o.Region,
+			PrivateLink:     o.AWSPrivateLink,
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
@@ -722,6 +732,10 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		builder.CloudBuilder = oVirtProvider
 		builder.SkipMachinePools = true
+	}
+
+	if o.Internal {
+		builder.PublishStrategy = "Internal"
 	}
 
 	if len(o.ServingCert) != 0 {

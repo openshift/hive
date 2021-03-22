@@ -88,7 +88,69 @@ type HiveConfigSpec struct {
 	// +optional
 	ControllersConfig *ControllersConfig `json:"controllersConfig,omitempty"`
 
+	// AWSPrivateLink defines the configuration for the aws-private-link controller.
+	// It provides 3 major pieces of information required by the controller,
+	// 1. The Credentials that should be used to create AWS PrivateLink resources other than
+	//     what exist in the customer's account.
+	// 2. A list of VPCs that can be used by the controller to choose one to create AWS VPC Endpoints
+	//     for the AWS VPC Endpoint Services created for ClusterDeployments in their
+	//     corresponding regions.
+	// 3. A list of VPCs that should be able to resolve the DNS addresses setup for Private Link.
+	AWSPrivateLink *AWSPrivateLinkConfig `json:"awsPrivateLink,omitempty"`
+
 	FeatureGates *FeatureGateSelection `json:"featureGates,omitempty"`
+}
+
+// AWSPrivateLinkConfig defines the configuration for the aws-private-link controller.
+type AWSPrivateLinkConfig struct {
+	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
+	// AWS for creating the resources for AWS PrivateLink.
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// EndpointVPCInventory is a list of VPCs and the corresponding subnets in various AWS regions.
+	// The controller uses this list to choose a VPC for creating AWS VPC Endpoints. Since the
+	// VPC Endpoints must be in the same region as the ClusterDeployment, we must have VPCs in that
+	// region to be able to setup Private Link.
+	EndpointVPCInventory []AWSPrivateLinkInventory `json:"endpointVPCInventory,omitempty"`
+
+	// AssociatedVPCs is the list of VPCs that should be able to resolve the DNS addresses
+	// setup for Private Link. This allows clients in VPC to resolve the AWS PrivateLink address
+	// using AWS's default DNS resolver for Private Route53 Hosted Zones.
+	//
+	// This list should at minimum include the VPC where the current Hive controller is running.
+	AssociatedVPCs []AWSAssociatedVPC `json:"associatedVPCs,omitempty"`
+}
+
+// AWSPrivateLinkInventory is a VPC and its corresponding subnets in an AWS region.
+// This VPC will be used to create an AWS VPC Endpoint whenever there is a VPC Endpoint Service
+// created for a ClusterDeployment.
+type AWSPrivateLinkInventory struct {
+	AWSPrivateLinkVPC `json:",inline"`
+	Subnets           []AWSPrivateLinkSubnet `json:"subnets"`
+}
+
+// AWSAssociatedVPC defines a VPC that should be able to resolve the DNS addresses
+// setup for Private Link.
+type AWSAssociatedVPC struct {
+	AWSPrivateLinkVPC `json:",inline"`
+	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
+	// AWS for associating the VPC with the Private HostedZone created for PrivateLink.
+	// When not provided, the common credentials for the controller should be used.
+	//
+	// +optional
+	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef"`
+}
+
+// AWSPrivateLinkVPC defines an AWS VPC in a region.
+type AWSPrivateLinkVPC struct {
+	VPCID  string `json:"vpcID"`
+	Region string `json:"region"`
+}
+
+// AWSPrivateLinkSubnet defines a subnet in the an AWS VPC.
+type AWSPrivateLinkSubnet struct {
+	SubnetID         string `json:"subnetID"`
+	AvailabilityZone string `json:"availabilityZone"`
 }
 
 // FeatureSet defines the set of feature gates that should be used.
@@ -349,6 +411,7 @@ const (
 	MetricsControllerName              ControllerName = "metrics"
 	ClustersyncControllerName          ControllerName = "clustersync"
 	MachineManagementControllerName    ControllerName = "machineManagement"
+	AWSPrivateLinkControllerName       ControllerName = "awsprivatelink"
 )
 
 // SpecificControllerConfig contains the configuration for a specific controller

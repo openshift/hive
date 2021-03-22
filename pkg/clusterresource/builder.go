@@ -134,6 +134,9 @@ type Builder struct {
 
 	// BoundServiceAccountSigningKey is the private key used to sign ServiceAccounts. Primarily used for provisioning clusters that use AWS Security Token Service.
 	BoundServiceAccountSigningKey string
+
+	// PublishStrategy defines the publishing strategy for the install-config.
+	PublishStrategy string
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -397,6 +400,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 			},
 		},
 		AdditionalTrustBundle: o.AdditionalTrustBundle,
+		Publish:               installertypes.PublishingStrategy(o.PublishStrategy),
 	}
 
 	o.CloudBuilder.addInstallConfigPlatform(o, installConfig)

@@ -236,6 +236,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		expectedAllowed     bool
 		gvr                 *metav1.GroupVersionResource
 		enabledFeatureGates []string
+		awsPrivateLink      *hivev1.AWSPrivateLinkConfig
 	}{
 		{
 			name:            "Test valid create",
@@ -1046,6 +1047,83 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed:     false,
 			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
 		},
+		{
+			name: "private link set, but disabled, no config",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "private link enabled, no config",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "private link enabled, no inventory",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			awsPrivateLink:      &hivev1.AWSPrivateLinkConfig{},
+		},
+		{
+			name: "private link enabled, no inventory in the given region",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
+				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
+					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+						Region: "some-region",
+						VPCID:  "vpc-id",
+					},
+				}},
+			},
+		},
+		{
+			name: "private link enabled, some inventory in given region",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
+				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
+					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+						Region: "some-region",
+						VPCID:  "vpc-id",
+					},
+				}, {
+					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+						Region: "test-region",
+						VPCID:  "vpc-id-2",
+					},
+				}},
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -1059,6 +1137,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 						Enabled: tc.enabledFeatureGates,
 					},
 				},
+				awsPrivateLinkConfig: tc.awsPrivateLink,
 			}
 
 			if tc.gvr == nil {

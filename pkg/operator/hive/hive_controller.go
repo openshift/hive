@@ -339,7 +339,14 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance)
+	plConfigHash, err := r.deployAWSPrivateLinkConfigMap(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying aws privatelink configmap")
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance, plConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying controllers configmap")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
@@ -372,7 +379,7 @@ func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash)
+	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash, plConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)

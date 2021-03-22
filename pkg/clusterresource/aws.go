@@ -34,6 +34,8 @@ type AWSCloudBuilder struct {
 	UserTags map[string]string
 	// Region is the AWS region to which to install the cluster
 	Region string
+
+	PrivateLink bool
 }
 
 func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
@@ -71,6 +73,9 @@ func (p *AWSCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			},
 			Region:   p.Region,
 			UserTags: p.UserTags,
+			PrivateLink: &hivev1aws.PrivateLinkAccess{
+				Enabled: p.PrivateLink,
+			},
 		},
 	}
 	return plat

@@ -297,6 +297,11 @@ type ClusterDeploymentStatus struct {
 	// InstallStrategy contains observed state from specific install strategies.
 	// +optional
 	InstallStrategy *InstallStrategyStatus `json:"installStrategy,omitempty"`
+
+	// Platform contains the observed state for the specific platform upon which to
+	// perform the installation.
+	// +optional
+	Platform *PlatformStatus `json:"platformStatus,omitempty"`
 }
 
 // InstallStrategyStatus contains observed state from specific install strategies.
@@ -388,6 +393,14 @@ const (
 
 	// AuthenticationFailureCondition is true when platform credentials cannot be used because of authentication failure
 	AuthenticationFailureClusterDeploymentCondition ClusterDeploymentConditionType = "AuthenticationFailure"
+
+	// AWSPrivateLinkReadyClusterDeploymentCondition is true when private link access has been
+	// setup for the cluster.
+	AWSPrivateLinkReadyClusterDeploymentCondition ClusterDeploymentConditionType = "AWSPrivateLinkReady"
+
+	// AWSPrivateLinkFailedClusterDeploymentCondition is true controller fails to setup private link access
+	// for the cluster.
+	AWSPrivateLinkFailedClusterDeploymentCondition ClusterDeploymentConditionType = "AWSPrivateLinkFailed"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -405,6 +418,8 @@ var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	RelocationFailedCondition,
 	ClusterHibernatingCondition,
 	InstallLaunchErrorCondition,
+	AWSPrivateLinkReadyClusterDeploymentCondition,
+	AWSPrivateLinkFailedClusterDeploymentCondition,
 }
 
 // Cluster hibernating reasons
@@ -498,6 +513,13 @@ type Platform struct {
 	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
 	// to bare metal. Can only be used with the Assisted InstallStrategy.
 	AgentBareMetal *agent.BareMetalPlatform `json:"agentBareMetal,omitempty"`
+}
+
+// PlatformStatus contains the observed state for the specific platform upon which to
+// perform the installation
+type PlatformStatus struct {
+	// AWS is the observed state on AWS.
+	AWS *aws.PlatformStatus `json:"aws,omitempty"`
 }
 
 // InstallStrategy provides configuration for optional alternative install strategies.

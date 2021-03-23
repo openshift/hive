@@ -15,15 +15,16 @@ import (
 )
 
 func EnqueueDNSZonesOwnedByClusterDeployment(c client.Client, logger log.FieldLogger) handler.EventHandler {
-	return &handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(func(mapObj handler.MapObject) []reconcile.Request {
+
+	return handler.EnqueueRequestsFromMapFunc(func(mapObj client.Object) []reconcile.Request {
 		dnsZones := &hivev1.DNSZoneList{}
 		if err := c.List(
 			context.TODO(),
 			dnsZones,
-			client.InNamespace(mapObj.Meta.GetNamespace()),
+			client.InNamespace(mapObj.GetNamespace()),
 			client.MatchingLabels{
 				constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
-				constants.ClusterDeploymentNameLabel: mapObj.Meta.GetName(),
+				constants.ClusterDeploymentNameLabel: mapObj.GetName(),
 			},
 		); err != nil {
 			logger.WithError(err).Log(LogLevel(err), "could not list DNS zones owned by ClusterDeployment")
@@ -31,15 +32,10 @@ func EnqueueDNSZonesOwnedByClusterDeployment(c client.Client, logger log.FieldLo
 		}
 		requests := make([]reconcile.Request, len(dnsZones.Items))
 		for i, dnsZone := range dnsZones.Items {
-			request, err := client.ObjectKeyFromObject(&dnsZone)
-			if err != nil {
-				logger.WithError(err).Error("could not get object key for DNS zone")
-				continue
-			}
-			requests[i] = reconcile.Request{NamespacedName: request}
+			requests[i] = reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&dnsZone)}
 		}
 		return requests
-	})}
+	})
 }
 
 // ReconcileDNSZoneForRelocation performs reconciliation on a DNSZone that is in the midst of a relocation to a new

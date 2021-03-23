@@ -7,7 +7,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +17,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
+
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/imageset"
 )
@@ -174,7 +174,7 @@ type Calculator struct {
 }
 
 // Start begins the metrics calculation loop.
-func (mc *Calculator) Start(stopCh <-chan struct{}) error {
+func (mc *Calculator) Start(ctx context.Context) error {
 	log.Info("started metrics calculator goroutine")
 
 	// Run forever, sleep at the end:
@@ -314,7 +314,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		}
 
 		mc.calculateSelectorSyncSetMetrics(mcLog)
-	}, mc.Interval, stopCh)
+	}, mc.Interval, ctx.Done())
 
 	return nil
 }

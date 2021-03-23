@@ -4,6 +4,14 @@ metadata:
   creationTimestamp: null
   name: clustersyncs.hiveinternal.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[0].reason
+    name: Status
+    type: string
+  - JSONPath: .status.conditions[?(@.type=="Failed")].message
+    name: Message
+    priority: 1
+    type: string
   group: hiveinternal.openshift.io
   names:
     kind: ClusterSync

@@ -7,8 +7,8 @@ Hive is published to [OperatorHub](https://operatorhub.io/operator/hive-operator
   1. Create a 'hive' namespace.
   1. In OpenShift web console navigate to Administrator perspective > Operators > OperatorHub.
   1. Search for “hive” and select the OpenShift Hive operator.
-    1. Select the “alpha” update channel, install to a specific namespace, select the “hive” namespace just created, approval strategy automatic, and press Install.
-    1. You should now have a hive-operator pod running in the hive namespace.
+     1. Select the “alpha” update channel, install to a specific namespace, select the “hive” namespace just created, approval strategy automatic, and press Install.
+     1. You should now have a hive-operator pod running in the hive namespace.
   1. Create a HiveConfig to trigger the the actual deployment of Hive. (can be done via the web UI with a couple clicks, or with oc apply)
 
 ```yaml

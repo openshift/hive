@@ -147,7 +147,7 @@ type ReconcileClusterDeprovision struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeprovision object and makes changes based on the state read
 // and what is in the ClusterDeprovision.Spec
-func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	rLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeprovision", request.NamespacedName)
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	rLog.Info("reconciling cluster deprovision request")

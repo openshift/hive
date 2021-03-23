@@ -130,7 +130,7 @@ type ReconcileRemoteClusterIngress struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and sets up
 // any needed ClusterIngress objects up for syncing to the remote cluster.
 //
-func (r *ReconcileRemoteClusterIngress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)

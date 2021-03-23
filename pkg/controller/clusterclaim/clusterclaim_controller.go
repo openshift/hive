@@ -159,7 +159,7 @@ type ReconcileClusterClaim struct {
 }
 
 // Reconcile reconciles a ClusterClaim.
-func (r *ReconcileClusterClaim) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterClaim", request.NamespacedName)
 	logger.Infof("reconciling cluster claim")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

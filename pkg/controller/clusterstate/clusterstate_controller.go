@@ -100,7 +100,7 @@ type ReconcileClusterState struct {
 }
 
 // Reconcile ensures that a given ClusterState resource exists and reflects the state of cluster operators from its target cluster
-func (r *ReconcileClusterState) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterState) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

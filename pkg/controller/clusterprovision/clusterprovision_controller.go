@@ -143,7 +143,7 @@ type ReconcileClusterProvision struct {
 
 // Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read
 // and what is in the ClusterProvision.Spec
-func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	pLog := controllerutils.BuildControllerLogger(ControllerName, "clusterProvision", request.NamespacedName)
 	pLog.Info("reconciling cluster provision")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, pLog)

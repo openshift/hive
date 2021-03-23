@@ -150,7 +150,7 @@ type ReconcileClusterRelocate struct {
 }
 
 // Reconcile relocates ClusterDeployments matching with a ClusterRelocate to another Hive instance.
-func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterRelocate) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

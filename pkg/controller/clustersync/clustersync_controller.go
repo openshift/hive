@@ -335,7 +335,7 @@ func (r *ReconcileClusterSync) isSyncAssignedToMe(sts *appsv1.StatefulSet, cd *h
 
 // Reconcile reads the state of the ClusterDeployment and applies any SyncSets or SelectorSyncSets that need to be
 // applied or re-applied.
-func (r *ReconcileClusterSync) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Infof("reconciling ClusterDeployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

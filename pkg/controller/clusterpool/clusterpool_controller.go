@@ -198,7 +198,7 @@ type ReconcileClusterPool struct {
 
 // Reconcile reads the state of the ClusterPool, checks if we currently have enough ClusterDeployments waiting, and
 // attempts to reach the desired state if not.
-func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterPool", request.NamespacedName)
 	logger.Infof("reconciling cluster pool")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

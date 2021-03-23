@@ -174,7 +174,7 @@ type identityProviderPatchSpec struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes to the
 // remote cluster MachineSets based on the state read and the worker machines defined in
 // ClusterDeployment.Spec.Config.Machines
-func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileSyncIdentityProviders) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	contextLogger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	contextLogger.Info("reconciling syncidentityproviders and clusterdeployments")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, contextLogger)

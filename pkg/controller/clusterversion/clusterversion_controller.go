@@ -92,7 +92,7 @@ type ReconcileClusterVersion struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and syncs the remote ClusterVersion status
 // if the remote cluster is available.
-func (r *ReconcileClusterVersion) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)

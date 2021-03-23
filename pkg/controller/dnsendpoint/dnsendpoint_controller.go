@@ -164,7 +164,7 @@ type ReconcileDNSEndpoint struct {
 
 // Reconcile reads that state of the cluster for a DNSEndpoint object and makes changes based on the state read
 // and what is in the DNSEndpoint.Spec
-func (r *ReconcileDNSEndpoint) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	dnsLog := controllerutils.BuildControllerLogger(ControllerName, "dnsZone", request.NamespacedName)
 	dnsLog.Info("reconciling dns endpoint")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, dnsLog)

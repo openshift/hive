@@ -76,30 +76,21 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 	// Watch for changes to ClusterDeployment
 	if err := c.Watch(
 		&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(requestsForClusterDeployment),
-		},
-	); err != nil {
+		handler.EnqueueRequestsFromMapFunc(requestsForClusterDeployment)); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive-claim-owner Role
 	if err := c.Watch(
 		&source.Kind{Type: &rbacv1.Role{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: requestsForRBACResources(r.Client, hiveClaimOwnerRoleName, r.logger),
-		},
-	); err != nil {
+		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleName, r.logger))); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive-claim-owner RoleBinding
 	if err := c.Watch(
 		&source.Kind{Type: &rbacv1.Role{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger),
-		},
-	); err != nil {
+		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger))); err != nil {
 		return err
 	}
 
@@ -119,8 +110,8 @@ func claimForClusterDeployment(cd *hivev1.ClusterDeployment) *types.NamespacedNa
 	}
 }
 
-func requestsForClusterDeployment(o handler.MapObject) []reconcile.Request {
-	cd, ok := o.Object.(*hivev1.ClusterDeployment)
+func requestsForClusterDeployment(o client.Object) []reconcile.Request {
+	cd, ok := o.(*hivev1.ClusterDeployment)
 	if !ok {
 		return nil
 	}
@@ -131,12 +122,12 @@ func requestsForClusterDeployment(o handler.MapObject) []reconcile.Request {
 	return []reconcile.Request{{NamespacedName: *claim}}
 }
 
-func requestsForRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.ToRequestsFunc {
-	return func(o handler.MapObject) []reconcile.Request {
-		if o.Meta.GetName() != resourceName {
+func requestsForRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
+	return func(o client.Object) []reconcile.Request {
+		if o.GetName() != resourceName {
 			return nil
 		}
-		clusterName := o.Meta.GetNamespace()
+		clusterName := o.GetNamespace()
 		cd := &hivev1.ClusterDeployment{}
 		if err := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to get ClusterDeployment for RBAC resource")

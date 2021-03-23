@@ -74,18 +74,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to ClusterDeployment
-	cdMapFn := func(a handler.MapObject) []reconcile.Request {
-		cd := a.Object.(*hivev1.ClusterDeployment)
+	cdMapFn := func(a client.Object) []reconcile.Request {
+		cd := a.(*hivev1.ClusterDeployment)
 		return []reconcile.Request{{
 			NamespacedName: types.NamespacedName{Name: cd.Namespace},
 		}}
 	}
 	if err := c.Watch(
 		&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(cdMapFn),
-		},
-	); err != nil {
+		handler.EnqueueRequestsFromMapFunc(cdMapFn)); err != nil {
 		return err
 	}
 

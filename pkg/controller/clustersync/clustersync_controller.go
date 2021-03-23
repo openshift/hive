@@ -199,28 +199,22 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconc
 	// Watch for changes to SyncSets
 	if err := c.Watch(
 		&source.Kind{Type: &hivev1.SyncSet{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(requestsForSyncSet),
-		},
-	); err != nil {
+		handler.EnqueueRequestsFromMapFunc(requestsForSyncSet)); err != nil {
 		return err
 	}
 
 	// Watch for changes to SelectorSyncSets
 	if err := c.Watch(
 		&source.Kind{Type: &hivev1.SelectorSyncSet{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: requestsForSelectorSyncSet(r.Client, r.logger),
-		},
-	); err != nil {
+		handler.EnqueueRequestsFromMapFunc(requestsForSelectorSyncSet(r.Client, r.logger))); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func requestsForSyncSet(o handler.MapObject) []reconcile.Request {
-	ss, ok := o.Object.(*hivev1.SyncSet)
+func requestsForSyncSet(o client.Object) []reconcile.Request {
+	ss, ok := o.(*hivev1.SyncSet)
 	if !ok {
 		return nil
 	}
@@ -232,9 +226,9 @@ func requestsForSyncSet(o handler.MapObject) []reconcile.Request {
 	return requests
 }
 
-func requestsForSelectorSyncSet(c client.Client, logger log.FieldLogger) handler.ToRequestsFunc {
-	return func(o handler.MapObject) []reconcile.Request {
-		sss, ok := o.Object.(*hivev1.SelectorSyncSet)
+func requestsForSelectorSyncSet(c client.Client, logger log.FieldLogger) handler.MapFunc {
+	return func(o client.Object) []reconcile.Request {
+		sss, ok := o.(*hivev1.SelectorSyncSet)
 		if !ok {
 			return nil
 		}

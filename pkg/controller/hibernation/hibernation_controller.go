@@ -331,6 +331,11 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		return reconcile.Result{}, err
 	}
 	if !running {
+		// Ensure all machines have been started. Should have been handled already but we've seen VMs left in stopped state.
+		if err := actuator.StartMachines(cd, r.Client, logger); err != nil {
+			logger.WithError(err).Error("error starting machines")
+			return reconcile.Result{}, err
+		}
 		return reconcile.Result{RequeueAfter: stateCheckInterval}, nil
 	}
 	remoteClient, err := r.remoteClientBuilder(cd).Build()

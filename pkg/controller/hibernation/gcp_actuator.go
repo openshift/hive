@@ -79,6 +79,10 @@ func (a *gcpActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient cli
 	if err != nil {
 		return err
 	}
+	if len(instances) == 0 {
+		logger.Info("No instances were found to start")
+		return nil
+	}
 	var errs []error
 	for _, instance := range instances {
 		logger.WithField("instance", instance.Name).Info("Starting instance")

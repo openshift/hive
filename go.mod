@@ -66,7 +66,7 @@ require (
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
-	sigs.k8s.io/controller-runtime v0.6.2
+	sigs.k8s.io/controller-runtime v0.7.0
 	sigs.k8s.io/controller-tools v0.4.1
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -113,4 +113,4 @@ replace k8s.io/client-go => k8s.io/client-go v0.20.0
 replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0
 
 // point sigs.k8s.io/controller-runtime to forked version
-replace sigs.k8s.io/controller-runtime => github.com/openshift-hive/controller-runtime v0.6.2-openshift
+replace sigs.k8s.io/controller-runtime => github.com/openshift-hive/controller-runtime v0.7.0-openshift

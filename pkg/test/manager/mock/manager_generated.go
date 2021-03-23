@@ -5,6 +5,7 @@
 package mock
 
 import (
+	context "context"
 	logr "github.com/go-logr/logr"
 	gomock "github.com/golang/mock/gomock"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -268,7 +269,7 @@ func (mr *MockManagerMockRecorder) SetFields(arg0 interface{}) *gomock.Call {
 }
 
 // Start mocks base method
-func (m *MockManager) Start(arg0 <-chan struct{}) error {
+func (m *MockManager) Start(arg0 context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Start", arg0)
 	ret0, _ := ret[0].(error)

@@ -73,6 +73,8 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+	credsSecret         = "foo-aws-creds"
+	sshKeySecret        = "foo-ssh-key"
 
 	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"
@@ -1282,6 +1284,49 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						}
 					}
 					assert.Truef(t, cdAsOwnerRef, "cluster deployment not owner of %s", secretName)
+				}
+			},
+		},
+		{
+			name: "Add labels to cd referenced secrets",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Installed = true
+					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						InfraID:                  "fakeinfra",
+						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+						AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: adminPasswordSecret},
+					}
+					cd.Status.WebConsoleURL = "https://example.com"
+					cd.Status.APIURL = "https://example.com"
+					cd.Spec.Platform.AWS.CredentialsSecretRef = corev1.LocalObjectReference{
+						Name: credsSecret,
+					}
+					cd.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{
+						Name: sshKeySecret,
+					}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(
+					testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, credsSecret, "password", adminPassword),
+				testSecret(corev1.SecretTypeOpaque, sshKeySecret, "id_rsa", adminPassword),
+				testMetadataConfigMap(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				secretNames := []string{pullSecretSecret, credsSecret, sshKeySecret}
+				for _, secretName := range secretNames {
+					secret := &corev1.Secret{}
+					err := c.Get(context.TODO(), client.ObjectKey{Name: secretName, Namespace: testNamespace},
+						secret)
+					require.NoErrorf(t, err, "not found secret %s", secretName)
+					require.NotNilf(t, secret, "expected secret %s", secretName)
+					assert.Equalf(t, testClusterDeployment().Name, secret.Labels[constants.ClusterDeploymentNameLabel],
+						"incorrect cluster deployment name label for %s", secretName)
 				}
 			},
 		},

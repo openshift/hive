@@ -41,6 +41,7 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/install"
@@ -518,6 +519,21 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
+	// Add labels to secrets referenced by cluster deployment for machine management controller
+	if err := r.addClusterDeploymentNameLabelToSecret(utils.CredentialsSecretName(cd), cd, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+	if cd.Spec.PullSecretRef != nil {
+		if err := r.addClusterDeploymentNameLabelToSecret(cd.Spec.PullSecretRef.Name, cd, cdLog); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+	if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+		if err := r.addClusterDeploymentNameLabelToSecret(cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name, cd, cdLog); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	if cd.Spec.Installed {
 		// set installedTimestamp for adopted clusters
 		if cd.Status.InstalledTimestamp == nil {
@@ -654,6 +670,21 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	return r.reconcileExistingProvision(cd, cdLog)
+}
+
+func (r *ReconcileClusterDeployment) addClusterDeploymentNameLabelToSecret(secretName string, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: secretName, Namespace: cd.Namespace}, secret); err == nil {
+		if !metav1.HasLabel(secret.ObjectMeta, constants.ClusterDeploymentNameLabel) {
+			secret.Labels = k8slabels.AddLabel(secret.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
+			err := r.Update(context.TODO(), secret)
+			if err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update secret ", secretName)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.ClusterDeploymentCondition) {

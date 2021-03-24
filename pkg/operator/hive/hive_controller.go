@@ -137,7 +137,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		mgr.Add(&informerRunnable{informer: configMapInformer})
 
 		// Watch for changes to cm/kube-apiserver-aggregator-client-ca in the OpenShift managed namespace
-		err = c.Watch(&source.Informer{Informer: configMapInformer}, &handler.EnqueueRequestsFromMapFunc{ToRequests: handler.ToRequestsFunc(aggregatorCAConfigMapHandler)})
+		err = c.Watch(&source.Informer{Informer: configMapInformer}, handler.EnqueueRequestsFromMapFunc(handler.MapFunc(aggregatorCAConfigMapHandler)))
 		if err != nil {
 			return err
 		}
@@ -235,7 +235,7 @@ type ReconcileHiveConfig struct {
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
 // and what is in the Hive.Spec
-func (r *ReconcileHiveConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	hLog := log.WithField("controller", "hive")
 	hLog.Info("Reconciling Hive components")
 
@@ -427,12 +427,12 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 			},
 		}, predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				hLog.WithField("predicateResponse", e.Meta.GetName() == hiveAdmissionServingCertSecretName).Debug("secret CreateEvent")
-				return e.Meta.GetName() == hiveAdmissionServingCertSecretName
+				hLog.WithField("predicateResponse", e.Object.GetName() == hiveAdmissionServingCertSecretName).Debug("secret CreateEvent")
+				return e.Object.GetName() == hiveAdmissionServingCertSecretName
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				hLog.WithField("predicateResponse", e.MetaNew.GetName() == hiveAdmissionServingCertSecretName).Debug("secret UpdateEvent")
-				return e.MetaNew.GetName() == hiveAdmissionServingCertSecretName
+				hLog.WithField("predicateResponse", e.ObjectNew.GetName() == hiveAdmissionServingCertSecretName).Debug("secret UpdateEvent")
+				return e.ObjectNew.GetName() == hiveAdmissionServingCertSecretName
 			},
 		})
 		if err != nil {
@@ -464,14 +464,15 @@ type informerRunnable struct {
 	informer cache.SharedIndexInformer
 }
 
-func (r *informerRunnable) Start(stopch <-chan struct{}) error {
+func (r *informerRunnable) Start(ctx context.Context) error {
+	stopch := ctx.Done()
 	r.informer.Run(stopch)
 	cache.WaitForCacheSync(stopch, r.informer.HasSynced)
 	return nil
 }
 
-func aggregatorCAConfigMapHandler(o handler.MapObject) []reconcile.Request {
-	if o.Meta.GetName() == aggregatorCAConfigMapName {
+func aggregatorCAConfigMapHandler(o client.Object) []reconcile.Request {
+	if o.GetName() == aggregatorCAConfigMapName {
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: hiveConfigName}}}
 	}
 	return nil

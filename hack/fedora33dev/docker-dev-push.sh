@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
-IMG=quay.io/dgoodwin/hive:latest
+
+# exit if IMG is not set, should be a ref to a registry you can push to (i.e. quay.io/user/hive:latest)
+set -u
+: "$IMG"
 
 # TODO: update not strictly required here unless dealing with manifest changes
 make update build

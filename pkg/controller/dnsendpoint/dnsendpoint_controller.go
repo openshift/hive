@@ -9,7 +9,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -126,13 +126,8 @@ func newReconciler(mgr manager.Manager, kubeClient client.Client) (*ReconcileDNS
 			continue
 		}
 
-		registerNameServerChange := func(objectKey client.ObjectKey) {
-			nameServerChangeNotifier <- event.GenericEvent{
-				Meta: &metav1.ObjectMeta{
-					Namespace: objectKey.Namespace,
-					Name:      objectKey.Name,
-				},
-			}
+		registerNameServerChange := func(obj client.Object) {
+			nameServerChangeNotifier <- event.GenericEvent{Object: obj}
 		}
 		nameServerScraper := newNameServerScraper(logger, nameServerQuery, md.Domains, registerNameServerChange)
 		if err := mgr.Add(nameServerScraper); err != nil {
@@ -253,7 +248,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 			return reconcile.Result{}, err
 		}
 
-		nsTool.scraper.AddEndpoint(request.NamespacedName, fullDomain, desiredNameServers)
+		nsTool.scraper.AddEndpoint(instance, fullDomain, desiredNameServers)
 
 	// NS needs to be deleted, either because the DNSZone has been deleted or because
 	// there are no targets for the NS.

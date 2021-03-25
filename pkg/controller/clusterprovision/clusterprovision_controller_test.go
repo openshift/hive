@@ -269,7 +269,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 				controllerExpectations.ExpectCreations(reconcileRequest.String(), 1)
 			}
 
-			result, err := rcp.Reconcile(reconcileRequest)
+			result, err := rcp.Reconcile(context.TODO(), reconcileRequest)
 
 			if test.validateRequeueAfter != nil {
 				test.validateRequeueAfter(result.RequeueAfter, fakeClient, t)

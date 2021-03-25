@@ -321,7 +321,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				logger:  log.WithField("controller", ControllerName),
 				kubeCLI: helper,
 			}
-			_, err := rcd.Reconcile(reconcile.Request{
+			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testClusterName,
 					Namespace: testNamespace,
@@ -419,7 +419,7 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 				logger:  log.WithField("controller", ControllerName),
 				kubeCLI: helper,
 			}
-			_, err := rcd.Reconcile(reconcile.Request{
+			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testClusterName,
 					Namespace: testNamespace,

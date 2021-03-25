@@ -15,11 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -197,8 +197,7 @@ func TestSyncIdentityProviderWatchHandler(t *testing.T) {
 			}
 
 			// Act
-			actualRequestList := reconciler.syncIdentityProviderWatchHandler(handler.MapObject{
-				Object: test.syncIdentityProvider})
+			actualRequestList := reconciler.syncIdentityProviderWatchHandler(test.syncIdentityProvider)
 
 			// Assert
 			assert.True(t, reflect.DeepEqual(test.expectedRequestList, actualRequestList))
@@ -256,8 +255,7 @@ func TestSelectorSyncIdentityProviderWatchHandler(t *testing.T) {
 			}
 
 			// Act
-			actualRequestList := r.selectorSyncIdentityProviderWatchHandler(handler.MapObject{
-				Object: test.selectorSyncIdentityProvider})
+			actualRequestList := r.selectorSyncIdentityProviderWatchHandler(test.selectorSyncIdentityProvider)
 
 			// Assert
 			assert.True(t, reflect.DeepEqual(test.expectedRequestList, actualRequestList))
@@ -462,7 +460,7 @@ func TestReconcile(t *testing.T) {
 			}
 
 			// Act
-			result, err := r.Reconcile(reconcile.Request{
+			result, err := r.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      test.watchedObjectName,
 					Namespace: test.watchedObjectNamespace,

@@ -182,7 +182,7 @@ func TestMachineManagementReconcile(t *testing.T) {
 				},
 			}
 
-			result, err := rcd.Reconcile(reconcileRequest)
+			result, err := rcd.Reconcile(context.TODO(), reconcileRequest)
 
 			if test.validate != nil {
 				test.validate(fakeClient, t)

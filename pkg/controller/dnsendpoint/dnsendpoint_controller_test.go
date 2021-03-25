@@ -81,8 +81,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -100,16 +100,16 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -127,8 +127,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("old-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("old-value"),
 					},
 				},
 			},
@@ -138,8 +138,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -157,8 +157,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -283,8 +283,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -340,7 +340,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					},
 				},
 			}
-			result, err := cut.Reconcile(reconcile.Request{NamespacedName: objectKey})
+			result, err := cut.Reconcile(context.TODO(), reconcile.Request{NamespacedName: objectKey})
 			if tc.expectErr {
 				assert.Error(t, err, "expected error from reconcile")
 			} else {
@@ -400,7 +400,7 @@ func (*fakeManager) AddHealthzCheck(name string, check healthz.Checker) error {
 func (*fakeManager) AddReadyzCheck(name string, check healthz.Checker) error {
 	panic("not implemented")
 }
-func (*fakeManager) Start(<-chan struct{}) error {
+func (*fakeManager) Start(ctx context.Context) error {
 	panic("not implemented")
 }
 func (*fakeManager) GetConfig() *rest.Config {

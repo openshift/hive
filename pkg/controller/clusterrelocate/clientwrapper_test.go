@@ -5,7 +5,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -15,7 +14,7 @@ type deleteBlockingClientWrapper struct {
 
 var _ client.Client = (*deleteBlockingClientWrapper)(nil)
 
-func (c *deleteBlockingClientWrapper) Delete(ctx context.Context, obj runtime.Object, opts ...client.DeleteOption) error {
+func (c *deleteBlockingClientWrapper) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	a, err := meta.Accessor(obj)
 	if err != nil {
 		return err

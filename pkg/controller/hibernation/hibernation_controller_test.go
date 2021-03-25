@@ -371,7 +371,7 @@ func TestReconcile(t *testing.T) {
 				},
 				csrUtil: mockCSRHelper,
 			}
-			_, err := reconciler.Reconcile(reconcile.Request{
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{Namespace: namespace, Name: cdName},
 			})
 
@@ -553,7 +553,7 @@ func TestHibernateAfter(t *testing.T) {
 				},
 				csrUtil: mockCSRHelper,
 			}
-			result, err := reconciler.Reconcile(reconcile.Request{
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{Namespace: namespace, Name: cdName},
 			})
 

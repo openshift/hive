@@ -165,7 +165,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				applier: applier,
 			}
 
-			_, err := r.Reconcile(reconcile.Request{
+			_, err := r.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      fakeName,
 					Namespace: fakeNamespace,

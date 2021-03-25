@@ -130,7 +130,7 @@ func (rt *reconcileTest) run(t *testing.T) {
 
 	startTime := time.Now()
 	timeSinceOrigLeaseRenewTime := time.Since(origLeaseRenewTime.Time)
-	result, err := rt.r.Reconcile(reconcileRequest)
+	result, err := rt.r.Reconcile(context.TODO(), reconcileRequest)
 	require.NoError(t, err, "unexpected error from Reconcile")
 	endTime := time.Now()
 	startTime = startTime.Truncate(time.Second)
@@ -256,7 +256,7 @@ func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
 			Name:      testCDName,
 		},
 	}
-	result, err := rt.r.Reconcile(reconcileRequest)
+	result, err := rt.r.Reconcile(context.TODO(), reconcileRequest)
 	require.NoError(t, err, "unexpected error from Reconcile")
 	assert.Equal(t, result, reconcile.Result{Requeue: true}, "unexpected result from reconcile")
 	err = rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeaseName}, &hiveintv1alpha1.ClusterSyncLease{})

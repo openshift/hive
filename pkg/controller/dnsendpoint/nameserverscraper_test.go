@@ -1,6 +1,7 @@
 package dnsendpoint
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -111,7 +112,6 @@ func TestGetEndpoint(t *testing.T) {
 func TestAddEndpoint(t *testing.T) {
 	rootDomain := "domain.com"
 	domain := "test.domain.com"
-	objectKey := client.ObjectKey{Namespace: "test-namespace", Name: "test-name"}
 	values := sets.NewString("test-value-1", "test-value-2", "test-value-3")
 	cases := []struct {
 		name                string
@@ -138,8 +138,8 @@ func TestAddEndpoint(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						objectKey: objectKey,
-						nsValues:  values,
+						object:   testDNSZone(),
+						nsValues: values,
 					},
 				},
 			},
@@ -155,8 +155,8 @@ func TestAddEndpoint(t *testing.T) {
 				rootDomain: nameServersMap{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
-						objectKey: objectKey,
-						nsValues:  values,
+						object:   testDNSZone(),
+						nsValues: values,
 					},
 				},
 			},
@@ -166,16 +166,21 @@ func TestAddEndpoint(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						objectKey: client.ObjectKey{Namespace: "other-namespace", Name: "other-name"},
-						nsValues:  sets.NewString("other-value"),
+						object: func() client.Object {
+							dz := testDNSZone()
+							dz.Name = "other-name"
+							dz.Namespace = "other-namespace"
+							return dz
+						}(),
+						nsValues: sets.NewString("other-value"),
 					},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						objectKey: objectKey,
-						nsValues:  values,
+						object:   testDNSZone(),
+						nsValues: values,
 					},
 				},
 			},
@@ -194,8 +199,8 @@ func TestAddEndpoint(t *testing.T) {
 				rootDomain: nameServersMap{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
-						objectKey: objectKey,
-						nsValues:  values,
+						object:   testDNSZone(),
+						nsValues: values,
 					},
 				},
 				"other-domain": nameServersMap{
@@ -207,7 +212,7 @@ func TestAddEndpoint(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cut := &nameServerScraper{nameServers: tc.nameServers}
-			cut.AddEndpoint(objectKey, domain, values)
+			cut.AddEndpoint(testDNSZone(), domain, values)
 			assert.Equal(t, tc.expectedNameServers, cut.nameServers, "unexpected changes to name servers")
 		})
 	}
@@ -260,8 +265,8 @@ func TestRemoveEndpoint(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-name"},
-						nsValues:  sets.NewString("test-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value"),
 					},
 				},
 			},
@@ -275,8 +280,8 @@ func TestRemoveEndpoint(t *testing.T) {
 				rootDomain: nameServersMap{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-name"},
-						nsValues:  sets.NewString("test-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value"),
 					},
 				},
 				"other-domain": nameServersMap{
@@ -414,8 +419,8 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-name"},
-						nsValues:  sets.NewString("old-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("old-value"),
 					},
 				},
 			},
@@ -431,8 +436,8 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-name"},
-						nsValues:  sets.NewString("test-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value"),
 					},
 				},
 			},
@@ -444,8 +449,8 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-name"},
-						nsValues:  sets.NewString("test-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value"),
 					},
 				},
 			},
@@ -461,8 +466,8 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-name"},
-						nsValues:  sets.NewString("test-value"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value"),
 					},
 				},
 			},
@@ -473,20 +478,20 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"changed-1.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-changed-1"},
-						nsValues:  sets.NewString("old-value-1"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("old-value-1"),
 					},
 					"changed-2.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-changed-2"},
-						nsValues:  sets.NewString("old-value-2"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("old-value-2"),
 					},
 					"changed-3.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-changed-3"},
-						nsValues:  sets.NewString("old-value-3a", "old-value-3b"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("old-value-3a", "old-value-3b"),
 					},
 					"unchanged.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-unchanged"},
-						nsValues:  sets.NewString("test-value-4"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-4"),
 					},
 				},
 			},
@@ -506,20 +511,20 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"changed-1.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-changed-1"},
-						nsValues:  sets.NewString("test-value-1"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-1"),
 					},
 					"changed-2.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-changed-2"},
-						nsValues:  sets.NewString("test-value-2a", "test-value-2b"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-2a", "test-value-2b"),
 					},
 					"changed-3.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-changed-3"},
-						nsValues:  sets.NewString("test-value-3"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-3"),
 					},
 					"unchanged.domain.com": endpointState{
-						objectKey: client.ObjectKey{Namespace: "test-namespace", Name: "test-unchanged"},
-						nsValues:  sets.NewString("test-value-4"),
+						object:   testDNSZone(),
+						nsValues: sets.NewString("test-value-4"),
 					},
 				},
 			},
@@ -536,9 +541,9 @@ func TestScrape(t *testing.T) {
 			defer mockCtrl.Finish()
 			mockQuery := mock.NewMockQuery(mockCtrl)
 			tc.configureQuery(mockQuery)
-			changeNotifications := make(chan client.ObjectKey, 100)
-			notifyChange := func(objectKey client.ObjectKey) {
-				changeNotifications <- objectKey
+			changeNotifications := make(chan client.Object, 100)
+			notifyChange := func(object client.Object) {
+				changeNotifications <- testDNSZone()
 			}
 			cut := newNameServerScraper(log.StandardLogger(), mockQuery, tc.rootDomains, notifyChange)
 			if tc.scrapePeriod > 0 {
@@ -547,16 +552,17 @@ func TestScrape(t *testing.T) {
 			if tc.nameServers != nil {
 				cut.nameServers = tc.nameServers
 			}
-			stop := make(chan struct{})
+			//stop := make(chan struct{})
+			ctx, stop := context.WithCancel(context.Background())
 			go func() {
 				sleepTime := tc.testDuration
 				if sleepTime <= 0 {
 					sleepTime = 3 * time.Second
 				}
 				time.Sleep(sleepTime)
-				stop <- struct{}{}
+				stop()
 			}()
-			err := cut.Start(stop)
+			err := cut.Start(ctx)
 			assert.NoError(t, err, "unexpected error starting scraper")
 			expectedNameServers := tc.expectedNameServers
 			if len(expectedNameServers) == 0 {
@@ -566,7 +572,7 @@ func TestScrape(t *testing.T) {
 				}
 			}
 			assert.Equal(t, expectedNameServers, cut.nameServers, "unexpected changes to name servers")
-			actualChanges := []client.ObjectKey{}
+			actualChanges := []client.Object{}
 			for {
 				empty := false
 				select {

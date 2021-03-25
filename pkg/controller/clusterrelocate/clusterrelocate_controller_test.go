@@ -91,7 +91,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		cd                *hivev1.ClusterDeployment
 		srcResources      []runtime.Object
 		destResources     []runtime.Object
-		expectedResources []runtime.Object
+		expectedResources []client.Object
 	}{
 		{
 			name: "no relocation",
@@ -103,7 +103,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -119,7 +119,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			destResources: []runtime.Object{
 				cdBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				cdBuilder.Build(),
 			},
 		},
@@ -136,7 +136,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					},
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				cdBuilder.Build(
 					func(cd *hivev1.ClusterDeployment) {
 						cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
@@ -157,7 +157,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			destResources: []runtime.Object{
 				cdBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				cdBuilder.Build(),
 			},
 		},
@@ -172,7 +172,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testcd.Generic(testgeneric.WithResourceVersion("some-rv")),
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				cdBuilder.Build(
 					testcd.Generic(testgeneric.WithResourceVersion("some-rv")),
 				),
@@ -187,7 +187,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			destResources: []runtime.Object{
 				namespaceBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -201,7 +201,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				secretBuilder.Build(testsecret.WithDataKeyValue("test-key", []byte("test-data"))),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -223,7 +223,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testsecret.WithDataKeyValue("test-key-2", []byte("test-data-2")),
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -253,7 +253,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testsecret.WithDataKeyValue("test-key-2", []byte("test-data-2")),
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -274,7 +274,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			destResources: []runtime.Object{
 				secretBuilder.Build(testsecret.WithDataKeyValue("test-key", []byte("test-data"))),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -292,7 +292,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			destResources: []runtime.Object{
 				secretBuilder.Build(testsecret.WithDataKeyValue("test-key", []byte("other-data"))),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -314,7 +314,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			destResources: []runtime.Object{
 				mpBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -337,7 +337,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -358,7 +358,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -386,7 +386,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					},
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -400,7 +400,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				cmBuilder.Build(testcm.WithDataKeyValue("test-key", "test-data")),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -415,7 +415,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				mpBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -430,7 +430,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				ssBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -445,7 +445,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				sipBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -460,7 +460,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				dnsZoneBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -477,7 +477,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				dnsZoneBuilder.Build(testdnszone.Generic(testgeneric.WithName("other-dnszone"))),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -491,7 +491,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				crBuilder.Build(),
 				jobBuilder.Build(),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -633,7 +633,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testsip.ForIdentities("other-user"),
 				),
 			},
-			expectedResources: []runtime.Object{
+			expectedResources: []client.Object{
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -725,7 +725,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					return mockRemoteClientBuilder
 				},
 			}
-			_, err := reconciler.Reconcile(reconcile.Request{
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      cdName,
 					Namespace: namespace,
@@ -734,11 +734,8 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			require.NoError(t, err, "unexpected error during reconcile")
 
 			for _, obj := range tc.expectedResources {
-				objKey, err := client.ObjectKeyFromObject(obj)
-				if !assert.NoError(t, err, "unexpected error getting object key") {
-					continue
-				}
-				destObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+				objKey := client.ObjectKeyFromObject(obj)
+				destObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(client.Object)
 				err = destClient.Get(context.Background(), objKey, destObj)
 				if !assert.NoError(t, err, "unexpected error getting destination object") {
 					continue
@@ -1004,7 +1001,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 					return mockRemoteClientBuilder
 				},
 			}
-			_, err := reconciler.Reconcile(reconcile.Request{
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      cdName,
 					Namespace: namespace,

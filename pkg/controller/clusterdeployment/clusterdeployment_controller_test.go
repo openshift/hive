@@ -1577,7 +1577,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(), nil)
 			}
 
-			result, err := rcd.Reconcile(reconcileRequest)
+			result, err := rcd.Reconcile(context.TODO(), reconcileRequest)
 
 			if test.validate != nil {
 				test.validate(fakeClient, t)
@@ -1635,7 +1635,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
-			reconcileResult, err := rcd.Reconcile(reconcile.Request{
+			reconcileResult, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testName,
 					Namespace: testNamespace,
@@ -2199,7 +2199,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 				},
 			}
 
-			_, err := rcd.Reconcile(reconcile.Request{
+			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testName,
 					Namespace: testNamespace,

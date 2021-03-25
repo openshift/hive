@@ -348,7 +348,7 @@ func TestReconcile(t *testing.T) {
 
 			// Act
 			err := ReconcileOwnerReferences(test.owner, test.ownershipUniqueKeys, fakeKubeClient, testscheme, logger)
-			actualObjects, listErr := ListRuntimeObjects(fakeKubeClient, []runtime.Object{test.listRuntimeObjectsOwnershipUniqueKey.TypeToList}, client.MatchingLabels(test.listRuntimeObjectsOwnershipUniqueKey.LabelSelector))
+			actualObjects, listErr := ListRuntimeObjects(fakeKubeClient, []client.ObjectList{test.listRuntimeObjectsOwnershipUniqueKey.TypeToList}, client.MatchingLabels(test.listRuntimeObjectsOwnershipUniqueKey.LabelSelector))
 
 			// Assert
 			assert.NoError(t, err, "Unexpected error from ReconcileOwnerReferences")

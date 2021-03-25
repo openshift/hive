@@ -660,7 +660,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				},
 				expectations: controllerExpectations,
 			}
-			_, err := rcd.Reconcile(reconcile.Request{
+			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      fmt.Sprintf("%s-worker", testName),
 					Namespace: testNamespace,

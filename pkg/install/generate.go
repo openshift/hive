@@ -1,23 +1,32 @@
 package install
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/controller/utils"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -47,6 +56,78 @@ var (
 	// LibvirtSSHPrivateKeyFilePath is the path to the private key contents (from the libvirt SSH secret)
 	LibvirtSSHPrivateKeyFilePath = fmt.Sprintf("%s/%s", LibvirtSSHPrivateKeyDir, constants.SSHPrivateKeySecretKey)
 )
+
+func AWSAssumeRoleSecretName(secretPrefix string) string {
+	return secretPrefix + "-aws-assume-role-config"
+}
+
+// CopyAWSServiceProviderSecret copies the AWS service provider secret to the dest namespace
+// when HiveAWSServiceProviderCredentialsSecretRefEnvVar is set in envVars. The secret
+// name in the dest namespace will be the value set in HiveAWSServiceProviderCredentialsSecretRefEnvVar.
+func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, envVars []corev1.EnvVar, owner metav1.Object, scheme *runtime.Scheme) error {
+	hiveNS := controllerutils.GetHiveNamespace()
+
+	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
+	if spSecretName == "" {
+		// If the src secret reference wasn't found, then don't attempt to copy the secret.
+		return nil
+	}
+
+	foundDest := false
+	var destSecretName string
+	for _, envVar := range envVars {
+		if envVar.Name == constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar {
+			destSecretName = envVar.Value
+			foundDest = true
+		}
+	}
+	if !foundDest {
+		// If the dest secret reference wasn't found, then don't attempt to copy the secret.
+		return nil
+	}
+
+	src := types.NamespacedName{Name: spSecretName, Namespace: hiveNS}
+	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
+	return controllerutils.CopySecret(client, src, dest, owner, scheme)
+}
+
+// AWSAssumeRoleCLIConfig creates a secret that can assume the role using the hiveutil
+// credential_process helper.
+func AWSAssumeRoleCLIConfig(client client.Client, role *hivev1aws.AssumeRole, secretName, secretNamespace string, owner metav1.Object, scheme *runtime.Scheme) error {
+	cmd := "/usr/bin/hiveutil"
+	args := []string{"install-manager", "aws-credentials"}
+	args = append(args, []string{"--namespace", secretNamespace}...)
+	args = append(args, []string{"--role-arn", role.RoleARN}...)
+	if role.ExternalID != "" {
+		args = append(args, []string{"--external-id", role.ExternalID}...)
+	}
+
+	cmd = fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))
+
+	template := `[default]
+credential_process = %s
+`
+	data := fmt.Sprintf(template, cmd)
+
+	secret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: secretNamespace,
+			Name:      secretName,
+		},
+		Data: map[string][]byte{
+			constants.AWSConfigSecretKey: []byte(data),
+		},
+	}
+	if err := controllerutil.SetOwnerReference(owner, secret, scheme); err != nil {
+		return nil
+	}
+
+	return client.Create(context.TODO(), secret)
+}
 
 // InstallerPodSpec generates a spec for an installer pod.
 func InstallerPodSpec(
@@ -130,14 +211,19 @@ func InstallerPodSpec(
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
+		credentialRef := cd.Spec.Platform.AWS.CredentialsSecretRef
+		if credentialRef.Name == "" {
+			credentialRef = corev1.LocalObjectReference{Name: AWSAssumeRoleSecretName(cd.Name)}
+		}
 		env = append(
 			env,
 			corev1.EnvVar{
 				Name: "AWS_ACCESS_KEY_ID",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
+						LocalObjectReference: credentialRef,
 						Key:                  constants.AWSAccessKeyIDSecretKey,
+						Optional:             pointer.BoolPtr(true),
 					},
 				},
 			},
@@ -145,39 +231,34 @@ func InstallerPodSpec(
 				Name: "AWS_SECRET_ACCESS_KEY",
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: cd.Spec.Platform.AWS.CredentialsSecretRef,
+						LocalObjectReference: credentialRef,
 						Key:                  constants.AWSSecretAccessKeySecretKey,
+						Optional:             pointer.BoolPtr(true),
 					},
 				},
 			},
+			corev1.EnvVar{
+				Name:  "AWS_SDK_LOAD_CONFIG",
+				Value: "true",
+			},
+			corev1.EnvVar{
+				Name:  "AWS_CONFIG_FILE",
+				Value: filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey),
+			},
 		)
 
-		// If this is an STS cluster, mount volume for the bound service account signing key:
-		if cd.Spec.BoundServiceAccountSignkingKeySecretRef != nil {
-			volumes = append(volumes, corev1.Volume{
-				Name: "bound-token-signing-key",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cd.Spec.BoundServiceAccountSignkingKeySecretRef.Name,
-						Items: []corev1.KeyToPath{
-							{
-								Key:  constants.BoundServiceAccountSigningKeyFile,
-								Path: constants.BoundServiceAccountSigningKeyFile,
-							},
-						},
-					},
+		volumes = append(volumes, corev1.Volume{
+			Name: "aws",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: credentialRef.Name,
 				},
-			})
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      "bound-token-signing-key",
-				MountPath: boundSASigningKeyDir,
-			})
-			env = append(env, corev1.EnvVar{
-				Name:  constants.BoundServiceAccountSigningKeyEnvVar,
-				Value: boundSASigningKeyFile,
-			})
-
-		}
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "aws",
+			MountPath: constants.AWSCredsMount,
+		})
 	case cd.Spec.Platform.Azure != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "azure",
@@ -316,6 +397,33 @@ func InstallerPodSpec(
 				MountPath: "/manifests",
 			},
 		)
+	}
+
+	// If this cluster is using a custom BoundServiceAccountSigningKey, mount volume for the bound service account signing key:
+	if cd.Spec.BoundServiceAccountSignkingKeySecretRef != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "bound-token-signing-key",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: cd.Spec.BoundServiceAccountSignkingKeySecretRef.Name,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  constants.BoundServiceAccountSigningKeyFile,
+							Path: constants.BoundServiceAccountSigningKeyFile,
+						},
+					},
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "bound-token-signing-key",
+			MountPath: boundSASigningKeyDir,
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  constants.BoundServiceAccountSigningKeyEnvVar,
+			Value: boundSASigningKeyFile,
+		})
+
 	}
 
 	if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
@@ -493,13 +601,16 @@ func GetUninstallJobName(name string) string {
 
 // GenerateUninstallerJobForDeprovision generates an uninstaller job for a given deprovision request
 func GenerateUninstallerJobForDeprovision(
-	req *hivev1.ClusterDeprovision) (*batchv1.Job, error) {
+	req *hivev1.ClusterDeprovision,
+	serviceAccountName string,
+	extraEnvVars []corev1.EnvVar) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
 
 	podSpec := corev1.PodSpec{
-		DNSPolicy:     corev1.DNSClusterFirst,
-		RestartPolicy: restartPolicy,
+		DNSPolicy:          corev1.DNSClusterFirst,
+		RestartPolicy:      restartPolicy,
+		ServiceAccountName: serviceAccountName,
 	}
 
 	completions := int32(1)
@@ -542,22 +653,53 @@ func GenerateUninstallerJobForDeprovision(
 		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
 
+	for idx := range job.Spec.Template.Spec.Containers {
+		job.Spec.Template.Spec.Containers[idx].Env = append(job.Spec.Template.Spec.Containers[idx].Env, extraEnvVars...)
+	}
+
 	return job, nil
 }
 
 func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
-	credentialsSecret := ""
-	if len(req.Spec.Platform.AWS.CredentialsSecretRef.Name) > 0 {
-		credentialsSecret = req.Spec.Platform.AWS.CredentialsSecretRef.Name
+	credentialRef := *req.Spec.Platform.AWS.CredentialsSecretRef
+	if credentialRef.Name == "" {
+		credentialRef = corev1.LocalObjectReference{Name: AWSAssumeRoleSecretName(req.Name)}
 	}
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Command:         []string{"/usr/bin/hiveutil"},
+			Env: []corev1.EnvVar{{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: credentialRef,
+						Key:                  constants.AWSAccessKeyIDSecretKey,
+						Optional:             pointer.BoolPtr(true),
+					},
+				},
+			}, {
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: credentialRef,
+						Key:                  constants.AWSSecretAccessKeySecretKey,
+						Optional:             pointer.BoolPtr(true),
+					},
+				},
+			}, {
+				Name:  "AWS_SDK_LOAD_CONFIG",
+				Value: "true",
+			}, {
+				Name:  "AWS_CONFIG_FILE",
+				Value: filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey),
+			}},
+			Command: []string{"/usr/bin/hiveutil"},
 			Args: []string{
 				"aws-tag-deprovision",
+				"--creds-dir",
+				constants.AWSCredsMount,
 				"--loglevel",
 				"debug",
 				"--region",
@@ -570,25 +712,24 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
 		containers[0].Args = append(containers[0].Args, fmt.Sprintf("openshiftClusterID=%s", req.Spec.ClusterID))
 	}
-	job.Spec.Template.Spec.Containers = containers
-	if len(credentialsSecret) > 0 {
-		containers[0].VolumeMounts = []corev1.VolumeMount{
-			{
-				Name:      "aws-creds",
-				MountPath: constants.AWSCredsMount,
-			},
-		}
-		job.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				Name: "aws-creds",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: credentialsSecret,
-					},
+	containers[0].VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      "aws-creds",
+			MountPath: constants.AWSCredsMount,
+		},
+	}
+	job.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "aws-creds",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: credentialRef.Name,
 				},
 			},
-		}
+		},
 	}
+
+	job.Spec.Template.Spec.Containers = containers
 }
 
 func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {

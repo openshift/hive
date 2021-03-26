@@ -161,6 +161,8 @@ func NewInstallManagerCommand() *cobra.Command {
 	flags.StringVar(&im.LogLevel, "log-level", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.LogsDir, "logs-dir", "/logs", "directory to use for all installer logs")
+
+	cmd.AddCommand(NewInstallManagerAWSCredentials())
 	return cmd
 }
 

@@ -243,6 +243,12 @@ const (
 	// AWSSecretAccessKeySecretKey is the key we use in a Kubernetes Secret containing AWS credentials for the access key ID.
 	AWSSecretAccessKeySecretKey = "aws_secret_access_key"
 
+	// AWSConfigSecretKey is the key we use in a Kubernetes Secret containing AWS config.
+	AWSConfigSecretKey = "aws_config"
+
+	// AWSCredsMount is the location where the AWS credentials secret is mounted for uninstall pods.
+	AWSCredsMount = "/etc/aws-creds"
+
 	// TLSCrtSecretKey is the key we use in a Kubernetes Secret containing a TLS certificate.
 	TLSCrtSecretKey = "tls.crt"
 
@@ -281,14 +287,12 @@ const (
 	// VersionMajorMinorPatchLabel is a label applied to ClusterDeployments to show the version of the cluster
 	// in the form "[MAJOR].[MINOR].[PATCH]".
 	VersionMajorMinorPatchLabel = "hive.openshift.io/version-major-minor-patch"
+
 	// OvirtCredentialsName is the name of the oVirt credentials file.
 	OvirtCredentialsName = "ovirt-config.yaml"
 
 	// OvirtConfigEnvVar is the environment variable specifying the oVirt config path
 	OvirtConfigEnvVar = "OVIRT_CONFIG"
-
-	// AWSCredsMount is the location where the AWS credentials secret is mounted for uninstall pods.
-	AWSCredsMount = "/etc/aws-creds"
 
 	// InstallLogsUploadProviderEnvVar is used to specify which object store provider is being used.
 	InstallLogsUploadProviderEnvVar = "HIVE_INSTALL_LOGS_UPLOAD_PROVIDER"
@@ -324,6 +328,10 @@ const (
 	// that are previously claimed is no longer required and therefore should be removed/deprovisioned and removed
 	// from the pool.
 	ClusterClaimRemoveClusterAnnotation = "hive.openshift.io/remove-claimed-cluster-from-pool"
+
+	// HiveAWSServiceProviderCredentialsSecretRefEnvVar is the environment variable specifying what secret to use for
+	// assuming the service provider credentials for AWS clusters.
+	HiveAWSServiceProviderCredentialsSecretRefEnvVar = "HIVE_AWS_SERVICE_PROVIDER_CREDENTIALS_SECRET"
 
 	// HiveFeatureGatesEnabledEnvVar is the the environment variable specifying the comma separated list of
 	// feature gates that are enabled.

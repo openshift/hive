@@ -12,6 +12,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -265,9 +266,30 @@ func (r *ReconcileClusterDeprovision) Reconcile(request reconcile.Request) (reco
 		}
 	}
 
+	extraEnvVars := getAWSServiceProviderEnvVars(instance, instance.Name)
+
+	if err := install.CopyAWSServiceProviderSecret(r.Client, instance.Namespace, extraEnvVars, instance, r.scheme); err != nil {
+		rLog.WithError(err).Error("could not copy AWS service provider secret")
+		return reconcile.Result{}, err
+	}
+
+	if err := r.setupAWSCredentialForAssumeRole(instance); err != nil {
+		if !apierrors.IsAlreadyExists(err) {
+			// Couldn't create the assume role credentials secret for a reason other than it already exists.
+			// If the secret already exists, then we should just use that secret.
+			rLog.WithError(err).Error("could not create assume role AWS secret")
+			return reconcile.Result{}, err
+		}
+	}
+
+	if err := controllerutils.SetupClusterUninstallServiceAccount(r, cd.Namespace, rLog); err != nil {
+		rLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
+		return reconcile.Result{}, err
+	}
+
 	// Generate an uninstall job
 	rLog.Debug("generating uninstall job")
-	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance)
+	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance, controllerutils.UninstallServiceAccountName, extraEnvVars)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err
@@ -373,4 +395,34 @@ func (r *ReconcileClusterDeprovision) getActuator(cd *hivev1.ClusterDeprovision)
 		}
 	}
 	return nil
+}
+
+func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeprovision, secretPrefix string) []corev1.EnvVar {
+	var extraEnvVars []corev1.EnvVar
+	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
+	if spSecretName == "" {
+		return extraEnvVars
+	}
+
+	if cd.Spec.Platform.AWS == nil {
+		return extraEnvVars
+	}
+
+	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
+		Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
+		Value: secretPrefix + "-" + spSecretName,
+	})
+	return extraEnvVars
+}
+
+func (r *ReconcileClusterDeprovision) setupAWSCredentialForAssumeRole(cd *hivev1.ClusterDeprovision) error {
+	if cd.Spec.Platform.AWS == nil ||
+		cd.Spec.Platform.AWS.CredentialsSecretRef.Name != "" ||
+		cd.Spec.Platform.AWS.CredentialsAssumeRole == nil {
+		// no setup required
+		return nil
+	}
+
+	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
+
 }

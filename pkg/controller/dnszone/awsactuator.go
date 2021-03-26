@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -46,12 +47,13 @@ type AWSActuator struct {
 	dnsZone *hivev1.DNSZone
 }
 
-type awsClientBuilderType func(secret *corev1.Secret, region string) (awsclient.Client, error)
+type awsClientBuilderType func(client.Client, awsclient.Options) (awsclient.Client, error)
 
 // NewAWSActuator creates a new AWSActuator object. A new AWSActuator is expected to be created for each controller sync.
 func NewAWSActuator(
 	logger log.FieldLogger,
-	secret *corev1.Secret,
+	kubeClient client.Client,
+	credentials awsclient.CredentialsSource,
 	dnsZone *hivev1.DNSZone,
 	awsClientBuilder awsClientBuilderType,
 ) (*AWSActuator, error) {
@@ -59,7 +61,10 @@ func NewAWSActuator(
 	if region == "" {
 		region = constants.AWSRoute53Region
 	}
-	awsClient, err := awsClientBuilder(secret, region)
+	awsClient, err := awsClientBuilder(kubeClient, awsclient.Options{
+		Region:            region,
+		CredentialsSource: credentials,
+	})
 	if err != nil {
 		logger.WithError(err).Error("Error creating AWSClient")
 		return nil, err

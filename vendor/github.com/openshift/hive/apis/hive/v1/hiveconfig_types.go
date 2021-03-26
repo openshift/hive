@@ -53,6 +53,11 @@ type HiveConfigSpec struct {
 	// +optional
 	FailedProvisionConfig FailedProvisionConfig `json:"failedProvisionConfig,omitempty"`
 
+	// ServiceProviderCredentialsConfig is used to configure credentials related to being a service provider on
+	// various cloud platforms.
+	// +optional
+	ServiceProviderCredentialsConfig ServiceProviderCredentials `json:"serviceProviderCredentialsConfig,omitempty"`
+
 	// LogLevel is the level of logging to use for the Hive controllers.
 	// Acceptable levels, from coarsest to finest, are panic, fatal, error, warn, info, debug, and trace.
 	// The default level is info.
@@ -151,6 +156,24 @@ type AWSPrivateLinkVPC struct {
 type AWSPrivateLinkSubnet struct {
 	SubnetID         string `json:"subnetID"`
 	AvailabilityZone string `json:"availabilityZone"`
+}
+
+// ServiceProviderCredentials is used to configure credentials related to being a service provider on
+// various cloud platforms.
+type ServiceProviderCredentials struct {
+	// AWS is used to configure credentials related to being a service provider on AWS.
+	// +optional
+	AWS *AWSServiceProviderCredentials `json:"aws,omitempty"`
+}
+
+// AWSServiceProviderCredentials is used to configure credentials related to being a service
+// provider on AWS.
+type AWSServiceProviderCredentials struct {
+	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
+	// AWS to become the Service Provider. Being a Service Provider allows the controllers
+	// to assume the role in customer AWS accounts to manager clusters.
+	// +optional
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 }
 
 // FeatureSet defines the set of feature gates that should be used.

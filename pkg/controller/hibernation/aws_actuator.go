@@ -2,10 +2,12 @@ package hibernation
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,6 +15,8 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 var (
@@ -123,11 +127,24 @@ func (a *awsActuator) MachinesStopped(cd *hivev1.ClusterDeployment, c client.Cli
 }
 
 func getAWSClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
-	awsClient, err := awsclient.NewClient(c, cd.Spec.Platform.AWS.CredentialsSecretRef.Name, cd.Namespace, cd.Spec.Platform.AWS.Region)
-	if err != nil {
-		logger.WithError(err).Error("failed to get AWS client")
+	options := awsclient.Options{
+		Region: cd.Spec.Platform.AWS.Region,
+		CredentialsSource: awsclient.CredentialsSource{
+			Secret: &awsclient.SecretCredentialsSource{
+				Namespace: cd.Namespace,
+				Ref:       &cd.Spec.Platform.AWS.CredentialsSecretRef,
+			},
+			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
+				SecretRef: corev1.SecretReference{
+					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Namespace: controllerutils.GetHiveNamespace(),
+				},
+				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+			},
+		},
 	}
-	return awsClient, err
+
+	return awsclient.New(c, options)
 }
 
 func getClusterInstanceIDs(cd *hivev1.ClusterDeployment, c awsclient.Client, states sets.String, logger log.FieldLogger) ([]*string, error) {

@@ -14,7 +14,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	azureclient "github.com/openshift/hive/pkg/azureclient"
-	"github.com/openshift/hive/pkg/constants"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -78,19 +77,6 @@ var (
 			},
 			Status: hivev1.DNSZoneStatus{
 				Azure: &hivev1.AzureDNSZoneStatus{},
-			},
-		}
-	}
-
-	validAWSSecret = func() *corev1.Secret {
-		return &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "somesecret",
-				Namespace: "ns",
-			},
-			Data: map[string][]byte{
-				constants.AWSAccessKeyIDSecretKey:     []byte("notrealaccesskey"),
-				constants.AWSSecretAccessKeySecretKey: []byte("notrealsecretaccesskey"),
 			},
 		}
 	}
@@ -206,7 +192,7 @@ func setupDefaultMocks(t *testing.T) *mocks {
 }
 
 func fakeAWSClientBuilder(mockAWSClient *mockaws.MockClient) awsClientBuilderType {
-	return func(secret *corev1.Secret, region string) (awsclient.Client, error) {
+	return func(_ client.Client, _ awsclient.Options) (awsclient.Client, error) {
 		return mockAWSClient, nil
 	}
 }

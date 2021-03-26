@@ -1,13 +1,18 @@
 package clusterdeprovision
 
 import (
+	"os"
+
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/aws/aws-sdk-go/service/sts"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 func init() {
@@ -46,10 +51,23 @@ func (a *awsActuator) TestCredentials(clusterDeprovision *hivev1.ClusterDeprovis
 	return nil
 }
 
-func getAWSClient(clusterDeprovision *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
-	awsClient, err := awsclient.NewClient(c, clusterDeprovision.Spec.Platform.AWS.CredentialsSecretRef.Name, clusterDeprovision.Namespace, clusterDeprovision.Spec.Platform.AWS.Region)
-	if err != nil {
-		logger.WithError(err).Error("failed to get AWS client")
+func getAWSClient(cd *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
+	options := awsclient.Options{
+		Region: cd.Spec.Platform.AWS.Region,
+		CredentialsSource: awsclient.CredentialsSource{
+			Secret: &awsclient.SecretCredentialsSource{
+				Namespace: cd.Namespace,
+				Ref:       cd.Spec.Platform.AWS.CredentialsSecretRef,
+			},
+			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
+				SecretRef: corev1.SecretReference{
+					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Namespace: controllerutils.GetHiveNamespace(),
+				},
+				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+			},
+		},
 	}
-	return awsClient, err
+
+	return awsclient.New(c, options)
 }

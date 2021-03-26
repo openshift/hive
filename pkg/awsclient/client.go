@@ -1,9 +1,13 @@
 package awsclient
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -34,6 +38,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -407,6 +412,150 @@ func (c *awsClient) GetCallerIdentity(input *sts.GetCallerIdentityInput) (*sts.G
 	return c.stsClient.GetCallerIdentity(input)
 }
 
+// Options provides the means to control how a client is created and what
+// configuration values will be loaded.
+//
+type Options struct {
+	// Region helps create the clients with correct endpoints.
+	Region string
+
+	// CredentialsSource defines how the credentials will be loaded.
+	// It supports various methods of sourcing credentials. But if none
+	// of the supported sources are configured such that they can be used,
+	// credentials are loaded from the environment.
+	// If multiple sources are configured, the first source is used.
+	CredentialsSource CredentialsSource
+}
+
+// CredentialsSource defines how the credentials will be loaded.
+// It supports various methods of sourcing credentials. But if none
+// of the supported sources are configured such that they can be used,
+// credentials are loaded from the environment.
+// If multiple sources are configured, the first source is used.
+type CredentialsSource struct {
+	// Secret credentials source loads the credentials from a secret.
+	// It supports static credentials in the secret provided by aws_access_key_id,
+	// and aws_access_secret key. It also supports loading credentials from AWS
+	// cli config provided in aws_config key.
+	// This source is used only when the Secret name is not empty.
+	Secret *SecretCredentialsSource
+
+	// AssumeRole credentials source uses AWS session configured using credentials
+	// in the SecretRef, and then uses that to assume the role provided in Role.
+	// AWS client is created using the assumed credentials.
+	// If the secret in SecretRef is empty, environment is used to create AWS session.
+	// This source is used only when the RoleARN is not empty in Role.
+	AssumeRole *AssumeRoleCredentialsSource
+
+	// when none set, use environment to load the credentials
+}
+
+// Secret credentials source loads the credentials from a secret.
+// It supports static credentials in the secret provided by aws_access_key_id,
+// and aws_access_secret key. It also supports loading credentials from AWS
+// cli config provided in aws_config key.
+// This source is used only when the Secret name is not empty.
+type SecretCredentialsSource struct {
+	Namespace string
+	Ref       *corev1.LocalObjectReference
+}
+
+// AssumeRole credentials source uses AWS session configured using credentials
+// in the SecretRef, and then uses that to assume the role provided in Role.
+// AWS client is created using the assumed credentials.
+// If the secret in SecretRef is empty, environment is used to create AWS session.
+// This source is used only when the RoleARN is not empty in Role.
+type AssumeRoleCredentialsSource struct {
+	SecretRef corev1.SecretReference
+	Role      *hivev1aws.AssumeRole
+}
+
+// New creates an AWS client using the provided options. kubeClient is used whenever
+// a k8s resource like secret needs to be fetched. Look at doc for Options for various
+// configurations.
+//
+// Some examples are,
+// 1. Configure an AWS client using credentials in Secret for ClusterDeployment.
+//    ```go
+//    options := Options{
+//    	Region: cd.Spec.Platform.AWS.Region,
+//    	CredentialsSource: CredentialsSource{
+//    		Secret: &SecretCredentialsSource{
+//    			Namespace: cd.Namespace,
+//    			Ref:       cd.Spec.Platform.AWS.CredentialsSecretRef,
+//    		},
+//    	},
+//    }
+//    client, err := New(kubeClient, options)
+//    ```
+// 2. Configure an AWS client using Assume role chain for ClusterDeployment.
+//    ```go
+//    options := Options{
+//    	Region: cd.Spec.Platform.AWS.Region,
+//    	CredentialsSource: CredentialsSource{
+//    		AssumeRole: &AssumeRoleCredentialsSource{
+//    			SecretRef: corev1.SecretReference{
+//    				Name:      AWSServiceProviderSecretName,
+//    				Namespace: AWSServiceProviderSecretNS,
+//    			},
+//    			Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+//    		},
+//    	},
+//    }
+//    client, err := New(kubeClient, options)
+//    ```
+//
+func New(kubeClient client.Client, options Options) (Client, error) {
+	source := options.CredentialsSource
+	switch {
+	case source.Secret != nil && source.Secret.Ref != nil && source.Secret.Ref.Name != "":
+		return NewClient(kubeClient, source.Secret.Ref.Name, source.Secret.Namespace, options.Region)
+	case source.AssumeRole != nil && source.AssumeRole.Role != nil && source.AssumeRole.Role.RoleARN != "":
+		return newClientAssumeRole(kubeClient,
+			source.AssumeRole.SecretRef.Name, source.AssumeRole.SecretRef.Namespace,
+			source.AssumeRole.Role,
+			options.Region,
+		)
+	}
+
+	return NewClientFromSecret(nil, options.Region)
+}
+
+func newClientAssumeRole(kubeClient client.Client,
+	serviceProviderSecretName, serviceProviderSecretNamespace string,
+	role *hivev1aws.AssumeRole,
+	region string,
+) (Client, error) {
+	var secret *corev1.Secret
+	if serviceProviderSecretName != "" {
+		secret = &corev1.Secret{}
+		err := kubeClient.Get(context.TODO(),
+			types.NamespacedName{
+				Name:      serviceProviderSecretName,
+				Namespace: serviceProviderSecretNamespace,
+			},
+			secret)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get service provider secret")
+		}
+	}
+
+	sess, err := NewSessionFromSecret(secret, region)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create AWS session")
+	}
+
+	duration := stscreds.DefaultDuration
+	sess.Config.Credentials = stscreds.NewCredentials(sess, role.RoleARN, func(p *stscreds.AssumeRoleProvider) {
+		p.Duration = duration
+		if role.ExternalID != "" {
+			p.ExternalID = &role.ExternalID
+		}
+	})
+
+	return newClientFromSession(sess)
+}
+
 // NewClient creates our client wrapper object for the actual AWS clients we use.
 // For authentication the underlying clients will use either the cluster AWS credentials
 // secret if defined (i.e. in the root cluster),
@@ -442,31 +591,56 @@ func NewClient(kubeClient client.Client, secretName, namespace, region string) (
 //
 // Pass a nil secret to load credentials from the standard AWS environment variables.
 func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
-	awsConfig := &aws.Config{
-		Region:           aws.String(region),
-		EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
+	s, err := NewSessionFromSecret(secret, region)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create AWS session")
+	}
+	return newClientFromSession(s)
+}
+
+func newClientFromSession(s *session.Session, cfgs ...*aws.Config) (Client, error) {
+	return &awsClient{
+		ec2Client:     ec2.New(s, cfgs...),
+		elbClient:     elb.New(s, cfgs...),
+		iamClient:     iam.New(s, cfgs...),
+		s3Client:      s3.New(s, cfgs...),
+		s3Uploader:    s3manager.NewUploader(s),
+		route53Client: route53.New(s, cfgs...),
+		stsClient:     sts.New(s, cfgs...),
+		tagClient:     resourcegroupstaggingapi.New(s, cfgs...),
+	}, nil
+}
+
+// NewSessionFromSecret creates a new AWS session using the configuration in the secret. If the secret
+// was nil, it initializes a new session using configuration of the envionment.
+func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Session, error) {
+	options := session.Options{
+		Config: aws.Config{
+			Region:           aws.String(region),
+			EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
+		},
+		SharedConfigState: session.SharedConfigEnable,
+		Profile:           "default",
 	}
 
 	// Special case to not use a secret to gather credentials.
 	if secret != nil {
-		accessKeyID, ok := secret.Data[constants.AWSAccessKeyIDSecretKey]
-		if !ok {
-			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secret.Name, constants.AWSAccessKeyIDSecretKey)
+		config := awsCLIConfigFromSecret(secret)
+		f, err := ioutil.TempFile("", "hive-aws-config")
+		if err != nil {
+			return nil, err
 		}
-		secretAccessKey, ok := secret.Data[constants.AWSSecretAccessKeySecretKey]
-		if !ok {
-			return nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
-				secret.Name, constants.AWSSecretAccessKeySecretKey)
-
+		defer f.Close()
+		if _, err := f.Write(config); err != nil {
+			return nil, err
 		}
+		defer os.Remove(f.Name())
 
-		awsConfig.Credentials = credentials.NewStaticCredentials(
-			string(accessKeyID), string(secretAccessKey), "")
+		options.SharedConfigFiles = []string{f.Name()}
 	}
 
-	// Otherwise default to relying on the IAM role of the masters where the actuator is running:
-	s, err := session.NewSession(awsConfig)
+	// Otherwise default to relying on the environment where the actuator is running:
+	s, err := session.NewSessionWithOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -476,17 +650,21 @@ func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io hive", "v1"),
 	})
 
-	return &awsClient{
-		ec2Client:     ec2.New(s),
-		elbClient:     elb.New(s),
-		elbv2Client:   elbv2.New(s),
-		iamClient:     iam.New(s),
-		s3Client:      s3.New(s),
-		s3Uploader:    s3manager.NewUploader(s),
-		route53Client: route53.New(s),
-		stsClient:     sts.New(s),
-		tagClient:     resourcegroupstaggingapi.New(s),
-	}, nil
+	return s, nil
+}
+
+// awsCLIConfigFromSecret returns an AWS CLI config using the data available in the secret.
+func awsCLIConfigFromSecret(secret *corev1.Secret) []byte {
+	if config, ok := secret.Data[constants.AWSConfigSecretKey]; ok {
+		return config
+	}
+
+	buf := &bytes.Buffer{}
+	fmt.Fprint(buf, "[default]\n")
+	for k, v := range secret.Data {
+		fmt.Fprintf(buf, "%s = %s\n", k, v)
+	}
+	return buf.Bytes()
 }
 
 func awsChinaEndpointResolver(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {

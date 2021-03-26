@@ -30,6 +30,9 @@ type AWSCloudBuilder struct {
 	AccessKeyID string
 	// SecretAccessKey is the AWS secret access key.
 	SecretAccessKey string
+
+	RoleARN, ExternalID string
+
 	// UserTags are user-provided tags to add to resources.
 	UserTags map[string]string
 	// Region is the AWS region to which to install the cluster
@@ -44,6 +47,13 @@ func NewAWSCloudBuilderFromSecret(credsSecret *corev1.Secret) *AWSCloudBuilder {
 	return &AWSCloudBuilder{
 		AccessKeyID:     string(accessKeyID),
 		SecretAccessKey: string(secretAccessKey),
+	}
+}
+
+func NewAWSCloudBuilderFromAssumeRole(role *hivev1aws.AssumeRole) *AWSCloudBuilder {
+	return &AWSCloudBuilder{
+		RoleARN:    role.RoleARN,
+		ExternalID: role.ExternalID,
 	}
 }
 

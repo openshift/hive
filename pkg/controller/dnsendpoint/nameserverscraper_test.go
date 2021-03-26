@@ -478,19 +478,19 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"changed-1.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-changed-1"),
 						nsValues: sets.NewString("old-value-1"),
 					},
 					"changed-2.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-changed-2"),
 						nsValues: sets.NewString("old-value-2"),
 					},
 					"changed-3.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-changed-3"),
 						nsValues: sets.NewString("old-value-3a", "old-value-3b"),
 					},
 					"unchanged.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-unchanged"),
 						nsValues: sets.NewString("test-value-4"),
 					},
 				},
@@ -511,19 +511,19 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"changed-1.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-changed-1"),
 						nsValues: sets.NewString("test-value-1"),
 					},
 					"changed-2.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-changed-2"),
 						nsValues: sets.NewString("test-value-2a", "test-value-2b"),
 					},
 					"changed-3.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-changed-3"),
 						nsValues: sets.NewString("test-value-3"),
 					},
 					"unchanged.domain.com": endpointState{
-						object:   testDNSZone(),
+						object:   testDNSZoneWithNSName(testNamespace, "test-unchanged"),
 						nsValues: sets.NewString("test-value-4"),
 					},
 				},
@@ -543,7 +543,7 @@ func TestScrape(t *testing.T) {
 			tc.configureQuery(mockQuery)
 			changeNotifications := make(chan client.Object, 100)
 			notifyChange := func(object client.Object) {
-				changeNotifications <- testDNSZone()
+				changeNotifications <- object
 			}
 			cut := newNameServerScraper(log.StandardLogger(), mockQuery, tc.rootDomains, notifyChange)
 			if tc.scrapePeriod > 0 {
@@ -552,7 +552,6 @@ func TestScrape(t *testing.T) {
 			if tc.nameServers != nil {
 				cut.nameServers = tc.nameServers
 			}
-			//stop := make(chan struct{})
 			ctx, stop := context.WithCancel(context.Background())
 			go func() {
 				sleepTime := tc.testDuration
@@ -588,7 +587,11 @@ func TestScrape(t *testing.T) {
 			if len(tc.expectedChanges) == 0 {
 				assert.Empty(t, actualChanges, "expected no change notifications")
 			} else {
-				assert.ElementsMatch(t, tc.expectedChanges, actualChanges, "unexpected change notifications")
+				assert.Equal(t, len(tc.expectedChanges), len(actualChanges), "unexpected change count")
+				for i, expectedChangedKey := range tc.expectedChanges {
+					assert.Equal(t, expectedChangedKey.Namespace, actualChanges[i].GetNamespace())
+					assert.Equal(t, expectedChangedKey.Name, actualChanges[i].GetName())
+				}
 			}
 		})
 	}

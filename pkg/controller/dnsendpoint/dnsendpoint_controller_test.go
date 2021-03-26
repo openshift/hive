@@ -348,7 +348,6 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
 			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
-			//assert.Equal(t, tc.expectedNameServers, scraper.nameServers, "unexpected name servers in scraper")
 			assertRootDomainsMapEqual(t, tc.expectedNameServers, scraper.nameServers)
 			dnsZone := &hivev1.DNSZone{}
 			if err := fakeClient.Get(context.Background(), objectKey, dnsZone); assert.NoError(t, err, "unexpected error getting DNSZone") {
@@ -593,6 +592,27 @@ func testManagedDomain() hivev1.ManageDNSConfig {
 		AWS: &hivev1.ManageDNSAWSConfig{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: cloudCredsSecret,
+			},
+		},
+	}
+}
+
+func testDNSZoneWithNSName(namespace, name string) *hivev1.DNSZone {
+	return &hivev1.DNSZone{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  namespace,
+			Name:       name,
+			Finalizers: []string{hivev1.FinalizerDNSEndpoint},
+		},
+		Spec: hivev1.DNSZoneSpec{
+			Zone:               dnsName,
+			LinkToParentDomain: true,
+		},
+		Status: hivev1.DNSZoneStatus{
+			NameServers: []string{
+				"test-value-1",
+				"test-value-2",
+				"test-value-3",
 			},
 		},
 	}

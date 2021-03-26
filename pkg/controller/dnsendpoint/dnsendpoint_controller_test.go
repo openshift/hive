@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	corev1 "k8s.io/api/core/v1"
@@ -347,12 +348,27 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
 			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
-			assert.Equal(t, tc.expectedNameServers, scraper.nameServers, "unexpected name servers in scraper")
+			//assert.Equal(t, tc.expectedNameServers, scraper.nameServers, "unexpected name servers in scraper")
+			assertRootDomainsMapEqual(t, tc.expectedNameServers, scraper.nameServers)
 			dnsZone := &hivev1.DNSZone{}
 			if err := fakeClient.Get(context.Background(), objectKey, dnsZone); assert.NoError(t, err, "unexpected error getting DNSZone") {
 				validateConditions(t, dnsZone, tc.expectedConditions)
 			}
 		})
+	}
+}
+
+func assertRootDomainsMapEqual(t *testing.T, expected rootDomainsMap, actual rootDomainsMap) {
+	require.Equal(t, len(expected), len(actual), "unexpected number of root domain map keys")
+	for rootDomainKey, expectedDomainMap := range expected {
+		require.Contains(t, actual, rootDomainKey)
+		actualDomainMap := actual[rootDomainKey]
+		require.Equal(t, len(expectedDomainMap), len(actualDomainMap), "unexpected number of domain map keys")
+		for domainKey, expectedEndpointState := range expectedDomainMap {
+			require.Contains(t, actualDomainMap, domainKey)
+			actualEndpointState := actualDomainMap[domainKey]
+			assert.Equal(t, expectedEndpointState.nsValues.List(), actualEndpointState.nsValues.List())
+		}
 	}
 }
 

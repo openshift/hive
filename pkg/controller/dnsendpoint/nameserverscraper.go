@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
 )
 
@@ -21,7 +22,7 @@ const (
 )
 
 type endpointState struct {
-	object   client.Object
+	dnsZone  *hivev1.DNSZone
 	nsValues sets.String
 }
 
@@ -68,7 +69,7 @@ func (s *nameServerScraper) GetEndpoint(domain string) (rootDomain string, nameS
 }
 
 // AddEndpoint adds an endpoint with the specified domain.
-func (s *nameServerScraper) AddEndpoint(object client.Object, domain string, nameServers sets.String) {
+func (s *nameServerScraper) AddEndpoint(object *hivev1.DNSZone, domain string, nameServers sets.String) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	_, nsMap := s.rootDomainNameServers(domain)
@@ -76,7 +77,7 @@ func (s *nameServerScraper) AddEndpoint(object client.Object, domain string, nam
 		return
 	}
 	nsMap[domain] = endpointState{
-		object:   object,
+		dnsZone:  object,
 		nsValues: nameServers,
 	}
 }
@@ -150,7 +151,7 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 		for domain, oldNameServer := range oldNameServers {
 			currentNameServer, ok := currentNameServers[domain]
 			if !ok || !currentNameServer.Equal(oldNameServer.nsValues) {
-				changedEndpoints = append(changedEndpoints, oldNameServer.object)
+				changedEndpoints = append(changedEndpoints, oldNameServer.dnsZone)
 				oldNameServer.nsValues = currentNameServer
 				oldNameServers[domain] = oldNameServer
 			}

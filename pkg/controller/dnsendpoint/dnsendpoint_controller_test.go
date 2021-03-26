@@ -82,7 +82,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
@@ -101,7 +101,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
@@ -109,7 +109,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
@@ -128,7 +128,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("old-value"),
 					},
 				},
@@ -139,7 +139,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
@@ -158,7 +158,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
@@ -284,7 +284,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},

@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver/mock"
 )
 
@@ -138,7 +139,7 @@ func TestAddEndpoint(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: values,
 					},
 				},
@@ -155,7 +156,7 @@ func TestAddEndpoint(t *testing.T) {
 				rootDomain: nameServersMap{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: values,
 					},
 				},
@@ -166,7 +167,7 @@ func TestAddEndpoint(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						object: func() client.Object {
+						dnsZone: func() *hivev1.DNSZone {
 							dz := testDNSZone()
 							dz.Name = "other-name"
 							dz.Namespace = "other-namespace"
@@ -179,7 +180,7 @@ func TestAddEndpoint(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: values,
 					},
 				},
@@ -199,7 +200,7 @@ func TestAddEndpoint(t *testing.T) {
 				rootDomain: nameServersMap{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: values,
 					},
 				},
@@ -265,7 +266,7 @@ func TestRemoveEndpoint(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					domain: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
 					},
 				},
@@ -280,7 +281,7 @@ func TestRemoveEndpoint(t *testing.T) {
 				rootDomain: nameServersMap{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
 					},
 				},
@@ -419,7 +420,7 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("old-value"),
 					},
 				},
@@ -436,7 +437,7 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
 					},
 				},
@@ -449,7 +450,7 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
 					},
 				},
@@ -466,7 +467,7 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"test.domain.com": endpointState{
-						object:   testDNSZone(),
+						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
 					},
 				},
@@ -478,19 +479,19 @@ func TestScrape(t *testing.T) {
 			nameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"changed-1.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-changed-1"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-1"),
 						nsValues: sets.NewString("old-value-1"),
 					},
 					"changed-2.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-changed-2"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-2"),
 						nsValues: sets.NewString("old-value-2"),
 					},
 					"changed-3.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-changed-3"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-3"),
 						nsValues: sets.NewString("old-value-3a", "old-value-3b"),
 					},
 					"unchanged.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-unchanged"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-unchanged"),
 						nsValues: sets.NewString("test-value-4"),
 					},
 				},
@@ -511,19 +512,19 @@ func TestScrape(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				"domain.com": nameServersMap{
 					"changed-1.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-changed-1"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-1"),
 						nsValues: sets.NewString("test-value-1"),
 					},
 					"changed-2.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-changed-2"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-2"),
 						nsValues: sets.NewString("test-value-2a", "test-value-2b"),
 					},
 					"changed-3.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-changed-3"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-3"),
 						nsValues: sets.NewString("test-value-3"),
 					},
 					"unchanged.domain.com": endpointState{
-						object:   testDNSZoneWithNSName(testNamespace, "test-unchanged"),
+						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-unchanged"),
 						nsValues: sets.NewString("test-value-4"),
 					},
 				},
@@ -588,9 +589,15 @@ func TestScrape(t *testing.T) {
 				assert.Empty(t, actualChanges, "expected no change notifications")
 			} else {
 				assert.Equal(t, len(tc.expectedChanges), len(actualChanges), "unexpected change count")
-				for i, expectedChangedKey := range tc.expectedChanges {
-					assert.Equal(t, expectedChangedKey.Namespace, actualChanges[i].GetNamespace())
-					assert.Equal(t, expectedChangedKey.Name, actualChanges[i].GetName())
+				for _, expectedChangedDNSZone := range tc.expectedChanges {
+					found := false
+					for _, actualChangedDNSZone := range actualChanges {
+						if actualChangedDNSZone.GetNamespace() == expectedChangedDNSZone.Namespace &&
+							actualChangedDNSZone.GetName() == expectedChangedDNSZone.Name {
+							found = true
+						}
+					}
+					assert.True(t, found, "expected change to DNSZone %s did not occur", expectedChangedDNSZone.Name)
 				}
 			}
 		})

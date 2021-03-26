@@ -1539,7 +1539,7 @@ users:
 				NamespacedName: key,
 			}
 
-			_, err := reconciler.Reconcile(reconcileRequest)
+			_, err := reconciler.Reconcile(context.TODO(), reconcileRequest)
 			if test.err == "" {
 				assert.NoError(t, err, "unexpected error from Reconcile")
 			} else {

@@ -19,7 +19,6 @@ import (
 func WaitForMachineSets(cfg *rest.Config, testFunc func([]*machinev1.MachineSet) bool, timeOut time.Duration) error {
 	logger := log.WithField("client", "machineset")
 	logger.Infof("Waiting for MachineSet")
-	stop := make(chan struct{})
 	done := make(chan struct{})
 	scheme := runtime.NewScheme()
 	err := machinev1.SchemeBuilder.AddToScheme(scheme)
@@ -54,8 +53,9 @@ func WaitForMachineSets(cfg *rest.Config, testFunc func([]*machinev1.MachineSet)
 			DeleteFunc: func(obj interface{}) { onUpdate() },
 		})
 
-	go internalCache.Start(stop)
-	defer func() { stop <- struct{}{} }()
+	ctx, stop := context.WithCancel(context.Background())
+	go internalCache.Start(ctx)
+	defer func() { stop() }()
 
 	select {
 	case <-time.After(timeOut):

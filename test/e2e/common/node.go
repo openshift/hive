@@ -17,7 +17,6 @@ import (
 func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut time.Duration) error {
 	logger := log.WithField("client", "node")
 	logger.Infof("Waiting for Nodes")
-	stop := make(chan struct{})
 	done := make(chan struct{})
 	internalCache, err := cache.New(cfg, cache.Options{})
 	if err != nil {
@@ -45,8 +44,9 @@ func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut 
 			DeleteFunc: func(obj interface{}) { onUpdate() },
 		})
 
-	go internalCache.Start(stop)
-	defer func() { stop <- struct{}{} }()
+	ctx, stop := context.WithCancel(context.Background())
+	go internalCache.Start(ctx)
+	defer func() { stop() }()
 
 	select {
 	case <-time.After(timeOut):

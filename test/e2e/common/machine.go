@@ -19,7 +19,6 @@ import (
 func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool, timeOut time.Duration) error {
 	logger := log.WithField("client", "machine")
 	logger.Infof("Waiting for Machine")
-	stop := make(chan struct{})
 	done := make(chan struct{})
 	scheme := runtime.NewScheme()
 	err := machinev1.SchemeBuilder.AddToScheme(scheme)
@@ -55,8 +54,9 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 			DeleteFunc: func(obj interface{}) { onUpdate() },
 		})
 
-	go internalCache.Start(stop)
-	defer func() { stop <- struct{}{} }()
+	ctx, stop := context.WithCancel(context.Background())
+	go internalCache.Start(ctx)
+	defer func() { stop() }()
 
 	select {
 	case <-time.After(timeOut):

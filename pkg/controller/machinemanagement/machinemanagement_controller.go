@@ -33,8 +33,10 @@ import (
 	k8sannotations "github.com/openshift/hive/pkg/util/annotations"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+)
 
 const (
 	ControllerName = hivev1.MachineManagementControllerName
@@ -83,10 +85,45 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return err
 	}
 
-	// Watch for changes to Secret filtered by label
-	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(selectorSecretWatchHandler),
+	err = mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{}, "spec.secrets.secretName", func(o client.Object) []string {
+		var res []string
+		cd := o.(*hivev1.ClusterDeployment)
+		if utils.CredentialsSecretName(cd) != "" {
+			res = append(res, utils.CredentialsSecretName(cd))
+		}
+		if cd.Spec.PullSecretRef != nil {
+			res = append(res, cd.Spec.PullSecretRef.Name)
+		}
+		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+			res = append(res, cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name)
+		}
+		return res
 	})
+	if err != nil {
+		log.WithField("controller", ControllerName).WithError(err).Error("Error indexing cluster deployment secrets")
+	}
+
+	// Watch for changes to Secret referenced by cluster deployment
+	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		retval := []reconcile.Request{}
+
+		secret := a.(*corev1.Secret)
+		if secret == nil {
+			// Wasn't a Secret, bail out. This should not happen.
+			log.Errorf("Error converting MapObject.Object to Secret. Value: %+v", a)
+			return retval
+		}
+
+		cdsWithSecrets := &hivev1.ClusterDeploymentList{}
+		_ = mgr.GetClient().List(context.Background(), cdsWithSecrets, client.MatchingFields{"spec.secrets.secretName": secret.Name})
+		for _, cd := range cdsWithSecrets.Items {
+			retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+				Name:      cd.Name,
+				Namespace: secret.Namespace,
+			}})
+		}
+		return retval
+	}))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment secrets")
 		return err
@@ -212,18 +249,21 @@ func (r *ReconcileMachineManagement) createOrUpdateSecretInTargetNamespace(secre
 	secret := &corev1.Secret{}
 	err := r.Get(context.Background(), types.NamespacedName{Name: secretName, Namespace: targetNamespace}, secret)
 	// Create secret in targetNamespace
-	if err != nil && apierrors.IsNotFound(err) {
-		cdLog.Infof("Creating secret %s in the target namespace %s", secretName, targetNamespace)
-		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret)
-		if err != nil {
-			return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			cdLog.Infof("Creating secret %s in the target namespace %s", secretName, targetNamespace)
+			err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret)
+			if err != nil {
+				return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+			}
+			secret.Namespace = targetNamespace
+			secret.ResourceVersion = ""
+			if err := r.Create(context.TODO(), secret); err != nil && !apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create secret in target namespace: %v", err)
+			}
+			return nil
 		}
-		secret.Namespace = targetNamespace
-		secret.ResourceVersion = ""
-		if err := r.Create(context.TODO(), secret); err != nil && !apierrors.IsAlreadyExists(err) {
-			return fmt.Errorf("failed to create secret in target namespace: %v", err)
-		}
-		return nil
+		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 	}
 
 	origSecret := &corev1.Secret{}
@@ -231,14 +271,16 @@ func (r *ReconcileMachineManagement) createOrUpdateSecretInTargetNamespace(secre
 	if err != nil {
 		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 	}
+	if reflect.DeepEqual(origSecret.Data, secret.Data) {
+		return nil
+	}
+
 	// Update secret in targetNamespace
-	if !reflect.DeepEqual(origSecret.Data, secret.Data) {
-		cdLog.Infof("Updating secret %s in the target namespace %s", secretName, targetNamespace)
-		secret.Data = origSecret.Data
-		err := r.Update(context.Background(), secret)
-		if err != nil {
-			return fmt.Errorf("failed to update secret %s: %w", secretName, err)
-		}
+	cdLog.Infof("Updating secret %s in the target namespace %s", secretName, targetNamespace)
+	secret.Data = origSecret.Data
+	err = r.Update(context.Background(), secret)
+	if err != nil {
+		return fmt.Errorf("failed to update secret %s: %w", secretName, err)
 	}
 
 	return nil
@@ -272,25 +314,9 @@ func (r *ReconcileMachineManagement) addAnnotationToTargetNamespace(cd *hivev1.C
 	return nil
 }
 
-func selectorSecretWatchHandler(a handler.MapObject) []reconcile.Request {
-	retval := []reconcile.Request{}
-
-	secret := a.Object.(*corev1.Secret)
-	if secret == nil {
-		// Wasn't a Secret, bail out. This should not happen.
-		log.Errorf("Error converting MapObject.Object to Secret. Value: %+v", a.Object)
-		return retval
+// initializeAnnotations() initializes the annotations if it is not already
+func initializeAnnotations(cd *hivev1.ClusterDeployment) {
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
 	}
-	if secret.Labels == nil {
-		return retval
-	}
-	cdName, ok := secret.Labels[constants.ClusterDeploymentNameLabel]
-	if !ok {
-		return retval
-	}
-	retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
-		Name:      cdName,
-		Namespace: secret.Namespace,
-	}})
-	return retval
 }

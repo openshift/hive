@@ -125,8 +125,7 @@ func (s *nameServerScraper) Start(ctx context.Context) error {
 			}()
 		}
 	}()
-	stopCh := ctx.Done()
-	<-stopCh
+	<-ctx.Done()
 	return nil
 }
 

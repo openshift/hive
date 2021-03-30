@@ -56,7 +56,7 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 
 	ctx, stop := context.WithCancel(context.Background())
 	go internalCache.Start(ctx)
-	defer func() { stop() }()
+	defer stop()
 
 	select {
 	case <-time.After(timeOut):

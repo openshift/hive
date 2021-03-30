@@ -46,7 +46,7 @@ func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut 
 
 	ctx, stop := context.WithCancel(context.Background())
 	go internalCache.Start(ctx)
-	defer func() { stop() }()
+	defer stop()
 
 	select {
 	case <-time.After(timeOut):

@@ -17,7 +17,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
-
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/imageset"
 )
@@ -178,7 +177,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 	log.Info("started metrics calculator goroutine")
 
 	// Run forever, sleep at the end:
-	wait.Until(func() {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		mcLog := log.WithField("controller", "metrics")
 		recobsrv := NewReconcileObserver(ControllerName, mcLog)
 		defer recobsrv.ObserveControllerReconcileTime()
@@ -186,7 +185,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
 		clusterDeployments := &hivev1.ClusterDeploymentList{}
-		err := mc.Client.List(context.Background(), clusterDeployments)
+		err := mc.Client.List(ctx, clusterDeployments)
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
@@ -257,7 +256,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		// install job metrics
 		installJobs := &batchv1.JobList{}
 		installJobLabelSelector := map[string]string{constants.InstallJobLabel: "true"}
-		err = mc.Client.List(context.Background(), installJobs, client.MatchingLabels(installJobLabelSelector))
+		err = mc.Client.List(ctx, installJobs, client.MatchingLabels(installJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing install jobs")
 		} else {
@@ -277,7 +276,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
 		uninstallJobLabelSelector := map[string]string{constants.UninstallJobLabel: "true"}
-		err = mc.Client.List(context.Background(), uninstallJobs, client.MatchingLabels(uninstallJobLabelSelector))
+		err = mc.Client.List(ctx, uninstallJobs, client.MatchingLabels(uninstallJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing uninstall jobs")
 		} else {
@@ -297,7 +296,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		// imageset job metrics
 		imagesetJobs := &batchv1.JobList{}
 		imagesetJobLabelSelector := map[string]string{imageset.ImagesetJobLabel: "true"}
-		err = mc.Client.List(context.Background(), imagesetJobs, client.MatchingLabels(imagesetJobLabelSelector))
+		err = mc.Client.List(ctx, imagesetJobs, client.MatchingLabels(imagesetJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing imageset jobs")
 		} else {
@@ -314,7 +313,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		}
 
 		mc.calculateSelectorSyncSetMetrics(mcLog)
-	}, mc.Interval, ctx.Done())
+	}, mc.Interval)
 
 	return nil
 }

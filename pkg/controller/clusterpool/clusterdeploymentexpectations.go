@@ -15,7 +15,7 @@ import (
 
 func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) error {
 	h := &clusterDeploymentEventHandler{
-		handler.EnqueueRequestsFromMapFunc(
+		EventHandler: handler.EnqueueRequestsFromMapFunc(
 			func(a client.Object) []reconcile.Request {
 				cpKey := clusterPoolKey(a.(*hivev1.ClusterDeployment))
 				if cpKey == nil {
@@ -24,7 +24,7 @@ func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) 
 				return []reconcile.Request{{NamespacedName: *cpKey}}
 			},
 		),
-		r,
+		reconciler: r,
 	}
 	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, h)
 }

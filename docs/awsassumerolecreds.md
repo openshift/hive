@@ -40,16 +40,17 @@ Secret created "aws-service-provider-secret"
 Let's update the HiveConfig to configure Hive with the credentials for AWS service provider IAM role,
 
 ```console
-oc patch hiveconfig hive --type='json' -p='[{"op":"replace","path":"/spec/awsServiceProviderConfig","value":{"credentialsSecretRef": {"name": "aws-service-provider-secret"}}}]'
+oc patch hiveconfig hive --type='json' -p='[{"op":"replace","path":"/spec/serviceProviderCredentialsConfig","value":{"aws":{"credentialsSecretRef": {"name": "aws-service-provider-secret"}}}}]'
 ```
 
 The HiveConfig must look like,
 
 ```yaml
 spec:
-  awsServiceProviderConfig:
-    credentialsSecretRef:
-      name: aws-service-provider-secret
+  serviceProviderCredentialsConfig:
+    aws:
+      credentialsSecretRef:
+        name: aws-service-provider-secret
 ```
 
 **WARNING:** Hive controllers will copy this secret to ClusterDeployment namespaces that need access to this secret

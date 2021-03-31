@@ -85,9 +85,7 @@ func cleanupRequired(cd *hivev1.ClusterDeployment) bool {
 }
 
 func (r *ReconcileAWSPrivateLink) cleanupPrivateLink(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) error {
-	awsClient, err := newAWSClient(r,
-		corev1.SecretReference{Name: cd.Spec.Platform.AWS.CredentialsSecretRef.Name, Namespace: cd.Namespace},
-		cd.Spec.Platform.AWS.Region)
+	awsClient, err := newAWSClient(r, cd)
 	if err != nil {
 		logger.WithError(err).Error("error creating AWS client for the cluster")
 		return err

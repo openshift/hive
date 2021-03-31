@@ -10,10 +10,6 @@ type BareMetalPlatform struct {
 	// +optional
 	APIVIP string `json:"apiVIP,omitempty"`
 
-	// APIVIPDNSName is the domain name used to reach the OpenShift cluster API.
-	// +optional
-	APIVIPDNSName string `json:"apiVIPDNSName,omitempty"`
-
 	// IngressVIP is the virtual IP used for cluster ingress traffic.
 	// +optional
 	IngressVIP string `json:"ingressVIP,omitempty"`

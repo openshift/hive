@@ -1,17 +1,12 @@
-#FROM registry.access.redhat.com/ubi7/ubi
-FROM registry.ci.openshift.org/openshift/release:golang-1.15
+# Base OS image for Hive development containers FROM on Fedora.
+
+FROM fedora:33
 
 # ssh-agent required for gathering logs in some situations:
-RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clean all && rm -rf /var/cache/yum/*; fi
+RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
 #
 # libvirt libraries required for running bare metal installer.
-RUN yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*
-
-
-ADD bin/hiveadmission /opt/services/
-ADD bin/operator /opt/services/hive-operator
-ADD bin/manager /opt/services/
-ADD bin/hiveutil /usr/bin/
+RUN dnf install -y libvirt-devel && dnf clean all && rm -rf /var/cache/dnf/*
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as

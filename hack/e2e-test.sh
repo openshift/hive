@@ -84,7 +84,7 @@ export HIVE_NS="hive-e2e"
 export HIVE_OPERATOR_NS="hive-operator"
 
 # Install Hive
-DEPLOY_IMAGE="${HIVE_IMAGE}" make deploy
+IMG="${HIVE_IMAGE}" make deploy
 
 
 function teardown() {

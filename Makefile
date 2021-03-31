@@ -31,9 +31,6 @@ LOG_LEVEL ?= debug
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
-# Image to use when deploying
-DEPLOY_IMAGE ?= registry.ci.openshift.org/openshift/hive-v4.0:hive
-
 GO_PACKAGES :=./...
 GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
 GO_BUILD_BINDIR :=bin
@@ -64,7 +61,8 @@ BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/co
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
 $(call build-image,hive,$(IMG),./Dockerfile,.)
-$(call build-image,hive-dev,$(IMG),./Dockerfile.dev,.)
+$(call build-image,hive-fedora-dev-base,hive-fedora-dev-base,./build/fedora-dev/Dockerfile.devbase,.)
+$(call build-image,hive-fedora-dev,$(IMG),./build/fedora-dev/Dockerfile.dev,.)
 $(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
 clean:
@@ -169,7 +167,7 @@ deploy: install
 	oc create namespace ${HIVE_OPERATOR_NS} || true
 	mkdir -p overlays/deploy
 	cp overlays/template/kustomization.yaml overlays/deploy
-	cd overlays/deploy && kustomize edit set image registry.ci.openshift.org/openshift/hive-v4.0:hive=${DEPLOY_IMAGE} && kustomize edit set namespace ${HIVE_OPERATOR_NS}
+	cd overlays/deploy && kustomize edit set image registry.ci.openshift.org/openshift/hive-v4.0:hive=${IMG} && kustomize edit set namespace ${HIVE_OPERATOR_NS}
 	kustomize build overlays/deploy | oc apply -f -
 	rm -rf overlays/deploy
 	# Create a default basic HiveConfig so the operator will deploy Hive
@@ -229,23 +227,11 @@ $(addprefix generate-submodules-,$(GO_SUB_MODULES)):
 	# hande go generate for submodule
 	(cd $(subst generate-submodules-,,$@); $(GOFLAGS_FOR_GENERATE) $(GO) generate ./...)
 
-
 # Build the image using docker
 .PHONY: docker-build
 docker-build:
 	@echo "*** DEPRECATED: Use the image-hive target instead ***"
 	$(DOCKER_CMD) build -t ${IMG} .
-
-# Build the dev image using docker
-.PHONY: docker-dev-build
-docker-dev-build: build
-	@echo "*** DEPRECATED: Use the image-hive-dev target instead ***"
-	$(DOCKER_CMD) build -t ${IMG} -f Dockerfile.dev .
-
-# Build the dev image using builah
-.PHONY: buildah-dev-build
-buildah-dev-build:
-	buildah bud -f Dockerfile --tag ${IMG}
 
 # Push the image using docker
 .PHONY: docker-push

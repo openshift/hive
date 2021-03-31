@@ -32,6 +32,7 @@ const (
 	natGatewayLimitExceeded = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error creating NAT Gateway: NatGatewayLimitExceeded: The maximum number of NAT Gateways has been reached.\""
 	vpcLimitExceeded        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating VPC: VpcLimitExceeded: The maximum number of VPCs has been reached.\""
 	genericLimitExceeded    = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating Generic: GenericLimitExceeded: The maximum number of Generics has been reached.\""
+	invalidCredentials      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: error waiting for Route53 Hosted Zone (Z1009177L956IM4ANFHL) creation: InvalidClientTokenId: The security token included in the request is invalid.\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -83,6 +84,12 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(genericLimitExceeded),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "ResourceLimitExceeded",
+		},
+		{
+			name:           "Credentials are invalid",
+			log:            pointer.StringPtr(invalidCredentials),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "InvalidCredentials",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",
@@ -299,6 +306,11 @@ func buildRegexConfigMap() *corev1.ConfigMap {
   - "LimitExceeded"
   installFailingReason: ResourceLimitExceeded
   installFailingMessage: Resource limit exceeded
+- name: InvalidCredentials
+  searchRegexStrings:
+  - "InvalidClientTokenId: The security token included in the request is invalid."
+  installFailingReason: InvalidCredentials
+  installFailingMessage: Credentials are invalid
 `,
 		},
 	}

@@ -115,11 +115,11 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		}
 
 		cdsWithSecrets := &hivev1.ClusterDeploymentList{}
-		_ = mgr.GetClient().List(context.Background(), cdsWithSecrets, client.MatchingFields{"spec.secrets.secretName": secret.Name})
+		_ = mgr.GetClient().List(context.Background(), cdsWithSecrets, client.MatchingFields{"spec.secrets.secretName": secret.Name}, client.InNamespace(secret.Namespace))
 		for _, cd := range cdsWithSecrets.Items {
 			retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      cd.Name,
-				Namespace: secret.Namespace,
+				Namespace: cd.Namespace,
 			}})
 		}
 		return retval

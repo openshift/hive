@@ -620,7 +620,6 @@ func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Sessio
 			EndpointResolver: endpoints.ResolverFunc(awsChinaEndpointResolver),
 		},
 		SharedConfigState: session.SharedConfigEnable,
-		Profile:           "default",
 	}
 
 	// Special case to not use a secret to gather credentials.
@@ -637,6 +636,7 @@ func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Sessio
 		defer os.Remove(f.Name())
 
 		options.SharedConfigFiles = []string{f.Name()}
+		options.Profile = "default"
 	}
 
 	// Otherwise default to relying on the environment where the actuator is running:

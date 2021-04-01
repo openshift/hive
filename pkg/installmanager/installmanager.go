@@ -930,6 +930,12 @@ func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
 	cmd.Env = append(cmd.Env, fmt.Sprintf("KUBECONFIG=%s", filepath.Join(m.WorkDir, "auth", "kubeconfig")))
 	stdout, err := cmd.Output()
 	m.log.Infof("must-gather output: %s", stdout)
+	if err != nil {
+		return err
+	}
+	// Creating a compressed file of the must-gather directory in m.LogsDir
+	tarCmd := exec.Command("tar", "cvaf", filepath.Join(m.LogsDir, "must-gather.tar.gz"), destDir)
+	err = tarCmd.Run()
 	return err
 }
 

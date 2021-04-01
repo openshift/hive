@@ -1530,7 +1530,7 @@ users:
 					AssociatedVPCs:       test.associate,
 				},
 
-				awsClientFn: func(_ client.Client, _, _, _ string) (awsclient.Client, error) {
+				awsClientFn: func(_ client.Client, _ awsclient.Options) (awsclient.Client, error) {
 					return mockedAWSClient, nil
 				},
 			}

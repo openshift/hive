@@ -1,4 +1,4 @@
-# github.com/go-logr/logr v0.3.0
+# github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
@@ -27,6 +27,7 @@ golang.org/x/text/unicode/norm
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
 # gopkg.in/yaml.v2 v2.3.0
+## explicit
 gopkg.in/yaml.v2
 # k8s.io/api v0.20.0
 ## explicit
@@ -57,8 +58,5 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/klog/v2 v2.4.0
 k8s.io/klog/v2
-# sigs.k8s.io/controller-runtime v0.7.0
-## explicit
-sigs.k8s.io/controller-runtime/pkg/scheme
 # sigs.k8s.io/structured-merge-diff/v4 v4.0.2
 sigs.k8s.io/structured-merge-diff/v4/value

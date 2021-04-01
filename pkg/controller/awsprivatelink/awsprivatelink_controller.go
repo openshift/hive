@@ -82,7 +82,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 		return reconciler, err
 	}
 	reconciler.controllerconfig = config
-	reconciler.awsClientFn = awsclient.NewClient
+	reconciler.awsClientFn = awsclient.New
 	return reconciler, nil
 }
 
@@ -140,7 +140,7 @@ type ReconcileAWSPrivateLink struct {
 	awsClientFn awsClientFn
 }
 
-type awsClientFn func(kubeClient client.Client, secretName, namespace, region string) (awsclient.Client, error)
+type awsClientFn func(client.Client, awsclient.Options) (awsclient.Client, error)
 
 // Reconcile reconciles PrivateLink for ClusterDeployment.
 func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
@@ -388,9 +388,7 @@ func (r *ReconcileAWSPrivateLink) setProgressCondition(cd *hivev1.ClusterDeploym
 
 func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeployment, clusterMetadata *hivev1.ClusterMetadata, logger log.FieldLogger) (reconcile.Result, error) {
 	logger.Debug("reconciling PrivateLink resources")
-	awsClient, err := newAWSClient(r,
-		corev1.SecretReference{Name: cd.Spec.Platform.AWS.CredentialsSecretRef.Name, Namespace: cd.Namespace},
-		cd.Spec.Platform.AWS.Region)
+	awsClient, err := newAWSClient(r, cd)
 	if err != nil {
 		logger.WithError(err).Error("error creating AWS client for the cluster")
 		return reconcile.Result{}, err
@@ -1023,7 +1021,15 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZoneAssociations(awsClient *aws
 				return modified, err
 			}
 
-			awsAssociationClient, err = r.awsClientFn(r.Client, info.CredentialsSecretRef.Name, controllerutils.GetHiveNamespace(), info.Region)
+			awsAssociationClient, err = r.awsClientFn(r.Client, awsclient.Options{
+				Region: info.Region,
+				CredentialsSource: awsclient.CredentialsSource{
+					Secret: &awsclient.SecretCredentialsSource{
+						Namespace: controllerutils.GetHiveNamespace(),
+						Ref:       info.CredentialsSecretRef,
+					},
+				},
+			})
 			if err != nil {
 				vpcLog.WithError(err).Error("failed to create AWS client for association of the Hosted Zone to the VPC")
 				return modified, err
@@ -1102,16 +1108,35 @@ type awsClient struct {
 	user awsclient.Client
 }
 
-func newAWSClient(r *ReconcileAWSPrivateLink, user corev1.SecretReference, region string) (*awsClient, error) {
-	uClient, err := r.awsClientFn(r.Client,
-		user.Name, user.Namespace,
-		region)
+func newAWSClient(r *ReconcileAWSPrivateLink, cd *hivev1.ClusterDeployment) (*awsClient, error) {
+	uClient, err := r.awsClientFn(r.Client, awsclient.Options{
+		Region: cd.Spec.Platform.AWS.Region,
+		CredentialsSource: awsclient.CredentialsSource{
+			Secret: &awsclient.SecretCredentialsSource{
+				Namespace: cd.Namespace,
+				Ref:       &cd.Spec.Platform.AWS.CredentialsSecretRef,
+			},
+			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
+				SecretRef: corev1.SecretReference{
+					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Namespace: controllerutils.GetHiveNamespace(),
+				},
+				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-	hClient, err := r.awsClientFn(r.Client,
-		r.controllerconfig.CredentialsSecretRef.Name, controllerutils.GetHiveNamespace(),
-		region)
+	hClient, err := r.awsClientFn(r.Client, awsclient.Options{
+		Region: cd.Spec.Platform.AWS.Region,
+		CredentialsSource: awsclient.CredentialsSource{
+			Secret: &awsclient.SecretCredentialsSource{
+				Namespace: controllerutils.GetHiveNamespace(),
+				Ref:       &r.controllerconfig.CredentialsSecretRef,
+			},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}

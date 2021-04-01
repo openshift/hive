@@ -1579,6 +1579,11 @@ data:
       - "Throttling: Rate exceeded"
       installFailingReason: AWSAPIRateLimitExceeded
       installFailingMessage: AWS API rate limit exceeded
+    - name: InvalidCredentials
+      searchRegexStrings:
+      - "InvalidClientTokenId: The security token included in the request is invalid."
+      installFailingReason: InvalidCredentials
+      installFailingMessage: Credentials are invalid
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:

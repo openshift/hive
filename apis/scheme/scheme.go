@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Copied from controller-runtime to avoid a dependency on specific versions
+// causing problems with anyone importing hive's api package.
+
 // Package scheme contains utilities for gradually building Schemes,
 // which contain information associating Go types with Kubernetes
 // groups, versions, and kinds.

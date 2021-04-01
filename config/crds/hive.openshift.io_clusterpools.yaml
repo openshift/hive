@@ -181,10 +181,6 @@ spec:
                       description: APIVIP is the virtual IP used to reach the OpenShift
                         cluster's API.
                       type: string
-                    apiVIPDNSName:
-                      description: APIVIPDNSName is the domain name used to reach
-                        the OpenShift cluster API.
-                      type: string
                     ingressVIP:
                       description: IngressVIP is the virtual IP used for cluster ingress
                         traffic.

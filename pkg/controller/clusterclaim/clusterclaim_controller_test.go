@@ -719,7 +719,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				},
 			}
 
-			result, err := rcp.Reconcile(reconcileRequest)
+			result, err := rcp.Reconcile(context.TODO(), reconcileRequest)
 			require.NoError(t, err, "unexpected error from Reconcile")
 
 			if test.expectedRequeueAfter == nil {

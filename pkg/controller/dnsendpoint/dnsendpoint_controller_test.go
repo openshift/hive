@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	corev1 "k8s.io/api/core/v1"
@@ -81,8 +82,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -100,16 +101,16 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -127,8 +128,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("old-value"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("old-value"),
 					},
 				},
 			},
@@ -138,8 +139,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -157,8 +158,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -283,8 +284,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nameServersMap{
 					dnsName: endpointState{
-						objectKey: objectKey,
-						nsValues:  sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						dnsZone:  testDNSZone(),
+						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
 				},
 			},
@@ -340,19 +341,33 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					},
 				},
 			}
-			result, err := cut.Reconcile(reconcile.Request{NamespacedName: objectKey})
+			result, err := cut.Reconcile(context.TODO(), reconcile.Request{NamespacedName: objectKey})
 			if tc.expectErr {
 				assert.Error(t, err, "expected error from reconcile")
 			} else {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
 			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
-			assert.Equal(t, tc.expectedNameServers, scraper.nameServers, "unexpected name servers in scraper")
+			assertRootDomainsMapEqual(t, tc.expectedNameServers, scraper.nameServers)
 			dnsZone := &hivev1.DNSZone{}
 			if err := fakeClient.Get(context.Background(), objectKey, dnsZone); assert.NoError(t, err, "unexpected error getting DNSZone") {
 				validateConditions(t, dnsZone, tc.expectedConditions)
 			}
 		})
+	}
+}
+
+func assertRootDomainsMapEqual(t *testing.T, expected rootDomainsMap, actual rootDomainsMap) {
+	require.Equal(t, len(expected), len(actual), "unexpected number of root domain map keys")
+	for rootDomainKey, expectedDomainMap := range expected {
+		require.Contains(t, actual, rootDomainKey)
+		actualDomainMap := actual[rootDomainKey]
+		require.Equal(t, len(expectedDomainMap), len(actualDomainMap), "unexpected number of domain map keys")
+		for domainKey, expectedEndpointState := range expectedDomainMap {
+			require.Contains(t, actualDomainMap, domainKey)
+			actualEndpointState := actualDomainMap[domainKey]
+			assert.Equal(t, expectedEndpointState.nsValues.List(), actualEndpointState.nsValues.List())
+		}
 	}
 }
 
@@ -400,7 +415,7 @@ func (*fakeManager) AddHealthzCheck(name string, check healthz.Checker) error {
 func (*fakeManager) AddReadyzCheck(name string, check healthz.Checker) error {
 	panic("not implemented")
 }
-func (*fakeManager) Start(<-chan struct{}) error {
+func (*fakeManager) Start(ctx context.Context) error {
 	panic("not implemented")
 }
 func (*fakeManager) GetConfig() *rest.Config {
@@ -577,6 +592,27 @@ func testManagedDomain() hivev1.ManageDNSConfig {
 		AWS: &hivev1.ManageDNSAWSConfig{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: cloudCredsSecret,
+			},
+		},
+	}
+}
+
+func testDNSZoneWithNSName(namespace, name string) *hivev1.DNSZone {
+	return &hivev1.DNSZone{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:  namespace,
+			Name:       name,
+			Finalizers: []string{hivev1.FinalizerDNSEndpoint},
+		},
+		Spec: hivev1.DNSZoneSpec{
+			Zone:               dnsName,
+			LinkToParentDomain: true,
+		},
+		Status: hivev1.DNSZoneStatus{
+			NameServers: []string{
+				"test-value-1",
+				"test-value-2",
+				"test-value-3",
 			},
 		},
 	}

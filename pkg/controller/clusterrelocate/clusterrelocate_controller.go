@@ -97,9 +97,8 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to ClusterRelocate
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterRelocate{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(r.clusterRelocateHandlerFunc),
-	}); err != nil {
+	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterRelocate{}},
+		handler.EnqueueRequestsFromMapFunc(r.clusterRelocateHandlerFunc)); err != nil {
 		logger.WithError(err).Error("Error watching ClusterRelocate")
 		return err
 	}
@@ -107,8 +106,8 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
-func (r *ReconcileClusterRelocate) clusterRelocateHandlerFunc(a handler.MapObject) (requests []reconcile.Request) {
-	clusterRelocate := a.Object.(*hivev1.ClusterRelocate)
+func (r *ReconcileClusterRelocate) clusterRelocateHandlerFunc(a client.Object) (requests []reconcile.Request) {
+	clusterRelocate := a.(*hivev1.ClusterRelocate)
 
 	labelSelector, err := metav1.LabelSelectorAsSelector(&clusterRelocate.Spec.ClusterDeploymentSelector)
 	if err != nil {
@@ -150,7 +149,7 @@ type ReconcileClusterRelocate struct {
 }
 
 // Reconcile relocates ClusterDeployments matching with a ClusterRelocate to another Hive instance.
-func (r *ReconcileClusterRelocate) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterRelocate) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
@@ -470,12 +469,7 @@ func (r *ReconcileClusterRelocate) reconcileNoSingleMatch(cd *hivev1.ClusterDepl
 // Hive can or should do to resolve this. The ClusterDeployment cannot be relocated to the destination cluster
 // unless the existing ClusterDeployment on the destination cluster is deleted.
 func (r *ReconcileClusterRelocate) checkForExistingClusterDeployment(cd *hivev1.ClusterDeployment, destClient client.Client, logger log.FieldLogger) (proceed bool, completed bool, returnErr error) {
-	cdKey, err := client.ObjectKeyFromObject(cd)
-	if err != nil {
-		logger.WithError(err).Error("could not get object key for clusterdeployment")
-		returnErr = errors.Wrap(err, "could not get object key for clusterdeployment")
-		return
-	}
+	cdKey := client.ObjectKeyFromObject(cd)
 	destCD := &hivev1.ClusterDeployment{}
 	switch err := destClient.Get(context.Background(), cdKey, destCD); {
 	// no ClusterDeployment in destination cluster
@@ -524,7 +518,7 @@ func (r *ReconcileClusterRelocate) copy(cd *hivev1.ClusterDeployment, destClient
 
 	// copy dependent resources
 	for _, t := range typesToCopy() {
-		if err := r.copyResources(cd, destClient, t, logger); err != nil {
+		if err := r.copyResources(cd, destClient, t.(client.ObjectList), logger); err != nil {
 			return errors.Wrapf(err, "failed to copy %T", t)
 		}
 	}
@@ -554,7 +548,7 @@ func (r *ReconcileClusterRelocate) copy(cd *hivev1.ClusterDeployment, destClient
 
 // copyResources copies all of the resources of the given object type in the namespace of the ClusterDeployment to the
 // destination cluster
-func (r *ReconcileClusterRelocate) copyResources(cd *hivev1.ClusterDeployment, destClient client.Client, objectList runtime.Object, logger log.FieldLogger) error {
+func (r *ReconcileClusterRelocate) copyResources(cd *hivev1.ClusterDeployment, destClient client.Client, objectList client.ObjectList, logger log.FieldLogger) error {
 	logger = logger.WithField("type", reflect.TypeOf(objectList))
 	if err := r.List(context.Background(), objectList, client.InNamespace(cd.Namespace)); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not list resources")
@@ -594,7 +588,7 @@ func (r *ReconcileClusterRelocate) copyResource(obj runtime.Object, destClient c
 		return errors.Wrap(err, "could not clear fields from source object")
 	}
 	// Need to use a copy here so that `obj` is left unaltered if the resource already exists on the remote cluster.
-	objToCreate := obj.DeepCopyObject()
+	objToCreate := obj.DeepCopyObject().(client.Object)
 	switch err := destClient.Create(context.Background(), objToCreate); {
 	case err == nil:
 		logger.Info("resource created in destination cluster")
@@ -603,7 +597,7 @@ func (r *ReconcileClusterRelocate) copyResource(obj runtime.Object, destClient c
 			return errors.Wrap(err, "resource already exists in destination cluster")
 		}
 		logger.Info("resource already exists in destination cluster; replacing if there are changes")
-		if err := r.replaceResourceIfChanged(destClient, obj, logger); err != nil {
+		if err := r.replaceResourceIfChanged(destClient, obj.(client.Object), logger); err != nil {
 			return errors.Wrap(err, "failed to sync existing resource")
 		}
 	default:
@@ -613,14 +607,10 @@ func (r *ReconcileClusterRelocate) copyResource(obj runtime.Object, destClient c
 	return nil
 }
 
-func (r *ReconcileClusterRelocate) replaceResourceIfChanged(destClient client.Client, srcObj runtime.Object, logger log.FieldLogger) error {
+func (r *ReconcileClusterRelocate) replaceResourceIfChanged(destClient client.Client, srcObj client.Object, logger log.FieldLogger) error {
 	// Get the object from the destination cluster
-	objKey, err := client.ObjectKeyFromObject(srcObj)
-	if err != nil {
-		logger.WithError(err).Error("could not get object key")
-		return errors.Wrap(err, "could not get object key")
-	}
-	destObj := reflect.New(reflect.TypeOf(srcObj).Elem()).Interface().(runtime.Object)
+	objKey := client.ObjectKeyFromObject(srcObj)
+	destObj := reflect.New(reflect.TypeOf(srcObj).Elem()).Interface().(client.Object)
 	if err := destClient.Get(context.Background(), objKey, destObj); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get resource from destination cluster")
 		return errors.Wrap(err, "could not get resource from destination cluster")

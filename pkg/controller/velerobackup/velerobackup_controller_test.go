@@ -271,7 +271,7 @@ func TestReconcile(t *testing.T) {
 			tolerance := float64(10 * time.Second)
 
 			// Act
-			actualResult, actualError := r.Reconcile(test.request)
+			actualResult, actualError := r.Reconcile(context.TODO(), test.request)
 			actualObjects, err := controllerutils.ListRuntimeObjects(r, types, client.InNamespace(namespace))
 			lastBackupName, lastBackupTimestamp := ignoreUncomparedFields(test.expectedObjects, actualObjects)
 

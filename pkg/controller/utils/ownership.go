@@ -22,7 +22,7 @@ import (
 // OwnershipUniqueKey contains the uniquly identifiable pattern for ensuring ownership labels are correct applied for a type.
 type OwnershipUniqueKey struct {
 	LabelSelector map[string]string
-	TypeToList    runtime.Object
+	TypeToList    client.ObjectList
 	Controlled    bool
 }
 
@@ -31,7 +31,7 @@ func ReconcileOwnerReferences(owner hivev1.MetaRuntimeObject, ownershipKeys []*O
 	errlist := []error{}
 
 	for _, ownershipKey := range ownershipKeys {
-		objects, err := ListRuntimeObjects(kubeclient, []runtime.Object{ownershipKey.TypeToList}, client.MatchingLabels(ownershipKey.LabelSelector), client.InNamespace(owner.GetNamespace()))
+		objects, err := ListRuntimeObjects(kubeclient, []client.ObjectList{ownershipKey.TypeToList}, client.MatchingLabels(ownershipKey.LabelSelector), client.InNamespace(owner.GetNamespace()))
 		if err != nil {
 			errlist = append(errlist, errors.Wrap(err, "failed listing objects owned by clusterdeployment according to label"))
 			continue

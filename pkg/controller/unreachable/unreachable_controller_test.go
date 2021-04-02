@@ -232,7 +232,7 @@ func TestReconcile(t *testing.T) {
 				Namespace: testNamespace,
 			}
 
-			result, err := rcd.Reconcile(reconcile.Request{NamespacedName: namespacedName})
+			result, err := rcd.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
 			assert.NoError(t, err, "unexpected error during reconcile")
 
 			cd := &hivev1.ClusterDeployment{}

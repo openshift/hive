@@ -108,9 +108,9 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(r.clusterDeploymentWatchHandler),
-	})
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(
+		r.clusterDeploymentWatchHandler,
+	))
 	if err != nil {
 		return err
 	}
@@ -118,13 +118,13 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
-func (r *ReconcileRemoteMachineSet) clusterDeploymentWatchHandler(a handler.MapObject) []reconcile.Request {
+func (r *ReconcileRemoteMachineSet) clusterDeploymentWatchHandler(a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
-	cd := a.Object.(*hivev1.ClusterDeployment)
+	cd := a.(*hivev1.ClusterDeployment)
 	if cd == nil {
 		// Wasn't a clusterdeployment, bail out. This should not happen.
-		r.logger.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a.Object)
+		r.logger.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a)
 		return retval
 	}
 
@@ -132,7 +132,7 @@ func (r *ReconcileRemoteMachineSet) clusterDeploymentWatchHandler(a handler.MapO
 	err := r.List(context.TODO(), pools)
 	if err != nil {
 		// Could not list machine pools
-		r.logger.Errorf("Error listing machine pools. Value: %+v", a.Object)
+		r.logger.Errorf("Error listing machine pools. Value: %+v", a)
 		return retval
 	}
 
@@ -176,7 +176,7 @@ type ReconcileRemoteMachineSet struct {
 
 // Reconcile reads that state of the cluster for a MachinePool object and makes changes to the
 // remote cluster MachineSets based on the state read
-func (r *ReconcileRemoteMachineSet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "machinePool", request.NamespacedName)
 	logger.Info("reconciling machine pool")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

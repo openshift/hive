@@ -100,7 +100,7 @@ type ReconcileMachineManagement struct {
 
 // Reconcile reads settings within ClusterDeployment.Spec.MachineManagement and creates/copies resources necessary for
 // managing machines centrally when requested.
-func (r *ReconcileMachineManagement) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *ReconcileMachineManagement) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)

@@ -1,6 +1,7 @@
 package dnsendpoint
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
 )
 
@@ -20,8 +22,8 @@ const (
 )
 
 type endpointState struct {
-	objectKey client.ObjectKey
-	nsValues  sets.String
+	dnsZone  *hivev1.DNSZone
+	nsValues sets.String
 }
 
 type nameServersMap map[string]endpointState
@@ -35,10 +37,10 @@ type nameServerScraper struct {
 	queue           workqueue.RateLimitingInterface
 	nameServers     rootDomainsMap
 	nameServerQuery nameserver.Query
-	notifyChange    func(client.ObjectKey)
+	notifyChange    func(client.Object)
 }
 
-func newNameServerScraper(logger log.FieldLogger, nameServerQuery nameserver.Query, domains []string, notifyChange func(client.ObjectKey)) *nameServerScraper {
+func newNameServerScraper(logger log.FieldLogger, nameServerQuery nameserver.Query, domains []string, notifyChange func(client.Object)) *nameServerScraper {
 	if len(domains) == 0 {
 		return nil
 	}
@@ -67,7 +69,7 @@ func (s *nameServerScraper) GetEndpoint(domain string) (rootDomain string, nameS
 }
 
 // AddEndpoint adds an endpoint with the specified domain.
-func (s *nameServerScraper) AddEndpoint(objectKey client.ObjectKey, domain string, nameServers sets.String) {
+func (s *nameServerScraper) AddEndpoint(object *hivev1.DNSZone, domain string, nameServers sets.String) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	_, nsMap := s.rootDomainNameServers(domain)
@@ -75,8 +77,8 @@ func (s *nameServerScraper) AddEndpoint(objectKey client.ObjectKey, domain strin
 		return
 	}
 	nsMap[domain] = endpointState{
-		objectKey: objectKey,
-		nsValues:  nameServers,
+		dnsZone:  object,
+		nsValues: nameServers,
 	}
 }
 
@@ -96,7 +98,7 @@ func (s *nameServerScraper) HasBeenScraped(domain string) bool {
 }
 
 // Start starts the name server scraper.
-func (s *nameServerScraper) Start(stop <-chan struct{}) error {
+func (s *nameServerScraper) Start(ctx context.Context) error {
 	defer s.queue.ShutDown()
 	go func() {
 		for {
@@ -123,7 +125,7 @@ func (s *nameServerScraper) Start(stop <-chan struct{}) error {
 			}()
 		}
 	}()
-	<-stop
+	<-ctx.Done()
 	return nil
 }
 
@@ -132,7 +134,7 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 	if err != nil {
 		return errors.Wrap(err, "error querying name servers")
 	}
-	changedEndpoints := []client.ObjectKey{}
+	changedEndpoints := []client.Object{}
 	func() {
 		s.mux.Lock()
 		defer s.mux.Unlock()
@@ -148,7 +150,7 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 		for domain, oldNameServer := range oldNameServers {
 			currentNameServer, ok := currentNameServers[domain]
 			if !ok || !currentNameServer.Equal(oldNameServer.nsValues) {
-				changedEndpoints = append(changedEndpoints, oldNameServer.objectKey)
+				changedEndpoints = append(changedEndpoints, oldNameServer.dnsZone)
 				oldNameServer.nsValues = currentNameServer
 				oldNameServers[domain] = oldNameServer
 			}

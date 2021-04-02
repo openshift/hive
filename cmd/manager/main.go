@@ -27,7 +27,7 @@ import (
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"

@@ -904,7 +904,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				},
 			}
 
-			_, err := rcp.Reconcile(reconcileRequest)
+			_, err := rcp.Reconcile(context.TODO(), reconcileRequest)
 			if test.expectError {
 				assert.Error(t, err, "expected error from reconcile")
 			} else {

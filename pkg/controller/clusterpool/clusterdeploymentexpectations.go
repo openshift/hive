@@ -3,6 +3,7 @@ package clusterpool
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -13,21 +14,19 @@ import (
 )
 
 func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) error {
-	handler := &clusterDeploymentEventHandler{
-		EventHandler: &handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					cpKey := clusterPoolKey(a.Object.(*hivev1.ClusterDeployment))
-					if cpKey == nil {
-						return nil
-					}
-					return []reconcile.Request{{NamespacedName: *cpKey}}
-				},
-			),
-		},
+	h := &clusterDeploymentEventHandler{
+		EventHandler: handler.EnqueueRequestsFromMapFunc(
+			func(a client.Object) []reconcile.Request {
+				cpKey := clusterPoolKey(a.(*hivev1.ClusterDeployment))
+				if cpKey == nil {
+					return nil
+				}
+				return []reconcile.Request{{NamespacedName: *cpKey}}
+			},
+		),
 		reconciler: r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler)
+	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, h)
 }
 
 var _ handler.EventHandler = &clusterDeploymentEventHandler{}

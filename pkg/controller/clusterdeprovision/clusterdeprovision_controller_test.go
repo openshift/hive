@@ -260,7 +260,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				return mocks.mockAWSClient, nil
 			}}}
 
-			_, err := r.Reconcile(reconcile.Request{
+			_, err := r.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testName,
 					Namespace: testNamespace,

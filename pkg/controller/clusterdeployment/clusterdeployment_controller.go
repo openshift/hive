@@ -221,9 +221,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for pods created by an install job
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(selectorPodWatchHandler),
-	})
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(selectorPodWatchHandler))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment pods")
 		return err
@@ -284,7 +282,7 @@ type ReconcileClusterDeployment struct {
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
-func (r *ReconcileClusterDeployment) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
@@ -1853,13 +1851,13 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 	return nil
 }
 
-func selectorPodWatchHandler(a handler.MapObject) []reconcile.Request {
+func selectorPodWatchHandler(a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
-	pod := a.Object.(*corev1.Pod)
+	pod := a.(*corev1.Pod)
 	if pod == nil {
 		// Wasn't a Pod, bail out. This should not happen.
-		log.Errorf("Error converting MapObject.Object to Pod. Value: %+v", a.Object)
+		log.Errorf("Error converting MapObject.Object to Pod. Value: %+v", a)
 		return retval
 	}
 	if pod.Labels == nil {

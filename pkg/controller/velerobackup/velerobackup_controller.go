@@ -57,7 +57,7 @@ var (
 		&hivev1.DNSZone{},
 	}
 
-	hiveNamespaceScopedListTypes = []runtime.Object{
+	hiveNamespaceScopedListTypes = []client.ObjectList{
 		&hivev1.ClusterDeploymentList{},
 		&hivev1.SyncSetList{},
 		&hivev1.DNSZoneList{},
@@ -142,12 +142,14 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 func (r *ReconcileBackup) registerHiveObjectWatches(c controller.Controller) error {
 	for _, t := range hiveNamespaceScopedTypesToWatch {
-		if err := c.Watch(&source.Kind{Type: t.DeepCopyObject()}, &handler.EnqueueRequestsFromMapFunc{
-			// Queue up the NS for this Hive Object
-			ToRequests: handler.ToRequestsFunc(func(a handler.MapObject) []reconcile.Request {
-				return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: a.Meta.GetNamespace()}}}
-			}),
-		}); err != nil {
+		err := c.Watch(&source.Kind{Type: t.DeepCopyObject().(client.Object)}, handler.EnqueueRequestsFromMapFunc(
+			func(mapObj client.Object) []reconcile.Request {
+				// Queue up the NS for this Hive Object
+				return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: mapObj.GetNamespace()}}}
+			},
+		),
+		)
+		if err != nil {
 			return err
 		}
 	}
@@ -168,7 +170,7 @@ type ReconcileBackup struct {
 }
 
 // Reconcile ensures that all Hive object changes have corresponding Velero backup objects.
-func (r *ReconcileBackup) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileBackup) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	nsLogger := controllerutils.BuildControllerLogger(ControllerName, "namespace", request.NamespacedName)
 	nsLogger.Info("reconciling backups and Hive object changes")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, nsLogger)

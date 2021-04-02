@@ -7,7 +7,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,11 +173,11 @@ type Calculator struct {
 }
 
 // Start begins the metrics calculation loop.
-func (mc *Calculator) Start(stopCh <-chan struct{}) error {
+func (mc *Calculator) Start(ctx context.Context) error {
 	log.Info("started metrics calculator goroutine")
 
 	// Run forever, sleep at the end:
-	wait.Until(func() {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		mcLog := log.WithField("controller", "metrics")
 		recobsrv := NewReconcileObserver(ControllerName, mcLog)
 		defer recobsrv.ObserveControllerReconcileTime()
@@ -186,7 +185,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
 		clusterDeployments := &hivev1.ClusterDeploymentList{}
-		err := mc.Client.List(context.Background(), clusterDeployments)
+		err := mc.Client.List(ctx, clusterDeployments)
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
@@ -257,7 +256,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		// install job metrics
 		installJobs := &batchv1.JobList{}
 		installJobLabelSelector := map[string]string{constants.InstallJobLabel: "true"}
-		err = mc.Client.List(context.Background(), installJobs, client.MatchingLabels(installJobLabelSelector))
+		err = mc.Client.List(ctx, installJobs, client.MatchingLabels(installJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing install jobs")
 		} else {
@@ -277,7 +276,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		// uninstall job metrics
 		uninstallJobs := &batchv1.JobList{}
 		uninstallJobLabelSelector := map[string]string{constants.UninstallJobLabel: "true"}
-		err = mc.Client.List(context.Background(), uninstallJobs, client.MatchingLabels(uninstallJobLabelSelector))
+		err = mc.Client.List(ctx, uninstallJobs, client.MatchingLabels(uninstallJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing uninstall jobs")
 		} else {
@@ -297,7 +296,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		// imageset job metrics
 		imagesetJobs := &batchv1.JobList{}
 		imagesetJobLabelSelector := map[string]string{imageset.ImagesetJobLabel: "true"}
-		err = mc.Client.List(context.Background(), imagesetJobs, client.MatchingLabels(imagesetJobLabelSelector))
+		err = mc.Client.List(ctx, imagesetJobs, client.MatchingLabels(imagesetJobLabelSelector))
 		if err != nil {
 			log.WithError(err).Error("error listing imageset jobs")
 		} else {
@@ -314,7 +313,7 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 		}
 
 		mc.calculateSelectorSyncSetMetrics(mcLog)
-	}, mc.Interval, stopCh)
+	}, mc.Interval)
 
 	return nil
 }

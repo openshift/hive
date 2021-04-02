@@ -100,7 +100,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				Namespace: testNamespace,
 			}
 
-			_, err := rcd.Reconcile(reconcile.Request{NamespacedName: namespacedName})
+			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespacedName})
 
 			if test.validate != nil {
 				cd := &hivev1.ClusterDeployment{}

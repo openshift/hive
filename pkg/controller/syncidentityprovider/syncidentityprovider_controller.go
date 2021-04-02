@@ -80,17 +80,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	reconciler := r.(*ReconcileSyncIdentityProviders)
 
 	// Watch for changes to SyncIdentityProvider
-	err = c.Watch(&source.Kind{Type: &hivev1.SyncIdentityProvider{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(reconciler.syncIdentityProviderWatchHandler),
-	})
+	err = c.Watch(&source.Kind{Type: &hivev1.SyncIdentityProvider{}},
+		handler.EnqueueRequestsFromMapFunc(reconciler.syncIdentityProviderWatchHandler))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to SelectorSyncIdentityProvider
-	err = c.Watch(&source.Kind{Type: &hivev1.SelectorSyncIdentityProvider{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(reconciler.selectorSyncIdentityProviderWatchHandler),
-	})
+	err = c.Watch(&source.Kind{Type: &hivev1.SelectorSyncIdentityProvider{}},
+		handler.EnqueueRequestsFromMapFunc(reconciler.selectorSyncIdentityProviderWatchHandler))
 	if err != nil {
 		return err
 	}
@@ -100,13 +98,13 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	return err
 }
 
-func (r *ReconcileSyncIdentityProviders) syncIdentityProviderWatchHandler(a handler.MapObject) []reconcile.Request {
+func (r *ReconcileSyncIdentityProviders) syncIdentityProviderWatchHandler(a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
-	syncIDP := a.Object.(*hivev1.SyncIdentityProvider)
+	syncIDP := a.(*hivev1.SyncIdentityProvider)
 	if syncIDP == nil {
 		// Wasn't a SyncIdentityProvider, bail out. This should not happen.
-		r.logger.Errorf("Error converting MapObject.Object to SyncIdentityProvider. Value: %+v", a.Object)
+		r.logger.Errorf("Error converting MapObject.Object to SyncIdentityProvider. Value: %+v", a)
 		return retval
 	}
 
@@ -120,13 +118,13 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviderWatchHandler(a hand
 	return retval
 }
 
-func (r *ReconcileSyncIdentityProviders) selectorSyncIdentityProviderWatchHandler(a handler.MapObject) []reconcile.Request {
+func (r *ReconcileSyncIdentityProviders) selectorSyncIdentityProviderWatchHandler(a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
-	ssidp := a.Object.(*hivev1.SelectorSyncIdentityProvider)
+	ssidp := a.(*hivev1.SelectorSyncIdentityProvider)
 	if ssidp == nil {
 		// Wasn't a SelectorSyncIdentityProvider, bail out. This should not happen.
-		r.logger.Errorf("Error converting MapObject.Object to SelectorSyncIdentityProvider. Value: %+v", a.Object)
+		r.logger.Errorf("Error converting MapObject.Object to SelectorSyncIdentityProvider. Value: %+v", a)
 		return retval
 	}
 
@@ -174,7 +172,7 @@ type identityProviderPatchSpec struct {
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes to the
 // remote cluster MachineSets based on the state read and the worker machines defined in
 // ClusterDeployment.Spec.Config.Machines
-func (r *ReconcileSyncIdentityProviders) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileSyncIdentityProviders) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	contextLogger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	contextLogger.Info("reconciling syncidentityproviders and clusterdeployments")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, contextLogger)

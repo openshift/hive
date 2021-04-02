@@ -1233,7 +1233,7 @@ func uploadAdminPassword(provision *hivev1.ClusterProvision, m *InstallManager) 
 	return s, nil
 }
 
-func createWithRetries(obj runtime.Object, m *InstallManager) error {
+func createWithRetries(obj client.Object, m *InstallManager) error {
 	logger := m.log.WithField("kind", obj.GetObjectKind().GroupVersionKind().Kind)
 
 	metaObj, err := meta.Accessor(obj)
@@ -1309,7 +1309,7 @@ func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallMana
 	if err != nil {
 		return errors.Wrap(err, "could not get the GVK for clusterprovisions")
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, config, scheme.Codecs)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, scheme.Codecs)
 	if err != nil {
 		return errors.Wrap(err, "could not create REST client")
 	}

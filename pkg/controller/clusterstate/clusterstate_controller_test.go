@@ -178,7 +178,7 @@ func TestClusterStateReconcile(t *testing.T) {
 				},
 			}
 
-			result, err := rcd.Reconcile(reconcile.Request{
+			result, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testName,
 					Namespace: testNamespace,

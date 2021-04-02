@@ -121,9 +121,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 	}
 
 	// Watch for changes to ClusterDeployment
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(clusterDeploymentWatchHandler),
-	}); err != nil {
+	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(clusterDeploymentWatchHandler)); err != nil {
 		return errors.Wrap(err, "could not watch clusterdeployments")
 	}
 
@@ -143,7 +141,7 @@ type ReconcileClusterProvision struct {
 
 // Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read
 // and what is in the ClusterProvision.Spec
-func (r *ReconcileClusterProvision) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	pLog := controllerutils.BuildControllerLogger(ControllerName, "clusterProvision", request.NamespacedName)
 	pLog.Info("reconciling cluster provision")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, pLog)
@@ -504,11 +502,11 @@ func (r *ReconcileClusterProvision) existingJobs(provision *hivev1.ClusterProvis
 	return jobs, nil
 }
 
-func clusterDeploymentWatchHandler(a handler.MapObject) []reconcile.Request {
-	cd := a.Object.(*hivev1.ClusterDeployment)
+func clusterDeploymentWatchHandler(a client.Object) []reconcile.Request {
+	cd := a.(*hivev1.ClusterDeployment)
 	if cd == nil {
 		// Wasn't a ClusterDeployment, bail out. This should not happen.
-		log.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a.Object)
+		log.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a)
 		return nil
 	}
 

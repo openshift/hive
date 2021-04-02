@@ -33,28 +33,28 @@ type loggingEventHandler struct {
 
 // Create implements handler.EventHandler
 func (h *loggingEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
-	logger := h.loggerForEvent("create", e.Meta)
+	logger := h.loggerForEvent("create", e.Object)
 	logger.Debug("Handling event")
 	h.eventHandler.Create(e, wrapQueueWithLogging(q, logger))
 }
 
 // Delete implements handler.EventHandler
 func (h *loggingEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	logger := h.loggerForEvent("delete", e.Meta)
+	logger := h.loggerForEvent("delete", e.Object)
 	logger.Debug("Handling event")
 	h.eventHandler.Delete(e, wrapQueueWithLogging(q, logger))
 }
 
 // Update implements handler.EventHandler
 func (h *loggingEventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	logger := h.loggerForEvent("update", e.MetaNew)
+	logger := h.loggerForEvent("update", e.ObjectNew)
 	logger.Debug("Handling event")
 	h.eventHandler.Update(e, wrapQueueWithLogging(q, logger))
 }
 
 // Generic implements handler.EventHandler
 func (h *loggingEventHandler) Generic(e event.GenericEvent, q workqueue.RateLimitingInterface) {
-	logger := h.loggerForEvent("generic", e.Meta)
+	logger := h.loggerForEvent("generic", e.Object)
 	logger.Debug("Handling event")
 	h.eventHandler.Generic(e, wrapQueueWithLogging(q, logger))
 }

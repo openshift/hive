@@ -96,22 +96,20 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	}
 
 	// Watch for changes to ClusterClaims
-	enqueuePoolForClaim := &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(
-			func(o handler.MapObject) []reconcile.Request {
-				claim, ok := o.Object.(*hivev1.ClusterClaim)
-				if !ok {
-					return nil
-				}
-				return []reconcile.Request{{
-					NamespacedName: types.NamespacedName{
-						Namespace: claim.Namespace,
-						Name:      claim.Spec.ClusterPoolName,
-					},
-				}}
-			},
-		),
-	}
+	enqueuePoolForClaim := handler.EnqueueRequestsFromMapFunc(
+		func(o client.Object) []reconcile.Request {
+			claim, ok := o.(*hivev1.ClusterClaim)
+			if !ok {
+				return nil
+			}
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Namespace: claim.Namespace,
+					Name:      claim.Spec.ClusterPoolName,
+				},
+			}}
+		},
+	)
 	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, enqueuePoolForClaim); err != nil {
 		return err
 	}
@@ -119,9 +117,8 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	// Watch for changes to the hive cluster pool admin RoleBindings
 	if err := c.Watch(
 		&source.Kind{Type: &rbacv1.RoleBinding{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: requestsForRBACResources(r.Client, r.logger),
-		},
+		handler.EnqueueRequestsFromMapFunc(
+			requestsForRBACResources(r.Client, r.logger)),
 	); err != nil {
 		return err
 	}
@@ -129,9 +126,8 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	// Watch for changes to the hive-cluster-pool-admin-binding RoleBinding
 	if err := c.Watch(
 		&source.Kind{Type: &rbacv1.RoleBinding{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger),
-		},
+		handler.EnqueueRequestsFromMapFunc(
+			requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger)),
 	); err != nil {
 		return err
 	}
@@ -139,12 +135,12 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	return nil
 }
 
-func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.ToRequestsFunc {
-	return func(o handler.MapObject) []reconcile.Request {
-		if o.Meta.GetName() != resourceName {
+func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
+	return func(o client.Object) []reconcile.Request {
+		if o.GetName() != resourceName {
 			return nil
 		}
-		clusterName := o.Meta.GetNamespace()
+		clusterName := o.GetNamespace()
 		cd := &hivev1.ClusterDeployment{}
 		if err := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to get ClusterDeployment for RBAC resource")
@@ -158,9 +154,9 @@ func requestsForCDRBACResources(c client.Client, resourceName string, logger log
 	}
 }
 
-func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.ToRequestsFunc {
-	return func(o handler.MapObject) []reconcile.Request {
-		binding, ok := o.Object.(*rbacv1.RoleBinding)
+func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
+	return func(o client.Object) []reconcile.Request {
+		binding, ok := o.(*rbacv1.RoleBinding)
 		if !ok {
 			return nil
 		}
@@ -169,7 +165,7 @@ func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.T
 		}
 
 		cpList := &hivev1.ClusterPoolList{}
-		if err := c.List(context.Background(), cpList, client.InNamespace(o.Meta.GetNamespace())); err != nil {
+		if err := c.List(context.Background(), cpList, client.InNamespace(o.GetNamespace())); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to list cluster pools for RBAC resource")
 			return nil
 		}
@@ -198,7 +194,7 @@ type ReconcileClusterPool struct {
 
 // Reconcile reads the state of the ClusterPool, checks if we currently have enough ClusterDeployments waiting, and
 // attempts to reach the desired state if not.
-func (r *ReconcileClusterPool) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterPool", request.NamespacedName)
 	logger.Infof("reconciling cluster pool")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
@@ -581,7 +577,7 @@ func (r *ReconcileClusterPool) createCluster(
 	}
 	// Create the resources.
 	for _, obj := range objs {
-		if err := r.Client.Create(context.Background(), obj); err != nil {
+		if err := r.Client.Create(context.Background(), obj.(client.Object)); err != nil {
 			r.expectations.CreationObserved(poolKey)
 			return err
 		}

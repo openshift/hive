@@ -212,7 +212,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 				logger: logger,
 			}
 			namespaceKey := client.ObjectKey{Name: namespaceName}
-			result, err := reconciler.Reconcile(reconcile.Request{NamespacedName: namespaceKey})
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespaceKey})
 			endTime := time.Now()
 			require.NoError(t, err, "unexpected error during reconcile")
 

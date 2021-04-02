@@ -129,7 +129,7 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 }
 
 // Reconcile syncs a single ClusterDeployment
-func (r *hibernationReconciler) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)

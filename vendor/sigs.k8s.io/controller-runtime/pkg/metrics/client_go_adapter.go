@@ -47,7 +47,6 @@ const (
 
 var (
 	// client metrics
-
 	requestResult = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Subsystem: RestClientSubsystem,
 		Name:      ResultKey,

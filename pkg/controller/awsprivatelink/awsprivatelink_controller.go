@@ -143,7 +143,7 @@ type ReconcileAWSPrivateLink struct {
 type awsClientFn func(client.Client, awsclient.Options) (awsclient.Client, error)
 
 // Reconcile reconciles PrivateLink for ClusterDeployment.
-func (r *ReconcileAWSPrivateLink) Reconcile(request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	logger.Debug("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)

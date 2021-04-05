@@ -10,24 +10,6 @@ parameters:
   value: staging
 - name: IMAGE_TAG
   value: latest
-- name: ADDITIONAL_CERTIFICATE_AUTHORITY
-  value: letsencrypt-ca
-- name: GLOBAL_PULL_SECRET
-  value: ""
-- name: MANAGED_DOMAINS
-  value: "[]"
-- name: DISABLED_CONTROLLERS
-  value: "[]"
-- name: DELETE_PROTECTION
-  value: ""
-- name: BACKUP_VELERO_ENABLED
-  value: "false"
-- name: BACKUP_VELERO_NAMESPACE
-  value: openshift-velero
-- name: FAILED_PROVISION_CONFIG
-  value: "{}"
-- name: CONTROLLERS_CONFIG
-  value: "{}"
 
 objects:
 - apiVersion: operators.coreos.com/v1alpha1
@@ -57,23 +39,3 @@ objects:
     name: hive-operator
     source: hive-catalog
     sourceNamespace: hive
-
-- apiVersion: hive.openshift.io/v1
-  kind: HiveConfig
-  metadata:
-    name: hive
-  spec:
-    additionalCertificateAuthoritiesSecretRef:
-    - name: ${ADDITIONAL_CERTIFICATE_AUTHORITY}
-    managedDomains: "${{MANAGED_DOMAINS}}"
-    disabledControllers: "${{DISABLED_CONTROLLERS}}"
-    globalPullSecretRef:
-      name: ${GLOBAL_PULL_SECRET}
-    deleteProtection: ${DELETE_PROTECTION}
-    backup:
-      velero:
-        enabled: "${{BACKUP_VELERO_ENABLED}}"
-        namespace: ${BACKUP_VELERO_NAMESPACE}
-    failedProvisionConfig: "${{FAILED_PROVISION_CONFIG}}"
-    controllersConfig: "${{CONTROLLERS_CONFIG}}"
-

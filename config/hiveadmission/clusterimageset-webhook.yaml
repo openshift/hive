@@ -22,3 +22,4 @@ webhooks:
     resources:
     - clusterimagesets
   failurePolicy: Fail
+  sideEffects: None

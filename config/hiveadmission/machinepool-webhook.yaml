@@ -22,3 +22,4 @@ webhooks:
     resources:
     - machinepools
   failurePolicy: Fail
+  sideEffects: None

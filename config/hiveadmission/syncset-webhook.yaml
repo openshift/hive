@@ -22,3 +22,4 @@ webhooks:
     resources:
     - syncsets
   failurePolicy: Fail
+  sideEffects: None

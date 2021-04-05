@@ -2,6 +2,7 @@ package machinemanagement
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -38,7 +39,6 @@ const (
 	testClusterID         = "testFooClusterUUID"
 	testInfraID           = "testFooInfraID"
 	testNamespace         = "default"
-	pullSecretSecret      = "pull-secret"
 	adminKubeconfigSecret = "foo-lqmsh-admin-kubeconfig"
 	adminKubeconfig       = `clusters:
 - cluster:
@@ -53,6 +53,10 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+
+	pullSecretSecret = "pull-secret"
+	credsSecret      = "aws-credentials"
+	targetNamespace  = "foo-lqmsh-targetns-vxx6f"
 
 	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"
@@ -114,7 +118,7 @@ func TestMachineManagementReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, "aws-credentials", corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
@@ -136,21 +140,47 @@ func TestMachineManagementReconcile(t *testing.T) {
 					cd := testDeletedClusterDeployment()
 					cd.Spec.MachineManagement = &hivev1.MachineManagement{
 						Central:         &hivev1.CentralMachineManagement{},
-						TargetNamespace: "foo-lqmsh-targetns-vxx6f",
+						TargetNamespace: targetNamespace,
 					}
 					controllerutil.AddFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, "aws-credentials", corev1.DockerConfigJsonKey, "{}"),
-				testNs("foo-lqmsh-targetns-vxx6f"),
+				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
+				testNs(targetNamespace),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assert.True(t, !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace))
 				ns := getTargetNS(c, cd)
 				assert.Nil(t, ns)
+			},
+		},
+		{
+			name: "Changes to secret in cd namespace are synced to target namespace",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.MachineManagement = &hivev1.MachineManagement{
+						Central:         &hivev1.CentralMachineManagement{},
+						TargetNamespace: targetNamespace,
+					}
+					return cd
+				}(),
+				testNs(targetNamespace),
+				testSecretWithNamespace(corev1.SecretTypeOpaque, credsSecret, targetNamespace, "username", "test"),
+				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, pullSecretSecret, targetNamespace, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{\"update\": \"updated\"}"),
+				testSecret(corev1.SecretTypeOpaque, credsSecret, "username", "updated"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				secretNames := []string{pullSecretSecret, credsSecret}
+				for _, secretName := range secretNames {
+					cdSecret := getSecret(c, secretName, testNamespace)
+					targetSecret := getSecret(c, secretName, targetNamespace)
+					assert.True(t, reflect.DeepEqual(cdSecret.Data, targetSecret.Data))
+				}
 			},
 		},
 	}

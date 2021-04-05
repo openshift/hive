@@ -73,6 +73,8 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+	credsSecret         = "foo-aws-creds"
+	sshKeySecret        = "foo-ssh-key"
 
 	remoteClusterRouteObjectName      = "console"
 	remoteClusterRouteObjectNamespace = "openshift-console"

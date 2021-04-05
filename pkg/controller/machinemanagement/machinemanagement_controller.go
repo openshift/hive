@@ -3,6 +3,7 @@ package machinemanagement
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -32,8 +33,10 @@ import (
 	k8sannotations "github.com/openshift/hive/pkg/util/annotations"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+)
 
 const (
 	ControllerName = hivev1.MachineManagementControllerName
@@ -79,6 +82,51 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment")
+		return err
+	}
+
+	err = mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{}, "spec.secrets.secretName", func(o client.Object) []string {
+		var res []string
+		cd := o.(*hivev1.ClusterDeployment)
+		if utils.CredentialsSecretName(cd) != "" {
+			res = append(res, utils.CredentialsSecretName(cd))
+		}
+		if cd.Spec.PullSecretRef != nil {
+			res = append(res, cd.Spec.PullSecretRef.Name)
+		}
+		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+			res = append(res, cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name)
+		}
+		return res
+	})
+	if err != nil {
+		log.WithField("controller", ControllerName).WithError(err).Error("Error indexing cluster deployment secrets")
+		return err
+	}
+
+	// Watch for changes to Secret referenced by cluster deployment
+	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		retval := []reconcile.Request{}
+
+		secret, ok := a.(*corev1.Secret)
+		if !ok {
+			// Wasn't a Secret, bail out. This should not happen.
+			log.Errorf("Error converting MapObject.Object to Secret. Value: %+v", a)
+			return retval
+		}
+
+		cdsWithSecrets := &hivev1.ClusterDeploymentList{}
+		_ = mgr.GetClient().List(context.Background(), cdsWithSecrets, client.MatchingFields{"spec.secrets.secretName": secret.Name}, client.InNamespace(secret.Namespace))
+		for _, cd := range cdsWithSecrets.Items {
+			retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+				Name:      cd.Name,
+				Namespace: cd.Namespace,
+			}})
+		}
+		return retval
+	}))
+	if err != nil {
+		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment secrets")
 		return err
 	}
 
@@ -176,57 +224,66 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
-		// TODO: Secrets should be kept in sync with secrets in the cluster deployment namespace.
-		credentialsSecretName := utils.CredentialsSecretName(cd)
-		if credentialsSecretName != "" {
-			credentialsSecret := &corev1.Secret{}
-			if err := r.Get(context.Background(), types.NamespacedName{Name: credentialsSecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, credentialsSecret); err != nil && apierrors.IsNotFound(err) {
-				cdLog.Infof("Creating credentials secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
-				err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: credentialsSecretName}, credentialsSecret)
-				if err != nil {
-					return reconcile.Result{}, fmt.Errorf("failed to get provider creds %s: %w", credentialsSecretName, err)
-				}
-				credentialsSecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
-				credentialsSecret.ResourceVersion = ""
-				if err := r.Create(context.TODO(), credentialsSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-					return reconcile.Result{}, fmt.Errorf("failed to create provider creds secret: %v", err)
-				}
-			}
+		// Sync credentials secret to targetNamespace
+		if err := r.createOrUpdateSecretInTargetNamespace(utils.CredentialsSecretName(cd), cd, cdLog); err != nil {
+			return reconcile.Result{}, err
 		}
 
-		pullSecretName := cd.Spec.PullSecretRef.Name
-		pullSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: pullSecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, pullSecret); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Infof("Creating pull secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
-			err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: pullSecretName}, pullSecret)
-			if err != nil {
-				return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", pullSecretName, err)
-			}
-			pullSecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
-			pullSecret.ResourceVersion = ""
-			if err := r.Create(context.TODO(), pullSecret); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create pull secret: %v", err)
-			}
+		// Sync pull secret to targetNamespace
+		if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.PullSecretRef.Name, cd, cdLog); err != nil {
+			return reconcile.Result{}, err
 		}
 
+		// Sync SSH key secret to targetNamespace
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
-			SSHKeySecretName := cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name
-			SSHKeySecret := &corev1.Secret{}
-			if err := r.Get(context.Background(), types.NamespacedName{Name: SSHKeySecretName, Namespace: cd.Spec.MachineManagement.TargetNamespace}, SSHKeySecret); err != nil && apierrors.IsNotFound(err) {
-				cdLog.Infof("Creating ssh key secret in the target namespace %s", cd.Spec.MachineManagement.TargetNamespace)
-				err = r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: SSHKeySecretName}, SSHKeySecret)
-				if err != nil {
-					return reconcile.Result{}, fmt.Errorf("failed to get pull secret %s: %w", SSHKeySecretName, err)
-				}
-				SSHKeySecret.Namespace = cd.Spec.MachineManagement.TargetNamespace
-				SSHKeySecret.ResourceVersion = ""
-				if err := r.Create(context.TODO(), SSHKeySecret); err != nil && !apierrors.IsAlreadyExists(err) {
-					return reconcile.Result{}, fmt.Errorf("failed to create ssh key secret: %v", err)
-				}
+			if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name, cd, cdLog); err != nil {
+				return reconcile.Result{}, err
 			}
 		}
 	}
 	return reconcile.Result{}, nil
+}
+
+// createOrUpdateSecretInTargetNamespace
+func (r *ReconcileMachineManagement) createOrUpdateSecretInTargetNamespace(secretName string, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	targetNamespace := cd.Spec.MachineManagement.TargetNamespace
+	secret := &corev1.Secret{}
+	err := r.Get(context.Background(), types.NamespacedName{Name: secretName, Namespace: targetNamespace}, secret)
+	// Create secret in targetNamespace
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			cdLog.Infof("Creating secret %s in the target namespace %s", secretName, targetNamespace)
+			if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret); err != nil {
+				return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+			}
+			secret.Namespace = targetNamespace
+			secret.ResourceVersion = ""
+			if err := r.Create(context.TODO(), secret); err != nil {
+				return fmt.Errorf("failed to create secret in target namespace: %v", err)
+			}
+			return nil
+		}
+		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+
+	origSecret := &corev1.Secret{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: secretName, Namespace: cd.Namespace}, origSecret)
+	if err != nil {
+		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+	if reflect.DeepEqual(origSecret.Data, secret.Data) {
+		return nil
+	}
+
+	// Update secret in targetNamespace
+	cdLog.Infof("Updating secret %s in the target namespace %s", secretName, targetNamespace)
+	secret.Data = origSecret.Data
+	err = r.Update(context.Background(), secret)
+	if err != nil {
+		return fmt.Errorf("failed to update secret %s: %w", secretName, err)
+	}
+
+	return nil
 }
 
 // addAnnotationToTargetNamespace adds annotation to cluster deployment

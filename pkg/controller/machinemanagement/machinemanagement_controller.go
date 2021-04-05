@@ -101,14 +101,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error indexing cluster deployment secrets")
+		return err
 	}
 
 	// Watch for changes to Secret referenced by cluster deployment
 	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
 		retval := []reconcile.Request{}
 
-		secret := a.(*corev1.Secret)
-		if secret == nil {
+		secret, ok := a.(*corev1.Secret)
+		if !ok {
 			// Wasn't a Secret, bail out. This should not happen.
 			log.Errorf("Error converting MapObject.Object to Secret. Value: %+v", a)
 			return retval
@@ -252,13 +253,12 @@ func (r *ReconcileMachineManagement) createOrUpdateSecretInTargetNamespace(secre
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			cdLog.Infof("Creating secret %s in the target namespace %s", secretName, targetNamespace)
-			err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret)
-			if err != nil {
+			if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret); err != nil {
 				return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 			}
 			secret.Namespace = targetNamespace
 			secret.ResourceVersion = ""
-			if err := r.Create(context.TODO(), secret); err != nil && !apierrors.IsAlreadyExists(err) {
+			if err := r.Create(context.TODO(), secret); err != nil {
 				return fmt.Errorf("failed to create secret in target namespace: %v", err)
 			}
 			return nil
@@ -312,11 +312,4 @@ func (r *ReconcileMachineManagement) addAnnotationToTargetNamespace(cd *hivev1.C
 	}
 
 	return nil
-}
-
-// initializeAnnotations() initializes the annotations if it is not already
-func initializeAnnotations(cd *hivev1.ClusterDeployment) {
-	if cd.Annotations == nil {
-		cd.Annotations = map[string]string{}
-	}
 }

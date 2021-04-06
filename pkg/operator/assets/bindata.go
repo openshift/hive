@@ -277,6 +277,7 @@ webhooks:
     resources:
     - clusterdeployments
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionClusterdeploymentWebhookYamlBytes() ([]byte, error) {
@@ -318,6 +319,7 @@ webhooks:
     resources:
     - clusterimagesets
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionClusterimagesetWebhookYamlBytes() ([]byte, error) {
@@ -359,6 +361,7 @@ webhooks:
     resources:
     - clusterprovisions
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionClusterprovisionWebhookYamlBytes() ([]byte, error) {
@@ -476,6 +479,7 @@ webhooks:
     resources:
     - dnszones
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionDnszonesWebhookYamlBytes() ([]byte, error) {
@@ -609,6 +613,7 @@ webhooks:
     resources:
     - machinepools
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionMachinepoolWebhookYamlBytes() ([]byte, error) {
@@ -650,6 +655,7 @@ webhooks:
     resources:
     - selectorsyncsets
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionSelectorsyncsetWebhookYamlBytes() ([]byte, error) {
@@ -746,6 +752,7 @@ webhooks:
     resources:
     - syncsets
   failurePolicy: Fail
+  sideEffects: None
 `)
 
 func configHiveadmissionSyncsetWebhookYamlBytes() ([]byte, error) {

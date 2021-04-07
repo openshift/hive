@@ -72,7 +72,11 @@ Get the sources from GitHub:
 git clone https://github.com/openshift/hive.git
 ```
 
-## Deploying with Kubernetes In Docker (kind)
+## Obtaining a Cluster
+
+A Kubernetes or OpenShift cluster is required to run Hive from source. If you would prefer to work locally, it is possible to use kind.
+
+### Creating a Kubernetes In Docker (kind) Cluster
 
 [Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. Currently, we support 0.8.1 version of Kind. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
 
@@ -111,15 +115,11 @@ go install github.com/cloudflare/cfssl/cmd/cfssljson
 go install github.com/cloudflare/cfssl/cmd/cfssl
 ```
 
-You can now build your local Hive source as a container, push to the local registry, and deploy Hive. Because we are not running on OpenShift we must also create a secret with certificates for the hiveadmission webhooks.
+You can now build your local Hive source as a container and push to the local registry using the build instructions below and:
 
 ```bash
-IMG=localhost:5000/hive:latest make docker-dev-push
-DEPLOY_IMAGE=localhost:5000/hive:latest make deploy
-./hack/hiveadmission-dev-cert.sh
+export IMG=localhost:5000/hive:latest
 ```
-
-Hive should now be running.
 
 You can leave your registry container running indefinitely. The kind cluster can be replaced quickly as necessary:
 
@@ -128,99 +128,71 @@ kind delete cluster --name hive
 ./hack/create-kind-cluster.sh hive
 ```
 
-## Deploying with kind and Podman (EXPERIMENTAL)
+## Deploying from Source
 
-The process for running kind with Podman is similar to the Docker environment with some key differences. You will of course need Podman installed and Buildah as well. Last tested with kind v0.9.0.
+### Full Container Build
 
-Create the kind cluster and deploy a local container registry.
+The most resilient method of deploying Hive is to build and publish a container from scratch, and deploy manifests to the cluster currently referenced by your kubeconfig.
 
-```bash
-./hack/create-kind-podman-cluster.sh hive
-```
-
-This will start up a kind cluster and a container registry under the root user (running rootless does not currently work). You should now have a kubeconfig in ~/.kube/hive.kube that can be used to interact with the kind cluster.
-
-You should now see a kind cluster and a container registry running under Podman under root.
+This method is quite slow, but reliable.
 
 ```bash
-$ sudo podman ps -a
-CONTAINER ID  IMAGE                                                                                           COMMAND               CREATED     STATUS         PORTS                      NAMES
-7a7ef66cdc70  docker.io/kindest/node@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600                        3 days ago  Up 3 days ago  127.0.0.1:38191->6443/tcp  hive-control-plane
-148e174d9634  docker.io/library/registry:2                                                                    /etc/docker/regis...  3 days ago  Up 3 days ago  0.0.0.0:5000->5000/tcp     kind-podman-registry
+export IMG="quay.io/{username}/hive:latest}"
+make image-hive docker-push deploy
+oc delete pods -n hive --all
 ```
 
-Build hive and push to the local container registry.
+NOTE: If you are running on Kubernetes or kind, (not OpenShift), you will also need to create certificates for hiveadmission after running make deploy for the first time:
 
 ```bash
-IMG=localhost:5000/hive:latest make buildah-dev-push
+./hack/hiveadmission-dev-cert.sh
 ```
 
-Reference the docs above for running kind with Docker to see how to install `cfssl`, how to deploy with `make deploy`, and how to sign certifcates for the admission webhooks.
+### Fedora Development Container Build
 
-To bring down the kind cluster:
+This approach is much faster than a full container build as it uses a base OS image, and binaries compiled on your host OS and then added to the container. *At present this is best suited for Fedora 33+.*
+
+The base image only needs to be built once locally, though you may wish to periodically update it:
 
 ```bash
-$ sudo KIND_EXPERIMENTAL_PROVIER="podman" kind delete cluster --name hive
+make image-hive-fedora-dev-base
 ```
 
-You can stop/rm the container registry as you would any podman container (eg `sudo podman stop CONTAINER-ID`).
-
-
-## Adopting ClusterDeployments
-
-It is possible to adopt cluster deployments into Hive, potentially even fake or kind clusters. This can be useful for developers who would like to work on functionality separate from actual provisioning.
-
-To create a kind cluster and adopt:
+You can now build the development image with the hiveutil binaries from your local system:
 
 ```bash
-./hack/create-kind-cluster.sh cluster1
-bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
+export IMG="quay.io/{username}/hive:latest}"
+make build image-hive-fedora-dev docker-push deploy
+oc delete pods -n hive --all
 ```
 
-NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)
+NOTE: If you are running on Kubernetes or kind, (not OpenShift), you will also need to create certificates for hiveadmission after running make deploy for the first time:
 
-Alternatively you can use any valid kubeconfig for live or since deleted clusters.
+```bash
+./hack/hiveadmission-dev-cert.sh
+```
 
-Deprovision will run but find nothing to delete if no resources are tagged with your fake infrastructure ID.
-
-
-## Writing/Testing Code
+### Running Code Locally
 
 Our typical approach to manually testing code is to deploy Hive into your current cluster as defined by kubeconfig, scale down the relevant component you wish to test, and then run its code locally.
+It is also possible to run the controllers locally on the host OS using your current kubeconfig context. To do this you would deploy normally per above, scale down the appropriate Deployment for the component you wish to work on, and then run the code locally.
 
-### Run Hive Operator
+TODO: this section needs updating for breakout of clustersync controllers, and various configurations required for controllers.
 
-You can run the Hive operator using your source code using any one method from below
-
-#### Directly from source
-
-NOTE: assumes you have [previously deployed Hive](install.md)
+#### hive-operator
 
 ```bash
 oc scale -n hive deployment.v1.apps/hive-operator --replicas=0
 make run-operator
 ```
 
-#### Run Hive Operator Using Custom Images
-
- 1. Build a custom Hive image from your current working dir: `$ IMG=quay.io/{username}/hive:latest make image-hive`
- 1. Publish your custom image: `$ IMG=quay.io/{username}/hive:latest make buildah-push`
- 1. Deploy with your custom image: `$ DEPLOY_IMAGE=quay.io/{username}/hive:latest make deploy`
- 1. After code changes you need to rebuild the Hive images as mentioned in step 1.
- 1. Delete the running Hive pods using following command, so that the new pods will be running using the latest images built in the previous step.
-
-```bash
-oc delete pods --all -n hive
-```
-
-### Run Hive Controllers From Source
-
-NOTE: assumes you have [previously deployed Hive](install.md)
+### hive-controllers
 
 ```bash
 oc scale -n hive deployment.v1.apps/hive-controllers --replicas=0
 HIVE_NS="hive" make run
 ```
+
 Kind users should also specify `HIVE_IMAGE="localhost:5000/hive:latest"` as the default image location cannot be authenticated to from Kind clusters, resulting in inability to launch install pods.
 
 ## Developing Hiveutil Install Manager
@@ -234,6 +206,12 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
  3. Compile your hiveutil changes: `$ make build`
  4. Set your pull secret as an env var to match the pod: `$ export PULL_SECRET=$(cat ~/pull-secret)`
  5. Run: `/bin/hiveutil install-manager --work-dir $GOPATH/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
+
+## Build OLM Bundle
+
+While a community Hive operator bundle is now published weekly to OperatorHub (see above), in rare cases developers may want to build a bundle from source.  You can run or work off the test script below to generate a ClusterServiceVersion, OLM bundle+package, registry image, catalog source, and subscription. (WARNING: this is seldom used and may not always be working)
+
+`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry" DEPLOY_IMG="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
 
 ## Enable Debug Logging In Hive Controllers
 
@@ -282,7 +260,25 @@ create a cluster that uses the certificate.
 NOTE: The cluster name and domain used to create the certificate must match the name and base domain of the cluster you create.
 
 Example:
-`hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key` 
+`hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key`
+
+## Adopting ClusterDeployments
+
+It is possible to adopt cluster deployments into Hive, potentially even fake or kind clusters. This can be useful for developers who would like to work on functionality separate from actual provisioning.
+
+To create a kind cluster and adopt:
+
+```bash
+./hack/create-kind-cluster.sh cluster1
+bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
+```
+
+NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)
+
+Alternatively you can use any valid kubeconfig for live or since deleted clusters.
+
+Deprovision will run but find nothing to delete if no resources are tagged with your fake infrastructure ID.
+
 
 ## Code editors and multi-module repositories
 

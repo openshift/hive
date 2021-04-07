@@ -383,6 +383,9 @@ func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.Clus
 func (r *ReconcileClusterProvision) reconcileFailedJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
 	pLog.Info("install job failed")
 	reason, message := r.parseInstallLog(instance.Spec.InstallLog, pLog)
+	if controllerutils.IsDeadlineExceeded(job) && reason == unknownReason {
+		reason, message = "AttemptDeadlineExceeded", "Install job failed due to deadline being exceeded for the attempt"
+	}
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	if err == nil {
 		// Increment a counter metric for this cluster type and error reason:

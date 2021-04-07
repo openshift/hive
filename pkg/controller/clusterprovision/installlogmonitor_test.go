@@ -33,15 +33,17 @@ const (
 	vpcLimitExceeded        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating VPC: VpcLimitExceeded: The maximum number of VPCs has been reached.\""
 	genericLimitExceeded    = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating Generic: GenericLimitExceeded: The maximum number of Generics has been reached.\""
 	invalidCredentials      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: error waiting for Route53 Hosted Zone (Z1009177L956IM4ANFHL) creation: InvalidClientTokenId: The security token included in the request is invalid.\""
+	noMatchLog              = "an example of something that doesn't match the log regexes"
 )
 
 func TestParseInstallLog(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
-		name           string
-		log            *string
-		existing       []runtime.Object
-		expectedReason string
+		name            string
+		log             *string
+		existing        []runtime.Object
+		expectedReason  string
+		expectedMessage *string
 	}{
 		{
 			name:           "DNS already exists",
@@ -171,6 +173,13 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: unknownReason,
 		},
 		{
+			name:            "no matching log",
+			log:             pointer.StringPtr(noMatchLog),
+			existing:        []runtime.Object{buildRegexConfigMap()},
+			expectedReason:  unknownReason,
+			expectedMessage: pointer.StringPtr(noMatchLog),
+		},
+		{
 			name:           "missing regex configmap",
 			log:            pointer.StringPtr(dnsAlreadyExistsLog),
 			expectedReason: unknownReason,
@@ -257,7 +266,11 @@ func TestParseInstallLog(t *testing.T) {
 			}
 			reason, message := r.parseInstallLog(test.log, log.WithFields(log.Fields{}))
 			assert.Equal(t, test.expectedReason, reason, "unexpected reason")
-			assert.NotEmpty(t, message, "expected message to be not empty")
+			if test.expectedMessage != nil {
+				assert.Equal(t, *test.expectedMessage, message)
+			} else {
+				assert.NotEmpty(t, message, "expected message to be not empty")
+			}
 		})
 	}
 }

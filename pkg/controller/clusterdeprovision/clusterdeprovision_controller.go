@@ -335,6 +335,16 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	// Uninstall job exists, check its status and if successful, set the deprovision request status to complete
 	if controllerutils.IsSuccessful(existingJob) {
 		rLog.Infof("uninstall job successful, setting completed status")
+		conditions, _ := controllerutils.SetClusterDeprovisionConditionWithChangeCheck(
+			instance.Status.Conditions,
+			hivev1.DeprovisionFailedClusterDeprovisionCondition,
+			corev1.ConditionFalse,
+			"DeprovisionCompleted",
+			"Deprovision has succeeded",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		instance.Status.Conditions = conditions
+
 		// jobDuration calculates the time elapsed since the uninstall job started for deprovision job
 		jobDuration := existingJob.Status.CompletionTime.Time.Sub(existingJob.Status.StartTime.Time)
 		rLog.WithField("duration", jobDuration.Seconds()).Debug("uninstall job completed")
@@ -358,6 +368,26 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	} else if existingJob.Annotations[jobHashAnnotation] != jobHash {
 		// delete the job so we get a fresh one with the new job spec
 		newJobNeeded = true
+	}
+	if controllerutils.IsFailed(existingJob) {
+		newJobNeeded = true
+		reason, message := "UnknownError", "Deprovision attempt failed for unknown reason"
+		if controllerutils.IsDeadlineExceeded(existingJob) {
+			reason, message = "AttemptDeadlineExceeded", "Deprovision attempt failed because the deadline was exceeded"
+		}
+		conditions, changed := controllerutils.SetClusterDeprovisionConditionWithChangeCheck(
+			instance.Status.Conditions,
+			hivev1.DeprovisionFailedClusterDeprovisionCondition,
+			corev1.ConditionTrue,
+			reason, message,
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			instance.Status.Conditions = conditions
+			if err := r.Status().Update(context.Background(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
 	}
 
 	if newJobNeeded {

@@ -29,6 +29,19 @@ func IsFailed(job *batchv1.Job) bool {
 	return getJobConditionStatus(job, batchv1.JobFailed) == corev1.ConditionTrue
 }
 
+// IsDeadlineExceeded returns true if the job failed due to deadline being exceeded
+func IsDeadlineExceeded(job *batchv1.Job) bool {
+	if !IsFailed(job) {
+		return false
+	}
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == batchv1.JobFailed {
+			return condition.Reason == "DeadlineExceeded"
+		}
+	}
+	return false
+}
+
 // IsFinished returns true if the job completed (succeeded or failed)
 func IsFinished(job *batchv1.Job) bool {
 	return IsSuccessful(job) || IsFailed(job)

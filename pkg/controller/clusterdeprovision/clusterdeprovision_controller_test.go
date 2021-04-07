@@ -159,6 +159,69 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:        "job failed",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
+			existing: []runtime.Object{
+				func() runtime.Object {
+					job := testUninstallJob()
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: corev1.ConditionTrue,
+						},
+					}
+					now := metav1.Now()
+					job.Status.CompletionTime = &now
+					job.Status.StartTime = &now
+					return job
+				}(),
+			},
+			mockGetCallerIdentity: true,
+			validate: func(t *testing.T, c client.Client) {
+				validateCondition(t, c, []hivev1.ClusterDeprovisionCondition{
+					{
+						Type:    hivev1.DeprovisionFailedClusterDeprovisionCondition,
+						Reason:  "UnknownError",
+						Message: "Deprovision attempt failed for unknown reason",
+						Status:  corev1.ConditionTrue,
+					},
+				})
+			},
+		},
+		{
+			name:        "job deadline exceeded",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
+			existing: []runtime.Object{
+				func() runtime.Object {
+					job := testUninstallJob()
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: corev1.ConditionTrue,
+							Reason: "DeadlineExceeded",
+						},
+					}
+					now := metav1.Now()
+					job.Status.CompletionTime = &now
+					job.Status.StartTime = &now
+					return job
+				}(),
+			},
+			mockGetCallerIdentity: true,
+			validate: func(t *testing.T, c client.Client) {
+				validateCondition(t, c, []hivev1.ClusterDeprovisionCondition{
+					{
+						Type:    hivev1.DeprovisionFailedClusterDeprovisionCondition,
+						Reason:  "AttemptDeadlineExceeded",
+						Message: "Deprovision attempt failed because the deadline was exceeded",
+						Status:  corev1.ConditionTrue,
+					},
+				})
+			},
+		},
+		{
 			name:        "credentials test fails",
 			deprovision: testClusterDeprovision(),
 			deployment:  testDeletedClusterDeployment(),
@@ -382,7 +445,7 @@ func validateCondition(t *testing.T, c client.Client, expectedConditions []hivev
 		if actualCondition.Status != expectedCondition.Status ||
 			actualCondition.Type != expectedCondition.Type ||
 			actualCondition.Reason != expectedCondition.Reason {
-			t.Errorf("request is expected to have specific condition %v", expectedCondition)
+			t.Errorf("request is expected to have specific condition %v, got %v", expectedCondition, actualCondition)
 		}
 	}
 }

@@ -289,6 +289,18 @@ func TestReconcileClusterSync_NoWorkToDo(t *testing.T) {
 			),
 		},
 		{
+			name: "uninstalled and unreachable unknown",
+			cd: testcd.FullBuilder(testNamespace, testCDName, scheme).
+				GenericOptions(
+					testgeneric.WithUID(testCDUID),
+				).
+				Options(
+					testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.UnreachableCondition,
+						Status: corev1.ConditionUnknown,
+					})).Build(),
+		},
+		{
 			name: "syncset pause",
 			cd:   cdBuilder(scheme).GenericOptions(testgeneric.WithAnnotation(constants.SyncsetPauseAnnotation, "true")).Build(),
 		},

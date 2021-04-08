@@ -27,8 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb/elbiface"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/elbv2/elbv2iface"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/iam/iamiface"
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/route53/route53iface"
@@ -39,6 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -62,14 +61,9 @@ func init() {
 type Client interface {
 	// EC2
 	DescribeAvailabilityZones(*ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error)
-	DescribeImages(*ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error)
-	DescribeVpcs(*ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
 	DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
 	DescribeRouteTables(*ec2.DescribeRouteTablesInput) (*ec2.DescribeRouteTablesOutput, error)
-	DescribeSecurityGroups(*ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error)
-	RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error)
 	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
-	TerminateInstances(*ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
 	StopInstances(*ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error)
 	StartInstances(*ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error)
 	CreateVpcEndpointServiceConfiguration(*ec2.CreateVpcEndpointServiceConfigurationInput) (*ec2.CreateVpcEndpointServiceConfigurationOutput, error)
@@ -83,28 +77,8 @@ type Client interface {
 	CreateVpcEndpoint(*ec2.CreateVpcEndpointInput) (*ec2.CreateVpcEndpointOutput, error)
 	DeleteVpcEndpoints(*ec2.DeleteVpcEndpointsInput) (*ec2.DeleteVpcEndpointsOutput, error)
 
-	// ELB
-	RegisterInstancesWithLoadBalancer(*elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error)
-
 	// ELBV2
 	DescribeLoadBalancers(*elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error)
-
-	// IAM
-	CreateAccessKey(*iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error)
-	CreateUser(*iam.CreateUserInput) (*iam.CreateUserOutput, error)
-	DeleteAccessKey(*iam.DeleteAccessKeyInput) (*iam.DeleteAccessKeyOutput, error)
-	DeleteUser(*iam.DeleteUserInput) (*iam.DeleteUserOutput, error)
-	DeleteUserPolicy(*iam.DeleteUserPolicyInput) (*iam.DeleteUserPolicyOutput, error)
-	GetUser(*iam.GetUserInput) (*iam.GetUserOutput, error)
-	ListAccessKeys(*iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error)
-	ListUserPolicies(*iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error)
-	PutUserPolicy(*iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error)
-
-	// S3
-	CreateBucket(*s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
-	DeleteBucket(*s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
-	ListBuckets(*s3.ListBucketsInput) (*s3.ListBucketsOutput, error)
-	PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error)
 
 	// S3 Manager
 	Upload(*s3manager.UploadInput) (*s3manager.UploadOutput, error)
@@ -118,7 +92,6 @@ type Client interface {
 	ListTagsForResource(*route53.ListTagsForResourceInput) (*route53.ListTagsForResourceOutput, error)
 	ChangeTagsForResource(input *route53.ChangeTagsForResourceInput) (*route53.ChangeTagsForResourceOutput, error)
 	DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error)
-	ListHostedZones(input *route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error)
 	ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error)
 	ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error)
 	ListHostedZonesByVPC(input *route53.ListHostedZonesByVPCInput) (*route53.ListHostedZonesByVPCOutput, error)
@@ -138,7 +111,6 @@ type awsClient struct {
 	ec2Client     ec2iface.EC2API
 	elbClient     elbiface.ELBAPI
 	elbv2Client   elbv2iface.ELBV2API
-	iamClient     iamiface.IAMAPI
 	route53Client route53iface.Route53API
 	s3Client      s3iface.S3API
 	s3Uploader    *s3manager.Uploader
@@ -151,16 +123,6 @@ func (c *awsClient) DescribeAvailabilityZones(input *ec2.DescribeAvailabilityZon
 	return c.ec2Client.DescribeAvailabilityZones(input)
 }
 
-func (c *awsClient) DescribeImages(input *ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DescribeImages").Inc()
-	return c.ec2Client.DescribeImages(input)
-}
-
-func (c *awsClient) DescribeVpcs(input *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DescribeVpcs").Inc()
-	return c.ec2Client.DescribeVpcs(input)
-}
-
 func (c *awsClient) DescribeSubnets(input *ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error) {
 	metricAWSAPICalls.WithLabelValues("DescribeSubnets").Inc()
 	return c.ec2Client.DescribeSubnets(input)
@@ -171,24 +133,9 @@ func (c *awsClient) DescribeRouteTables(input *ec2.DescribeRouteTablesInput) (*e
 	return c.ec2Client.DescribeRouteTables(input)
 }
 
-func (c *awsClient) DescribeSecurityGroups(input *ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DescribeSecurityGroups").Inc()
-	return c.ec2Client.DescribeSecurityGroups(input)
-}
-
-func (c *awsClient) RunInstances(input *ec2.RunInstancesInput) (*ec2.Reservation, error) {
-	metricAWSAPICalls.WithLabelValues("RunInstances").Inc()
-	return c.ec2Client.RunInstances(input)
-}
-
 func (c *awsClient) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	metricAWSAPICalls.WithLabelValues("DescribeInstances").Inc()
 	return c.ec2Client.DescribeInstances(input)
-}
-
-func (c *awsClient) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
-	metricAWSAPICalls.WithLabelValues("TerminateInstances").Inc()
-	return c.ec2Client.TerminateInstances(input)
 }
 
 func (c *awsClient) StopInstances(input *ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error) {
@@ -251,78 +198,9 @@ func (c *awsClient) DeleteVpcEndpoints(input *ec2.DeleteVpcEndpointsInput) (*ec2
 	return c.ec2Client.DeleteVpcEndpoints(input)
 }
 
-func (c *awsClient) RegisterInstancesWithLoadBalancer(input *elb.RegisterInstancesWithLoadBalancerInput) (*elb.RegisterInstancesWithLoadBalancerOutput, error) {
-	metricAWSAPICalls.WithLabelValues("RegisterInstancesWithLoadBalancer").Inc()
-	return c.elbClient.RegisterInstancesWithLoadBalancer(input)
-}
-
 func (c *awsClient) DescribeLoadBalancers(input *elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {
 	metricAWSAPICalls.WithLabelValues("DescribeLoadBalancers").Inc()
 	return c.elbv2Client.DescribeLoadBalancers(input)
-}
-
-func (c *awsClient) CreateAccessKey(input *iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error) {
-	metricAWSAPICalls.WithLabelValues("CreateAccessKey").Inc()
-	return c.iamClient.CreateAccessKey(input)
-}
-
-func (c *awsClient) CreateUser(input *iam.CreateUserInput) (*iam.CreateUserOutput, error) {
-	metricAWSAPICalls.WithLabelValues("CreateUser").Inc()
-	return c.iamClient.CreateUser(input)
-}
-
-func (c *awsClient) DeleteAccessKey(input *iam.DeleteAccessKeyInput) (*iam.DeleteAccessKeyOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DeleteAccessKey").Inc()
-	return c.iamClient.DeleteAccessKey(input)
-}
-
-func (c *awsClient) DeleteUser(input *iam.DeleteUserInput) (*iam.DeleteUserOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DeleteUser").Inc()
-	return c.iamClient.DeleteUser(input)
-}
-
-func (c *awsClient) DeleteUserPolicy(input *iam.DeleteUserPolicyInput) (*iam.DeleteUserPolicyOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DeleteUserPolicy").Inc()
-	return c.iamClient.DeleteUserPolicy(input)
-}
-func (c *awsClient) GetUser(input *iam.GetUserInput) (*iam.GetUserOutput, error) {
-	metricAWSAPICalls.WithLabelValues("GetUser").Inc()
-	return c.iamClient.GetUser(input)
-}
-
-func (c *awsClient) ListAccessKeys(input *iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error) {
-	metricAWSAPICalls.WithLabelValues("ListAccessKeys").Inc()
-	return c.iamClient.ListAccessKeys(input)
-}
-
-func (c *awsClient) ListUserPolicies(input *iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error) {
-	metricAWSAPICalls.WithLabelValues("ListUserPolicies").Inc()
-	return c.iamClient.ListUserPolicies(input)
-}
-
-func (c *awsClient) PutUserPolicy(input *iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error) {
-	metricAWSAPICalls.WithLabelValues("PutUserPolicy").Inc()
-	return c.iamClient.PutUserPolicy(input)
-}
-
-func (c *awsClient) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
-	metricAWSAPICalls.WithLabelValues("CreateBucket").Inc()
-	return c.s3Client.CreateBucket(input)
-}
-
-func (c *awsClient) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error) {
-	metricAWSAPICalls.WithLabelValues("DeleteBucket").Inc()
-	return c.s3Client.DeleteBucket(input)
-}
-
-func (c *awsClient) ListBuckets(input *s3.ListBucketsInput) (*s3.ListBucketsOutput, error) {
-	metricAWSAPICalls.WithLabelValues("ListBuckets").Inc()
-	return c.s3Client.ListBuckets(input)
-}
-
-func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
-	metricAWSAPICalls.WithLabelValues("PutObject").Inc()
-	return c.s3Client.PutObject(input)
 }
 
 func (c *awsClient) GetS3API() s3iface.S3API {
@@ -333,10 +211,6 @@ func (c *awsClient) Upload(input *s3manager.UploadInput) (*s3manager.UploadOutpu
 	return c.s3Uploader.Upload(input)
 }
 
-func (c *awsClient) ListHostedZones(input *route53.ListHostedZonesInput) (*route53.ListHostedZonesOutput, error) {
-	metricAWSAPICalls.WithLabelValues("ListHostedZones").Inc()
-	return c.route53Client.ListHostedZones(input)
-}
 func (c *awsClient) ListHostedZonesByName(input *route53.ListHostedZonesByNameInput) (*route53.ListHostedZonesByNameOutput, error) {
 	metricAWSAPICalls.WithLabelValues("ListHostedZonesByName").Inc()
 	return c.route53Client.ListHostedZonesByName(input)
@@ -602,7 +476,6 @@ func newClientFromSession(s *session.Session, cfgs ...*aws.Config) (Client, erro
 	return &awsClient{
 		ec2Client:     ec2.New(s, cfgs...),
 		elbClient:     elb.New(s, cfgs...),
-		iamClient:     iam.New(s, cfgs...),
 		s3Client:      s3.New(s, cfgs...),
 		s3Uploader:    s3manager.NewUploader(s),
 		route53Client: route53.New(s, cfgs...),

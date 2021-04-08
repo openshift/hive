@@ -568,10 +568,12 @@ func (r *ReconcileClusterSync) applySyncSets(
 			ObservedGeneration: syncSet.AsMetaObject().GetGeneration(),
 			Result:             hiveintv1alpha1.SuccessSyncSetResult,
 		}
-		if syncSet.GetSpec().ResourceApplyMode == hivev1.SyncResourceApplyMode {
+		applyMode := syncSet.GetSpec().ResourceApplyMode
+		if applyMode == hivev1.SyncResourceApplyMode {
 			newSyncStatus.ResourcesToDelete = resourcesApplied
 		}
-		if syncSet.GetSpec().ResourceApplyMode == hivev1.UpsertResourceApplyMode && len(oldSyncStatus.ResourcesToDelete) > 0 {
+		// applyMode defaults to UpsertResourceApplyMode
+		if (applyMode == hivev1.UpsertResourceApplyMode || applyMode == "") && len(oldSyncStatus.ResourcesToDelete) > 0 {
 			logger.Infof("resource apply mode is %v but there are resources to delete in clustersync status", hivev1.UpsertResourceApplyMode)
 			oldSyncStatus.ResourcesToDelete = nil
 		}

@@ -885,16 +885,19 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 		name                     string
 		includeResourcesToDelete bool
 		expectDelete             bool
+		resourceApplyMode        hivev1.SyncSetResourceApplyMode
 	}{
 		{
 			name:                     "upsert",
 			includeResourcesToDelete: false,
 			expectDelete:             false,
+			resourceApplyMode:        hivev1.UpsertResourceApplyMode,
 		},
 		{
 			name:                     "sync",
 			includeResourcesToDelete: true,
 			expectDelete:             true,
+			resourceApplyMode:        hivev1.SyncResourceApplyMode,
 		},
 	}
 	for _, tc := range cases {
@@ -907,6 +910,7 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 				testsyncset.ForClusterDeployments(testCDName),
 				testsyncset.WithGeneration(2),
 				testsyncset.WithResources(resourceToApply),
+				testsyncset.WithApplyMode(tc.resourceApplyMode),
 			)
 			existingSyncStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
 				withTransitionInThePast(),
@@ -1728,6 +1732,7 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 					testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 						testsyncset.ForClusterDeployments(testCDName),
 						testsyncset.WithGeneration(2),
+						testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
 					),
 				)
 			}

@@ -2,7 +2,6 @@ package v1
 
 import (
 	"net/http"
-	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -211,19 +210,6 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
-
-	if !reflect.DeepEqual(oldObject.Spec, newObject.Spec) {
-		message := "ClusterImageSet.Spec is immutable"
-		contextLogger.Infof("Failed validation: %v", message)
-
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
-		}
-	}
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")

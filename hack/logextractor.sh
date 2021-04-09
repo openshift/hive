@@ -55,13 +55,13 @@ if [ -z "$credentials_secret" -o "$credentials_secret" == "null" ] ; then
   exit 10
 fi
 
-AWS_ACCESS_KEY_ID=$(echo "$credentials_secret" | jq -r '.data.aws_access_key_id' | base64 -d)
+export AWS_ACCESS_KEY_ID=$(echo "$credentials_secret" | jq -r '.data.aws_access_key_id' | base64 -d)
 if [ -z "$AWS_ACCESS_KEY_ID" -o "$AWS_ACCESS_KEY_ID" == "null" ] || [[ "$AWS_ACCESS_KEY_ID" != AKIA* ]] ; then
   echo "Error: Unable to retrieve aws_access_key_id from secret [$secret_name] in the [$hive_ns] namespace."
   exit 10
 fi
 
-AWS_SECRET_ACCESS_KEY=$(echo "$credentials_secret" | jq -r '.data.aws_secret_access_key' | base64 -d)
+export AWS_SECRET_ACCESS_KEY=$(echo "$credentials_secret" | jq -r '.data.aws_secret_access_key' | base64 -d)
 if [ -z "$AWS_SECRET_ACCESS_KEY" -o "$AWS_SECRET_ACCESS_KEY" == "null" ]; then
   echo "Error: Unable to retrieve aws_secret_access_key from secret [$secret_name] in the [$hive_ns] namespace."
   exit 10

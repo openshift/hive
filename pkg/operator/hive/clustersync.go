@@ -111,6 +111,8 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	}
 	newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation] = newClusterSyncStatefulSetSpecHash
 
+	controllerutils.CopyProxyEnvVars(&newClusterSyncStatefulSet.Spec.Template.Spec)
+
 	existingClusterSyncStatefulSet := &appsv1.StatefulSet{}
 	existingClusterSyncStatefulSetNamespacedName := apitypes.NamespacedName{Name: newClusterSyncStatefulSet.Name, Namespace: newClusterSyncStatefulSet.Namespace}
 	err = r.Get(context.TODO(), existingClusterSyncStatefulSetNamespacedName, existingClusterSyncStatefulSet)

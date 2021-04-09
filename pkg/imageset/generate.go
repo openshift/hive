@@ -3,6 +3,7 @@ package imageset
 import (
 	"time"
 
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -100,6 +101,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			labels[hivev1.HiveClusterTypeLabel] = typeStr
 		}
 	}
+	controllerutils.CopyProxyEnvVars(&podSpec)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

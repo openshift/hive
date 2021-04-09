@@ -350,3 +350,17 @@ func BuildControllerLogger(controller hivev1.ControllerName, resource string, ns
 		"reconcileID": utilrand.String(constants.ReconcileIDLen),
 	})
 }
+
+// CopyProxyEnvVars will add the standard proxy environment variables to all containers in the given pod spec,
+// if they are currently set for this controller process. Used to pass vars set by OLM for
+// hive-operator on to hive-controllers, clustersync, hiveadmission, and provision/deprovision pods.
+func CopyProxyEnvVars(podSpec *corev1.PodSpec) {
+	for _, envVar := range [3]string{"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"} {
+		if os.Getenv(envVar) != "" {
+			log.WithField("key", envVar).WithField("value", os.Getenv(envVar)).Warn("transferring env var to podspec")
+			for i := range podSpec.Containers {
+				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, corev1.EnvVar{Name: envVar, Value: os.Getenv(envVar)})
+			}
+		}
+	}
+}

@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
@@ -209,6 +210,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
+
+	utils.CopyProxyEnvVars(&hiveDeployment.Spec.Template.Spec)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	namespacedAssets := []string{

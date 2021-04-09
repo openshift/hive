@@ -116,6 +116,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		hasher.Write([]byte(v))
 	}
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = hex.EncodeToString(hasher.Sum(nil))
+	controllerutils.CopyProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec)
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)

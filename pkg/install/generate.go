@@ -541,14 +541,16 @@ func InstallerPodSpec(
 		},
 	}
 
-	return &corev1.PodSpec{
+	podSpec := &corev1.PodSpec{
 		DNSPolicy:          corev1.DNSClusterFirst,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
-	}, nil
+	}
+	controllerutils.CopyProxyEnvVars(podSpec)
+	return podSpec, nil
 }
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -656,6 +658,7 @@ func GenerateUninstallerJobForDeprovision(
 	for idx := range job.Spec.Template.Spec.Containers {
 		job.Spec.Template.Spec.Containers[idx].Env = append(job.Spec.Template.Spec.Containers[idx].Env, extraEnvVars...)
 	}
+	controllerutils.CopyProxyEnvVars(&job.Spec.Template.Spec)
 
 	return job, nil
 }

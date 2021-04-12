@@ -476,6 +476,7 @@ func newClientFromSession(s *session.Session, cfgs ...*aws.Config) (Client, erro
 	return &awsClient{
 		ec2Client:     ec2.New(s, cfgs...),
 		elbClient:     elb.New(s, cfgs...),
+		elbv2Client:   elbv2.New(s, cfgs...),
 		s3Client:      s3.New(s, cfgs...),
 		s3Uploader:    s3manager.NewUploader(s),
 		route53Client: route53.New(s, cfgs...),

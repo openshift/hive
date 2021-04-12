@@ -1550,6 +1550,11 @@ data:
       - "VpcLimitExceeded"
       installFailingReason: AWSVPCLimitExceeded
       installFailingMessage: AWS VPC limit exceeded
+    - name: S3BucketsLimitExceeded
+      searchRegexStrings:
+       - "TooManyBuckets"
+      installFailingReason: S3BucketsLimitExceeded
+      installFailingMessage: S3 Buckets Limit Exceeded
     - name: LimitExceeded
       searchRegexStrings:
       - "LimitExceeded"

@@ -164,13 +164,13 @@ expectations of required permissions for these credentials.
     The following permissions are required:
 
     ```txt
-    ec2.CreateVpcEndpointServiceConfiguration
-    ec2.DescribeVpcEndpointServiceConfigurations
-    ec2.ModifyVpcEndpointServiceConfiguration
-    ec2.DescribeVpcEndpointServicePermissions
-    ec2.ModifyVpcEndpointServicePermissions
+    ec2:CreateVpcEndpointServiceConfiguration
+    ec2:DescribeVpcEndpointServiceConfigurations
+    ec2:ModifyVpcEndpointServiceConfiguration
+    ec2:DescribeVpcEndpointServicePermissions
+    ec2:ModifyVpcEndpointServicePermissions
 
-    ec2.DeleteVpcEndpointServiceConfigurations
+    ec2:DeleteVpcEndpointServiceConfigurations
     ```
 
 2. The credentials specified in HiveConfig for endpoint VPCs account `.spec.awsPrivateLink.credentialsSecretRef`
@@ -178,21 +178,21 @@ expectations of required permissions for these credentials.
     The following permissions are required:
 
     ```txt
-    ec2.DescribeVpcEndpointServices
-    ec2.DescribeVpcEndpoints
-    ec2.CreateVpcEndpoint
+    ec2:DescribeVpcEndpointServices
+    ec2:DescribeVpcEndpoints
+    ec2:CreateVpcEndpoint
 
-    ec2.DeleteVpcEndpoints
+    ec2:DeleteVpcEndpoints
 
-    route53.CreateHostedZone
-    route53.GetHostedZone
-    route53.ListHostedZonesByVPC
-    route53.AssociateVPCWithHostedZone
-    route53.DisassociateVPCFromHostedZone
-    route53.CreateVPCAssociationAuthorization
-    route53.DeleteVPCAssociationAuthorization
+    route53:CreateHostedZone
+    route53:GetHostedZone
+    route53:ListHostedZonesByVPC
+    route53:AssociateVPCWithHostedZone
+    route53:DisassociateVPCFromHostedZone
+    route53:CreateVPCAssociationAuthorization
+    route53:DeleteVPCAssociationAuthorization
 
-    route53.DeleteHostedZone
+    route53:DeleteHostedZone
     ```
 
 3. The credentials specified in HiveConfig for associating VPCs to the Private Hosted Zone.
@@ -201,8 +201,8 @@ expectations of required permissions for these credentials.
     The following permissions are required in the account where the VPC exists:
 
     ```txt
-    route53.AssociateVPCWithHostedZone
-    route53.DisassociateVPCFromHostedZone
+    route53:AssociateVPCWithHostedZone
+    route53:DisassociateVPCFromHostedZone
     ```
 
 [aws-private-link-overview]: https://docs.aws.amazon.com/vpc/latest/privatelink/endpoint-services-overview.html

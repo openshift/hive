@@ -1743,9 +1743,23 @@ func Test_shouldSync(t *testing.T) {
 		shouldSync:           true,
 		deltaGreaterThanZero: true,
 	}, {
-		name: "ready for less than 2 hours",
+		name: "ready for less than 2 hours, installing",
 
 		desired: cdBuilder.Build(
+			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:               hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+			}),
+		),
+
+		shouldSync:           true,
+		deltaGreaterThanZero: true,
+	}, {
+		name: "ready for less than 2 hours, installed",
+
+		desired: cdBuilder.Build(
+			testcd.Installed(),
 			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 				Type:               hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
 				Status:             corev1.ConditionTrue,

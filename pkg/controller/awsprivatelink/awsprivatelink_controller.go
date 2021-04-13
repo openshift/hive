@@ -303,7 +303,14 @@ func shouldSync(desired *hivev1.ClusterDeployment) (shouldSync bool, delta time.
 		delta = time.Now().Sub(readyCondition.LastTransitionTime.Time)
 	}
 
-	if delta >= 2*time.Hour {
+	limit := 2 * time.Hour
+	if !desired.Spec.Installed {
+		// as cluster is installing, but the private link has been setup once, we wait
+		// for a shorter duration before reconciling again.
+		limit = 10 * time.Minute
+	}
+
+	if delta >= limit {
 		// We haven't sync'd in over resync duration time, sync now.
 		return true, delta
 	}

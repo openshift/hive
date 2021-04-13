@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -116,7 +117,8 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		hasher.Write([]byte(v))
 	}
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = hex.EncodeToString(hasher.Sum(nil))
-	controllerutils.CopyProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec)
+	controllerutils.SetProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec,
+		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)

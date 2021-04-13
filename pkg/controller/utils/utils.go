@@ -351,16 +351,39 @@ func BuildControllerLogger(controller hivev1.ControllerName, resource string, ns
 	})
 }
 
-// CopyProxyEnvVars will add the standard proxy environment variables to all containers in the given pod spec,
-// if they are currently set for this controller process. Used to pass vars set by OLM for
-// hive-operator on to hive-controllers, clustersync, hiveadmission, and provision/deprovision pods.
-func CopyProxyEnvVars(podSpec *corev1.PodSpec) {
-	for _, envVar := range [3]string{"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"} {
-		if os.Getenv(envVar) != "" {
-			log.WithField("key", envVar).WithField("value", os.Getenv(envVar)).Warn("transferring env var to podspec")
-			for i := range podSpec.Containers {
-				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, corev1.EnvVar{Name: envVar, Value: os.Getenv(envVar)})
+// SetProxyEnvVars will add the standard proxy environment variables to all containers in the given pod spec. If
+// any of the provided values are empty, the environment variable will not be set.
+func SetProxyEnvVars(podSpec *corev1.PodSpec, httpProxy, httpsProxy, noProxy string) {
+	setEnvVarOnContainers := func(podSpec *corev1.PodSpec, envVar, value string) {
+		if value == "" {
+			return
+		}
+		for i := range podSpec.Containers {
+			// Check if the env var is already set, if so we preserve the original but warn if they differ:
+			found := false
+			for j := range podSpec.Containers[i].Env {
+				if podSpec.Containers[i].Env[j].Name == envVar {
+					found = true
+					if podSpec.Containers[i].Env[j].Value != value {
+						log.Warnf("container %s already has env var %s=%s, overwriting with %s", podSpec.Containers[i].Name, envVar, podSpec.Containers[i].Env[j].Value, value)
+						podSpec.Containers[i].Env[j].Value = value
+					}
+				}
+			}
+			if !found {
+				log.WithField(envVar, value).Info("transferring env var to PodSpec")
+				podSpec.Containers[i].Env = append(podSpec.Containers[i].Env, corev1.EnvVar{Name: envVar, Value: value})
 			}
 		}
+	}
+
+	if httpProxy != "" {
+		setEnvVarOnContainers(podSpec, "HTTP_PROXY", httpProxy)
+	}
+	if httpsProxy != "" {
+		setEnvVarOnContainers(podSpec, "HTTPS_PROXY", httpsProxy)
+	}
+	if noProxy != "" {
+		setEnvVarOnContainers(podSpec, "NO_PROXY", noProxy)
 	}
 }

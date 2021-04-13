@@ -24,7 +24,7 @@ const (
 
 // GenerateImageSetJob creates a job to determine the installer image for a ClusterImageSet
 // given a release image
-func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName string) *batchv1.Job {
+func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName, httpProxy, httpsProxy, noProxy string) *batchv1.Job {
 	logger := log.WithFields(log.Fields{
 		"clusterdeployment": types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(),
 	})
@@ -101,7 +101,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			labels[hivev1.HiveClusterTypeLabel] = typeStr
 		}
 	}
-	controllerutils.CopyProxyEnvVars(&podSpec)
+	controllerutils.SetProxyEnvVars(&podSpec, httpProxy, httpsProxy, noProxy)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

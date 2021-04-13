@@ -2,6 +2,7 @@ package hive
 
 import (
 	"context"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -111,7 +112,8 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	}
 	newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation] = newClusterSyncStatefulSetSpecHash
 
-	controllerutils.CopyProxyEnvVars(&newClusterSyncStatefulSet.Spec.Template.Spec)
+	controllerutils.SetProxyEnvVars(&newClusterSyncStatefulSet.Spec.Template.Spec,
+		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
 	existingClusterSyncStatefulSet := &appsv1.StatefulSet{}
 	existingClusterSyncStatefulSetNamespacedName := apitypes.NamespacedName{Name: newClusterSyncStatefulSet.Name, Namespace: newClusterSyncStatefulSet.Namespace}

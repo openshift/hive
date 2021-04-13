@@ -211,7 +211,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 
-	utils.CopyProxyEnvVars(&hiveDeployment.Spec.Template.Spec)
+	utils.SetProxyEnvVars(&hiveDeployment.Spec.Template.Spec,
+		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	namespacedAssets := []string{

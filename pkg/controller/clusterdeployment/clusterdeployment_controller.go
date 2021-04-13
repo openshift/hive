@@ -781,6 +781,9 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		provisionName,
 		releaseImage,
 		controllerutils.InstallServiceAccountName,
+		os.Getenv("HTTP_PROXY"),
+		os.Getenv("HTTPS_PROXY"),
+		os.Getenv("NO_PROXY"),
 		extraEnvVars,
 	)
 	if err != nil {
@@ -1212,7 +1215,10 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 
-		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName)
+		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName,
+			os.Getenv("HTTP_PROXY"),
+			os.Getenv("HTTPS_PROXY"),
+			os.Getenv("NO_PROXY"))
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)

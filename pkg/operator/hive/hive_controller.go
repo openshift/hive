@@ -69,7 +69,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileHiveConfig{Client: mgr.GetClient(), scheme: mgr.GetScheme(), restConfig: mgr.GetConfig(), mgr: mgr}
+	return &ReconcileHiveConfig{
+		Client:     mgr.GetClient(),
+		scheme:     mgr.GetScheme(),
+		restConfig: mgr.GetConfig(),
+		mgr:        mgr,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

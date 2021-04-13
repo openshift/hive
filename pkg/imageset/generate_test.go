@@ -3,14 +3,24 @@ package imageset
 import (
 	"testing"
 
+	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	batchv1 "k8s.io/api/batch/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
+const (
+	testHttpProxy  = "localhost:3112"
+	testHttpsProxy = "localhost:4432"
+	testNoProxy    = "example.com,foo.com,bar.org"
+)
+
 func TestGenerateImageSetJob(t *testing.T) {
-	job := GenerateImageSetJob(testClusterDeployment(), testImageSet().Spec.ReleaseImage, "test-service-account")
+	job := GenerateImageSetJob(testClusterDeployment(), testImageSet().Spec.ReleaseImage, "test-service-account", testHttpProxy, testHttpsProxy, testNoProxy)
 	validateJob(t, job)
+	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)
+	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTPS_PROXY", testHttpsProxy)
+	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "NO_PROXY", testNoProxy)
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

@@ -32,14 +32,16 @@ func (r *ReconcileAWSPrivateLink) cleanupClusterDeployment(cd *hivev1.ClusterDep
 		return reconcile.Result{}, err
 	}
 
-	if err := r.cleanupPrivateLink(cd, metadata, logger); err != nil {
-		logger.WithError(err).Error("error cleaning up PrivateLink resources for ClusterDeployment")
+	if metadata != nil && cleanupRequired(cd) {
+		if err := r.cleanupPrivateLink(cd, metadata, logger); err != nil {
+			logger.WithError(err).Error("error cleaning up PrivateLink resources for ClusterDeployment")
 
-		if err := r.setErrCondition(cd, "CleanupForDeprovisionFailed", err, logger); err != nil {
-			logger.WithError(err).Error("failed to update condition on cluster deployment")
+			if err := r.setErrCondition(cd, "CleanupForDeprovisionFailed", err, logger); err != nil {
+				logger.WithError(err).Error("failed to update condition on cluster deployment")
+				return reconcile.Result{}, err
+			}
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, err
 	}
 
 	logger.Info("removing finalizer from ClusterDeployment")

@@ -242,6 +242,11 @@ docker-push:
 .PHONY: docker-dev-push
 docker-dev-push: build image-hive-dev docker-push
 
+# Build the dev image using builah
+.PHONY: buildah-dev-build
+buildah-dev-build:
+	buildah bud -f Dockerfile --tag ${IMG}
+
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push
 buildah-dev-push: buildah-dev-build

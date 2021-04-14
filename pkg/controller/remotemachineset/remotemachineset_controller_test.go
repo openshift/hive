@@ -616,6 +616,33 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				*testClusterAutoscaler("1"),
 			},
 		},
+		{
+			name:              "Create machine autoscalers with zero minReplicas",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(0, 5),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testClusterAutoscaler("1"),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 0, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 0, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 0, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 0, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 0, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 0, 0),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 0, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 0, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 0, 1),
+			},
+			expectedRemoteClusterAutoscalers: []autoscalingv1.ClusterAutoscaler{
+				*testClusterAutoscaler("1"),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -631,8 +658,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
 			}
-			fakeClient := fake.NewFakeClient(localExisting...)
-			remoteFakeClient := fake.NewFakeClient(test.remoteExisting...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(localExisting...).Build()
+			remoteFakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()

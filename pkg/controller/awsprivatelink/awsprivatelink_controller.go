@@ -212,13 +212,13 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 
 	// See if we need to sync. This is what rate limits our cloud API usage, but allows for immediate syncing
 	// on changes and deletes.
-	shouldSync, delta := shouldSync(cd)
+	shouldSync, syncAfter := shouldSync(cd)
 	if !shouldSync {
 		logger.WithFields(log.Fields{
-			"delta": delta,
+			"syncAfter": syncAfter,
 		}).Debug("Sync not needed")
 
-		return reconcile.Result{}, nil
+		return reconcile.Result{RequeueAfter: syncAfter}, nil
 	}
 
 	if cd.Spec.Installed {
@@ -281,7 +281,10 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 	return r.reconcilePrivateLink(cd, &hivev1.ClusterMetadata{InfraID: *cp.Spec.InfraID, AdminKubeconfigSecretRef: *cp.Spec.AdminKubeconfigSecretRef}, logger)
 }
 
-func shouldSync(desired *hivev1.ClusterDeployment) (shouldSync bool, delta time.Duration) {
+// shouldSync returns if we should sync the desired ClusterDeployment. If it returns false, it also returns
+// the duration after which we should try to check if sync is required.
+func shouldSync(desired *hivev1.ClusterDeployment) (bool, time.Duration) {
+	window := 2 * time.Hour
 	if desired.DeletionTimestamp != nil && !controllerutils.HasFinalizer(desired, finalizer) {
 		return false, 0 // No finalizer means our cleanup has been completed. There's nothing left to do.
 	}
@@ -296,27 +299,29 @@ func shouldSync(desired *hivev1.ClusterDeployment) (shouldSync bool, delta time.
 	}
 
 	readyCondition := controllerutils.FindClusterDeploymentCondition(desired.Status.Conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition)
-	if readyCondition == nil || readyCondition.Status == corev1.ConditionFalse {
+	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		return true, 0 // we have not reached Ready level
 	}
-	if readyCondition != nil {
-		delta = time.Now().Sub(readyCondition.LastTransitionTime.Time)
-	}
+	delta := time.Now().Sub(readyCondition.LastProbeTime.Time)
 
-	limit := 2 * time.Hour
 	if !desired.Spec.Installed {
 		// as cluster is installing, but the private link has been setup once, we wait
 		// for a shorter duration before reconciling again.
-		limit = 10 * time.Minute
+		window = 10 * time.Minute
 	}
 
-	if delta >= limit {
+	if delta >= window {
 		// We haven't sync'd in over resync duration time, sync now.
-		return true, delta
+		return true, 0
 	}
 
+	syncAfter := (window - delta).Round(time.Minute)
+	if syncAfter == 0 {
+		// if it is less than a minute, sync after a minute
+		syncAfter = time.Minute
+	}
 	// We didn't meet any of the criteria above, so we should not sync.
-	return false, delta
+	return false, syncAfter
 }
 
 func (r *ReconcileAWSPrivateLink) setErrCondition(cd *hivev1.ClusterDeployment,
@@ -375,8 +380,9 @@ func (r *ReconcileAWSPrivateLink) setProgressCondition(cd *hivev1.ClusterDeploym
 	}
 
 	var readyChanged bool
-	if ready := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition); ready == nil ||
-		ready.Status != corev1.ConditionTrue {
+	ready := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition)
+	if ready == nil || ready.Status != corev1.ConditionTrue {
+		// we want to allow Ready condition to reach Ready level
 		conditions, readyChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 			conditions,
 			hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
@@ -384,6 +390,18 @@ func (r *ReconcileAWSPrivateLink) setProgressCondition(cd *hivev1.ClusterDeploym
 			reason,
 			message,
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
+	} else {
+		if completed == corev1.ConditionTrue {
+			// allow reinforcing Ready level to track the last Ready probe.
+			// we have a higher level control of when to sync an already Ready cluster
+			conditions, readyChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				conditions,
+				hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+				corev1.ConditionTrue,
+				reason,
+				message,
+				controllerutils.UpdateConditionAlways)
+		}
 	}
 	if !readyChanged && !failedChanged {
 		return nil

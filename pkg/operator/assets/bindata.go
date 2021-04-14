@@ -1555,6 +1555,11 @@ data:
        - "TooManyBuckets"
       installFailingReason: S3BucketsLimitExceeded
       installFailingMessage: S3 Buckets Limit Exceeded
+    - name: EIPAddressLimitExceeded
+      searchRegexStrings:
+      - "EIP: AddressLimitExceeded"
+      installFailingReason: EIPAddressLimitExceeded
+      installFailingMessage: EIP Address limit exceeded
     - name: LimitExceeded
       searchRegexStrings:
       - "LimitExceeded"

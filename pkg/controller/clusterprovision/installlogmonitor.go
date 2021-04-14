@@ -96,5 +96,5 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 		}
 	}
 
-	return unknownReason, unknownMessage
+	return unknownReason, *log
 }

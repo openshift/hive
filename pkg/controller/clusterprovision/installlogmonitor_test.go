@@ -38,10 +38,11 @@ const (
 func TestParseInstallLog(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
-		name           string
-		log            *string
-		existing       []runtime.Object
-		expectedReason string
+		name            string
+		log             *string
+		existing        []runtime.Object
+		expectedReason  string
+		expectedMessage *string
 	}{
 		{
 			name:           "DNS already exists",
@@ -257,7 +258,11 @@ func TestParseInstallLog(t *testing.T) {
 			}
 			reason, message := r.parseInstallLog(test.log, log.WithFields(log.Fields{}))
 			assert.Equal(t, test.expectedReason, reason, "unexpected reason")
-			assert.NotEmpty(t, message, "expected message to be not empty")
+			if test.expectedMessage != nil {
+				assert.Equal(t, *test.expectedMessage, message)
+			} else {
+				assert.NotEmpty(t, message, "expected message to be not empty")
+			}
 		})
 	}
 }

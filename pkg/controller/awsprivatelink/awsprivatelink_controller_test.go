@@ -284,7 +284,7 @@ func Test_setProgressCondition(t *testing.T) {
 			Reason:  "AllLookingGood",
 			Message: "All looking good",
 		}},
-		completed: corev1.ConditionTrue,
+		completed: corev1.ConditionFalse,
 		message:   "progresing towards stage 1",
 		reason:    "InprogesStage1",
 
@@ -292,6 +292,25 @@ func Test_setProgressCondition(t *testing.T) {
 			Status:  corev1.ConditionTrue,
 			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
 			Reason:  "AllLookingGood",
+			Message: "All looking good",
+		}},
+	}, {
+		name: "previous ready, now ready with different reason",
+
+		conditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionTrue,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "AllLookingGood",
+			Message: "All looking good",
+		}},
+		completed: corev1.ConditionTrue,
+		message:   "All looking good",
+		reason:    "AllLookingGoodVersion2",
+
+		expectedConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionTrue,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "AllLookingGoodVersion2",
 			Message: "All looking good",
 		}},
 	}}
@@ -1680,24 +1699,21 @@ func Test_shouldSync(t *testing.T) {
 
 		desired    *hivev1.ClusterDeployment
 		shouldSync bool
-
-		deltaGreaterThanZero bool // required fake time to match exact value.
+		syncAfter  time.Duration
 	}{{
 		name: "deleted and no finalizer",
 
 		desired: cdBuilder.GenericOptions(generic.Deleted()).
 			Build(),
 
-		shouldSync:           false,
-		deltaGreaterThanZero: false,
+		shouldSync: false,
 	}, {
 		name: "deleted and finalizer",
 
 		desired: cdBuilder.GenericOptions(generic.Deleted(), generic.WithFinalizer(finalizer)).
 			Build(),
 
-		shouldSync:           true,
-		deltaGreaterThanZero: false,
+		shouldSync: true,
 	}, {
 		name: "failed condition",
 
@@ -1708,15 +1724,13 @@ func Test_shouldSync(t *testing.T) {
 			}),
 		),
 
-		shouldSync:           true,
-		deltaGreaterThanZero: false,
+		shouldSync: true,
 	}, {
 		name: "no ready condition",
 
 		desired: cdBuilder.Build(),
 
-		shouldSync:           true,
-		deltaGreaterThanZero: false,
+		shouldSync: true,
 	}, {
 		name: "ready condition false",
 
@@ -1727,40 +1741,51 @@ func Test_shouldSync(t *testing.T) {
 			}),
 		),
 
-		shouldSync:           true,
-		deltaGreaterThanZero: false,
+		shouldSync: true,
 	}, {
 		name: "ready for more than 2 hours",
 
 		desired: cdBuilder.Build(
 			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:               hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.Time{Time: time.Now().Add(-3 * time.Hour)},
+				Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+				Status:        corev1.ConditionTrue,
+				LastProbeTime: metav1.Time{Time: time.Now().Add(-3 * time.Hour)},
 			}),
 		),
 
-		shouldSync:           true,
-		deltaGreaterThanZero: true,
+		shouldSync: true,
 	}, {
-		name: "ready for less than 2 hours",
+		name: "ready for less than 2 hours, installing",
 
 		desired: cdBuilder.Build(
 			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:               hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+				Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+				Status:        corev1.ConditionTrue,
+				LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
 			}),
 		),
 
-		shouldSync:           false,
-		deltaGreaterThanZero: true,
+		shouldSync: true,
+	}, {
+		name: "ready for less than 2 hours, installed",
+
+		desired: cdBuilder.Build(
+			testcd.Installed(),
+			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+				Status:        corev1.ConditionTrue,
+				LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+			}),
+		),
+
+		shouldSync: false,
+		syncAfter:  1 * time.Hour,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := shouldSync(tt.desired)
 			assert.Equal(t, tt.shouldSync, got)
-			assert.Equal(t, tt.deltaGreaterThanZero, got1 > 0)
+			assert.Equal(t, tt.syncAfter, got1)
 		})
 	}
 }

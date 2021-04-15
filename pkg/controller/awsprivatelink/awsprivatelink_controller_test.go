@@ -1427,28 +1427,6 @@ users:
 		},
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
-			endpoint := &ec2.VpcEndpoint{
-				VpcEndpointId: aws.String("vpce-12345"),
-				VpcId:         aws.String("vpc-1"),
-			}
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).
-				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{{
-						VpcEndpointId: endpoint.VpcEndpointId,
-						VpcId:         endpoint.VpcId,
-					}},
-				}, nil).Times(2)
-
-			m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
-				MaxItems:  aws.String("100"),
-				VPCId:     endpoint.VpcId,
-				VPCRegion: aws.String("us-east-1"),
-			}).Return(&route53.ListHostedZonesByVPCOutput{
-				HostedZoneSummaries: []*route53.HostedZoneSummary{{
-					HostedZoneId: aws.String("HZ12345"),
-					Name:         aws.String("api.test-cluster"),
-				}},
-			}, nil)
 			rr := &route53.ResourceRecordSet{
 				Type: aws.String("A"),
 				Name: aws.String("api.test-cluster"),
@@ -1478,6 +1456,17 @@ users:
 				Id: aws.String("HZ12345"),
 			}).Return(nil, nil)
 
+			endpoint := &ec2.VpcEndpoint{
+				VpcEndpointId: aws.String("vpce-12345"),
+				VpcId:         aws.String("vpc-1"),
+			}
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).
+				Return(&ec2.DescribeVpcEndpointsOutput{
+					VpcEndpoints: []*ec2.VpcEndpoint{{
+						VpcEndpointId: endpoint.VpcEndpointId,
+						VpcId:         endpoint.VpcId,
+					}},
+				}, nil).Times(1)
 			m.EXPECT().DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{
 				VpcEndpointIds: aws.StringSlice([]string{*endpoint.VpcEndpointId}),
 			}).Return(nil, nil)

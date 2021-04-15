@@ -16,9 +16,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/events"
 
-	apiextclientv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	apiregclientv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -94,16 +91,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	r.(*ReconcileHiveConfig).apiregClient, err = apiregclientv1.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-
-	r.(*ReconcileHiveConfig).apiextClient, err = apiextclientv1beta1.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		return err
-	}
-
 	r.(*ReconcileHiveConfig).discoveryClient, err = discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
@@ -154,6 +141,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to HiveConfig:
 	err = c.Watch(&source.Kind{Type: &hivev1.HiveConfig{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	err = mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.HiveConfig{}, "spec.secrets.secretName", func(o client.Object) []string {
+		var res []string
+		instance := o.(*hivev1.HiveConfig)
+
+		// add all the secret objects to res that should trigger resync of HiveConfig
+
+		for _, lObj := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
+			res = append(res, lObj.Name)
+		}
+
+		return res
+	})
 	if err != nil {
 		return err
 	}
@@ -223,8 +226,6 @@ type ReconcileHiveConfig struct {
 	client.Client
 	scheme                            *runtime.Scheme
 	kubeClient                        kubernetes.Interface
-	apiextClient                      *apiextclientv1beta1.ApiextensionsV1beta1Client
-	apiregClient                      *apiregclientv1.ApiregistrationV1Client
 	discoveryClient                   discovery.DiscoveryInterface
 	dynamicClient                     dynamic.Interface
 	restConfig                        *rest.Config
@@ -444,6 +445,35 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 			hLog.WithError(err).Error("error establishing secret watch")
 			return err
 		}
+
+		// Watch secrets in HiveConfig that should trigger reconcile on change.
+		err = r.ctrlr.Watch(&source.Informer{Informer: secretsInformer}, handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			retval := []reconcile.Request{}
+			secret, ok := a.(*corev1.Secret)
+			if !ok {
+				// Wasn't a Secret, bail out. This should not happen.
+				hLog.Errorf("Error converting MapObject.Object to Secret. Value: %+v", a)
+				return retval
+			}
+
+			configWithSecrets := &hivev1.HiveConfigList{}
+			err := r.mgr.GetClient().List(context.Background(), configWithSecrets, client.MatchingFields{"spec.secrets.secretName": secret.Name})
+			if err != nil {
+				hLog.Errorf("Error listing HiveConfigs for secret %s: %v", secret.Name, err)
+				return retval
+			}
+			for _, config := range configWithSecrets.Items {
+				retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+					Name: config.Name,
+				}})
+			}
+			hLog.WithField("secretName", secret.Name).WithField("configs", retval).Debug("secret change trigger reconcile for HiveConfigs")
+			return retval
+		}))
+		if err != nil {
+			return err
+		}
+
 		r.servingCertSecretWatchEstablished = true
 	} else {
 		hLog.Debug("secret watch already established")

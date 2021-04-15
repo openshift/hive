@@ -7,6 +7,10 @@ objects:
     kind: ConfigMap
     metadata:
       name: additional-install-log-regexes
-      namespace: hive
     data:
-      regexes:
+      regexes: |
+        - name: EIPAddressLimitExceeded
+          searchRegexStrings:
+            - "EIP: AddressLimitExceeded"
+          installFailingReason: EIPAddressLimitExceeded
+          installFailingMessage: EIP Address limit exceeded

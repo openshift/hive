@@ -130,9 +130,22 @@ To configure Hive to support Private Link in a specific region,
             name: < credentials that have access to account where Hive2 VPC exists>
     ```
 
-    You can include VPC from all the regions where private link is suported in the
-    endpointVPCInventory list. The controller will pick a VPC appropiate for the
+    You can include VPC from all the regions where private link is supported in the
+    endpointVPCInventory list. The controller will pick a VPC appropriate for the
     ClusterDeployment.
+
+### Security Groups for VPC Endpoints
+
+Each VPC Endpoint in AWS has a Security Group attached to control access to the endpoint.
+See the [docs][control-access-vpc-endpoint] for details.
+
+When Hive creates VPC Endpoint, it does not specify any Security Group and therefore the
+default Security Group of the VPC is attached to the VPC Endpoint. Therefore, the default
+security group of the VPC where VPC Endpoints are created must have rules to allow traffic
+from the Hive installer pods.
+
+For example, if Hive is running in hive-vpc(10.1.0.0/16), there must be a rule in default
+Security Group of VPC where VPC Endpoint is created that allows ingess from 10.1.0.0/16.
 
 ## Using AWS Private Link
 
@@ -206,3 +219,4 @@ expectations of required permissions for these credentials.
     ```
 
 [aws-private-link-overview]: https://docs.aws.amazon.com/vpc/latest/privatelink/endpoint-services-overview.html
+[control-access-vpc-endpoint]: https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html#vpc-endpoints-security-groups

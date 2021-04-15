@@ -21,6 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1788,4 +1789,50 @@ func Test_shouldSync(t *testing.T) {
 			assert.Equal(t, tt.syncAfter, got1)
 		})
 	}
+}
+
+func Test_toSupportedSubnets(t *testing.T) {
+	inv := []hivev1.AWSPrivateLinkInventory{{
+		AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+			VPCID:  "vpc-1",
+			Region: "us-east-1",
+		},
+		Subnets: []hivev1.AWSPrivateLinkSubnet{{
+			SubnetID:         "subnet-4",
+			AvailabilityZone: "az4",
+		}, {
+			SubnetID:         "subnet-5",
+			AvailabilityZone: "az5",
+		}, {
+			SubnetID:         "subnet-6",
+			AvailabilityZone: "az6",
+		}},
+	}, {
+		AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+			VPCID:  "vpc-1",
+			Region: "us-east-1",
+		},
+		Subnets: []hivev1.AWSPrivateLinkSubnet{{
+			SubnetID:         "subnet-1",
+			AvailabilityZone: "az1",
+		}, {
+			SubnetID:         "subnet-2",
+			AvailabilityZone: "az2",
+		}, {
+			SubnetID:         "subnet-3",
+			AvailabilityZone: "az3",
+		}},
+	}}
+
+	inv = filterVPCInventory(inv, toSupportedSubnets(sets.NewString("az3")))
+	assert.Equal(t, []hivev1.AWSPrivateLinkInventory{{
+		AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+			VPCID:  "vpc-1",
+			Region: "us-east-1",
+		},
+		Subnets: []hivev1.AWSPrivateLinkSubnet{{
+			SubnetID:         "subnet-3",
+			AvailabilityZone: "az3",
+		}},
+	}}, inv)
 }

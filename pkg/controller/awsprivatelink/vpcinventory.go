@@ -77,12 +77,12 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 	return &candidates[0], nil
 }
 
-type filterVPCInventoryFn func(hivev1.AWSPrivateLinkInventory) bool
+type filterVPCInventoryFn func(*hivev1.AWSPrivateLinkInventory) bool
 
 func filterVPCInventory(input []hivev1.AWSPrivateLinkInventory, fn filterVPCInventoryFn) []hivev1.AWSPrivateLinkInventory {
 	n := 0
 	for _, cand := range input {
-		if fn(cand) {
+		if fn(&cand) {
 			input[n] = cand
 			n++
 		}
@@ -92,13 +92,13 @@ func filterVPCInventory(input []hivev1.AWSPrivateLinkInventory, fn filterVPCInve
 }
 
 func toSupportedRegion(region string) filterVPCInventoryFn {
-	return func(inv hivev1.AWSPrivateLinkInventory) bool {
+	return func(inv *hivev1.AWSPrivateLinkInventory) bool {
 		return strings.EqualFold(region, inv.Region)
 	}
 }
 
 func toSupportedSubnets(azs sets.String) filterVPCInventoryFn {
-	return func(inv hivev1.AWSPrivateLinkInventory) bool {
+	return func(inv *hivev1.AWSPrivateLinkInventory) bool {
 		n := 0
 		for _, subnet := range inv.Subnets {
 			if azs.Has(subnet.AvailabilityZone) {
@@ -123,7 +123,7 @@ const (
 )
 
 func toAvailableQuota(existingPerVPC map[string]int) filterVPCInventoryFn {
-	return func(inv hivev1.AWSPrivateLinkInventory) bool {
+	return func(inv *hivev1.AWSPrivateLinkInventory) bool {
 		avail := VPCEndpointPerVPCLimit - existingPerVPC[inv.VPCID]
 		if avail > 0 {
 			return true

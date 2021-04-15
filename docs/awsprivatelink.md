@@ -194,6 +194,8 @@ expectations of required permissions for these credentials.
     ec2:DescribeVpcEndpointServices
     ec2:DescribeVpcEndpoints
     ec2:CreateVpcEndpoint
+    ec2:CreateTags
+    ec2:DescribeVPCs
 
     ec2:DeleteVpcEndpoints
 
@@ -204,6 +206,8 @@ expectations of required permissions for these credentials.
     route53:DisassociateVPCFromHostedZone
     route53:CreateVPCAssociationAuthorization
     route53:DeleteVPCAssociationAuthorization
+    route53:ListResourceRecordSets
+    route53:ChangeResourceRecordSets
 
     route53:DeleteHostedZone
     ```
@@ -216,6 +220,7 @@ expectations of required permissions for these credentials.
     ```txt
     route53:AssociateVPCWithHostedZone
     route53:DisassociateVPCFromHostedZone
+    ec2:DescribeVPCs
     ```
 
 [aws-private-link-overview]: https://docs.aws.amazon.com/vpc/latest/privatelink/endpoint-services-overview.html

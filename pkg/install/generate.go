@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -47,6 +48,15 @@ const (
 
 	// LibvirtSSHPrivateKeyDir is the directory where the generated Job will mount the libvirt ssh secret to
 	LibvirtSSHPrivateKeyDir = "/libvirtsshkeys"
+
+	// provisionJobDeadline is the maximum time that provision job will be allowed to run.
+	// when this deadline is reached, the provision attempt will be marked failed.
+	// since provision jobs can include cleanup before attempting installation, this should
+	// include maximum of both these durations to allow for a successfull attempt.
+	provisionJobDeadline = 3 * time.Hour
+	// deprovisionJobDeadline is the maximum time that deprovision job will be allowed to run.
+	// when this deadline is reached, the deprovision attempt will be marked failed.
+	deprovisionJobDeadline = 1 * time.Hour
 )
 
 var (
@@ -575,8 +585,9 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: pointer.Int32Ptr(0),
-			Completions:  pointer.Int32Ptr(1),
+			BackoffLimit:          pointer.Int32Ptr(0),
+			Completions:           pointer.Int32Ptr(1),
+			ActiveDeadlineSeconds: pointer.Int64Ptr(int64(provisionJobDeadline.Seconds())),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -626,8 +637,9 @@ func GenerateUninstallerJobForDeprovision(
 	job.ObjectMeta.Labels = labels
 	job.ObjectMeta.Annotations = map[string]string{}
 	job.Spec = batchv1.JobSpec{
-		Completions:  &completions,
-		BackoffLimit: &backoffLimit,
+		Completions:           &completions,
+		BackoffLimit:          &backoffLimit,
+		ActiveDeadlineSeconds: pointer.Int64Ptr(int64(deprovisionJobDeadline.Seconds())),
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: labels,

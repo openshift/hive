@@ -138,6 +138,16 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			expectedFailReason: unknownReason,
 		},
 		{
+			name: "deadline exceeded job",
+			existing: []runtime.Object{
+				testProvision(withJob()),
+				testJob(deadlineExceededJob()),
+				testPod("foo"),
+			},
+			expectedStage:      hivev1.ClusterProvisionStageFailed,
+			expectedFailReason: "AttemptDeadlineExceeded",
+		},
+		{
 			name: "keep job for 24 hours after success",
 			existing: []runtime.Object{
 				testProvision(succeeded(), withJob(), withCreationTime(time.Now())),
@@ -426,6 +436,17 @@ func failedJob() testjob.Option {
 			batchv1.JobCondition{
 				Type:   batchv1.JobFailed,
 				Status: corev1.ConditionTrue,
+			},
+		)
+	}
+}
+func deadlineExceededJob() testjob.Option {
+	return func(job *batchv1.Job) {
+		job.Status.Conditions = append(job.Status.Conditions,
+			batchv1.JobCondition{
+				Type:   batchv1.JobFailed,
+				Status: corev1.ConditionTrue,
+				Reason: "DeadlineExceeded",
 			},
 		)
 	}

@@ -155,6 +155,9 @@ type ClusterDeprovisionConditionType string
 const (
 	// AuthenticationFailureClusterDeprovisionCondition is true when credentials cannot be used because of authentication failure
 	AuthenticationFailureClusterDeprovisionCondition ClusterDeprovisionConditionType = "AuthenticationFailure"
+
+	// DeprovisionFailedClusterDeprovisionCondition is true when deprovision attempt failed
+	DeprovisionFailedClusterDeprovisionCondition ClusterDeprovisionConditionType = "DeprovisionFailed"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -208,11 +208,13 @@ func getKnownConditions(conditions []hivev1.ClusterDeploymentCondition) (conditi
 	for _, delayCondition := range provisioningDelayCondition {
 		if cdCondition := controllerutils.FindClusterDeploymentCondition(conditions,
 			delayCondition); cdCondition != nil {
-			if cdCondition.Status == corev1.ConditionTrue && cdCondition.Reason != "" {
+			if cdCondition.Status == corev1.ConditionTrue {
 				condition = string(delayCondition)
-				reason = cdCondition.Reason
+				if cdCondition.Reason != "" {
+					reason = cdCondition.Reason
+				}
+				break
 			}
-			break
 		}
 	}
 	return condition, reason

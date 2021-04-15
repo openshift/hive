@@ -422,6 +422,30 @@ func TestProvisioningUnderwayInstallRestartsCollector(t *testing.T) {
 			"cluster_deployment = cd-3 cluster_type = unspecified condition = DNSNotReady image_set = none namespace = cd-3 platform =  reason = FailedDueToQuotas 2",
 		},
 	}, {
+		name: "cluster deployment with multiple conditions",
+		existing: []runtime.Object{
+			cdBuilder("cd-1").Build(testcd.InstallRestarts(1),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.DNSNotReadyCondition,
+					Status: corev1.ConditionFalse,
+					Reason: "DNSReady",
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionTrue,
+					Reason: "FailedDueToQuotas",
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionTrue,
+					Reason: "InstallRestartsReached",
+				})),
+		},
+		min: 1,
+		expected: []string{
+			"cluster_deployment = cd-1 cluster_type = unspecified condition = ProvisionFailed image_set = none namespace = cd-1 platform =  reason = FailedDueToQuotas 1",
+		},
+	}, {
 		name: "provisioning with no conditions and restarts less than min restarts",
 		existing: []runtime.Object{
 			cdBuilder("cd-1").Build(testcd.Installed()),

@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/time/rate"
+	corev1 "k8s.io/api/core/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -370,6 +372,121 @@ func TestEnsureRequeueAtLeastWithin(t *testing.T) {
 			actualResult, actualErr := EnsureRequeueAtLeastWithin(tc.duration, tc.result, tc.err)
 			assert.Equal(t, tc.expectedResult, actualResult, "unexpected reconcile result")
 			assert.Equal(t, tc.expectedErr, actualErr, "unexpected error")
+		})
+	}
+}
+
+const (
+	testHttpProxy  = "localhost:3112"
+	testHttpsProxy = "localhost:4432"
+	testNoProxy    = "example.com,foo.com,bar.org"
+)
+
+func TestSetProxyEnvVars(t *testing.T) {
+	createPodSpec := func(containers int, origEnvVars map[string]string) *corev1.PodSpec {
+		podSpec := &corev1.PodSpec{}
+		envVars := []corev1.EnvVar{}
+		for k, v := range origEnvVars {
+			envVars = append(envVars, corev1.EnvVar{Name: k, Value: v})
+		}
+		for i := 0; i < containers; i++ {
+			c := corev1.Container{
+				Name: fmt.Sprintf("container%d", i),
+				Env:  envVars,
+			}
+			podSpec.Containers = append(podSpec.Containers, c)
+
+		}
+		return podSpec
+	}
+	cases := []struct {
+		name                           string
+		podSpec                        *corev1.PodSpec
+		httpProxy, httpsProxy, noProxy string
+		expectedEnvVars                map[string]string
+		expectedErr                    bool
+	}{
+		{
+			name: "add all proxy env vars",
+			podSpec: createPodSpec(1, map[string]string{
+				"foo": "bar",
+			}),
+			httpProxy:  testHttpProxy,
+			httpsProxy: testHttpsProxy,
+			noProxy:    testNoProxy,
+			expectedEnvVars: map[string]string{
+				"foo":         "bar",
+				"HTTP_PROXY":  testHttpProxy,
+				"HTTPS_PROXY": testHttpsProxy,
+				"NO_PROXY":    testNoProxy,
+			},
+		},
+		{
+			name: "add some proxy env vars",
+			podSpec: createPodSpec(1, map[string]string{
+				"foo": "bar",
+			}),
+			httpProxy: testHttpProxy,
+			expectedEnvVars: map[string]string{
+				"foo":        "bar",
+				"HTTP_PROXY": testHttpProxy,
+			},
+		},
+		{
+			name: "add no proxy env vars",
+			podSpec: createPodSpec(1, map[string]string{
+				"foo": "bar",
+			}),
+			expectedEnvVars: map[string]string{
+				"foo": "bar",
+			},
+		},
+		{
+			name: "container already has proxy env vars",
+			podSpec: createPodSpec(1, map[string]string{
+				"foo":         "bar",
+				"HTTP_PROXY":  testHttpProxy,
+				"HTTPS_PROXY": testHttpsProxy,
+				"NO_PROXY":    testNoProxy,
+			}),
+			httpProxy:  testHttpProxy,
+			httpsProxy: testHttpsProxy,
+			noProxy:    testNoProxy,
+			expectedEnvVars: map[string]string{
+				"foo":         "bar",
+				"HTTP_PROXY":  testHttpProxy,
+				"HTTPS_PROXY": testHttpsProxy,
+				"NO_PROXY":    testNoProxy,
+			},
+		},
+		{
+			name: "container already has proxy env vars diff values",
+			podSpec: createPodSpec(1, map[string]string{
+				"foo":         "bar",
+				"HTTP_PROXY":  "foo",
+				"HTTPS_PROXY": "bar",
+				"NO_PROXY":    "no",
+			}),
+			httpProxy:  testHttpProxy,
+			httpsProxy: testHttpsProxy,
+			noProxy:    testNoProxy,
+			expectedEnvVars: map[string]string{
+				"foo":         "bar",
+				"HTTP_PROXY":  testHttpProxy,
+				"HTTPS_PROXY": testHttpsProxy,
+				"NO_PROXY":    testNoProxy,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			SetProxyEnvVars(tc.podSpec, tc.httpProxy, tc.httpsProxy, tc.noProxy)
+			for _, c := range tc.podSpec.Containers {
+				assert.Equal(t, len(tc.expectedEnvVars), len(c.Env), "unexpected env var cound on container %s", c.Name)
+			}
+			for k, v := range tc.expectedEnvVars {
+				hiveassert.AssertAllContainersHaveEnvVar(t, tc.podSpec, k, v)
+			}
 		})
 	}
 }

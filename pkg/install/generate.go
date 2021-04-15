@@ -142,9 +142,10 @@ credential_process = %s
 // InstallerPodSpec generates a spec for an installer pod.
 func InstallerPodSpec(
 	cd *hivev1.ClusterDeployment,
-	provisionName string,
-	releaseImage string,
-	serviceAccountName string,
+	provisionName,
+	releaseImage,
+	serviceAccountName,
+	httpProxy, httpsProxy, noProxy string,
 	extraEnvVars []corev1.EnvVar,
 ) (*corev1.PodSpec, error) {
 
@@ -551,14 +552,16 @@ func InstallerPodSpec(
 		},
 	}
 
-	return &corev1.PodSpec{
+	podSpec := &corev1.PodSpec{
 		DNSPolicy:          corev1.DNSClusterFirst,
 		RestartPolicy:      corev1.RestartPolicyNever,
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
-	}, nil
+	}
+	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
+	return podSpec, nil
 }
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
@@ -613,7 +616,7 @@ func GetUninstallJobName(name string) string {
 // GenerateUninstallerJobForDeprovision generates an uninstaller job for a given deprovision request
 func GenerateUninstallerJobForDeprovision(
 	req *hivev1.ClusterDeprovision,
-	serviceAccountName string,
+	serviceAccountName, httpProxy, httpsProxy, noProxy string,
 	extraEnvVars []corev1.EnvVar) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
@@ -668,6 +671,7 @@ func GenerateUninstallerJobForDeprovision(
 	for idx := range job.Spec.Template.Spec.Containers {
 		job.Spec.Template.Spec.Containers[idx].Env = append(job.Spec.Template.Spec.Containers[idx].Env, extraEnvVars...)
 	}
+	controllerutils.SetProxyEnvVars(&job.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
 
 	return job, nil
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -16,15 +17,24 @@ var (
 	cliImage       = "fakecliimage"
 )
 
+const (
+	testHttpProxy  = "localhost:3112"
+	testHttpsProxy = "localhost:4432"
+	testNoProxy    = "example.com,foo.com,bar.org"
+)
+
 func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
 func TestGenerateDeprovision(t *testing.T) {
 	dr := testClusterDeprovision()
-	job, err := GenerateUninstallerJobForDeprovision(dr, "someseviceaccount", nil)
+	job, err := GenerateUninstallerJobForDeprovision(dr, "someseviceaccount", testHttpProxy, testHttpsProxy, testNoProxy, nil)
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
+	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)
+	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTPS_PROXY", testHttpsProxy)
+	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "NO_PROXY", testNoProxy)
 }
 
 func testClusterDeprovision() *hivev1.ClusterDeprovision {
@@ -104,10 +114,16 @@ func TestInstallerPodSpec(t *testing.T) {
 				test.provisionName,
 				test.releaseImage,
 				test.serviceAccountName,
+				testHttpProxy,
+				testHttpsProxy,
+				testNoProxy,
 				test.extraEnvVars)
 
 			// Assert
 			test.validate(t, actualPodSpec, actualError)
+			hiveassert.AssertAllContainersHaveEnvVar(t, actualPodSpec, "HTTP_PROXY", testHttpProxy)
+			hiveassert.AssertAllContainersHaveEnvVar(t, actualPodSpec, "HTTPS_PROXY", testHttpsProxy)
+			hiveassert.AssertAllContainersHaveEnvVar(t, actualPodSpec, "NO_PROXY", testNoProxy)
 		})
 	}
 }

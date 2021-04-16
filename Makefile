@@ -240,7 +240,7 @@ docker-push:
 
 # Build and push the dev image
 .PHONY: docker-dev-push
-docker-dev-push: build image-hive-dev docker-push
+docker-dev-push: build image-hive-fedora-dev docker-push
 
 # Build the dev image using builah
 .PHONY: buildah-dev-build

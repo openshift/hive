@@ -1307,6 +1307,13 @@ func (in *ClusterPoolSpec) DeepCopyInto(out *ClusterPoolSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.InstallConfigSecretTemplateRef != nil {
 		in, out := &in.InstallConfigSecretTemplateRef, &out.InstallConfigSecretTemplateRef
 		*out = new(corev1.LocalObjectReference)

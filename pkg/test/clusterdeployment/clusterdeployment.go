@@ -91,6 +91,11 @@ func WithLabel(key, value string) Option {
 	return Generic(generic.WithLabel(key, value))
 }
 
+// WithAnnotation sets the specified annotation on the supplied object.
+func WithAnnotation(key, value string) Option {
+	return Generic(generic.WithAnnotation(key, value))
+}
+
 // WithCondition adds the specified condition to the ClusterDeployment
 func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {

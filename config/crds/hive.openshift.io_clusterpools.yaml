@@ -52,6 +52,13 @@ spec:
         spec:
           description: ClusterPoolSpec defines the desired state of the ClusterPool.
           properties:
+            annotations:
+              additionalProperties:
+                type: string
+              description: Annotations to be applied to new ClusterDeployments created
+                for the pool. ClusterDeployments that have already been claimed will
+                not be affected when this value is modified.
+              type: object
             baseDomain:
               description: BaseDomain is the base domain to use for all clusters created
                 in this pool.

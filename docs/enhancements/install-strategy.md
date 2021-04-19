@@ -99,6 +99,23 @@ ClusterInstall controllers can add their own conditions, but these will not tran
 
 The core ClusterInstall CRDs and controllers discussed in this document should live in Hive. However, in theory, it would be possible for an external application to implement it's own ClusterInstall outside of Hive and still interface with ClusterDeployment using this system.
 
+### Cluster Deprovisioning
+
+Today in Hive each ClusterDeployment is given a finalizer automatically, and when the API resource is deleted we create a ClusterDeprovision resource, which launches a pod to run the openshift-install deprovision process until it completes, after which the finalizer is removed and the ClusterDeployment is removed.
+
+There is presently no deprovision implementation for agent based or bare metal clusters.
+
+It stands to reason that deprovision implementations are fully tied to ClusterInstall implementations.
+
+Option 1: Deleting ClusterInstall automatically deprovisions cluster. Clean in that we know exactly what implementation to use. Dangerous in that users might think it should be safe to delete a ClusterInstall to free up space in etcd after the cluster is provisioned, inadvertently destroying their cluster.
+
+Option 2: Deleting ClusterDeployment automatically deprovisions the cluster as we do today. (how do we know what implementation to call?
+
+Option 3: Caller must specify a ClusterDeprovision themselves. Discussed many times for safety reasons, but has never been popular with team due to unusual Kube behavior and a desire to instad mitigate risks of accidental deletion in other ways.
+
+
+
+
 ### Migration Plan
 
 No breakage for current installation API is planned. (with exception of as yet unreleased Agent install strategy)

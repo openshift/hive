@@ -548,6 +548,7 @@ func (r *ReconcileClusterPool) createCluster(
 		PullSecret:            pullSecret,
 		CloudBuilder:          cloudBuilder,
 		Labels:                clp.Spec.Labels,
+		Annotations:           clp.Spec.Annotations,
 		InstallConfigTemplate: installConfigTemplate,
 		SkipMachinePools:      clp.Spec.SkipMachinePools,
 	}

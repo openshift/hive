@@ -46,6 +46,11 @@ type ClusterPoolSpec struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
+	// Annotations to be applied to new ClusterDeployments created for the pool. ClusterDeployments that have already been
+	// claimed will not be affected when this value is modified.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// InstallConfigSecretTemplateRef is a secret with the key install-config.yaml consisting of the content of the install-config.yaml
 	// to be used as a template for all clusters in this pool.
 	// Cluster specific settings (name, basedomain) will be injected dynamically when the ClusterDeployment install-config Secret is generated.

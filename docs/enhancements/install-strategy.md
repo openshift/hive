@@ -15,11 +15,13 @@ Hive is presently struggling with how to design the API to meet the needs of pro
 - Breakout clusterDeployment.spec.installStrategy.agent to a separate AgentClusterInstall CRD. This is still guarded by an alpha feature gate and thus we should still be able to move it around.
 - Provide space for implementations to define the spec and status they need without causing uncomfortable complications for other implementations.
 - Do not break API compatability for existing standalone OpenShift cluster provisioning. We hope to slowly migrate those installs to this system by offering it in parallel and eventually deprecating the old, but for now the focus is on breaking out the AgentClusterInstall CRD.
+- Plan for a future of integration of ClusterInstalls with ClusterPools. (see Future Considerations)
 
 ### Non-Goals
 
 - Replace ClusterProvision. This CRD represents an attempt to install a standalone cluster, it's highly specific to running openshift-install in a pod, and we do not want to modify anything in this area. Even if we move standalone provisions to an OpenShiftClusterInstall, ClusterProvision will likely be used beneath it as the retry mechanism.
 - Implementing retries within Hive itself. Retries will be left to specific implementations of ClusterInstall interface, if desired.
+- Implementing ClusterPool support for ClusterInstalls. (see Future Considerations)
 
 ## Proposal
 
@@ -103,11 +105,6 @@ No breakage for current installation API is planned. (with exception of as yet u
 
 Initial goal would be to breakout ClusterDeployment.Spec.InstallStrategy.Agent. The only implementation here is agent based and this is hidden behind an alpha feature gate, and not yet released to customers. Replace this with a new hive.openshift.io.AgentClusterInstall CRD, and a ClusterDeployment.Spec.ClusterInstallRef link. Refactor the Agent controllers (currently living in the assisted service repo, coming to hive in future) to watch this resource instead of ClusterDeployment.
 
-In the future, we could migrate the current standalone openshift-install implementation to an OpenShiftClusterInstall, which continues to use ClusterProvision for it's retry mechanism. To do this we would allow a parallel path to specify where you cannot use both ClusterInstallRef and provisioning sections together. Provisioning then becomes deprecated and after some period of time, could be removed.
-
-In the future we could add an additional implementation which offers InstallConfig generation, and could be used by users who are ok with a simpler interface and don't want to specify an install config secret.
-
-HypershiftClusterInstall would be another likely future implementation.
 
 ### Examples
 
@@ -178,6 +175,30 @@ spec:
       status: "True"
       type: AgentSpecificCondition
 ```
+
+### Future Considerations
+
+#### OpenShiftClusterInstall
+
+Once the concept is proved with AgentClusterInstall, we would want to soon move the current openshift-install ClusterProvision standalone implementation to an OpenShiftClusterInstall CRD to match this flow. Existing ClusterDeployment Provisioning section would be deprecated over time, and not usable in conjunction with a ClusterInstallRef. Eventually the Provisioning section would be removed entirely
+
+#### HypershiftClusterInstall
+
+Hypershift is likely to be our next integration point and would thus benefit from having a HyperShiftClusterInstall CRD on which to define settings needed to install a Hypershift cluster.
+
+#### NoInstallConfigOpenShiftClusterInstall
+
+We've pondered returning to supporting a way to provision ClusterDeployments without requiring users to specify their own InstallConfig Secret and instead offering a fully defined Kubernetes API and generating the install-config as an implementation detail. This could be added as a separate ClusterInstall implementation for those who would like a simpler interface.
+
+#### ClusterPool Support
+
+ClusterInstall implementations could in the future be used in conjunction with ClusterPools. ClusterPool would gain a ClusterInstallRef. Hive will copy this ClusterInstall to the namespace of the ClusterDeployment when created and associate them together.
+
+The requirement here would be that for a ClusterInstall to *function* with ClusterPools, it must not contain anything cluster specific. It can however contain configuration for how to obtain cluster specific information. Hive itself does not care about any of this, and controllers to fullfill that ClusterInstall can be implented outside of Hive. Hive will manage the pool, create new ClusterDeployments as necessary and fulfill claims.
+
+For an example consider our outstanding request to support VMWare cluster pools, but with arbitrary DNS configurations that could change depending on use case. In this scenario an external entity could implement MyCustomVMWareInstall. That CRD could define configuration to obtain DNS from Route53 or other, and then generate an appropriate InstallConfig.
+
+This idea would need to be fleshed out more in the future when the time came to implement.
 
 
 ### Risks and Mitigations

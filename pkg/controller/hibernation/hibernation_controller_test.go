@@ -26,6 +26,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/hibernation/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
@@ -528,6 +529,15 @@ func TestHibernateAfter(t *testing.T) {
 				testcs.WithFirstSuccessTime(time.Now()),
 			).Build(),
 			expectedPowerState: hivev1.HibernatingClusterPowerState,
+		},
+		{
+			name: "skip hibernation for fake cluster",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(1*time.Hour),
+				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
+				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
+			cs:                 csBuilder.Build(),
+			expectedPowerState: "",
 		},
 	}
 

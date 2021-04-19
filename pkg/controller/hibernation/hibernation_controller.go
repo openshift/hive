@@ -159,6 +159,10 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if !cd.Spec.Installed {
 		return reconcile.Result{}, nil
 	}
+	// If cluster is fake, skip any processing
+	if controllerutils.IsFakeCluster(cd) {
+		return reconcile.Result{}, nil
+	}
 
 	shouldHibernate := cd.Spec.PowerState == hivev1.HibernatingClusterPowerState
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)

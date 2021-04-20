@@ -630,7 +630,7 @@ func FindClusterDeprovisionCondition(conditions []hivev1.ClusterDeprovisionCondi
 
 // FindClusterInstallCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
-func FindClusterInstallCondition(conditions []hivecontractsv1alpha1.ClusterInstallCondition, conditionType hivecontractsv1alpha1.ClusterInstallConditionType) *hivecontractsv1alpha1.ClusterInstallCondition {
+func FindClusterInstallCondition(conditions []hivecontractsv1alpha1.ClusterInstallCondition, conditionType string) *hivecontractsv1alpha1.ClusterInstallCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

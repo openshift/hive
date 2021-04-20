@@ -1041,11 +1041,13 @@ func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.C
 func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
 	nextProvisionTime := time.Now()
 	reason := "MissingCondition"
+	message := fmt.Sprintf("Provision %s failed. Next provision will begin soon.", provision.Name)
 
 	failedCond := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
 	if failedCond != nil && failedCond.Status == corev1.ConditionTrue {
 		nextProvisionTime = calculateNextProvisionTime(failedCond.LastTransitionTime.Time, cd.Status.InstallRestarts, cdLog)
 		reason = failedCond.Reason
+		message = fmt.Sprintf("Provision %s failed. Next provision at %s.\n\n%s", provision.Name, nextProvisionTime.UTC().Format(time.RFC3339), failedCond.Message)
 	} else {
 		cdLog.Warnf("failed provision does not have a %s condition", hivev1.ClusterProvisionFailedCondition)
 	}
@@ -1055,7 +1057,7 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 		hivev1.ProvisionFailedCondition,
 		corev1.ConditionTrue,
 		reason,
-		fmt.Sprintf("Provision %s failed. Next provision at %s.", provision.Name, nextProvisionTime.UTC().Format(time.RFC3339)),
+		message,
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	cd.Status.Conditions = newConditions

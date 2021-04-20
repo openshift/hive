@@ -2,6 +2,8 @@
 
 package v1
 
+type AgentClusterInstallExpansion interface{}
+
 type CheckpointExpansion interface{}
 
 type ClusterClaimExpansion interface{}
@@ -21,6 +23,8 @@ type ClusterRelocateExpansion interface{}
 type ClusterStateExpansion interface{}
 
 type DNSZoneExpansion interface{}
+
+type FakeClusterInstallExpansion interface{}
 
 type HiveConfigExpansion interface{}
 

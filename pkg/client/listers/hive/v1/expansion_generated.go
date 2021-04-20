@@ -2,6 +2,14 @@
 
 package v1
 
+// AgentClusterInstallListerExpansion allows custom methods to be added to
+// AgentClusterInstallLister.
+type AgentClusterInstallListerExpansion interface{}
+
+// AgentClusterInstallNamespaceListerExpansion allows custom methods to be added to
+// AgentClusterInstallNamespaceLister.
+type AgentClusterInstallNamespaceListerExpansion interface{}
+
 // CheckpointListerExpansion allows custom methods to be added to
 // CheckpointLister.
 type CheckpointListerExpansion interface{}
@@ -73,6 +81,14 @@ type DNSZoneListerExpansion interface{}
 // DNSZoneNamespaceListerExpansion allows custom methods to be added to
 // DNSZoneNamespaceLister.
 type DNSZoneNamespaceListerExpansion interface{}
+
+// FakeClusterInstallListerExpansion allows custom methods to be added to
+// FakeClusterInstallLister.
+type FakeClusterInstallListerExpansion interface{}
+
+// FakeClusterInstallNamespaceListerExpansion allows custom methods to be added to
+// FakeClusterInstallNamespaceLister.
+type FakeClusterInstallNamespaceListerExpansion interface{}
 
 // HiveConfigListerExpansion allows custom methods to be added to
 // HiveConfigLister.

@@ -12,6 +12,10 @@ type FakeHiveV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeHiveV1) AgentClusterInstalls(namespace string) v1.AgentClusterInstallInterface {
+	return &FakeAgentClusterInstalls{c, namespace}
+}
+
 func (c *FakeHiveV1) Checkpoints(namespace string) v1.CheckpointInterface {
 	return &FakeCheckpoints{c, namespace}
 }
@@ -50,6 +54,10 @@ func (c *FakeHiveV1) ClusterStates(namespace string) v1.ClusterStateInterface {
 
 func (c *FakeHiveV1) DNSZones(namespace string) v1.DNSZoneInterface {
 	return &FakeDNSZones{c, namespace}
+}
+
+func (c *FakeHiveV1) FakeClusterInstalls(namespace string) v1.FakeClusterInstallInterface {
+	return &FakeFakeClusterInstalls{c, namespace}
 }
 
 func (c *FakeHiveV1) HiveConfigs() v1.HiveConfigInterface {

@@ -8,6 +8,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// AgentClusterInstalls returns a AgentClusterInstallInformer.
+	AgentClusterInstalls() AgentClusterInstallInformer
 	// Checkpoints returns a CheckpointInformer.
 	Checkpoints() CheckpointInformer
 	// ClusterClaims returns a ClusterClaimInformer.
@@ -28,6 +30,8 @@ type Interface interface {
 	ClusterStates() ClusterStateInformer
 	// DNSZones returns a DNSZoneInformer.
 	DNSZones() DNSZoneInformer
+	// FakeClusterInstalls returns a FakeClusterInstallInformer.
+	FakeClusterInstalls() FakeClusterInstallInformer
 	// HiveConfigs returns a HiveConfigInformer.
 	HiveConfigs() HiveConfigInformer
 	// MachinePools returns a MachinePoolInformer.
@@ -53,6 +57,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// AgentClusterInstalls returns a AgentClusterInstallInformer.
+func (v *version) AgentClusterInstalls() AgentClusterInstallInformer {
+	return &agentClusterInstallInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Checkpoints returns a CheckpointInformer.
@@ -103,6 +112,11 @@ func (v *version) ClusterStates() ClusterStateInformer {
 // DNSZones returns a DNSZoneInformer.
 func (v *version) DNSZones() DNSZoneInformer {
 	return &dNSZoneInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// FakeClusterInstalls returns a FakeClusterInstallInformer.
+func (v *version) FakeClusterInstalls() FakeClusterInstallInformer {
+	return &fakeClusterInstallInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // HiveConfigs returns a HiveConfigInformer.

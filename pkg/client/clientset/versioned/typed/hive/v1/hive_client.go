@@ -10,6 +10,7 @@ import (
 
 type HiveV1Interface interface {
 	RESTClient() rest.Interface
+	AgentClusterInstallsGetter
 	CheckpointsGetter
 	ClusterClaimsGetter
 	ClusterDeploymentsGetter
@@ -20,6 +21,7 @@ type HiveV1Interface interface {
 	ClusterRelocatesGetter
 	ClusterStatesGetter
 	DNSZonesGetter
+	FakeClusterInstallsGetter
 	HiveConfigsGetter
 	MachinePoolsGetter
 	MachinePoolNameLeasesGetter
@@ -32,6 +34,10 @@ type HiveV1Interface interface {
 // HiveV1Client is used to interact with features provided by the hive.openshift.io group.
 type HiveV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *HiveV1Client) AgentClusterInstalls(namespace string) AgentClusterInstallInterface {
+	return newAgentClusterInstalls(c, namespace)
 }
 
 func (c *HiveV1Client) Checkpoints(namespace string) CheckpointInterface {
@@ -72,6 +78,10 @@ func (c *HiveV1Client) ClusterStates(namespace string) ClusterStateInterface {
 
 func (c *HiveV1Client) DNSZones(namespace string) DNSZoneInterface {
 	return newDNSZones(c, namespace)
+}
+
+func (c *HiveV1Client) FakeClusterInstalls(namespace string) FakeClusterInstallInterface {
+	return newFakeClusterInstalls(c, namespace)
 }
 
 func (c *HiveV1Client) HiveConfigs() HiveConfigInterface {

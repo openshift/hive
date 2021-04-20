@@ -425,6 +425,7 @@ const (
 	ControlPlaneCertsControllerName    ControllerName = "controlPlaneCerts"
 	DNSEndpointControllerName          ControllerName = "dnsendpoint"
 	DNSZoneControllerName              ControllerName = "dnszone"
+	FakeClusterInstallControllerName   ControllerName = "fakeclusterinstall"
 	HibernationControllerName          ControllerName = "hibernation"
 	RemoteIngressControllerName        ControllerName = "remoteingress"
 	RemoteMachinesetControllerName     ControllerName = "remotemachineset"

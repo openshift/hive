@@ -38,6 +38,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=hive.openshift.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("agentclusterinstalls"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().AgentClusterInstalls().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("checkpoints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().Checkpoints().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterclaims"):
@@ -58,6 +60,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().ClusterStates().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("dnszones"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().DNSZones().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("fakeclusterinstalls"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().FakeClusterInstalls().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("hiveconfigs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().HiveConfigs().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("machinepools"):
